@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.16.3" },
+  "records": [
+    {
+      "subject": "codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "version:0.16.3;marketplace:spec-guard-marketplace;source:yizhongkaimail-collab/spec-guard-plugin@v0.16.3"
+      },
+      "observedAt": "2026-09-16T14:57:15Z",
+      "evidence": [
+        "command:codex plugin marketplace add https://github.com/yizhongkaimail-collab/spec-guard-plugin.git --ref v0.16.3 --json",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.3",
+        "result:codex plugin list reports spec-guard@spec-guard-marketplace 0.16.3 installed and enabled"
+      ]
+    },
+    {
+      "subject": "codex-cli-host",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:01a0aab8-4be9-7f32-99d0-26495e4b6c21"
+      },
+      "observedAt": "2026-09-16T14:57:15Z",
+      "evidence": [
+        "command:codex exec --sandbox read-only --cd <configured-temporary-git-project> 'use spec-guard:source-command-phase'",
+        "result:SessionStart and UserPromptSubmit hooks completed; the migrated source-command-phase resolved v0.16.3 and returned SPECED"
+      ]
+    }
+  ]
+}
