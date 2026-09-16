@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-16
+
+### 新增
+
+- **主链 Proposal 评审。** Proposal v2 将文档内容绑定 revision，并由远端
+  policy、当前 worktree Git 拓扑、受限本地观察和显式人工裁决共同限制
+  accepted-candidate。普通提出支路只能发布和读取，不能自行接受。
+- **晋级前后证明。** revision-bound attestation 与 accepted Issue 阶段共同
+  作为 fresh preflight 前提；promotion proof 额外验证首次能力图插入、模块
+  Spec、Plan 与严格文件 allowlist。
+- **显式只读命令。** 新增 mainline candidates、mainline review 与 promotion
+  preflight 入口；它们不创建或修改 tracker、分支、能力图或任务。
+
+### 迁移
+
+- 已发布 v1 Proposal 保留可读，但不能接受或晋级；仍相关的需求须由人工发布为
+  v2 revision，并走主链评审流程。
+
 ## [0.15.1] - 2026-09-16
 
 ### 修复
