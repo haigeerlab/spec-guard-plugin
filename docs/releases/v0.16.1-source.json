@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.16.1" },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:b3551df"
+      },
+      "observedAt": "2026-09-16T09:40:01Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "result:mainline local-observation whitelist and related-module validation regressions passed"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "not-verified",
+      "target": {
+        "kind": "package",
+        "id": "version:0.16.1"
+      },
+      "reason": "release artifact is not built or installed yet"
+    }
+  ],
+  "journeys": [
+    {
+      "id": "proposal-v2-github-e2e",
+      "kind": "github-project",
+      "confirmation": "required",
+      "status": "not-verified",
+      "target": {
+        "kind": "tracker-project",
+        "id": "requires-approved-isolated-project"
+      },
+      "expectedSideEffects": [
+        "human-created Proposal Issue, attestation, promotion branch and merge"
+      ],
+      "reason": "requires a separately approved isolated GitHub target"
+    }
+  ]
+}
