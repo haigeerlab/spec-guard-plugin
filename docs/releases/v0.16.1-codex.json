@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.16.1"
+  },
+  "records": [
+    {
+      "subject": "codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "version:0.16.1;marketplace:spec-guard-marketplace;source:haigeer-labs/spec-guard-plugin@v0.16.1"
+      },
+      "observedAt": "2026-09-16T09:45:20Z",
+      "evidence": [
+        "command:codex plugin marketplace add https://github.com/haigeer-labs/spec-guard-plugin.git --ref v0.16.1 --json",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.1",
+        "result:codex plugin list reports spec-guard@spec-guard-marketplace 0.16.1 installed and enabled; marketplace snapshot at 54b47222d06b0feab113766fc92717da839df313"
+      ]
+    },
+    {
+      "subject": "codex-cli-host",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:01a0a99b-262e-7ee3-bfca-9265c4ec040e"
+      },
+      "observedAt": "2026-09-16T09:45:20Z",
+      "evidence": [
+        "command:codex exec --sandbox read-only --cd <temporary-git-project> 'use spec-guard:source-command-phase'",
+        "result:SessionStart and UserPromptSubmit completed; the installed phase skill returned IDLE"
+      ]
+    }
+  ]
+}
