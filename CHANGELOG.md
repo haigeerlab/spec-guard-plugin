@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-09-16
+
+### 迁移
+
+- **公开来源恢复。** 公开 marketplace、插件作者与主页迁回
+  `yizhongkaimail-collab/spec-guard-plugin`。这是在原公开来源不可访问后的连续性恢复，
+  不重写既有 Git 历史、Issue 或发布证据；已缓存的旧安装可继续运行，但后续更新需手动重加
+  marketplace 来源。
+
 ## [0.16.1] - 2026-09-16
 
 ### 修复

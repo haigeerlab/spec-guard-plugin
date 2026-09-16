@@ -13,7 +13,12 @@ It does not create or modify Issues, pull requests, merge requests, branches,
 tasks, remote refs, or Proposal lifecycle state.
 
 Install from the public marketplace with
-`/plugin marketplace add haigeer-labs/spec-guard-plugin`.
+`/plugin marketplace add yizhongkaimail-collab/spec-guard-plugin`.
+
+The public source was recovered to `yizhongkaimail-collab/spec-guard-plugin`
+in v0.16.2. Existing cached installs continue to run, but future marketplace
+updates require manually re-adding this source; see the
+[source-recovery migration note](docs/migrations/v0.16.2-source-recovery.md).
 
 ## Breaking migration after v0.14.0
 

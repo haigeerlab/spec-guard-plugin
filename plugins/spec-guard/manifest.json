@@ -1,10 +1,10 @@
 {
   "manifest_version": "0.2",
   "name": "spec-guard",
-  "version": "0.16.1",
+  "version": "0.16.2",
   "description": "Read-only Spec Guard phase, local verification, and Proposal review support for Claude Desktop.",
   "author": {
-    "name": "haigeer-labs"
+    "name": "yizhongkaimail-collab"
   },
   "server": {
     "type": "node",
