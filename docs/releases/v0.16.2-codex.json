@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.16.2" },
+  "records": [
+    {
+      "subject": "codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "version:0.16.2;marketplace:spec-guard-marketplace;source:yizhongkaimail-collab/spec-guard-plugin@v0.16.2"
+      },
+      "observedAt": "2026-09-16T14:38:40Z",
+      "evidence": [
+        "command:codex plugin marketplace add https://github.com/yizhongkaimail-collab/spec-guard-plugin.git --ref v0.16.2 --json",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.2",
+        "result:codex plugin list reports spec-guard@spec-guard-marketplace 0.16.2 installed and enabled; direct cached phase-guard read-only check exited 0"
+      ]
+    },
+    {
+      "subject": "codex-cli-host",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:01a0aaa6-94c9-7d73-9a48-ec4c49c20fbe"
+      },
+      "reason": "Session hooks completed, but the migrated source-command-phase skill could not locate its relative checkpoint reference before returning a phase result; do not treat this as host-command verification"
+    }
+  ]
+}
