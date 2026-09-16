@@ -3,12 +3,31 @@ description: 校验已落地的产物是否符合约定（spec 命名、plan 形
 allowed-tools: Bash
 ---
 
-阶段交接、确认或停止前，读取并遵循[共享检查点规则](../references/workflow-checkpoints.md)；按实际路径预告下一步，已有授权不重复询问。
+阶段交接、确认或停止前，读取并遵循 `spec-guard-ops` 的共享检查点规则；按实际路径预告下一步，已有授权不重复询问。
 
 跑一次产物落地校验：
 
 ```bash
-CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}" bash "${CLAUDE_PLUGIN_ROOT}/hooks/verify-artifacts.sh"
+ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+if [ -z "$ROOT" ] && command -v codex >/dev/null 2>&1; then
+  ROOT="$(codex plugin list --available --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    plugins = json.load(sys.stdin).get("installed", [])
+except (TypeError, ValueError):
+    plugins = []
+for plugin in plugins:
+    if plugin.get("name") == "spec-guard" and plugin.get("installed") and plugin.get("enabled"):
+        source = plugin.get("source")
+        path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(path, str) and path:
+            print(path)
+            break
+')"
+fi
+[ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
+PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/verify-artifacts.sh"
 ```
 
 脚本输出已经是给人看的格式，**原样转述**，然后：

@@ -7,10 +7,28 @@ allowed-tools: Bash, Read
 先运行只读审计；它只输出 JSON 报告，绝不修改账本、checkpoint 或当前 state：
 
 ```bash
+ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+if [ -z "$ROOT" ] && command -v codex >/dev/null 2>&1; then
+  ROOT="$(codex plugin list --available --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    plugins = json.load(sys.stdin).get("installed", [])
+except (TypeError, ValueError):
+    plugins = []
+for plugin in plugins:
+    if plugin.get("name") == "spec-guard" and plugin.get("installed") and plugin.get("enabled"):
+        source = plugin.get("source")
+        path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(path, str) and path:
+            print(path)
+            break
+')"
+fi
+[ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 LEDGER="$PROJECT/spec/CAPABILITY-HISTORY.json"
 [ -f "$LEDGER" ] || { echo "未验证：没有 capability history ledger"; exit 0; }
-python3 "${CLAUDE_PLUGIN_ROOT}/hooks/capability-history.py" audit "$LEDGER" "$PROJECT"
+python3 "$ROOT/hooks/capability-history.py" audit "$LEDGER" "$PROJECT"
 ```
 
 审计报告中的 `unknown` 不是失败时可以猜测补齐的值。它表示现有证据无法支撑历史主张；
@@ -26,8 +44,26 @@ audit finding 为 `corrected`。`<audit-report.json>` 和
 `null`）与 audit finding：
 
 ```bash
+ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
+if [ -z "$ROOT" ] && command -v codex >/dev/null 2>&1; then
+  ROOT="$(codex plugin list --available --json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    plugins = json.load(sys.stdin).get("installed", [])
+except (TypeError, ValueError):
+    plugins = []
+for plugin in plugins:
+    if plugin.get("name") == "spec-guard" and plugin.get("installed") and plugin.get("enabled"):
+        source = plugin.get("source")
+        path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(path, str) and path:
+            print(path)
+            break
+')"
+fi
+[ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-python3 "${CLAUDE_PLUGIN_ROOT}/hooks/capability-history.py" correct --confirm \
+python3 "$ROOT/hooks/capability-history.py" correct --confirm \
   "$PROJECT/spec/CAPABILITY-HISTORY.json" <audit-report.json> <correction.json>
 ```
 
