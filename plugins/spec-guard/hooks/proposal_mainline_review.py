@@ -17,6 +17,11 @@ HARD_CONFLICTS = frozenset((
     "public-contract-conflict",
     "anchor-conflict",
 ))
+OBSERVATION_KINDS = HARD_CONFLICTS | frozenset((
+    "unmerged-public-contract-change",
+    "dependency-suggestion",
+    "anchor-suggestion",
+))
 DECISIONS = {
     "accept": "accepted-candidate",
     "needs-revision": "needs-revision",
@@ -121,17 +126,27 @@ def _pool_contains_current_module(pool, context):
         return None
 
 
-def _observation_codes(observations):
+def _observation_codes(publication, context, observations):
     if not isinstance(observations, (tuple, list)):
         return None
+    proposal = getattr(publication, "proposal", None)
+    change = getattr(proposal, "change", None)
+    if change is None:
+        return None
+    related_module_ids = set((context["currentModuleId"], change.module_id))
+    related_module_ids.update(change.depends_on)
+    if change.anchor != "end":
+        related_module_ids.add(change.anchor[len("after:"):])
     codes = []
     for item in observations:
         if (not isinstance(item, dict) or set(item) - {"kind", "moduleIds"} or
                 not isinstance(item.get("kind"), str) or
+                item["kind"] not in OBSERVATION_KINDS or
                 not isinstance(item.get("moduleIds"), list) or
                 not item["moduleIds"] or
                 any(not isinstance(module_id, str) or not module_id
-                    for module_id in item["moduleIds"])):
+                    for module_id in item["moduleIds"]) or
+                any(module_id not in related_module_ids for module_id in item["moduleIds"])):
             return None
         codes.append(item["kind"])
     return tuple(sorted(set(codes)))
@@ -304,7 +319,7 @@ def evaluate(publication, tracker, platform, target, policy, context, decision, 
     facts = review(publication, tracker, platform, target)
     if facts.state not in ("awaiting-review", "in-review"):
         return _result(facts.state, publication, context, diagnostic=facts.diagnostic)
-    codes = _observation_codes(observations)
+    codes = _observation_codes(publication, context, observations)
     if codes is None:
         return _result("invalid", publication, context, diagnostic="local-observation-invalid")
     if any(code in HARD_CONFLICTS for code in codes):

@@ -25,7 +25,7 @@
 
 - 仅在显式 module-deliver 或 module-advance 且主链上下文有效时，枚举固定 snapshot 中 spec/proposals/ 下的 Proposal。候选按 proposal id 排序；候选数超过固定上限、snapshot 变化、解析失败或任一必需分页无法证实完整性时，返回 blocked 或 unknown，不能返回部分完整列表。
 - 可评审候选必须同时是 v2 published Publication、verified TrackerRead，且阶段为 proposal-stage:published 或 proposal-stage:in-review。发现不自动产生接受结论。
-- local observation 是本地主链评审输入，不是共享事实。每条只能含固定 kind、关联 module ids 和受限的 proposal anchor/dependency 指示；不接受代码片段、路径、Issue/评论正文、token、自由文本或其他 worktree 身份。
+- local observation 是本地主链评审输入，不是共享事实。每条只能含固定 kind（package-boundary-conflict、public-contract-conflict、anchor-conflict、unmerged-public-contract-change、dependency-suggestion 或 anchor-suggestion）和关联 module ids；module id 只能是当前模块、Proposal 自身、其声明的依赖或锚点。不接受代码片段、路径、Issue/评论正文、token、自由文本或其他 worktree 身份。
 - 硬冲突 kind（package-boundary-conflict、public-contract-conflict、anchor-conflict）强制输出 needs-revision。其他架构或优先级判断须由显式 decision 决定，绝不从发布状态或边界自动推断。
 
 ### Human decision and acceptance attestation

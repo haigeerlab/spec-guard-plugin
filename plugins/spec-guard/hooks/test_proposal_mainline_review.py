@@ -80,6 +80,21 @@ class ProposalMainlineReviewTests(unittest.TestCase):
                           POLICY, CONTEXT, "accept", (observation,))
         self.assertEqual(result.state, "needs-revision")
 
+    def test_local_observations_reject_free_text_kinds_and_unrelated_module_ids(self):
+        free_text = {"kind": "read this uncommitted code", "moduleIds": ["alpha"]}
+        unrelated = {"kind": "anchor-conflict", "moduleIds": ["unrelated"]}
+        for observation in (free_text, unrelated):
+            result = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                              POLICY, CONTEXT, "accept", (observation,))
+            self.assertEqual(result.state, "invalid")
+
+    def test_bounded_anchor_suggestion_remains_a_nonshared_review_input(self):
+        observation = {"kind": "anchor-suggestion", "moduleIds": ["alpha", "gamma"]}
+        result = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                          POLICY, CONTEXT, "accept", (observation,))
+        self.assertEqual((result.state, result.reason_codes),
+                         ("accepted-candidate", ("anchor-suggestion",)))
+
     def test_only_mainline_module_boundaries_discover_sorted_candidates(self):
         pool = PublicationPool("published", review_commit="a" * 40,
                                publications=(publication(),), review_map=MAP)
