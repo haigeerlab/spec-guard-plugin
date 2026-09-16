@@ -19,3 +19,7 @@ Proposal 入口：`intake`、`review`、`promotion-proof`。其他工作事件�
 
 `as_json(guidance)` 只提供状态、原始 boundary 和稳定 entry id，不包含需求、Proposal、
 能力图、Issue/评论、URL、token、临时路径或异常详情。
+
+调用方明确声明 mainline 时，同一边界额外提示 mainline-candidates、
+mainline-review 和 promotion-preflight。声明只影响提示，不能取代后续
+mainline policy、Git 拓扑与远端 snapshot 的实际核验。

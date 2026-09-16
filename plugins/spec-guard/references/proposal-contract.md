@@ -72,6 +72,24 @@ marker 必须完整地单独占一行，文档中恰好一次。fenced code bloc
 `proposal-stage:promoted`。标签是唯一可变阶段事实；不要将其复制到 Proposal 文档或
 `.agent/state.json`。
 
+## Proposal v2 revision
+
+新 Proposal 使用完整 v2 marker：
+
+~~~markdown
+<!-- spec-guard-proposal:v2 id=<proposal-id> revision=sha256:<64-hex> -->
+~~~
+
+revision 是规范化文档内容的 SHA-256。计算时 marker 的 revision 值以 64 个零替换；
+因此修改文档内容却不更新 marker 会被拒绝。v2 在 Summary 后增加 Integration intent
+字段表：Problem、In scope、Out of scope、Safety boundaries、Initial dependency
+assumptions、Acceptance intent。
+
+v1 Proposal 继续可读，不会被自动重写或删除；它不能进入新的主链接受或 promotion
+流程，直到作者发布有新 revision 的 v2 文档。v2 Issue 必须匹配完整 marker，不能复用
+同一 id 的旧 revision。阶段还允许 proposal-stage:needs-revision 和
+proposal-stage:deferred。
+
 ## Minimal example
 
 ```markdown

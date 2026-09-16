@@ -1,10 +1,12 @@
 """Proposal contract tests: explicit facts only, with no Git or tracker writes."""
 import importlib.util
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
 
-from proposal_contract import ContractError, parse_proposal, validate_proposal, validate_tracker
+from proposal_contract import (ContractError, compute_revision, parse_proposal,
+                               validate_proposal, validate_tracker)
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -94,6 +96,31 @@ class ProposalContractTests(unittest.TestCase):
         ]
         return "\n".join(lines)
 
+    def v2_proposal(self):
+        placeholder = "0" * 64
+        text = self.proposal().replace(
+            "<!-- spec-guard-proposal:v1 id=gamma -->",
+            "<!-- spec-guard-proposal:v2 id=gamma revision=sha256:%s -->" % placeholder,
+            1).replace(
+                "Gamma is a separate capability.\n\n## Capability map baseline",
+                """Gamma is a separate capability.
+
+## Integration intent
+
+| Field | Value |
+| --- | --- |
+| Problem | Gamma is missing. |
+| In scope | Add the Gamma module. |
+| Out of scope | Change Alpha. |
+| Safety boundaries | Do not expose secrets. |
+| Initial dependency assumptions | Alpha remains the only dependency. |
+| Acceptance intent | Gamma has a reviewed module spec and plan. |
+
+## Capability map baseline""",
+                1)
+        revision = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        return text.replace(placeholder, revision, 1)
+
     def test_valid_proposal_matches_explicit_capability_map_baseline(self):
         proposal = self.write_proposal(self.proposal())
         parsed = validate_proposal(proposal, self.map_path)
@@ -168,6 +195,34 @@ class ProposalContractTests(unittest.TestCase):
         before = (proposal.read_bytes(), self.map_path.read_bytes())
         validate_proposal(proposal, self.map_path)
         self.assertEqual(before, (proposal.read_bytes(), self.map_path.read_bytes()))
+
+    def test_v2_binds_the_proposal_contents_to_a_revision_marker(self):
+        proposal = self.write_proposal(self.v2_proposal())
+        parsed = validate_proposal(proposal, self.map_path)
+        self.assertEqual(parsed.version, "v2")
+        self.assertEqual(parsed.revision, compute_revision(proposal))
+        self.assertTrue(parsed.marker.endswith(" -->"))
+
+        changed = self.write_proposal(self.v2_proposal().replace(
+            "Gamma is missing.", "Gamma is materially different.", 1))
+        with self.assertRaisesRegex(ContractError, "revision"):
+            validate_proposal(changed, self.map_path)
+
+    def test_v2_issue_identity_and_new_decision_stages_are_revision_bound(self):
+        proposal = parse_proposal(self.write_proposal(self.v2_proposal()))
+        validate_tracker(proposal, proposal.marker,
+                         ["proposal", "proposal-stage:needs-revision"])
+        validate_tracker(proposal, proposal.marker,
+                         ["proposal", "proposal-stage:deferred"])
+
+        old_marker = "<!-- spec-guard-proposal:v1 id=gamma -->"
+        with self.assertRaisesRegex(ContractError, "marker"):
+            validate_tracker(proposal, old_marker,
+                             ["proposal", "proposal-stage:accepted"])
+
+    def test_v1_remains_parseable_without_a_revision(self):
+        proposal = parse_proposal(self.write_proposal(self.proposal()))
+        self.assertEqual((proposal.version, proposal.revision), ("v1", None))
 
 
 if __name__ == "__main__":

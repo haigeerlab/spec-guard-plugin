@@ -7,10 +7,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from proposal_contract import compute
-from proposal_publication import read_published
-from proposal_promotion_proof import as_json, prove
-from proposal_review import Review, review
+from proposal_contract import compute, compute_revision
+from proposal_publication import Publication, read_published
+from proposal_promotion_proof import as_json, preflight, prove
+from proposal_mainline_review import accepted, policy_digest
+from proposal_review import Review
 from proposal_tracker_read import TrackerRead
 
 
@@ -43,6 +44,8 @@ PROMOTION_MAP = BASE_MAP.replace(
 class PromotionFixture(unittest.TestCase):
     promotion_map = PROMOTION_MAP
     merge_promotion = False
+    include_artifacts = True
+    include_extra_file = False
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-promotion-proof-")
@@ -67,16 +70,27 @@ class PromotionFixture(unittest.TestCase):
         self.git(self.seed, "push", "origin", "trunk")
         self.git(self.root, "clone", str(self.remote), str(self.consumer))
         self.publication = read_published(self.consumer, "gamma")
-        self.accepted = review(
+        self.policy = {
+            "authorityId": "mainline", "remote": "origin",
+            "reviewRef": "refs/heads/integration/mainline",
+            "workflowId": "capability-map-integration",
+        }
+        evidence = {
+            "schemaVersion": 1, "proposalId": "gamma",
+            "revision": self.publication.proposal.revision,
+            "reviewCommit": self.publication.review_commit,
+            "policyDigest": policy_digest(self.policy),
+            "authorityId": "mainline", "decision": "accept",
+        }
+        self.accepted = accepted(
             self.publication,
             TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
                         proposal_id="gamma", platform="github", target="octo/spec-guard"),
-            "github", "octo/spec-guard")
+            "github", "octo/spec-guard", self.policy, evidence)
         self.assertEqual(self.accepted.state, "accepted")
         if self.merge_promotion:
             self.git(self.seed, "checkout", "-b", "proposal-gamma")
-            (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.promotion_map, encoding="utf-8")
-            self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
+            self.write_promotion_artifacts()
             self.git(self.seed, "commit", "-m", "prepare gamma")
             self.feature_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
             self.git(self.seed, "checkout", "trunk")
@@ -85,9 +99,7 @@ class PromotionFixture(unittest.TestCase):
             self.git(self.seed, "commit", "-m", "mainline change")
             self.git(self.seed, "merge", "--no-ff", "proposal-gamma", "-m", "merge gamma")
         else:
-            (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.promotion_map,
-                                                               encoding="utf-8")
-            self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
+            self.write_promotion_artifacts()
             self.git(self.seed, "commit", "-m", "promote gamma")
         self.promotion_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.git(self.seed, "push", "origin", "trunk")
@@ -103,11 +115,22 @@ class PromotionFixture(unittest.TestCase):
         rows = "\n".join("| %s | %s |" % (item["id"], item["rowDigest"])
                          for item in digest["rows"])
         text = """# Proposal: Add gamma
-<!-- spec-guard-proposal:v1 id=gamma -->
+<!-- spec-guard-proposal:v2 id=gamma revision=sha256:%s -->
 
 ## Summary
 
 Gamma is separate.
+
+## Integration intent
+
+| Field | Value |
+| --- | --- |
+| Problem | Gamma is absent. |
+| In scope | Gamma module. |
+| Out of scope | Existing modules. |
+| Safety boundaries | No automatic writes. |
+| Initial dependency assumptions | alpha is stable. |
+| Acceptance intent | Verify gamma. |
 
 ## Capability map baseline
 
@@ -143,9 +166,27 @@ Gamma is separate.
 | Proposal id | gamma |
 | Identity label | proposal |
 | Stage label namespace | proposal-stage: |
-""" % (self.baseline, digest["goalDigest"], rows)
+""" % ("0" * 64, self.baseline, digest["goalDigest"], rows)
         (self.seed / "spec/proposals").mkdir()
-        (self.seed / "spec/proposals/gamma.md").write_text(text, encoding="utf-8")
+        path = self.seed / "spec/proposals/gamma.md"
+        path.write_text(text, encoding="utf-8")
+        path.write_text(text.replace("0" * 64, compute_revision(path)), encoding="utf-8")
+
+    def write_promotion_artifacts(self):
+        (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.promotion_map,
+                                                           encoding="utf-8")
+        if self.include_artifacts:
+            (self.seed / "spec/gamma.md").write_text("# Spec: gamma\n", encoding="utf-8")
+            (self.seed / "tasks/gamma").mkdir(parents=True)
+            (self.seed / "tasks/gamma/plan.md").write_text("# Plan: gamma\n", encoding="utf-8")
+        if self.include_extra_file:
+            (self.seed / "README.md").write_text("unrelated\n", encoding="utf-8")
+        paths = ["spec/CAPABILITY-MAP.md"]
+        if self.include_artifacts:
+            paths.extend(("spec/gamma.md", "tasks/gamma/plan.md"))
+        if self.include_extra_file:
+            paths.append("README.md")
+        self.git(self.seed, "add", *paths)
 
 class PromotionProofStateTests(PromotionFixture):
     def test_nonaccepted_invalid_and_unknown_reviews_stop_before_remote_access(self):
@@ -210,6 +251,70 @@ class MergePromotionProofRemoteTests(PromotionFixture):
         self.assertEqual(result.state, "proved")
         self.assertEqual(result.promotion_commit, self.promotion_commit)
         self.assertNotEqual(result.promotion_commit, self.feature_commit)
+
+
+class MissingPromotionArtifactTests(PromotionFixture):
+    include_artifacts = False
+
+    def test_missing_module_spec_or_plan_is_invalid(self):
+        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+
+
+class ExtraPromotionFileTests(PromotionFixture):
+    include_extra_file = True
+
+    def test_promotion_commit_cannot_carry_unrelated_files(self):
+        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+
+
+class PromotionPreflightTests(PromotionFixture):
+    def test_preflight_requires_fresh_pool_attestation_and_issue(self):
+        from proposal_publication import PublicationPool
+        from unittest.mock import patch
+        remote_policy = dict(self.policy, schemaVersion=1)
+        evidence = {
+            "schemaVersion": 1, "proposalId": "gamma",
+            "revision": self.publication.proposal.revision,
+            "reviewCommit": self.publication.review_commit,
+            "policyDigest": policy_digest(remote_policy),
+            "authorityId": "mainline", "decision": "accept",
+        }
+        pool = PublicationPool("published", review_commit=self.publication.review_commit,
+                               publications=(self.publication,), review_map=PROMOTION_MAP,
+                               policy_text=__import__("json").dumps(remote_policy),
+                               attestation_texts={"gamma": __import__("json").dumps(evidence)})
+        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
+                              proposal_id="gamma", platform="github", target="octo/spec-guard")
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                               tracker_reader=lambda *ignored: tracker)
+        self.assertEqual((result.state, result.base_commit), ("ready", pool.review_commit))
+
+    def test_stale_remote_review_never_returns_a_promotion_base(self):
+        from proposal_publication import PublicationPool
+        remote_policy = dict(self.policy, schemaVersion=1)
+        evidence = {
+            "schemaVersion": 1, "proposalId": "gamma",
+            "revision": self.publication.proposal.revision,
+            "reviewCommit": self.publication.review_commit,
+            "policyDigest": policy_digest(remote_policy),
+            "authorityId": "mainline", "decision": "accept",
+        }
+        stale_publication = Publication(
+            "published", review_commit=self.publication.review_commit,
+            proposal=self.publication.proposal, baseline_map=self.publication.baseline_map,
+            review_map=PROMOTION_MAP)
+        pool = PublicationPool(
+            "published", review_commit=self.publication.review_commit,
+            publications=(stale_publication,), review_map=PROMOTION_MAP,
+            policy_text=json.dumps(remote_policy),
+            attestation_texts={"gamma": json.dumps(evidence)})
+        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
+                              proposal_id="gamma", platform="github", target="octo/spec-guard")
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                               tracker_reader=lambda *ignored: tracker)
+        self.assertEqual((result.state, result.base_commit), ("stale", None))
 
 
 if __name__ == "__main__":

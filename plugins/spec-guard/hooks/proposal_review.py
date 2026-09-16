@@ -11,6 +11,8 @@ STAGES = {
     "proposal-stage:published": "awaiting-review",
     "proposal-stage:in-review": "in-review",
     "proposal-stage:accepted": "accepted",
+    "proposal-stage:needs-revision": "needs-revision",
+    "proposal-stage:deferred": "deferred",
     "proposal-stage:rejected": "rejected",
     "proposal-stage:promoted": "promoted-claim",
 }
@@ -18,7 +20,7 @@ STAGES = {
 
 class Review(object):
     def __init__(self, state, review_commit=None, proposal_id=None, platform=None, target=None,
-                 issue_id=None, stage=None, diagnostic=None):
+                 issue_id=None, stage=None, revision=None, diagnostic=None):
         self.state = state
         self.review_commit = review_commit
         self.proposal_id = proposal_id
@@ -26,6 +28,7 @@ class Review(object):
         self.target = target
         self.issue_id = issue_id
         self.stage = stage
+        self.revision = revision
         self.diagnostic = diagnostic
 
 
@@ -35,7 +38,7 @@ def as_json(result):
     for key, value in (("reviewCommit", result.review_commit),
                        ("proposalId", result.proposal_id), ("platform", result.platform),
                        ("target", result.target), ("issueId", result.issue_id),
-                       ("stage", result.stage)):
+                       ("stage", result.stage), ("revision", result.revision)):
         if value is not None:
             data[key] = value
     if result.state in ("invalid", "unknown"):
@@ -97,17 +100,20 @@ def review(publication, tracker, platform, target):
                 for module_id, row_digest in expected_rows.items())):
         return Review("stale", review_commit=review_commit, proposal_id=proposal.proposal_id,
                       platform=platform, target=target, issue_id=tracker.issue_id,
-                      stage=tracker.stage, diagnostic="proposal-baseline-drifted")
+                      stage=tracker.stage, revision=getattr(proposal, "revision", None),
+                      diagnostic="proposal-baseline-drifted")
     if proposal.change.module_id in review_map.order:
         return Review("stale", review_commit=review_commit, proposal_id=proposal.proposal_id,
                       platform=platform, target=target, issue_id=tracker.issue_id,
-                      stage=tracker.stage, diagnostic="proposal-module-already-present")
+                      stage=tracker.stage, revision=getattr(proposal, "revision", None),
+                      diagnostic="proposal-module-already-present")
     positions = dict((module_id, index) for index, module_id in enumerate(review_map.order))
     dependencies = proposal.change.depends_on
     if any(dependency not in positions for dependency in dependencies):
         return Review("stale", review_commit=review_commit, proposal_id=proposal.proposal_id,
                       platform=platform, target=target, issue_id=tracker.issue_id,
-                      stage=tracker.stage, diagnostic="proposal-dependency-missing")
+                      stage=tracker.stage, revision=getattr(proposal, "revision", None),
+                      diagnostic="proposal-dependency-missing")
     anchor = proposal.change.anchor
     if anchor != "end":
         anchor_id = anchor[len("after:"):]
@@ -115,10 +121,11 @@ def review(publication, tracker, platform, target):
                 any(positions[dependency] > positions[anchor_id] for dependency in dependencies)):
             return Review("stale", review_commit=review_commit, proposal_id=proposal.proposal_id,
                           platform=platform, target=target, issue_id=tracker.issue_id,
-                          stage=tracker.stage, diagnostic="proposal-anchor-drifted")
+                          stage=tracker.stage, revision=getattr(proposal, "revision", None),
+                          diagnostic="proposal-anchor-drifted")
     state = STAGES.get(tracker.stage)
     if state is None:
         return _blocked("invalid")
     return Review(state, review_commit=review_commit, proposal_id=proposal.proposal_id,
                   platform=platform, target=target, issue_id=tracker.issue_id,
-                  stage=tracker.stage)
+                  stage=tracker.stage, revision=getattr(proposal, "revision", None))

@@ -9,6 +9,9 @@ from capability_map import MapError, parse_map
 from proposal_contract import ContractError, PROPOSAL_ID, parse_proposal, validate_proposal
 
 
+MAX_POOL_SIZE = 100
+
+
 class Publication(object):
     def __init__(self, state, review_commit=None, proposal=None, baseline_map=None,
                  review_map=None, diagnostic=None):
@@ -17,6 +20,18 @@ class Publication(object):
         self.proposal = proposal
         self.baseline_map = baseline_map
         self.review_map = review_map
+        self.diagnostic = diagnostic
+
+
+class PublicationPool(object):
+    def __init__(self, state, review_commit=None, publications=(), review_map=None,
+                 policy_text=None, attestation_texts=None, diagnostic=None):
+        self.state = state
+        self.review_commit = review_commit
+        self.publications = tuple(publications)
+        self.review_map = review_map
+        self.policy_text = policy_text
+        self.attestation_texts = dict(attestation_texts or {})
         self.diagnostic = diagnostic
 
 
@@ -114,6 +129,82 @@ def read_published(project, proposal_id, remote="origin"):
             return Publication("invalid", review_commit=observed_commit, diagnostic=str(error))
         return Publication("published", review_commit=observed_commit, proposal=proposal,
                            baseline_map=baseline_map, review_map=review_map)
+
+
+def read_published_pool(project, remote="origin"):
+    """Read every Proposal from one remote-default snapshot, never a worktree."""
+    project = Path(project)
+    url = _remote(project, remote)
+    observed = _head(url) if url else None
+    if not observed:
+        return PublicationPool("unknown", diagnostic="remote default branch is unavailable")
+    branch, observed_commit = observed
+    with tempfile.TemporaryDirectory(prefix="sg-proposal-publication-") as temp:
+        repo = Path(temp) / "snapshot.git"
+        if not _run(["git", "init", "--bare", str(repo)]):
+            return PublicationPool("unknown", diagnostic="temporary Git snapshot failed")
+        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
+                        "refs/heads/%s" % branch])
+        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
+        if not fetched or not tip or tip.stdout.strip() != observed_commit:
+            return PublicationPool("unknown", diagnostic="remote default branch moved or fetch failed")
+        listed = _run(["git", "-C", str(repo), "ls-tree", "-r", "--name-only",
+                       observed_commit, "spec/proposals"])
+        review_map = _show(repo, observed_commit, "spec/CAPABILITY-MAP.md")
+        if not listed or review_map is None:
+            return PublicationPool("invalid", review_commit=observed_commit,
+                                   diagnostic="review capability map is missing")
+        try:
+            review_path = Path(temp) / "review-map.md"
+            review_path.write_text(review_map, encoding="utf-8")
+            parse_map(review_path)
+        except (MapError, OSError, UnicodeError):
+            return PublicationPool("invalid", review_commit=observed_commit,
+                                   diagnostic="review capability map is invalid")
+        publications = []
+        proposal_ids = set()
+        policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
+        attestation_texts = {}
+        prefix = "spec/proposals/"
+        paths = sorted(line for line in listed.stdout.splitlines()
+                       if line.startswith(prefix) and line.endswith(".md"))
+        if len(paths) > MAX_POOL_SIZE:
+            return PublicationPool("unknown", review_commit=observed_commit,
+                                   diagnostic="proposal pool exceeds the fixed limit")
+        for path in paths:
+            proposal_path = Path(temp) / "proposal.md"
+            proposal_path.write_text(_show(repo, observed_commit, path), encoding="utf-8")
+            try:
+                proposal = parse_proposal(proposal_path)
+                if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
+                    raise ContractError("Proposal baseline remote or default branch differs")
+                ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
+                                 proposal.baseline.commit, observed_commit])
+                baseline_map = _show(repo, proposal.baseline.commit, "spec/CAPABILITY-MAP.md")
+                if not ancestor or baseline_map is None:
+                    raise ContractError("Proposal baseline commit is not on remote default branch")
+                baseline_path = Path(temp) / "baseline-map.md"
+                baseline_path.write_text(baseline_map, encoding="utf-8")
+                validate_proposal(proposal_path, baseline_path)
+            except (ContractError, OSError, UnicodeError) as error:
+                return PublicationPool("invalid", review_commit=observed_commit, diagnostic=str(error))
+            if proposal.proposal_id in proposal_ids:
+                return PublicationPool("invalid", review_commit=observed_commit,
+                                       diagnostic="proposal pool contains a duplicate id")
+            proposal_ids.add(proposal.proposal_id)
+            publications.append(Publication("published", review_commit=observed_commit,
+                                            proposal=proposal, baseline_map=baseline_map,
+                                            review_map=review_map))
+            if proposal.version == "v2":
+                attestation_path = "spec/proposal-acceptances/%s-%s.json" % (
+                    proposal.proposal_id, proposal.revision)
+                text = _show(repo, observed_commit, attestation_path)
+                if text is not None:
+                    attestation_texts[proposal.proposal_id] = text
+        return PublicationPool("published", review_commit=observed_commit,
+                               publications=publications, review_map=review_map,
+                               policy_text=policy_text,
+                               attestation_texts=attestation_texts)
 
 
 def main(argv=None):

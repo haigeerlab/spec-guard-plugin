@@ -2,9 +2,10 @@
 
 spec-guard protects two deliberately separate workflows:
 
-- Proposal lifecycle: a read-only review path that fixes shared facts to the
-  remote default branch and reads GitHub/GitLab Proposal Issues only through
-  explicit, read-only adapters.
+- Proposal lifecycle: a revision-bound, read-only path that fixes shared facts
+  to the remote default branch and reads GitHub/GitLab Proposal Issues only
+  through explicit adapters. Only a policy-defined mainline may produce an
+  accepted candidate; Issue stages remain human-written facts.
 - Local multi-spec convention: a small directory convention for capability
   maps, module specs, plans, and local task lists.
 
@@ -43,6 +44,18 @@ tasks/<module-id>/todo.md
 ```
 
 The local state file is never a Proposal requirement or candidate pool.
+
+## Proposal mainline review
+
+Proposal authors publish v2 documents to the remote default branch. At an
+explicit mainline module boundary, the plugin reads the fixed remote Proposal
+pool, policy and Issue facts, then returns candidate or human-decision results.
+It never accepts automatically. Before a human creates a promotion branch,
+preflight requires a fresh accepted Issue and matching immutable attestation;
+post-merge proof verifies the declared capability-map insertion plus module Spec
+and Plan. Existing v1 published Proposals remain readable but must be republished
+as v2 before acceptance or promotion. See the
+[migration guide](docs/migrations/proposal-mainline-review-v2.md).
 
 <!-- SYNC:claude-block-local BEGIN -->
 ````markdown

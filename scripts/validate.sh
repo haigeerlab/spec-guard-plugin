@@ -79,6 +79,7 @@ python3 -B plugins/spec-guard/hooks/test_proposal_contract.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_publication.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py || F=1
+python3 -B plugins/spec-guard/hooks/test_proposal_mainline_review.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_promotion_proof.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_boundary_guidance.py || F=1
 /bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh || F=1

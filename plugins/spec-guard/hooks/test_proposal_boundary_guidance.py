@@ -18,6 +18,12 @@ class ProposalBoundaryGuidanceTests(unittest.TestCase):
         self.assertEqual((result.state, result.boundary, result.entries),
                          ("not-applicable", "task-progress", ()))
 
+    def test_mainline_declaration_only_adds_entry_hints_at_real_boundaries(self):
+        result = guide("module-deliver", mainline_declared=True)
+        self.assertEqual(result.entries[-3:], (
+            "mainline-candidates", "mainline-review", "promotion-preflight"))
+        self.assertEqual(guide("task-progress", mainline_declared=True).entries, ())
+
     def test_empty_or_nonstring_boundary_is_invalid(self):
         for boundary in ("", None, 7):
             result = guide(boundary)

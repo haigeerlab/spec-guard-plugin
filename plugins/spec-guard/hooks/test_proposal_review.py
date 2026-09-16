@@ -142,6 +142,19 @@ class ProposalReviewFixtures(unittest.TestCase):
         self.assertEqual(review(published(), wrong, "github", "octo/spec-guard").state,
                          "invalid")
 
+    def test_review_keeps_a_v2_proposal_revision_in_its_safe_output(self):
+        item = proposal()
+        item.version = "v2"
+        item.revision = "b" * 64
+        publication = Publication("published", review_commit="a" * 40, proposal=item,
+                                  baseline_map=BASE_MAP, review_map=REVIEW_MAP)
+
+        result = review(publication, verified("proposal-stage:published"),
+                        "github", "octo/spec-guard")
+
+        self.assertEqual(result.revision, "b" * 64)
+        self.assertEqual(as_json(result)["revision"], "b" * 64)
+
 
 if __name__ == "__main__":
     unittest.main()

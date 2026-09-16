@@ -60,6 +60,26 @@ v1 中 `Change` 段只允许下面的字段：
 - Issue 标签必须恰好有一个身份标签 `proposal`，并恰好有一个阶段标签：`proposal-stage:draft`、`proposal-stage:published`、`proposal-stage:in-review`、`proposal-stage:accepted`、`proposal-stage:rejected` 或 `proposal-stage:promoted`。
 - 阶段标签是唯一的可变阶段事实；Proposal 文档不镜像当前阶段，`.agent/state.json` 也不记录候选池。任何标签或 Issue 的创建、修改与阶段转换都由人或后续明确授权的流程完成，不由本能力自动执行。
 
+### Proposal v2 revision and intent
+
+新写 Proposal 必须使用 v2 marker：
+
+~~~html
+<!-- spec-guard-proposal:v2 id=<proposal-id> revision=sha256:<64-hex> -->
+~~~
+
+revision 是文档 UTF-8 内容在统一 LF 后的 SHA-256；计算时只将 marker 内 revision
+值替换为 64 个零。任何内容修改都会改变 revision。v2 比 v1 多一个严格的
+Integration intent 顶级段，字段恰好为 Problem、In scope、Out of scope、Safety
+boundaries、Initial dependency assumptions 和 Acceptance intent。
+
+v1 文档继续可读，且既有 Issue 不会被改写；但后续主链评审必须将其标为
+legacy-revision-required，不能把它作为新的 accepted 或 promotion 输入。
+
+v2 Issue 必须含完整 v2 marker，因此同一 proposal id 的不同 revision 不能复用
+旧 Issue 身份或旧接受结论。允许阶段增加 proposal-stage:needs-revision 与
+proposal-stage:deferred；阶段标签仍是唯一可变阶段事实。
+
 ## Result model
 
 本模块的解析与校验入口只处理本地给定的 Markdown、已固定的能力图内容和显式 tracker 响应；不执行网络写入。结果为：

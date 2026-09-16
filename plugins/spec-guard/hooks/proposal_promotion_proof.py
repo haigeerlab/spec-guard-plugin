@@ -1,10 +1,15 @@
 """Read-only remote-default proof that a Proposal module was promoted."""
+import argparse
+import json
 import subprocess
 import tempfile
 from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
+from proposal_mainline_review import accepted_from_pool
+from proposal_publication import read_published_pool
+from proposal_tracker_read import read_tracker
 
 
 class Proof(object):
@@ -16,6 +21,27 @@ class Proof(object):
         self.module_id = module_id
         self.promotion_commit = promotion_commit
         self.diagnostic = diagnostic
+
+
+class Preflight(object):
+    def __init__(self, state, proposal_id=None, revision=None, base_commit=None,
+                 diagnostic=None):
+        self.state = state
+        self.proposal_id = proposal_id
+        self.revision = revision
+        self.base_commit = base_commit
+        self.diagnostic = diagnostic
+
+
+def preflight_as_json(result):
+    data = {"state": result.state}
+    for key, value in (("proposalId", result.proposal_id), ("revision", result.revision),
+                       ("baseCommit", result.base_commit)):
+        if value is not None:
+            data[key] = value
+    if result.state != "ready":
+        data["diagnostic"] = "promotion-preflight-%s" % result.state
+    return data
 
 
 def as_json(result):
@@ -104,8 +130,43 @@ def _first_parent(repo, commit):
     return fields[1] if len(fields) >= 2 and fields[0] == commit else "invalid"
 
 
+def _promotion_paths(repo, parent, commit):
+    result = _run(["git", "-C", str(repo), "diff-tree", "--no-commit-id",
+                   "--name-only", "-r", parent, commit])
+    return set(result.stdout.splitlines()) if result else None
+
+
+def _has_module_artifacts(repo, commit, proposal):
+    module_id = proposal.change.module_id
+    spec = _show(repo, commit, "spec/%s.md" % module_id)
+    plan = _show(repo, commit, "tasks/%s/plan.md" % module_id)
+    return (isinstance(spec, str) and spec.startswith("# Spec: %s" % module_id) and
+            isinstance(plan, str) and plan.startswith("# Plan:"))
+
+
 def _blocked(state):
     return Proof(state, diagnostic="promotion-input-%s" % state)
+
+
+def preflight(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
+    """Freshly require remote policy, Issue and attestation before branch creation."""
+    pool = read_published_pool(project, remote)
+    if getattr(pool, "state", None) != "published":
+        return Preflight(getattr(pool, "state", "unknown"), diagnostic="pool-unavailable")
+    publication = next((item for item in pool.publications
+                        if item.proposal.proposal_id == proposal_id), None)
+    if publication is None:
+        return Preflight("absent")
+    reader = read_tracker if tracker_reader is None else tracker_reader
+    tracker = reader(publication.proposal, platform, target)
+    acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
+    if acceptance.state != "accepted":
+        return Preflight(acceptance.state, proposal_id=proposal_id,
+                         revision=getattr(publication.proposal, "revision", None),
+                         diagnostic=acceptance.diagnostic)
+    return Preflight("ready", proposal_id=proposal_id,
+                     revision=publication.proposal.revision,
+                     base_commit=pool.review_commit)
 
 
 def prove(project, publication, review_result, remote="origin"):
@@ -124,8 +185,12 @@ def prove(project, publication, review_result, remote="origin"):
     review_commit = getattr(publication, "review_commit", None)
     if (proposal is None or not isinstance(review_commit, str) or
             not COMMIT.fullmatch(review_commit) or
+            getattr(proposal, "version", None) != "v2" or
+            not isinstance(getattr(proposal, "revision", None), str) or
             getattr(review_result, "review_commit", None) != review_commit or
-            getattr(review_result, "proposal_id", None) != proposal.proposal_id):
+            getattr(review_result, "proposal_id", None) != proposal.proposal_id or
+            getattr(review_result, "revision", None) != proposal.revision or
+            not isinstance(getattr(review_result, "authority_id", None), str)):
         return _blocked("invalid")
     url = _remote(project, remote)
     observed = _head(url) if url else None
@@ -163,8 +228,37 @@ def prove(project, publication, review_result, remote="origin"):
             parent_map = _map(repo, parent, temp)
             if parent_map == "invalid":
                 return _blocked("invalid")
-            if proposal.change.module_id in parent_map.order or not _matches(proposal, capability_map):
+            allowed_paths = {
+                "spec/CAPABILITY-MAP.md",
+                "spec/%s.md" % proposal.change.module_id,
+                "tasks/%s/plan.md" % proposal.change.module_id,
+            }
+            paths = _promotion_paths(repo, parent, commit)
+            if (proposal.change.module_id in parent_map.order or
+                    not _matches(proposal, capability_map) or
+                    paths is None or not allowed_paths.issubset(paths) or
+                    not paths.issubset(allowed_paths) or
+                    not _has_module_artifacts(repo, commit, proposal)):
                 return _blocked("invalid")
             return Proof("proved", review_commit=review_commit, proposal_id=proposal.proposal_id,
                          module_id=proposal.change.module_id, promotion_commit=commit)
     return _blocked("invalid")
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Read-only Proposal promotion preflight.")
+    parser.add_argument("--project", default=".")
+    parser.add_argument("--proposal-id", required=True)
+    parser.add_argument("--platform", choices=("github", "gitlab"), required=True)
+    parser.add_argument("--target", required=True)
+    parser.add_argument("--remote", default="origin")
+    args = parser.parse_args(argv)
+    target = int(args.target) if args.platform == "gitlab" and args.target.isdigit() else args.target
+    print(json.dumps(preflight_as_json(preflight(
+        args.project, args.proposal_id, args.platform, target, args.remote)),
+        ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

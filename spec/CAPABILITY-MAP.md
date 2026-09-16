@@ -2,7 +2,7 @@
 
 ## 目标
 
-让正在实现既有模块的任务能够把新发现的、独立的需求分流到独立设计任务；该需求在合并到远端默认分支后成为可评审 Proposal，并在合适的模块边界被明确评审、再安全晋级到能力图。
+让正在实现既有模块的任务能够把新发现的、独立的需求分流到独立设计任务；该需求在合并到远端默认分支后成为可评审 Proposal，并只能由具备可验证主链上下文、明确人工裁决和远端授权证据的流程安全晋级到能力图。
 
 这套能力只负责 Proposal、能力图与晋级证据，不调用、不依赖 `spec-github-bridge`，也不接管 Task、分支、PR 或交付流程。`spec-github-bridge` 的退役是后续独立迁移。
 
@@ -10,14 +10,15 @@
 
 | Module id | Responsibility | Depends on |
 |---|---|---|
-| proposal-contract | 定义并严格校验 Proposal 文档、唯一 Issue marker、阶段标签、能力图基准摘要和受支持变更类型。 | — |
-| proposal-publication | 只从远端默认分支读取已发布 Proposal，固定评审 commit，并拒绝把其他 worktree 的本地文件当作共享事实。 | proposal-contract |
-| proposal-tracker-read | 用最小的 GitHub/GitLab 只读适配器核验普通 Proposal Issue 的唯一 marker 与唯一阶段，不使用旧 bridge。 | proposal-contract |
-| proposal-review | 汇总发布、tracker 与当前能力图事实，给出 ready、stale、blocked 或 unknown 的只读评审结论。 | proposal-publication, proposal-tracker-read |
-| proposal-promotion-proof | 对已接受的 new-module Proposal 核验能力图修订已合并、模块/锚点/依赖/构建顺序均已兑现。 | proposal-review |
-| proposal-boundary-guidance | 提供 intake/review/晋级核验入口，并仅在模块交付或推进边界给出非阻断的需求池评审提醒。 | proposal-review |
+| proposal-contract | 定义并严格校验 Proposal v1/v2 文档、内容绑定 revision、阶段标签、能力图基准摘要和受支持变更类型。 | — |
+| proposal-publication | 只从远端默认分支的固定快照读取一个已发布 Proposal 或候选池，拒绝把其他 worktree 的本地文件当作共享事实。 | proposal-contract |
+| proposal-tracker-read | 用最小的 GitHub/GitLab 只读适配器核验普通 Proposal Issue 的唯一 revision marker 与唯一阶段，不使用旧 bridge。 | proposal-contract |
+| proposal-review | 汇总发布、tracker 与当前能力图事实，给出与人工授权分离的 freshness/stale/blocked/unknown 结果。 | proposal-publication, proposal-tracker-read |
+| proposal-mainline-review | 验证唯一主链上下文和远端 acceptance attestation，接收受限本地观察并输出人工主链裁决。 | proposal-review |
+| proposal-promotion-proof | 对已接受、已预检的 new-module Proposal 核验严格 promotion diff、首次纳入和必要 Spec/Plan。 | proposal-mainline-review |
+| proposal-boundary-guidance | 提供 intake/review/主链评审/晋级核验入口，并仅在模块交付或推进边界给出非阻断提醒。 | proposal-mainline-review, proposal-promotion-proof |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-promotion-proof → proposal-boundary-guidance
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance
 
 ---
 

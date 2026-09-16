@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from proposal_publication import as_json, read_published
+from proposal_publication import as_json, read_published, read_published_pool
 
 
 HOOKS = Path(__file__).parent
@@ -45,7 +45,10 @@ class ProposalPublicationTests(unittest.TestCase):
         self.git(self.seed, "config", "user.name", "test")
         (self.seed / "spec").mkdir()
         (self.seed / "spec/CAPABILITY-MAP.md").write_text(MAP, encoding="utf-8")
-        self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
+        (self.seed / "spec/proposal-mainline-policy.json").write_text(
+            '{"authorityId":"mainline","remote":"origin","reviewRef":"refs/heads/integration/mainline","schemaVersion":1,"workflowId":"capability-map-integration"}',
+            encoding="utf-8")
+        self.git(self.seed, "add", "spec/CAPABILITY-MAP.md", "spec/proposal-mainline-policy.json")
         self.git(self.seed, "commit", "-m", "baseline")
         self.baseline = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.write_proposal(remote="origin")
@@ -154,6 +157,31 @@ Gamma is separate.
             result = read_published(self.consumer, "gamma")
         self.assertEqual(result.state, "unknown")
         self.assertIsNone(result.review_commit)
+
+    def test_pool_reads_only_published_remote_proposals_from_one_snapshot(self):
+        dirty = self.consumer / "spec/proposals/local-only.md"
+        dirty.parent.mkdir(exist_ok=True)
+        dirty.write_text("not a published Proposal", encoding="utf-8")
+        local_policy = self.consumer / "spec/proposal-mainline-policy.json"
+        local_policy.write_text("not a remote policy", encoding="utf-8")
+
+        pool = read_published_pool(self.consumer)
+
+        self.assertEqual(pool.state, "published")
+        self.assertEqual(pool.review_commit, read_published(self.consumer, "gamma").review_commit)
+        self.assertEqual([item.proposal.proposal_id for item in pool.publications], ["gamma"])
+        self.assertEqual(dirty.read_text(encoding="utf-8"), "not a published Proposal")
+        self.assertIn('"schemaVersion":1', pool.policy_text)
+        self.assertEqual(local_policy.read_text(encoding="utf-8"), "not a remote policy")
+
+    def test_pool_rejects_two_remote_files_with_the_same_proposal_identity(self):
+        duplicate = self.seed / "spec/proposals/duplicate.md"
+        duplicate.write_text((self.seed / "spec/proposals/gamma.md").read_text(encoding="utf-8"),
+                             encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposals/duplicate.md")
+        self.git(self.seed, "commit", "-m", "duplicate proposal identity")
+        self.git(self.seed, "push", "origin", "trunk")
+        self.assertEqual(read_published_pool(self.consumer).state, "invalid")
 
 
 if __name__ == "__main__":

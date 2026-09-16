@@ -6,8 +6,8 @@
 
 ## Contract
 
-- 输入为一次新的 `proposal-review` 结果及其 Publication；只接受 `accepted`，并重新从远端默认分支固定 promotion commit，不能信任本地 checkout、缓存或 `promoted-claim` 标签。
-- 在远端默认分支的 first-parent 历史中，promotion commit 是首次含该 module 的 commit；其 map 中 Proposal module id 必须恰好一次，责任、依赖和 Build order 位置必须与 `new-module` 声明一致；其 first parent 不得已包含该 id。任一条件失败为 `invalid`，远端/父提交无法安全读取为 `unknown`。
+- 输入为一次新的 mainline `accepted` 结果及其 Publication；该结果必须已由 accepted Issue 阶段、v2 revision 与匹配 immutable acceptance attestation 共同证明。proof 不接受仅来自 `proposal-review` 的 accepted 标签，也不能信任本地 checkout、缓存或 `promoted-claim` 标签。
+- 在远端默认分支的 first-parent 历史中，promotion commit 是首次含该 module 的 commit；其 map 中 Proposal module id 必须恰好一次，责任、依赖和 Build order 位置必须与 `new-module` 声明一致；其 first parent 不得已包含该 id。commit diff 只能包含 capability map、该 module Spec 与该 module Plan，且两份产物必须存在。任一条件失败为 `invalid`，远端/父提交无法安全读取为 `unknown`。
 - 输出 `proved` 时包含 proposal id、review commit、promotion commit 与 module id；绝不把 `proved` 写回 tracker，且 `promoted-claim` 不是输入替代品。
 
 ## Commands

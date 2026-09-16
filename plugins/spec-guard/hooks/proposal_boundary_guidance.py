@@ -3,6 +3,8 @@
 
 REMINDER_BOUNDARIES = frozenset(("module-deliver", "module-advance"))
 ENTRIES = ("intake", "review", "promotion-proof")
+MAINLINE_ENTRIES = ENTRIES + ("mainline-candidates", "mainline-review",
+                              "promotion-preflight")
 
 
 class Guidance(object):
@@ -22,10 +24,11 @@ def as_json(result):
     return data
 
 
-def guide(boundary):
+def guide(boundary, mainline_declared=False):
     """Return a non-blocking reminder only at an explicit module boundary."""
     if not isinstance(boundary, str) or not boundary:
         return Guidance("invalid")
     if boundary in REMINDER_BOUNDARIES:
-        return Guidance("reminder", boundary, ENTRIES)
+        entries = MAINLINE_ENTRIES if mainline_declared is True else ENTRIES
+        return Guidance("reminder", boundary, entries)
     return Guidance("not-applicable", boundary)

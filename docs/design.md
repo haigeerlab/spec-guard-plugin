@@ -11,10 +11,17 @@ spec-guard adds two independent safeguards around agent-skills:
 
 ## Proposal boundary
 
-Proposal is a six-module capability map.  It has no dependency on local state,
-task selection, branch binding, or a mutable tracker.  The tracker adapters
-are read-only and only recover a normal Proposal Issue by its full identity
-marker in an explicitly supplied container.
+Proposal is a seven-module capability map. Proposal v2 binds its published
+contents to a revision digest. A normal author branch can publish and read a
+Proposal, but only the policy-defined mainline may evaluate it at an explicit
+module boundary. Mainline identity is Git topology plus protected remote policy,
+not a person or agent name. Acceptance additionally requires a revision-bound
+immutable attestation and a separately human-written Issue stage.
+
+The tracker adapters are read-only and only recover a normal Proposal Issue by
+its complete identity marker in an explicitly supplied container. A preflight
+and post-merge proof are read-only; neither can create the promotion branch,
+modify the capability map, or write tracker state.
 
 ## Local boundary
 

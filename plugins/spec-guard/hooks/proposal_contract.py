@@ -1,4 +1,5 @@
 """Strict, read-only Proposal contract validation."""
+import hashlib
 import importlib.util
 import re
 from pathlib import Path
@@ -16,7 +17,10 @@ compute = _digest_module.compute
 PROPOSAL_ID = re.compile(r"^[a-z][a-z0-9-]{2,62}$")
 COMMIT = re.compile(r"^[0-9a-f]{40,64}$")
 DIGEST = re.compile(r"^[0-9a-f]{12}$")
-MARKER = re.compile(r"^<!-- spec-guard-proposal:v1 id=([a-z][a-z0-9-]{2,62}) -->$")
+V1_MARKER = re.compile(r"^<!-- spec-guard-proposal:v1 id=([a-z][a-z0-9-]{2,62}) -->$")
+V2_MARKER = re.compile(
+    r"^<!-- spec-guard-proposal:v2 id=([a-z][a-z0-9-]{2,62}) "
+    r"revision=sha256:([0-9a-f]{64}) -->$")
 HEADING = re.compile(r"^##\s+(.+?)\s*$")
 BUILD_ORDER = re.compile(r"^Build order:\s*(.+?)\s*$", re.IGNORECASE)
 ALLOWED_STAGES = frozenset((
@@ -24,6 +28,8 @@ ALLOWED_STAGES = frozenset((
     "proposal-stage:published",
     "proposal-stage:in-review",
     "proposal-stage:accepted",
+    "proposal-stage:needs-revision",
+    "proposal-stage:deferred",
     "proposal-stage:rejected",
     "proposal-stage:promoted",
 ))
@@ -53,11 +59,13 @@ class Change(object):
 
 
 class Proposal(object):
-    def __init__(self, proposal_id, marker, baseline, change):
+    def __init__(self, proposal_id, marker, baseline, change, version="v1", revision=None):
         self.proposal_id = proposal_id
         self.marker = marker
         self.baseline = baseline
         self.change = change
+        self.version = version
+        self.revision = revision
 
 
 def _cells(line):
@@ -70,17 +78,21 @@ def _cells(line):
     return [cell.strip() for cell in line.split("|")]
 
 
-def _read_visible(path, label):
+def _read_text(path, label):
     path = Path(path)
     if path.is_symlink() or not path.is_file():
         raise ContractError("%s must be a regular file" % label)
     try:
-        return _visible_lines(path.read_text(encoding="utf-8").splitlines())
+        return path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
         raise ContractError("cannot read %s: %s" % (label, error))
 
 
-def _sections(lines):
+def _read_visible(path, label):
+    return _visible_lines(_read_text(path, label).splitlines())
+
+
+def _sections(lines, expected):
     sections = []
     current = None
     for line in lines:
@@ -93,7 +105,6 @@ def _sections(lines):
             current[1].append(line)
     if current is not None:
         sections.append(current)
-    expected = ["Summary", "Capability map baseline", "Change", "Tracker contract"]
     names = [name for name, _ in sections]
     if names != expected:
         raise ContractError("Proposal must contain exactly these top-level sections in order: %s" %
@@ -175,14 +186,30 @@ def _marker(lines):
     malformed = False
     for line in lines:
         stripped = line.strip()
-        match = MARKER.fullmatch(stripped)
-        if match:
-            markers.append(match)
+        match_v1 = V1_MARKER.fullmatch(stripped)
+        match_v2 = V2_MARKER.fullmatch(stripped)
+        if match_v1:
+            markers.append((match_v1.group(1), stripped, "v1", None))
+        elif match_v2:
+            markers.append((match_v2.group(1), stripped, "v2", match_v2.group(2)))
         elif stripped.startswith("<!-- spec-guard-proposal:"):
             malformed = True
     if malformed or len(markers) != 1:
         raise ContractError("Proposal must contain exactly one complete identity marker")
-    return markers[0].group(1), markers[0].group(0)
+    return markers[0]
+
+
+def compute_revision(path):
+    """Return a v2 digest with its self-referential marker blanked."""
+    text = _read_text(path, "Proposal").replace("\r\n", "\n").replace("\r", "\n")
+    matches = [V2_MARKER.fullmatch(line) for line in text.splitlines()]
+    matches = [match for match in matches if match]
+    if len(matches) != 1:
+        raise ContractError("Proposal v2 must contain exactly one complete revision marker")
+    revision = matches[0].group(2)
+    marker = matches[0].group(0)
+    blanked = marker.replace(revision, "0" * 64)
+    return hashlib.sha256(text.replace(marker, blanked, 1).encode("utf-8")).hexdigest()
 
 
 def _build_order(path):
@@ -201,11 +228,22 @@ def parse_proposal(path):
     lines = _read_visible(path, "Proposal")
     if not lines or not re.fullmatch(r"# Proposal: \S(?:.*\S)?", lines[0].strip()):
         raise ContractError("Proposal title must be the first non-fenced line")
-    proposal_id, marker = _marker(lines)
-    sections = _sections(lines)
+    proposal_id, marker, version, revision = _marker(lines)
+    expected = ["Summary", "Capability map baseline", "Change", "Tracker contract"]
+    if version == "v2":
+        expected.insert(1, "Integration intent")
+    sections = _sections(lines, expected)
     if not any(line.strip() and not line.lstrip().startswith("|")
                for line in sections["Summary"]):
         raise ContractError("Summary must be non-empty")
+    if version == "v2":
+        _field_table(
+            sections["Integration intent"],
+            ("Problem", "In scope", "Out of scope", "Safety boundaries",
+             "Initial dependency assumptions", "Acceptance intent"),
+            "Integration intent")
+        if revision != compute_revision(path):
+            raise ContractError("Proposal revision does not match its contents")
 
     baseline_fields = _field_table(
         sections["Capability map baseline"],
@@ -248,7 +286,7 @@ def parse_proposal(path):
         baseline_fields["Commit"], baseline_fields["Goal digest"].strip("`"),
         _module_digests(sections["Capability map baseline"]),
         baseline_fields["Build order"]), Change(module_id, change_fields["Responsibility"],
-                                                   dependencies, anchor))
+                                                   dependencies, anchor), version, revision)
 
 
 def validate_proposal(path, map_path):
