@@ -280,7 +280,7 @@ class PromotionPreflightTests(PromotionFixture):
             "authorityId": "mainline", "decision": "accept",
         }
         pool = PublicationPool("published", review_commit=self.publication.review_commit,
-                               publications=(self.publication,), review_map=PROMOTION_MAP,
+                               publications=(self.publication,), review_map=self.publication.review_map,
                                policy_text=__import__("json").dumps(remote_policy),
                                attestation_texts={"gamma": __import__("json").dumps(evidence)})
         tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",

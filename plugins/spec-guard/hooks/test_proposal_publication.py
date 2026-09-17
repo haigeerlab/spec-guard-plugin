@@ -280,8 +280,9 @@ Gamma is separate.
         self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
         self.git(self.seed, "commit", "-m", "drift capability map")
         self.git(self.seed, "push", "origin", "trunk")
-        self.assertNotEqual(read_published(self.consumer, "gamma").review_commit,
-                            reviewed.review_commit)
+        drifted = read_published_pool(self.consumer)
+        self.assertEqual(drifted.publications[0].review_commit, reviewed.review_commit)
+        self.assertNotEqual(drifted.publications[0].review_map, drifted.review_map)
 
 
 if __name__ == "__main__":

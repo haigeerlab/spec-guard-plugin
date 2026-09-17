@@ -82,8 +82,7 @@ def _show(repo, commit, path):
     return result.stdout if result else None
 
 
-def _attested_review_commit(repo, observed_commit, proposal, proposal_text, review_map,
-                             policy_text):
+def _attested_review_commit(repo, observed_commit, proposal, proposal_text, policy_text):
     """Keep a v2 attestation's prior snapshot only while all reviewed facts match."""
     if getattr(proposal, "version", None) != "v2":
         return observed_commit
@@ -100,7 +99,6 @@ def _attested_review_commit(repo, observed_commit, proposal, proposal_text, revi
                      review_commit, observed_commit])
     paths = (
         ("spec/proposals/%s.md" % proposal.proposal_id, proposal_text),
-        ("spec/CAPABILITY-MAP.md", review_map),
         ("spec/proposal-mainline-policy.json", policy_text),
     )
     if not ancestor or any(_show(repo, review_commit, path) != text for path, text in paths):
@@ -155,7 +153,10 @@ def read_published(project, proposal_id, remote="origin"):
             return Publication("invalid", review_commit=observed_commit, diagnostic=str(error))
         policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
         review_commit = _attested_review_commit(repo, observed_commit, proposal, proposal_text,
-                                                review_map, policy_text)
+                                                policy_text)
+        review_map = _show(repo, review_commit, "spec/CAPABILITY-MAP.md")
+        if review_map is None:
+            return Publication("unknown", diagnostic="attested review map is unavailable")
         return Publication("published", review_commit=review_commit, proposal=proposal,
                            baseline_map=baseline_map, review_map=review_map)
 
@@ -223,10 +224,14 @@ def read_published_pool(project, remote="origin"):
                                        diagnostic="proposal pool contains a duplicate id")
             proposal_ids.add(proposal.proposal_id)
             review_commit = _attested_review_commit(repo, observed_commit, proposal,
-                                                     proposal_text, review_map, policy_text)
+                                                     proposal_text, policy_text)
+            publication_map = _show(repo, review_commit, "spec/CAPABILITY-MAP.md")
+            if publication_map is None:
+                return PublicationPool("unknown", review_commit=observed_commit,
+                                       diagnostic="attested review map is unavailable")
             publications.append(Publication("published", review_commit=review_commit,
                                             proposal=proposal, baseline_map=baseline_map,
-                                            review_map=review_map))
+                                            review_map=publication_map))
             if proposal.version == "v2":
                 attestation_path = "spec/proposal-acceptances/%s-%s.json" % (
                     proposal.proposal_id, proposal.revision)

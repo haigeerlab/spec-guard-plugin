@@ -157,6 +157,9 @@ def preflight(project, proposal_id, platform, target, remote="origin", tracker_r
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:
         return Preflight("absent")
+    if publication.review_map != pool.review_map:
+        return Preflight("stale", proposal_id=proposal_id,
+                         revision=getattr(publication.proposal, "revision", None))
     reader = read_tracker if tracker_reader is None else tracker_reader
     tracker = reader(publication.proposal, platform, target)
     acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
