@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.16.5] - 2026-09-17
+
+### 修复
+
+- **Proposal 接受证明可落地。** acceptance attestation 现在绑定其写入前的已评审
+  远端快照，而 promotion base 仍取最新远端 main；仅当 Proposal、能力图和主链策略
+  自该快照起完全未漂移时才认定该证明有效。此前 attestation 必须引用包含自身的 Git
+  提交，形成不可满足的自指哈希约束。
+
 ## [0.16.4] - 2026-09-17
 
 ### 修复

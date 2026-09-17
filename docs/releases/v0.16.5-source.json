@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.16.5" },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:1b0d68f8727bf50e531efe0dfa1b01516efe78be"
+      },
+      "observedAt": "2026-09-17T07:47:12Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:PYTHONPATH=plugins/spec-guard/hooks python3 -B plugins/spec-guard/hooks/test_proposal_publication.py",
+        "result:the v2 acceptance-sidecar regression passed: a pre-acceptance review snapshot remains valid only while Proposal, capability map and policy bytes remain identical"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "not-verified",
+      "target": {
+        "kind": "package",
+        "id": "version:0.16.5"
+      },
+      "reason": "release artifact is not built or installed yet"
+    }
+  ]
+}
