@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from proposal_contract import ContractError, PROPOSAL_ID, parse_proposal, validate_proposal
+from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal, validate_proposal
 
 
 MAX_POOL_SIZE = 100
@@ -82,6 +82,32 @@ def _show(repo, commit, path):
     return result.stdout if result else None
 
 
+def _attested_review_commit(repo, observed_commit, proposal, proposal_text, review_map,
+                             policy_text):
+    """Keep a v2 attestation's prior snapshot only while all reviewed facts match."""
+    if getattr(proposal, "version", None) != "v2":
+        return observed_commit
+    attestation_path = "spec/proposal-acceptances/%s-%s.json" % (
+        proposal.proposal_id, proposal.revision)
+    try:
+        attestation = json.loads(_show(repo, observed_commit, attestation_path))
+    except (TypeError, ValueError):
+        return observed_commit
+    review_commit = attestation.get("reviewCommit") if isinstance(attestation, dict) else None
+    if not isinstance(review_commit, str) or not COMMIT.fullmatch(review_commit):
+        return observed_commit
+    ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
+                     review_commit, observed_commit])
+    paths = (
+        ("spec/proposals/%s.md" % proposal.proposal_id, proposal_text),
+        ("spec/CAPABILITY-MAP.md", review_map),
+        ("spec/proposal-mainline-policy.json", policy_text),
+    )
+    if not ancestor or any(_show(repo, review_commit, path) != text for path, text in paths):
+        return observed_commit
+    return review_commit
+
+
 def read_published(project, proposal_id, remote="origin"):
     """Return only remote-default facts; never read consumer proposal/map files."""
     if not isinstance(proposal_id, str) or not PROPOSAL_ID.fullmatch(proposal_id):
@@ -127,7 +153,10 @@ def read_published(project, proposal_id, remote="origin"):
             parse_map(review_path)
         except (ContractError, MapError, OSError, UnicodeError) as error:
             return Publication("invalid", review_commit=observed_commit, diagnostic=str(error))
-        return Publication("published", review_commit=observed_commit, proposal=proposal,
+        policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
+        review_commit = _attested_review_commit(repo, observed_commit, proposal, proposal_text,
+                                                review_map, policy_text)
+        return Publication("published", review_commit=review_commit, proposal=proposal,
                            baseline_map=baseline_map, review_map=review_map)
 
 
@@ -173,7 +202,8 @@ def read_published_pool(project, remote="origin"):
                                    diagnostic="proposal pool exceeds the fixed limit")
         for path in paths:
             proposal_path = Path(temp) / "proposal.md"
-            proposal_path.write_text(_show(repo, observed_commit, path), encoding="utf-8")
+            proposal_text = _show(repo, observed_commit, path)
+            proposal_path.write_text(proposal_text, encoding="utf-8")
             try:
                 proposal = parse_proposal(proposal_path)
                 if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
@@ -192,7 +222,9 @@ def read_published_pool(project, remote="origin"):
                 return PublicationPool("invalid", review_commit=observed_commit,
                                        diagnostic="proposal pool contains a duplicate id")
             proposal_ids.add(proposal.proposal_id)
-            publications.append(Publication("published", review_commit=observed_commit,
+            review_commit = _attested_review_commit(repo, observed_commit, proposal,
+                                                     proposal_text, review_map, policy_text)
+            publications.append(Publication("published", review_commit=review_commit,
                                             proposal=proposal, baseline_map=baseline_map,
                                             review_map=review_map))
             if proposal.version == "v2":
