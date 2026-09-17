@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.16.6] - 2026-09-17
+
+### 修复
+
+- **Promotion 后证明。** post-merge proof 改用 acceptance attestation 绑定的历史
+  review snapshot 验证首次能力图插入；preflight 仍要求 promotion 前的当前能力图与
+  该 snapshot 完全相同。此前 promotion 本身会被错误当作 acceptance stale。
+
 ## [0.16.5] - 2026-09-17
 
 ### 修复
