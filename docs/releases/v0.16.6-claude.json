@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.16.6" },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "marketplace:spec-guard-marketplace;source:yizhongkaimail-collab/spec-guard-plugin@v0.16.6"
+      },
+      "observedAt": "2026-09-17T08:07:00Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user -y --json",
+        "command:claude plugin details spec-guard@spec-guard-marketplace",
+        "command:claude -p --permission-mode dontAsk -- 'Reply with exactly: HOST_OK'",
+        "result:a new Claude CLI session returned HOST_OK; its installed v0.16.6 plugin inventory contains 12 skills and one UserPromptSubmit hook"
+      ]
+    }
+  ]
+}
