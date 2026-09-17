@@ -9,6 +9,11 @@ spec-guard protects two deliberately separate workflows:
 - Local multi-spec convention: a small directory convention for capability
   maps, module specs, plans, and local task lists.
 
+It also provides an optional, same-Mac collaboration mailbox for Claude Code
+and Codex sessions. It is a published Proposal candidate, not an accepted
+Capability Map module: it does not change the Proposal lifecycle or automate
+Git, Issue, Ticket, project grouping, or task assignment.
+
 It does not create or modify Issues, pull requests, merge requests, branches,
 tasks, remote refs, or Proposal lifecycle state.
 
@@ -49,6 +54,26 @@ tasks/<module-id>/todo.md
 ```
 
 The local state file is never a Proposal requirement or candidate pool.
+
+## Local agent collaboration
+
+The optional collaboration runtime lets Claude Code and Codex sessions on the
+same Mac exchange durable free-text technical messages without manually
+relaying them. Each session supplies only its own display context (for example,
+name, project path, role, and current work); Spec Guard does not infer project
+relationships or route messages automatically.
+
+Start with `/spec-guard:collaboration` to inspect the local state. Initialization,
+background service enablement, host configuration, and stale-agent removal all
+require an explicit user request. The runtime is loopback-only and keeps its
+token in `~/.spec-guard/collaboration/`, not in project files or MCP
+configuration. See the [runtime reference](plugins/spec-guard/references/collaboration-runtime.md)
+for the explicit setup sequence.
+
+Native Codex Desktop uses persistent mailbox delivery only; it does not enable
+managed app-server wake mode, so ChatGPT in Chrome remains available. The
+candidate still requires independent Proposal review before it can enter the
+Capability Map.
 
 ## Proposal mainline review
 
