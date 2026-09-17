@@ -160,36 +160,22 @@ def _json(raw):
         return None
 
 
-def _github_page(proposal, target, runner):
+def _github_page(target, runner):
+    response = _json(runner([
+        "gh", "issue", "list", "--repo", target, "--state", "all",
+        "--limit", str(PAGE_SIZE * MAX_PAGES), "--json", "number,body,labels",
+    ]))
+    if (not isinstance(response, list) or
+            len(response) >= PAGE_SIZE * MAX_PAGES):
+        return None
     issues = []
-    total = None
-    for page_number in range(1, MAX_PAGES + 1):
-        query = urlencode({
-            "q": "repo:%s is:issue %s" % (target, proposal.marker),
-            "per_page": str(PAGE_SIZE),
-            "page": str(page_number),
-        })
-        response = _json(runner(["gh", "api", "search/issues?%s" % query]))
-        if (not isinstance(response, dict) or
-                not isinstance(response.get("total_count"), int) or
-                response["total_count"] < 0 or
-                response.get("incomplete_results") is not False or
-                not isinstance(response.get("items"), list)):
-            return None
-        if total is None:
-            total = response["total_count"]
-            if total > PAGE_SIZE * MAX_PAGES:
-                return None
-        elif response["total_count"] != total:
-            return None
-        items = response["items"]
-        remaining = total - len(issues)
-        if len(items) != min(PAGE_SIZE, remaining):
-            return None
-        issues.extend(items)
-        if len(issues) == total:
-            return {"complete": True, "issues": issues}
-    return None
+    for issue in response:
+        if not isinstance(issue, dict) or "pull_request" in issue:
+            continue
+        issue = dict(issue)
+        issue["repository"] = {"full_name": target}
+        issues.append(issue)
+    return {"complete": True, "issues": issues}
 
 
 def _gitlab_page(proposal, target, runner):
@@ -208,12 +194,12 @@ def _gitlab_page(proposal, target, runner):
 
 
 def read_tracker(proposal, platform, target, runner=None):
-    """Read a complete candidate set through GitHub/GitLab GET-only CLI calls."""
+    """Read a complete candidate set through GitHub/GitLab read-only CLI calls."""
     runner = _run if runner is None else runner
     if not callable(runner):
         return _unknown("tracker runner is unavailable")
     if platform == "github":
-        page = _github_page(proposal, target, runner)
+        page = _github_page(target, runner)
     elif platform == "gitlab":
         page = _gitlab_page(proposal, target, runner)
     else:

@@ -120,23 +120,27 @@ class ProposalTrackerTransportTests(unittest.TestCase):
 
         return run, calls
 
-    def test_github_reads_every_known_search_page_using_get_argv(self):
-        first_page = [github_issue(number=index, body="plain text")
-                      for index in range(1, 101)]
+    def test_github_reads_complete_repository_issue_set_using_read_only_argv(self):
+        issues = [github_issue(number=index, body="plain text")
+                  for index in range(1, 101)]
+        pull_request = github_issue(number=102)
+        pull_request["pull_request"] = {"url": "https://api.github.com/repos/octo/spec-guard/pulls/102"}
         runner, calls = self.runner(
-            json.dumps({"total_count": 101, "incomplete_results": False,
-                        "items": first_page}),
-            json.dumps({"total_count": 101, "incomplete_results": False,
-                        "items": [github_issue(number=101)]}),
+            json.dumps(issues + [pull_request, github_issue(number=101)]),
         )
         result = read_tracker(proposal(), "github", "octo/spec-guard", runner=runner)
         self.assertEqual((result.state, result.issue_id), ("verified", 101))
-        self.assertEqual(len(calls), 2)
-        self.assertTrue(all(call[:2] == ["gh", "api"] for call in calls))
-        self.assertTrue(all(call[2].startswith("search/issues?") for call in calls))
-        self.assertTrue(all("is%3Aissue" in call[2] and "page=" in call[2]
-                            for call in calls))
-        self.assertTrue(all("-X" not in call and "--method" not in call for call in calls))
+        self.assertEqual(calls, [[
+            "gh", "issue", "list", "--repo", "octo/spec-guard", "--state", "all",
+            "--limit", "1000", "--json", "number,body,labels",
+        ]])
+
+    def test_github_result_at_the_read_limit_is_unknown(self):
+        runner, _ = self.runner(json.dumps([
+            github_issue(number=index, body="plain text") for index in range(1, 1001)
+        ]))
+        result = read_tracker(proposal(), "github", "octo/spec-guard", runner=runner)
+        self.assertEqual(result.state, "unknown")
 
     def test_gitlab_reads_until_a_short_page_using_get_argv(self):
         first_page = [gitlab_issue(iid=index, body="plain text")
