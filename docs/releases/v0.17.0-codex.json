@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.17.0" },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "not-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "marketplace:spec-guard-marketplace;version:0.17.0"
+      },
+      "reason": "Codex marketplace upgrade of the configured HTTPS source failed before installation because GitHub returned HTTP 403 for the suspended account"
+    }
+  ]
+}

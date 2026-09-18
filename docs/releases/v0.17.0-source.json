@@ -20,7 +20,7 @@
       "subject": "spec-guard-release-artifact",
       "status": "not-verified",
       "target": { "kind": "package", "id": "version:0.17.0" },
-      "reason": "release artifact has not been built or installed yet"
+      "reason": "GitHub Release asset creation was rejected with HTTP 403 because the account is suspended; a local tag-derived artifact is not public-release evidence"
     }
   ]
 }
