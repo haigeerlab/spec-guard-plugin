@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.17.0" },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6e8f44b92e892f061cc7362565c66aaca704886a"
+      },
+      "observedAt": "2026-09-18T01:26:47Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:python3 -B plugins/spec-guard/hooks/test_collaboration_runtime.py",
+        "result:private loopback runtime, Claude Code bridge, and native Codex Desktop mailbox exchange were verified without token material in host configuration"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "not-verified",
+      "target": { "kind": "package", "id": "version:0.17.0" },
+      "reason": "release artifact has not been built or installed yet"
+    }
+  ]
+}

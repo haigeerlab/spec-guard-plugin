@@ -1,8 +1,8 @@
 {
   "manifest_version": "0.2",
   "name": "spec-guard",
-  "version": "0.16.6",
-  "description": "Read-only Spec Guard phase, local verification, and Proposal review support for Claude Desktop.",
+  "version": "0.17.0",
+  "description": "Spec Guard phase, local verification, Proposal review, and optional same-Mac Agent collaboration for Claude Desktop.",
   "author": {
     "name": "yizhongkaimail-collab"
   },

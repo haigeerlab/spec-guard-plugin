@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-18
+
+### 新增
+
+- **本机 Agent 协作邮箱。** Claude Code 与原生 Codex Desktop 可在同一台 Mac 上通过私有、
+  loopback-only 的持久邮箱交换自由文本技术消息。会话只提供显示用自我介绍，不建立项目组、
+  自动路由或任务所有权；Git、Issue 与 Ticket 仍不受此能力写入。
+- **显式且无密钥的宿主接入。** 可选 LaunchAgent 维持固定版 XATS 运行时；Claude 的用户级
+  stdio bridge 与 Codex 的动态请求头 helper 都不把 bearer token 写入项目或宿主配置。原生
+  Codex Desktop 保持邮箱模式，因此 ChatGPT in Chrome 可继续使用。
+
 ## [0.16.6] - 2026-09-17
 
 ### 修复
