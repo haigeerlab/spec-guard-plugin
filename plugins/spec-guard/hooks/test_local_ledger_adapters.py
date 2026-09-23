@@ -1,8 +1,10 @@
 """Local-ledger Claude/Codex adapter tests; never alter real host configuration."""
 import json
+import io
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -51,6 +53,29 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertIn(local_ledger_adapters.MCP_SERVER_NAME, add_command)
         self.assertIn(str(self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"), add_command)
         self.assertNotIn("token", " ".join(add_command).lower())
+
+    def test_codex_cli_prints_a_fragment_without_modifying_configuration(self):
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "codex", "--runtime-dir", str(self.runtime_dir),
+            ]), 0)
+        self.assertIn("[mcp_servers.spec_guard_local_ledger]", output.getvalue())
+
+    def test_host_configuration_cli_requires_an_explicit_confirmation(self):
+        config = Path(self.tmp.name) / "codex" / "config.toml"
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "install-codex", "--runtime-dir", str(self.runtime_dir),
+                "--codex-config", str(config),
+            ]), 1)
+        self.assertFalse(config.exists())
+        self.assertIn("configuration-confirmation-required", output.getvalue())
 
 
 if __name__ == "__main__":
