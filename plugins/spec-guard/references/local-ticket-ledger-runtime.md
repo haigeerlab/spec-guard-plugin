@@ -101,6 +101,37 @@ Epiq 上游初始化尝试推送，不能表示远端操作已经成功；输出
 成功后 Epiq 会提交 `.epiq/project.json`、创建 `__epiq_state__` 状态分支，并在同一 macOS 用户的 linked
 worktree 间共享状态。它不会安装 Claude/Codex MCP 配置；那是独立的后续明确操作。
 
+## Explicit host MCP adapters
+
+安装 Epiq 或初始化项目都不会改变 Claude Code、Codex Desktop 或 ChatGPT in Chrome。先可只读地生成每个
+宿主的 stdio 配置片段：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" claude
+```
+
+它们都指向已验证的受管 `node` 和固定 `epiq` MCP 入口，不包含 token、HTTP 地址、账本内容或项目 secret。
+只有用户明确要求写入某一个宿主的用户级配置时，才可运行相应安装命令，而且仍必须带第二层
+`--confirm-install`：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-codex --confirm-install
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-install \
+  --claude-bin "$(command -v claude)"
+```
+
+Codex 安装只原子追加 `[mcp_servers.spec_guard_local_ledger]` 表；Claude 安装只通过
+`claude mcp add --scope user` 添加同名 stdio server。两者若发现同名条目都会拒绝覆盖，并且客户端重启后才会
+加载。Spec Guard 不使用 Codex managed app-server，因此不会影响 ChatGPT in Chrome。
+
+本阶段没有自动或手动的账本移除命令。不得把移除 MCP 配置理解为删除事项，也不得删除 `.epiq/`、
+`__epiq_state__` 或受管运行时来“重置”项目；这些路径可能承载其他 worktree 的持久记录，任何移除能力都必须
+另立可审查设计。
+
+接入后可以由 Agent 自由地做可读自我说明、查询已有事项，再记录 bug、需求、排查或完成结果。不是强制工作流；
+也不会自动分配、路由或要求任何状态。可选协作邮箱消息可以包含事项短编号，但消息投递与 Epiq 写入始终分离。
+
 ## Deliberate boundaries
 
 - 同一个 macOS 用户下，已初始化的同一 Git 仓库 linked worktree 能共享 Epiq 项目身份；独立机器不在本层范围。

@@ -29,6 +29,10 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertNotIn("token", fragment.lower())
         self.assertNotIn("http", fragment.lower())
 
+    def test_adapter_refuses_a_missing_runtime(self):
+        with self.assertRaisesRegex(ValueError, "not ready"):
+            local_ledger_adapters.mcp_command(Path(self.tmp.name) / "missing", "/opt/node")
+
     def test_codex_install_appends_atomically_and_refuses_a_conflict(self):
         config = Path(self.tmp.name) / "codex" / "config.toml"
         config.parent.mkdir()

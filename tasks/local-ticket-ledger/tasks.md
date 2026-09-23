@@ -59,14 +59,14 @@ remote writes or a capability-map change.
 
 **Acceptance criteria:**
 
-- [ ] Explicit adapter installation adds a no-secret user-scoped stdio entry for each selected host.
-- [ ] Existing unrelated configuration remains byte-preserved; a conflicting managed entry is refused.
-- [ ] Agent guidance supports voluntary self-description and ticket lookup without assigning roles or
+- [x] Explicit adapter installation adds a no-secret user-scoped stdio entry for each selected host.
+- [x] Existing unrelated configuration remains byte-preserved; a conflicting managed entry is refused.
+- [x] Agent guidance supports voluntary self-description and ticket lookup without assigning roles or
       enforcing ticket workflow.
 
 **Verification:**
 
-- [ ] Adapter tests cover generated config, missing runtime, conflict refusal, and atomic update.
+- [x] Adapter tests cover generated config, missing runtime, conflict refusal, and atomic update.
 - [ ] Real Claude Code and native Codex Desktop each list/read the same local ticket after restart.
 
 **Likely files:** `local_ledger_adapters.py`, tests, Claude/Codex config references, ledger skill.
@@ -85,17 +85,17 @@ remote writes or a capability-map change.
 
 **Acceptance criteria:**
 
-- [ ] Operators can discover status, explicitly install, initialize, connect each host, and understand
+- [x] Operators can discover status, explicitly install, initialize, connect each host, and understand
       removal boundaries.
-- [ ] Documentation describes bugs, requirements, comments, and completion notices as flexible
+- [x] Documentation describes bugs, requirements, comments, and completion notices as flexible
       examples—not mandatory stages.
-- [ ] Documentation distinguishes durable Epiq records from optional XATS notifications and explicitly
+- [x] Documentation distinguishes durable Epiq records from optional XATS notifications and explicitly
       describes the no-automatic-GitHub/GitLab-sync boundary.
 
 **Verification:**
 
-- [ ] Command/skill documentation review covers both GitHub/GitLab-unavailable and later-return cases.
-- [ ] Existing README and collaboration references remain internally consistent.
+- [x] Command/skill documentation review covers both GitHub/GitLab-unavailable and later-return cases.
+- [x] Existing README and collaboration references remain internally consistent.
 
 **Likely files:** command, skill, runtime reference, README, collaboration reference.
 
