@@ -4,7 +4,7 @@ import io
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -80,6 +80,19 @@ class LocalLedgerAdapterTests(unittest.TestCase):
             ]), 1)
         self.assertFalse(config.exists())
         self.assertIn("configuration-confirmation-required", output.getvalue())
+
+    def test_cli_reports_a_missing_runtime_without_a_traceback(self):
+        output = io.StringIO()
+        errors = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output), redirect_stderr(errors):
+            self.assertEqual(local_ledger_adapters.main([
+                "codex", "--runtime-dir", str(Path(self.tmp.name) / "missing"),
+            ]), 1)
+        self.assertEqual(output.getvalue(), "")
+        self.assertIn("local-ledger adapter unavailable", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
 
 
 if __name__ == "__main__":

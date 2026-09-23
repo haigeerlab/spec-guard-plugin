@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import stat
 import subprocess
+import sys
 import tempfile
 
 from local_ledger_runtime import MCP_RELATIVE_PATH, default_runtime_dir, node_status, runtime_status
@@ -88,20 +89,24 @@ def main(argv=None) -> int:
     parser.add_argument("--confirm-install", action="store_true",
                         help="allow the selected install command to write host configuration")
     args = parser.parse_args(argv)
-    node_path = _node_path()
-    if args.host == "codex":
-        print(codex_toml_fragment(args.runtime_dir, node_path), end="")
-    elif args.host == "claude":
-        print(json.dumps({"command": node_path, "args": [str(args.runtime_dir / MCP_RELATIVE_PATH)]}, indent=2))
-    elif not args.confirm_install:
-        print("configuration-confirmation-required: rerun with --confirm-install to write host configuration")
+    try:
+        node_path = _node_path()
+        if args.host == "codex":
+            print(codex_toml_fragment(args.runtime_dir, node_path), end="")
+        elif args.host == "claude":
+            print(json.dumps({"command": node_path, "args": [str(args.runtime_dir / MCP_RELATIVE_PATH)]}, indent=2))
+        elif not args.confirm_install:
+            print("configuration-confirmation-required: rerun with --confirm-install to write host configuration")
+            return 1
+        elif args.host == "install-codex":
+            install_codex_config(args.codex_config, args.runtime_dir, node_path)
+            print("Codex local-ledger MCP configuration installed (no secret stored).")
+        else:
+            install_claude_config(args.claude_bin, args.runtime_dir, node_path)
+            print("Claude local-ledger MCP configuration installed (no secret stored).")
+    except ValueError as error:
+        print("local-ledger adapter unavailable: " + str(error), file=sys.stderr)
         return 1
-    elif args.host == "install-codex":
-        install_codex_config(args.codex_config, args.runtime_dir, node_path)
-        print("Codex local-ledger MCP configuration installed (no secret stored).")
-    else:
-        install_claude_config(args.claude_bin, args.runtime_dir, node_path)
-        print("Claude local-ledger MCP configuration installed (no secret stored).")
     return 0
 
 
