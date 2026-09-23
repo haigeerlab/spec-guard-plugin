@@ -44,9 +44,9 @@ remote writes or a capability-map change.
 
 **Verification:**
 
-- [ ] Temporary-repository tests prove clean-tree refusal, `origin` confirmation gating,
+- [x] Temporary-repository tests prove clean-tree refusal, `origin` confirmation gating,
       `.epiq/project.json` commitment, and `__epiq_state__` creation.
-- [ ] Tests prove no project `node_modules` directory is created and no remote write can be executed by
+- [x] Tests prove no project `node_modules` directory is created and no remote write can be executed by
       default when `origin` is configured.
 
 **Likely files:** runtime helper, focused tests, operator command, runtime reference.
@@ -107,16 +107,17 @@ remote writes or a capability-map change.
 
 **Acceptance criteria:**
 
-- [ ] Two linked worktrees and independently launched MCP processes see the same created ticket.
-- [ ] Concurrent comments from both processes survive; restarting one process preserves both comments.
-- [ ] The acceptance fixture only creates and removes its own temporary paths; existing collaboration
+- [x] Two linked worktrees and independently launched MCP processes see the same created ticket.
+- [x] Concurrent comments from both processes survive; restarting one process preserves both comments.
+- [x] The acceptance fixture only creates and removes its own temporary paths; existing collaboration
       tests still pass.
 
 **Verification:**
 
-- [ ] Focused local-ledger suite passes.
-- [ ] `/bin/bash scripts/validate.sh`, `test-codex-adapter.sh`, and the relevant collaboration suite
-      pass.
+- [x] Focused local-ledger suite passes.
+- [x] `/bin/bash scripts/validate.sh`, the current Codex smoke self-test, and the relevant collaboration
+      suite pass. (The previously named `test-codex-adapter.sh` is a retired legacy bridge test and is
+      no longer present.)
 - [ ] A final status report records runtime version, license, Node requirement, Git effects, and
       remaining remote-migration limitation.
 
