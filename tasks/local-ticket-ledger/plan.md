@@ -21,7 +21,9 @@ Proposal candidate: [`../../spec/proposals/local-ticket-ledger.md`](../../spec/p
   本机账本。初始化前必须要求工作树干净，并清晰列出这些可见 Git 影响。
 - **Explicit lifecycle:** 插件安装、项目打开、hook、状态诊断都不得下载依赖、修改仓库、修改 MCP 配置
   或初始化账本。用户明确选择后才可安装固定运行时、初始化项目、或追加 Claude/Codex 的无秘密 MCP
-  条目；同名配置存在时拒绝覆盖。
+  条目；同名配置存在时拒绝覆盖。Epiq 上游初始化会尝试推送分支，因此检测到 `origin` 时，Spec Guard
+  必须在调用上游前停下并要求一次单独、明确的“允许本次 Epiq 推送”确认；无 `origin` 的本地项目可继续，
+  并把上游失败的推送尝试报告为警告。
 - **Free coordination:** Agent 自行通过 `epiq_actor_assume` 声明可读名字和当前工作；不实现项目组、
   角色、指派锁、自动认领、自动排期或基于项目路径的投递规则。Epiq 的标签、泳道、assignee 只是
   用户／Agent 可选记录，不成为 Spec Guard 的强制流程。
@@ -62,12 +64,14 @@ replacement.
 
 Add user-invoked operations that install the exact package into the managed user directory and then
 call Epiq project initialization only in a clean Git worktree. Before a write, preview the precise
-effects: package installation, `.epiq/project.json` commit, `__epiq_state__` branch, and any failed
-remote push reported by Epiq as a warning. The command must preserve a usable local ledger if no
-GitHub/GitLab remote exists.
+effects: package installation, `.epiq/project.json` commit, `__epiq_state__` branch, and Epiq's
+upstream push behavior. If `origin` exists, require a separate explicit push confirmation before
+calling Epiq; without `origin`, continue locally and report Epiq's failed push as a warning. The command
+must preserve a usable local ledger if no GitHub/GitLab remote exists.
 
-**Verification:** Isolated temporary Git repositories verify clean-tree refusal, no-remote warning,
-committed project identity, state-branch creation, and no project-local runtime dependency directory.
+**Verification:** Isolated temporary Git repositories verify clean-tree refusal, `origin` confirmation
+gating, no-remote warning, committed project identity, state-branch creation, and no project-local
+runtime dependency directory.
 
 ### Slice 3: Narrow Claude Code and Codex MCP adapters
 
@@ -106,7 +110,7 @@ green, proving XATS was not coupled to ticket state.
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
 | Epiq upstream changes behavior or MCP schema | Medium | Pin the version, validate executable identity, isolate adapter construction, and make upgrade an explicit future operation. |
-| Initialization alters a developer's repository unexpectedly | High | Never initialize implicitly; require clean-tree preflight and print the exact `.epiq` / state-branch effects before the write. |
+| Initialization alters a developer's repository unexpectedly | High | Never initialize implicitly; require clean-tree preflight, print the exact `.epiq` / state-branch effects, and require a second confirmation before upstream Epiq may push to an existing `origin`. |
 | Agents treat local tickets as mandatory bureaucracy | Medium | Expose tools and examples only; prohibit role, routing, ownership, and scheduling enforcement. |
 | Users confuse local persistence with GitHub/GitLab synchronization | High | Use separate status wording; document that remote creation/import/sync is absent and requires explicit future work. |
 | Multiple worktrees lose concurrent updates | High | Retain the actual two-process concurrent-comment acceptance test; do not substitute a git-ref backend whose concurrent updates silently overwrite one another. |

@@ -47,6 +47,26 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" contract --format json
 ```
 
+## Initialization preflight
+
+Epiq 的上游 `epiq_project_init` 会尝试推送普通分支和其状态分支。Spec Guard 因此先提供只读预检：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
+```
+
+预检只读取 Git worktree 状态与 `origin` URL：
+
+- `ready` + `origin: null`：Git 工作树干净且没有 `origin`。后续显式初始化可以继续；Epiq 仍会尝试
+  `origin` 推送，但会作为本地可用的警告失败。
+- `push-confirmation-required`：发现 `origin`。不会启动 Epiq；必须让用户为本次初始化单独确认其上游
+  推送行为。`--allow-epiq-push` 仅表达该确认给后续显式初始化操作，单独运行预检不会写入或推送。
+- `dirty`：工作树含改动，拒绝初始化。
+- `not-git` 或 `invalid`：无法取得安全预检所需的 Git 事实。
+
+这条门槛防止“为了启用本地 fallback”意外把 `.epiq/project.json` 或 `__epiq_state__` 推送到已有远端。
+它不验证远端是否可达，也不把缺少网络解释为安全许可。
+
 ## Deliberate boundaries
 
 - 同一个 macOS 用户下，已初始化的同一 Git 仓库 linked worktree 能共享 Epiq 项目身份；独立机器不在本层范围。

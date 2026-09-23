@@ -1,6 +1,7 @@
 """Local-ledger runtime contract tests; no package installation or Git mutation."""
 import io
 import json
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -115,6 +116,46 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(payload["state"], "invalid")
             self.assertEqual(payload["node"]["state"], node["state"])
+
+    def initialize_git_project(self, origin=None):
+        subprocess.run(["git", "init", "-q", str(self.project_dir)], check=True)
+        subprocess.run(["git", "-C", str(self.project_dir), "config", "user.email", "test@example.invalid"], check=True)
+        subprocess.run(["git", "-C", str(self.project_dir), "config", "user.name", "Local Ledger Test"], check=True)
+        (self.project_dir / "README.md").write_text("test\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.project_dir), "add", "README.md"], check=True)
+        subprocess.run(["git", "-C", str(self.project_dir), "commit", "-qm", "initial"], check=True)
+        if origin:
+            subprocess.run(["git", "-C", str(self.project_dir), "remote", "add", "origin", origin], check=True)
+
+    def test_initialization_preflight_allows_a_clean_project_without_origin(self):
+        self.initialize_git_project()
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["state"], "ready")
+        self.assertIsNone(payload["origin"])
+        self.assertEqual(payload["upstreamPush"], "will-fail-as-warning")
+
+    def test_initialization_preflight_requires_explicit_permission_before_epiq_can_push_to_origin(self):
+        self.initialize_git_project(origin="https://example.invalid/local-ledger.git")
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir)
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["state"], "push-confirmation-required")
+        self.assertEqual(payload["origin"], "https://example.invalid/local-ledger.git")
+        self.assertEqual(payload["upstreamPush"], "requires-explicit-confirmation")
+
+        code, payload = local_ledger_runtime.initialization_preflight(
+            self.project_dir, allow_epiq_push=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(payload["state"], "ready")
+        self.assertEqual(payload["upstreamPush"], "permitted")
+
+    def test_initialization_preflight_refuses_a_dirty_project_before_epiq_runs(self):
+        self.initialize_git_project()
+        (self.project_dir / "README.md").write_text("dirty\n", encoding="utf-8")
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir)
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["state"], "dirty")
+        self.assertNotIn("origin", payload)
 
 
 if __name__ == "__main__":

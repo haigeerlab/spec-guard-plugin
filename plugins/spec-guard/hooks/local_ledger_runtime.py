@@ -138,6 +138,56 @@ def project_status(project_dir: Path) -> dict[str, str]:
     }
 
 
+def _git(project_dir: Path, *arguments: str) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(project_dir), *arguments],
+            check=False, capture_output=True, text=True,
+        )
+    except OSError:
+        return None
+
+
+def initialization_preflight(
+    project_dir: Path, allow_epiq_push: bool = False,
+) -> tuple[int, dict[str, Any]]:
+    """Read Git facts that must be safe before explicit Epiq initialization."""
+    project_dir = Path(project_dir)
+    top_level = _git(project_dir, "rev-parse", "--show-toplevel")
+    if top_level is None or top_level.returncode != 0:
+        return 1, {"state": "not-git", "diagnostic": "project directory is not a Git worktree"}
+    repository = Path(top_level.stdout.strip())
+    worktree = _git(repository, "status", "--porcelain", "--untracked-files=all")
+    if worktree is None or worktree.returncode != 0:
+        return 1, {"state": "invalid", "diagnostic": "unable to inspect Git worktree"}
+    if worktree.stdout:
+        return 1, {"state": "dirty", "projectDir": str(repository)}
+    origin = _git(repository, "remote", "get-url", "origin")
+    if origin is None:
+        return 1, {"state": "invalid", "diagnostic": "unable to inspect Git origin"}
+    if origin.returncode == 0:
+        origin_url = origin.stdout.strip()
+        if not allow_epiq_push:
+            return 1, {
+                "state": "push-confirmation-required",
+                "projectDir": str(repository),
+                "origin": origin_url,
+                "upstreamPush": "requires-explicit-confirmation",
+            }
+        return 0, {
+            "state": "ready",
+            "projectDir": str(repository),
+            "origin": origin_url,
+            "upstreamPush": "permitted",
+        }
+    return 0, {
+        "state": "ready",
+        "projectDir": str(repository),
+        "origin": None,
+        "upstreamPush": "will-fail-as-warning",
+    }
+
+
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     """Return side-effect-free status for the optional local ledger."""
     node = node_status()
@@ -162,19 +212,24 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("contract", "status"))
+    parser.add_argument("command", choices=("contract", "status", "preflight"))
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
+    parser.add_argument("--allow-epiq-push", action="store_true")
     parser.add_argument("--format", choices=("json", "text"), default="text")
     args = parser.parse_args(argv)
     if args.command == "contract":
         code, payload = 0, runtime_contract()
-    else:
+    elif args.command == "status":
         code, payload = status(args.runtime_dir, args.project_dir)
+    else:
+        code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push)
     if args.format == "json":
         print(json.dumps(payload, sort_keys=True))
     elif args.command == "contract":
         print("本地事项账本固定运行时：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
+    elif args.command == "preflight":
+        print("本地事项账本初始化预检：" + payload["state"])
     else:
         print("本地事项账本状态：" + payload["state"])
     return code

@@ -34,16 +34,20 @@ remote writes or a capability-map change.
 **Acceptance criteria:**
 
 - [ ] A user-requested install places only the pinned Epiq runtime in a managed user-level directory.
+- [x] A read-only preflight refuses a dirty worktree and blocks a configured `origin` until the user
+      separately permits Epiq's upstream push behavior.
 - [ ] Project initialization refuses a dirty worktree and previews its Git-visible effects before it
       runs.
-- [ ] An initialized no-remote repository remains locally usable and reports remote push failure as a
-      warning rather than success.
+- [ ] A configured `origin` blocks initialization until the user separately permits Epiq's upstream
+      push attempt; an initialized no-remote repository remains locally usable and reports the failed
+      push attempt as a warning rather than success.
 
 **Verification:**
 
-- [ ] Temporary-repository tests prove `.epiq/project.json` is committed and `__epiq_state__` exists.
-- [ ] Tests prove no project `node_modules` directory is created and no remote operation is attempted
-      by default.
+- [ ] Temporary-repository tests prove clean-tree refusal, `origin` confirmation gating,
+      `.epiq/project.json` commitment, and `__epiq_state__` creation.
+- [ ] Tests prove no project `node_modules` directory is created and no remote write can be executed by
+      default when `origin` is configured.
 
 **Likely files:** runtime helper, focused tests, operator command, runtime reference.
 
