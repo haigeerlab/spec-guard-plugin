@@ -33,7 +33,7 @@ remote writes or a capability-map change.
 
 **Acceptance criteria:**
 
-- [ ] A user-requested install places only the pinned Epiq runtime in a managed user-level directory.
+- [x] A user-requested install places only the pinned Epiq runtime in a managed user-level directory.
 - [x] A read-only preflight refuses a dirty worktree and blocks a configured `origin` until the user
       separately permits Epiq's upstream push behavior.
 - [ ] Project initialization refuses a dirty worktree and previews its Git-visible effects before it

@@ -188,6 +188,41 @@ def initialization_preflight(
     }
 
 
+def install_command(runtime_dir: Path, npm_executable: str) -> list[str]:
+    """Build the fixed, project-independent npm installation command."""
+    return [
+        npm_executable, "install", "--ignore-scripts", "--prefix", str(Path(runtime_dir)),
+        PACKAGE_NAME + "@" + PACKAGE_VERSION,
+    ]
+
+
+def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dict[str, str]:
+    """Install the fixed runtime only when explicitly invoked by the caller."""
+    runtime_dir = Path(runtime_dir)
+    existing = runtime_status(runtime_dir)
+    if existing["state"] == "ready":
+        raise RuntimeContractError("local-ledger runtime is already installed")
+    if existing["state"] == "invalid":
+        raise RuntimeContractError("refusing to overwrite an invalid local-ledger runtime")
+    npm_path = npm_executable or shutil.which("npm")
+    if not npm_path:
+        raise RuntimeContractError("npm executable is unavailable")
+    runtime_dir.parent.mkdir(parents=True, exist_ok=True)
+    runtime_dir.mkdir(mode=0o700)
+    try:
+        completed = subprocess.run(
+            install_command(runtime_dir, npm_path), check=False, capture_output=True, text=True,
+        )
+    except OSError as error:
+        raise RuntimeContractError("unable to run npm install") from error
+    if completed.returncode != 0:
+        raise RuntimeContractError("npm install failed")
+    installed = runtime_status(runtime_dir)
+    if installed["state"] != "ready":
+        raise RuntimeContractError("installed local-ledger runtime does not match the audited contract")
+    return installed
+
+
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     """Return side-effect-free status for the optional local ledger."""
     node = node_status()
@@ -212,24 +247,40 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("contract", "status", "preflight"))
+    parser.add_argument("command", choices=("contract", "status", "preflight", "install"))
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
+    parser.add_argument("--confirm-install", action="store_true")
+    parser.add_argument("--npm", default=None)
     parser.add_argument("--format", choices=("json", "text"), default="text")
     args = parser.parse_args(argv)
     if args.command == "contract":
         code, payload = 0, runtime_contract()
     elif args.command == "status":
         code, payload = status(args.runtime_dir, args.project_dir)
-    else:
+    elif args.command == "preflight":
         code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push)
+    elif not args.confirm_install:
+        code, payload = 1, {
+            "state": "install-confirmation-required",
+            "diagnostic": "rerun with --confirm-install to install the fixed local-ledger runtime",
+        }
+    else:
+        try:
+            payload = install_runtime(args.runtime_dir, args.npm)
+        except RuntimeContractError as error:
+            code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
+        else:
+            code, payload = 0, {"state": "installed", **payload}
     if args.format == "json":
         print(json.dumps(payload, sort_keys=True))
     elif args.command == "contract":
         print("本地事项账本固定运行时：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     elif args.command == "preflight":
         print("本地事项账本初始化预检：" + payload["state"])
+    elif args.command == "install" and payload["state"] == "installed":
+        print("本地事项账本运行时已安装：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     else:
         print("本地事项账本状态：" + payload["state"])
     return code

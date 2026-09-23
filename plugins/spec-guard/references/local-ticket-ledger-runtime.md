@@ -4,8 +4,8 @@
 [`epiq@1.11.0`](https://github.com/ljtn/epiq)（MIT）作为未来的 MCP 后端；它不是 GitHub、GitLab
 或现有协作邮箱的替代品。
 
-本层只有合同与诊断。它**不会**下载 Epiq、执行 Epiq、创建 `.epiq/`、修改 Git、写入 Claude/Codex
-配置、启动服务，或打开网络端口。
+默认的合同、状态与预检入口只读。只有用户明确执行写入操作时，才可能下载 Epiq 或准备初始化；它们仍不
+写入 Claude/Codex 配置、启动服务或打开网络端口。
 
 ## 固定合同
 
@@ -46,6 +46,22 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 ```bash
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" contract --format json
 ```
+
+## Explicit runtime installation
+
+安装固定运行时会下载 Epiq 及其 Node 依赖（隔离 POC 约为 119 MB），因此绝不会由状态检查、hook、
+项目打开或 MCP 配置自动触发。用户确认后才执行：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --format json
+```
+
+它只调用固定的 `npm install --ignore-scripts --prefix <managed-runtime> epiq@1.11.0`，并在完成后重新
+核对包名、版本和 `epiq-mcp` 入口。运行时存放在用户级受管目录，绝不写入项目 `node_modules`。
+
+- 没有 `--confirm-install` 时返回 `install-confirmation-required`，不创建目录也不调用 npm。
+- 已安装且合同正确的目录拒绝覆盖；已存在但不合法的目录也拒绝覆盖，供用户先审查或显式清理。
+- 安装本身不初始化任何项目、不写 Git、不添加 Claude/Codex MCP 配置，也不启动 Epiq。
 
 ## Initialization preflight
 

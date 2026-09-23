@@ -157,6 +157,41 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "dirty")
         self.assertNotIn("origin", payload)
 
+    def test_install_command_pins_epiq_and_keeps_it_out_of_the_project(self):
+        command = local_ledger_runtime.install_command(
+            self.runtime_dir, npm_executable="/opt/homebrew/bin/npm")
+        self.assertEqual(command, [
+            "/opt/homebrew/bin/npm", "install", "--ignore-scripts", "--prefix",
+            str(self.runtime_dir), "epiq@1.11.0",
+        ])
+        self.assertNotIn(str(self.project_dir), command)
+
+    def test_install_refuses_to_overwrite_an_existing_runtime(self):
+        self.write_runtime()
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "already installed"):
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable="/opt/npm")
+
+    def test_install_cli_requires_explicit_confirmation_without_creating_runtime_files(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "install", "--runtime-dir", str(self.runtime_dir), "--format", "json",
+            ]), 1)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["state"], "install-confirmation-required")
+        self.assertFalse(self.runtime_dir.exists())
+
+    def test_install_runs_the_pinned_command_then_validates_the_result(self):
+        with patch("local_ledger_runtime.subprocess.run", return_value=subprocess.CompletedProcess([], 0)), \
+             patch("local_ledger_runtime.runtime_status", side_effect=[
+                 {"state": "absent"}, {"state": "ready"},
+             ]) as runtime_status:
+            result = local_ledger_runtime.install_runtime(
+                self.runtime_dir, npm_executable="/opt/homebrew/bin/npm")
+        self.assertEqual(result["state"], "ready")
+        self.assertTrue(self.runtime_dir.is_dir())
+        self.assertEqual(runtime_status.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
