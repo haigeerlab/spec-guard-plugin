@@ -223,6 +223,130 @@ def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dic
     return installed
 
 
+def project_init_arguments(
+    project_dir: Path, user_name: str, preferred_editor: str, auto_sync: bool,
+) -> dict[str, Any]:
+    """Build the documented Epiq setup input without using an agent identity."""
+    if not isinstance(user_name, str) or not user_name.strip():
+        raise RuntimeContractError("Epiq user name is required")
+    if not isinstance(preferred_editor, str) or not preferred_editor.strip():
+        raise RuntimeContractError("Epiq preferred editor is required")
+    if not isinstance(auto_sync, bool):
+        raise RuntimeContractError("Epiq auto sync must be a boolean")
+    return {
+        "repoRoot": str(Path(project_dir)),
+        "userName": user_name.strip(),
+        "preferredEditor": preferred_editor.strip(),
+        "autoSync": auto_sync,
+    }
+
+
+def _read_mcp_response(stream: Any, request_id: int) -> dict[str, Any]:
+    while True:
+        line = stream.readline()
+        if not line:
+            raise RuntimeContractError("MCP server closed before responding")
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise RuntimeContractError("MCP server returned invalid JSON") from error
+        if response.get("id") == request_id:
+            if not isinstance(response.get("result"), dict) or "error" in response:
+                raise RuntimeContractError("MCP server rejected the request")
+            return response["result"]
+
+
+def read_mcp_tool_result(stream: Any, request_id: int) -> dict[str, Any]:
+    """Read Epiq's JSON text result without exposing unstructured server diagnostics."""
+    result = _read_mcp_response(stream, request_id)
+    content = result.get("content")
+    if not isinstance(content, list) or not content:
+        raise RuntimeContractError("MCP tool response is invalid")
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "text" or not isinstance(first.get("text"), str):
+        raise RuntimeContractError("MCP tool response is invalid")
+    try:
+        payload = json.loads(first["text"])
+    except json.JSONDecodeError as error:
+        raise RuntimeContractError("MCP tool response is invalid") from error
+    if not isinstance(payload, dict) or payload.get("status") != "success":
+        raise RuntimeContractError("MCP tool response is unsuccessful")
+    return payload
+
+
+def mcp_tool_call(command: list[str], tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Call one stdio MCP tool and terminate the private child process afterwards."""
+    try:
+        process = subprocess.Popen(
+            command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True,
+        )
+    except OSError as error:
+        raise RuntimeContractError("unable to start the local-ledger MCP server") from error
+    if process.stdin is None or process.stdout is None:
+        process.terminate()
+        raise RuntimeContractError("unable to open local-ledger MCP streams")
+    try:
+        process.stdin.write(json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                "protocolVersion": "2025-03-26", "capabilities": {},
+                "clientInfo": {"name": "spec-guard", "version": "local-ledger"},
+            },
+        }) + "\n")
+        process.stdin.flush()
+        _read_mcp_response(process.stdout, 1)
+        process.stdin.write(json.dumps({
+            "jsonrpc": "2.0", "method": "notifications/initialized", "params": {},
+        }) + "\n")
+        process.stdin.write(json.dumps({
+            "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
+                "name": tool_name, "arguments": arguments,
+            },
+        }) + "\n")
+        process.stdin.flush()
+        return read_mcp_tool_result(process.stdout, 2)
+    finally:
+        process.stdin.close()
+        if process.poll() is None:
+            process.terminate()
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+
+
+def initialize_project(
+    runtime_dir: Path, project_dir: Path, user_name: str, preferred_editor: str, auto_sync: bool,
+    allow_epiq_push: bool = False,
+) -> dict[str, Any]:
+    """Explicitly initialize Epiq only after clean-tree and push-consent preflight."""
+    code, preflight = initialization_preflight(project_dir, allow_epiq_push)
+    if code != 0:
+        raise RuntimeContractError("initialization preflight: " + preflight["state"])
+    node = node_status()
+    runtime = runtime_status(runtime_dir)
+    if node["state"] != "ready" or runtime["state"] != "ready":
+        raise RuntimeContractError("local-ledger runtime is not ready")
+    result = mcp_tool_call(
+        [node["path"], str(Path(runtime_dir) / MCP_RELATIVE_PATH)],
+        "epiq_project_init",
+        project_init_arguments(Path(preflight["projectDir"]), user_name, preferred_editor, auto_sync),
+    )
+    value = result.get("value")
+    if not isinstance(value, dict) or not isinstance(value.get("projectId"), str):
+        raise RuntimeContractError("Epiq initialization returned an invalid project identity")
+    if value.get("stateBranch") != STATE_BRANCH:
+        raise RuntimeContractError("Epiq initialization returned an unexpected state branch")
+    return {
+        "state": "initialized",
+        "projectId": value["projectId"],
+        "stateBranch": value["stateBranch"],
+        "upstreamPush": preflight["upstreamPush"],
+        "warnings": bool(value.get("warnings")),
+    }
+
+
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     """Return side-effect-free status for the optional local ledger."""
     node = node_status()
@@ -247,11 +371,15 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("contract", "status", "preflight", "install"))
+    parser.add_argument("command", choices=("contract", "status", "preflight", "install", "initialize"))
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
     parser.add_argument("--confirm-install", action="store_true")
+    parser.add_argument("--confirm-initialize", action="store_true")
+    parser.add_argument("--user-name", default=None)
+    parser.add_argument("--preferred-editor", default=None)
+    parser.add_argument("--auto-sync", choices=("true", "false"), default=None)
     parser.add_argument("--npm", default=None)
     parser.add_argument("--format", choices=("json", "text"), default="text")
     args = parser.parse_args(argv)
@@ -261,18 +389,38 @@ def main(argv: Sequence[str] | None = None) -> int:
         code, payload = status(args.runtime_dir, args.project_dir)
     elif args.command == "preflight":
         code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push)
-    elif not args.confirm_install:
+    elif args.command == "install" and not args.confirm_install:
         code, payload = 1, {
             "state": "install-confirmation-required",
             "diagnostic": "rerun with --confirm-install to install the fixed local-ledger runtime",
         }
-    else:
+    elif args.command == "install":
         try:
             payload = install_runtime(args.runtime_dir, args.npm)
         except RuntimeContractError as error:
             code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
         else:
             code, payload = 0, {"state": "installed", **payload}
+    elif not args.confirm_initialize:
+        code, payload = 1, {
+            "state": "initialization-confirmation-required",
+            "diagnostic": "rerun with --confirm-initialize after reviewing the Git effects",
+        }
+    elif not args.user_name or not args.preferred_editor or args.auto_sync is None:
+        code, payload = 1, {
+            "state": "user-setup-required",
+            "diagnostic": "user name, preferred editor, and auto sync choice are required",
+        }
+    else:
+        try:
+            payload = initialize_project(
+                args.runtime_dir, args.project_dir, args.user_name, args.preferred_editor,
+                args.auto_sync == "true", args.allow_epiq_push,
+            )
+        except RuntimeContractError as error:
+            code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
+        else:
+            code = 0
     if args.format == "json":
         print(json.dumps(payload, sort_keys=True))
     elif args.command == "contract":
@@ -281,6 +429,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本初始化预检：" + payload["state"])
     elif args.command == "install" and payload["state"] == "installed":
         print("本地事项账本运行时已安装：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
+    elif args.command == "initialize" and payload["state"] == "initialized":
+        print("本地事项账本项目已初始化：" + payload["projectId"])
     else:
         print("本地事项账本状态：" + payload["state"])
     return code

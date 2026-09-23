@@ -36,9 +36,9 @@ remote writes or a capability-map change.
 - [x] A user-requested install places only the pinned Epiq runtime in a managed user-level directory.
 - [x] A read-only preflight refuses a dirty worktree and blocks a configured `origin` until the user
       separately permits Epiq's upstream push behavior.
-- [ ] Project initialization refuses a dirty worktree and previews its Git-visible effects before it
+- [x] Project initialization refuses a dirty worktree and previews its Git-visible effects before it
       runs.
-- [ ] A configured `origin` blocks initialization until the user separately permits Epiq's upstream
+- [x] A configured `origin` blocks initialization until the user separately permits Epiq's upstream
       push attempt; an initialized no-remote repository remains locally usable and reports the failed
       push attempt as a warning rather than success.
 

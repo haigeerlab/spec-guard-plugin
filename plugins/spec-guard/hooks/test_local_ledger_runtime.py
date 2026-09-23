@@ -192,6 +192,79 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertTrue(self.runtime_dir.is_dir())
         self.assertEqual(runtime_status.call_count, 2)
 
+    def test_project_init_arguments_require_user_setup_values_without_using_agent_identity(self):
+        arguments = local_ledger_runtime.project_init_arguments(
+            self.project_dir, "Vilin", "code --wait", False)
+        self.assertEqual(arguments, {
+            "repoRoot": str(self.project_dir),
+            "userName": "Vilin",
+            "preferredEditor": "code --wait",
+            "autoSync": False,
+        })
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "user name"):
+            local_ledger_runtime.project_init_arguments(self.project_dir, "", "code --wait", False)
+
+    def test_mcp_tool_result_reader_requires_a_successful_json_tool_payload(self):
+        response = io.StringIO(
+            '{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text",'
+            '"text":"{\\"status\\": \\"success\\", \\"value\\": {\\"projectId\\": \\"project\\"}}"}]}}\n')
+        self.assertEqual(local_ledger_runtime.read_mcp_tool_result(response, 1), {
+            "status": "success", "value": {"projectId": "project"},
+        })
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "MCP server returned invalid JSON"):
+            local_ledger_runtime.read_mcp_tool_result(io.StringIO("not json\n"), 1)
+
+    def test_initialize_requires_push_permission_and_returns_sanitized_epiq_facts(self):
+        ready_preflight = (0, {
+            "state": "ready", "projectDir": str(self.project_dir), "origin": None,
+            "upstreamPush": "will-fail-as-warning",
+        })
+        with patch("local_ledger_runtime.initialization_preflight", return_value=ready_preflight), \
+             patch("local_ledger_runtime.node_status", return_value={"state": "ready", "path": "/opt/node", "version": "20.0.0"}), \
+             patch("local_ledger_runtime.runtime_status", return_value={"state": "ready"}), \
+             patch("local_ledger_runtime.mcp_tool_call", return_value={
+                 "status": "success",
+                 "value": {"projectId": "project", "stateBranch": "__epiq_state__", "warnings": ["do not print this"]},
+             }) as mcp_call:
+            payload = local_ledger_runtime.initialize_project(
+                self.runtime_dir, self.project_dir, "Vilin", "code --wait", False,
+            )
+        self.assertEqual(payload, {
+            "state": "initialized", "projectId": "project", "stateBranch": "__epiq_state__",
+            "upstreamPush": "will-fail-as-warning", "warnings": True,
+        })
+        self.assertEqual(mcp_call.call_args.args[1], "epiq_project_init")
+        self.assertEqual(mcp_call.call_args.args[2]["userName"], "Vilin")
+
+    def test_initialize_refuses_before_starting_mcp_when_origin_has_not_been_confirmed(self):
+        with patch("local_ledger_runtime.initialization_preflight", return_value=(1, {
+            "state": "push-confirmation-required", "origin": "https://example.invalid/repo.git",
+        })), patch("local_ledger_runtime.mcp_tool_call") as mcp_call:
+            with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "push-confirmation-required"):
+                local_ledger_runtime.initialize_project(
+                    self.runtime_dir, self.project_dir, "Vilin", "code --wait", False,
+                )
+        mcp_call.assert_not_called()
+
+    def test_initialize_cli_requires_confirmation_and_user_setup_before_starting_epiq(self):
+        output = io.StringIO()
+        with patch("local_ledger_runtime.initialize_project") as initialize, redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "initialize", "--runtime-dir", str(self.runtime_dir),
+                "--project-dir", str(self.project_dir), "--format", "json",
+            ]), 1)
+        self.assertEqual(json.loads(output.getvalue())["state"], "initialization-confirmation-required")
+        initialize.assert_not_called()
+
+        output = io.StringIO()
+        with patch("local_ledger_runtime.initialize_project") as initialize, redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "initialize", "--confirm-initialize", "--runtime-dir", str(self.runtime_dir),
+                "--project-dir", str(self.project_dir), "--format", "json",
+            ]), 1)
+        self.assertEqual(json.loads(output.getvalue())["state"], "user-setup-required")
+        initialize.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -83,6 +83,24 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 这条门槛防止“为了启用本地 fallback”意外把 `.epiq/project.json` 或 `__epiq_state__` 推送到已有远端。
 它不验证远端是否可达，也不把缺少网络解释为安全许可。
 
+预检通过、运行时已安装后，才可由用户显式初始化：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
+  --confirm-initialize \
+  --user-name "你的显示名" \
+  --preferred-editor "code --wait" \
+  --auto-sync false \
+  --format json
+```
+
+`user-name`、`preferred-editor` 和 `auto-sync` 是 Epiq 首次在当前 macOS 用户下保存的偏好；Spec Guard
+不会猜测或代填它们。若预检显示已有 `origin`，还必须明确增加 `--allow-epiq-push`。该标记只允许本次
+Epiq 上游初始化尝试推送，不能表示远端操作已经成功；输出只报告是否有警告，不回显上游原始 Git 错误。
+
+成功后 Epiq 会提交 `.epiq/project.json`、创建 `__epiq_state__` 状态分支，并在同一 macOS 用户的 linked
+worktree 间共享状态。它不会安装 Claude/Codex MCP 配置；那是独立的后续明确操作。
+
 ## Deliberate boundaries
 
 - 同一个 macOS 用户下，已初始化的同一 Git 仓库 linked worktree 能共享 Epiq 项目身份；独立机器不在本层范围。
