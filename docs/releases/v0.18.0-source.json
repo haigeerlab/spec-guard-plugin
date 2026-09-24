@@ -18,9 +18,19 @@
     },
     {
       "subject": "spec-guard-release-artifact",
-      "status": "not-verified",
-      "target": { "kind": "package", "id": "version:0.18.0" },
-      "reason": "requires a tag-derived artifact after the release commit is merged"
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.18.0;asset:spec-guard-v0.18.0.tar.gz;sha256:ec57beab90e40945f4e24a93c9c3d73d91f281fa63b40a6c3a18372c2c6dc98e"
+      },
+      "observedAt": "2026-09-24T12:19:25Z",
+      "evidence": [
+        "release:https://github.com/yizhongkaimail-collab/spec-guard-plugin/releases/tag/v0.18.0",
+        "asset:spec-guard-v0.18.0.tar.gz",
+        "source-tag:v0.18.0@40108fa5d559ff6bc60c9d10f3042c33a1a955a6",
+        "command:python3 scripts/release-package.py validate <tag-derived-artifact> 0.18.0",
+        "result:GitHub asset digest matched the locally built and re-downloaded SHA-256; the re-downloaded archive was extracted and its package manifest validated"
+      ]
     }
   ]
 }
