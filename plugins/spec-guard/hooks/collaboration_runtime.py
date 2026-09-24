@@ -76,10 +76,19 @@ def default_config_dir() -> Path:
 
 
 def launch_agent_plist(
-    config_dir: Path, runtime_script: Path, python_executable: str, npx_executable: str
+    config_dir: Path, runtime_script: Path, python_executable: str, npx_executable: str,
+    tmux_executable: str | None = None,
 ) -> dict[str, Any]:
     """Build the non-secret, per-user launchd contract for the runtime."""
     config_dir = Path(config_dir)
+    path_entries = [str(Path(npx_executable).parent)]
+    if tmux_executable is not None:
+        if not Path(tmux_executable).is_absolute() or any(
+            character == ":" or ord(character) < 32 for character in tmux_executable
+        ):
+            raise RuntimeContractError("tmux path must be absolute and contain no PATH separators")
+        path_entries.append(str(Path(tmux_executable).parent))
+    path_entries.extend(("/usr/bin", "/bin", "/usr/sbin", "/sbin"))
     return {
         "Label": LAUNCH_AGENT_LABEL,
         "ProgramArguments": [
@@ -89,7 +98,7 @@ def launch_agent_plist(
         "RunAtLoad": True,
         "KeepAlive": True,
         "EnvironmentVariables": {
-            "PATH": str(Path(npx_executable).parent) + ":/usr/bin:/bin:/usr/sbin:/sbin",
+            "PATH": ":".join(dict.fromkeys(path_entries)),
         },
         "StandardOutPath": str(config_dir / DAEMON_STDOUT_FILENAME),
         "StandardErrorPath": str(config_dir / DAEMON_STDERR_FILENAME),
@@ -321,6 +330,9 @@ def enable_background_service(
     read_runtime_config(config_dir)
     config_dir = Path(config_dir)
     launch_agents_dir = Path(launch_agents_dir)
+    plist_contract = launch_agent_plist(
+        config_dir, runtime_script, python_executable, npx_executable, shutil.which("tmux"),
+    )
     launch_agents_dir.mkdir(parents=True, exist_ok=True)
     plist_path = launch_agents_dir / LAUNCH_AGENT_FILENAME
     if plist_path.exists() or plist_path.is_symlink():
@@ -338,9 +350,7 @@ def enable_background_service(
         )
     _ensure_private_log(config_dir / DAEMON_STDOUT_FILENAME)
     _ensure_private_log(config_dir / DAEMON_STDERR_FILENAME)
-    _write_launch_agent_plist(
-        plist_path, launch_agent_plist(config_dir, runtime_script, python_executable, npx_executable),
-    )
+    _write_launch_agent_plist(plist_path, plist_contract)
     subprocess.run(
         ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(plist_path)],
         check=True, capture_output=True, text=True,

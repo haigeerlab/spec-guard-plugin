@@ -15,7 +15,8 @@ from collaboration_adapters import (CHANNEL_SERVER_NAME, MCP_SERVER_NAME, TOKEN_
                                     claude_mcp_config, codex_toml_fragment, install_claude_config,
                                     install_codex_config)
 from collaboration_auth_header import authorization_header, main as auth_header_main
-from collaboration_claude import build_claude_command, write_ephemeral_mcp_config
+from collaboration_claude import (build_claude_command, build_tmux_command,
+                                  launch_tmux_claude, write_ephemeral_mcp_config)
 from collaboration_claude_stdio import (MCP_REMOTE_AUTH_ENV_VAR, MCP_REMOTE_PACKAGE,
                                         MCP_REMOTE_VERSION, mcp_remote_command)
 from collaboration_runtime import (HEALTH_PROTOCOL_VERSION, LOCAL_NAMESPACE, PACKAGE_NAME, PACKAGE_VERSION, RuntimeContractError,
@@ -170,6 +171,42 @@ class CollaborationRuntimeTests(unittest.TestCase):
         self.assertIn(str(self.config_dir / "daemon.stdout.log"), plist.values())
         self.assertIn(str(self.config_dir / "daemon.stderr.log"), plist.values())
         self.assertNotIn(token, json.dumps(plist))
+
+    def test_launch_agent_plist_adds_tmux_directory_without_changing_npx_priority(self):
+        plist = collaboration_runtime.launch_agent_plist(
+            self.config_dir, Path("/opt/spec-guard/collaboration_runtime.py"),
+            "/usr/bin/python3", "/opt/node/bin/npx",
+            tmux_executable="/opt/homebrew/bin/tmux",
+        )
+        self.assertEqual(
+            plist["EnvironmentVariables"]["PATH"],
+            "/opt/node/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        )
+        self.assertNotIn("tmux", " ".join(plist["ProgramArguments"]))
+
+    def test_launch_agent_plist_rejects_unsafe_tmux_path(self):
+        for tmux_path in ("relative/tmux", "/tmp/unsafe:dir/tmux", "/tmp/line\nbreak/tmux"):
+            with self.subTest(tmux_path=tmux_path):
+                with self.assertRaisesRegex(RuntimeContractError, "tmux path"):
+                    collaboration_runtime.launch_agent_plist(
+                        self.config_dir, Path("/opt/spec-guard/collaboration_runtime.py"),
+                        "/usr/bin/python3", "/opt/homebrew/bin/npx", tmux_path,
+                    )
+
+    def test_explicit_service_enable_uses_discovered_tmux(self):
+        self.write_config()
+        launch_agents_dir = Path(self.tmp.name) / "Library" / "LaunchAgents"
+        with patch("collaboration_runtime.shutil.which", return_value="/opt/homebrew/bin/tmux"), \
+             patch("collaboration_runtime.os.getuid", return_value=501), \
+             patch("collaboration_runtime.subprocess.run"):
+            plist_path = collaboration_runtime.enable_background_service(
+                self.config_dir, launch_agents_dir,
+                Path("/opt/spec-guard/collaboration_runtime.py"), "/usr/bin/python3",
+                "/opt/node/bin/npx",
+            )
+        with plist_path.open("rb") as handle:
+            plist = plistlib.load(handle)
+        self.assertIn("/opt/homebrew/bin", plist["EnvironmentVariables"]["PATH"])
 
     def test_enable_background_service_writes_private_logs_and_bootstraps_current_user(self):
         self.write_config()
@@ -375,6 +412,70 @@ class CollaborationRuntimeTests(unittest.TestCase):
         self.assertNotIn("test-only-token", " ".join(command))
         with self.assertRaisesRegex(ValueError, "MCP options"):
             build_claude_command("claude", generated, False, ["--mcp-config", "other.json"])
+
+    def test_claude_launcher_rejects_equals_form_mcp_overrides(self):
+        for option in (
+            "--mcp-config=other.json",
+            "--dangerously-load-development-channels=server:other",
+        ):
+            with self.subTest(option=option):
+                with self.assertRaisesRegex(ValueError, "MCP options"):
+                    build_claude_command("claude", Path("/tmp/selected.json"), True, [option])
+
+    def test_claude_launcher_default_does_not_enable_channel(self):
+        self.write_config()
+        generated = write_ephemeral_mcp_config(self.config_dir, include_channel=False)
+        self.addCleanup(generated.unlink, missing_ok=True)
+        contents = generated.read_text(encoding="utf-8")
+        self.assertNotIn(CHANNEL_SERVER_NAME, contents)
+        self.assertNotIn("test-only-token", contents)
+        command = build_claude_command("claude", generated, False, ["--model", "sonnet"])
+        self.assertNotIn("--dangerously-load-development-channels", command)
+
+    def test_tmux_launcher_uses_direct_arguments_and_unique_session_name(self):
+        command = build_tmux_command(
+            self.config_dir, "claude", ["--model", "sonnet", "a;b"],
+            session_name="spec-guard-test1234",
+        )
+        self.assertEqual(command[:6], [
+            "tmux", "new-session", "-s", "spec-guard-test1234", "-c", str(Path.cwd()),
+        ])
+        self.assertIn("--tmux-wake", command)
+        self.assertEqual(command[-4:], ["--", "--model", "sonnet", "a;b"])
+        self.assertNotIn("test-only-token", " ".join(command))
+        self.assertNotIn("--dangerously-load-development-channels", command)
+
+    def test_tmux_launcher_does_not_nest_inside_an_existing_pane(self):
+        with patch.dict("collaboration_claude.os.environ", {"TMUX_PANE": "%1"}):
+            with patch("collaboration_claude.launch_claude", return_value=7) as launch:
+                with patch("collaboration_claude.subprocess.run") as run:
+                    result = launch_tmux_claude(self.config_dir, "claude", ["--model", "sonnet"])
+        self.assertEqual(result, 7)
+        launch.assert_called_once_with(self.config_dir, "claude", False, ["--model", "sonnet"])
+        run.assert_not_called()
+
+    def test_tmux_launcher_refuses_missing_tmux_or_noninteractive_terminal(self):
+        with patch.dict("collaboration_claude.os.environ", {}, clear=True):
+            with patch("collaboration_claude.shutil.which", return_value=None):
+                with self.assertRaisesRegex(ValueError, "tmux executable"):
+                    launch_tmux_claude(self.config_dir, "claude", [])
+            with patch("collaboration_claude.shutil.which", return_value="/opt/homebrew/bin/tmux"):
+                with patch("collaboration_claude.sys.stdin.isatty", return_value=False):
+                    with self.assertRaisesRegex(ValueError, "interactive terminal"):
+                        launch_tmux_claude(self.config_dir, "claude", [])
+
+    def test_tmux_launcher_starts_one_new_session_without_a_shell(self):
+        with patch.dict("collaboration_claude.os.environ", {}, clear=True):
+            with patch("collaboration_claude.shutil.which", return_value="/opt/homebrew/bin/tmux"):
+                with patch("collaboration_claude.sys.stdin.isatty", return_value=True):
+                    with patch("collaboration_claude.subprocess.run", return_value=subprocess.CompletedProcess([], 0)) as run:
+                        self.assertEqual(launch_tmux_claude(self.config_dir, "claude", []), 0)
+                        self.assertEqual(launch_tmux_claude(self.config_dir, "claude", []), 0)
+        command = run.call_args_list[0].args[0]
+        self.assertIsInstance(command, list)
+        self.assertTrue(command[3].startswith("spec-guard-"))
+        self.assertNotEqual(command[3], run.call_args_list[1].args[0][3])
+        self.assertEqual(run.call_args.kwargs, {"check": False})
 
     def test_claude_stdio_bridge_uses_a_pinned_open_source_proxy_without_argv_token(self):
         self.write_config()

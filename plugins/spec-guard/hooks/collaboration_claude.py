@@ -4,9 +4,12 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import tempfile
 from typing import Sequence
+from uuid import uuid4
 
 from collaboration_adapters import CHANNEL_SERVER_NAME, TOKEN_ENV_VAR, claude_mcp_config
 from collaboration_auth_header import read_private_token
@@ -32,7 +35,8 @@ def build_claude_command(
 ) -> list[str]:
     """Build a command that cannot be overridden with another MCP configuration."""
     forbidden = {"--mcp-config", "--dangerously-load-development-channels"}
-    if any(argument in forbidden for argument in extra_args):
+    if any(argument in forbidden or any(argument.startswith(option + "=") for option in forbidden)
+           for argument in extra_args):
         raise ValueError("pass MCP options to the Spec Guard wrapper, not directly to Claude")
     command = [claude_bin, "--mcp-config", str(config_path)]
     if include_channel:
@@ -61,17 +65,47 @@ def launch_claude(
             pass
 
 
+def build_tmux_command(
+    config_dir: Path, claude_bin: str, extra_args: Sequence[str], session_name: str
+) -> list[str]:
+    """Use tmux's direct argv form (https://man.openbsd.org/tmux#new-session)."""
+    return [
+        "tmux", "new-session", "-s", session_name, "-c", str(Path.cwd()),
+        sys.executable, "-B", str(Path(__file__).resolve()),
+        "--config-dir", str(config_dir), "--claude-bin", claude_bin,
+        "--tmux-wake", "--", *extra_args,
+    ]
+
+
+def launch_tmux_claude(config_dir: Path, claude_bin: str, extra_args: Sequence[str]) -> int:
+    """Enter one tmux pane, then launch Claude through the existing private MCP path."""
+    if os.environ.get("TMUX_PANE"):
+        return launch_claude(config_dir, claude_bin, False, extra_args)
+    if shutil.which("tmux") is None:
+        raise ValueError("tmux executable not found")
+    if not sys.stdin.isatty():
+        raise ValueError("tmux wake requires an interactive terminal")
+    command = build_tmux_command(config_dir, claude_bin, extra_args, "spec-guard-" + uuid4().hex[:12])
+    return subprocess.run(command, check=False).returncode
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config-dir", type=Path, default=default_config_dir())
     parser.add_argument("--claude-bin", default="claude")
     parser.add_argument("--enable-channel-wake", action="store_true",
                         help="explicitly enable Claude Code's preview channel loader")
+    parser.add_argument("--tmux-wake", action="store_true",
+                        help="explicitly launch Claude Code CLI inside a tmux pane for XATS inbox hints")
     parser.add_argument("claude_args", nargs=argparse.REMAINDER,
                         help="arguments forwarded to Claude; place them after --")
     args = parser.parse_args(argv)
     forwarded = args.claude_args[1:] if args.claude_args[:1] == ["--"] else args.claude_args
     try:
+        if args.tmux_wake and args.enable_channel_wake:
+            raise ValueError("choose either tmux wake or experimental channel wake")
+        if args.tmux_wake:
+            return launch_tmux_claude(args.config_dir, args.claude_bin, forwarded)
         return launch_claude(args.config_dir, args.claude_bin, args.enable_channel_wake, forwarded)
     except (RuntimeContractError, ValueError) as error:
         print("Spec Guard collaboration Claude launcher is unavailable: " + str(error), file=os.sys.stderr)
