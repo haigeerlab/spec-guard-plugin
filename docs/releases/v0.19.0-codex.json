@@ -17,10 +17,31 @@
       ]
     },
     {
-      "subject": "spec-guard-codex-cli-new-session",
-      "status": "not-verified",
-      "target": { "kind": "host-session", "id": "codex-cli-new-session:v0.19.0" },
-      "reason": "No new Codex CLI session has exercised the v0.19.0 ticket entry."
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.19.0;test:readonly-ticket-list-20260924"
+      },
+      "observedAt": "2026-09-24T14:45:15Z",
+      "evidence": [
+        "host:a new ephemeral Codex CLI session loaded the installed v0.19.0 ticket skill from the plugin cache",
+        "result:the session ran under a read-only sandbox with no repository or ticket writes"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-ticket",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli-ticket:v0.19.0;test:readonly-list-20260924"
+      },
+      "observedAt": "2026-09-24T14:45:15Z",
+      "evidence": [
+        "host:the new Codex CLI session used the installed ticket skill and called spec_guard_local_ledger epiq_issue_list with brief=true and includeClosed=false",
+        "result:the query returned the same existing open ticket observed in Codex Desktop and Claude Code CLI",
+        "result:creation, editing, closing, and cross-project messaging were not tested"
+      ]
     }
   ]
 }
