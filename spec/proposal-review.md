@@ -45,7 +45,7 @@
 ```text
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py
 /bin/bash scripts/validate.sh
-/bin/bash plugins/spec-guard/hooks/test-codex-adapter.sh
+python3 scripts/check-manifests.py
 /bin/bash evals/codex-plugin-smoke.sh --selftest
 ```
 

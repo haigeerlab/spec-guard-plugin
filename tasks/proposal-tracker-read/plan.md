@@ -56,7 +56,7 @@ No browser UI is introduced. This module exposes Python/JSON read results only, 
 
 **Acceptance criteria:** A narrow Python/JSON entry point reports safe platform/container/Issue/stage data without body, comment, token or API URL leakage. Focused tests join the repository validation script; reference guidance explains that this is read-only and not a review or promotion action.
 
-**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py`, `/bin/bash plugins/spec-guard/hooks/test-codex-adapter.sh`, `/bin/bash scripts/validate.sh` and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
+**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py`, `python3 scripts/check-manifests.py`, `/bin/bash scripts/validate.sh` and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
 
 **Likely files:** `plugins/spec-guard/hooks/proposal_tracker_read.py`, `plugins/spec-guard/hooks/test_proposal_tracker_read.py`, `plugins/spec-guard/references/proposal-tracker-read.md`, `scripts/validate.sh`.
 

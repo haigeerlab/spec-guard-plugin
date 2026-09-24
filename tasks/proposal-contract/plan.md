@@ -56,7 +56,7 @@ No browser UI is introduced. This module produces a reference grammar and read-o
 
 **Acceptance criteria:** Source tests use the contract's public result model; validation wiring and source documentation identify the new focused test without adding bridge coupling, tracker writes or a state projection.
 
-**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_contract.py`, `/bin/bash plugins/spec-guard/hooks/test-codex-adapter.sh`, `/bin/bash scripts/validate.sh`, and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
+**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_contract.py`, `python3 scripts/check-manifests.py`, `/bin/bash scripts/validate.sh`, and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
 
 **Likely files:** `scripts/validate.sh`, `docs/maintainer-workflow.md` only if a new focused-test row is necessary, focused test files.
 

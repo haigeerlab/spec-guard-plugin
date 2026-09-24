@@ -56,7 +56,7 @@ No browser UI is introduced. This module exposes Python/JSON read results only, 
 
 **Acceptance criteria:** A narrow Python/JSON entry point serializes state, review commit and safe diagnostics without dumping remote URLs or mutating the project. The focused test joins `scripts/validate.sh`; source guidance explains that publication does not query trackers.
 
-**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_publication.py`, `/bin/bash plugins/spec-guard/hooks/test-codex-adapter.sh`, `/bin/bash scripts/validate.sh` and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
+**Verification:** `python3 -B plugins/spec-guard/hooks/test_proposal_publication.py`, `python3 scripts/check-manifests.py`, `/bin/bash scripts/validate.sh` and `/bin/bash evals/codex-plugin-smoke.sh --selftest` pass.
 
 **Likely files:** `plugins/spec-guard/hooks/proposal_publication.py`, `plugins/spec-guard/hooks/test_proposal_publication.py`, `plugins/spec-guard/references/proposal-publication.md`, `scripts/validate.sh`.
 

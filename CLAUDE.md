@@ -55,7 +55,7 @@ scripts/validate.sh                      ← 仓库完整性校验
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
-/bin/bash plugins/spec-guard/hooks/test-codex-adapter.sh
+python3 scripts/check-manifests.py
 /bin/bash evals/codex-plugin-smoke.sh --selftest
 ```
 
