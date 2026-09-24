@@ -4,12 +4,31 @@
   "records": [
     {
       "subject": "spec-guard-claude-code",
-      "status": "not-verified",
+      "status": "installed-verified",
       "target": {
         "kind": "installed-session",
-        "id": "marketplace:spec-guard-marketplace;version:0.18.0"
+        "id": "marketplace:spec-guard-marketplace;source:yizhongkaimail-collab/spec-guard-plugin@v0.18.0"
       },
-      "reason": "requires the published v0.18.0 tag and a newly started Claude Code session"
+      "observedAt": "2026-09-24T11:07:32Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user --json",
+        "command:claude plugin list",
+        "result:Claude Code reported spec-guard 0.18.0 installed and enabled from the published marketplace tag"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-collaboration",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli-collab:v0.18.0;alias:claude-v018-2fc6;peer:codex-v018-xw9yg"
+      },
+      "observedAt": "2026-09-24T11:07:32Z",
+      "evidence": [
+        "host:new Claude Code CLI session loaded the installed v0.18.0 collab skill",
+        "result:the session lazily registered, received the Codex mailbox message, and replied using the sender identity",
+        "result:the reply preserved honest mailbox semantics and was subsequently read by the Codex peer"
+      ]
     }
   ]
 }

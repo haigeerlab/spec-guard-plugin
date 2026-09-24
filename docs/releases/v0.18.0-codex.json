@@ -4,12 +4,31 @@
   "records": [
     {
       "subject": "spec-guard-codex",
-      "status": "not-verified",
+      "status": "installed-verified",
       "target": {
         "kind": "installed-session",
-        "id": "marketplace:spec-guard-marketplace;version:0.18.0"
+        "id": "marketplace:spec-guard-marketplace;source:yizhongkaimail-collab/spec-guard-plugin@v0.18.0"
       },
-      "reason": "requires the published v0.18.0 tag and a newly started Codex session"
+      "observedAt": "2026-09-24T11:07:32Z",
+      "evidence": [
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "command:codex plugin list --json",
+        "result:Codex reported spec-guard 0.18.0 installed and enabled from the published marketplace tag"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-collaboration",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli-collab:v0.18.0;alias:codex-v018-xw9yg;peer:claude-v018-2fc6"
+      },
+      "observedAt": "2026-09-24T11:07:32Z",
+      "evidence": [
+        "host:new Codex CLI session loaded the installed v0.18.0 collab skill and received the Spec Guard UserPromptSubmit phase context",
+        "result:the session lazily registered, discovered the Claude Code peer by human-friendly name, and sent a mailbox message without claiming a wake acknowledgement",
+        "result:the session read the Claude Code reply confirming bidirectional local collaboration"
+      ]
     }
   ]
 }
