@@ -29,6 +29,21 @@
         "result:the session lazily registered, discovered the Claude Code peer by human-friendly name, and sent a mailbox message without claiming a wake acknowledgement",
         "result:the session read the Claude Code reply confirming bidirectional local collaboration"
       ]
+    },
+    {
+      "subject": "spec-guard-codex-desktop-native-collaboration",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-desktop-native-collab:v0.18.0;alias:codex-desktop-v018-p9k3;peer:claude-desktop-peer-v018-5d6d"
+      },
+      "observedAt": "2026-09-24T11:33:22Z",
+      "evidence": [
+        "host:the active native Codex Desktop session loaded the installed v0.18.0 collab skill and registered without a managed app-server thread or terminal process binding",
+        "result:Codex Desktop read the exact Claude Code mailbox message and wrote a confirmation reply while honestly reporting that no real-time pane wake occurred",
+        "result:the same Claude Code peer read the Codex Desktop confirmation, proving bidirectional mailbox delivery",
+        "result:both temporary collaboration identities were unregistered after verification"
+      ]
     }
   ]
 }
