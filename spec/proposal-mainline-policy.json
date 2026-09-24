@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "authorityId": "mainline",
+  "remote": "origin",
+  "reviewRef": "refs/heads/integration/mainline",
+  "workflowId": "capability-map-integration"
+}

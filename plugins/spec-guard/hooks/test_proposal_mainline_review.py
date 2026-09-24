@@ -1,6 +1,7 @@
 """Mainline-review fixtures; no tracker writes."""
 import json
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -58,12 +59,23 @@ CONTEXT = {
     "workflowId": "capability-map-integration",
     "currentModuleId": "alpha",
 }
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 class ProposalMainlineReviewTests(unittest.TestCase):
     def tracker(self):
         return TrackerRead("verified", issue_id=7, stage="proposal-stage:published",
                            proposal_id="gamma", platform="github", target="octo/repo")
+
+    def test_repository_policy_matches_the_canonical_single_authority_contract(self):
+        path = REPO_ROOT / "spec" / "proposal-mainline-policy.json"
+        self.assertTrue(path.is_file(), "repository mainline policy must exist")
+        policy = json.loads(path.read_text(encoding="utf-8"))
+
+        self.assertEqual(policy, dict(POLICY, schemaVersion=1))
+        pool = PublicationPool("published", review_commit="a" * 40,
+                               review_map=MAP, policy_text=json.dumps(policy))
+        self.assertEqual(policy_from_pool(pool), policy)
 
     def test_only_a_matching_mainline_context_can_create_an_accept_candidate(self):
         result = evaluate(publication(), self.tracker(), "github", "octo/repo",
