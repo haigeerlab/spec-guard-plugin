@@ -10,12 +10,11 @@ spec-guard protects two deliberately separate workflows:
   maps, module specs, plans, and local task lists.
 
 It also provides an optional, same-Mac collaboration mailbox for Claude Code
-and Codex sessions. It is a published Proposal candidate, not an accepted
-Capability Map module: it does not change the Proposal lifecycle or automate
-Git, Issue, Ticket, project grouping, or task assignment.
+and Codex sessions. The mailbox does not change the Proposal lifecycle or
+automate Git, Issue, Ticket, project grouping, or task assignment.
 
-It does not create or modify Issues, pull requests, merge requests, branches,
-tasks, remote refs, or Proposal lifecycle state.
+The Proposal lifecycle does not create or modify Issues, pull requests, merge
+requests, branches, tasks, remote refs, or Proposal lifecycle state.
 
 Install from the public marketplace with
 `/plugin marketplace add yizhongkaimail-collab/spec-guard-plugin`.
@@ -71,9 +70,19 @@ configuration. See the [runtime reference](plugins/spec-guard/references/collabo
 for the explicit setup sequence.
 
 Native Codex Desktop uses persistent mailbox delivery only; it does not enable
-managed app-server wake mode, so ChatGPT in Chrome remains available. The
-candidate still requires independent Proposal review before it can enter the
-Capability Map.
+managed app-server wake mode, so ChatGPT in Chrome remains available.
+
+## Local tickets
+
+When GitHub or GitLab Issues are unavailable, the optional Epiq-backed local
+ledger records bugs, requests, and discussion for linked worktrees of one Git
+repository on the same Mac. After explicit one-time setup through
+`/spec-guard:local-ticket-ledger`, use `/spec-guard:ticket` in Claude Code or
+ask Codex to “show local tickets” or “record a bug.” The agent can include a
+ticket's short ref in a separate collaboration message. An agent working in a
+different repository needs the source project and a problem summary in that
+message; the short ref alone does not grant access to this repository's ledger.
+See the [ledger reference](plugins/spec-guard/references/local-ticket-ledger-runtime.md).
 
 ## Proposal mainline review
 

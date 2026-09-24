@@ -10,6 +10,10 @@ for a Git repository's linked worktrees when GitHub/GitLab Issues are unavailabl
 from the Spec Guard collaboration mailbox: a mailbox message may mention a ledger short ID, but
 neither system may automatically create, update, route, or require the other.
 
+For ordinary listing, reading, creating, commenting, or closing an already enabled ticket, use the
+`ticket` skill. This operations skill handles status, explicit installation, initialization, and
+Claude/Codex MCP connection.
+
 The ledger is not a local GitHub/GitLab replacement. Do not introduce project groups, participant
 topology, role locks, assignments, scheduling, automatic claiming, routing rules, or automatic
 remote synchronization. Ticket fields are voluntary collaboration context, not access control.

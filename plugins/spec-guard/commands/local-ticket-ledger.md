@@ -6,6 +6,9 @@ allowed-tools: Bash, Read
 这是一个可选的、同机同仓库 linked worktree 共享的持久事项账本入口。它不替代协作邮箱，不是
 GitHub/GitLab 的本地克隆，也不包含项目组、角色、派单、排期或自动同步。
 
+普通查看、创建、评论和关闭事项使用 `/spec-guard:ticket`；本命令负责只读状态、显式安装、初始化与
+宿主接入。
+
 先定位已安装的 Spec Guard 根目录，并只读检查状态：
 
 ```bash
