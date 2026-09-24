@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.19.0" },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:4de519357771a9f510d62fa2eb1a065fc596cfc2"
+      },
+      "observedAt": "2026-09-24T14:17:14Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "command:python3 -B plugins/spec-guard/hooks/test_local_ledger_runtime.py",
+        "command:python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py",
+        "command:python3 -B plugins/spec-guard/hooks/test_collab_entry.py",
+        "result:release commit tree matched the tested release-preparation commit 0f6e082 without differences"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.19.0;asset:spec-guard-v0.19.0.tar.gz;sha256:b8bb8a61c8737074fb3368c520498182e783b1fb6b0da7663d13329d69168c8d"
+      },
+      "observedAt": "2026-09-24T14:17:14Z",
+      "evidence": [
+        "release:https://github.com/yizhongkaimail-collab/spec-guard-plugin/releases/tag/v0.19.0",
+        "source-tag:v0.19.0@4de519357771a9f510d62fa2eb1a065fc596cfc2",
+        "command:python3 scripts/release-package.py validate <tag-derived-artifact> 0.19.0",
+        "result:all 93 distributed source files matched the tag; the downloaded GitHub asset matched the local archive byte-for-byte and passed package validation after extraction"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-new-session",
+      "status": "not-verified",
+      "target": { "kind": "host-session", "id": "codex-new-session:v0.19.0" },
+      "reason": "The Codex plugin cache reports 0.19.0, but no new host session has loaded or exercised this release yet."
+    },
+    {
+      "subject": "spec-guard-claude-code-new-session",
+      "status": "not-verified",
+      "target": { "kind": "host-session", "id": "claude-code-new-session:v0.19.0" },
+      "reason": "The Claude Code plugin cache reports 0.19.0 and requests a restart; no restarted host session has loaded or exercised this release yet."
+    }
+  ]
+}

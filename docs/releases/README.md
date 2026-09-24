@@ -26,6 +26,9 @@
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
 逐次确认流程见 [acceptance-journeys.md](acceptance-journeys.md)。
 
+v0.19.0 的源码与发布包已验证，Codex 和 Claude Code 的新会话加载仍待验证；见
+[v0.19.0-source.json](v0.19.0-source.json)。上表的 v0.18.0 宿主证据不自动延伸到新版本。
+
 ## 新安装或升级记录模板
 
 在获得用户确认并完成实际操作后，创建 `<version>-<host>.json`。`target.id` 必须包括
