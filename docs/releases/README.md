@@ -17,8 +17,8 @@
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
 | Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.18.0）：从发布 tag 安装，新 CLI 会话完成本机协作双向收发，见 [v0.18.0-codex.json](v0.18.0-codex.json) | 显式确认；模块严格串行推进 |
-| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.18.0）：原生桌面会话与 Claude Code CLI 完成本机协作双向收发，见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.18.0）：从发布 tag 安装，新 CLI 会话完成本机协作双向收发，见 [v0.18.0-claude.json](v0.18.0-claude.json) | 显式确认；模块严格串行推进 |
+| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.19.0）：原生桌面任务只读列出本地事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话通过 `/spec-guard:ticket` 只读列出本地事项，见 [v0.19.0-claude.json](v0.19.0-claude.json)；v0.18.0 联调双向收发另见 [v0.18.0-claude.json](v0.18.0-claude.json) | 显式确认；模块严格串行推进 |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `installed-verified` / `host-verified`（v0.13.0）：重启后的桌面会话收到 UserPromptSubmit 阶段注入，见 [v0.13.0-claude.json](v0.13.0-claude.json) | 不因其他宿主而获得写入结论 |
 | Claude Desktop MCPB | `source-verified`：`test-claude-desktop-mcp.sh` | `not-verified`：未记录已安装 MCPB 会话 | 只读；没有写入工具 |
 
@@ -26,8 +26,9 @@
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
 逐次确认流程见 [acceptance-journeys.md](acceptance-journeys.md)。
 
-v0.19.0 的源码与发布包已验证，Codex 和 Claude Code 的新会话加载仍待验证；见
-[v0.19.0-source.json](v0.19.0-source.json)。上表的 v0.18.0 宿主证据不自动延伸到新版本。
+v0.19.0 的源码与发布包见 [v0.19.0-source.json](v0.19.0-source.json)。本次宿主验证仅覆盖同仓库
+本地事项的只读列举；Codex CLI 新会话和事项写入、跨项目通知仍未验证。v0.18.0 的联调证据不自动
+延伸到新版本。
 
 ## 新安装或升级记录模板
 

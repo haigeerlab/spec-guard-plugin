@@ -33,18 +33,6 @@
         "command:python3 scripts/release-package.py validate <tag-derived-artifact> 0.19.0",
         "result:all 93 distributed source files matched the tag; the downloaded GitHub asset matched the local archive byte-for-byte and passed package validation after extraction"
       ]
-    },
-    {
-      "subject": "spec-guard-codex-new-session",
-      "status": "not-verified",
-      "target": { "kind": "host-session", "id": "codex-new-session:v0.19.0" },
-      "reason": "The Codex plugin cache reports 0.19.0, but no new host session has loaded or exercised this release yet."
-    },
-    {
-      "subject": "spec-guard-claude-code-new-session",
-      "status": "not-verified",
-      "target": { "kind": "host-session", "id": "claude-code-new-session:v0.19.0" },
-      "reason": "The Claude Code plugin cache reports 0.19.0 and requests a restart; no restarted host session has loaded or exercised this release yet."
     }
   ]
 }
