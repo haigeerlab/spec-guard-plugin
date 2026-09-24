@@ -29,6 +29,38 @@
         "result:the skill called epiq_issue_list with brief=true and includeClosed=false and returned the existing open ticket also observed by Codex Desktop",
         "result:no ticket or repository write was requested; creation, editing, closing, and cross-project messaging were not tested"
       ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-ticket-cross-host-read",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli-ticket:v0.19.0;test:isolated-local-cross-host-read-20260924"
+      },
+      "observedAt": "2026-09-24T15:05:20Z",
+      "evidence": [
+        "scope:a new Claude Code CLI session opened the same no-origin temporary repository used by Codex Desktop",
+        "host:the session loaded /spec-guard:ticket and called epiq_issue_list and epiq_issue_get for a temporary test ticket",
+        "result:before closure it read the Codex Desktop comment; after closure a fresh CLI session called epiq_issue_get and observed isClosed=true",
+        "limit:an initial untraced natural-language response did not establish a successful read; only the later traced tool calls count as verification",
+        "limit:Claude Code CLI ticket writes and cross-project collaboration messaging were not tested"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-ticket-write",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli-ticket:v0.19.0;test:isolated-local-write-full-id-20260924"
+      },
+      "observedAt": "2026-09-24T15:17:55Z",
+      "evidence": [
+        "scope:new Claude Code CLI sessions used the initialized no-origin temporary repository and did not touch the existing project ledger",
+        "host:the sessions loaded /spec-guard:ticket and called epiq_issue_create, epiq_issue_comment_add, and epiq_issue_close",
+        "result:a temporary test ticket was created, commented on, and closed; Codex Desktop read the comment and isClosed=true",
+        "limit:the installed v0.19.0 skill passed a short ref directly to epiq_issue_comment_add, which returned Issue not found; the successful comment and close used the full issue ID",
+        "limit:cross-project collaboration messaging was not tested"
+      ]
     }
   ]
 }

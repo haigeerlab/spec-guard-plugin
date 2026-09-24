@@ -42,6 +42,21 @@
         "result:the query returned the same existing open ticket observed in Codex Desktop and Claude Code CLI",
         "result:creation, editing, closing, and cross-project messaging were not tested"
       ]
+    },
+    {
+      "subject": "spec-guard-codex-desktop-ticket-write",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-desktop-ticket:v0.19.0;test:isolated-local-write-20260924"
+      },
+      "observedAt": "2026-09-24T15:05:20Z",
+      "evidence": [
+        "scope:an isolated temporary Git repository without origin was initialized through the connected Epiq MCP; the existing project ledger was not modified",
+        "host:the native Codex Desktop task called epiq_issue_create, epiq_issue_comment_add, epiq_issue_get, and epiq_issue_close",
+        "result:a temporary test ticket was created, its comment was read back, and a final read returned isClosed=true",
+        "result:no collaboration message was sent; Epiq attempted to push to absent origin and reported the expected warnings, with no remote write"
+      ]
     }
   ]
 }

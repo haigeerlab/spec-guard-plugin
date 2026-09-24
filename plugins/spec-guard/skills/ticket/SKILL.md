@@ -15,6 +15,9 @@ description: 在已启用的本地事项账本中查询、创建、讨论或关�
 `Todo`／`To do`／`Backlog` 泳道。没有明显的收件泳道且多个选项都合理时，才问一次。不要因为一次
 事项请求自动创建看板、泳道、标签、负责人或永久 Agent 身份。
 
+用户给短编号且要修改已有事项时，先用 `epiq_issue_get` 取得完整 `value.id`；写操作传完整 ID
+（`issueId`／`issueIds`），不要把短编号直接传给写工具。读取失败时报告实际错误，不推断账本未初始化。
+
 按用户意图调用 `epiq_issue_comment_add`、`epiq_issue_description_edit`、`epiq_issue_move`、
 `epiq_issue_reopen` 或 `epiq_issue_close`。记录“已修复”可以是评论；只有用户要求关闭或明确确认验证
 通过时才关闭。已在当前会话声明过的 Epiq 身份继续复用；只有用户提供或确认稳定身份时才调用

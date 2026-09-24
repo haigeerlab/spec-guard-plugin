@@ -17,8 +17,8 @@
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
 | Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话只读列出本地事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 显式确认；模块严格串行推进 |
-| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.19.0）：原生桌面任务只读列出本地事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话通过 `/spec-guard:ticket` 只读列出本地事项，见 [v0.19.0-claude.json](v0.19.0-claude.json)；v0.18.0 联调双向收发另见 [v0.18.0-claude.json](v0.18.0-claude.json) | 显式确认；模块严格串行推进 |
+| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.19.0）：原生桌面任务在无远端临时账本中创建、评论、读取并关闭事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话读取 Codex 桌面事项，并在隔离账本中创建、评论和关闭事项（写入使用完整 ID），见 [v0.19.0-claude.json](v0.19.0-claude.json)；v0.18.0 联调双向收发另见 [v0.18.0-claude.json](v0.18.0-claude.json) | 显式确认；模块严格串行推进 |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `installed-verified` / `host-verified`（v0.13.0）：重启后的桌面会话收到 UserPromptSubmit 阶段注入，见 [v0.13.0-claude.json](v0.13.0-claude.json) | 不因其他宿主而获得写入结论 |
 | Claude Desktop MCPB | `source-verified`：`test-claude-desktop-mcp.sh` | `not-verified`：未记录已安装 MCPB 会话 | 只读；没有写入工具 |
 
@@ -26,9 +26,11 @@
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
 逐次确认流程见 [acceptance-journeys.md](acceptance-journeys.md)。
 
-v0.19.0 的源码与发布包见 [v0.19.0-source.json](v0.19.0-source.json)。本次三种宿主入口的验证仅
-覆盖同仓库本地事项的只读列举；事项写入、跨项目通知仍未验证。v0.18.0 的联调证据不自动延伸到
-新版本。
+v0.19.0 的源码与发布包见 [v0.19.0-source.json](v0.19.0-source.json)。三种宿主入口均已验证
+同仓库本地事项的只读列举；Codex 桌面还在隔离临时仓库完成了创建、评论、读取、关闭，Claude Code
+CLI 读到了其评论与关闭状态，并用完整 ID 创建、评论、关闭了另一条测试事项，Codex 桌面也读回了
+结果。安装版 v0.19.0 的短编号直接评论失败；源码中的 `ticket` 指引已修正，尚未作为发布版验收。
+Codex CLI 的事项写入、跨项目通知仍未验证。v0.18.0 的联调证据不自动延伸到新版本。
 
 ## 新安装或升级记录模板
 
