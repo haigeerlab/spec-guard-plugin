@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "proposalId": "collaboration-messaging",
+  "revision": "91ea56bbada0acba5a0682f944e89cb7ede0c34ed7cf4f435fe39cc2c67888dd",
+  "reviewCommit": "33d9500540872ddb16b6ed9604135a87e1f324f8",
+  "policyDigest": "f39616b45bbf1ace28a1bf9bf81039bfc06cb625b82979c3e33c0aa1bc8c06e9",
+  "authorityId": "mainline",
+  "decision": "accept"
+}
