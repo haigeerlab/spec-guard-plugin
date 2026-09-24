@@ -5,3 +5,7 @@ node_modules/
 __pycache__/
 .claude/settings.local.json
 .mutation-check.lock
+
+# [epiq]: local hydrated state is never committed
+.epiq/events/
+.epiq/log/
