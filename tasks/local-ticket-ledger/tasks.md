@@ -67,7 +67,7 @@ remote writes or a capability-map change.
 **Verification:**
 
 - [x] Adapter tests cover generated config, missing runtime, conflict refusal, and atomic update.
-- [ ] Real Claude Code and native Codex Desktop each list/read the same local ticket after restart.
+- [x] Real Claude Code and native Codex Desktop each list/read the same local ticket after restart.
 
 **Likely files:** `local_ledger_adapters.py`, tests, Claude/Codex config references, ledger skill.
 
@@ -75,9 +75,9 @@ remote writes or a capability-map change.
 
 ## Checkpoint: Safe local tracker setup
 
-- [ ] The runtime is opt-in, version-pinned, user-scoped, and diagnosable.
-- [ ] A dirty repository cannot be initialized accidentally.
-- [ ] Neither mailbox configuration nor ChatGPT in Chrome behavior has changed.
+- [x] The runtime is opt-in, version-pinned, user-scoped, and diagnosable.
+- [x] A dirty repository cannot be initialized accidentally.
+- [x] Neither mailbox configuration nor ChatGPT in Chrome behavior has changed.
 
 ## Task 4: Document the local issue loop and optional mailbox handoff
 
@@ -118,7 +118,7 @@ remote writes or a capability-map change.
 - [x] `/bin/bash scripts/validate.sh`, the current Codex smoke self-test, and the relevant collaboration
       suite pass. (The previously named `test-codex-adapter.sh` is a retired legacy bridge test and is
       no longer present.)
-- [ ] A final status report records runtime version, license, Node requirement, Git effects, and
+- [x] A final status report records runtime version, license, Node requirement, Git effects, and
       remaining remote-migration limitation.
 
 **Likely files:** acceptance fixture, focused tests, validation script, references.
@@ -127,7 +127,7 @@ remote writes or a capability-map change.
 
 ## Checkpoint: Ready for review
 
-- [ ] All task verification items pass.
-- [ ] The plugin has not implemented a second forge, hidden a network service, or imposed roles/groups.
-- [ ] Capability Map and remote Proposal lifecycle are changed only through their existing explicit
+- [x] All task verification items pass.
+- [x] The plugin has not implemented a second forge, hidden a network service, or imposed roles/groups.
+- [x] Capability Map and remote Proposal lifecycle are changed only through their existing explicit
       review and promotion path.
