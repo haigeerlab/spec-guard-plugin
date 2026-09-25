@@ -432,16 +432,25 @@ class CollaborationRuntimeTests(unittest.TestCase):
         command = build_claude_command("claude", generated, False, ["--model", "sonnet"])
         self.assertNotIn("--dangerously-load-development-channels", command)
 
+    def test_claude_launcher_preserves_chrome_flag_with_optional_wake(self):
+        for include_channel in (False, True):
+            with self.subTest(include_channel=include_channel):
+                command = build_claude_command(
+                    "claude", Path("/tmp/collab.json"), include_channel,
+                    ["--chrome", "--model", "sonnet"],
+                )
+                self.assertEqual(command[-3:], ["--chrome", "--model", "sonnet"])
+
     def test_tmux_launcher_uses_direct_arguments_and_unique_session_name(self):
         command = build_tmux_command(
-            self.config_dir, "claude", ["--model", "sonnet", "a;b"],
+            self.config_dir, "claude", ["--chrome", "--model", "sonnet", "a;b"],
             session_name="spec-guard-test1234",
         )
         self.assertEqual(command[:6], [
             "tmux", "new-session", "-s", "spec-guard-test1234", "-c", str(Path.cwd()),
         ])
         self.assertIn("--tmux-wake", command)
-        self.assertEqual(command[-4:], ["--", "--model", "sonnet", "a;b"])
+        self.assertEqual(command[-5:], ["--", "--chrome", "--model", "sonnet", "a;b"])
         self.assertNotIn("test-only-token", " ".join(command))
         self.assertNotIn("--dangerously-load-development-channels", command)
 
