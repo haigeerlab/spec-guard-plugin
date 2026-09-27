@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.20.1" },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.20.1;test:official-marketplace-upgrade-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "command:claude plugin list --json",
+        "host:a new no-persistence Claude Code CLI session loaded spec-guard version 0.20.1 from the resolved plugin cache path",
+        "result:the installed plugin remained enabled and its marketplace checkout resolved tag v0.20.1 at commit e9ad99f51721581f24580f4c351bf15f323737ab"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.20.1;test:isolated-map-only-hook-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "scope:a temporary consumer Git repository was initialized with the Claude convention after an explicit dry-run; the source repository was not modified",
+        "host:a new claude -p --no-session-persistence session ran with tools disabled and loaded the installed v0.20.1 plugin",
+        "result:UserPromptSubmit injected MAP_ONLY phase context, reporting that the capability map existed and module specs were absent",
+        "result:no permission denial occurred and the temporary consumer directory was removed after the check"
+      ]
+    },
+    {
+      "subject": "claude-code-in-chrome-post-upgrade",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-in-chrome:existing-profile;test:public-pr-read-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "host:Claude Code in Chrome used the installed extension in an existing browser profile after the spec-guard upgrade",
+        "target:https://github.com/haigeerlab/spec-guard-plugin/pull/2",
+        "result:the public pull request URL and title were read successfully without changing Chrome settings or repository state",
+        "limit:this verifies preservation of the Claude Code in Chrome capability; it does not claim a browser-side spec-guard hook"
+      ]
+    }
+  ]
+}

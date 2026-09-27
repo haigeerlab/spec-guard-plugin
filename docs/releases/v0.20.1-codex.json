@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.20.1" },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.20.1;test:official-marketplace-upgrade-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "command:codex plugin list --available --json",
+        "result:spec-guard version 0.20.1 was installed and enabled from https://github.com/haigeerlab/spec-guard-plugin.git",
+        "result:the marketplace checkout resolved tag v0.20.1 at commit e9ad99f51721581f24580f4c351bf15f323737ab"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.20.1;test:user-prompt-submit-smoke-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source <resolved-source.path>",
+        "result:a real Codex CLI session received the current-stage context injected by the installed spec-guard UserPromptSubmit hook",
+        "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
+      ]
+    },
+    {
+      "subject": "chatgpt-in-chrome-post-upgrade",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "chatgpt-in-chrome:existing-profile;test:public-pr-read-20260927"
+      },
+      "observedAt": "2026-09-27T14:40:38Z",
+      "evidence": [
+        "host:ChatGPT in Chrome used an existing browser profile after the spec-guard upgrade",
+        "target:https://github.com/haigeerlab/spec-guard-plugin/pull/2",
+        "result:the public pull request URL and title were read successfully without changing Chrome settings or repository state",
+        "limit:this is a Chrome capability preservation check, not a Codex Desktop plugin-hook claim"
+      ]
+    }
+  ]
+}

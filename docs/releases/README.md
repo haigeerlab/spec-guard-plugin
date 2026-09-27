@@ -16,15 +16,23 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话只读列出本地事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.20.1）：官方 marketplace 安装副本的新 CLI 会话收到 UserPromptSubmit 阶段注入，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 显式确认；模块严格串行推进 |
 | Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.19.0）：原生桌面任务在无远端临时账本中创建、评论、读取并关闭事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.19.0）：新 CLI 会话读取 Codex 桌面事项，并在隔离账本中创建、评论和关闭事项（写入使用完整 ID），见 [v0.19.0-claude.json](v0.19.0-claude.json)；v0.18.0 联调双向收发另见 [v0.18.0-claude.json](v0.18.0-claude.json) | 显式确认；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.20.1）：官方 marketplace 安装副本的新 CLI 会话在隔离消费者项目收到 MAP_ONLY 阶段注入，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 显式确认；模块严格串行推进 |
+| ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
+| Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `installed-verified` / `host-verified`（v0.13.0）：重启后的桌面会话收到 UserPromptSubmit 阶段注入，见 [v0.13.0-claude.json](v0.13.0-claude.json) | 不因其他宿主而获得写入结论 |
 | Claude Desktop MCPB | `source-verified`：`test-claude-desktop-mcp.sh` | `not-verified`：未记录已安装 MCPB 会话 | 只读；没有写入工具 |
 
 以上行不等同于 GitHub/GitLab 项目验收；项目验收必须另行记录目标仓库、操作范围和
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
 逐次确认流程见 [acceptance-journeys.md](acceptance-journeys.md)。
+
+v0.20.1 的源码候选证据见 [v0.20.1-source.json](v0.20.1-source.json)，发布包、tag 与
+SHA-256 核对见 [v0.20.1-package.json](v0.20.1-package.json)，安装及真实宿主验收分别见
+[v0.20.1-codex.json](v0.20.1-codex.json) 与 [v0.20.1-claude.json](v0.20.1-claude.json)。
+源码候选记录保留发布前观察时点，不追写发布后状态；GitHub Actions 自动触发仍未验证，
+不阻塞已完成的包、安装与宿主验收。
 
 v0.19.0 的源码与发布包见 [v0.19.0-source.json](v0.19.0-source.json)。三种宿主入口均已验证
 同仓库本地事项的只读列举；Codex 桌面还在隔离临时仓库完成了创建、评论、读取、关闭，Claude Code

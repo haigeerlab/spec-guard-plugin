@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.20.1" },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.20.1;asset:spec-guard-v0.20.1.tar.gz;sha256:8fe6948df39fded9a58e5042b779359e08837c97821bccd98a6329f0ceaa68ba"
+      },
+      "observedAt": "2026-09-27T14:47:34Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.20.1",
+        "asset:spec-guard-v0.20.1.tar.gz;size:169339",
+        "source-tag:v0.20.1@e9ad99f51721581f24580f4c351bf15f323737ab",
+        "result:the locally validated archive and the published GitHub asset digest matched SHA-256 8fe6948df39fded9a58e5042b779359e08837c97821bccd98a6329f0ceaa68ba",
+        "limit:GitHub Actions automatic push and pull_request triggers were not verified and are not claimed as release evidence"
+      ]
+    }
+  ]
+}
