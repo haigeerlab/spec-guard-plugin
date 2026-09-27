@@ -29,6 +29,27 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertNotIn("token", fragment.lower())
         self.assertNotIn("http", fragment.lower())
 
+    def test_codex_fragment_exposes_only_daily_tools(self):
+        fragment = local_ledger_adapters.codex_toml_fragment(self.runtime_dir, "/opt/node")
+        lines = [line for line in fragment.splitlines() if line.startswith("enabled_tools = ")]
+        self.assertEqual(len(lines), 1)
+        enabled = json.loads(lines[0].split(" = ", 1)[1])
+        self.assertIn("epiq_issue_create", enabled)
+        self.assertIn("epiq_issue_close", enabled)
+        for tool in ("epiq_sync", "epiq_project_init", "epiq_skill_install", "epiq_issue_comment_delete",
+                     "epiq_swimlane_delete", "epiq_tag_remove", "epiq_contributor_remove",
+                     "epiq_contributor_email_link", "epiq_contributor_email_suggest",
+                     "epiq_contributor_email_unlink"):
+            self.assertNotIn(tool, enabled)
+        self.assertEqual(sorted(enabled + list(local_ledger_adapters.GATED_TOOLS)),
+                         sorted(local_ledger_adapters.LEDGER_TOOLS))
+
+    def test_gated_tools_are_a_subset_of_the_pinned_tool_surface(self):
+        tools = local_ledger_adapters.LEDGER_TOOLS
+        self.assertEqual(len(tools), len(set(tools)))
+        self.assertEqual(len(tools), 39)
+        self.assertTrue(set(local_ledger_adapters.GATED_TOOLS) <= set(tools))
+
     def test_adapter_refuses_a_missing_runtime(self):
         with self.assertRaisesRegex(ValueError, "not ready"):
             local_ledger_adapters.mcp_command(Path(self.tmp.name) / "missing", "/opt/node")
@@ -45,11 +66,14 @@ class LocalLedgerAdapterTests(unittest.TestCase):
             local_ledger_adapters.install_codex_config(config, self.runtime_dir, "/opt/node")
 
     def test_claude_install_checks_for_a_conflict_then_adds_a_user_scoped_stdio_server(self):
+        settings = Path(self.tmp.name) / "claude" / "settings.json"
         with patch("local_ledger_adapters.subprocess.run", side_effect=[
             subprocess.CompletedProcess([], 1), subprocess.CompletedProcess([], 0),
         ]) as run:
             local_ledger_adapters.install_claude_config(
-                "claude", self.runtime_dir, "/opt/node")
+                "claude", self.runtime_dir, "/opt/node", settings)
+        ask = json.loads(settings.read_text(encoding="utf-8"))["permissions"]["ask"]
+        self.assertIn("mcp__spec-guard-local-ledger__epiq_sync", ask)
         add_command = run.call_args_list[1].args[0]
         self.assertEqual(add_command[:5], [
             "claude", "mcp", "add", "--scope", "user",
@@ -57,6 +81,79 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertIn(local_ledger_adapters.MCP_SERVER_NAME, add_command)
         self.assertIn(str(self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"), add_command)
         self.assertNotIn("token", " ".join(add_command).lower())
+
+    def test_claude_install_refuses_an_existing_server_before_writing_settings(self):
+        settings = Path(self.tmp.name) / "claude" / "settings.json"
+        with patch("local_ledger_adapters.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 0)):
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                local_ledger_adapters.install_claude_config(
+                    "claude", self.runtime_dir, "/opt/node", settings)
+        self.assertFalse(settings.exists())
+
+    def test_claude_guard_merges_ask_rules_and_preserves_other_settings(self):
+        settings = Path(self.tmp.name) / "settings.json"
+        settings.write_text(json.dumps({
+            "model": "x",
+            "permissions": {"allow": ["Read"], "ask": ["Bash(git push *)", "mcp__spec-guard-local-ledger__epiq_sync"]},
+        }), encoding="utf-8")
+        settings.chmod(0o644)
+        local_ledger_adapters.install_claude_guard(settings)
+        local_ledger_adapters.install_claude_guard(settings)
+        value = json.loads(settings.read_text(encoding="utf-8"))
+        self.assertEqual(value["model"], "x")
+        self.assertEqual(value["permissions"]["allow"], ["Read"])
+        ask = value["permissions"]["ask"]
+        self.assertEqual(ask[0], "Bash(git push *)")
+        self.assertEqual(sorted(ask[1:]), sorted(local_ledger_adapters.claude_ask_rules()))
+        self.assertEqual(len(ask), len(set(ask)))
+        self.assertEqual(settings.stat().st_mode & 0o777, 0o644)
+
+    def test_claude_guard_refuses_malformed_settings_without_rewriting_them(self):
+        for contents in ("{not json", "[]", '{"permissions": []}', '{"permissions": {"ask": "x"}}'):
+            with self.subTest(contents=contents):
+                settings = Path(self.tmp.name) / "bad-settings.json"
+                settings.write_text(contents, encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    local_ledger_adapters.install_claude_guard(settings)
+                self.assertEqual(settings.read_text(encoding="utf-8"), contents)
+
+    def test_claude_guard_refuses_a_symlinked_settings_file(self):
+        target = Path(self.tmp.name) / "real.json"
+        target.write_text("{}", encoding="utf-8")
+        link = Path(self.tmp.name) / "settings.json"
+        link.symlink_to(target)
+        with self.assertRaisesRegex(ValueError, "non-symlink"):
+            local_ledger_adapters.install_claude_guard(link)
+        self.assertEqual(target.read_text(encoding="utf-8"), "{}")
+
+    def test_claude_cli_prints_ask_rules_without_modifying_configuration(self):
+        settings = Path(self.tmp.name) / "claude" / "settings.json"
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "claude", "--runtime-dir", str(self.runtime_dir), "--claude-settings", str(settings),
+            ]), 0)
+        printed = json.loads(output.getvalue())
+        self.assertEqual(printed["permissions"]["ask"], local_ledger_adapters.claude_ask_rules())
+        self.assertFalse(settings.exists())
+
+    def test_claude_guard_cli_requires_an_explicit_confirmation(self):
+        settings = Path(self.tmp.name) / "claude" / "settings.json"
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={"state": "absent"}), \
+                redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "install-claude-guard", "--claude-settings", str(settings),
+            ]), 1)
+            self.assertEqual(local_ledger_adapters.main([
+                "install-claude-guard", "--claude-settings", str(settings), "--confirm-install",
+            ]), 0)
+        self.assertIn("configuration-confirmation-required", output.getvalue())
+        self.assertIn("mcp__spec-guard-local-ledger__epiq_sync",
+                      json.loads(settings.read_text(encoding="utf-8"))["permissions"]["ask"])
 
     def test_codex_cli_prints_a_fragment_without_modifying_configuration(self):
         output = io.StringIO()

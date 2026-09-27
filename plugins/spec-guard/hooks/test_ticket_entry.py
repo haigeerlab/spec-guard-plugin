@@ -4,6 +4,8 @@
 from pathlib import Path
 import unittest
 
+from local_ledger_adapters import GATED_TOOLS
+
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SKILL = PLUGIN_ROOT / "skills" / "ticket" / "SKILL.md"
@@ -25,10 +27,20 @@ class TicketEntryContractTest(unittest.TestCase):
         self.assertIn("不得把短编号直接传给写工具", text)
         self.assertIn("写工具确认成功后才能报告成功", text)
 
+    def test_daily_entries_name_every_gated_tool_as_confirmation_only(self) -> None:
+        for path in (SKILL, COMMAND):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.name):
+                self.assertIn("每次调用单独确认", text)
+                self.assertIn("不构成授权", text)
+                for tool in GATED_TOOLS:
+                    self.assertIn(f"`{tool}`", text)
+
     def test_repository_validation_runs_ticket_contract(self) -> None:
         text = VALIDATE.read_text(encoding="utf-8")
 
         self.assertIn("python3 -B plugins/spec-guard/hooks/test_ticket_entry.py", text)
+        self.assertIn("python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py", text)
 
 
 if __name__ == "__main__":

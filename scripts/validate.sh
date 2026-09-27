@@ -81,6 +81,7 @@ python3 -B plugins/spec-guard/hooks/test_collab_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collab_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_collaboration_backend.py || F=1
 python3 -B plugins/spec-guard/hooks/test_ticket_entry.py || F=1
+python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py || F=1
 python3 -B plugins/spec-guard/hooks/test_collaboration_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collaboration_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collaboration_adapters.py || F=1
@@ -98,6 +99,14 @@ echo ""
 
 echo "═══ Capability history ledger regression ═══"
 /bin/bash plugins/spec-guard/hooks/test-capability-history.sh || F=1
+echo ""
+
+echo "═══ Checkpoint contract discoverability ═══"
+python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py || F=1
+echo ""
+
+echo "═══ Claude Desktop MCP regression ═══"
+/bin/bash plugins/spec-guard/hooks/test-claude-desktop-mcp.sh || F=1
 echo ""
 
 echo "═══ History verification regression ═══"

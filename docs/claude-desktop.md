@@ -2,7 +2,7 @@
 
 Claude Desktop 不执行 Claude Code plugin 的 `/spec-guard:*` slash commands。Spec Guard 为它提供
 一个本地 Node.js stdio MCP server，并以 MCP Bundle（`.mcpb`）形式安装。这个入口刻意只暴露
-只读检查与预览，不将一次桌面 tool call 当作 GitHub/GitLab 写入授权。
+只读检查，不将一次桌面 tool call 当作任何写入授权。
 
 ## 打包与安装
 
@@ -30,18 +30,15 @@ settings → Install Extension…** 后选取。安装页面会展示工具与�
 | --- | --- | --- |
 | `phase` | 返回现有 `phase-guard.sh` 的阶段事实 | 否 |
 | `verify` | 调用 `verify-artifacts.sh` 校验产物 | 否 |
-| `verify_history` | 校验 capability history evidence | 否 |
-| `sync_map_preview` | GitHub 本地投影预览、GitLab 确定性预览或 local 说明 | 否 |
+| `verify_history` | 调用 `verify-history.sh` 校验 capability history evidence | 否 |
+| `audit_history` | 只读语义审计 `spec/CAPABILITY-HISTORY.json`；没有 ledger 时返回“未验证” | 否 |
 | `write_operation` | 返回需要确认的下一步 | 否，永不执行 |
 
-`setup`、创建/刷新 Issue、MR 创建/合并、history import、lifecycle、`next`、`deliver` 与 teardown
-没有 MCP 工具入口。写入请在 Claude Code CLI、Codex CLI 或 Codex 桌面版中明确说明影响范围并确认后执行。
+hook 以非零状态退出时，工具结果标记为 `isError`，不会包装成成功文本。旧 tracker 同步预览
+`sync_map_preview` 已随 tracker bridge 退役移除；早期安装的扩展若仍显示它，需要重新打包安装。
 
-GitHub 预览与 GitLab 确定性入口都先调用同一能力图解析器。Spec Guard 始终严格串行推进；
-为兼容上游格式，Build order 的逗号分组会按左到右展开为单模块步骤，依赖仍只取 `Depends on`。
-图无效、Python 不可用、子进程非零或返回坏 JSON 时，
-预览直接返回错误，绝不会退回旧正则解析或报告成功。该保证来自本地协议回归，不等同于 Desktop
-原生 UI E2E。
+`setup`、`teardown`、history 更正等写入没有 MCP 工具入口。Proposal 评审、本机协作邮箱与本地事项
+账本也不在 Desktop 中提供。写入请在 Claude Code 或 Codex 中明确说明影响范围并确认后执行。
 
 ## 四端功能矩阵
 
@@ -49,7 +46,7 @@ GitHub 预览与 GitLab 确定性入口都先调用同一能力图解析器。Sp
 | --- | --- | --- | --- |
 | Claude Code CLI | Claude plugin slash command | 支持 | 支持；执行前确认 |
 | Claude Desktop | 本地 MCPB | 支持 | 不提供；切换至 CLI/Codex |
-| Codex CLI | Codex plugin skill/hook | 支持 | 支持；sandbox 可能要求批准 `gh`/`glab` |
+| Codex CLI | Codex plugin skill/hook | 支持 | 支持；遵从 sandbox 批准流程 |
 | Codex 桌面版 | Codex plugin skill | 支持 | 支持；遵从桌面端批准流程 |
 
 ## 验证
@@ -59,5 +56,7 @@ GitHub 预览与 GitLab 确定性入口都先调用同一能力图解析器。Sp
 /bin/bash scripts/validate.sh
 ```
 
-安装后先调用 `phase`，并传入目标项目的绝对 Git 根路径。相对路径、子目录和不存在路径会返回错误，
+`test-claude-desktop-mcp.sh` 通过 stdio 调用每个工具，确认它们分派到对应 hook、传递 hook 失败，
+并拒绝已移除的工具名；它不等同于 Desktop 原生 UI E2E。安装后先调用 `phase`，并传入目标项目的
+绝对 Git 根路径。相对路径、子目录和不存在路径会返回错误，
 不会扫描或修改其他位置。

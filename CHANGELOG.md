@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **共享检查点规则可达。** `spec-guard-ops` 重新链接 `references/workflow-checkpoints.md`；
+  本地约定模板、`/phase` 与 `/verify-artifacts` 让 agent 加载的检查点规则不再指向空内容。
+- **Desktop 文档对齐实现。** `docs/claude-desktop.md` 移除已退役的同步预览说明，补充
+  `audit_history`，并写明 Desktop 不提供 Proposal、协作与本地事项入口。
+- **Desktop 扩展描述。** `manifest.json` 的描述改为只列出实际提供的只读阶段、产物与
+  capability history 检查，不再宣称 Proposal 评审与协作能力；Desktop 回归测试守住这一点。
+
+### 变更
+
+- **本地事项账本高风险工具门控。** `epiq_sync`（推送事项到 Git 远端）、`epiq_project_init`、
+  `epiq_skill_install`、项目级删除／移除与贡献者邮箱工具共 10 个，在 `ticket` skill 与命令中改为逐次
+  确认；`install-claude` 同时写入用户级 `permissions.ask`，`install-codex` 以 `enabled_tools` 白名单只暴露
+  其余 29 个日常工具。已接入的 Claude 可用新增的 `install-claude-guard --confirm-install` 单独补上确认规则；
+  Codex 需按参考文档手动加入 `enabled_tools`。Claude 的 `bypassPermissions` 模式会跳过确认。
+- **主链评审报告真实原因。** 远端快照读不到时 `proposal-mainline-*` 返回 `unknown` /
+  `proposal-pool-unknown`，不再与分支不符一起显示为 `blocked` / `mainline-blocked`；策略缺失、授权 id 不符、
+  无上游、本地主链未包含远端提交与 Proposal 不存在各有稳定诊断码。候选列表新增 `skipped`，列出未成为候选的
+  Proposal 及原因，空列表不再无法区分“没有 Proposal”与“Proposal 没有 Issue”。
+
+### 测试
+
+- **检查点规则可发现性回归。** 任何提到共享检查点规则的命令、skill 或模板都必须能到达它。
+- **Claude Desktop MCP 回归恢复。** `test-claude-desktop-mcp.sh` 按当前 5 个工具重建并进入
+  `validate.sh`：核对每个工具分派到对应 hook、hook 失败以 `isError` 返回、已移除的
+  `sync_map_preview` 被拒绝。`check-manifests.py` 同时核对 Desktop `manifest.json` 的名称与版本。
+- **history 回归不再假绿。** `test-history-verification.sh` 与 `test-history-migration.sh`
+  改为任一断言失败即退出并报告行号；此前只有最后一条命令决定结果。
+- **主链评审 CLI 端到端回归。** 首次覆盖 `main()` 的两种模式，以及各层失败的诊断码与 Git 拓扑判定。
+- **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
+  契约测试要求日常入口点名全部门控工具。
+
 ## [0.20.1] - 2026-09-27
 
 ### 修复

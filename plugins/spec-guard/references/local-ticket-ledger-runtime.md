@@ -121,9 +121,35 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-insta
   --claude-bin "$(command -v claude)"
 ```
 
-Codex 安装只原子追加 `[mcp_servers.spec_guard_local_ledger]` 表；Claude 安装只通过
-`claude mcp add --scope user` 添加同名 stdio server。两者若发现同名条目都会拒绝覆盖，并且客户端重启后才会
+Codex 安装只原子追加 `[mcp_servers.spec_guard_local_ledger]` 表（含 `enabled_tools` 白名单）；Claude
+安装先合并下文的 `permissions.ask` 规则，再通过 `claude mcp add --scope user` 添加同名 stdio server。两者若发现同名条目都会拒绝覆盖，并且客户端重启后才会
 加载。Spec Guard 不使用 Codex managed app-server，因此不会影响 ChatGPT in Chrome。
+
+### 高风险工具门控
+
+Epiq 1.11.0 的 MCP 提供 39 个工具。其中 10 个会推送远端、改写仓库文件、删除项目级记录或处理邮箱：
+`epiq_sync`、`epiq_project_init`、`epiq_skill_install`、`epiq_issue_comment_delete`、
+`epiq_swimlane_delete`、`epiq_tag_remove`、`epiq_contributor_remove`、`epiq_contributor_email_link`、
+`epiq_contributor_email_suggest`、`epiq_contributor_email_unlink`。`epiq_sync` 会把事项标题、描述与
+评论推送到 Git 远端的 `__epiq_state__` 分支；远端公开时这些内容随之公开。
+
+- **Claude Code**：`install-claude` 先把这 10 个工具写入用户级 `~/.claude/settings.json` 的
+  `permissions.ask`（形如 `mcp__spec-guard-local-ledger__epiq_sync`），再注册 MCP；每次调用由 Claude
+  Code 弹出确认，自动模式下同样生效。`bypassPermissions` 模式会跳过确认，此时只剩 skill 中的逐次确认要求。
+- **Codex**：`install-codex` 写入 `enabled_tools` 白名单，只暴露其余 29 个日常工具；这 10 个工具与
+  Epiq 日后新增的工具都不会注册给 Codex。需要同步时，由用户在终端自行使用受管运行时的
+  `node_modules/.bin/epiq`。
+
+已按旧版本接入的宿主不会自动获得门控，需要用户明确要求后迁移：
+
+```bash
+# Claude Code：只合并 ask 规则，不改 MCP 条目与其他设置
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude-guard --confirm-install
+# Codex：打印新片段，把其中的 enabled_tools 行手动加入现有 [mcp_servers.spec_guard_local_ledger] 表
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
+```
+
+迁移后重启对应客户端。升级 Epiq 版本时必须重新核对 `local_ledger_adapters.py` 中的工具清单。
 
 本阶段没有自动或手动的账本移除命令。不得把移除 MCP 配置理解为删除事项，也不得删除 `.epiq/`、
 `__epiq_state__` 或受管运行时来“重置”项目；这些路径可能承载其他 worktree 的持久记录，任何移除能力都必须

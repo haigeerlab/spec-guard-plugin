@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
+trap 'echo "  ❌ ${BASH_SOURCE[0]}:${LINENO} 断言失败" >&2' ERR
 HOOKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIGRATION="$HOOKDIR/history-migration.py"
 TMP="$(mktemp -d)"
@@ -24,3 +25,4 @@ printf '{"initiative":{"title":"capability-history"}}' > "$TMP/current/.agent/st
 python3 "$MIGRATION" import --confirm "$TMP/current" >/dev/null
 python3 "$HOOKDIR/capability-history.py" verify "$TMP/current/spec/CAPABILITY-HISTORY.json" "$TMP/current" >/dev/null
 [ "$(python3 "$HOOKDIR/capability-history.py" status "$TMP/current/spec/CAPABILITY-HISTORY.json" capability-history)" = active ]
+echo "  ✅ history migration regression passed"

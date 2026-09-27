@@ -31,7 +31,9 @@ python3 -B "$ROOT/hooks/proposal_mainline_review.py" \
 ~~~
 
 原样报告 JSON。candidate-list 只是待人工审阅的排序候选，绝不等于 accepted。
-若结果为 blocked、unknown、invalid 或 stale，停止，不从其他 worktree 补充事实。
+若结果为 blocked、unknown、invalid 或 stale，停止，不从其他 worktree 补充事实；按 `diagnostic` 说明原因：
+`proposal-pool-unknown` 是远端快照读不到，`mainline-review-commit-not-ancestor` 是本地主链未包含远端默认
+分支，其余代码见 `references/proposal-mainline-review.md`。`skipped` 列出未成为候选的 Proposal 及原因。
 本命令不会创建或修改 Issue、标签、能力图、分支、任务或 PR。
 
 要记录主链人工裁决，追加 Proposal id、decision 和 observations JSON：
