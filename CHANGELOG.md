@@ -8,6 +8,8 @@
   本地约定模板、`/phase` 与 `/verify-artifacts` 让 agent 加载的检查点规则不再指向空内容。
 - **Desktop 文档对齐实现。** `docs/claude-desktop.md` 移除已退役的同步预览说明，补充
   `audit_history`，并写明 Desktop 不提供 Proposal、协作与本地事项入口。
+- **Desktop 扩展描述。** `manifest.json` 的描述改为只列出实际提供的只读阶段、产物与
+  capability history 检查，不再宣称 Proposal 评审与协作能力；Desktop 回归测试守住这一点。
 
 ### 测试
 

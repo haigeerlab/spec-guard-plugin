@@ -131,6 +131,9 @@ import json, sys
 manifest = json.load(open(sys.argv[1], encoding="utf-8"))
 assert manifest["manifest_version"] == "0.2"
 assert manifest["name"] == "spec-guard"
+# 描述只能宣称 Desktop 实际提供的只读工具；这些能力只在 Claude Code 与 Codex 中提供。
+for absent in ("Proposal", "collaboration", "ticket", "ledger"):
+    assert absent.lower() not in manifest["description"].lower(), absent
 assert manifest["server"] == {
     "type": "node",
     "entry_point": "mcp/claude_desktop_server.mjs",
