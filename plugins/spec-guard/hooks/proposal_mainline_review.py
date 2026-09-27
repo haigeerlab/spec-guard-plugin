@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -35,12 +36,14 @@ ATTESTATION_FIELDS = frozenset((
 POLICY_FIELDS = frozenset((
     "schemaVersion", "authorityId", "remote", "reviewRef", "workflowId",
 ))
+# 只有稳定诊断码可以出现在输出里；发布层的说明文字和原始异常一律退回 mainline-<state>。
+DIAGNOSTIC_CODE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
 class MainlineReview(object):
     def __init__(self, state, proposal_id=None, revision=None, review_commit=None,
                  authority_id=None, current_module_id=None, reason_codes=(),
-                 diagnostic=None, candidates=()):
+                 diagnostic=None, candidates=(), skipped=()):
         self.state = state
         self.proposal_id = proposal_id
         self.revision = revision
@@ -50,6 +53,7 @@ class MainlineReview(object):
         self.reason_codes = tuple(reason_codes)
         self.diagnostic = diagnostic
         self.candidates = tuple(candidates)
+        self.skipped = tuple(skipped)
 
 
 def as_json(result):
@@ -63,12 +67,26 @@ def as_json(result):
             data[key] = value
     if result.candidates:
         data["candidates"] = list(result.candidates)
+    if result.skipped:
+        data["skipped"] = [{"proposalId": proposal_id, "reason": reason}
+                           for proposal_id, reason in result.skipped]
     if result.reason_codes:
         data["reasonCodes"] = list(result.reason_codes)
     if result.state in ("blocked", "invalid", "unknown", "stale",
                         "legacy-revision-required"):
-        data["diagnostic"] = "mainline-%s" % result.state
+        code = result.diagnostic
+        data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
+                              else "mainline-%s" % result.state)
     return data
+
+
+def _unusable_pool(pool):
+    """Report an unreadable or invalid snapshot before any policy or Git check."""
+    state = getattr(pool, "state", None)
+    if state == "published":
+        return None
+    state = state if state in ("invalid", "unknown") else "unknown"
+    return MainlineReview(state, diagnostic="proposal-pool-%s" % state)
 
 
 def _result(state, publication, context=None, reason_codes=(), diagnostic=None,
@@ -189,19 +207,23 @@ def _git_text(project, args):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def local_mainline_context(project, pool, authority_id, boundary, current_module_id):
-    """Read only this worktree's Git topology against a remote-snapshot policy."""
+def _local_mainline_context(project, pool, authority_id, boundary, current_module_id):
+    """Return (context, None) or (None, stable diagnostic code) for this worktree."""
     policy = policy_from_pool(pool)
-    if (boundary not in ("module-deliver", "module-advance") or
-            not isinstance(authority_id, str) or
-            not isinstance(current_module_id, str) or not current_module_id or
-            policy is None or authority_id != policy["authorityId"]):
-        return None
+    if boundary not in ("module-deliver", "module-advance"):
+        return None, "mainline-boundary-invalid"
+    if policy is None:
+        return None, "mainline-policy-invalid"
+    if (not isinstance(authority_id, str) or
+            not isinstance(current_module_id, str) or not current_module_id):
+        return None, "mainline-input-invalid"
+    if authority_id != policy["authorityId"]:
+        return None, "mainline-authority-mismatch"
     branch = _git_text(project, ["symbolic-ref", "-q", "HEAD"])
     upstream = _git_text(project, ["rev-parse", "--abbrev-ref",
                                    "--symbolic-full-name", "@{upstream}"])
     if branch is None or upstream is None:
-        return None
+        return None, "mainline-branch-unavailable"
     context = {
         "authorityId": authority_id,
         "branch": branch,
@@ -210,14 +232,23 @@ def local_mainline_context(project, pool, authority_id, boundary, current_module
         "currentModuleId": current_module_id,
     }
     if not _matching_context(policy, context):
-        return None
+        return None, "mainline-context-invalid"
     try:
         topology = subprocess.run(
             ["git", "-C", str(project), "merge-base", "--is-ancestor",
              pool.review_commit, "HEAD"], text=True, capture_output=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired):
-        return None
-    return context if topology.returncode == 0 else None
+        return None, "mainline-topology-unavailable"
+    if topology.returncode == 1:
+        return None, "mainline-review-commit-not-ancestor"
+    if topology.returncode != 0:
+        return None, "mainline-topology-unavailable"
+    return context, None
+
+
+def local_mainline_context(project, pool, authority_id, boundary, current_module_id):
+    """Read only this worktree's Git topology against a remote-snapshot policy."""
+    return _local_mainline_context(project, pool, authority_id, boundary, current_module_id)[0]
 
 
 def accepted(publication, tracker, platform, target, policy, attestation):
@@ -258,12 +289,15 @@ def accepted_from_pool(pool, publication, tracker, platform, target):
 def discover_from_pool(project, pool, tracker_for, platform, target, authority_id,
                        boundary, current_module_id):
     """Discover candidates only after reading policy and Git context locally."""
-    policy = policy_from_pool(pool)
-    context = local_mainline_context(project, pool, authority_id, boundary,
-                                     current_module_id)
-    if policy is None or context is None:
-        return MainlineReview("blocked", diagnostic="mainline-context-invalid")
-    return discover(pool, tracker_for, platform, target, policy, context, boundary)
+    unusable = _unusable_pool(pool)
+    if unusable is not None:
+        return unusable
+    context, code = _local_mainline_context(project, pool, authority_id, boundary,
+                                            current_module_id)
+    if context is None:
+        return MainlineReview("blocked", diagnostic=code)
+    return discover(pool, tracker_for, platform, target, policy_from_pool(pool), context,
+                    boundary)
 
 
 def discover(pool, tracker_for, platform, target, policy, context, boundary):
@@ -283,10 +317,12 @@ def discover(pool, tracker_for, platform, target, policy, context, boundary):
     if not current_module:
         return MainlineReview("invalid", diagnostic="current-module-is-not-in-review-map")
     candidates = []
+    skipped = []
     for publication in getattr(pool, "publications", ()):
         proposal = getattr(publication, "proposal", None)
         if (getattr(proposal, "version", None) != "v2" or
                 not getattr(proposal, "revision", None)):
+            skipped.append((proposal.proposal_id, "legacy-revision-required"))
             continue
         tracker = tracker_for(proposal)
         facts = review(publication, tracker, platform, target)
@@ -294,9 +330,11 @@ def discover(pool, tracker_for, platform, target, policy, context, boundary):
             candidates.append(proposal.proposal_id)
         elif facts.state in ("invalid", "unknown"):
             return MainlineReview(facts.state, diagnostic="candidate-facts-%s" % facts.state)
+        else:
+            skipped.append((proposal.proposal_id, "review-%s" % facts.state))
     return MainlineReview("candidate-list", authority_id=context["authorityId"],
                           current_module_id=context["currentModuleId"],
-                          candidates=tuple(sorted(candidates)))
+                          candidates=tuple(sorted(candidates)), skipped=tuple(sorted(skipped)))
 
 
 def evaluate(publication, tracker, platform, target, policy, context, decision, observations):
@@ -360,15 +398,21 @@ def main(argv=None):
             observations = json.loads(args.observations_json)
         except ValueError:
             observations = None
-        policy = policy_from_pool(pool)
-        context = local_mainline_context(args.project, pool, args.authority_id,
-                                         args.boundary, args.current_module_id)
-        publication = next((item for item in getattr(pool, "publications", ())
-                            if item.proposal.proposal_id == args.proposal_id), None)
-        result = (MainlineReview("blocked", diagnostic="mainline-context-invalid")
-                  if policy is None or context is None or publication is None else
-                  evaluate(publication, read_tracker(publication.proposal, args.platform, target),
-                           args.platform, target, policy, context, args.decision, observations))
+        result = _unusable_pool(pool)
+        if result is None:
+            context, code = _local_mainline_context(args.project, pool, args.authority_id,
+                                                    args.boundary, args.current_module_id)
+            publication = next((item for item in getattr(pool, "publications", ())
+                                if item.proposal.proposal_id == args.proposal_id), None)
+            if context is None:
+                result = MainlineReview("blocked", diagnostic=code)
+            elif publication is None:
+                result = MainlineReview("invalid", diagnostic="proposal-not-published")
+            else:
+                result = evaluate(publication,
+                                  read_tracker(publication.proposal, args.platform, target),
+                                  args.platform, target, policy_from_pool(pool), context,
+                                  args.decision, observations)
     print(json.dumps(as_json(result), ensure_ascii=False))
     return 0
 

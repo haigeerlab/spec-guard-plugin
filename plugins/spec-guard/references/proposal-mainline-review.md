@@ -18,3 +18,22 @@ remote-default snapshot as the Proposal pool. It then reads only the current
 worktree's branch, upstream and ancestor relation to that snapshot. Callers provide
 only authority id, explicit boundary and current module id; supplied branch or HEAD
 text is never accepted as authority evidence.
+
+The CLI reports the first failing layer with a stable diagnostic code and never
+free text or raw errors:
+
+| State | Diagnostic | Meaning |
+| --- | --- | --- |
+| unknown / invalid | `proposal-pool-unknown` / `proposal-pool-invalid` | The remote-default snapshot could not be read or does not parse; no Git context was evaluated. |
+| blocked | `mainline-policy-invalid` | The snapshot has no valid mainline policy. |
+| blocked | `mainline-authority-mismatch` | The supplied authority id differs from the policy. |
+| blocked | `mainline-branch-unavailable` | Detached HEAD or no upstream. |
+| blocked | `mainline-context-invalid` | Branch, upstream or workflow does not match the policy. |
+| blocked | `mainline-review-commit-not-ancestor` | Local HEAD does not contain the remote review commit; update the mainline first. |
+| blocked | `mainline-topology-unavailable` | Git could not evaluate ancestry. |
+| invalid | `proposal-not-published` | The requested Proposal id is not in the snapshot. |
+
+A candidate list also carries `skipped`: each published Proposal that is not a
+candidate, with `legacy-revision-required` or `review-<state>` (for example
+`review-absent` when no Proposal Issue exists). An empty candidate list therefore
+still says what was seen.
