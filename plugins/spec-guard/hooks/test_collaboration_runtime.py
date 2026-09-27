@@ -518,7 +518,7 @@ class CollaborationRuntimeTests(unittest.TestCase):
         ])
         self.assertIn(str(helper.resolve()), added)
         self.assertIn(str(self.config_dir), added)
-        self.assertIn("/bin/echo", added)
+        self.assertEqual(added[-1], str(Path("/bin/echo").resolve()))
         self.assertNotIn("test-only-token", " ".join(added))
 
     def test_claude_user_configuration_refuses_to_replace_an_existing_server(self):
