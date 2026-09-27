@@ -3,6 +3,8 @@ name: spec-guard-ops
 description: 在 Codex 中运行 Spec Guard 的本地约定、只读验证和文档／历史工具。
 ---
 
+阶段交接、确认或停止前，读取并遵循[共享检查点规则](../../references/workflow-checkpoints.md)；按实际路径预告下一步，已有授权不重复询问。
+
 本 skill 不接管远端 tracker。GitHub/GitLab 的旧任务投影、选择、绑定和交付流程已退役；
 不得从 `.agent/state.json` 恢复它们，也不得创建或修改远端对象。
 

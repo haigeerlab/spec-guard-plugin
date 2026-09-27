@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **共享检查点规则可达。** `spec-guard-ops` 重新链接 `references/workflow-checkpoints.md`；
+  本地约定模板、`/phase` 与 `/verify-artifacts` 让 agent 加载的检查点规则不再指向空内容。
+- **Desktop 文档对齐实现。** `docs/claude-desktop.md` 移除已退役的同步预览说明，补充
+  `audit_history`，并写明 Desktop 不提供 Proposal、协作与本地事项入口。
+
+### 测试
+
+- **检查点规则可发现性回归。** 任何提到共享检查点规则的命令、skill 或模板都必须能到达它。
+- **Claude Desktop MCP 回归恢复。** `test-claude-desktop-mcp.sh` 按当前 5 个工具重建并进入
+  `validate.sh`：核对每个工具分派到对应 hook、hook 失败以 `isError` 返回、已移除的
+  `sync_map_preview` 被拒绝。`check-manifests.py` 同时核对 Desktop `manifest.json` 的名称与版本。
+- **history 回归不再假绿。** `test-history-verification.sh` 与 `test-history-migration.sh`
+  改为任一断言失败即退出并报告行号；此前只有最后一条命令决定结果。
+
 ## [0.20.1] - 2026-09-27
 
 ### 修复

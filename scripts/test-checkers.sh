@@ -137,6 +137,24 @@ mkcodex "$TMP/codex-good" spec-guard 1.0.0 ./skills/ ./hooks/hooks.json
 want pass "codex manifest: 名称和版本一致 → 放行" \
   bash -c "cd '$TMP/codex-good' && python3 '$ROOT/scripts/check-manifests.py'"
 
+# Claude Desktop MCPB 清单（manifest.json）同样必须镜像名称与版本。
+mkdesktop() {  # $1=目录 $2=name $3=version
+  printf '{"manifest_version":"0.2","name":"%s","version":"%s"}\n' "$2" "$3" \
+    > "$1/plugins/spec-guard/manifest.json"
+}
+mkspecguard "$TMP/desktop-version-bad"
+mkdesktop "$TMP/desktop-version-bad" spec-guard 9.9.9
+want fail "desktop manifest: 版本漂移 → 报错" \
+  bash -c "cd '$TMP/desktop-version-bad' && python3 '$ROOT/scripts/check-manifests.py'"
+mkspecguard "$TMP/desktop-name-bad"
+mkdesktop "$TMP/desktop-name-bad" wrong-name 1.0.0
+want fail "desktop manifest: 名称漂移 → 报错" \
+  bash -c "cd '$TMP/desktop-name-bad' && python3 '$ROOT/scripts/check-manifests.py'"
+mkspecguard "$TMP/desktop-good"
+mkdesktop "$TMP/desktop-good" spec-guard 1.0.0
+want pass "desktop manifest: 名称和版本一致 → 放行" \
+  bash -c "cd '$TMP/desktop-good' && python3 '$ROOT/scripts/check-manifests.py'"
+
 # ── check-command-names.py ──
 mkc() {  # $1=目录 $2=模板里引用的命令名
   rm -rf "$1"; mkdir -p "$1/plugins/demo/commands" "$1/plugins/demo/templates" "$1/plugins/demo/skills"
