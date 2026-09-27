@@ -9,8 +9,8 @@ import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-repository_url = "https://github.com/yizhongkaimail-collab/spec-guard-plugin"
-owner_name = "yizhongkaimail-collab"
+repository_url = "https://github.com/haigeerlab/spec-guard-plugin"
+owner_name = "haigeerlab"
 
 marketplace = json.loads((root / ".claude-plugin/marketplace.json").read_text())
 claude = json.loads((root / "plugins/spec-guard/.claude-plugin/plugin.json").read_text())
@@ -21,7 +21,7 @@ assert marketplace["owner"] == {"name": owner_name, "url": repository_url}
 assert claude["author"] == {"name": owner_name}
 assert claude["homepage"] == repository_url
 assert desktop["author"] == {"name": owner_name}
-assert f"/plugin marketplace add yizhongkaimail-collab/spec-guard-plugin" in readme
-assert "haigeer-labs/spec-guard-plugin" not in readme
-print("public metadata points to yizhongkaimail-collab/spec-guard-plugin")
+assert f"/plugin marketplace add {owner_name}/spec-guard-plugin" in readme
+assert "/plugin marketplace add yizhongkaimail-collab/spec-guard-plugin" not in readme
+print("public metadata points to haigeerlab/spec-guard-plugin")
 PY

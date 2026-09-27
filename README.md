@@ -17,12 +17,14 @@ The Proposal lifecycle does not create or modify Issues, pull requests, merge
 requests, branches, tasks, remote refs, or Proposal lifecycle state.
 
 Install from the public marketplace with
-`/plugin marketplace add yizhongkaimail-collab/spec-guard-plugin`.
+`/plugin marketplace add haigeerlab/spec-guard-plugin`.
 
 The public source was recovered to `yizhongkaimail-collab/spec-guard-plugin`
-in v0.16.2. Existing cached installs continue to run, but future marketplace
-updates require manually re-adding this source; see the
-[source-recovery migration note](docs/migrations/v0.16.2-source-recovery.md).
+in v0.16.2, then copied to `haigeerlab/spec-guard-plugin` in September 2026.
+Existing cached installs continue to run; re-add the current source to receive
+future marketplace updates. See the
+[repository-copy migration note](docs/migrations/2026-09-27-repository-copy.md)
+and the earlier [source-recovery note](docs/migrations/v0.16.2-source-recovery.md).
 
 ## Breaking migration after v0.14.0
 

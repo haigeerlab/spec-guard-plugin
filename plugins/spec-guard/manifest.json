@@ -4,7 +4,7 @@
   "version": "0.20.0",
   "description": "Spec Guard phase, local verification, Proposal review, and optional same-Mac Agent collaboration for Claude Desktop.",
   "author": {
-    "name": "yizhongkaimail-collab"
+    "name": "haigeerlab"
   },
   "server": {
     "type": "node",
