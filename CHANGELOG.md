@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-27
+
 ### 新增
 
 - **实验性原生跨会话唤醒。** Claude Code 与原生 Codex Desktop 在同一台 Mac 上可经显式安装、
