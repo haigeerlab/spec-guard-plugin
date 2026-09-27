@@ -207,8 +207,14 @@ if [ -n "${UPS}" ] && [ -d "${UPS}/.claude/commands" ]; then
   mkfake "$TMP/upgone" plan
   want pass "command-names: 对照上游本人 → 放行" \
     bash -c "cd '$ROOT' && SPEC_GUARD_UPSTREAM_REGISTRY='$TMP/upfull.json' python3 '$ROOT/scripts/check-command-names.py'"
+  # 用自带夹具引用 /plan，不依赖仓库文案恰好提到它。
+  mkdir -p "$TMP/cmdref/plugins/demo/commands"
+  printf '%s\n' '---' 'description: d' '---' '完成后运行 `/plan` 拆任务。' \
+    > "$TMP/cmdref/plugins/demo/commands/demo.md"
+  want pass "command-names: 夹具引用 /plan，上游齐全 → 放行" \
+    bash -c "cd '$TMP/cmdref' && SPEC_GUARD_UPSTREAM_REGISTRY='$TMP/upfull.json' python3 '$ROOT/scripts/check-command-names.py'"
   want fail "command-names: 上游删了 /plan → 报快照过期" \
-    bash -c "cd '$ROOT' && SPEC_GUARD_UPSTREAM_REGISTRY='$TMP/upgone.json' python3 '$ROOT/scripts/check-command-names.py'"
+    bash -c "cd '$TMP/cmdref' && SPEC_GUARD_UPSTREAM_REGISTRY='$TMP/upgone.json' python3 '$ROOT/scripts/check-command-names.py'"
 else
   printf '  ⏭  本机没装上游 agent-skills，跳过「对照上游本人」的一正一反（不代表通过）\n'
 fi
