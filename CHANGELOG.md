@@ -11,6 +11,14 @@
 - **Desktop 扩展描述。** `manifest.json` 的描述改为只列出实际提供的只读阶段、产物与
   capability history 检查，不再宣称 Proposal 评审与协作能力；Desktop 回归测试守住这一点。
 
+### 新增
+
+- **Proposal 评审与晋级证明入口。** 新增 `/spec-guard:proposal-review`（任何分支只读查看单个 Proposal 的
+  新鲜度与 Issue 阶段）和 `/spec-guard:proposal-promotion-proof`（晋级合并后，从新鲜远端事实重新确认接受，
+  再证明 module 按声明纳入能力图）。此前这两步只有库函数，README 承诺的合并后证明没有任何入口。
+  Codex 的 `spec-guard-ops` 新增 proposal 一节，覆盖评审、主链候选与裁决、预检和证明；共享检查点规则补充
+  模块交付或推进时可用的 Proposal 命令。
+
 ### 变更
 
 - **本地事项账本高风险工具门控。** `epiq_sync`（推送事项到 Git 远端）、`epiq_project_init`、
@@ -22,6 +30,9 @@
   `proposal-pool-unknown`，不再与分支不符一起显示为 `blocked` / `mainline-blocked`；策略缺失、授权 id 不符、
   无上游、本地主链未包含远端提交与 Proposal 不存在各有稳定诊断码。候选列表新增 `skipped`，列出未成为候选的
   Proposal 及原因，空列表不再无法区分“没有 Proposal”与“Proposal 没有 Issue”。
+- **Proposal 评审区分缺失的层。** 远端没有该 Proposal 时诊断为 `publication-absent`；Proposal 已发布但
+  Issue 缺失或不可读时为 `tracker-absent`／`tracker-invalid`／`tracker-unknown`，并附 proposal id 与
+  review commit。
 
 ### 测试
 
@@ -31,6 +42,10 @@
   `sync_map_preview` 被拒绝。`check-manifests.py` 同时核对 Desktop `manifest.json` 的名称与版本。
 - **history 回归不再假绿。** `test-history-verification.sh` 与 `test-history-migration.sh`
   改为任一断言失败即退出并报告行号；此前只有最后一条命令决定结果。
+- **Proposal 入口回归。** 晋级证明 CLI 以本地 bare 远端跑通“发布 → attestation → 晋级提交 → `proved`”，
+  并覆盖未接受、仅有 accepted 标签而 attestation 不匹配、Proposal 缺失、远端不可达，以及不带 `--prove` 时只做
+  预检；评审 CLI 覆盖组合、未发布时不读
+  tracker 与 GitLab 数字项目 id。
 - **主链评审 CLI 端到端回归。** 首次覆盖 `main()` 的两种模式，以及各层失败的诊断码与 Git 拓扑判定。
 - **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
   契约测试要求日常入口点名全部门控工具。

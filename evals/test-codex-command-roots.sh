@@ -11,6 +11,8 @@ COMMANDS=(
   proposal-mainline-candidates
   proposal-mainline-review
   proposal-promotion-preflight
+  proposal-promotion-proof
+  proposal-review
   verify-artifacts
 )
 

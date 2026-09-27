@@ -1,15 +1,17 @@
 """Promotion-proof fixtures begin with safe input-state precedence."""
 import importlib.util
+import io
 import json
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 from proposal_contract import compute, compute_revision
 from proposal_publication import Publication, read_published
-from proposal_promotion_proof import as_json, preflight, prove
+from proposal_promotion_proof import as_json, main, preflight, prove
 from proposal_mainline_review import accepted, policy_digest
 from proposal_review import Review
 from proposal_tracker_read import TrackerRead
@@ -41,11 +43,19 @@ PROMOTION_MAP = BASE_MAP.replace(
         "Build order: alpha", "Build order: alpha → gamma")
 
 
+REMOTE_POLICY = {
+    "schemaVersion": 1, "authorityId": "mainline", "remote": "origin",
+    "reviewRef": "refs/heads/integration/mainline",
+    "workflowId": "capability-map-integration",
+}
+
+
 class PromotionFixture(unittest.TestCase):
     promotion_map = PROMOTION_MAP
     merge_promotion = False
     include_artifacts = True
     include_extra_file = False
+    attested = False
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-promotion-proof-")
@@ -65,7 +75,13 @@ class PromotionFixture(unittest.TestCase):
         self.baseline = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.write_proposal()
         self.git(self.seed, "add", "spec/proposals/gamma.md")
+        if self.attested:
+            (self.seed / "spec/proposal-mainline-policy.json").write_text(
+                json.dumps(REMOTE_POLICY), encoding="utf-8")
+            self.git(self.seed, "add", "spec/proposal-mainline-policy.json")
         self.git(self.seed, "commit", "-m", "publish proposal")
+        if self.attested:
+            self.write_attestation()
         self.git(self.seed, "remote", "add", "origin", str(self.remote))
         self.git(self.seed, "push", "origin", "trunk")
         self.git(self.root, "clone", str(self.remote), str(self.consumer))
@@ -171,6 +187,18 @@ Gamma is separate.
         path = self.seed / "spec/proposals/gamma.md"
         path.write_text(text, encoding="utf-8")
         path.write_text(text.replace("0" * 64, compute_revision(path)), encoding="utf-8")
+
+    def write_attestation(self):
+        reviewed = self.git(self.seed, "rev-parse", "HEAD").strip()
+        revision = compute_revision(self.seed / "spec/proposals/gamma.md")
+        (self.seed / "spec/proposal-acceptances").mkdir()
+        (self.seed / ("spec/proposal-acceptances/gamma-%s.json" % revision)).write_text(json.dumps({
+            "schemaVersion": 1, "proposalId": "gamma", "revision": revision,
+            "reviewCommit": reviewed, "policyDigest": policy_digest(REMOTE_POLICY),
+            "authorityId": "mainline", "decision": "accept",
+        }), encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposal-acceptances")
+        self.git(self.seed, "commit", "-m", "attest gamma")
 
     def write_promotion_artifacts(self):
         (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.promotion_map,
@@ -315,6 +343,59 @@ class PromotionPreflightTests(PromotionFixture):
             result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
                                tracker_reader=lambda *ignored: tracker)
         self.assertEqual((result.state, result.base_commit), ("stale", None))
+
+
+
+class PromotionProofCliTests(PromotionFixture):
+    attested = True
+
+    def run_cli(self, *extra, stage="proposal-stage:accepted"):
+        tracker = TrackerRead("verified", issue_id=42, stage=stage,
+                              proposal_id="gamma", platform="github", target="octo/spec-guard")
+        output = io.StringIO()
+        with patch("proposal_promotion_proof.read_tracker", return_value=tracker), \
+                redirect_stdout(output):
+            self.assertEqual(main(["--project", str(self.consumer), "--platform", "github",
+                                   "--target", "octo/spec-guard"] + list(extra)), 0)
+        return json.loads(output.getvalue())
+
+    def test_prove_cli_proves_the_merged_promotion_from_fresh_remote_facts(self):
+        result = self.run_cli("--proposal-id", "gamma", "--prove")
+        self.assertEqual(result["state"], "proved")
+        self.assertEqual(result["promotionCommit"], self.promotion_commit)
+        self.assertEqual(result["moduleId"], "gamma")
+
+    def test_prove_cli_requires_a_fresh_accepted_issue_stage(self):
+        self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove",
+                                      stage="proposal-stage:in-review"),
+                         {"state": "not-accepted", "diagnostic": "promotion-not-accepted"})
+
+    def test_prove_cli_rejects_an_accepted_label_without_a_matching_attestation(self):
+        # Issue 仍是 accepted，但远端 attestation 不再是 accept：只有标签不足以证明。
+        path = next((self.seed / "spec/proposal-acceptances").glob("gamma-*.json"))
+        attestation = json.loads(path.read_text(encoding="utf-8"))
+        attestation["decision"] = "defer"
+        path.write_text(json.dumps(attestation), encoding="utf-8")
+        self.git(self.seed, "add", str(path))
+        self.git(self.seed, "commit", "-m", "withdraw attestation")
+        self.git(self.seed, "push", "origin", "trunk")
+        self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
+                         {"state": "not-accepted", "diagnostic": "promotion-not-accepted"})
+
+    def test_prove_cli_reports_a_missing_proposal_and_an_unreachable_remote(self):
+        self.assertEqual(self.run_cli("--proposal-id", "missing", "--prove"),
+                         {"state": "absent", "proposalId": "missing"})
+        self.git(self.consumer, "remote", "set-url", "origin", str(self.root / "gone.git"))
+        self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
+                         {"state": "unknown", "diagnostic": "promotion-unknown"})
+
+    def test_cli_without_prove_still_runs_only_the_preflight(self):
+        with patch("proposal_promotion_proof.prove",
+                   side_effect=AssertionError("preflight must not prove")):
+            result = self.run_cli("--proposal-id", "gamma")
+        # 晋级后能力图已变，preflight 只能报告 stale，绝不输出晋级证明。
+        self.assertEqual(result["state"], "stale")
+        self.assertNotIn("promotionCommit", result)
 
 
 if __name__ == "__main__":

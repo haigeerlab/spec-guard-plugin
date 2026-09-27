@@ -248,15 +248,40 @@ def prove(project, publication, review_result, remote="origin"):
     return _blocked("invalid")
 
 
+def prove_from_remote(project, proposal_id, platform, target, remote="origin",
+                      tracker_reader=None):
+    """Re-establish acceptance from fresh remote facts, then prove; nothing is written."""
+    pool = read_published_pool(project, remote)
+    state = getattr(pool, "state", None)
+    if state != "published":
+        return _blocked(state if state in ("invalid", "unknown") else "unknown")
+    publication = next((item for item in pool.publications
+                        if item.proposal.proposal_id == proposal_id), None)
+    if publication is None:
+        return Proof("absent", proposal_id=proposal_id)
+    reader = read_tracker if tracker_reader is None else tracker_reader
+    tracker = reader(publication.proposal, platform, target)
+    acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
+    return prove(project, publication, acceptance, remote)
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Read-only Proposal promotion preflight.")
+    parser = argparse.ArgumentParser(
+        description="Read-only Proposal promotion preflight, or post-merge proof with --prove.")
     parser.add_argument("--project", default=".")
     parser.add_argument("--proposal-id", required=True)
     parser.add_argument("--platform", choices=("github", "gitlab"), required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--remote", default="origin")
+    parser.add_argument("--prove", action="store_true",
+                        help="prove the merged promotion instead of previewing its base")
     args = parser.parse_args(argv)
     target = int(args.target) if args.platform == "gitlab" and args.target.isdigit() else args.target
+    if args.prove:
+        print(json.dumps(as_json(prove_from_remote(
+            args.project, args.proposal_id, args.platform, target, args.remote)),
+            ensure_ascii=False))
+        return 0
     print(json.dumps(preflight_as_json(preflight(
         args.project, args.proposal_id, args.platform, target, args.remote)),
         ensure_ascii=False))
