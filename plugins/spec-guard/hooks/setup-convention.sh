@@ -3,13 +3,12 @@
 # were retired and deliberately do not have a fallback.
 set -euo pipefail
 
-MODE="local"
 HOST="claude"
 DRY=false
 REPLACE=false
 for arg in "$@"; do
   case "$arg" in
-    local) MODE=local ;;
+    local) : ;;
     github|gitlab)
       echo "${arg} tracker mode was retired; no files were changed." >&2
       exit 2

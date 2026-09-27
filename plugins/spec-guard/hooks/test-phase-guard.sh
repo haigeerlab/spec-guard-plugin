@@ -13,6 +13,9 @@ local_project="$WORK/local"
 mkdir -p "$local_project/spec"
 printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGENTS.md"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' > "$local_project/spec/CAPABILITY-MAP.md"
+MAP_ONLY=$(CLAUDE_PROJECT_DIR="$local_project" /bin/bash "$HOOKDIR/phase-guard.sh")
+grep -q 'MAP_ONLY' <<<"$MAP_ONLY"
+grep -q 'spec/' <<<"$MAP_ONLY"
 touch "$local_project/spec/alpha.md"
 LOCAL=$(CLAUDE_PROJECT_DIR="$local_project" /bin/bash "$HOOKDIR/phase-guard.sh")
 grep -q '"hookSpecificOutput"' <<<"$LOCAL"

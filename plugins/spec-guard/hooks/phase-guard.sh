@@ -77,7 +77,7 @@ if [ "$SPECS" -eq 0 ]; then
 - Capability map: present
 - Module specs: absent
 
-Suggested next step: write the first reviewed module spec under `spec/`."
+Suggested next step: write the first reviewed module spec under \`spec/\`."
   exit 0
 fi
 
