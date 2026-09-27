@@ -41,6 +41,13 @@ adapter's `--confirm-install` flag. They store no ledger secret, use a stdio com
 same-name managed entry, and require the selected client to restart. Never configure a managed
 Codex app-server mode or alter ChatGPT in Chrome.
 
+The adapters gate the 10 high-risk Epiq tools (`epiq_sync`, `epiq_project_init`,
+`epiq_skill_install`, project-level deletes/removals, and contributor email tools): Claude installs
+add them to user-scoped `permissions.ask`; the Codex fragment's `enabled_tools` allowlist omits them.
+For a host connected before this gate existed, offer the migration in the reference
+(`install-claude-guard --confirm-install`, or the printed Codex `enabled_tools` line) only when the
+user asks for it.
+
 After the Epiq MCP is available, an Agent may voluntarily state a readable name and current activity,
 look for existing relevant tickets, then create or update a bug, requirement, investigation, or
 completion record as appropriate. Keep the interaction natural: do not force a fixed sequence,

@@ -56,6 +56,12 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-insta
   --claude-bin "$(command -v claude)"
 ```
 
+两个安装命令都会门控 10 个高风险 Epiq 工具（`epiq_sync`、`epiq_project_init`、`epiq_skill_install`、
+项目级删除／移除与贡献者邮箱工具）：Claude 写入用户级 `permissions.ask`，逐次确认；Codex 片段的
+`enabled_tools` 白名单不包含它们。此前已接入的宿主只有在用户明确要求时才迁移：Claude 运行
+`install-claude-guard --confirm-install`；Codex 把 `codex` 打印的 `enabled_tools` 行手动加入现有表。
+细节见 `references/local-ticket-ledger-runtime.md`。
+
 接入后的 Agent 可以通过 Epiq MCP 工具用可读名字和当前工作作自由自我说明，先查询可能相关的事项，再按
 需要创建 bug、需求、排查记录或完成说明。不要把标签、负责人或状态解释成访问控制或硬性流程。若协作邮箱
 也可用，消息可以携带事项短编号，例如“`R85YPWB` 已处理，请拉取后验证”；消息投递和事项改动仍是两个
