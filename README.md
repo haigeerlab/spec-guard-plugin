@@ -64,13 +64,18 @@ relationships or route messages automatically.
 
 Start with `/spec-guard:collaboration` to inspect the local state. Initialization,
 background service enablement, host configuration, and stale-agent removal all
-require an explicit user request. The runtime is loopback-only and keeps its
-token in `~/.spec-guard/collaboration/`, not in project files or MCP
-configuration. See the [runtime reference](plugins/spec-guard/references/collaboration-runtime.md)
-for the explicit setup sequence.
+require an explicit user request. The default XATS transport is loopback-only
+and keeps its token in `~/.spec-guard/collaboration/`, not in project files or
+MCP configuration. It gives native Codex Desktop persistent mailbox delivery,
+but not active wake-up.
 
-Native Codex Desktop uses persistent mailbox delivery only; it does not enable
-managed app-server wake mode, so ChatGPT in Chrome remains available.
+An experimental native transport can be installed and selected only through a
+separately approved, archive-guarded cutover. It uses one private local mailbox
+and may wake idle Claude Code and Codex Desktop conversations; an unsuccessful
+wake leaves the message available for later reading. It does not switch Codex to
+a managed app-server or change either Chrome integration. See the
+[runtime reference](plugins/spec-guard/references/collaboration-runtime.md) for
+the explicit setup and rollback boundaries.
 
 ## Local tickets
 
