@@ -9,6 +9,8 @@
 
 ### 文档
 
+- **记录 Codex 不加载插件 `commands/`。** 已核实 codex-cli 0.154.0 的插件组件里没有命令；Codex 用户经 `spec-guard-ops`
+  等 skill 使用。写入 `docs/maintainer-workflow.md` 的 Codex 一节。
 - **主链评审分支的同步方式。** 两个主链命令说明遇到 `mainline-review-commit-not-ancestor` 时先把主链分支快进到远端默认
   分支；发布流程加入“发布后快进 `integration/mainline`”。本仓库的 `integration/mainline` 已从落后 `main` 107 个提交快进
   到一致，并加了分支保护（禁止 force push 与删除）。
