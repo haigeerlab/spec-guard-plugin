@@ -1,6 +1,7 @@
 """Collaboration runtime contract tests; never start a daemon or read a real token."""
 import io
 import json
+import os
 import plistlib
 import stat
 import subprocess
@@ -258,6 +259,59 @@ class CollaborationRuntimeTests(unittest.TestCase):
         self.assertIn("cross-agent-teams-mcp@0.8.6", command)
         self.assertEqual(environment["CROSS_AGENT_TEAMS_MCP_TOKEN"], "test-only-token")
         self.assertNotIn("test-only-token", " ".join(command))
+
+    def write_database(self, mode=0o644):
+        for suffix in ("", "-wal", "-shm"):
+            path = self.config_dir / ("messages.sqlite" + suffix)
+            path.write_bytes(b"")
+            path.chmod(mode)
+
+    def assert_private_database(self):
+        for suffix in ("", "-wal", "-shm"):
+            path = self.config_dir / ("messages.sqlite" + suffix)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600, path.name)
+
+    def test_serve_daemon_makes_the_mailbox_private_and_execs_under_an_owner_only_umask(self):
+        self.write_config()
+        self.write_database()
+        seen = {}
+
+        def record_umask(*_args):
+            seen["umask"] = os.umask(0o022)
+            raise RuntimeError("exec called")
+
+        previous = os.umask(0o022)
+        self.addCleanup(os.umask, previous)
+        with patch("collaboration_auth_header.read_private_token", return_value="test-only-token"), \
+             patch("collaboration_runtime.os.execvpe", side_effect=record_umask):
+            with self.assertRaisesRegex(RuntimeError, "exec called"):
+                collaboration_runtime.serve_daemon(self.config_dir, "/opt/homebrew/bin/npx")
+        self.assertEqual(seen["umask"], 0o077)
+        self.assert_private_database()
+
+    def test_start_daemon_makes_the_mailbox_private_and_spawns_under_an_owner_only_umask(self):
+        self.write_config()
+        self.write_database()
+        process = MagicMock()
+        process.poll.return_value = None
+        with patch("collaboration_auth_header.read_private_token", return_value="test-only-token"), \
+             patch("collaboration_runtime.health", return_value=False), \
+             patch("collaboration_runtime.subprocess.Popen", return_value=process) as popen:
+            collaboration_runtime.start_daemon(self.config_dir, health_attempts=0)
+        self.assertEqual(popen.call_args.kwargs["umask"], 0o077)
+        self.assert_private_database()
+
+    def test_a_symlinked_mailbox_is_refused_rather_than_following_it(self):
+        self.write_config()
+        target = Path(self.tmp.name) / "elsewhere.sqlite"
+        target.write_bytes(b"")
+        target.chmod(0o644)
+        (self.config_dir / "messages.sqlite").symlink_to(target)
+        with patch("collaboration_runtime.subprocess.Popen") as popen:
+            with self.assertRaisesRegex(RuntimeContractError, "regular file"):
+                collaboration_runtime.start_daemon(self.config_dir)
+        popen.assert_not_called()
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o644)
 
     def test_stale_daemon_pid_file_is_removed_only_after_its_process_is_confirmed_gone(self):
         self.write_config()

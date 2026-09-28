@@ -11,6 +11,11 @@
 
 ### 修复
 
+- **XATS 信箱数据库只对本人可读写。** XATS 按调用者的 umask 创建 `messages.sqlite` 及其 `-wal`、`-shm`，
+  实测为 0644（所在目录为 0700，因此此前其他用户仍无法进入）。现在 `start` 与 LaunchAgent 使用的 `serve`
+  都以 umask 077 启动 XATS，并在启动前把已有的三个文件收紧到 0600；它们若是符号链接则拒绝启动，不跟随链接改权限。
+  native 后端的 `bridge.sqlite` 此前已强制 0600，不受影响。
+
 - **hook 入口不再执行项目仓库里的脚本。** `hooks.json` 此前在找不到插件根目录时回退到
   `${CLAUDE_PROJECT_DIR}/.claude/hooks/phase-guard.sh`：任何被打开的仓库只要放一个同名文件，就能让它在每轮提示时
   执行。插件从不向项目写这个文件，Claude Code 提供 `CLAUDE_PLUGIN_ROOT`，Codex CLI 0.154.0 提供 `PLUGIN_ROOT`
