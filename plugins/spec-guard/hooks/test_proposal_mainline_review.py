@@ -174,9 +174,21 @@ class ProposalMainlineReviewTests(unittest.TestCase):
         result = accepted(publication(), accepted_tracker, "github", "octo/repo",
                           POLICY, evidence)
         self.assertEqual((result.state, result.authority_id), ("accepted", "mainline"))
-        evidence["revision"] = "c" * 64
-        self.assertEqual(accepted(publication(), accepted_tracker, "github", "octo/repo",
-                                  POLICY, evidence).state, "blocked")
+        wrong = {
+            "schemaVersion": 2, "proposalId": "delta", "revision": "c" * 64,
+            "reviewCommit": "d" * 40, "policyDigest": "0" * 64,
+            "authorityId": "other", "decision": "reject",
+        }
+        self.assertEqual(set(wrong), set(evidence))
+        for field, value in sorted(wrong.items()):
+            with self.subTest(field=field):
+                result = accepted(publication(), accepted_tracker, "github", "octo/repo",
+                                  POLICY, dict(evidence, **{field: value}))
+                self.assertEqual((result.state, result.diagnostic),
+                                 ("blocked", "acceptance-attestation-invalid"))
+        result = accepted(publication(), accepted_tracker, "github", "octo/repo",
+                          POLICY, dict(evidence, note="extra"))
+        self.assertEqual(result.state, "blocked")
 
     def test_acceptance_evidence_and_policy_are_read_only_pool_facts(self):
         remote_policy = dict(POLICY, schemaVersion=1)
