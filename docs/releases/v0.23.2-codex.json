@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.23.2" },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.23.2;test:marketplace-ref-upgrade-20260928"
+      },
+      "observedAt": "2026-09-28T07:54:53Z",
+      "evidence": [
+        "change:only marketplaces.spec-guard-marketplace ref in the user Codex config was changed from v0.23.1 to v0.23.2",
+        "result:spec-guard@spec-guard-marketplace version 0.23.2 is installed and enabled from the marketplace checkout at tag v0.23.2"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.23.2;test:user-prompt-submit-smoke-20260928"
+      },
+      "observedAt": "2026-09-28T07:55:30Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and left no temporary project trust entry in the Codex config",
+        "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
+      ]
+    },
+    {
+      "subject": "spec-guard-gitlab-tracker-read",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "gitlab-15.3.2:private-instance;test:read-only-tracker-read-20260928"
+      },
+      "observedAt": "2026-09-28T07:55:08Z",
+      "evidence": [
+        "scope:read-only; run from a consumer checkout whose git remote selects a private GitLab 15.3.2 instance; nothing was written to that project or checkout",
+        "result:the installed 0.23.2 reader from both the Claude and the Codex plugin copies listed all issues in 2 pages without search= and reported absent for a Proposal id that does not exist",
+        "before:the same instance matched 0 of 6 issues when searching for text inside HTML comments, so the search-based reader could never find a marker"
+      ]
+    }
+  ]
+}
