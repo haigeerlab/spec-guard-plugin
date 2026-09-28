@@ -65,6 +65,27 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already exists"):
             local_ledger_adapters.install_codex_config(config, self.runtime_dir, "/opt/node")
 
+    def test_codex_install_creates_a_missing_config_in_an_existing_directory(self):
+        config = Path(self.tmp.name) / "codex" / "config.toml"
+        config.parent.mkdir()
+        local_ledger_adapters.install_codex_config(config, self.runtime_dir, "/opt/node")
+        self.assertIn("[mcp_servers.spec_guard_local_ledger]", config.read_text(encoding="utf-8"))
+        self.assertEqual(config.stat().st_mode & 0o777, 0o600)
+
+    def test_cli_reports_a_filesystem_error_without_a_traceback(self):
+        blocker = Path(self.tmp.name) / "not-a-directory"
+        blocker.write_text("x", encoding="utf-8")
+        errors = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(io.StringIO()), redirect_stderr(errors):
+            self.assertEqual(local_ledger_adapters.main([
+                "install-codex", "--runtime-dir", str(self.runtime_dir),
+                "--codex-config", str(blocker / "config.toml"), "--confirm-install",
+            ]), 1)
+        self.assertIn("local-ledger adapter unavailable", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+
     def test_claude_install_checks_for_a_conflict_then_adds_a_user_scoped_stdio_server(self):
         settings = Path(self.tmp.name) / "claude" / "settings.json"
         with patch("local_ledger_adapters.subprocess.run", side_effect=[

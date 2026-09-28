@@ -10,6 +10,10 @@
   `audit_history`，并写明 Desktop 不提供 Proposal、协作与本地事项入口。
 - **Desktop 扩展描述。** `manifest.json` 的描述改为只列出实际提供的只读阶段、产物与
   capability history 检查，不再宣称 Proposal 评审与协作能力；Desktop 回归测试守住这一点。
+- **账本安装失败不再卡死。** 运行时先装进临时目录、校验通过后才改名到位；npm 失败或包不符时受管目录保持
+  `absent`，可直接重试，诊断带 npm 错误输出的最后一行。旧版本失败留下的空目录可被安装接管。
+- **Codex 账本配置不再崩溃。** `~/.codex/` 已存在而 `config.toml` 不存在时，`install-codex` 不再抛出
+  `FileExistsError`；文件系统错误统一报告为可读诊断。
 
 ### 新增
 
@@ -59,6 +63,8 @@
 - **phase-guard 回归从 3 个场景扩到 9 例。** 每条输出都按 JSON 解析并核对事件名；覆盖无关 state、正文提及
   标记、CRLF、IDLE 与缺 python3。
 - **主链评审 CLI 端到端回归。** 首次覆盖 `main()` 的两种模式，以及各层失败的诊断码与 Git 拓扑判定。
+- **账本运行时回归进入 `validate.sh`。** 以会真实写入 `--prefix` 的假 npm 覆盖成功、失败后重试、包不符、
+  接管空目录与拒绝非空无效目录；可选验收测试缺少运行时时以退出码 2 表示“未运行”，不再与通过混淆。
 - **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
   契约测试要求日常入口点名全部门控工具。
 

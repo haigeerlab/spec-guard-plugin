@@ -108,7 +108,7 @@ def install_codex_config(codex_config: Path, runtime_dir: Path, node_executable:
         existing = codex_config.read_text(encoding="utf-8")
         mode = stat.S_IMODE(metadata.st_mode)
     else:
-        codex_config.parent.mkdir(parents=True, mode=0o700)
+        codex_config.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         existing, mode = "", 0o600
     table = re.compile(rf"^\s*\[mcp_servers\.{re.escape(CODEX_TABLE_NAME)}\]\s*$", re.MULTILINE)
     if table.search(existing):
@@ -175,7 +175,7 @@ def main(argv=None) -> int:
         else:
             install_claude_config(args.claude_bin, args.runtime_dir, node_path, args.claude_settings)
             print("Claude local-ledger ask rules and MCP configuration installed (no secret stored).")
-    except ValueError as error:
+    except (OSError, ValueError) as error:
         print("local-ledger adapter unavailable: " + str(error), file=sys.stderr)
         return 1
     return 0

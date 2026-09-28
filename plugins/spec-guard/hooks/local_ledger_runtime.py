@@ -5,6 +5,7 @@ import re
 import shutil
 import stat
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -203,24 +204,41 @@ def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dic
     if existing["state"] == "ready":
         raise RuntimeContractError("local-ledger runtime is already installed")
     if existing["state"] == "invalid":
-        raise RuntimeContractError("refusing to overwrite an invalid local-ledger runtime")
+        # 旧版本安装失败会留下空目录；空目录没有任何数据，可以接管，其余无效运行时一律不碰。
+        if (runtime_dir.is_symlink() or not runtime_dir.is_dir() or
+                any(runtime_dir.iterdir())):
+            raise RuntimeContractError("refusing to overwrite an invalid local-ledger runtime")
     npm_path = npm_executable or shutil.which("npm")
     if not npm_path:
         raise RuntimeContractError("npm executable is unavailable")
     runtime_dir.parent.mkdir(parents=True, exist_ok=True)
-    runtime_dir.mkdir(mode=0o700)
+    # 装进同级临时目录，校验通过后才原子改名；失败时只删自己建的临时目录，正式目录不会出现。
+    staging = Path(tempfile.mkdtemp(prefix=runtime_dir.name + ".installing-", dir=runtime_dir.parent))
     try:
-        completed = subprocess.run(
-            install_command(runtime_dir, npm_path), check=False, capture_output=True, text=True,
-        )
-    except OSError as error:
-        raise RuntimeContractError("unable to run npm install") from error
-    if completed.returncode != 0:
-        raise RuntimeContractError("npm install failed")
-    installed = runtime_status(runtime_dir)
-    if installed["state"] != "ready":
-        raise RuntimeContractError("installed local-ledger runtime does not match the audited contract")
-    return installed
+        try:
+            completed = subprocess.run(
+                install_command(staging, npm_path), check=False, capture_output=True, text=True,
+            )
+        except OSError as error:
+            raise RuntimeContractError("unable to run npm install") from error
+        if completed.returncode != 0:
+            lines = [line.strip() for line in (completed.stderr or "").splitlines() if line.strip()]
+            detail = (": " + lines[-1][:200]) if lines else ""
+            raise RuntimeContractError("npm install failed" + detail)
+        installed = runtime_status(staging)
+        if installed["state"] != "ready":
+            raise RuntimeContractError(
+                "installed local-ledger runtime does not match the audited contract")
+        try:
+            if runtime_dir.exists() or runtime_dir.is_symlink():
+                runtime_dir.rmdir()
+            staging.rename(runtime_dir)
+        except OSError as error:
+            raise RuntimeContractError("unable to move the verified runtime into place") from error
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return dict(installed, directory=str(runtime_dir))
 
 
 def project_init_arguments(

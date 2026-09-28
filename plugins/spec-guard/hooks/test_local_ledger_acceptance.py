@@ -136,7 +136,8 @@ def main() -> int:
             "state": "skipped",
             "diagnostic": "set SPEC_GUARD_EPIQ_RUNTIME to an already-installed pinned runtime",
         }, sort_keys=True))
-        return 0
+        # 2 = 环境未就绪：没有运行任何验收，不能与通过（0）混为一谈。
+        return 2
     try:
         result = run(Path(configured_runtime))
     except (RuntimeContractError, subprocess.CalledProcessError) as error:

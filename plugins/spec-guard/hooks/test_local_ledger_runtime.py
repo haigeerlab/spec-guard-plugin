@@ -192,6 +192,87 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertTrue(self.runtime_dir.is_dir())
         self.assertEqual(runtime_status.call_count, 2)
 
+    def fake_npm(self, script):
+        """A stand-in npm that really writes under --prefix, so install uses real directories."""
+        npm = Path(self.tmp.name) / "fake-npm"
+        npm.write_text("#!/bin/sh\n" + '[ "$3" = --prefix ] || exit 9\nprefix="$4"\n' + script, encoding="utf-8")
+        npm.chmod(0o755)
+        return str(npm)
+
+    def installed_files(self, version="1.11.0"):
+        return (
+            'mkdir -p "$prefix/node_modules/epiq/dist"\n'
+            'printf \'{"name":"epiq","version":"%s"}\' > "$prefix/node_modules/epiq/package.json"\n'
+            % version +
+            ': > "$prefix/node_modules/epiq/dist/mcp.js"\n')
+
+    def leftovers(self):
+        return sorted(path.name for path in Path(self.tmp.name).iterdir()
+                      if path.name.startswith("runtime.installing-"))
+
+    def test_install_moves_a_verified_runtime_into_place(self):
+        result = local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()))
+        self.assertEqual((result["state"], result["directory"]), ("ready", str(self.runtime_dir)))
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir)["state"], "ready")
+        self.assertEqual(self.leftovers(), [])
+
+    def test_failed_npm_leaves_no_runtime_and_can_be_retried(self):
+        npm = self.fake_npm('echo "npm ERR! code E404" >&2\nexit 1\n')
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError,
+                                    "npm install failed: npm ERR! code E404"):
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir), {"state": "absent"})
+        self.assertEqual(self.leftovers(), [])
+        result = local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()))
+        self.assertEqual(result["state"], "ready")
+
+    def test_wrong_package_is_discarded_without_creating_the_runtime(self):
+        npm = self.fake_npm(self.installed_files(version="9.9.9"))
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "audited contract"):
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir), {"state": "absent"})
+        self.assertEqual(self.leftovers(), [])
+
+    def test_install_takes_over_an_empty_directory_left_by_an_older_failed_install(self):
+        self.runtime_dir.mkdir()
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir)["state"], "invalid")
+        result = local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()))
+        self.assertEqual(result["state"], "ready")
+
+    def test_install_still_refuses_a_nonempty_invalid_runtime(self):
+        (self.runtime_dir / "node_modules").mkdir(parents=True)
+        (self.runtime_dir / "keep.txt").write_text("user data\n", encoding="utf-8")
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "refusing to overwrite"):
+            local_ledger_runtime.install_runtime(
+                self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()))
+        self.assertEqual((self.runtime_dir / "keep.txt").read_text(encoding="utf-8"), "user data\n")
+        self.assertEqual(self.leftovers(), [])
+
+    def test_install_cli_reports_the_npm_failure_reason(self):
+        output = io.StringIO()
+        npm = self.fake_npm('echo "npm ERR! network timeout" >&2\nexit 1\n')
+        with redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "install", "--runtime-dir", str(self.runtime_dir), "--npm", npm,
+                "--confirm-install", "--format", "json",
+            ]), 1)
+        payload = json.loads(output.getvalue())
+        self.assertIn("npm ERR! network timeout", payload["diagnostic"])
+        self.assertFalse(self.runtime_dir.exists())
+
+    def test_acceptance_without_a_runtime_reports_not_run_instead_of_passing(self):
+        import os
+        import test_local_ledger_acceptance
+        output = io.StringIO()
+        environment = {key: value for key, value in os.environ.items()
+                       if key != "SPEC_GUARD_EPIQ_RUNTIME"}
+        with patch.dict(os.environ, environment, clear=True), redirect_stdout(output):
+            self.assertEqual(test_local_ledger_acceptance.main(), 2)
+        self.assertEqual(json.loads(output.getvalue())["state"], "skipped")
+
     def test_project_init_arguments_require_user_setup_values_without_using_agent_identity(self):
         arguments = local_ledger_runtime.project_init_arguments(
             self.project_dir, "Vilin", "code --wait", False)

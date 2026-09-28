@@ -41,6 +41,7 @@ class TicketEntryContractTest(unittest.TestCase):
 
         self.assertIn("python3 -B plugins/spec-guard/hooks/test_ticket_entry.py", text)
         self.assertIn("python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py", text)
+        self.assertIn("python3 -B plugins/spec-guard/hooks/test_local_ledger_runtime.py", text)
 
 
 if __name__ == "__main__":
