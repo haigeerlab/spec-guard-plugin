@@ -13,7 +13,7 @@ beyond what the user explicitly approves at initialization.
 
 Governance: this module shipped in v0.19 while its Proposal (`spec/proposals/local-ticket-ledger.md`)
 was published but never accepted. It was brought into the capability map by the one-time
-registration of 2026-09-28 (`docs/decisions/2026-09-28-initiative-rollover.md`), not by the Proposal
+registration of 2026-09-28 (`docs/decisions/2026-09-28-single-capability-map.md`), not by the Proposal
 process.
 
 ## Runtime contract

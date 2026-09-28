@@ -9,7 +9,7 @@
 <!-- BEGIN:spec-guard-codex-convention -->
 ## Spec Guard 项目约定
 
-> Proposal 生命周期已作为 initiative `proposal-lifecycle` 归档；当前能力图是本机协作与事项。
+> `spec/CAPABILITY-MAP.md` 是整个插件唯一的能力图；新需求经 Proposal 按锚点插入模块，不另建图。
 > `.agent/state.json` 只是本地 active-module 上下文，不是 Proposal 状态。
 
 - 能力图：`spec/CAPABILITY-MAP.md`；模块 spec：`spec/<module-id>.md`
