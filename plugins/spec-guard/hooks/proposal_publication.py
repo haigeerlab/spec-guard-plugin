@@ -3,6 +3,7 @@ import argparse
 import json
 import subprocess
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from capability_map import MapError, parse_map
@@ -74,7 +75,45 @@ def _head(url):
                 branch = ref[len("refs/heads/"):]
         elif len(fields) == 2 and fields[1] == "HEAD":
             commit = fields[0]
-    return (branch, commit) if branch and commit else None
+    return (branch, commit) if branch and COMMIT.fullmatch(commit or "") else None
+
+
+class Snapshot(object):
+    def __init__(self, failure=None, repo=None, temp=None, url=None, branch=None, commit=None):
+        self.failure = failure
+        self.repo = repo
+        self.temp = temp
+        self.url = url
+        self.branch = branch
+        self.commit = commit
+
+
+@contextmanager
+def fixed_snapshot(project, remote, prefix):
+    """Fetch the remote default tip once into a temporary bare repository.
+
+    Yields a Snapshot whose `failure` names why no snapshot exists, or whose
+    repo/branch/commit are pinned to the tip observed before the fetch.  A tip
+    that moves between observation and fetch is a failure, never a new snapshot.
+    """
+    url = _remote(Path(project), remote)
+    observed = _head(url) if url else None
+    if not observed:
+        yield Snapshot("remote default branch is unavailable")
+        return
+    branch, commit = observed
+    with tempfile.TemporaryDirectory(prefix=prefix) as temp:
+        repo = Path(temp) / "snapshot.git"
+        if not _run(["git", "init", "--bare", str(repo)]):
+            yield Snapshot("temporary Git snapshot failed")
+            return
+        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
+                        "refs/heads/%s" % branch])
+        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
+        if not fetched or not tip or tip.stdout.strip() != commit:
+            yield Snapshot("remote default branch moved or fetch failed")
+            return
+        yield Snapshot(repo=repo, temp=Path(temp), url=url, branch=branch, commit=commit)
 
 
 def _show(repo, commit, path):
@@ -110,21 +149,10 @@ def read_published(project, proposal_id, remote="origin"):
     """Return only remote-default facts; never read consumer proposal/map files."""
     if not isinstance(proposal_id, str) or not PROPOSAL_ID.fullmatch(proposal_id):
         return Publication("invalid", diagnostic="proposal id is invalid")
-    project = Path(project)
-    url = _remote(project, remote)
-    observed = _head(url) if url else None
-    if not observed:
-        return Publication("unknown", diagnostic="remote default branch is unavailable")
-    branch, observed_commit = observed
-    with tempfile.TemporaryDirectory(prefix="sg-proposal-publication-") as temp:
-        repo = Path(temp) / "snapshot.git"
-        if not _run(["git", "init", "--bare", str(repo)]):
-            return Publication("unknown", diagnostic="temporary Git snapshot failed")
-        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
-                        "refs/heads/%s" % branch])
-        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
-        if not fetched or not tip or tip.stdout.strip() != observed_commit:
-            return Publication("unknown", diagnostic="remote default branch moved or fetch failed")
+    with fixed_snapshot(project, remote, "sg-proposal-publication-") as snapshot:
+        if snapshot.failure:
+            return Publication("unknown", diagnostic=snapshot.failure)
+        repo, temp, branch, observed_commit = snapshot.repo, snapshot.temp, snapshot.branch, snapshot.commit
         proposal_text = _show(repo, observed_commit, "spec/proposals/%s.md" % proposal_id)
         if proposal_text is None:
             return Publication("absent", review_commit=observed_commit)
@@ -163,21 +191,10 @@ def read_published(project, proposal_id, remote="origin"):
 
 def read_published_pool(project, remote="origin"):
     """Read every Proposal from one remote-default snapshot, never a worktree."""
-    project = Path(project)
-    url = _remote(project, remote)
-    observed = _head(url) if url else None
-    if not observed:
-        return PublicationPool("unknown", diagnostic="remote default branch is unavailable")
-    branch, observed_commit = observed
-    with tempfile.TemporaryDirectory(prefix="sg-proposal-publication-") as temp:
-        repo = Path(temp) / "snapshot.git"
-        if not _run(["git", "init", "--bare", str(repo)]):
-            return PublicationPool("unknown", diagnostic="temporary Git snapshot failed")
-        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
-                        "refs/heads/%s" % branch])
-        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
-        if not fetched or not tip or tip.stdout.strip() != observed_commit:
-            return PublicationPool("unknown", diagnostic="remote default branch moved or fetch failed")
+    with fixed_snapshot(project, remote, "sg-proposal-publication-") as snapshot:
+        if snapshot.failure:
+            return PublicationPool("unknown", diagnostic=snapshot.failure)
+        repo, temp, branch, observed_commit = snapshot.repo, snapshot.temp, snapshot.branch, snapshot.commit
         listed = _run(["git", "-C", str(repo), "ls-tree", "-r", "--name-only",
                        observed_commit, "spec/proposals"])
         review_map = _show(repo, observed_commit, "spec/CAPABILITY-MAP.md")

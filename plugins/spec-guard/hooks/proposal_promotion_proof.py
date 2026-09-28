@@ -2,13 +2,12 @@
 import argparse
 import json
 import subprocess
-import tempfile
 from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
 from proposal_mainline_review import accepted_from_pool
-from proposal_publication import read_published_pool
+from proposal_publication import fixed_snapshot, read_published_pool
 from proposal_tracker_read import read_tracker
 
 
@@ -58,37 +57,12 @@ def as_json(result):
     return data
 
 
-def _remote(project, name):
-    try:
-        result = subprocess.run(["git", "-C", str(project), "remote", "get-url", name],
-                                text=True, capture_output=True, timeout=20)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return result.stdout.strip() if result.returncode == 0 and result.stdout.strip() else None
-
-
 def _run(args):
     try:
         result = subprocess.run(args, text=True, capture_output=True, timeout=20)
     except (OSError, subprocess.TimeoutExpired):
         return None
     return result if result.returncode == 0 else None
-
-
-def _head(url):
-    result = _run(["git", "ls-remote", "--symref", url, "HEAD"])
-    if not result:
-        return None
-    branch = None
-    commit = None
-    for line in result.stdout.splitlines():
-        fields = line.split()
-        if len(fields) == 3 and fields[0] == "ref:" and fields[2] == "HEAD":
-            if fields[1].startswith("refs/heads/"):
-                branch = fields[1][len("refs/heads/"):]
-        elif len(fields) == 2 and fields[1] == "HEAD":
-            commit = fields[0]
-    return (branch, commit) if branch and COMMIT.fullmatch(commit or "") else None
 
 
 def _show(repo, commit, path):
@@ -195,20 +169,10 @@ def prove(project, publication, review_result, remote="origin"):
             getattr(review_result, "revision", None) != proposal.revision or
             not isinstance(getattr(review_result, "authority_id", None), str)):
         return _blocked("invalid")
-    url = _remote(project, remote)
-    observed = _head(url) if url else None
-    if not observed:
-        return _blocked("unknown")
-    branch, observed_commit = observed
-    with tempfile.TemporaryDirectory(prefix="sg-proposal-promotion-proof-") as temp:
-        repo = Path(temp) / "snapshot.git"
-        if not _run(["git", "init", "--bare", str(repo)]):
+    with fixed_snapshot(project, remote, "sg-proposal-promotion-proof-") as snapshot:
+        if snapshot.failure:
             return _blocked("unknown")
-        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
-                        "refs/heads/%s" % branch])
-        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
-        if not fetched or not tip or tip.stdout.strip() != observed_commit:
-            return _blocked("unknown")
+        repo, temp, observed_commit = snapshot.repo, snapshot.temp, snapshot.commit
         ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                          review_commit, observed_commit])
         if not ancestor:

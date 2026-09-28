@@ -79,6 +79,11 @@
 
 ### 变更
 
+- **远端默认分支快照只有一份实现。** `read_published`、`read_published_pool` 与 `prove` 此前各自复制了
+  “取远端 → `ls-remote` → 临时 bare 仓库 → fetch → 核对 tip”的流程，现在共用 `proposal_publication.fixed_snapshot()`；
+  诊断文字与状态不变。`publication` 读取远端 HEAD 时也像 `prove` 一样校验 commit 格式，格式异常报
+  “remote default branch is unavailable”。
+
 - **阶段注入按模块判断。** phase-guard 不再在有 Spec 后永远报 `SPECED` 并建议“创建 plan”：它取 `activeModule` 或
   Build order 中第一个未完成的模块，按 Spec、`tasks/<id>/plan.md` 与 `tasks/<id>/todo.md` 的未勾选项报告
   `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING` 或 `DONE`，并附全局计数；全部完成时建议经 Proposal 追加新模块。能力图无效时

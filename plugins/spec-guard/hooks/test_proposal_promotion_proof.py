@@ -225,7 +225,7 @@ class PromotionProofStateTests(PromotionFixture):
             (Review("accepted", review_commit="b" * 40, proposal_id="gamma",
                     platform="github", target="octo/spec-guard"), "invalid"),
         )
-        with patch("proposal_promotion_proof._remote") as remote:
+        with patch("proposal_publication._remote") as remote:
             for review_result, expected in cases:
                 result = prove(self.consumer, self.publication, review_result)
                 self.assertEqual(result.state, expected)
@@ -250,7 +250,7 @@ class PromotionProofRemoteTests(PromotionFixture):
         self.assertEqual(dirty.read_text(encoding="utf-8"), "not shared remote fact")
 
     def test_unavailable_remote_is_unknown(self):
-        with patch("proposal_promotion_proof._head", return_value=None):
+        with patch("proposal_publication._head", return_value=None):
             self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "unknown")
 
     def test_json_exposes_only_safe_proof_identifiers(self):
