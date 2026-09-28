@@ -11,7 +11,7 @@
 ### Explicit scope and inputs
 
 - 调用方必须显式提供 tracker kind（仅 `github` 或 `gitlab`）和目标容器：GitHub 为精确 `owner/repository`，GitLab 为可验证的 project id；不得从本地 remote、Issue URL、标题或搜索结果反推。
-- 调用方提供已解析的 `proposal_contract.Proposal`，其完整 marker 是唯一搜索键。adapter 不重新实现 Proposal Markdown grammar 或 marker 生成。
+- 调用方提供已解析的 `proposal_contract.Proposal`，其完整 marker 是唯一识别键：两个平台都列出 Issue（有上限），在本地逐行匹配，不依赖服务端搜索；GitLab 的 `search=` 匹配不到 HTML 注释（15.3.2 实测）。adapter 不重新实现 Proposal Markdown grammar 或 marker 生成。
 - transport 只能执行平台的认证检查和 Issue/read-search 请求。所有命令使用 argv；不得调用 Issue/PR/label/discussion 写入端点、`git` 写入操作、旧 bridge、slash command 或 state helper。
 
 ### Candidate recovery

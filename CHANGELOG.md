@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **GitLab 上能找到 Proposal Issue 了。** 读取器此前用 marker 调 `search=`，而 GitLab 的搜索匹配不到 HTML 注释里的
+  文字，marker 恰好是一行 HTML 注释。2026-09-28 在一台 GitLab 15.3.2 上只读实测：注释内文字 0/6 命中、正文可见文字
+  5/6 命中，所以无论 Proposal Issue 是否存在都会报 `absent`。现在 GitLab 与 GitHub 一样分页列出全部 Issue（最多
+  1000 个），在本地匹配 marker；读满上限仍未结束报 `unknown`。对同一实例只读复验：分 2 页完整读完 144 个 Issue。
+
 ## [0.23.1] - 2026-09-28
 
 ### 修复
