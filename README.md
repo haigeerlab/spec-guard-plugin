@@ -9,9 +9,10 @@ spec-guard protects two deliberately separate workflows:
 - Local multi-spec convention: a small directory convention for capability
   maps, module specs, plans, and local task lists.
 
-It also provides an optional, same-Mac collaboration mailbox for Claude Code
-and Codex sessions. The mailbox does not change the Proposal lifecycle or
-automate Git, Issue, Ticket, project grouping, or task assignment.
+It also provides two optional, same-Mac capabilities for Claude Code and Codex
+sessions: a collaboration mailbox and a local ticket ledger. Both need explicit
+setup. Neither changes the Proposal lifecycle, replaces or synchronizes
+GitHub/GitLab Issues, or automates Git, project grouping, or task assignment.
 
 The Proposal lifecycle does not create or modify Issues, pull requests, merge
 requests, branches, tasks, remote refs, or Proposal lifecycle state.

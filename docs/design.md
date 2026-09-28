@@ -9,9 +9,16 @@ spec-guard adds two independent safeguards around agent-skills:
 2. A Proposal lifecycle that reads a published remote-default-branch snapshot
    and explicit GitHub/GitLab Proposal Issue facts without side effects.
 
+It also ships two optional same-Mac capabilities that need explicit setup: a
+collaboration mailbox for Claude Code and Codex sessions, and a local ticket
+ledger for repositories without GitHub/GitLab Issues. Neither replaces or
+synchronizes remote Issues.
+
 ## Proposal boundary
 
-Proposal is a seven-module capability map. Proposal v2 binds its published
+The Proposal lifecycle was delivered as a seven-module initiative, now archived
+in capability history as `proposal-lifecycle`; the current capability map is
+the local collaboration and tickets initiative. Proposal v2 binds its published
 contents to a revision digest. A normal author branch can publish and read a
 Proposal, but only the policy-defined mainline may evaluate it at an explicit
 module boundary. Mainline identity is Git topology plus protected remote policy,

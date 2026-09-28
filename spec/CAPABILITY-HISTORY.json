@@ -1366,6 +1366,337 @@
           }
         }
       ]
+    },
+    {
+      "id": "proposal-lifecycle",
+      "title": "Candidate Proposal Pool and Capability Map Promotion",
+      "events": [
+        {
+          "type": "created",
+          "at": "2026-09-28T02:38:46Z",
+          "checkpoint": {
+            "id": "20260928T023846Z-0001",
+            "map": {
+              "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/CAPABILITY-MAP.md",
+              "sha256": "5e456744710237f2c7ac4ff1794116851eeec540f550efcd5b7a2d4a91efac74"
+            },
+            "state": {
+              "path": ".agent/history/proposal-lifecycle/20260928T023846Z-0001/state.json",
+              "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+            },
+            "modules": [
+              {
+                "id": "proposal-contract",
+                "responsibility": "定义并严格校验 Proposal v1/v2 文档、内容绑定 revision、阶段标签、能力图基准摘要和受支持变更类型。",
+                "dependsOn": [],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-contract.md",
+                  "sha256": "64b259b8dd6bd796983c64726092ff58a658417ba03911170be2e05f7e27f89f"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-contract/plan.md",
+                  "sha256": "09a42b8090acd16a9110f5d4007b05cf8e6e4d20ea556a7c499a4669e54cb412"
+                }
+              },
+              {
+                "id": "proposal-publication",
+                "responsibility": "只从远端默认分支的固定快照读取一个已发布 Proposal 或候选池，拒绝把其他 worktree 的本地文件当作共享事实。",
+                "dependsOn": [
+                  "proposal-contract"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-publication.md",
+                  "sha256": "9acba6f9fc2eacd054355c7bcc064bd209e4a7015e4bcfe44a53cb12b0ffe592"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-publication/plan.md",
+                  "sha256": "c5f4ce1f3b249e36b33ca01b8f157a0c4618afb152dcd7dda3cc52030c325f77"
+                }
+              },
+              {
+                "id": "proposal-tracker-read",
+                "responsibility": "用最小的 GitHub/GitLab 只读适配器核验普通 Proposal Issue 的唯一 revision marker 与唯一阶段，不使用旧 bridge。",
+                "dependsOn": [
+                  "proposal-contract"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-tracker-read.md",
+                  "sha256": "4d2c5adb4f68f4cf26a91445a20f9434da3ec52dcb2c08edf52f85bb053ab168"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-tracker-read/plan.md",
+                  "sha256": "82f90cf46320531324132d05919db80244086f92e8a28c1e847e34a05fa944c5"
+                }
+              },
+              {
+                "id": "proposal-review",
+                "responsibility": "汇总发布、tracker 与当前能力图事实，给出与人工授权分离的 freshness/stale/blocked/unknown 结果。",
+                "dependsOn": [
+                  "proposal-publication",
+                  "proposal-tracker-read"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-review.md",
+                  "sha256": "73331d49013e0b0732917900e78d486b58b400f5f1a50721c9882501667bf96a"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-review/plan.md",
+                  "sha256": "756a47708dd3f8078cb35be75b7dcc59cb6cd97efd91445a6b95fb0c5a49d5fa"
+                }
+              },
+              {
+                "id": "proposal-mainline-review",
+                "responsibility": "验证唯一主链上下文和远端 acceptance attestation，接收受限本地观察并输出人工主链裁决。",
+                "dependsOn": [
+                  "proposal-review"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-mainline-review.md",
+                  "sha256": "c385992716dad6670bd179d6e26e4477e89eb590ace1178f271e1ef62d2456d7"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-mainline-review/plan.md",
+                  "sha256": "53097ed4857456c6cc4d068fe94cd08697ad957b63e573b5c020323888bcaca0"
+                }
+              },
+              {
+                "id": "proposal-promotion-proof",
+                "responsibility": "对已接受、已预检的 new-module Proposal 核验严格 promotion diff、首次纳入和必要 Spec/Plan。",
+                "dependsOn": [
+                  "proposal-mainline-review"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-promotion-proof.md",
+                  "sha256": "0e34d9679de16261204cacf9159eba2233b0d86ccc780cccecb45668e1de5d8b"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-promotion-proof/plan.md",
+                  "sha256": "852401c921c035f2a0d3cd5c84a8fea8c85d20ceba2583a1424890e5f2b54545"
+                }
+              },
+              {
+                "id": "proposal-boundary-guidance",
+                "responsibility": "提供 intake/review/主链评审/晋级核验入口，并仅在模块交付或推进边界给出非阻断提醒。",
+                "dependsOn": [
+                  "proposal-mainline-review",
+                  "proposal-promotion-proof"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-boundary-guidance.md",
+                  "sha256": "a7dadd72e45cb073b8098bfe4690df422f5dc2602f5a252ca6dc4b8730b5f939"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-boundary-guidance/plan.md",
+                  "sha256": "402ed8c40ab55ad56f2b5158912226243c2ef306db3c91f85027cda09ccafd5d"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "completed",
+          "at": "2026-09-28T02:38:46Z",
+          "checkpoint": {
+            "id": "20260928T023846Z-0001",
+            "map": {
+              "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/CAPABILITY-MAP.md",
+              "sha256": "5e456744710237f2c7ac4ff1794116851eeec540f550efcd5b7a2d4a91efac74"
+            },
+            "state": {
+              "path": ".agent/history/proposal-lifecycle/20260928T023846Z-0001/state.json",
+              "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+            },
+            "modules": [
+              {
+                "id": "proposal-contract",
+                "responsibility": "定义并严格校验 Proposal v1/v2 文档、内容绑定 revision、阶段标签、能力图基准摘要和受支持变更类型。",
+                "dependsOn": [],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-contract.md",
+                  "sha256": "64b259b8dd6bd796983c64726092ff58a658417ba03911170be2e05f7e27f89f"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-contract/plan.md",
+                  "sha256": "09a42b8090acd16a9110f5d4007b05cf8e6e4d20ea556a7c499a4669e54cb412"
+                }
+              },
+              {
+                "id": "proposal-publication",
+                "responsibility": "只从远端默认分支的固定快照读取一个已发布 Proposal 或候选池，拒绝把其他 worktree 的本地文件当作共享事实。",
+                "dependsOn": [
+                  "proposal-contract"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-publication.md",
+                  "sha256": "9acba6f9fc2eacd054355c7bcc064bd209e4a7015e4bcfe44a53cb12b0ffe592"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-publication/plan.md",
+                  "sha256": "c5f4ce1f3b249e36b33ca01b8f157a0c4618afb152dcd7dda3cc52030c325f77"
+                }
+              },
+              {
+                "id": "proposal-tracker-read",
+                "responsibility": "用最小的 GitHub/GitLab 只读适配器核验普通 Proposal Issue 的唯一 revision marker 与唯一阶段，不使用旧 bridge。",
+                "dependsOn": [
+                  "proposal-contract"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-tracker-read.md",
+                  "sha256": "4d2c5adb4f68f4cf26a91445a20f9434da3ec52dcb2c08edf52f85bb053ab168"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-tracker-read/plan.md",
+                  "sha256": "82f90cf46320531324132d05919db80244086f92e8a28c1e847e34a05fa944c5"
+                }
+              },
+              {
+                "id": "proposal-review",
+                "responsibility": "汇总发布、tracker 与当前能力图事实，给出与人工授权分离的 freshness/stale/blocked/unknown 结果。",
+                "dependsOn": [
+                  "proposal-publication",
+                  "proposal-tracker-read"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-review.md",
+                  "sha256": "73331d49013e0b0732917900e78d486b58b400f5f1a50721c9882501667bf96a"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-review/plan.md",
+                  "sha256": "756a47708dd3f8078cb35be75b7dcc59cb6cd97efd91445a6b95fb0c5a49d5fa"
+                }
+              },
+              {
+                "id": "proposal-mainline-review",
+                "responsibility": "验证唯一主链上下文和远端 acceptance attestation，接收受限本地观察并输出人工主链裁决。",
+                "dependsOn": [
+                  "proposal-review"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-mainline-review.md",
+                  "sha256": "c385992716dad6670bd179d6e26e4477e89eb590ace1178f271e1ef62d2456d7"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-mainline-review/plan.md",
+                  "sha256": "53097ed4857456c6cc4d068fe94cd08697ad957b63e573b5c020323888bcaca0"
+                }
+              },
+              {
+                "id": "proposal-promotion-proof",
+                "responsibility": "对已接受、已预检的 new-module Proposal 核验严格 promotion diff、首次纳入和必要 Spec/Plan。",
+                "dependsOn": [
+                  "proposal-mainline-review"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-promotion-proof.md",
+                  "sha256": "0e34d9679de16261204cacf9159eba2233b0d86ccc780cccecb45668e1de5d8b"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-promotion-proof/plan.md",
+                  "sha256": "852401c921c035f2a0d3cd5c84a8fea8c85d20ceba2583a1424890e5f2b54545"
+                }
+              },
+              {
+                "id": "proposal-boundary-guidance",
+                "responsibility": "提供 intake/review/主链评审/晋级核验入口，并仅在模块交付或推进边界给出非阻断提醒。",
+                "dependsOn": [
+                  "proposal-mainline-review",
+                  "proposal-promotion-proof"
+                ],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/proposal-lifecycle/20260928T023846Z-0001/proposal-boundary-guidance.md",
+                  "sha256": "a7dadd72e45cb073b8098bfe4690df422f5dc2602f5a252ca6dc4b8730b5f939"
+                },
+                "plan": {
+                  "path": "tasks/history/proposal-lifecycle/20260928T023846Z-0001/proposal-boundary-guidance/plan.md",
+                  "sha256": "402ed8c40ab55ad56f2b5158912226243c2ef306db3c91f85027cda09ccafd5d"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-collaboration",
+      "title": "Local Collaboration and Tickets",
+      "events": [
+        {
+          "type": "created",
+          "at": "2026-09-28T02:49:55Z",
+          "checkpoint": {
+            "id": "20260928T024955Z-0001",
+            "map": {
+              "path": "spec/history/local-collaboration/20260928T024955Z-0001/CAPABILITY-MAP.md",
+              "sha256": "c320bb0822c2b668f56047119e4613baafbe1fac3848834639c2514d425bd024"
+            },
+            "state": {
+              "path": ".agent/history/local-collaboration/20260928T024955Z-0001/state.json",
+              "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+            },
+            "modules": [
+              {
+                "id": "collaboration-messaging",
+                "responsibility": "Provide a private same-Mac mailbox and host adapters for direct Claude Code and Codex session communication, with an experimental opt-in native transport.",
+                "dependsOn": [],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/local-collaboration/20260928T024955Z-0001/collaboration-messaging.md",
+                  "sha256": "455f07faf9dcba8b6276e9126cf068d07809899a080ba7f3199b4fc1c5bf5f9d"
+                },
+                "plan": {
+                  "path": "tasks/history/local-collaboration/20260928T024955Z-0001/collaboration-messaging/plan.md",
+                  "sha256": "14beeeeb29948dae8292ca51fffe7ad64fb5b07870d05e0e329410424b731bd3"
+                }
+              },
+              {
+                "id": "local-ticket-ledger",
+                "responsibility": "Provide an optional local-first, worktree-shared ticket ledger and narrow Claude Code/Codex access without imposing workflow ownership or project topology.",
+                "dependsOn": [],
+                "status": "unknown",
+                "issue": null,
+                "spec": {
+                  "path": "spec/history/local-collaboration/20260928T024955Z-0001/local-ticket-ledger.md",
+                  "sha256": "b34f7ec6501ad00dfc0d04dbea52cfdd2e196beeb08d6d3f12fb0114b2e1dc50"
+                },
+                "plan": {
+                  "path": "tasks/history/local-collaboration/20260928T024955Z-0001/local-ticket-ledger/plan.md",
+                  "sha256": "23d56667420ac5047d1c7cc4767a0abd6ab987a4627e9ecefe9ec2f8a70a2fb4"
+                }
+              }
+            ]
+          }
+        }
+      ]
     }
   ],
   "corrections": [
