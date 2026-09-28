@@ -67,7 +67,8 @@ def describe(root: Path) -> str:
     if current is None:
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
-                "Add new work to the map through a Proposal.")
+                "For new work, add a module to the map and review it; "
+                "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,

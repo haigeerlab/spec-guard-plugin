@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 变更
+
+- **Proposal 在使用者项目里是可选的。** 全部模块完成时，阶段提示此前写「Add new work to the map through a
+  Proposal」，读起来像必须走 Proposal。现在改为：新增模块时加进能力图并评审；需要留下经过评审的决定记录时，再用
+  Proposal。`docs/workflow.md` 写明两种做法各适合什么场景，README 功能表把 Proposal 标为可选。阶段回归新增一例，
+  断言新措辞。
+
 ## [0.23.3] - 2026-09-28
 
 ### 文档
