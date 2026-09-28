@@ -18,8 +18,8 @@
 - **入口**：`module-insert.py --project <dir> --id <module-id> --responsibility <text> --depends-on <a,b|—>
   --anchor <after:<module-id>|end> [--confirm]`。Claude 命令 `/spec-guard:add-module`，Codex 经 `spec-guard-ops`
   skill。
-- **检查点**：按 `module_stage.py` 选出的当前模块处于 `BUILDING` 时拒绝，并说明先完成或暂停当前模块；其余阶段
-  允许。能力图无效（`MAP_INVALID`）或不存在时拒绝。
+- **检查点**：取 `module_stage.py` 选出的当前模块。它的 `todo.md` 里**既有已勾选项、又有未勾选项**（做到一半）时
+  拒绝，并说明先完成当前模块；计划好但一项都没勾、或已全部完成时允许。能力图无效（`MAP_INVALID`）或不存在时拒绝。
 - **校验**（全部通过才算有效）：
   - 把新行加进模块表、把新模块按锚点加进 Build order 后，新能力图通过 `capability_map.parse_map` 严格校验，
     即 id 为 kebab-case 且不重复、依赖存在、依赖排在新模块之前、无环、Build order 恰好包含每个模块一次；
@@ -69,7 +69,8 @@ README.md, docs/workflow.md                      -> 用户文档
 
 - 正例：`after:` 与 `end` 两种锚点；预览不写任何文件；`--confirm` 只写能力图与 Spec 骨架，写入后能力图通过
   严格解析，阶段变为新模块的 `NEEDS_SPEC`（新模块排在当前模块之前时）；
-- 反例：当前模块 `BUILDING`；能力图无效或缺失；id 重复或不合法；未知依赖；依赖排在锚点之后；锚点不存在；职责为空
+- 检查点：当前模块有 Plan 但一项都没勾时放行；
+- 反例：当前模块做到一半（既有已勾选、又有未勾选项）；能力图无效或缺失；id 重复或不合法；未知依赖；依赖排在锚点之后；锚点不存在；职责为空
   或多行；`spec/<id>.md` 已存在；每个反例都断言没有写任何文件；
 - 已有内容不变：写入前后目标摘要、已有行摘要、已有模块相对顺序一致；
 - `test-phase-guard.sh` 断言 DONE 提示指向 `/spec-guard:add-module`。
@@ -86,7 +87,3 @@ README.md, docs/workflow.md                      -> 用户文档
 - 在一个已完成若干模块的项目里，用户给出需求上下文，一次预览、一次确认就能把新模块插进能力图，阶段提示随即指向
   这个新模块的下一步。
 - 所有反例都被拒绝且不改任何文件；现有回归和 `validate.sh` 保持通过。
-
-## Open questions
-
-- 当前模块处于 `BUILDING`（包括有 Plan 但一项都还没勾）时一律拒绝。是否需要在「一项都没开始」时放行？
