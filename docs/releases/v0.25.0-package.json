@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.25.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.25.0;asset:spec-guard-v0.25.0.tar.gz;sha256:32ef16cac257de0556517ad985667bd0c03c8bb1473b77508316e1197761d5d4"
+      },
+      "observedAt": "2026-09-28T18:30:24Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.25.0",
+        "asset:spec-guard-v0.25.0.tar.gz;size:216149",
+        "source-tag:v0.25.0@999a27cf69468c9eae9120f6898804dc2e344846",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.25.0",
+        "result:the package was built from the v0.25.0 tag with git archive of .claude-plugin and plugins/spec-guard plus ARTIFACT-MANIFEST.json; the same method rebuilt v0.24.0 file-for-file identical to its published asset",
+        "result:release-package.py validated the artifact directory before archiving and again after extracting the archive; the archive contains no AppleDouble entries",
+        "result:the locally built archive and the downloaded published GitHub asset both have SHA-256 32ef16cac257de0556517ad985667bd0c03c8bb1473b77508316e1197761d5d4, matching the digest GitHub reports",
+        "content:the package contains hooks/test_python_compat.py and module_stage.py with deferred annotations",
+        "limit:GitHub Actions did not create runs for push or pull_request events on this repository; no CI result is claimed as release evidence"
+      ]
+    }
+  ]
+}
