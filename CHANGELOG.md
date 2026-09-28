@@ -8,6 +8,11 @@
   提交把新 module 纳入远端默认分支能力图时，也返回 `invalid`，与晋级内容确实违反声明（职责、依赖、位置或
   diff 越界）无法区分。现在这种情况返回新状态 `not-promoted`（诊断 `promotion-not-found`），命令文档说明
   下一步是合并晋级分支后重新运行。晋级提交现在也可以额外携带 `tasks/<id>/todo.md`（不强制）。
+- **晋级预检与证明透传下层诊断，不再把不同原因折叠成同一个字符串。** `proposal_promotion_proof.py` 的
+  `preflight_as_json` 与 `as_json` 此前一律把诊断覆盖成 `promotion-preflight-<state>` / `promotion-<state>`，
+  缺 tracker Issue、缺 Proposal、验收记录无效等不同原因因此显示为同一个诊断。现在两者保留下层已给出的具体
+  诊断（例如 `publication-absent`、`tracker-absent`、`acceptance-attestation-invalid`、`proposal-pool-<state>`），
+  只有诊断缺失或不是稳定码形态时才退回原来的折叠字符串；`state` 取值不变。
 - **macOS 自带的 Python 3.9 下阶段提示不再显示 `UNKNOWN`。** 15 个 hook 模块在类型注解里用了 3.10 才支持的
   `X | None`，在 `/usr/bin/python3`（3.9）下一导入就失败：阶段提示每轮都是 `UNKNOWN`，`/spec-guard:add-module`、
   协作信箱与本地事项账本的脚本也无法运行。现在这些模块都延迟求值注解；新增回归会静态检查注解写法，并在本机

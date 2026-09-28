@@ -11,8 +11,9 @@ from unittest.mock import patch
 
 from capability_map import parse_map
 from proposal_contract import Change, compute, compute_revision
-from proposal_publication import Publication, read_published
-from proposal_promotion_proof import _matches, as_json, main, preflight, prove
+from proposal_publication import Publication, PublicationPool, read_published
+from proposal_promotion_proof import (
+    Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, prove)
 from proposal_mainline_review import accepted, policy_digest
 from proposal_review import Review
 from proposal_tracker_read import TrackerRead
@@ -430,6 +431,69 @@ class PromotionPreflightTests(PromotionFixture):
                                tracker_reader=lambda *ignored: tracker)
         self.assertEqual((result.state, result.base_commit), ("stale", None))
 
+    def test_preflight_reports_publication_absent_diagnostic_for_missing_proposal(self):
+        remote_policy = dict(self.policy, schemaVersion=1)
+        pool = PublicationPool("published", review_commit=self.publication.review_commit,
+                               publications=(), review_map=self.publication.review_map,
+                               policy_text=json.dumps(remote_policy))
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                               tracker_reader=lambda *ignored: TrackerRead("absent"))
+        self.assertEqual((result.state, result.diagnostic), ("absent", "publication-absent"))
+
+    def test_preflight_reports_tracker_absent_diagnostic_for_missing_issue(self):
+        remote_policy = dict(self.policy, schemaVersion=1)
+        pool = PublicationPool("published", review_commit=self.publication.review_commit,
+                               publications=(self.publication,), review_map=self.publication.review_map,
+                               policy_text=json.dumps(remote_policy))
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                               tracker_reader=lambda *ignored: TrackerRead("absent"))
+        self.assertEqual((result.state, result.diagnostic), ("absent", "tracker-absent"))
+
+    def test_preflight_reports_acceptance_attestation_invalid_diagnostic(self):
+        remote_policy = dict(self.policy, schemaVersion=1)
+        evidence = {
+            "schemaVersion": 1, "proposalId": "gamma",
+            "revision": self.publication.proposal.revision,
+            "reviewCommit": self.publication.review_commit,
+            "policyDigest": policy_digest(remote_policy),
+            "authorityId": "mainline", "decision": "defer",
+        }
+        pool = PublicationPool("published", review_commit=self.publication.review_commit,
+                               publications=(self.publication,), review_map=self.publication.review_map,
+                               policy_text=json.dumps(remote_policy),
+                               attestation_texts={"gamma": json.dumps(evidence)})
+        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
+                              proposal_id="gamma", platform="github", target="octo/spec-guard")
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                               tracker_reader=lambda *ignored: tracker)
+        self.assertEqual((result.state, result.diagnostic),
+                         ("blocked", "acceptance-attestation-invalid"))
+
+
+class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
+    """`as_json`/`preflight_as_json` 只透传码形态诊断，垃圾或缺失诊断退回旧的折叠字符串。"""
+
+    def test_as_json_keeps_only_code_shaped_diagnostics(self):
+        self.assertEqual(
+            as_json(Proof("not-accepted", diagnostic="acceptance-attestation-invalid")),
+            {"state": "not-accepted", "diagnostic": "acceptance-attestation-invalid"})
+        for raw in ("review capability map is missing", "Traceback: /tmp/x", None,
+                    "Promotion-Invalid", "code-"):
+            with self.subTest(raw=raw):
+                self.assertEqual(as_json(Proof("unknown", diagnostic=raw)),
+                                 {"state": "unknown", "diagnostic": "promotion-unknown"})
+
+    def test_preflight_as_json_keeps_only_code_shaped_diagnostics(self):
+        self.assertEqual(
+            preflight_as_json(Preflight("blocked", diagnostic="mainline-policy-invalid")),
+            {"state": "blocked", "diagnostic": "mainline-policy-invalid"})
+        for raw in ("review capability map is missing", None, "Promotion-Preflight-Blocked"):
+            with self.subTest(raw=raw):
+                self.assertEqual(preflight_as_json(Preflight("blocked", diagnostic=raw)),
+                                 {"state": "blocked", "diagnostic": "promotion-preflight-blocked"})
 
 
 class PromotionProofCliTests(PromotionFixture):
@@ -466,14 +530,14 @@ class PromotionProofCliTests(PromotionFixture):
         self.git(self.seed, "commit", "-m", "withdraw attestation")
         self.git(self.seed, "push", "origin", "trunk")
         self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
-                         {"state": "not-accepted", "diagnostic": "promotion-not-accepted"})
+                         {"state": "not-accepted", "diagnostic": "acceptance-attestation-invalid"})
 
     def test_prove_cli_reports_a_missing_proposal_and_an_unreachable_remote(self):
         self.assertEqual(self.run_cli("--proposal-id", "missing", "--prove"),
                          {"state": "absent", "proposalId": "missing"})
         self.git(self.consumer, "remote", "set-url", "origin", str(self.root / "gone.git"))
         self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
-                         {"state": "unknown", "diagnostic": "promotion-unknown"})
+                         {"state": "unknown", "diagnostic": "proposal-pool-unknown"})
 
     def test_cli_without_prove_still_runs_only_the_preflight(self):
         with patch("proposal_promotion_proof.prove",

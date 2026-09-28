@@ -35,4 +35,9 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 位置，或 diff 超出能力图、模块 Spec、Plan 与可选的 `tasks/<id>/todo.md`）；`not-promoted` 表示至今
 没有任何提交把该 module 纳入远端默认分支的能力图——下一步是合并晋级分支，再重新运行本命令；
 `unknown` 表示远端无法安全读取。
+
+`not-accepted`、`invalid`、`unknown` 附带的 `diagnostic` 会尽量透传下层已给出的具体原因（例如
+`acceptance-attestation-invalid`、`proposal-pool-unknown`），只有没有更具体原因时才是折叠后的
+`promotion-<state>`；`not-promoted` 固定是 `promotion-not-found`。详见
+`references/proposal-promotion-proof.md`。
 本命令不会把结果写回 Issue，也不创建或修改分支、能力图、Spec、Plan、任务或 PR。
