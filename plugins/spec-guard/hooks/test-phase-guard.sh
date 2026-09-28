@@ -102,9 +102,9 @@ injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶�
 legacy_project="$WORK/legacy"
 mkdir -p "$legacy_project/.agent"
 printf '%s\n' '{"tracker":"github","modules":{"alpha":{"issue":1}}}' > "$legacy_project/.agent/state.json"
-injects "旧 tracker state 报告退役迁移" "$legacy_project" "LEGACY_TRACKER_RETIRED"
-if grep -Eqi 'sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$legacy_project")"; then
-  fail "legacy migration output exposed a retired callable path"
+injects "旧 tracker state 按本地约定报告阶段" "$legacy_project" "当前阶段: **IDLE**"
+if grep -Eqi 'LEGACY|migration notice|sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$legacy_project")"; then
+  fail "旧 tracker state 不应再注入迁移提示或已退役的调用路径"
 fi
 
 # 已启用却缺 python3：必须注入可诊断的合法 JSON，不能静默成“未启用”。

@@ -4,6 +4,10 @@
 
 ### 破坏性变更
 
+- **删除旧 tracker 迁移提示。** `tracker` 为 `github`、`gitlab` 的 `.agent/state.json` 不再触发
+  `LEGACY_TRACKER_RETIRED` 提示，改为与其他已启用项目一样报告本地阶段（通常是 `IDLE` 或按模块的阶段）；其中的
+  映射仍不被读取。这条提示在 v0.15 退役旧 tracker 时加入，迁移指南原定在下一个 minor 版本删除。
+
 - **退役 Claude Desktop MCPB。** 删除 `manifest.json`、`mcp/claude_desktop_server.mjs` 及其测试、清单检查与文档。它从未
   进入发布流程，本机安装副本停留在 0.7.51。已安装扩展的用户请在 Claude Desktop 的 Settings → Extensions 中卸载；
   阶段与产物检查请改用 Claude Code 的斜杠命令或 Codex 的 `spec-guard-ops`。见
