@@ -46,6 +46,11 @@ macOS 上必须用 `/bin/bash`，以覆盖系统自带 bash 3.2；不要让 Home
 
 ## Codex 本地安装与真实 smoke
 
+Codex 不把插件的 `commands/` 当作斜杠命令加载（2026-09-28 核实 codex-cli 0.154.0）：`.codex-plugin/plugin.json`
+只声明 `skills` 与 `hooks`；Codex 描述插件组件的结构（`PluginDetail`）只有技能、hook、应用、MCP 服务器、应用模板与定时
+任务，没有命令。`commands` 只出现在“从其他 agent 导入配置”的迁移结构里，CLI 没有对应入口，本次未验证。因此 Codex
+用户的入口是 `spec-guard-ops` 等 skill；`commands/*.md` 里的 Codex 根目录解析只服务于这类导入后的副本。
+
 插件管理器安装的是 marketplace 解析出的副本，不会自动读取当前 Git 工作区。先查看实际来源：
 
 ```bash
