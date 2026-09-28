@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.23.2" },
+  "records": [
+    {
+      "subject": "spec-guard-proposal-flow-installed",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli-plugin-copy:v0.23.2;test:proposal-review-and-prove-20260928"
+      },
+      "observedAt": "2026-09-28T08:05:56Z",
+      "evidence": [
+        "scope:the installed 0.23.2 Codex plugin copy ran proposal_review.py and proposal_promotion_proof.py --prove against github.com/haigeerlab/spec-guard-e2e from a fresh consumer clone",
+        "result:review reported accepted with stage proposal-stage:accepted; prove reported proved for module gamma at promotion commit a48f496fa22344a2cd7431f875adbc827c79fc95"
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "id": "github-proposal-publish-to-proved",
+      "kind": "github-project",
+      "confirmation": "required",
+      "status": "project-verified",
+      "target": { "kind": "tracker-project", "id": "github.com/haigeerlab/spec-guard-e2e" },
+      "expectedSideEffects": [
+        "create a private throwaway repository",
+        "push a baseline capability map, a Proposal, a mainline policy and an acceptance attestation to main",
+        "create the proposal and proposal-stage labels and one Proposal Issue, and change its stage label",
+        "create and fast-forward integration/mainline",
+        "open and merge one promotion pull request"
+      ],
+      "observedAt": "2026-09-28T08:05:56Z",
+      "evidence": [
+        "confirmation:the user approved a private throwaway GitHub repository for this run on 2026-09-28",
+        "publish:read_published reported gamma published at review commit 30e5311816c06c6ae60dc13adac2f8f9a86e9d4d",
+        "review:proposal_review.py found Issue 1 and reported in-review, then accepted after the stage label changed",
+        "mainline:on integration/mainline the candidate list contained gamma and the accept decision returned accepted-candidate",
+        "preflight:after the human attestation was pushed, preflight reported ready with base commit 1ae94c0d96954a5339a3767586f5b319e40e0b81",
+        "prove:after pull request 2 was merged with a merge commit, --prove reported proved for gamma at a48f496fa22344a2cd7431f875adbc827c79fc95",
+        "limit:GitHub only; the GitLab path was verified read-only on a private GitLab 15.3.2 instance and not end to end"
+      ]
+    }
+  ]
+}
