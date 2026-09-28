@@ -1,5 +1,8 @@
 # spec-guard design
 
+> Maintainer-facing design notes. For the user-facing design principles and glossary, see
+> [concepts.md](concepts.md).
+
 ## Purpose
 
 spec-guard adds two independent safeguards around agent-skills:

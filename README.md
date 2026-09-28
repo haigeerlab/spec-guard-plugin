@@ -1,108 +1,92 @@
 # spec-guard
 
-spec-guard protects two deliberately separate workflows:
+spec-guard 是 [agent-skills](https://github.com/addyosmani/agent-skills) 的配套插件，支持 Claude Code 和 Codex。
+agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦拆成多个模块，就会出三类问题。spec-guard 补的就是这三处：
 
-- Proposal lifecycle: a revision-bound, read-only path that fixes shared facts
-  to the remote default branch and reads GitHub/GitLab Proposal Issues only
-  through explicit adapters. Only a policy-defined mainline may produce an
-  accepted candidate; Issue stages remain human-written facts.
-- Local multi-spec convention: a small directory convention for capability
-  maps, module specs, plans, and local task lists.
+| 问题 | spec-guard 的做法 |
+|---|---|
+| 多个模块的 plan 和 todo 写到同一个文件里，互相覆盖 | 多模块目录约定：一张能力图，每个模块各自的 Spec、Plan、todo |
+| agent 不知道现在该做哪个模块、做到哪一步 | 每轮对话开头自动注入当前阶段，例如「`NEEDS_PLAN`：去给 `billing` 写 plan」 |
+| 做到一半冒出新需求，没地方登记，也没人确认该不该加 | Proposal 流程：新需求写成提案，经评审和人工接受后，按锚点插进能力图 |
 
-It also provides two optional, same-Mac capabilities for Claude Code and Codex
-sessions: a collaboration mailbox and a local ticket ledger. Both need explicit
-setup. Neither changes the Proposal lifecycle, replaces or synchronizes
-GitHub/GitLab Issues, or automates Git, project grouping, or task assignment.
+它只报告事实、给出建议，**不替你改 Issue、分支或能力图**，决定和写入都留给人。设计原因见[设计理念与术语](docs/concepts.md)。
 
-The Proposal lifecycle does not create or modify Issues, pull requests, merge
-requests, branches, tasks, remote refs, or Proposal lifecycle state.
+## 功能一览
 
-Install from the public marketplace with
-`/plugin marketplace add haigeerlab/spec-guard-plugin`.
+| 功能 | 解决什么问题 | 入口（Claude Code） | 是否默认生效 |
+|---|---|---|---|
+| 多模块约定 | 模块产物互不覆盖，`/build` 只从当前模块取任务 | `/spec-guard:setup-convention` | 运行 setup 后生效 |
+| 阶段提示 | agent 每轮都知道当前模块和下一步 | 自动；`/spec-guard:phase` 查看 | 运行 setup 后生效 |
+| 产物校验 | 能力图格式、模块与 Spec 的对应关系是否正确 | `/spec-guard:verify-artifacts` | 按需运行 |
+| Proposal 流程 | 新需求经评审、人工接受后再加进能力图，全程留痕 | `/spec-guard:proposal-*` | 按需运行，需要一次性准备 |
+| 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
+| 本地事项账本 | 没有 GitHub/GitLab Issue 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
+| 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
+| 能力历史 | 核验旧版本归档下来的能力图没被改动 | `/spec-guard:history-integrity` | 只对有归档的项目有用 |
 
-The public source was recovered to `yizhongkaimail-collab/spec-guard-plugin`
-in v0.16.2, then copied to `haigeerlab/spec-guard-plugin` in September 2026.
-Existing cached installs continue to run; re-add the current source to receive
-future marketplace updates. See the
-[repository-copy migration note](docs/migrations/2026-09-27-repository-copy.md)
-and the earlier [source-recovery note](docs/migrations/v0.16.2-source-recovery.md).
+Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用，对照表见[使用流程](docs/workflow.md#命令对照)。
 
-## Breaking migration after v0.14.0
+## 适合谁
 
-The mutable GitHub/GitLab tracker bridge was retired.  Removed surface:
+- **适合**：已经在用 agent-skills，项目会拆成多个模块，或者有多个 agent、多个 worktree 并行开发。
+- **不太需要**：单文件脚本或一次性小改动。agent-skills 自带的单 Spec 流程就够了。
 
-- remote tracker projection, task selection, workspace binding, and delivery;
-- the former tracker-oriented commands and skills; and
-- tracker synchronization previews in the desktop adapter.
+## 安装
 
-Existing `.agent/state.json`, remote records, archives, release evidence, and
-Git history are preserved untouched.  They are historical evidence, not input
-for the new workflow.  Complete, abandon, or otherwise preserve outstanding
-remote tracker work with v0.14.0 before upgrading.  See
-[the migration guide](docs/migrations/v0.15-legacy-tracker-retirement.md).
+**前置条件：**
 
-## Local convention
+- 已安装 agent-skills；
+- `bash`、`git`、`python3`；
+- 用 Proposal 流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
+- 用协作信箱或本地事项账本时，需要 macOS 和 Node.js。
 
-Run the setup command in a project that wants the local convention.  Use its
-preview mode first; it only creates or updates local files after confirmation.
-The result is:
+**Claude Code：**
 
 ```text
-spec/CAPABILITY-MAP.md
-spec/<module-id>.md
-tasks/<module-id>/plan.md
-tasks/<module-id>/todo.md
-.agent/state.json        # local active-module context only
+/plugin marketplace add haigeerlab/spec-guard-plugin
+/plugin install spec-guard@spec-guard-marketplace
 ```
 
-The local state file is never a Proposal requirement or candidate pool.
+**Codex：**
 
-## Local agent collaboration
+```bash
+codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.23.3
+codex plugin add spec-guard@spec-guard-marketplace
+```
 
-The optional collaboration runtime lets Claude Code and Codex sessions on the
-same Mac exchange durable free-text technical messages without manually
-relaying them. Each session supplies only its own display context (for example,
-name, project path, role, and current work); Spec Guard does not infer project
-relationships or route messages automatically.
+`--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
+装好后开一个新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook。
 
-Start with `/spec-guard:collaboration` to inspect the local state. Initialization,
-background service enablement, host configuration, and stale-agent removal all
-require an explicit user request. The default XATS transport is loopback-only
-and keeps its token in `~/.spec-guard/collaboration/`, not in project files or
-MCP configuration. It gives native Codex Desktop persistent mailbox delivery,
-but not active wake-up.
+**装好之后不会自动生效。** 没有运行过 setup 的项目，hook 完全静默。要在哪个项目用，就在哪个项目里运行一次 setup。
 
-An experimental native transport can be installed and selected only through a
-separately approved, archive-guarded cutover. It uses one private local mailbox
-and may wake idle Claude Code and Codex Desktop conversations; an unsuccessful
-wake leaves the message available for later reading. It does not switch Codex to
-a managed app-server or change either Chrome integration. See the
-[runtime reference](plugins/spec-guard/references/collaboration-runtime.md) for
-the explicit setup and rollback boundaries.
+## 5 分钟上手
 
-## Local tickets
+1. 在项目里运行 `/spec-guard:setup-convention`，看预览，确认后写入。
+2. 用 `/spec` 写能力图 `spec/CAPABILITY-MAP.md`：列出模块，写一行 Build order，人工评审。
+3. 发一句话给 agent，它会看到类似下面的提示：
 
-When GitHub or GitLab Issues are unavailable, the optional Epiq-backed local
-ledger records bugs, requests, and discussion for linked worktrees of one Git
-repository on the same Mac. After explicit one-time setup through
-`/spec-guard:local-ticket-ledger`, use `/spec-guard:ticket` in Claude Code or
-ask Codex to “show local tickets” or “record a bug.” The agent can include a
-ticket's short ref in a separate collaboration message. An agent working in a
-different repository needs the source project and a problem summary in that
-message; the short ref alone does not grant access to this repository's ledger.
-See the [ledger reference](plugins/spec-guard/references/local-ticket-ledger-runtime.md).
+   ```text
+   当前阶段: **MAP_ONLY**
+   Suggested next step: write the first reviewed module spec under `spec/`.
+   ```
 
-## Proposal mainline review
+4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`。
 
-Proposal authors publish v2 documents to the remote default branch. At an
-explicit mainline module boundary, the plugin reads the fixed remote Proposal
-pool, policy and Issue facts, then returns candidate or human-decision results.
-It never accepts automatically. Before a human creates a promotion branch,
-preflight requires a fresh accepted Issue and matching immutable attestation;
-post-merge proof verifies the declared capability-map insertion plus module Spec
-and Plan. Existing v1 published Proposals remain readable but must be republished
-as v2 before acceptance or promotion. See the
-[migration guide](docs/migrations/proposal-mainline-review-v2.md).
+完整流程、每个阶段的含义，以及项目做到一半来了新需求怎么走 Proposal，见[使用流程](docs/workflow.md)。
+
+## 文档
+
+| 文档 | 内容 |
+|---|---|
+| [使用流程](docs/workflow.md) | 新项目从零到交付、Proposal 九步、能力图规则、Claude 与 Codex 命令对照 |
+| [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、主链、验收记录等术语的含义 |
+| [可选能力](docs/optional-features.md) | 协作信箱、本地事项账本、文档治理、能力历史：各自解决什么、怎么启用 |
+| [更新日志](CHANGELOG.md) | 每个版本改了什么 |
+
+## 约定块
+
+setup 会往 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入下面这段约定，告诉 agent 多模块的目录规则。不运行 setup 的人，
+也可以照着它手工遵守：
 
 <!-- SYNC:claude-block-local BEGIN -->
 ````markdown
@@ -125,16 +109,14 @@ as v2 before acceptance or promotion. See the
 ````
 <!-- SYNC:claude-block-local END -->
 
-## Verification
+## 升级与迁移
 
-```bash
-/bin/bash scripts/validate.sh
-/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
-/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
-```
+- 仓库已从 `yizhongkaimail-collab/spec-guard-plugin` 迁到 `haigeerlab/spec-guard-plugin`。旧安装仍能运行，但要重新添加
+  marketplace 才能收到更新，见[仓库迁移说明](docs/migrations/2026-09-27-repository-copy.md)。
+- v0.14 之后，可写的 GitHub/GitLab tracker 桥已退役，见[迁移指南](docs/migrations/v0.15-legacy-tracker-retirement.md)。
+- Proposal v1 升级到 v2，见 [Proposal v2 迁移](docs/migrations/proposal-mainline-review-v2.md)。
 
-These are the same three checks the pre-push hook runs; `validate.sh` already
-includes the manifest, checker, retirement, and Codex smoke self-test suites.
+## 参与开发
 
-The complete validation suite is offline.  Publishing, tagging, and any remote
-action require separate authorization.
+维护者的工作方式、验证命令和发布流程见 [docs/maintainer-workflow.md](docs/maintainer-workflow.md) 与
+[docs/release-process.md](docs/release-process.md)。
