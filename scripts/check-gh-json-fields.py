@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""校验仓库里写到的 `gh <sub> view --json <字段>` 都是真实存在的字段。
+"""校验仓库里写到的 `gh <sub> view|list --json <字段>` 都是真实存在的字段。
+
+既查文档与 shell 里的命令行写法，也查 Python 里 `["gh", "issue", "list", ..., "--json", "<字段>"]`
+这种参数列表写法 —— 插件里现存唯一的 `--json` 调用就是后者（proposal_tracker_read.py）。
 
 为什么要有它：这个仓库已经两次把不存在的东西写进操作步骤 ——
 `gh issue list --parent`（那个 flag 只在 create 上），以及
@@ -18,16 +21,20 @@ import shutil
 import subprocess
 import sys
 
-USE = re.compile(r"gh\s+(issue|pr|repo)\s+view\b[^\n]*?--json\s+([A-Za-z][A-Za-z,]*)")
+USE = re.compile(r"gh\s+(issue|pr|repo)\s+(view|list)\b[^\n]*?--json\s+([A-Za-z][A-Za-z,]*)")
+ARGV = re.compile(r'"gh",\s*"(issue|pr|repo)",\s*"(view|list)"[^\]]*?"--json",\s*"([A-Za-z][A-Za-z,]*)"')
 
 
-def valid_fields(sub: str):
-    """问 gh 要 `gh <sub> view` 的合法字段表。拿不到就返回 None。"""
+def valid_fields(sub: str, verb: str):
+    """问 gh 要 `gh <sub> <verb>` 的合法字段表。拿不到就返回 None。"""
     # `gh issue view` 必须带一个编号才走到字段校验（不带的话先报
     # "accepts 1 arg(s), received 0"）。给个 1 即可 —— 字段校验在**取数据之前**，
-    # 这个 issue 存不存在都不影响。
-    argv = ["gh", sub, "view"] + (["1"] if sub in ("issue", "pr") else []) \
-        + ["--json", "__probe__"]
+    # 这个 issue 存不存在都不影响。`list` 给一个任意 --repo，同样在联网前校验字段。
+    if verb == "view":
+        target = ["1"] if sub in ("issue", "pr") else []
+    else:
+        target = ["--repo", "a/b"] if sub in ("issue", "pr") else []
+    argv = ["gh", sub, verb] + target + ["--json", "__probe__"]
     try:
         r = subprocess.run(argv, capture_output=True, text=True, timeout=15)
     except Exception:
@@ -55,18 +62,18 @@ def main() -> int:
             text = open(path, encoding="utf-8").read()
         except (OSError, UnicodeDecodeError):
             continue
-        for sub, fieldlist in USE.findall(text):
-            if sub not in cache:
-                cache[sub] = valid_fields(sub)
-            known = cache[sub]
+        for sub, verb, fieldlist in USE.findall(text) + ARGV.findall(text):
+            if (sub, verb) not in cache:
+                cache[(sub, verb)] = valid_fields(sub, verb)
+            known = cache[(sub, verb)]
             if known is None:
-                print(f"  ⏭  问不到 `gh {sub} view` 的字段表，跳过（不代表通过）")
+                print(f"  ⏭  问不到 `gh {sub} {verb}` 的字段表，跳过（不代表通过）")
                 continue
             for f in [x for x in fieldlist.split(",") if x]:
                 checked += 1
                 if f not in known:
-                    print(f"  ❌ {path}: `gh {sub} view --json {f}` —— 没有这个字段。"
-                          f"合法值跑 `gh {sub} view --json x` 看")
+                    print(f"  ❌ {path}: `gh {sub} {verb} --json {f}` —— 没有这个字段。"
+                          f"合法值跑 `gh {sub} {verb} --json x` 看")
                     ok = False
     if ok:
         print(f"  ✅ gh --json 字段全部存在（校验了 {checked} 个）")

@@ -5,7 +5,9 @@ Usage:
   spec-digest.py compute <map>
   spec-digest.py --selftest
 
-The script only parses a capability map and emits deterministic JSON.  It does
+The script only parses a capability map and emits deterministic JSON.  A map
+that cannot be read or parsed is an error (exit 1, reason on stderr), never an
+empty digest.  It does
 not read workflow state, contact a tracker, or compare a map with a projection.
 """
 import hashlib
@@ -49,6 +51,12 @@ def _selftest():
         if result["order"] != ["alpha"] or not result["goalDigest"] or result["placeholder"]:
             print("spec-digest self-test failed")
             return 1
+        import subprocess
+        missing = subprocess.run([sys.executable, __file__, "compute", os.path.join(directory, "absent.md")],
+                                 capture_output=True, text=True)
+        if missing.returncode != 1 or missing.stdout or "cannot digest" not in missing.stderr:
+            print("spec-digest self-test failed: an unreadable map must exit 1 without JSON")
+            return 1
     print("spec-digest self-test passed")
     return 0
 
@@ -61,9 +69,9 @@ def main():
         try:
             print(json.dumps(compute(argv[1]), ensure_ascii=False))
             return 0
-        except Exception:
-            print(json.dumps({"rows": [], "order": [], "goalDigest": None, "placeholder": False}, ensure_ascii=False))
-            return 0
+        except Exception as error:
+            print("spec-digest: cannot digest %s: %s" % (argv[1], error), file=sys.stderr)
+            return 1
     print(__doc__)
     return 2
 

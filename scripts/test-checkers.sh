@@ -82,6 +82,13 @@ want fail "gh-json: 不存在的字段 → 报错" \
   env PATH="$GHJSON_PATH" python3 "$ROOT/scripts/check-gh-json-fields.py" "$TMP/badjson.md"
 want pass "gh-json: 真实字段 → 放行" \
   env PATH="$GHJSON_PATH" python3 "$ROOT/scripts/check-gh-json-fields.py" "$TMP/goodjson.md"
+# Python 参数列表写法（插件里现存唯一的 --json 调用就是这种）同样要查，且可以跨行。
+printf '%s\n' 'run(["gh", "issue", "list", "--repo", target,' "    \"--json\", \"title,$BADF\"])" > "$TMP/badjson.py"
+printf '%s\n' 'run(["gh", "issue", "list", "--repo", target,' '    "--json", "title,blockedBy"])' > "$TMP/goodjson.py"
+want fail "gh-json: Python 参数列表里的不存在字段 → 报错" \
+  env PATH="$GHJSON_PATH" python3 "$ROOT/scripts/check-gh-json-fields.py" "$TMP/badjson.py"
+want pass "gh-json: Python 参数列表里的真实字段 → 放行" \
+  env PATH="$GHJSON_PATH" python3 "$ROOT/scripts/check-gh-json-fields.py" "$TMP/goodjson.py"
 # gh 不可用时必须干净跳过退 0，不能假阻塞。
 # PATH 清空后 python3 也找不着了，所以用绝对路径调它 —— 这里要屏蔽的只有 gh。
 mkdir -p "$TMP/nogh"
@@ -137,6 +144,19 @@ mkcodex "$TMP/codex-good" spec-guard 1.0.0 ./skills/ ./hooks/hooks.json
 want pass "codex manifest: 名称和版本一致 → 放行" \
   bash -c "cd '$TMP/codex-good' && python3 '$ROOT/scripts/check-manifests.py'"
 
+
+# ── check-no-parallel-surface.py ──
+mkdir -p "$TMP/par-good/plugins/spec-guard/commands" "$TMP/par-bad/plugins/spec-guard/commands" \
+  "$TMP/par-file/plugins/spec-guard/commands"
+printf 'phase\n' > "$TMP/par-good/plugins/spec-guard/commands/phase.md"
+printf 'run the parallel-%s worker\n' worktree > "$TMP/par-bad/plugins/spec-guard/commands/phase.md"
+: > "$TMP/par-file/plugins/spec-guard/commands/parallel-run.md"
+want pass "parallel-surface: 干净的插件 → 放行" \
+  python3 "$ROOT/scripts/check-no-parallel-surface.py" "$TMP/par-good"
+want fail "parallel-surface: 现行文件引用已退役的并行流程 → 报错" \
+  python3 "$ROOT/scripts/check-no-parallel-surface.py" "$TMP/par-bad"
+want fail "parallel-surface: 残留已退役的并行命令文件 → 报错" \
+  python3 "$ROOT/scripts/check-no-parallel-surface.py" "$TMP/par-file"
 
 # ── check-command-names.py ──
 mkc() {  # $1=目录 $2=模板里引用的命令名

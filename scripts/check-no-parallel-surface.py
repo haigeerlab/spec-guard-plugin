@@ -5,10 +5,9 @@ import re
 import sys
 
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
 def main() -> int:
+    # 可传入另一个仓库根（测试夹具用），默认检查本仓库。
+    root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     forbidden_files = []
     for pattern in (
         "plugins/spec-guard/commands/parallel-*.md",
@@ -19,9 +18,9 @@ def main() -> int:
         "spec/parallel-*.md",
         "tasks/parallel-*",
     ):
-        forbidden_files.extend(ROOT.glob(pattern))
+        forbidden_files.extend(root.glob(pattern))
 
-    live_plugin = ROOT / "plugins/spec-guard"
+    live_plugin = root / "plugins/spec-guard"
     leaked_references = []
     pattern = re.compile(r"parallel[-_]|PARALLEL_WRITES_DISABLED")
     for path in live_plugin.rglob("*"):
@@ -30,8 +29,8 @@ def main() -> int:
         if pattern.search(path.read_text(encoding="utf-8")):
             leaked_references.append(path)
 
-    problems = sorted({str(path.relative_to(ROOT)) for path in forbidden_files if path.is_file()}
-                      | {str(path.relative_to(ROOT)) for path in leaked_references})
+    problems = sorted({str(path.relative_to(root)) for path in forbidden_files if path.is_file()}
+                      | {str(path.relative_to(root)) for path in leaked_references})
     if problems:
         print("parallel workflow remains in the live surface:", file=sys.stderr)
         print("\n".join("- " + path for path in problems), file=sys.stderr)
