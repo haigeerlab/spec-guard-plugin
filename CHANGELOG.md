@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 文档
+
+- **定下 XATS 协作传输的日落条件。** native 须先经 Proposal 转为默认；提出该 Proposal 的门槛是连续两个发布版本在
+  至少两台主机上实机验收通过、升级一次固定上游 revision 后唤醒仍有效、没有未关闭的 native P1/P2。转正后 XATS 留
+  一个 minor 过渡期再删除，保留归档读取与卸载命令。见 `docs/decisions/2026-09-28-xats-sunset.md`。本次不改变任何行为。
+
 ## [0.23.0] - 2026-09-28
 
 ### 破坏性变更
