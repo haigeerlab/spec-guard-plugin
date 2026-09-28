@@ -44,6 +44,10 @@
 
 ### 变更
 
+- **阶段注入按模块判断。** phase-guard 不再在有 Spec 后永远报 `SPECED` 并建议“创建 plan”：它取 `activeModule` 或
+  Build order 中第一个未完成的模块，按 Spec、`tasks/<id>/plan.md` 与 `tasks/<id>/todo.md` 的未勾选项报告
+  `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING` 或 `DONE`，并附全局计数；全部完成时建议经 Proposal 追加新模块。能力图无效时
+  报告 `MAP_INVALID`，无法计算时报告 `UNKNOWN` 而不是静默。`SPECED` 阶段取消。
 - **verify-artifacts 使用唯一的严格能力图解析器。** 不再用自带正则扫描所有表格行：围栏示例或其他表格首列
   中的 id 不再被当作模块；缺少 Build order、依赖未知或成环的能力图现在报 ❌ 并给出解析原因（此前通过）。
   python3 不可用或解析器异常时报「未验证」，不再把合法 spec 全部判成违规。命令说明删去已不存在的 plan、
@@ -69,6 +73,8 @@
 
 ### 测试
 
+- **阶段回归扩到 21 例。** 覆盖 `NEEDS_PLAN`、`BUILDING` 与剩余项数、模块推进、`activeModule` 优先与回退、`DONE` 计数、
+  `NEEDS_SPEC`、`MAP_INVALID` 与 `UNKNOWN`。
 - **setup 与 teardown 回归。** 新增 `test-setup-teardown.sh`（14 例）并接入 `validate.sh`：覆盖预览、首次安装、
   重复安装、`--replace`、无效标记、正文提及标记、往返逐字节还原、`--keep-state`、未启用项目与 Codex 主机。
 - **协作运维回归。** 覆盖 Codex 表的逐字删除与拒绝（改动、追加键、重复、带引号子表、符号链接）、XATS 与

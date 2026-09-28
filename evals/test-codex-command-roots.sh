@@ -42,7 +42,7 @@ PROJECT="$WORK/project"
 mkdir -p "$PROJECT/spec" "$WORK/bin"
 printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$PROJECT/AGENTS.md"
 printf '%s\n' '<!-- END:spec-guard-codex-convention -->' >> "$PROJECT/AGENTS.md"
-printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' > "$PROJECT/spec/CAPABILITY-MAP.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' 'Build order: alpha' > "$PROJECT/spec/CAPABILITY-MAP.md"
 touch "$PROJECT/spec/alpha.md"
 printf '%s\n' '#!/usr/bin/env bash' > "$WORK/bin/codex"
 printf '%s\n' "printf '%s\\n' '{\"installed\":[{\"name\":\"spec-guard\",\"installed\":true,\"enabled\":true,\"source\":{}},{\"name\":\"spec-guard\",\"installed\":true,\"enabled\":true,\"source\":{\"path\":\"$ROOT/plugins/spec-guard\"}}]}'" >> "$WORK/bin/codex"
@@ -50,7 +50,7 @@ chmod +x "$WORK/bin/codex"
 awk '/^```bash$/{capture=1; next} capture && /^```$/{exit} capture{print}' \
   "$ROOT/plugins/spec-guard/commands/phase.md" > "$WORK/phase-command.sh"
 PHASE="$(cd "$PROJECT" && PATH="$WORK/bin:$PATH" CLAUDE_PLUGIN_ROOT='' PLUGIN_ROOT='' /bin/bash "$WORK/phase-command.sh")"
-grep -q 'SPECED' <<<"$PHASE" || {
+grep -q 'NEEDS_PLAN' <<<"$PHASE" || {
   echo 'phase command cannot resolve an enabled Codex plugin without a root environment variable' >&2
   exit 1
 }

@@ -84,7 +84,7 @@ assert by_id[4]["error"]["code"] == -32601
 
 error, text = result(5)
 context = json.loads(text)["hookSpecificOutput"]["additionalContext"]
-assert error is False and "SPECED" in context and "Module specs: 1" in context, text
+assert error is False and "NEEDS_PLAN" in context and "Current module: `fixture-module`" in context, text
 
 error, text = result(6)
 assert error is False and "0 失败" in text, text

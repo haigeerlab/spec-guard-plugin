@@ -2,6 +2,9 @@
 # Read-only guidance for the local multi-spec convention and legacy migration.
 set -u
 
+# 只用 bash 内建取脚本目录：本 hook 只能依赖 bash、git 与 python3。
+case "${BASH_SOURCE[0]}" in */*) HOOKDIR="${BASH_SOURCE[0]%/*}" ;; *) HOOKDIR=. ;; esac
+HOOKDIR="$(cd "$HOOKDIR" && pwd)"
 ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$ROOT" 2>/dev/null || exit 0
 
@@ -91,11 +94,16 @@ Suggested next step: write the first reviewed module spec under \`spec/\`."
   exit 0
 fi
 
-emit "## spec-guard local workflow
+# 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . 2>/dev/null)"; then
+  emit "## spec-guard local workflow
 
-当前阶段: **SPECED**
+${STAGE}"
+else
+  emit "## spec-guard local workflow
 
-- Capability map: present
+当前阶段: **UNKNOWN**
+
 - Module specs: ${SPECS}
-
-Suggested next step: create a module plan and its local task list under \`tasks/<module-id>/\`."
+- The module stage could not be computed; run \`/spec-guard:verify-artifacts\` for details."
+fi
