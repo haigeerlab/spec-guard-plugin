@@ -5,10 +5,10 @@ import os
 from pathlib import Path
 import re
 import stat
-import subprocess
 import sys
 import tempfile
 
+from host_config_removal import add_claude_server
 from local_ledger_runtime import MCP_RELATIVE_PATH, default_runtime_dir, node_status, runtime_status
 
 
@@ -126,16 +126,9 @@ def install_claude_config(claude_bin: str, runtime_dir: Path, node_executable: s
                           settings: Path) -> None:
     """Install ask rules, then add an explicit user-scoped stdio server; never touch project files."""
     command = mcp_command(runtime_dir, node_executable)
-    existing = subprocess.run([claude_bin, "mcp", "get", MCP_SERVER_NAME], check=False,
-                              capture_output=True, text=True)
-    if existing.returncode == 0:
-        raise ValueError("Claude local-ledger MCP server already exists; refusing to overwrite it")
     install_claude_guard(settings)
-    try:
-        subprocess.run([claude_bin, "mcp", "add", "--scope", "user", MCP_SERVER_NAME, "--", *command],
-                       check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as error:
-        raise ValueError("unable to install Claude local-ledger MCP configuration") from error
+    add_claude_server(claude_bin, ["add", "--scope", "user", MCP_SERVER_NAME, "--", *command],
+                      MCP_SERVER_NAME)
 
 
 def _node_path() -> str:

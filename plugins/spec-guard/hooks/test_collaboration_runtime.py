@@ -504,15 +504,13 @@ class CollaborationRuntimeTests(unittest.TestCase):
         self.write_config()
         helper = Path(self.tmp.name) / "collaboration_claude_stdio.py"
         helper.write_text("# helper\n", encoding="utf-8")
-        with patch("collaboration_adapters.subprocess.run") as run:
-            run.side_effect = [
-                subprocess.CompletedProcess(["claude", "mcp", "get"], 1),
-                subprocess.CompletedProcess(["claude", "mcp", "add"], 0),
-            ]
+        with patch("host_config_removal.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(["claude", "mcp", "add"], 0)
             install_claude_config(
                 helper, self.config_dir, "claude", "/usr/bin/python3", "/bin/echo",
             )
-        added = run.call_args_list[1].args[0]
+        self.assertEqual(run.call_count, 1)
+        added = run.call_args_list[0].args[0]
         self.assertEqual(added[:7], [
             "claude", "mcp", "add", "--scope", "user", MCP_SERVER_NAME, "--",
         ])
@@ -525,16 +523,16 @@ class CollaborationRuntimeTests(unittest.TestCase):
         self.write_config()
         helper = Path(self.tmp.name) / "collaboration_claude_stdio.py"
         helper.write_text("# helper\n", encoding="utf-8")
-        with patch("collaboration_adapters.subprocess.run") as run:
-            run.return_value = subprocess.CompletedProcess(["claude", "mcp", "get"], 0)
+        with patch("host_config_removal.subprocess.run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                ["claude", "mcp", "add"], 1, "",
+                "MCP server spec-guard-collaboration already exists in user config")
             with self.assertRaisesRegex(ValueError, "refusing to overwrite"):
                 install_claude_config(
                     helper, self.config_dir, "claude", "/usr/bin/python3", "/bin/echo",
                 )
-        run.assert_called_once_with(
-            ["claude", "mcp", "get", MCP_SERVER_NAME], check=False,
-            capture_output=True, text=True,
-        )
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0][:3], ["claude", "mcp", "add"])
 
     def test_codex_config_install_is_atomic_non_secret_and_refuses_overwrite(self):
         self.write_config()

@@ -13,13 +13,12 @@ import re
 import shlex
 import shutil
 import stat
-import subprocess
 import sys
 import tempfile
 from typing import Any, Sequence
 
 from collaboration_runtime import RuntimeConfig, default_config_dir, read_runtime_config
-from host_config_removal import remove_claude_server, remove_codex_table
+from host_config_removal import add_claude_server, remove_claude_server, remove_codex_table
 
 
 MCP_SERVER_NAME = "spec-guard-collaboration"
@@ -116,22 +115,11 @@ def install_claude_config(
         raise ValueError("Claude stdio helper is unavailable")
     if not npx_path.is_absolute() or not npx_path.is_file():
         raise ValueError("Claude stdio npx executable is unavailable")
-    existing = subprocess.run(
-        [claude_bin, "mcp", "get", MCP_SERVER_NAME], check=False,
-        capture_output=True, text=True,
-    )
-    if existing.returncode == 0:
-        raise ValueError("Claude collaboration MCP server already exists; refusing to overwrite it")
-    command = [
-        claude_bin, "mcp", "add", "--scope", "user", MCP_SERVER_NAME, "--",
+    add_claude_server(claude_bin, [
+        "add", "--scope", "user", MCP_SERVER_NAME, "--",
         python_executable, "-B", str(helper), "--config-dir", str(Path(runtime_dir)),
         "--npx", str(npx_path),
-    ]
-    try:
-        subprocess.run(command, check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as error:
-        diagnostic = error.stderr.strip() or error.stdout.strip() or "Claude rejected MCP configuration"
-        raise ValueError("unable to install Claude collaboration MCP configuration: " + diagnostic) from error
+    ], MCP_SERVER_NAME)
 
 
 def _uninstall(args: argparse.Namespace) -> int:

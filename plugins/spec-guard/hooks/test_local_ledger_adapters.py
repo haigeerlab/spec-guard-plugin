@@ -88,14 +88,14 @@ class LocalLedgerAdapterTests(unittest.TestCase):
 
     def test_claude_install_checks_for_a_conflict_then_adds_a_user_scoped_stdio_server(self):
         settings = Path(self.tmp.name) / "claude" / "settings.json"
-        with patch("local_ledger_adapters.subprocess.run", side_effect=[
-            subprocess.CompletedProcess([], 1), subprocess.CompletedProcess([], 0),
-        ]) as run:
+        with patch("host_config_removal.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 0)) as run:
             local_ledger_adapters.install_claude_config(
                 "claude", self.runtime_dir, "/opt/node", settings)
         ask = json.loads(settings.read_text(encoding="utf-8"))["permissions"]["ask"]
         self.assertIn("mcp__spec-guard-local-ledger__epiq_sync", ask)
-        add_command = run.call_args_list[1].args[0]
+        self.assertEqual(run.call_count, 1)
+        add_command = run.call_args_list[0].args[0]
         self.assertEqual(add_command[:5], [
             "claude", "mcp", "add", "--scope", "user",
         ])
@@ -103,14 +103,16 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertIn(str(self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"), add_command)
         self.assertNotIn("token", " ".join(add_command).lower())
 
-    def test_claude_install_refuses_an_existing_server_before_writing_settings(self):
+    def test_claude_install_refuses_an_existing_server_but_keeps_its_ask_rules(self):
+        # 同名服务已存在时 CLI 自己拒绝；此前写入的 ask 规则只会让这些工具逐次询问，保留无害。
         settings = Path(self.tmp.name) / "claude" / "settings.json"
-        with patch("local_ledger_adapters.subprocess.run",
-                   return_value=subprocess.CompletedProcess([], 0)):
-            with self.assertRaisesRegex(ValueError, "already exists"):
+        with patch("host_config_removal.subprocess.run", return_value=subprocess.CompletedProcess(
+                [], 1, "", "MCP server spec-guard-local-ledger already exists in user config")):
+            with self.assertRaisesRegex(ValueError, "already exists; refusing to overwrite"):
                 local_ledger_adapters.install_claude_config(
                     "claude", self.runtime_dir, "/opt/node", settings)
-        self.assertFalse(settings.exists())
+        self.assertEqual(json.loads(settings.read_text(encoding="utf-8"))["permissions"]["ask"],
+                         local_ledger_adapters.claude_ask_rules())
 
     def test_claude_guard_merges_ask_rules_and_preserves_other_settings(self):
         settings = Path(self.tmp.name) / "settings.json"

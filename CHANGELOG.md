@@ -7,6 +7,10 @@
 - **移除失效的 Claude 协作条目不再超时。** `uninstall-claude` 不再先调用 `claude mcp get`：它会对条目做连接健康
   检查，失效端点实测需 17 秒，超过 10 秒超时后被误报为“无法检查配置”，而这正是最需要移除的情形。现在直接
   运行 `claude mcp remove --scope user`，按其结果区分已移除与本就不存在。
+- **Claude 接入遇到同名失效条目时不再超时或误报。** 协作（XATS、native）与本地事项账本的 `install-claude`
+  同样不再先调用 `claude mcp get`，直接运行 `claude mcp add`／`add-json`，由 CLI 自己拒绝同名条目并报告
+  “already exists”。native 此前在 10 秒超时后误报“无法检查配置”。拒绝规则与 ask 规则仍先于注册写入，
+  名称被占用时保留，它们只作用于本服务的工具。
 - **协作切换后不再遗留另一套后端。** 新增 XATS 与 native 的 `uninstall-claude`／`uninstall-codex`
   （需 `--confirm-uninstall`）：Claude 经 `claude mcp remove` 移除，Codex 表只有与安装时逐字一致才删除，
   被改过的表拒绝并给出行号。参考文档新增切换与回退检查清单，包括停用 XATS LaunchAgent 与移除旧条目。
