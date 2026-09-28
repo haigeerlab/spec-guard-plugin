@@ -275,6 +275,16 @@ printf 'z\n' > "$TMP/rsmissing/plugins/spec-guard/templates/claude-block-gitlab.
 printf 'y\n' > "$TMP/rsmissing/plugins/spec-guard/templates/claude-block-local.md"
 printf '# README\n没有 SYNC 标记\n' > "$TMP/rsmissing/README.md"
 want fail "readme-sync: README 里缺 SYNC 标记 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsmissing"
+mkrref() {  # $1=目录 $2=README 里写的 --ref 版本；清单固定为 1.2.3
+  mkr "$1" same
+  mkdir -p "$1/plugins/spec-guard/.claude-plugin"
+  printf '{"name":"spec-guard","version":"1.2.3"}\n' > "$1/plugins/spec-guard/.claude-plugin/plugin.json"
+  printf 'codex plugin marketplace add o/r --ref v%s\n' "$2" >> "$1/README.md"
+}
+mkrref "$TMP/rsrefbad" 1.2.2
+mkrref "$TMP/rsrefgood" 1.2.3
+want fail "readme-sync: 安装命令的 --ref 落后于清单版本 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefbad"
+want pass "readme-sync: 安装命令的 --ref 等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefgood"
 
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
