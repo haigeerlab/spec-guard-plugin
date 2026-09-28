@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **已有验收记录不可改写。** 新增 `scripts/check-acceptance-immutable.py`，经 `validate.sh` 与预推送 hook 运行：
+  `origin/main` 上已有的 `spec/proposal-acceptances/*.json` 必须逐字节不变，只允许新增。它防意外改写，不证明作者。
+
 ### 文档
 
 - **主链评审分支的同步方式。** 两个主链命令说明遇到 `mainline-review-commit-not-ancestor` 时先把主链分支快进到远端默认

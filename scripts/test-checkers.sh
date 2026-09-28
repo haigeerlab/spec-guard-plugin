@@ -145,6 +145,26 @@ want pass "codex manifest: 名称和版本一致 → 放行" \
   bash -c "cd '$TMP/codex-good' && python3 '$ROOT/scripts/check-manifests.py'"
 
 
+# ── check-acceptance-immutable.py ──
+ACC="$TMP/acc"
+mkdir -p "$ACC/spec/proposal-acceptances"
+git -C "$ACC" init -q
+printf '{"decision":"accept"}\n' > "$ACC/spec/proposal-acceptances/gamma-1.json"
+git -C "$ACC" add -A && git -C "$ACC" -c user.email=t@e -c user.name=t commit -qm base
+want pass "acceptance: 已有记录未改动 → 放行" \
+  python3 "$ROOT/scripts/check-acceptance-immutable.py" "$ACC" --base HEAD
+printf '{"decision":"accept"}\n' > "$ACC/spec/proposal-acceptances/delta-1.json"
+want pass "acceptance: 新增记录 → 放行" \
+  python3 "$ROOT/scripts/check-acceptance-immutable.py" "$ACC" --base HEAD
+printf '{"decision":"reject"}\n' > "$ACC/spec/proposal-acceptances/gamma-1.json"
+want fail "acceptance: 改写已有记录 → 报错" \
+  python3 "$ROOT/scripts/check-acceptance-immutable.py" "$ACC" --base HEAD
+rm "$ACC/spec/proposal-acceptances/gamma-1.json"
+want fail "acceptance: 删除已有记录 → 报错" \
+  python3 "$ROOT/scripts/check-acceptance-immutable.py" "$ACC" --base HEAD
+want pass "acceptance: 没有基准分支时降级跳过" \
+  python3 "$ROOT/scripts/check-acceptance-immutable.py" "$ACC" --base refs/heads/absent
+
 # ── check-no-parallel-surface.py ──
 mkdir -p "$TMP/par-good/plugins/spec-guard/commands" "$TMP/par-bad/plugins/spec-guard/commands" \
   "$TMP/par-file/plugins/spec-guard/commands"
