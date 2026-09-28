@@ -89,6 +89,7 @@ printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.ag
 injects "activeModule 不在图中时提示并回退" "$stages" 'activeModule `ghost` is not in the capability map'
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
+injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
 rm "$stages/spec/beta.md"

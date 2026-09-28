@@ -52,6 +52,28 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 
 旧 remote-tracker state 按本地约定报告阶段；phase 不认证、不读取其中的映射，也不选择任务。
 
+## add-module
+
+只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并
+说明先完成它。先读 `spec/CAPABILITY-MAP.md`，根据用户给的需求上下文提出 id（kebab-case、语义稳定）、单行
+responsibility、depends-on（既有模块 id，逗号分隔，没有填 `—`）、anchor（`after:<既有模块 id>` 或 `end`），
+每项都给一句对着能力图实际模块的理由。
+
+先预览（默认，只读）：
+
+```bash
+python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
+  --id <id> --responsibility "<responsibility>" --depends-on <a,b|—> --anchor <after:<id>|end>
+```
+
+原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒）；被拒绝时原样说明是哪一
+条校验失败并停下。等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次；用户改了 id、
+responsibility、depends-on 或 anchor 中任何一项，都要先重新预览，不能对着旧预览直接确认。
+
+写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
+Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
+并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 九步流程，而不是本命令。
+
 ## documentation
 
 文档基线、影响和验证仍是显式声明工具，不能扫描代码或 Git 历史来猜测状态：

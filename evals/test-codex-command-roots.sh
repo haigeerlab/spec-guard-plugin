@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMMANDS=(
+  add-module
   documentation-baseline
   documentation-impact
   documentation-verification

@@ -67,7 +67,8 @@ def describe(root: Path) -> str:
     if current is None:
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
-                "For new work, add a module to the map and review it; "
+                "For new work, insert a module with /spec-guard:add-module "
+                "(Codex: spec-guard-ops add-module) at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
     next_step = {

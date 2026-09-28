@@ -7,7 +7,7 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 |---|---|
 | 多个模块的 plan 和 todo 写到同一个文件里，互相覆盖 | 多模块目录约定：一张能力图，每个模块各自的 Spec、Plan、todo |
 | agent 不知道现在该做哪个模块、做到哪一步 | 每轮对话开头自动注入当前阶段，例如「`NEEDS_PLAN`：去给 `billing` 写 plan」 |
-| 做到一半冒出新需求，没地方登记，也没人确认该不该加 | Proposal 流程：新需求写成提案，经评审和人工接受后，按锚点插进能力图 |
+| 做到一半冒出新需求，不知道插在哪，手改能力图容易改坏 | 快速插入：在检查点提出新模块，校验、预览后经你确认插进能力图；需要留痕时改走 Proposal |
 
 它只报告事实、给出建议，**不替你改 Issue、分支或能力图**，决定和写入都留给人。设计原因见[设计理念与术语](docs/concepts.md)。
 
@@ -18,7 +18,8 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 多模块约定 | 模块产物互不覆盖，`/build` 只从当前模块取任务 | `/spec-guard:setup-convention` | 运行 setup 后生效 |
 | 阶段提示 | agent 每轮都知道当前模块和下一步 | 自动；`/spec-guard:phase` 查看 | 运行 setup 后生效 |
 | 产物校验 | 能力图格式、模块与 Spec 的对应关系是否正确 | `/spec-guard:verify-artifacts` | 按需运行 |
-| Proposal 流程 | 新需求经评审、人工接受后再加进能力图，全程留痕 | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
+| 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
+| Proposal 流程 | 需要留痕时，新需求经评审、人工接受后再加进能力图 | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
 | 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
 | 本地事项账本 | 没有 GitHub/GitLab Issue 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
@@ -72,13 +73,14 @@ codex plugin add spec-guard@spec-guard-marketplace
 
 4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`。
 
-完整流程、每个阶段的含义，以及项目做到一半来了新需求怎么走 Proposal，见[使用流程](docs/workflow.md)。
+项目做到一半来了新需求，在检查点用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，
+见[使用流程](docs/workflow.md)。
 
 ## 文档
 
 | 文档 | 内容 |
 |---|---|
-| [使用流程](docs/workflow.md) | 新项目从零到交付、Proposal 九步、能力图规则、Claude 与 Codex 命令对照 |
+| [使用流程](docs/workflow.md) | 新项目从零到交付、快速插入与 Proposal 两种加需求方式、能力图规则、Claude 与 Codex 命令对照 |
 | [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、主链、验收记录等术语的含义 |
 | [可选能力](docs/optional-features.md) | 协作信箱、本地事项账本、文档治理、能力历史：各自解决什么、怎么启用 |
 | [更新日志](CHANGELOG.md) | 每个版本改了什么 |
