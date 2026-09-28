@@ -39,6 +39,9 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 
 `--keep-state` 保留原名，**hook 会继续激活**，只在确实想切到零足迹模式时用。
 
+当前的激活判据：`CLAUDE.md`／`AGENTS.md` 中独占一行的 `BEGIN` 标记，或 `tracker` 为 `none`、`github`、
+`gitlab` 的 `.agent/state.json`。正文里提到标记、或其他工具写的 `.agent/state.json` 都不会激活。
+
 ## 之后
 
 把脚本输出**原样转述**给用户。退出码 2 表示本项目没启用过约定，什么都没做。

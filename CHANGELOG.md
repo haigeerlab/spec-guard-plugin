@@ -25,6 +25,9 @@
   中的 id 不再被当作模块；缺少 Build order、依赖未知或成环的能力图现在报 ❌ 并给出解析原因（此前通过）。
   python3 不可用或解析器异常时报「未验证」，不再把合法 spec 全部判成违规。命令说明删去已不存在的 plan、
   issue 与远端检查，并更正退出码 2 的含义。
+- **phase-guard 激活信号收窄，缺 python3 不再静默。** 声明块标记必须独占一行（与 `managed-block.py`
+  一致），`.agent/state.json` 必须带 `tracker` 为 `none`／`github`／`gitlab`；正文里提到标记、或其他工具的
+  state 文件不再让无关项目每轮收到注入。已启用的项目缺 python3 时注入可诊断的 JSON，而不是静默成“未启用”。
 - **本地事项账本高风险工具门控。** `epiq_sync`（推送事项到 Git 远端）、`epiq_project_init`、
   `epiq_skill_install`、项目级删除／移除与贡献者邮箱工具共 10 个，在 `ticket` skill 与命令中改为逐次
   确认；`install-claude` 同时写入用户级 `permissions.ask`，`install-codex` 以 `enabled_tools` 白名单只暴露
@@ -53,6 +56,8 @@
 - **verify-artifacts 回归从 1 正 1 反扩到 8 例。** 覆盖围栏与第二张表、无效能力图、缺 python3 和解析器异常。
 - **命令名检查器的反向用例改用夹具。** “上游删除 `/plan`”一例此前依赖仓库文案恰好提到 `/plan`，文案一改就
   失去检测能力；现在在临时夹具中引用 `/plan`。
+- **phase-guard 回归从 3 个场景扩到 9 例。** 每条输出都按 JSON 解析并核对事件名；覆盖无关 state、正文提及
+  标记、CRLF、IDLE 与缺 python3。
 - **主链评审 CLI 端到端回归。** 首次覆盖 `main()` 的两种模式，以及各层失败的诊断码与 Git 拓扑判定。
 - **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
   契约测试要求日常入口点名全部门控工具。
