@@ -152,9 +152,31 @@ class ProposalTrackerTransportTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertTrue(all(call[:2] == ["glab", "api"] for call in calls))
         self.assertTrue(all(call[2].startswith("projects/17/issues?") for call in calls))
-        self.assertTrue(all("search=" in call[2] and "page=" in call[2] and "state=all" in call[2]
+        self.assertTrue(all("search=" not in call[2] and "page=" in call[2] and "state=all" in call[2]
                             for call in calls))
         self.assertTrue(all("-X" not in call and "--method" not in call for call in calls))
+
+    def test_gitlab_finds_the_marker_even_when_search_ignores_html_comments(self):
+        # GitLab 15.3.2 (verified 2026-09-28): search= never matched text inside HTML
+        # comments, so a marker search always came back empty. The reader must list and match locally.
+        issues = [gitlab_issue(iid=index, body="plain text") for index in range(1, 40)]
+        issues.append(gitlab_issue(iid=77))
+        calls = []
+
+        def search_blind_gitlab(argv):
+            calls.append(argv)
+            return "[]" if "search=" in argv[2] else json.dumps(issues)
+
+        result = read_tracker(proposal(), "gitlab", 17, runner=search_blind_gitlab)
+        self.assertEqual((result.state, result.issue_id), ("verified", 77))
+        self.assertEqual(len(calls), 1)
+
+    def test_gitlab_result_filling_every_page_is_unknown(self):
+        full_page = json.dumps([gitlab_issue(iid=index, body="plain text") for index in range(1, 101)])
+        runner, calls = self.runner(*([full_page] * 10))
+        result = read_tracker(proposal(), "gitlab", 17, runner=runner)
+        self.assertEqual(result.state, "unknown")
+        self.assertEqual(len(calls), 10)
 
     def test_transport_failure_or_incomplete_github_response_is_unknown(self):
         failed, _ = self.runner(None)

@@ -178,10 +178,12 @@ def _github_page(target, runner):
     return {"complete": True, "issues": issues}
 
 
-def _gitlab_page(proposal, target, runner):
+def _gitlab_page(target, runner):
+    # List every Issue and match the marker locally, as for GitHub. GitLab's search= does not
+    # match text inside HTML comments (GitLab 15.3.2, verified 2026-09-28), and the marker is one.
     issues = []
     for page_number in range(1, MAX_PAGES + 1):
-        query = urlencode({"search": proposal.marker, "state": "all",
+        query = urlencode({"state": "all",
                            "per_page": str(PAGE_SIZE), "page": str(page_number)})
         response = _json(runner(["glab", "api", "projects/%s/issues?%s" %
                                  (target, query)]))
@@ -201,7 +203,7 @@ def read_tracker(proposal, platform, target, runner=None):
     if platform == "github":
         page = _github_page(target, runner)
     elif platform == "gitlab":
-        page = _gitlab_page(proposal, target, runner)
+        page = _gitlab_page(target, runner)
     else:
         return _unknown("unsupported tracker platform")
     return _unknown("tracker candidate set is unavailable") if page is None else (

@@ -18,11 +18,12 @@ GitLab 的目标容器是正整数 project id：
 result = read_tracker(published.proposal, "gitlab", 17)
 ```
 
-读取器使用 `gh api search/issues?...` 或 `glab api projects/<id>/issues?...` 的默认 GET
-请求。它只把搜索结果当候选：最终身份必须来自正文中单独一行的完整 Proposal marker。
-GitHub 以稳定的 `total_count` 证明搜索分页完整，并从响应的 `repository.full_name` 核验
-容器；GitLab 显式查询 `state=all`，逐页读取至短页，因此关闭的 Proposal Issue 不会被当成
-缺失。CLI、认证、网络、JSON、容器字段或分页无法核验时，不会猜测。
+读取器用只读请求列出 Issue：GitHub 为 `gh issue list --state all --limit 1000`，GitLab 为
+`glab api projects/<id>/issues?state=all&per_page=100&page=<n>` 的默认 GET，逐页读取至短页，最多 10 页。
+两个平台都不依赖服务端搜索：最终身份只来自正文中单独一行的完整 Proposal marker，在本地逐行匹配。
+GitLab 的 `search=` 匹配不到 HTML 注释里的文字（GitLab 15.3.2 实测，2026-09-28），而 marker 正是一行
+HTML 注释。关闭的 Proposal Issue 同样会被读到。读满上限仍未结束、CLI、认证、网络、JSON 或容器字段
+无法核验时报 `unknown`，不会猜测。
 
 安全 JSON 结果只有：
 
