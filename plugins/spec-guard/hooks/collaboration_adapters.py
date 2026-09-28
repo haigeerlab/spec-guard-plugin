@@ -22,7 +22,6 @@ from host_config_removal import add_claude_server, remove_claude_server, remove_
 
 
 MCP_SERVER_NAME = "spec-guard-collaboration"
-CHANNEL_SERVER_NAME = "spec-guard-collaboration-channel"
 TOKEN_ENV_VAR = "SPEC_GUARD_COLLABORATION_TOKEN"
 CODEX_TABLE_NAME = MCP_SERVER_NAME.replace("-", "_")
 
@@ -31,31 +30,19 @@ def mcp_url(config: RuntimeConfig) -> str:
     return f"http://{config.host}:{config.port}/mcp"
 
 
-def claude_mcp_config(config: RuntimeConfig, include_channel: bool = False) -> dict[str, Any]:
+def claude_mcp_config(config: RuntimeConfig) -> dict[str, Any]:
     """Return Claude Code's no-secret HTTP configuration.
 
     The caller must launch Claude with ``TOKEN_ENV_VAR`` set from the private
-    token file. The optional channel is a preview wake mechanism, not required
-    for mailbox delivery.
+    token file.
     """
-    url = mcp_url(config)
-    servers: dict[str, Any] = {
+    return {"mcpServers": {
         MCP_SERVER_NAME: {
             "type": "http",
-            "url": url,
+            "url": mcp_url(config),
             "headers": {"Authorization": f"Bearer ${{{TOKEN_ENV_VAR}}}"},
         }
-    }
-    if include_channel:
-        servers[CHANNEL_SERVER_NAME] = {
-            "command": "npx",
-            "args": [
-                "-y", "-p", f"{config.package}@{config.package_version}",
-                "cross-agent-teams-channel", "--daemon-url", url,
-            ],
-            "env": {"CROSS_AGENT_TEAMS_MCP_TOKEN": f"${{{TOKEN_ENV_VAR}}}"},
-        }
-    return {"mcpServers": servers}
+    }}
 
 
 def codex_toml_fragment(
@@ -147,7 +134,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("host", choices=("claude", "codex", "install-codex", "install-claude",
                                          "uninstall-codex", "uninstall-claude"))
     parser.add_argument("--config-dir", type=Path, default=default_config_dir())
-    parser.add_argument("--include-channel", action="store_true")
     parser.add_argument("--header-helper", type=Path,
                         default=Path(__file__).with_name("collaboration_auth_header.py"))
     parser.add_argument("--codex-config", type=Path,
@@ -164,7 +150,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _uninstall(args)
     config = read_runtime_config(args.config_dir)
     if args.host == "claude":
-        print(json.dumps(claude_mcp_config(config, args.include_channel), indent=2, sort_keys=True))
+        print(json.dumps(claude_mcp_config(config), indent=2, sort_keys=True))
     elif args.host == "codex":
         print(codex_toml_fragment(config, args.header_helper, args.config_dir), end="")
     elif args.host == "install-codex":
