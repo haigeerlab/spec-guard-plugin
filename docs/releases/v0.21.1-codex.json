@@ -1,6 +1,8 @@
 {
   "schemaVersion": 1,
-  "release": { "version": "0.21.1" },
+  "release": {
+    "version": "0.21.1"
+  },
   "records": [
     {
       "subject": "spec-guard-codex-cli",
@@ -19,12 +21,20 @@
     },
     {
       "subject": "spec-guard-codex-cli-hook",
-      "status": "not-verified",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
         "id": "codex-cli:v0.21.1;test:user-prompt-submit-smoke-20260928"
       },
-      "reason": "hooks.json is unchanged since 0.21.0, whose command change left the previously trusted hash stale; the user has not yet re-trusted the hook in /hooks, so codex-plugin-smoke.sh exited 2 (hook not trusted). The same run left no temporary project trust entry in the Codex config."
+      "observedAt": "2026-09-28T05:45:57Z",
+      "evidence": [
+        "change:the user re-trusted the spec-guard UserPromptSubmit hook in Codex /hooks; trusted_hash changed from sha256:71f34386… to sha256:20361c94…",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:a real Codex CLI session in a temporary consumer project restated the injected stage (当前阶段：IDLE) and the smoke exited 0",
+        "note:the first run after re-trust exited 2 only because the grader required an ASCII colon; the reply used a full-width colon. The grader was fixed to accept both before this run",
+        "result:the run left no temporary project trust entry in the Codex config",
+        "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
+      ]
     }
   ]
 }

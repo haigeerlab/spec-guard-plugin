@@ -110,7 +110,8 @@ grade() { # $1=transcript 或明确 hook 记录
     echo "  ⏭  hook 未信任或未执行：在新会话用 /hooks 审核并信任"
     return 2
   fi
-  if grep -q '当前阶段:' "$record"; then
+  # 模型复述时可能把半角冒号写成全角（实测 Codex 回复“当前阶段：IDLE”），两种都算。
+  if grep -Eq '当前阶段[:：]' "$record"; then
     echo "  ✅ 收到 spec-guard hook 注入的当前阶段"
     return 0
   fi
@@ -127,6 +128,9 @@ selftest() {
   SMOKE_TMP="$(mktemp -d)"; trap 'rm -rf "$SMOKE_TMP"' EXIT
   printf '%s\n' 'HOOK_EXECUTED 当前阶段: PLANNED' > "$SMOKE_TMP/valid"
   grade "$SMOKE_TMP/valid"; rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  printf '%s\n' '当前阶段：IDLE' > "$SMOKE_TMP/fullwidth"
+  grade "$SMOKE_TMP/fullwidth" >/dev/null; rc=$?
   [ "$rc" -eq 0 ] || return 1
   printf '%s\n' 'HOOK_NOT_RUN' > "$SMOKE_TMP/untrusted"
   grade "$SMOKE_TMP/untrusted"; rc=$?
