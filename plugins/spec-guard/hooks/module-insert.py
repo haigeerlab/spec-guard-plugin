@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Preview (and, from Task 2, confirm) a validated quick insertion into the
-capability map.
+"""Preview, and after explicit confirmation write, a validated quick insertion
+into the capability map.
 
-Task 1 only implements the read-only preview: it never writes a file, and
-`--confirm` is rejected until Task 2 lands the write path. See
+Preview (`--anchor`/`--depends-on`/... without `--confirm`) is always
+read-only. `--confirm` re-runs every preview check and then writes only
+`spec/CAPABILITY-MAP.md`; it never creates a spec skeleton (that would make
+module_stage report NEEDS_PLAN for an unwritten, unreviewed spec) and never
+touches `.agent/state.json`, `tasks/`, `spec/proposals/`, or Git. See
 `spec/module-insert.md` for the full contract.
 """
 import argparse
@@ -230,6 +233,42 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
         "new_current": new_current["id"] if new_current else None,
         "proposal_conflict": proposal_path.is_file(),
         "module_id": module_id,
+        "responsibility": responsibility,
+        "new_text": new_text,
+    }
+
+
+def write(project, module_id, responsibility, depends_on_raw, anchor):
+    """Re-run every preview check, then atomically write the capability map.
+
+    Writes only `spec/CAPABILITY-MAP.md` (temp file in the same directory,
+    then `os.replace`). It does not create a spec skeleton: module_stage's
+    stage only looks at whether `spec/<id>.md` exists, and a placeholder file
+    would jump straight to NEEDS_PLAN, skipping "write and review the spec".
+    """
+    project = Path(project)
+    result = preview(project, module_id, responsibility, depends_on_raw, anchor)
+    map_path = project / "spec" / "CAPABILITY-MAP.md"
+
+    tmp_fd, tmp_path_str = tempfile.mkstemp(prefix=".module-insert-", dir=str(map_path.parent))
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
+            handle.write(result["new_text"])
+        os.replace(tmp_path_str, str(map_path))
+    except BaseException:
+        try:
+            os.unlink(tmp_path_str)
+        except OSError:
+            pass
+        raise
+
+    final_parsed = parse_map(map_path)
+    final_current, _ = _current_module(project, list(final_parsed.order))
+
+    return {
+        "map_path": str(map_path),
+        "stage_module": final_current["id"] if final_current else None,
+        "stage_hint": final_current["stage"] if final_current else "DONE",
     }
 
 
@@ -263,9 +302,21 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.confirm:
-        print("错误: --confirm 尚未实现；Task 1 只支持预览，写入将在 Task 2 开放。",
-              file=sys.stderr)
-        return 2
+        try:
+            outcome = write(args.project, args.module_id, args.responsibility,
+                            args.depends_on, args.anchor)
+        except InsertError as error:
+            print("校验失败: %s" % error, file=sys.stderr)
+            return 1
+        except OSError as error:
+            print("写入失败: %s" % error, file=sys.stderr)
+            return 1
+        print("已写入: %s" % outcome["map_path"])
+        if outcome["stage_module"]:
+            print("当前阶段提示: `%s` 处于 %s" % (outcome["stage_module"], outcome["stage_hint"]))
+        else:
+            print("当前阶段提示: DONE")
+        return 0
 
     try:
         result = preview(args.project, args.module_id, args.responsibility,
