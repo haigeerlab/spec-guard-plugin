@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-28
+
 ### 破坏性变更
 
 - **移除 XATS channel 唤醒实验开关。** 删除 `collaboration_claude.py --enable-channel-wake` 与
