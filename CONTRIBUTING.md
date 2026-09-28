@@ -11,8 +11,10 @@
 三个都绿才提。
 
 **显式写 `/bin/bash`**：macOS 上 `bash` 可能是 Homebrew 的 5.x，而 3.2 才是
-这个项目踩过坑的版本。CI 有 macOS matrix 覆盖同样的检查，但它需要账户级
-Actions 可用 —— 本地手跑是唯一无条件生效的防线。
+这个项目踩过坑的版本。`.github/workflows/validate.yml` 定义了 Ubuntu + macOS 的
+job；某一次 push 或 PR 是否真的跑过，看 Actions 标签页或 `gh pr checks`。本地跑
+`scripts/validate.sh` 加上面两条回归脚本（即预推送 hook 那一套）是唯一必须满足
+的门禁。
 
 ## 改 phase-guard.sh
 
@@ -39,14 +41,19 @@ Actions 可用 —— 本地手跑是唯一无条件生效的防线。
 1. `plugins/spec-guard/commands/<name>.md`
 2. 必须有 frontmatter（`validate.sh` 会检查）
 3. 在 README 的命令表里补一行
+4. 在 Codex 侧接一条路由，通常在 `plugins/spec-guard/skills/spec-guard-ops/SKILL.md`（Codex 只读 skill，不读 command）
+5. 在 `docs/workflow.md` 的命令对照里补一行
+6. `scripts/check-command-parity.py` 会校验 command 与 skill 路由是否对得上
 
 ## 发版
 
-见 [CLAUDE.md](CLAUDE.md#发版)。**版本号不升，使用者收不到更新。**
+见 [docs/release-process.md](docs/release-process.md)。**版本号不升，使用者收不到更新。**
 
 ## 不接受的 PR
 
 - fork 或 vendored 上游 agent-skills 的文件
 - 给 phase-guard.sh 引入 `jq` 之类的硬依赖
 - 让 hook 做写操作
-- 在本仓库的 CLAUDE.md 里写激活字符串（会导致插件在自己仓库上激活）
+- 在本仓库的 CLAUDE.md 里写激活字符串（会导致插件在自己仓库上激活）—— 本仓库
+  是通过 `AGENTS.md` 的 Codex 约定块有意自激活的（见 [CLAUDE.md](CLAUDE.md)），
+  这条规则针对的是 `CLAUDE.md` 本身
