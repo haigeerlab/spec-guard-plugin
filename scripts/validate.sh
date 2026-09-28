@@ -112,6 +112,10 @@ echo "═══ Claude Desktop MCP regression ═══"
 /bin/bash plugins/spec-guard/hooks/test-claude-desktop-mcp.sh || F=1
 echo ""
 
+echo "═══ Setup/teardown regression ═══"
+/bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh || F=1
+echo ""
+
 echo "═══ History verification regression ═══"
 /bin/bash plugins/spec-guard/hooks/test-history-verification.sh || F=1
 echo ""
