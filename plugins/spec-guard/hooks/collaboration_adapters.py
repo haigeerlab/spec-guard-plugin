@@ -19,6 +19,7 @@ import tempfile
 from typing import Any, Sequence
 
 from collaboration_runtime import RuntimeConfig, default_config_dir, read_runtime_config
+from host_config_removal import remove_claude_server, remove_codex_table
 
 
 MCP_SERVER_NAME = "spec-guard-collaboration"
@@ -85,7 +86,7 @@ def install_codex_config(config: RuntimeConfig, header_helper: Path, runtime_dir
         existing = codex_config.read_text(encoding="utf-8")
         mode = stat.S_IMODE(metadata.st_mode)
     else:
-        codex_config.parent.mkdir(parents=True, mode=0o700)
+        codex_config.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         existing = ""
         mode = 0o600
     table = re.compile(rf"^\s*\[mcp_servers\.{re.escape(CODEX_TABLE_NAME)}\]\s*$", re.MULTILINE)
@@ -133,9 +134,30 @@ def install_claude_config(
         raise ValueError("unable to install Claude collaboration MCP configuration: " + diagnostic) from error
 
 
+def _uninstall(args: argparse.Namespace) -> int:
+    """Remove only the entry this adapter installed; an edited entry is left for the user."""
+    if not args.confirm_uninstall:
+        print("uninstall-confirmation-required: rerun with --confirm-uninstall")
+        return 1
+    try:
+        if args.host == "uninstall-claude":
+            state = remove_claude_server(args.claude_bin, MCP_SERVER_NAME)
+        else:
+            # 用安装时的同一套参数重建片段；原片段若来自另一份源码，传入当时的 --header-helper。
+            fragment = codex_toml_fragment(read_runtime_config(args.config_dir),
+                                           args.header_helper, args.config_dir)
+            state = remove_codex_table(args.codex_config, fragment, CODEX_TABLE_NAME)
+    except ValueError as error:
+        print("collaboration uninstall stopped: " + str(error), file=sys.stderr)
+        return 1
+    print("XATS collaboration MCP entry %s; restart the client to apply." % state)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("host", choices=("claude", "codex", "install-codex", "install-claude"))
+    parser.add_argument("host", choices=("claude", "codex", "install-codex", "install-claude",
+                                         "uninstall-codex", "uninstall-claude"))
     parser.add_argument("--config-dir", type=Path, default=default_config_dir())
     parser.add_argument("--include-channel", action="store_true")
     parser.add_argument("--header-helper", type=Path,
@@ -147,7 +169,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--npx", default=shutil.which("npx"))
     parser.add_argument("--stdio-helper", type=Path,
                         default=Path(__file__).with_name("collaboration_claude_stdio.py"))
+    parser.add_argument("--confirm-uninstall", action="store_true",
+                        help="allow an uninstall command to remove host configuration")
     args = parser.parse_args(argv)
+    if args.host.startswith("uninstall-"):
+        return _uninstall(args)
     config = read_runtime_config(args.config_dir)
     if args.host == "claude":
         print(json.dumps(claude_mcp_config(config, args.include_channel), indent=2, sort_keys=True))
