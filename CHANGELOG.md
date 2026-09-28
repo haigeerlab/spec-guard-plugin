@@ -4,6 +4,11 @@
 
 ### 修复
 
+- **快速插入不再假成功，也不再改能力图权限。** `module-insert.py` 定位模块表与 Build order 行时此前扫描
+  原始行，不跳过代码围栏：能力图在真实模块表之前有围栏示例表时，预览改的是示例，`--confirm` 会输出
+  "已写入" 并退出 0，新模块却不在能力图里，示例文本还被写坏。写入还会把 0644 的能力图改成 0600。现在定位
+  复用 `capability_map` 的可见行规则跳过围栏，示例原样不动；预览与写入都会断言新 id 确实出现在解析后的
+  模块行与 Build order 中，否则拒绝、非零退出、不写文件；写入后能力图保留原有权限位。
 - **主链裁决为 accepted-candidate 时输出可直接复制的验收记录。** 此前接受一个 Proposal 要求手写一份精确
   七字段的 `spec/proposal-acceptances/<id>-<revision>.json`，包括规范化 JSON 的 `policyDigest`，但没有任何
   文档、命令或 skill 说明这些字段或摘要算法。现在 `proposal_mainline_review.py` 在结果为 `accepted-candidate`

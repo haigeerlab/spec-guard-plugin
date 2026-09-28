@@ -2,6 +2,7 @@
 import importlib.util
 import io
 import os
+import stat
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -17,6 +18,35 @@ _spec.loader.exec_module(module_insert)
 InsertError = module_insert.InsertError
 preview = module_insert.preview
 main = module_insert.main
+
+
+FENCED_EXAMPLE_MAP = """# Capability Map: fixture
+
+## 目标
+
+Keep insertion facts explicit.
+
+## 模块
+
+示例（勿编辑）：
+
+```markdown
+| Module id | Responsibility | Depends on |
+| --- | --- | --- |
+| example-one | Example only | — |
+| example-two | Example only | example-one |
+
+Build order: example-one → example-two
+```
+
+| Module id | Responsibility | Depends on |
+| --- | --- | --- |
+| alpha | First module | — |
+| beta | Second module | alpha |
+| gamma | Third module | beta |
+
+Build order: alpha, beta → gamma
+"""
 
 
 MAP = """# Capability Map: fixture
@@ -325,6 +355,146 @@ class ModuleInsertTests(unittest.TestCase):
                               "--anchor", "end"])
         self.assertNotEqual(exit_code, 0)
         self.assertEqual(before, self.snapshot())
+
+    # ---- Task 4: fenced examples must be skipped, new id must be present, mode preserved ----
+
+    def test_preview_inserts_into_real_table_and_leaves_fenced_example_untouched(self):
+        root = self.fresh_project(map_text=FENCED_EXAMPLE_MAP)
+        before_text = (root / "spec" / "CAPABILITY-MAP.md").read_text(encoding="utf-8")
+        result = preview(root, "delta", "Fourth module", "beta", "after:beta")
+        # The real table gets the new row; the fenced example block is untouched.
+        self.assertIn("| delta | Fourth module | beta |", result["new_text"])
+        fence_start = before_text.index("```markdown")
+        fence_end = before_text.index("```", fence_start + len("```markdown")) + len("```")
+        fenced_block = before_text[fence_start:fence_end]
+        self.assertIn(fenced_block, result["new_text"])
+        self.assertNotIn("| delta | Fourth module | beta |", fenced_block)
+        # The real Build order (not the fenced example one) gained the new step.
+        self.assertTrue(result["build_order_line"].index("beta") <
+                        result["build_order_line"].index("delta") <
+                        result["build_order_line"].index("gamma"))
+
+    def test_confirm_with_fenced_example_inserts_into_real_map_and_parses(self):
+        root = self.fresh_project(map_text=FENCED_EXAMPLE_MAP)
+        map_path = root / "spec" / "CAPABILITY-MAP.md"
+        before_text = map_path.read_text(encoding="utf-8")
+        outcome = module_insert.write(root, "delta", "Fourth module", "beta", "after:beta")
+        after_text = map_path.read_text(encoding="utf-8")
+        # capability-map.py / parse_map now lists the new id.
+        parsed = module_insert.parse_map(map_path)
+        self.assertIn("delta", [row.module_id for row in parsed.rows])
+        self.assertIn("delta", parsed.order)
+        # The fenced example block is byte-identical to before.
+        fence_start = before_text.index("```markdown")
+        fence_end = before_text.index("```", fence_start + len("```markdown")) + len("```")
+        fenced_block_before = before_text[fence_start:fence_end]
+        self.assertIn(fenced_block_before, after_text)
+        self.assertNotIn("| delta | Fourth module | beta |", fenced_block_before)
+        self.assertEqual(outcome["map_path"], str(map_path))
+
+    def test_assert_new_module_present_rejects_missing_row(self):
+        # Unit-test the defensive assertion helper directly: a parsed map that
+        # lacks the new id in its module rows must be rejected.
+        class FakeRow(object):
+            def __init__(self, module_id):
+                self.module_id = module_id
+
+        class FakeParsed(object):
+            rows = [FakeRow("alpha"), FakeRow("beta")]
+            order = ["alpha", "beta"]
+
+        with self.assertRaises(InsertError):
+            module_insert._assert_new_module_present(FakeParsed(), "delta")
+
+    def test_assert_new_module_present_rejects_missing_from_build_order(self):
+        class FakeRow(object):
+            def __init__(self, module_id):
+                self.module_id = module_id
+
+        class FakeParsed(object):
+            rows = [FakeRow("alpha"), FakeRow("beta"), FakeRow("delta")]
+            order = ["alpha", "beta"]  # delta missing from Build order
+
+        with self.assertRaises(InsertError):
+            module_insert._assert_new_module_present(FakeParsed(), "delta")
+
+    def test_assert_new_module_present_accepts_when_present(self):
+        class FakeRow(object):
+            def __init__(self, module_id):
+                self.module_id = module_id
+
+        class FakeParsed(object):
+            rows = [FakeRow("alpha"), FakeRow("delta")]
+            order = ["alpha", "delta"]
+
+        module_insert._assert_new_module_present(FakeParsed(), "delta")
+
+    def test_preview_refuses_and_writes_nothing_when_new_id_would_be_missing(self):
+        # Defensive negative: even if the new-map parse somehow omitted the new
+        # id, preview (and therefore --confirm, which re-runs preview) must
+        # reject rather than reporting success. Simulate this by making the
+        # tmp-file parse (the one used to validate the *new* map) return a map
+        # without the new id, while the parse of the *old* map on disk behaves
+        # normally.
+        root = self.fresh_project(map_text=MAP)
+        map_path = root / "spec" / "CAPABILITY-MAP.md"
+        before = self.snapshot_of(root)
+        real_parse_map = module_insert.parse_map
+
+        class FakeRow(object):
+            def __init__(self, module_id):
+                self.module_id = module_id
+
+        class FakeParsed(object):
+            rows = [FakeRow("alpha"), FakeRow("beta"), FakeRow("gamma")]
+            order = ["alpha", "beta", "gamma"]  # missing "delta"
+            goal = None
+
+        def fake_parse_map(path, *args, **kwargs):
+            if str(path) == str(map_path):
+                return real_parse_map(path, *args, **kwargs)
+            return FakeParsed()
+
+        with mock.patch.object(module_insert, "parse_map", side_effect=fake_parse_map):
+            with self.assertRaises(InsertError):
+                preview(root, "delta", "Fourth module", "—", "end")
+        self.assertEqual(before, self.snapshot_of(root))
+
+    def test_confirm_refuses_and_writes_nothing_when_new_id_would_be_missing(self):
+        root = self.fresh_project(map_text=MAP)
+        map_path = root / "spec" / "CAPABILITY-MAP.md"
+        before = self.snapshot_of(root)
+        real_parse_map = module_insert.parse_map
+
+        class FakeRow(object):
+            def __init__(self, module_id):
+                self.module_id = module_id
+
+        class FakeParsed(object):
+            rows = [FakeRow("alpha"), FakeRow("beta"), FakeRow("gamma")]
+            order = ["alpha", "beta", "gamma"]  # missing "delta"
+            goal = None
+
+        def fake_parse_map(path, *args, **kwargs):
+            if str(path) == str(map_path):
+                return real_parse_map(path, *args, **kwargs)
+            return FakeParsed()
+
+        with mock.patch.object(module_insert, "parse_map", side_effect=fake_parse_map):
+            exit_code = self.confirm_main(root, id_="delta", responsibility="Fourth module")
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(before, self.snapshot_of(root))
+
+    def test_confirm_preserves_original_file_mode(self):
+        root = self.fresh_project(map_text=MAP)
+        map_path = root / "spec" / "CAPABILITY-MAP.md"
+        os.chmod(map_path, 0o644)
+        before_mode = stat.S_IMODE(os.stat(map_path).st_mode)
+        self.assertEqual(before_mode, 0o644)
+        exit_code = self.confirm_main(root, id_="delta", responsibility="Fourth module")
+        self.assertEqual(exit_code, 0)
+        after_mode = stat.S_IMODE(os.stat(map_path).st_mode)
+        self.assertEqual(after_mode, 0o644)
 
 
 if __name__ == "__main__":
