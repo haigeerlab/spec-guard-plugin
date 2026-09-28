@@ -11,6 +11,13 @@
 
 ### 修复
 
+- **hook 入口不再执行项目仓库里的脚本。** `hooks.json` 此前在找不到插件根目录时回退到
+  `${CLAUDE_PROJECT_DIR}/.claude/hooks/phase-guard.sh`：任何被打开的仓库只要放一个同名文件，就能让它在每轮提示时
+  执行。插件从不向项目写这个文件，Claude Code 提供 `CLAUDE_PLUGIN_ROOT`，Codex CLI 0.154.0 提供 `PLUGIN_ROOT`
+  与 `CLAUDE_PLUGIN_ROOT`（2026-09-27 真实 Codex smoke 在不含该文件的临时项目中通过），回退从未被正常路径用到。
+  现在只用宿主提供的插件根目录；缺失时注入一条“插件安装或宿主问题”的诊断，而不是静默或改跑项目脚本。
+  新增 `test-hook-entry.sh` 直接运行注册的入口命令。
+
 - **检查器覆盖真实调用面。** `check-gh-json-fields.py` 此前只认 `gh <sub> view --json` 命令行写法，而插件里唯一的
   `--json` 调用是 `proposal_tracker_read.py` 中 `gh issue list` 的 Python 参数列表，从未被检查；现在同时检查
   `view`／`list` 与跨行的参数列表写法，并扫描 `plugins/**/*.py`。`check-no-parallel-surface.py` 可传入夹具根目录，

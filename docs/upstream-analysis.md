@@ -238,7 +238,8 @@ grep -rn -iE "\bgh (issue|pr|api)\b|github issues|issue tracker" \
 
 **两个值得抄的模式**：
 
-1. `${CLAUDE_PLUGIN_ROOT}` 与 `${CLAUDE_PROJECT_DIR}` 双路径回退
+1. `${CLAUDE_PLUGIN_ROOT}` 与 `${CLAUDE_PROJECT_DIR}` 双路径回退（spec-guard 已不再沿用：回退会执行项目仓库里的
+   脚本，而 Claude Code 与 Codex CLI 都会提供插件根目录；见 CHANGELOG）
 2. 末尾 `|| true` —— hook 失败绝不阻断会话
 
 `session-start.sh` 的输出格式（spec-guard 的 UserPromptSubmit 沿用同一形状）：

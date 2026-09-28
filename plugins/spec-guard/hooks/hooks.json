@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ROOT=\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}\"; SCRIPT=\"${ROOT}/hooks/phase-guard.sh\"; [ -f \"$SCRIPT\" ] || SCRIPT=\"${CLAUDE_PROJECT_DIR}/.claude/hooks/phase-guard.sh\"; if [ -f \"$SCRIPT\" ]; then bash \"$SCRIPT\" || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"spec-guard: phase-guard.sh 执行失败(非零退出),本轮没有链路状态注入。这不是「未启用」—— 未启用时它静默退 0。排查: CLAUDE_PROJECT_DIR=$(pwd) bash -x \\\"$SCRIPT\\\"\"}}'; fi"
+            "command": "ROOT=\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}\"; SCRIPT=\"${ROOT}/hooks/phase-guard.sh\"; if [ -z \"$ROOT\" ] || [ ! -f \"$SCRIPT\" ]; then printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"spec-guard: 宿主没有提供插件根目录(PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT),或其中缺少 hooks/phase-guard.sh,本轮没有阶段注入。这是插件安装或宿主问题,不是项目未启用;重新安装 spec-guard 后在新会话重试。\"}}'; else bash \"$SCRIPT\" || printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"spec-guard: phase-guard.sh 执行失败(非零退出),本轮没有链路状态注入。这不是「未启用」—— 未启用时它静默退 0。排查: CLAUDE_PROJECT_DIR=$(pwd) bash -x \\\"$SCRIPT\\\"\"}}'; fi"
           }
         ]
       }
