@@ -20,7 +20,8 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 - `absent`：Epiq 运行时尚未安装。这是正常的未启用状态；不得自动下载。
 - `ready`：受管运行时可用，但当前仓库还没有本地账本。
 - `initialized`：当前仓库已有可用的 `.epiq/project.json`，可继续检查 MCP 接入。
-- `invalid`：原样说明诊断，不能删除、覆盖或尝试修复现有目录。
+- `invalid`：原样说明诊断，不能删除、覆盖或尝试修复现有目录。若诊断为 `Epiq package directory is absent`
+  且目录为空（旧版本安装失败的残留），用户明确要求安装时可直接重新安装，安装会接管这个空目录。
 
 只有用户明确要求安装时，才运行：
 

@@ -64,6 +64,27 @@ python3 -B "$ROOT/hooks/documentation_verification.py" --project "$PROJECT" --mo
 
 只有用户确认后才修改基线、模块 Spec 或 Plan。
 
+## proposal
+
+Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 GitHub/GitLab Proposal Issue，
+不读取其他 worktree 或 `.agent/state.json`，也不写 Issue、标签、能力图、分支或任务。按需运行：
+
+```bash
+# 任何分支：单个 Proposal 的新鲜度与阶段
+python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
+  --proposal-id <id> --platform <github|gitlab> --target <target>
+# 仅主链模块交付／推进边界：候选列表；加 --proposal-id 与 --decision 记录人工裁决
+python3 -B "$ROOT/hooks/proposal_mainline_review.py" --project "$PROJECT" \
+  --platform <github|gitlab> --target <target> --authority-id <id> \
+  --boundary <module-deliver|module-advance> --current-module-id <module-id>
+# 人工写入 accepted 后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
+python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
+  --proposal-id <id> --platform <github|gitlab> --target <target>
+```
+
+原样报告 JSON；除 `candidate-list`、`accepted-candidate`、`ready`、`proved` 外的状态都要停下并说明
+`diagnostic`。`accepted-candidate` 不是 Issue 阶段，`ready` 不创建分支，`proved` 不回写 Issue。
+
 ## history
 
 历史验证与审计均为只读；导入或补正仍须单独确认：

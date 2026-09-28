@@ -2,6 +2,7 @@
 # Read-only structural validation. Remote tracker projection was retired.
 set -u
 
+HOOKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 FAIL=0
@@ -29,24 +30,44 @@ else
   ok '没有根目录 spec 漂移'
 fi
 
+# 能力图只用 capability-map.py 这一个严格解析器；解析器跑不起来是环境问题，报“未验证”而不是违规。
 if [ -f spec/CAPABILITY-MAP.md ]; then
-  MAP_IDS=$(python3 - spec/CAPABILITY-MAP.md <<'PY' 2>/dev/null || true
-import re
-import sys
-for line in open(sys.argv[1], encoding="utf-8"):
-    match = re.match(r"\|\s*([a-z0-9]+(?:-[a-z0-9]+)*)\s*\|", line)
-    if match and match.group(1) not in {"module", "module-id"}:
-        print(match.group(1))
-PY
-)
-  for file in spec/*.md; do
-    [ -e "$file" ] || continue
-    name="${file##*/}"; [ "$name" = CAPABILITY-MAP.md ] && continue
-    module="${name%.md}"
-    if ! printf '%s\n' "$MAP_IDS" | grep -Fx "$module" >/dev/null 2>&1; then
-      bad "能力图上没有的模块 spec: ${module}"
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn '未验证：python3 不可用，没有检查能力图结构与模块 spec 的对应关系'
+  else
+    MAP_OUT="$(python3 "$HOOKDIR/capability-map.py" spec/CAPABILITY-MAP.md 2>/dev/null </dev/null |
+      python3 -c '
+import json, sys
+try:
+    value = json.load(sys.stdin)
+except ValueError:
+    raise SystemExit(4)
+if not isinstance(value, dict) or not isinstance(value.get("ok"), bool):
+    raise SystemExit(4)
+if not value["ok"]:
+    print(value.get("error") or "unknown parse error")
+    raise SystemExit(3)
+for module in value.get("modules", []):
+    print(module["id"])
+' 2>/dev/null)"
+    MAP_RC=$?
+    if [ "$MAP_RC" -eq 3 ]; then
+      bad "能力图无效: ${MAP_OUT}"
+      warn '能力图无效，未检查模块 spec 的对应关系'
+    elif [ "$MAP_RC" -ne 0 ]; then
+      warn '未验证：能力图解析器没有正常运行，没有检查模块 spec 的对应关系'
+    else
+      ok '能力图通过严格解析'
+      for file in spec/*.md; do
+        [ -e "$file" ] || continue
+        name="${file##*/}"; [ "$name" = CAPABILITY-MAP.md ] && continue
+        module="${name%.md}"
+        if ! grep -Fx "$module" >/dev/null 2>&1 <<<"$MAP_OUT"; then
+          bad "能力图上没有的模块 spec: ${module}"
+        fi
+      done
     fi
-  done
+  fi
 fi
 
 if [ -f .agent/state.json ]; then

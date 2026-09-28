@@ -13,6 +13,7 @@
 ## Commands
 
 ```text
+python3 -B plugins/spec-guard/hooks/proposal_promotion_proof.py --proposal-id <id> --platform <github|gitlab> --target <target> --prove
 python3 -B plugins/spec-guard/hooks/test_proposal_promotion_proof.py
 /bin/bash scripts/validate.sh
 ```

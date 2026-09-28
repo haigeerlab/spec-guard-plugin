@@ -5,17 +5,28 @@ set -u
 ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 cd "$ROOT" 2>/dev/null || exit 0
 
+# 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或带已知
+# tracker 值的 state.json。正文里提到标记、或别的工具的 .agent/state.json 都不算。
 has_block() {
-  if grep -q '<!-- BEGIN:agent-skills-convention -->' CLAUDE.md 2>/dev/null; then
+  if grep -Eq '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' CLAUDE.md 2>/dev/null; then
     return 0
   fi
-  grep -q '<!-- BEGIN:spec-guard-codex-convention -->' AGENTS.md 2>/dev/null
+  grep -Eq '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$' AGENTS.md 2>/dev/null
 }
 
-has_block || [ -f .agent/state.json ] || exit 0
+has_state() {
+  grep -Eq '"tracker"[[:space:]]*:[[:space:]]*"(none|github|gitlab)"' .agent/state.json 2>/dev/null
+}
+
+has_block || has_state || exit 0
+
+# 已启用却缺 python3 时不能静默：静默会被当成“未启用”。这段 JSON 手写转义，不依赖 python3。
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: 本项目已启用约定，但 python3 不可用，本轮没有阶段注入。这不是「未启用」；安装 python3 后恢复。"}}'
+  exit 0
+fi
 
 emit() {
-  command -v python3 >/dev/null 2>&1 || exit 0
   printf '%s' "$1" | python3 -c '
 import json, sys
 print(json.dumps({"hookSpecificOutput": {
@@ -27,7 +38,6 @@ print(json.dumps({"hookSpecificOutput": {
 
 legacy_tracker() {
   [ -f .agent/state.json ] || return 1
-  command -v python3 >/dev/null 2>&1 || return 0
   python3 - .agent/state.json <<'PY'
 import json
 import sys

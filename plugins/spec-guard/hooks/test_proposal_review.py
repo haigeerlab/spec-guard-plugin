@@ -1,12 +1,15 @@
 """In-memory Proposal review precedence fixtures; no Git or tracker transport."""
 import unittest
+import io
 import json
 import tempfile
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 from proposal_contract import Baseline, Change, Proposal, compute
 from proposal_publication import Publication
-from proposal_review import as_json, review
+from proposal_review import as_json, main, review
 from proposal_tracker_read import TrackerRead
 
 
@@ -105,6 +108,25 @@ class ProposalReviewFixtures(unittest.TestCase):
         self.assertEqual(review(published(), TrackerRead("unknown"), "github",
                                 "octo/spec-guard").state, "unknown")
 
+    def test_json_names_which_layer_blocked_the_review(self):
+        missing = as_json(review(Publication("absent"), None, "github", "octo/spec-guard"))
+        self.assertEqual(missing, {"state": "absent", "diagnostic": "publication-absent"})
+        no_issue = as_json(review(published(), TrackerRead("absent"), "github", "octo/spec-guard"))
+        self.assertEqual((no_issue["state"], no_issue["diagnostic"], no_issue["proposalId"]),
+                         ("absent", "tracker-absent", "gamma"))
+        self.assertEqual(no_issue["reviewCommit"], "a" * 40)
+        for state in ("invalid", "unknown"):
+            with self.subTest(state=state):
+                self.assertEqual(as_json(review(Publication(state), None, "github",
+                                                "octo/spec-guard"))["diagnostic"],
+                                 "publication-%s" % state)
+                self.assertEqual(as_json(review(published(), TrackerRead(state), "github",
+                                                "octo/spec-guard"))["diagnostic"],
+                                 "tracker-%s" % state)
+        self.assertEqual(as_json(review(published(), None, "github", "octo/spec-guard")),
+                         {"state": "unknown", "reviewCommit": "a" * 40, "proposalId": "gamma",
+                          "diagnostic": "tracker-unknown"})
+
     def test_absorbed_module_is_stale_before_an_accepted_stage(self):
         tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
                               proposal_id="gamma", platform="gitlab", target=17)
@@ -154,6 +176,37 @@ class ProposalReviewFixtures(unittest.TestCase):
 
         self.assertEqual(result.revision, "b" * 64)
         self.assertEqual(as_json(result)["revision"], "b" * 64)
+
+
+
+class ProposalReviewCliTests(unittest.TestCase):
+    def run_cli(self, publication, tracker, *target):
+        output = io.StringIO()
+        with patch("proposal_publication.read_published", return_value=publication) as read, \
+                patch("proposal_tracker_read.read_tracker", return_value=tracker) as tracker_read, \
+                redirect_stdout(output):
+            self.assertEqual(main(["--proposal-id", "gamma"] + list(target or
+                                   ("--platform", "github", "--target", "octo/spec-guard"))), 0)
+        return json.loads(output.getvalue()), read, tracker_read
+
+    def test_cli_composes_publication_tracker_and_review(self):
+        result, read, tracker_read = self.run_cli(published(), verified("proposal-stage:in-review"))
+        self.assertEqual(result["state"], "in-review")
+        self.assertEqual(result["issueId"], 42)
+        self.assertEqual(read.call_args.args, (".", "gamma", "origin"))
+        self.assertEqual(tracker_read.call_args.args[1:], ("github", "octo/spec-guard"))
+
+    def test_cli_does_not_read_the_tracker_for_an_unpublished_proposal(self):
+        for state in ("absent", "unknown", "invalid"):
+            with self.subTest(state=state):
+                result, _, tracker_read = self.run_cli(Publication(state), None)
+                self.assertEqual(result["state"], state)
+                tracker_read.assert_not_called()
+
+    def test_cli_passes_a_numeric_gitlab_project_id(self):
+        _, _, tracker_read = self.run_cli(published(), verified("proposal-stage:published"),
+                                          "--platform", "gitlab", "--target", "42")
+        self.assertEqual(tracker_read.call_args.args[1:], ("gitlab", 42))
 
 
 if __name__ == "__main__":

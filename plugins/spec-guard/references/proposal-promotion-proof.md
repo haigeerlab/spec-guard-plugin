@@ -15,6 +15,11 @@ the merge commit, never an already-merged feature-branch commit. The promotion d
 must contain only the capability map, module Spec and module Plan, and both artifacts
 must be present.
 
+`proposal_promotion_proof.py --prove` (and `/spec-guard:proposal-promotion-proof`)
+first re-establishes acceptance from the same fresh snapshot, the current Issue stage
+and the revision-addressed attestation, then runs `prove`. A missing Proposal returns
+`absent`; an unreadable or invalid pool returns `unknown` or `invalid`.
+
 The preflight function rereads the remote Proposal pool, policy and
 revision-addressed attestation before it returns a ready base commit. It is a
 read-only prerequisite for a human-created promotion branch; it does not create

@@ -43,6 +43,7 @@
 ## Commands
 
 ```text
+python3 -B plugins/spec-guard/hooks/proposal_review.py --proposal-id <id> --platform <github|gitlab> --target <target>
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py
 /bin/bash scripts/validate.sh
 python3 scripts/check-manifests.py

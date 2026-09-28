@@ -56,11 +56,15 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" contract --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --format json
 ```
 
-它只调用固定的 `npm install --ignore-scripts --prefix <managed-runtime> epiq@1.11.0`，并在完成后重新
-核对包名、版本和 `epiq-mcp` 入口。运行时存放在用户级受管目录，绝不写入项目 `node_modules`。
+它只调用固定的 `npm install --ignore-scripts --prefix <staging> epiq@1.11.0`，装进受管目录旁的临时目录，
+核对包名、版本和 `epiq-mcp` 入口通过后才原子改名为受管运行时。运行时存放在用户级受管目录，绝不写入项目
+`node_modules`。
 
 - 没有 `--confirm-install` 时返回 `install-confirmation-required`，不创建目录也不调用 npm。
-- 已安装且合同正确的目录拒绝覆盖；已存在但不合法的目录也拒绝覆盖，供用户先审查或显式清理。
+- npm 失败或装出的包不符合合同时，只删除本次创建的临时目录，受管运行时保持 `absent`，可直接重试；诊断带
+  npm 错误输出的最后一行。
+- 已安装且合同正确的目录拒绝覆盖；已存在但不合法的目录也拒绝覆盖，供用户先审查或显式清理。唯一例外是
+  旧版本安装失败留下的**空目录**：它不含任何数据，安装会直接接管。
 - 安装本身不初始化任何项目、不写 Git、不添加 Claude/Codex MCP 配置，也不启动 Epiq。
 
 ## Initialization preflight

@@ -17,9 +17,28 @@
   `audit_history`，并写明 Desktop 不提供 Proposal、协作与本地事项入口。
 - **Desktop 扩展描述。** `manifest.json` 的描述改为只列出实际提供的只读阶段、产物与
   capability history 检查，不再宣称 Proposal 评审与协作能力；Desktop 回归测试守住这一点。
+- **账本安装失败不再卡死。** 运行时先装进临时目录、校验通过后才改名到位；npm 失败或包不符时受管目录保持
+  `absent`，可直接重试，诊断带 npm 错误输出的最后一行。旧版本失败留下的空目录可被安装接管。
+- **Codex 账本配置不再崩溃。** `~/.codex/` 已存在而 `config.toml` 不存在时，`install-codex` 不再抛出
+  `FileExistsError`；文件系统错误统一报告为可读诊断。
+
+### 新增
+
+- **Proposal 评审与晋级证明入口。** 新增 `/spec-guard:proposal-review`（任何分支只读查看单个 Proposal 的
+  新鲜度与 Issue 阶段）和 `/spec-guard:proposal-promotion-proof`（晋级合并后，从新鲜远端事实重新确认接受，
+  再证明 module 按声明纳入能力图）。此前这两步只有库函数，README 承诺的合并后证明没有任何入口。
+  Codex 的 `spec-guard-ops` 新增 proposal 一节，覆盖评审、主链候选与裁决、预检和证明；共享检查点规则补充
+  模块交付或推进时可用的 Proposal 命令。
 
 ### 变更
 
+- **verify-artifacts 使用唯一的严格能力图解析器。** 不再用自带正则扫描所有表格行：围栏示例或其他表格首列
+  中的 id 不再被当作模块；缺少 Build order、依赖未知或成环的能力图现在报 ❌ 并给出解析原因（此前通过）。
+  python3 不可用或解析器异常时报「未验证」，不再把合法 spec 全部判成违规。命令说明删去已不存在的 plan、
+  issue 与远端检查，并更正退出码 2 的含义。
+- **phase-guard 激活信号收窄，缺 python3 不再静默。** 声明块标记必须独占一行（与 `managed-block.py`
+  一致），`.agent/state.json` 必须带 `tracker` 为 `none`／`github`／`gitlab`；正文里提到标记、或其他工具的
+  state 文件不再让无关项目每轮收到注入。已启用的项目缺 python3 时注入可诊断的 JSON，而不是静默成“未启用”。
 - **native 工具面不能静默扩大。** `probe` 要求固定版的工具目录与“邮箱工具＋拒绝工具”完全一致；上游新增
   任何未审查的工具都会让探测失败并报出名称。`collab` 在选择 native 但工具不可用时只报告并转交运维，
   不改用残留的 XATS 工具。
@@ -32,6 +51,9 @@
   `proposal-pool-unknown`，不再与分支不符一起显示为 `blocked` / `mainline-blocked`；策略缺失、授权 id 不符、
   无上游、本地主链未包含远端提交与 Proposal 不存在各有稳定诊断码。候选列表新增 `skipped`，列出未成为候选的
   Proposal 及原因，空列表不再无法区分“没有 Proposal”与“Proposal 没有 Issue”。
+- **Proposal 评审区分缺失的层。** 远端没有该 Proposal 时诊断为 `publication-absent`；Proposal 已发布但
+  Issue 缺失或不可读时为 `tracker-absent`／`tracker-invalid`／`tracker-unknown`，并附 proposal id 与
+  review commit。
 
 ### 测试
 
@@ -44,7 +66,18 @@
   `sync_map_preview` 被拒绝。`check-manifests.py` 同时核对 Desktop `manifest.json` 的名称与版本。
 - **history 回归不再假绿。** `test-history-verification.sh` 与 `test-history-migration.sh`
   改为任一断言失败即退出并报告行号；此前只有最后一条命令决定结果。
+- **Proposal 入口回归。** 晋级证明 CLI 以本地 bare 远端跑通“发布 → attestation → 晋级提交 → `proved`”，
+  并覆盖未接受、仅有 accepted 标签而 attestation 不匹配、Proposal 缺失、远端不可达，以及不带 `--prove` 时只做
+  预检；评审 CLI 覆盖组合、未发布时不读
+  tracker 与 GitLab 数字项目 id。
+- **verify-artifacts 回归从 1 正 1 反扩到 8 例。** 覆盖围栏与第二张表、无效能力图、缺 python3 和解析器异常。
+- **命令名检查器的反向用例改用夹具。** “上游删除 `/plan`”一例此前依赖仓库文案恰好提到 `/plan`，文案一改就
+  失去检测能力；现在在临时夹具中引用 `/plan`。
+- **phase-guard 回归从 3 个场景扩到 9 例。** 每条输出都按 JSON 解析并核对事件名；覆盖无关 state、正文提及
+  标记、CRLF、IDLE 与缺 python3。
 - **主链评审 CLI 端到端回归。** 首次覆盖 `main()` 的两种模式，以及各层失败的诊断码与 Git 拓扑判定。
+- **账本运行时回归进入 `validate.sh`。** 以会真实写入 `--prefix` 的假 npm 覆盖成功、失败后重试、包不符、
+  接管空目录与拒绝非空无效目录；可选验收测试缺少运行时时以退出码 2 表示“未运行”，不再与通过混淆。
 - **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
   契约测试要求日常入口点名全部门控工具。
 
