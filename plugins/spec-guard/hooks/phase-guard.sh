@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only guidance for the local multi-spec convention and legacy migration.
+# Read-only guidance for the local multi-spec convention.
 set -u
 
 # 只用 bash 内建取脚本目录：本 hook 只能依赖 bash、git 与 python3。
@@ -39,36 +39,11 @@ print(json.dumps({"hookSpecificOutput": {
 '
 }
 
-legacy_tracker() {
-  [ -f .agent/state.json ] || return 1
-  python3 - .agent/state.json <<'PY'
-import json
-import sys
-try:
-    value = json.load(open(sys.argv[1], encoding="utf-8")).get("tracker")
-except Exception:
-    value = None
-raise SystemExit(0 if value in {"github", "gitlab"} else 1)
-PY
-}
-
 SPECS=0
 for spec in spec/*.md; do
   [ -e "$spec" ] || continue
   [ "${spec##*/}" = CAPABILITY-MAP.md ] || SPECS=$((SPECS + 1))
 done
-
-if legacy_tracker; then
-  emit "## spec-guard migration notice (read-only)
-
-当前阶段: **LEGACY_TRACKER_RETIRED**
-
-- A previous remote-tracker state file is present.
-- This release does not read its mappings, contact a tracker, select tasks, or modify local state.
-
-Preserve the file and remote records as history. Complete or close any remaining tracker work with v0.14.0 before upgrading; use the retirement migration guide for the manual path."
-  exit 0
-fi
 
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "## spec-guard local workflow

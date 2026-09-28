@@ -17,7 +17,7 @@
   宿主接受的 JSON。无能力图为 `IDLE`，无模块 Spec 为 `MAP_ONLY`；否则由 `hooks/module_stage.py` 取 `activeModule` 或
   Build order 中第一个未完成的模块，按 Spec、`tasks/<id>/plan.md` 与 `tasks/<id>/todo.md` 的未勾选项报告
   `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING` 或 `DONE`，并附全局计数；能力图无效为 `MAP_INVALID`，无法计算为
-  `UNKNOWN`；旧 tracker 状态为 `LEGACY_TRACKER_RETIRED`。已启用但缺 python3 时注入可
+  `UNKNOWN`；`tracker` 为 `github`、`gitlab` 的旧状态文件按同样规则报告，不再有单独的迁移提示。已启用但缺 python3 时注入可
   诊断的 JSON，而不是静默成“未启用”。只依赖 `bash`、`git` 与 `python3`。
 - **产物校验**（`hooks/verify-artifacts.sh`）：能力图通过与 Proposal 相同的严格解析；`spec/` 下每个模块 Spec 都是
   能力图中的模块；项目根目录没有 `SPEC*.md`。python3 不可用或解析器异常时报“未验证”，不判为违规。

@@ -50,7 +50,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/phase-guard.sh"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 ```
 
-phase 若发现旧 remote-tracker state，只报告迁移提示；它不认证、不读取映射，也不选择任务。
+旧 remote-tracker state 按本地约定报告阶段；phase 不认证、不读取其中的映射，也不选择任务。
 
 ## documentation
 
