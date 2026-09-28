@@ -3,7 +3,9 @@
 The command requires an operator assertion that XATS is stopped. It cannot
 establish session liveness or stop the service itself.
 """
+from __future__ import annotations
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -57,10 +59,12 @@ def archive_legacy_mailbox(
     temporary = Path(temporary_name)
     try:
         source_uri = f"file:{quote(str(database.absolute()))}?mode=ro"
-        with sqlite3.connect(source_uri, uri=True) as source:
-            with sqlite3.connect(temporary) as target:
+        with closing(sqlite3.connect(source_uri, uri=True)) as source:
+            with closing(sqlite3.connect(temporary)) as target:
                 source.backup(target)
-                target.execute("PRAGMA journal_mode=DELETE")
+                mode = target.execute("PRAGMA journal_mode=DELETE").fetchone()[0]
+                if str(mode).lower() != "delete":
+                    raise ArchiveError("archive did not switch to delete journal mode")
                 if target.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                     raise ArchiveError("archive integrity check failed")
         archived = inspect_legacy_mailbox(temporary)
@@ -74,7 +78,11 @@ def archive_legacy_mailbox(
     except (OSError, sqlite3.Error, ValueError) as error:
         raise ArchiveError("archive creation or verification failed") from error
     finally:
-        temporary.unlink(missing_ok=True)
+        # Closing `target` does not guarantee SQLite drops the staging file's WAL
+        # sidecars on every SQLite build (observed to persist on 3.43.2); remove
+        # them explicitly. Only ever targets the staging file, never the source.
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            Path(f"{temporary}{suffix}").unlink(missing_ok=True)
 
 
 def main() -> int:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Launch Claude Code with an ephemeral, token-free collaboration MCP config."""
+from __future__ import annotations
 import argparse
 import json
 import os

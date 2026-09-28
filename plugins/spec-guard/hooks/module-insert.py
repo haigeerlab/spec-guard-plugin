@@ -14,11 +14,12 @@ import difflib
 import importlib.util
 import os
 import re
+import stat
 import sys
 import tempfile
 from pathlib import Path
 
-from capability_map import MapError, MODULE_ID, parse_map
+from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
 from module_stage import UNCHECKED, active_module, module_state
 
 
@@ -69,6 +70,14 @@ def _half_done(project, current):
 
 
 def _module_table_rows(lines):
+    """Locate the module table's header and rows.
+
+    `lines` must be `capability_map._visible_lines(...)` output (fenced
+    example lines blanked to ""), not raw lines, so a fenced example module
+    table can never be mistaken for the real one. The returned indices are
+    index-preserving, so callers can still edit the original raw lines by
+    the same index.
+    """
     header_index = None
     for index, line in enumerate(lines):
         if not line.lstrip().startswith("|"):
@@ -92,6 +101,10 @@ def _module_table_rows(lines):
 
 
 def _build_order_line_index(lines):
+    """Locate the `Build order:` line. `lines` must be
+    `capability_map._visible_lines(...)` output, for the same reason as
+    `_module_table_rows`: a fenced example Build order line must not be
+    mistaken for the real one."""
     for index, line in enumerate(lines):
         if re.match(r"^Build order:\s*.*$", line.strip(), re.IGNORECASE):
             return index
@@ -106,6 +119,17 @@ def _build_order_segments(line):
     raw = re.match(r"^Build order:\s*(.*)$", line.strip(), re.IGNORECASE).group(1)
     segments = re.split(r"\s*(?:→|->)\s*", raw.strip())
     return [[item.strip().strip("`") for item in segment.split(",")] for segment in segments]
+
+
+def _assert_new_module_present(parsed, module_id):
+    """Defensive check: the new module id must actually be in the parsed new
+    map, both as a module row and in the Build order. Without this, a bug in
+    the raw-line edit (or a future regression) could report success while the
+    new module never lands in the capability map."""
+    if module_id not in (row.module_id for row in parsed.rows):
+        raise InsertError("插入后的能力图未在模块表中包含新模块: %s" % module_id)
+    if module_id not in parsed.order:
+        raise InsertError("插入后的能力图未在 Build order 中包含新模块: %s" % module_id)
 
 
 def preview(project, module_id, responsibility, depends_on_raw, anchor):
@@ -152,8 +176,12 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
     old_text = map_path.read_text(encoding="utf-8")
     ends_with_newline = old_text.endswith("\n")
     old_lines = old_text.splitlines()
+    # Locate rows/Build order on the fence-stripped view (index-preserving)
+    # so a fenced example table or Build order line is never mistaken for the
+    # real one; the raw lines are still what gets edited, by the same index.
+    visible_lines = _visible_lines(old_lines)
 
-    table_rows = _module_table_rows(old_lines)
+    table_rows = _module_table_rows(visible_lines)
     if anchor_id is None:
         row_after_index = table_rows[-1][0]
     else:
@@ -162,7 +190,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
             raise InsertError("anchor 指向的模块不在模块表中: %s" % anchor_id)
         row_after_index = matches[0]
 
-    build_order_index = _build_order_line_index(old_lines)
+    build_order_index = _build_order_line_index(visible_lines)
 
     deps_text = ", ".join(depends_on) if depends_on else "—"
     row_text = "| %s | %s | %s |" % (module_id, responsibility, deps_text)
@@ -196,6 +224,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
             new_parsed = parse_map(tmp_path)
         except MapError as error:
             raise InsertError("插入后的能力图未通过严格校验: %s" % error)
+        _assert_new_module_present(new_parsed, module_id)
 
         old_digest = compute(str(map_path))
         new_digest = compute(str(tmp_path))
@@ -249,11 +278,13 @@ def write(project, module_id, responsibility, depends_on_raw, anchor):
     project = Path(project)
     result = preview(project, module_id, responsibility, depends_on_raw, anchor)
     map_path = project / "spec" / "CAPABILITY-MAP.md"
+    mode = stat.S_IMODE(os.stat(map_path).st_mode)
 
     tmp_fd, tmp_path_str = tempfile.mkstemp(prefix=".module-insert-", dir=str(map_path.parent))
     try:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
             handle.write(result["new_text"])
+        os.chmod(tmp_path_str, mode)
         os.replace(tmp_path_str, str(map_path))
     except BaseException:
         try:

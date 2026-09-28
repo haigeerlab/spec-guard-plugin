@@ -60,6 +60,7 @@ echo "═══ 用户可见输出里的命令名 ═══"
 python3 scripts/check-command-names.py || F=1
 python3 scripts/check-no-parallel-surface.py || F=1
 python3 scripts/check-acceptance-immutable.py || F=1
+python3 scripts/check-command-parity.py || F=1
 
 echo ""
 echo "═══ 校验器自身的回归 ═══"
@@ -74,6 +75,7 @@ echo ""
 
 echo "═══ Proposal 与本地结构回归 ═══"
 /bin/bash evals/test-codex-command-roots.sh || F=1
+/bin/bash evals/test-codex-skill-teardown-history.sh || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_baseline.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_impact.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_verification.py || F=1
@@ -108,6 +110,10 @@ echo ""
 
 echo "═══ Checkpoint contract discoverability ═══"
 python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py || F=1
+echo ""
+
+echo "═══ Python 3.9 兼容（macOS 自带 python3）═══"
+python3 -B plugins/spec-guard/hooks/test_python_compat.py || F=1
 echo ""
 
 echo "═══ Hook 入口命令回归 ═══"

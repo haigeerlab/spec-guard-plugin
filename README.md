@@ -37,7 +37,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 **前置条件：**
 
 - 已安装 agent-skills；
-- `bash`、`git`、`python3`；
+- `bash`、`git`、`python3`（3.9 及以上，macOS 自带的即可）；
 - 用 Proposal 流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
 - 用协作信箱或本地事项账本时，需要 macOS 和 Node.js。
 

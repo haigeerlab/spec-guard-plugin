@@ -7,6 +7,7 @@ otherwise the first module in Build order that is not done. A module needs a spe
 `tasks/<id>/todo.md` has unchecked items; it is done once a plan exists and no
 unchecked item remains. Read-only: this never writes a file.
 """
+from __future__ import annotations
 import json
 from pathlib import Path
 import re

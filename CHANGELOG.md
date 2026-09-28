@@ -2,6 +2,86 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **文档与代码脱节的三处更正，不改变任何行为。** `spec/documentation-verification.md` 此前仍承诺
+  `/verify-artifacts` 显示文档核验事实，该集成已在 `55278e9` 移除（`verify-artifacts.sh`、
+  `phase-guard.sh` 均不再提及 documentation）；现改为只通过 `/spec-guard:documentation-verification`
+  显式调用。`commands/phase.md` 的 `DONE` 行此前笼统地说"能力图中所有模块都有 Plan 且没有未勾选项；
+  新需求走 Proposal"，与 `module_stage.py` 的实际语义有出入——`DONE` 报告的是**当前模块**（`activeModule`
+  或 Build order 中第一个未完成模块），当 `activeModule` 明确指向一个已完成模块时，即使其他模块仍未完成
+  也会报 `DONE`；新需求默认走 `/spec-guard:add-module`，只有需要留痕的评审决定时才用 Proposal。
+  `docs/decisions/2026-09-28-quick-insert.md` 的状态行更正为已随 0.24.0 实现并发布。
+  `spec/collaboration-messaging.md` 的 Commands 与测试清单补齐已存在但未列出的脚本和测试
+  （`native_collaboration_archive.py`/`_cutover.py`/`_retire.py`、`collaboration_claude.py`、
+  `host_config_removal.py` 及其对应测试）。
+- **新增命令↔skill 路由对应检查，`local-ticket-ledger-ops` 补上 Codex 的 adapter 安装路由。**
+  `scripts/check-command-parity.py` 校验 `commands/*.md` 引用的每个 `hooks/<脚本>` 都在至少一个
+  `skills/*/SKILL.md` 里有对应路由——Codex 只读 skill，不读 command，两者此前没有任何检查比对。
+  检查发现唯一一处不对称：`commands/local-ticket-ledger.md` 的 `hooks/local_ledger_adapters.py
+  install-codex --confirm-install` 没有写进 `local-ticket-ledger-ops` skill（该 skill 只提到
+  adapter 的裸文件名，没有给出可运行的 Codex 安装命令），而这条路由确实适用于 Codex（与
+  `collaboration-ops` skill 对 `collaboration_adapters.py` 的处理方式一致）。现在该 skill 补上
+  `install-codex --confirm-install` 与 `install-claude --confirm-install` 的可运行命令，确认规则
+  与命令文档一致。检查器接入 `scripts/validate.sh`，`scripts/test-checkers.sh` 新增一正一反外加零
+  命令文件用例。
+- **退役扫描覆盖 `plugins/spec-guard/` 下所有非测试文件，不再只查固定路径。**
+  `test-retire-legacy-tracker-bridge.sh` 此前只检查 10 个精确路径和少量文件的正则；新增一个使用
+  `gh issue create`/`edit`、`glab issue create`/`update` 的命令，或让 `sync-map`、
+  `spec-github-bridge`、`spec-gitlab-bridge`、`workspace_binding`、`bind-workspace` 出现在任意
+  hook 脚本里，都不会被发现。现在扫描范围扩大到插件下所有非测试文件（排除 `test_*`/`test-*` 与
+  `__pycache__`）；`references/proposal-promotion-proof.md` 与
+  `references/proposal-boundary-guidance.md` 里现有的两处"不调用旧 bridge"否定说明用带理由的
+  显式允许清单（精确到路径:行号）放行。脚本现在接受一个可选的根目录参数，便于对着夹具树验证。
+- **Codex 侧 `spec-guard-ops` 补齐 teardown 与历史 `correct` 路由。** `docs/workflow.md:136` 一直声称
+  Codex 通过 `spec-guard-ops` skill 移除约定，但该 skill 只有 setup / phase and verify / add-module /
+  documentation / proposal / history 六节，没有 teardown 一节——Codex 用户没有入口做 Claude 侧
+  `/spec-guard:teardown-convention` 能做的事；history 一节也只跑 `verify-history.sh`、`capability-history.py
+  audit` 与 `history-migration.py preview`，没有 `correct` 路由。现在 `spec-guard-ops` 新增 teardown 一节
+  （先 `--host=codex --dry-run` 预览并原样转述，用户明确确认后才去掉 `--dry-run` 重新运行；仅在用户要求
+  零足迹模式时才加 `--keep-state`），history 一节补上 `correct --confirm` 的完整参数形状与拒绝条件（缺
+  `--confirm`、审计报告哈希不匹配、证据矛盾、把 `unknown` 升级成 `completed` 均拒绝且不写入）；
+  `docs/workflow.md` 命令对照表随之更新为具体小节。新增 `evals/test-codex-skill-teardown-history.sh` 断言
+  这两节存在且用真实 Codex（AGENTS.md）项目验证 teardown 命令行的参数确实被脚本接受。
+- **历史孤立目录检测覆盖三棵树，不再只查 `spec/history`。** `verify-history.sh` 此前把"期望目录集合"
+  只算作能力图所在目录，且只在 `spec/history` 下报 `orphan history evidence`；`tasks/history`、
+  `.agent/history` 下未登记的目录会让校验"通过"。现在期望目录集合改为取账本中每条记录（能力图、state、
+  各模块的 spec 与 plan）的所在目录——复用 `capability-history.py` 新增的 `artifact_paths()`（`artifact-dirs`
+  子命令输出），不在 `verify-history.sh` 里重新猜字段名；三棵树中任何含文件但不在集合中的目录都会报
+  `orphan history evidence` 并非零退出。
+- **快速插入不再假成功，也不再改能力图权限。** `module-insert.py` 定位模块表与 Build order 行时此前扫描
+  原始行，不跳过代码围栏：能力图在真实模块表之前有围栏示例表时，预览改的是示例，`--confirm` 会输出
+  "已写入" 并退出 0，新模块却不在能力图里，示例文本还被写坏。写入还会把 0644 的能力图改成 0600。现在定位
+  复用 `capability_map` 的可见行规则跳过围栏，示例原样不动；预览与写入都会断言新 id 确实出现在解析后的
+  模块行与 Build order 中，否则拒绝、非零退出、不写文件；写入后能力图保留原有权限位。
+- **主链裁决为 accepted-candidate 时输出可直接复制的验收记录。** 此前接受一个 Proposal 要求手写一份精确
+  七字段的 `spec/proposal-acceptances/<id>-<revision>.json`，包括规范化 JSON 的 `policyDigest`，但没有任何
+  文档、命令或 skill 说明这些字段或摘要算法。现在 `proposal_mainline_review.py` 在结果为 `accepted-candidate`
+  时，附带 `attestation`（可直接复制写入的记录）与 `attestationPath`（应写入的相对路径）；命令本身仍不写
+  任何文件，`accepted()` 的校验逻辑不变。字段与路径说明见 `references/proposal-mainline-review.md`，
+  `docs/workflow.md` 第 6 步已引用。
+- **晋级证明区分"尚未晋级"与"晋级内容违反声明"。** `proposal_promotion_proof.py --prove` 此前在没有任何
+  提交把新 module 纳入远端默认分支能力图时，也返回 `invalid`，与晋级内容确实违反声明（职责、依赖、位置或
+  diff 越界）无法区分。现在这种情况返回新状态 `not-promoted`（诊断 `promotion-not-found`），命令文档说明
+  下一步是合并晋级分支后重新运行。晋级提交现在也可以额外携带 `tasks/<id>/todo.md`（不强制）。
+- **晋级预检与证明透传下层诊断，不再把不同原因折叠成同一个字符串。** `proposal_promotion_proof.py` 的
+  `preflight_as_json` 与 `as_json` 此前一律把诊断覆盖成 `promotion-preflight-<state>` / `promotion-<state>`，
+  缺 tracker Issue、缺 Proposal、验收记录无效等不同原因因此显示为同一个诊断。现在两者保留下层已给出的具体
+  诊断（例如 `publication-absent`、`tracker-absent`、`acceptance-attestation-invalid`、`proposal-pool-<state>`），
+  只有诊断缺失或不是稳定码形态时才退回原来的折叠字符串；`state` 取值不变。
+- **归档不再在归档目录里留下 SQLite 临时文件。** `native_collaboration_archive.py` 备份到暂存文件后只用
+  `with sqlite3.connect(...) as x:` 管理事务，从不关闭连接；较新的 SQLite（如 macOS 自带 Python 3.9 的
+  3.43.2）在暂存文件仍是 WAL 来源、切到 DELETE 日志模式后，`-shm` 附属文件不会随之消失，`finally` 又只删了
+  暂存文件本身，归档目录因此残留 `.messages-*.sqlite-shm`，成功与失败路径皆有此问题。现在源库与暂存库连接
+  都显式 `close()`，`finally` 同时清理暂存文件的 `-wal`/`-shm`/`-journal` 附属文件（只针对暂存文件，不碰
+  原始信箱）；切换日志模式后也会检查返回值，不是 `delete` 就拒绝归档，避免日志模式切换失败时摘要与清单
+  基于不完整的文件计算。备份内容、完整性校验、清单比对与 `os.link` 不覆盖语义不变。这是实验性原生切换
+  归档步骤的修复，仅影响该未启用路径。
+- **macOS 自带的 Python 3.9 下阶段提示不再显示 `UNKNOWN`。** 15 个 hook 模块在类型注解里用了 3.10 才支持的
+  `X | None`，在 `/usr/bin/python3`（3.9）下一导入就失败：阶段提示每轮都是 `UNKNOWN`，`/spec-guard:add-module`、
+  协作信箱与本地事项账本的脚本也无法运行。现在这些模块都延迟求值注解；新增回归会静态检查注解写法，并在本机
+  有 3.10 以下的系统 Python 时实际导入每个模块。README 写明需要 Python 3.9 及以上。
+
 ## [0.24.0] - 2026-09-28
 
 ### 新增

@@ -40,3 +40,8 @@ unmerged-public-contract-change、dependency-suggestion 或 anchor-suggestion �
 只能引用当前模块、Proposal 自身、其声明依赖或锚点。不能放入代码、路径、Issue 正文、token
 或自由文本。accept 的结果只是 accepted-candidate。由受保护的人类流程另行写
 attestation 和 accepted Issue 阶段；本命令不得写入它们。
+
+结果为 accepted-candidate 时，输出的 JSON 额外带 `attestation`（可直接复制写入的验收记录，
+七个字段）和 `attestationPath`（应写入的相对路径）；其他结果都不带这两个字段。命令仍然不写
+任何文件。字段与路径的说明见
+[`references/proposal-mainline-review.md`](../references/proposal-mainline-review.md#the-accepted-candidate-attestation)。

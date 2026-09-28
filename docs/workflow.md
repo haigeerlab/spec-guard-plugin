@@ -84,7 +84,7 @@
 | 3 | 开 Issue | 人 | 在 GitHub 或 GitLab 开 Issue，正文放同一行身份标记，打上 `proposal` 和 `proposal-stage:published` |
 | 4 | 评审 | 命令 | `/spec-guard:proposal-review`：报告 Proposal 是否新鲜、过期或被卡住 |
 | 5 | 主链裁决 | 命令，在主链上运行 | 模块交付完的节点上运行 `/spec-guard:proposal-mainline-candidates` 看候选，再用 `/spec-guard:proposal-mainline-review` 给出结论。它只给结论，不会替你接受 |
-| 6 | 人工接受 | 人 | 写入验收记录 `spec/proposal-acceptances/<id>-<revision>.json`，并把 Issue 标签改成 `proposal-stage:accepted` |
+| 6 | 人工接受 | 人 | 写入验收记录 `spec/proposal-acceptances/<id>-<revision>.json`，并把 Issue 标签改成 `proposal-stage:accepted`。裁决结果为 `accepted-candidate` 时，`/spec-guard:proposal-mainline-review` 的输出里附带一份可直接复制的 `attestation` 和它该写入的 `attestationPath`；命令本身仍不写文件，字段说明见[参考文档](../plugins/spec-guard/references/proposal-mainline-review.md#the-accepted-candidate-attestation) |
 | 7 | 预检 | 命令 | `/spec-guard:proposal-promotion-preflight`：重读远端最新状态，确认可以晋级 |
 | 8 | 晋级 | 人 | 开晋级分支，把新模块按锚点插进能力图，补上它的 Spec 和 Plan，然后合并 |
 | 9 | 证明 | 命令 | `/spec-guard:proposal-promotion-proof`：核对新模块已按声明纳入。通过后，人工把标签改成 `proposal-stage:promoted` |
@@ -133,12 +133,12 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 
 | 功能 | Claude Code | Codex |
 |---|---|---|
-| 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill |
+| 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 评审、主链、预检、证明 | `/spec-guard:proposal-*` 五条命令 | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
-| 能力历史 | `/spec-guard:history-integrity` | `spec-guard-ops` skill |
+| 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
 | 协作信箱 | `/spec-guard:collaboration`、`collab` skill | `collab`、`collaboration-ops` skill |
 | 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
 

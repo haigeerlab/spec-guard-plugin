@@ -4,6 +4,7 @@
 The confirmations are operator assertions, not a process-liveness detector. This
 command never stops a service, acknowledges mail, or changes host configuration.
 """
+from __future__ import annotations
 import argparse
 from contextlib import closing
 import hashlib

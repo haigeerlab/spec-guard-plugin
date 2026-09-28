@@ -6,6 +6,7 @@ program obtains the bearer token only from Spec Guard's private runtime, then
 execs a pinned open-source stdio-to-HTTP bridge.  Neither the Claude
 configuration nor this process's argv contains the token.
 """
+from __future__ import annotations
 import argparse
 import os
 from pathlib import Path

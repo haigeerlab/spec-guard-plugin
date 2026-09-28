@@ -8,12 +8,14 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from proposal_contract import Baseline, Change, Proposal, compute
-from proposal_publication import Publication, PublicationPool
+from proposal_publication import Publication, PublicationPool, read_published_pool
 from proposal_mainline_review import (
-    MainlineReview, as_json,
-    accepted, accepted_from_pool, discover, discover_from_pool, evaluate, local_mainline_context,
-    main, policy_digest, policy_from_pool)
+    ATTESTATION_FIELDS, MainlineReview, as_json,
+    accepted, accepted_from_pool, attestation_for, attestation_path_for, discover,
+    discover_from_pool, evaluate, local_mainline_context, main, policy_digest,
+    policy_from_pool)
 from proposal_tracker_read import TrackerRead
+from test_proposal_promotion_proof import PromotionFixture, REMOTE_POLICY
 
 
 MAP = """# Capability Map: fixture
@@ -334,8 +336,107 @@ class ProposalMainlineReviewTests(unittest.TestCase):
                           POLICY, CONTEXT, "accept", ())
         data = as_json(result)
         self.assertEqual(data["state"], "accepted-candidate")
-        self.assertNotIn("policy", __import__("json").dumps(data).lower())
-        self.assertNotIn("octo/repo", __import__("json").dumps(data))
+        dumped = __import__("json").dumps(data)
+        # The digest, not the raw policy fields, is allowed to appear (it is the
+        # copyable attestation's policyDigest, the whole point of this result).
+        self.assertNotIn(POLICY["remote"], dumped)
+        self.assertNotIn(POLICY["reviewRef"], dumped)
+        self.assertNotIn(POLICY["workflowId"], dumped)
+        self.assertNotIn("octo/repo", dumped)
+
+    def test_accepted_candidate_json_carries_a_copyable_attestation_and_path(self):
+        result = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                          POLICY, CONTEXT, "accept", ())
+        self.assertEqual(result.state, "accepted-candidate")
+        data = as_json(result)
+        self.assertEqual(data["attestationPath"],
+                         "spec/proposal-acceptances/gamma-%s.json" % ("b" * 64))
+        attestation = data["attestation"]
+        self.assertEqual(set(attestation), ATTESTATION_FIELDS)
+        self.assertEqual(attestation, {
+            "schemaVersion": 1,
+            "proposalId": "gamma",
+            "revision": "b" * 64,
+            "reviewCommit": "a" * 40,
+            "policyDigest": policy_digest(POLICY),
+            "authorityId": "mainline",
+            "decision": "accept",
+        })
+        self.assertEqual(attestation_for(publication(), POLICY), attestation)
+        self.assertEqual(attestation_path_for(publication()), data["attestationPath"])
+
+    def test_emitted_attestation_round_trips_through_the_accepted_checker(self):
+        result = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                          POLICY, CONTEXT, "accept", ())
+        accepted_tracker = TrackerRead(
+            "verified", issue_id=7, stage="proposal-stage:accepted",
+            proposal_id="gamma", platform="github", target="octo/repo")
+        outcome = accepted(publication(), accepted_tracker, "github", "octo/repo",
+                           POLICY, result.attestation)
+        self.assertEqual(outcome.state, "accepted")
+
+    def test_only_accepted_candidate_state_carries_attestation_fields(self):
+        for decision, expected_state in (("reject", "rejected-candidate"),
+                                         ("defer", "deferred"),
+                                         ("needs-revision", "needs-revision")):
+            with self.subTest(decision=decision):
+                result = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                                  POLICY, CONTEXT, decision, ())
+                self.assertEqual(result.state, expected_state)
+                data = as_json(result)
+                self.assertNotIn("attestation", data)
+                self.assertNotIn("attestationPath", data)
+        observation = {"kind": "package-boundary-conflict", "moduleIds": ["alpha"]}
+        needs_revision = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                                  POLICY, CONTEXT, "accept", (observation,))
+        self.assertEqual(needs_revision.state, "needs-revision")
+        blocked_data = as_json(needs_revision)
+        self.assertNotIn("attestation", blocked_data)
+        self.assertNotIn("attestationPath", blocked_data)
+        blocked = evaluate(publication(), self.tracker(), "github", "octo/repo",
+                           POLICY, dict(CONTEXT, branch="refs/heads/feature/proposal"),
+                           "accept", ())
+        self.assertEqual(blocked.state, "blocked")
+        self.assertNotIn("attestation", as_json(blocked))
+        self.assertNotIn("attestationPath", as_json(blocked))
+
+
+class EmittedAttestationPoolReaderTests(PromotionFixture):
+    """Confirm `attestation_path_for` names the exact path the pool reader loads."""
+
+    skip_promotion = True
+
+    def test_attestation_path_matches_where_the_pool_reader_loads_it(self):
+        (self.seed / "spec/proposal-mainline-policy.json").write_text(
+            json.dumps(REMOTE_POLICY), encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposal-mainline-policy.json")
+        self.git(self.seed, "commit", "-m", "add mainline policy")
+        self.git(self.seed, "push", "origin", "trunk")
+
+        published_tracker = TrackerRead(
+            "verified", issue_id=42, stage="proposal-stage:published",
+            proposal_id="gamma", platform="github", target="octo/spec-guard")
+        result = evaluate(self.publication, published_tracker, "github", "octo/spec-guard",
+                          REMOTE_POLICY, CONTEXT, "accept", ())
+        self.assertEqual(result.state, "accepted-candidate")
+
+        target_path = self.seed / result.attestation_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(json.dumps(result.attestation), encoding="utf-8")
+        self.git(self.seed, "add", result.attestation_path)
+        self.git(self.seed, "commit", "-m", "attest gamma with the emitted attestation")
+        self.git(self.seed, "push", "origin", "trunk")
+
+        pool = read_published_pool(self.consumer, "origin")
+        self.assertEqual(pool.state, "published")
+        self.assertEqual(json.loads(pool.attestation_texts["gamma"]), result.attestation)
+
+        accepted_tracker = TrackerRead(
+            "verified", issue_id=42, stage="proposal-stage:accepted",
+            proposal_id="gamma", platform="github", target="octo/spec-guard")
+        outcome = accepted_from_pool(pool, self.publication, accepted_tracker,
+                                     "github", "octo/spec-guard")
+        self.assertEqual(outcome.state, "accepted")
 
 
 if __name__ == "__main__":

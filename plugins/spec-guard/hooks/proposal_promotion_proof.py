@@ -6,7 +6,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
-from proposal_mainline_review import accepted_from_pool
+from proposal_mainline_review import DIAGNOSTIC_CODE, accepted_from_pool
 from proposal_publication import fixed_snapshot, read_published_pool
 from proposal_tracker_read import read_tracker
 
@@ -39,7 +39,9 @@ def preflight_as_json(result):
         if value is not None:
             data[key] = value
     if result.state != "ready":
-        data["diagnostic"] = "promotion-preflight-%s" % result.state
+        code = result.diagnostic
+        data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
+                              else "promotion-preflight-%s" % result.state)
     return data
 
 
@@ -52,8 +54,12 @@ def as_json(result):
                        ("promotionCommit", result.promotion_commit)):
         if value is not None:
             data[key] = value
-    if result.state in ("invalid", "unknown", "not-accepted"):
-        data["diagnostic"] = "promotion-%s" % result.state
+    if result.state == "not-promoted":
+        data["diagnostic"] = result.diagnostic or "promotion-not-found"
+    elif result.state in ("invalid", "unknown", "not-accepted"):
+        code = result.diagnostic
+        data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
+                              else "promotion-%s" % result.state)
     return data
 
 
@@ -118,22 +124,25 @@ def _has_module_artifacts(repo, commit, proposal):
             isinstance(plan, str) and plan.startswith("# Plan:"))
 
 
-def _blocked(state):
-    return Proof(state, diagnostic="promotion-input-%s" % state)
+def _blocked(state, diagnostic=None):
+    return Proof(state, diagnostic=diagnostic)
 
 
 def preflight(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
     """Freshly require remote policy, Issue and attestation before branch creation."""
     pool = read_published_pool(project, remote)
-    if getattr(pool, "state", None) != "published":
-        return Preflight(getattr(pool, "state", "unknown"), diagnostic="pool-unavailable")
+    pool_state = getattr(pool, "state", None)
+    if pool_state != "published":
+        state = pool_state if pool_state in ("invalid", "unknown") else "unknown"
+        return Preflight(state, diagnostic="proposal-pool-%s" % state)
     publication = next((item for item in pool.publications
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:
-        return Preflight("absent")
+        return Preflight("absent", diagnostic="publication-absent")
     if publication.review_map != pool.review_map:
         return Preflight("stale", proposal_id=proposal_id,
-                         revision=getattr(publication.proposal, "revision", None))
+                         revision=getattr(publication.proposal, "revision", None),
+                         diagnostic="proposal-stale")
     reader = read_tracker if tracker_reader is None else tracker_reader
     tracker = reader(publication.proposal, platform, target)
     acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
@@ -150,14 +159,15 @@ def prove(project, publication, review_result, remote="origin"):
     """Prove the first matching module commit from a fresh remote-default snapshot."""
     publication_state = getattr(publication, "state", None)
     if publication_state in ("absent", "invalid", "unknown"):
-        return _blocked(publication_state)
+        return _blocked(publication_state, getattr(publication, "diagnostic", None))
     if publication_state != "published":
         return _blocked("unknown")
     review_state = getattr(review_result, "state", None)
+    review_diagnostic = getattr(review_result, "diagnostic", None)
     if review_state in ("invalid", "unknown"):
-        return _blocked(review_state)
+        return _blocked(review_state, review_diagnostic)
     if review_state != "accepted":
-        return _blocked("not-accepted")
+        return _blocked("not-accepted", review_diagnostic)
     proposal = getattr(publication, "proposal", None)
     review_commit = getattr(publication, "review_commit", None)
     if (proposal is None or not isinstance(review_commit, str) or
@@ -195,21 +205,23 @@ def prove(project, publication, review_result, remote="origin"):
             parent_map = _map(repo, parent, temp)
             if parent_map == "invalid":
                 return _blocked("invalid")
-            allowed_paths = {
+            required_paths = {
                 "spec/CAPABILITY-MAP.md",
                 "spec/%s.md" % proposal.change.module_id,
                 "tasks/%s/plan.md" % proposal.change.module_id,
             }
+            allowed_paths = required_paths | {"tasks/%s/todo.md" % proposal.change.module_id}
             paths = _promotion_paths(repo, parent, commit)
             if (proposal.change.module_id in parent_map.order or
                     not _matches(proposal, capability_map) or
-                    paths is None or not allowed_paths.issubset(paths) or
+                    paths is None or not required_paths.issubset(paths) or
                     not paths.issubset(allowed_paths) or
                     not _has_module_artifacts(repo, commit, proposal)):
                 return _blocked("invalid")
             return Proof("proved", review_commit=review_commit, proposal_id=proposal.proposal_id,
                          module_id=proposal.change.module_id, promotion_commit=commit)
-    return _blocked("invalid")
+    return Proof("not-promoted", proposal_id=proposal.proposal_id,
+                 module_id=proposal.change.module_id, diagnostic="promotion-not-found")
 
 
 def prove_from_remote(project, proposal_id, platform, target, remote="origin",
@@ -218,7 +230,8 @@ def prove_from_remote(project, proposal_id, platform, target, remote="origin",
     pool = read_published_pool(project, remote)
     state = getattr(pool, "state", None)
     if state != "published":
-        return _blocked(state if state in ("invalid", "unknown") else "unknown")
+        state = state if state in ("invalid", "unknown") else "unknown"
+        return _blocked(state, "proposal-pool-%s" % state)
     publication = next((item for item in pool.publications
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:

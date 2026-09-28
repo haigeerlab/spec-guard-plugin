@@ -2,11 +2,10 @@
 # ─────────────────────────────────────────────────────────────
 # 装 pre-push 钩子。
 #
-# 为什么需要：本仓的 GitHub Actions **从 v0.1.0 至今跑过 0 次**
-# （账户级 Actions 被禁，`gh api .../actions/runs` → total_count: 0）。
-# 也就是说 114 条 hook 断言、22 条校验器断言、shellcheck 全部依赖
-# **一个人记得在自己机器上敲那三条命令**。这个钩子是止血带，不是解药 ——
-# 真正的解法是把 Actions 恢复。
+# 为什么需要：`.github/workflows/validate.yml` 定义的 Actions job 是否真的
+# 在某次 push 上跑过，只能在 Actions 标签页或 `gh pr checks` 里看到，本地看
+# 不到、也管不了。hook 断言、校验器断言、shellcheck 因此不能只靠 CI 兜底 ——
+# 这个钩子让同样的三条检查无条件在本地跑一遍，不依赖任何人记得手动敲命令。
 #
 # 钩子只跑不花钱的那几层；变异测试和会调模型的 evals 不在里面。
 # 急着推可以 `git push --no-verify` 绕过，但那就回到了「靠自觉」。

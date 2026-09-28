@@ -35,11 +35,30 @@ worktree. Tell the user that initialization creates a committed `.epiq/project.j
 using `--allow-epiq-push`, because upstream Epiq will attempt a normal/state-branch push. Do not
 infer `user-name`, `preferred-editor`, or `auto-sync`; collect the user's values.
 
-Adapter inspection (`local_ledger_adapters.py codex` or `claude`) is read-only. Configuration writes
-are separate one-time, user-scoped actions and require both an explicit user request and the
-adapter's `--confirm-install` flag. They store no ledger secret, use a stdio command only, refuse a
-same-name managed entry, and require the selected client to restart. Never configure a managed
-Codex app-server mode or alter ChatGPT in Chrome.
+Adapter inspection is read-only and available for either host:
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" claude
+```
+
+Configuration writes are separate one-time, user-scoped actions and require both an explicit user
+request and the adapter's `--confirm-install` flag. For Codex:
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-codex --confirm-install
+```
+
+For Claude Code:
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-install \
+  --claude-bin "$(command -v claude)"
+```
+
+They store no ledger secret, use a stdio command only, refuse a same-name managed entry, and
+require the selected client to restart. Never configure a managed Codex app-server mode or alter
+ChatGPT in Chrome.
 
 The adapters gate the 10 high-risk Epiq tools (`epiq_sync`, `epiq_project_init`,
 `epiq_skill_install`, project-level deletes/removals, and contributor email tools): Claude installs

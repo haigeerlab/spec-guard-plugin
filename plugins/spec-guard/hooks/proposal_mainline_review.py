@@ -9,7 +9,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_review import review
-from proposal_publication import read_published_pool
+from proposal_publication import ATTESTATION_PATH_TEMPLATE, read_published_pool
 from proposal_tracker_read import read_tracker
 
 
@@ -43,7 +43,8 @@ DIAGNOSTIC_CODE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 class MainlineReview(object):
     def __init__(self, state, proposal_id=None, revision=None, review_commit=None,
                  authority_id=None, current_module_id=None, reason_codes=(),
-                 diagnostic=None, candidates=(), skipped=()):
+                 diagnostic=None, candidates=(), skipped=(), attestation=None,
+                 attestation_path=None):
         self.state = state
         self.proposal_id = proposal_id
         self.revision = revision
@@ -54,6 +55,8 @@ class MainlineReview(object):
         self.diagnostic = diagnostic
         self.candidates = tuple(candidates)
         self.skipped = tuple(skipped)
+        self.attestation = attestation
+        self.attestation_path = attestation_path
 
 
 def as_json(result):
@@ -72,6 +75,10 @@ def as_json(result):
                            for proposal_id, reason in result.skipped]
     if result.reason_codes:
         data["reasonCodes"] = list(result.reason_codes)
+    if result.attestation is not None:
+        data["attestation"] = result.attestation
+    if result.attestation_path is not None:
+        data["attestationPath"] = result.attestation_path
     if result.state in ("blocked", "invalid", "unknown", "stale",
                         "legacy-revision-required"):
         code = result.diagnostic
@@ -90,7 +97,7 @@ def _unusable_pool(pool):
 
 
 def _result(state, publication, context=None, reason_codes=(), diagnostic=None,
-            authority_id=None):
+            authority_id=None, attestation=None, attestation_path=None):
     proposal = getattr(publication, "proposal", None)
     return MainlineReview(
         state,
@@ -102,6 +109,8 @@ def _result(state, publication, context=None, reason_codes=(), diagnostic=None,
         current_module_id=context.get("currentModuleId") if isinstance(context, dict) else None,
         reason_codes=reason_codes,
         diagnostic=diagnostic,
+        attestation=attestation,
+        attestation_path=attestation_path,
     )
 
 
@@ -251,6 +260,33 @@ def local_mainline_context(project, pool, authority_id, boundary, current_module
     return _local_mainline_context(project, pool, authority_id, boundary, current_module_id)[0]
 
 
+def attestation_for(publication, policy):
+    """Build the exact immutable attestation dict `_attestation_matches` accepts."""
+    proposal = getattr(publication, "proposal", None)
+    return {
+        "schemaVersion": 1,
+        "proposalId": getattr(proposal, "proposal_id", None),
+        "revision": getattr(proposal, "revision", None),
+        "reviewCommit": getattr(publication, "review_commit", None),
+        "policyDigest": policy_digest(policy),
+        "authorityId": policy.get("authorityId") if isinstance(policy, dict) else None,
+        "decision": "accept",
+    }
+
+
+def attestation_path_for(publication):
+    """Return the exact relative path `read_published_pool` loads an attestation from."""
+    proposal = getattr(publication, "proposal", None)
+    return ATTESTATION_PATH_TEMPLATE % (getattr(proposal, "proposal_id", None),
+                                        getattr(proposal, "revision", None))
+
+
+def _attestation_matches(attestation, publication, policy):
+    """Require the exact immutable attestation shape `attestation_for` builds."""
+    return (isinstance(attestation, dict) and set(attestation) == ATTESTATION_FIELDS and
+            attestation == attestation_for(publication, policy))
+
+
 def accepted(publication, tracker, platform, target, policy, attestation):
     """Require a fresh accepted Issue fact and an exact immutable attestation."""
     proposal = getattr(publication, "proposal", None)
@@ -261,14 +297,7 @@ def accepted(publication, tracker, platform, target, policy, attestation):
     facts = review(publication, tracker, platform, target)
     if facts.state != "accepted":
         return _result(facts.state, publication, diagnostic=facts.diagnostic)
-    if (not isinstance(attestation, dict) or set(attestation) != ATTESTATION_FIELDS or
-            attestation.get("schemaVersion") != 1 or
-            attestation.get("proposalId") != proposal.proposal_id or
-            attestation.get("revision") != proposal.revision or
-            attestation.get("reviewCommit") != publication.review_commit or
-            attestation.get("policyDigest") != policy_digest(policy) or
-            attestation.get("authorityId") != policy.get("authorityId") or
-            attestation.get("decision") != "accept"):
+    if not _attestation_matches(attestation, publication, policy):
         return _result("blocked", publication, diagnostic="acceptance-attestation-invalid")
     return _result("accepted", publication, authority_id=policy["authorityId"])
 
@@ -365,6 +394,10 @@ def evaluate(publication, tracker, platform, target, policy, context, decision, 
     state = DECISIONS.get(decision)
     if state is None:
         return _result("invalid", publication, context, codes, "mainline-decision-invalid")
+    if state == "accepted-candidate":
+        return _result(state, publication, context, codes,
+                       attestation=attestation_for(publication, policy),
+                       attestation_path=attestation_path_for(publication))
     return _result(state, publication, context, codes)
 
 

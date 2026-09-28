@@ -5,6 +5,7 @@ This helper is intended only for Codex's ``http_headers_helper`` setting. It
 validates the runtime contract before reading the private token and writes the
 header JSON to stdout; it never logs or persists the token.
 """
+from __future__ import annotations
 import argparse
 import json
 import os

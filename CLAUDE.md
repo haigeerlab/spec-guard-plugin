@@ -11,6 +11,8 @@
 与 `.agent/` 是有意保留的激活信号，phase-guard 在这里报告的是本仓库自己的 initiative
 状态。它运行的是**已安装版**插件，不是工作区源码，其输出不能当作产品回归结果。
 需要验证插件行为时，使用 `evals/codex-plugin-smoke.sh` 建立的临时消费者项目。
+`.epiq/` 同样是有意保留的自用状态：它是本仓库自己使用的本地事项账本的已提交项目身份
+（见 [spec/local-ticket-ledger.md](spec/local-ticket-ledger.md) Boundaries）。
 
 ## 插件目的
 
@@ -60,9 +62,10 @@ scripts/validate.sh                      ← 仓库完整性校验
 
 这三条与预推送 hook 一致；`validate.sh` 已包含清单一致性、检查器回归、退役扫描与 Codex smoke 判决器自检。
 
-按变更范围选择更多检查、真实宿主 smoke、变异测试和预推送 hook；完整规则见
-[docs/maintainer-workflow.md](docs/maintainer-workflow.md)。发版与安装副本同步见
-[docs/release-process.md](docs/release-process.md)。
+按变更范围选择更多检查、真实宿主 smoke 和预推送 hook；判据本身是否真的会拦下回归，
+靠手工在一份草稿副本上改坏几行、看断言是否变红来验证，没有专用的变异测试脚本。
+完整规则见 [docs/maintainer-workflow.md](docs/maintainer-workflow.md)。发版与安装副本
+同步见 [docs/release-process.md](docs/release-process.md)。
 
 ## 调试
 

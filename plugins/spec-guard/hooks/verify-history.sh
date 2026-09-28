@@ -7,16 +7,11 @@ LEDGER="$PROJECT/spec/CAPABILITY-HISTORY.json"
 [ -f "$LEDGER" ] || { echo "未验证：没有 capability history ledger"; exit 0; }
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 python3 "$ROOT/capability-history.py" verify "$LEDGER" "$PROJECT" || exit 1
-python3 - "$LEDGER" "$PROJECT" <<'PY'
-import json, os, sys
-ledger, project = sys.argv[1:]
-data = json.load(open(ledger, encoding="utf-8"))
-expected = set()
-for initiative in data["initiatives"]:
-    for event in initiative["events"]:
-        checkpoint = event.get("checkpoint")
-        if checkpoint:
-            expected.add(os.path.dirname(checkpoint["map"]["path"]))
+EXPECTED="$(python3 "$ROOT/capability-history.py" artifact-dirs "$LEDGER")" || exit 1
+python3 - "$PROJECT" "$EXPECTED" <<'PY'
+import os, sys
+project, expected_raw = sys.argv[1:3]
+expected = set(line for line in expected_raw.splitlines() if line)
 for base in ("spec/history", "tasks/history", ".agent/history"):
     root = os.path.join(project, base)
     if not os.path.isdir(root):
@@ -25,7 +20,7 @@ for base in ("spec/history", "tasks/history", ".agent/history"):
         if not files:
             continue
         relative = os.path.relpath(directory, project)
-        if base == "spec/history" and relative not in expected:
+        if relative not in expected:
             raise SystemExit("orphan history evidence: " + relative)
 PY
 [ "$?" -eq 0 ] || exit 1

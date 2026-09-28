@@ -5,6 +5,7 @@ The output intentionally contains only a loopback endpoint, fixed package
 version, helper path, and environment-variable *names*. Provisioning commands
 are responsible for writing a private runtime and applying host configuration.
 """
+from __future__ import annotations
 import argparse
 import json
 import os

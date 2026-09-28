@@ -32,3 +32,8 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 仅当 JSON state 为 ready 时，baseCommit 才是人工创建 promotion 分支可使用的起点。
 命令本身不创建分支，也不更新 Issue、标签、能力图、模块 Spec、Plan、任务或 PR。
 任何其他状态都应原样报告并停止；不得根据旧 checkout 或另一个 worktree 猜测。
+
+非 ready 状态附带的 `diagnostic` 会尽量透传下层已给出的具体原因，例如缺 Proposal 是
+`publication-absent`、缺 tracker Issue 是 `tracker-absent`、验收记录无效是
+`acceptance-attestation-invalid`；只有没有更具体原因时才是折叠后的
+`promotion-preflight-<state>`。详见 `references/proposal-promotion-proof.md`。
