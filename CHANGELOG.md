@@ -81,6 +81,13 @@
 - **账本适配器回归进入 `validate.sh`。** 覆盖 Codex 白名单、Claude ask 规则合并与畸形配置拒绝；`ticket`
   契约测试要求日常入口点名全部门控工具。
 
+### 说明
+
+- **能力图交接。** 已实现的 Proposal initiative 按 capability-history 归档为 `proposal-lifecycle`；当前能力图
+  改为“本机协作与事项”，登记 `collaboration-messaging` 与 `local-ticket-ledger`。两者是既有能力的一次性
+  人工登记，未经 Proposal 流程；新需求仍走 Proposal。README 与设计文档写明可选的协作邮箱与本地事项账本，
+  二者都不替代、不同步 GitHub/GitLab Issue。决策见 `docs/decisions/2026-09-28-initiative-rollover.md`。
+
 ## [0.20.1] - 2026-09-27
 
 ### 修复

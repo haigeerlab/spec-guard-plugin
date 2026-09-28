@@ -9,11 +9,11 @@
 <!-- BEGIN:spec-guard-codex-convention -->
 ## Spec Guard 项目约定
 
-> 本仓库正在进行独立的 legacy tracker bridge 退役迁移；不要把 Proposal
-> 生命周期或 `.agent/state.json` 当作迁移状态。
+> Proposal 生命周期已作为 initiative `proposal-lifecycle` 归档；当前能力图是本机协作与事项。
+> `.agent/state.json` 只是本地 active-module 上下文，不是 Proposal 状态。
 
 - 能力图：`spec/CAPABILITY-MAP.md`；模块 spec：`spec/<module-id>.md`
 - Proposal 共享事实只来自远端默认分支；GitHub/GitLab 仅可作为只读 Proposal Issue 来源。
 - Proposal 不调用旧 tracker bridge，不创建或修改 Issue、PR、分支、任务或 `.agent/state.json`。
-- 退役 Spec 与 Plan 位于 `docs/retirements/`，不加入当前 Proposal capability map。
+- 退役 Spec 与 Plan 位于 `docs/retirements/`，不加入当前能力图。
 <!-- END:spec-guard-codex-convention -->
