@@ -32,5 +32,7 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 
 原样报告 JSON。只有 `proved` 才是晋级证明，并给出 promotion commit 与 module id。`not-accepted`
 表示 Issue 阶段或 attestation 不满足；`invalid` 表示首次纳入该 module 的提交不符合声明（职责、依赖、
-位置，或 diff 超出能力图、模块 Spec 与 Plan）；`unknown` 表示远端无法安全读取。
+位置，或 diff 超出能力图、模块 Spec、Plan 与可选的 `tasks/<id>/todo.md`）；`not-promoted` 表示至今
+没有任何提交把该 module 纳入远端默认分支的能力图——下一步是合并晋级分支，再重新运行本命令；
+`unknown` 表示远端无法安全读取。
 本命令不会把结果写回 Issue，也不创建或修改分支、能力图、Spec、Plan、任务或 PR。

@@ -52,7 +52,9 @@ def as_json(result):
                        ("promotionCommit", result.promotion_commit)):
         if value is not None:
             data[key] = value
-    if result.state in ("invalid", "unknown", "not-accepted"):
+    if result.state == "not-promoted":
+        data["diagnostic"] = result.diagnostic or "promotion-not-found"
+    elif result.state in ("invalid", "unknown", "not-accepted"):
         data["diagnostic"] = "promotion-%s" % result.state
     return data
 
@@ -195,21 +197,23 @@ def prove(project, publication, review_result, remote="origin"):
             parent_map = _map(repo, parent, temp)
             if parent_map == "invalid":
                 return _blocked("invalid")
-            allowed_paths = {
+            required_paths = {
                 "spec/CAPABILITY-MAP.md",
                 "spec/%s.md" % proposal.change.module_id,
                 "tasks/%s/plan.md" % proposal.change.module_id,
             }
+            allowed_paths = required_paths | {"tasks/%s/todo.md" % proposal.change.module_id}
             paths = _promotion_paths(repo, parent, commit)
             if (proposal.change.module_id in parent_map.order or
                     not _matches(proposal, capability_map) or
-                    paths is None or not allowed_paths.issubset(paths) or
+                    paths is None or not required_paths.issubset(paths) or
                     not paths.issubset(allowed_paths) or
                     not _has_module_artifacts(repo, commit, proposal)):
                 return _blocked("invalid")
             return Proof("proved", review_commit=review_commit, proposal_id=proposal.proposal_id,
                          module_id=proposal.change.module_id, promotion_commit=commit)
-    return _blocked("invalid")
+    return Proof("not-promoted", proposal_id=proposal.proposal_id,
+                 module_id=proposal.change.module_id, diagnostic="promotion-not-found")
 
 
 def prove_from_remote(project, proposal_id, platform, target, remote="origin",
