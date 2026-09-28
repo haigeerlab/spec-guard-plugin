@@ -4,6 +4,10 @@
 
 ### 修复
 
+- **Codex smoke 不再在用户配置里留下临时目录的信任记录。** `codex exec` 会把运行目录记为受信任项目（实测加 `-c`
+  覆盖也照样写入），`evals/codex-plugin-smoke.sh` 删掉临时目录后，`~/.codex/config.toml` 里就多出一条指向不存在目录的
+  `[projects."…/tmp.xxxx"]`。现在 smoke 退出时只删除本次新增、且内容只有 `trust_level = "trusted"` 的那张表，原子写回并
+  保留文件权限；自检覆盖保留他人条目、带其他键的表不删与权限保持。
 - **能力图模板不再引用旧 tracker。** `## 目标` 的注释改为说明它是 Proposal 评审的目标指纹、改写会让已发布的
   Proposal 过期；module id 的定稿说明不再提 `feat/<id>` 分支和 issue 标题。退役扫描新增对模板的检查。
 

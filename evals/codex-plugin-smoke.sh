@@ -61,6 +61,40 @@ print("ready")
 PY
 }
 
+# codex exec 会把运行目录记为受信任项目（实测加 -c 覆盖也照样写入），smoke 结束后临时目录已删除，
+# 这条记录就成了残留。只删除本次新增、且内容只有 trust_level = "trusted" 的那张表。
+forget_project_trust() { # $1=Codex config.toml $2=项目真实路径
+  python3 - "$1" "$2" <<'PY'
+import os
+import sys
+import tempfile
+
+path, project = sys.argv[1:]
+if os.path.islink(path) or not os.path.isfile(path):
+    raise SystemExit
+with open(path, encoding="utf-8") as handle:
+    lines = handle.read().split("\n")
+header = '[projects."%s"]' % project
+kept, removed, i = [], False, 0
+while i < len(lines):
+    if lines[i].strip() == header:
+        j = i + 1
+        while j < len(lines) and not lines[j].lstrip().startswith("["):
+            j += 1
+        if [line.strip() for line in lines[i + 1:j] if line.strip()] == ['trust_level = "trusted"']:
+            removed, i = True, j
+            continue
+    kept.append(lines[i])
+    i += 1
+if removed:
+    descriptor, temporary = tempfile.mkstemp(prefix=".config.toml.", dir=os.path.dirname(path))
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(kept))
+    os.chmod(temporary, os.stat(path).st_mode & 0o777)
+    os.replace(temporary, path)
+PY
+}
+
 print_plugin_repair() {
   echo "     codex plugin marketplace add /path/to/spec-guard-plugin"
   echo "     codex plugin add spec-guard@spec-guard-marketplace"
@@ -110,7 +144,16 @@ selftest() {
   printf '%s\n' 'HOOK_EXECUTED {not-json}' > "$SMOKE_TMP/invalid"
   grade "$SMOKE_TMP/invalid"; rc=$?
   [ "$rc" -eq 1 ] || return 1
-  echo "  ✅ selftest: 0=通过、1=行为失败、2=环境未就绪"
+  printf '%s\n' 'model = "x"' '' '[projects."/keep"]' 'trust_level = "trusted"' '' \
+    '[projects."/smoke"]' 'trust_level = "trusted"' '' '[projects."/custom"]' 'trust_level = "trusted"' 'note = "mine"' \
+    > "$SMOKE_TMP/config.toml"
+  chmod 640 "$SMOKE_TMP/config.toml"
+  forget_project_trust "$SMOKE_TMP/config.toml" /smoke
+  forget_project_trust "$SMOKE_TMP/config.toml" /custom
+  [ "$(printf '%s\n' 'model = "x"' '' '[projects."/keep"]' 'trust_level = "trusted"' '' \
+    '[projects."/custom"]' 'trust_level = "trusted"' 'note = "mine"')" = "$(cat "$SMOKE_TMP/config.toml")" ] || return 1
+  [ "$(stat -f %Lp "$SMOKE_TMP/config.toml" 2>/dev/null || stat -c %a "$SMOKE_TMP/config.toml")" = 640 ] || return 1
+  echo "  ✅ selftest: 0=通过、1=行为失败、2=环境未就绪；只清理 smoke 自己留下的信任记录"
 }
 
 [ "$MODE" = "--selftest" ] && { selftest; exit $?; }
@@ -158,8 +201,10 @@ case "$(plugin_state "$PLUGIN_LIST" "$PLUGIN_ID" "$EXPECTED_SOURCE")" in
     ;;
 esac
 
-WORK="$(mktemp -d)"
-trap 'rm -f "$PLUGIN_LIST"; rm -rf "$WORK"' EXIT
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
+CODEX_CONFIG="${CODEX_HOME:-$HOME/.codex}/config.toml"
+if grep -Fqx "[projects.\"$WORK\"]" "$CODEX_CONFIG" 2>/dev/null; then HAD_TRUST=1; else HAD_TRUST=0; fi
+trap 'rm -f "$PLUGIN_LIST"; rm -rf "$WORK"; [ "$HAD_TRUST" = 1 ] || forget_project_trust "$CODEX_CONFIG" "$WORK"' EXIT
 ( cd "$WORK" && git init -q && git config user.email smoke@example.invalid && git config user.name smoke )
 printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$WORK/AGENTS.md"
 printf '%s\n' '<!-- END:spec-guard-codex-convention -->' >> "$WORK/AGENTS.md"
