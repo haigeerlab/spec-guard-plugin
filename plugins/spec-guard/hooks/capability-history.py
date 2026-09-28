@@ -275,6 +275,34 @@ def verify(data, root_path):
                 verify_artifact(root, module["plan"])
 
 
+def artifact_paths(data):
+    """Yield the recorded path of every history artifact in the ledger.
+
+    Covers the checkpoint map, its optional state snapshot, and each
+    module's optional spec and plan — the only ledger fields that point at
+    files preserved under ``spec/history``, ``tasks/history`` or
+    ``.agent/history``. Callers that need to know which directories in
+    those trees are accounted for should use this instead of re-deriving
+    the field names.
+    """
+    for initiative in data["initiatives"]:
+        for event in initiative["events"]:
+            checkpoint = event.get("checkpoint")
+            if checkpoint is None:
+                continue
+            yield checkpoint["map"]["path"]
+            state = checkpoint.get("state")
+            if state is not None:
+                yield state["path"]
+            for module in checkpoint["modules"]:
+                spec = module.get("spec")
+                if spec is not None:
+                    yield spec["path"]
+                plan = module.get("plan")
+                if plan is not None:
+                    yield plan["path"]
+
+
 def initiative_by_id(data, initiative_id):
     for initiative in data["initiatives"]:
         if initiative["id"] == initiative_id:
@@ -432,8 +460,8 @@ def append_correction(ledger_path, audit_path, correction_path):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in {"validate", "status", "verify", "audit", "correct", "create"}:
-        print("usage: capability-history.py validate <file> | status <file> <initiative-id> | verify <file> <project-root> | audit <file> <project-root> | correct --confirm <ledger> <audit-report> <correction> | create <ledger> <initiative>", file=sys.stderr)
+    if len(argv) < 2 or argv[0] not in {"validate", "status", "verify", "audit", "correct", "create", "artifact-dirs"}:
+        print("usage: capability-history.py validate <file> | status <file> <initiative-id> | verify <file> <project-root> | audit <file> <project-root> | correct --confirm <ledger> <audit-report> <correction> | create <ledger> <initiative> | artifact-dirs <file>", file=sys.stderr)
         return 2
     try:
         if argv[0] == "correct":
@@ -465,6 +493,12 @@ def main(argv):
                 return 2
             json.dump(audit(data, argv[2]), sys.stdout, ensure_ascii=False, sort_keys=True)
             sys.stdout.write("\n")
+            return 0
+        if argv[0] == "artifact-dirs":
+            if len(argv) != 2:
+                return 2
+            for directory in sorted({os.path.dirname(path) for path in artifact_paths(data)}):
+                print(directory)
             return 0
         if len(argv) != 3:
             return 2

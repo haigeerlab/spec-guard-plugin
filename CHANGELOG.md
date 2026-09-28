@@ -4,6 +4,12 @@
 
 ### 修复
 
+- **历史孤立目录检测覆盖三棵树，不再只查 `spec/history`。** `verify-history.sh` 此前把"期望目录集合"
+  只算作能力图所在目录，且只在 `spec/history` 下报 `orphan history evidence`；`tasks/history`、
+  `.agent/history` 下未登记的目录会让校验"通过"。现在期望目录集合改为取账本中每条记录（能力图、state、
+  各模块的 spec 与 plan）的所在目录——复用 `capability-history.py` 新增的 `artifact_paths()`（`artifact-dirs`
+  子命令输出），不在 `verify-history.sh` 里重新猜字段名；三棵树中任何含文件但不在集合中的目录都会报
+  `orphan history evidence` 并非零退出。
 - **快速插入不再假成功，也不再改能力图权限。** `module-insert.py` 定位模块表与 Build order 行时此前扫描
   原始行，不跳过代码围栏：能力图在真实模块表之前有围栏示例表时，预览改的是示例，`--confirm` 会输出
   "已写入" 并退出 0，新模块却不在能力图里，示例文本还被写坏。写入还会把 0644 的能力图改成 0600。现在定位
