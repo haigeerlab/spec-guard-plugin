@@ -63,10 +63,41 @@ printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGE
 map "$local_project"
 injects "Codex 声明块激活并提示首个 spec" "$local_project" 'spec/'
 touch "$local_project/spec/alpha.md"
-injects "有 spec 时报告 SPECED" "$local_project" "SPECED"
+injects "有 spec 没 plan 时报告 NEEDS_PLAN" "$local_project" "当前阶段: **NEEDS_PLAN**"
+injects "指出当前模块" "$local_project" 'Current module: `alpha` (next in Build order)'
 if grep -Eqi 'sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$local_project")"; then
   fail "legacy tracker advice leaked into local phase output"
 fi
+
+# 按模块判断：plan 与 todo 决定 BUILDING／DONE，activeModule 决定当前模块。
+stages="$WORK/stages"
+mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
+touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
+printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+printf '%s\n' '- [x] done' '- [ ] one' '* [ ] two' > "$stages/tasks/alpha/todo.md"
+injects "todo 有未勾选项时报告 BUILDING" "$stages" "当前阶段: **BUILDING**"
+injects "BUILDING 给出剩余项数" "$stages" "2 unchecked item(s) in \`tasks/alpha/todo.md\`"
+injects "进行中时的全局计数" "$stages" "Modules 2 · Specs 2 · Plans 1 · In progress 1 · Done 0"
+printf '%s\n' '- [x] done' '- [X] one' > "$stages/tasks/alpha/todo.md"
+injects "当前模块完成后推进到下一个模块" "$stages" 'Current module: `beta` (next in Build order)'
+printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+injects "activeModule 优先于 Build order" "$stages" 'Current module: `alpha` (activeModule)'
+printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
+injects "activeModule 不在图中时提示并回退" "$stages" 'activeModule `ghost` is not in the capability map'
+printf '# Plan\n' > "$stages/tasks/beta/plan.md"
+injects "全部完成时报告 DONE 并指向 Proposal" "$stages" "当前阶段: **DONE**"
+injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
+rm "$stages/spec/beta.md"
+injects "缺 Spec 的模块报告 NEEDS_SPEC" "$stages" "当前阶段: **NEEDS_SPEC**"
+printf '%s\n' '| alpha | x | — |' > "$stages/spec/CAPABILITY-MAP.md"
+injects "能力图无效时报告 MAP_INVALID" "$stages" "当前阶段: **MAP_INVALID**"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
+printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
+injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶段: **UNKNOWN**"
 
 legacy_project="$WORK/legacy"
 mkdir -p "$legacy_project/.agent"

@@ -23,4 +23,4 @@
 
 - hooks.json 在插件根变量都缺失时回退执行项目内脚本（审计 P1-2），需真实 Codex 宿主确认可利用性
 - Codex 下以当前目录而非 Git 根定位项目
-- 阶段只到 SPECED，不识别 plan 与 todo（审计 P1-3，需产品决定）
+- 审计 P1-3（阶段只到 SPECED）已在 2026-09-28 修复：按模块报告 NEEDS_SPEC／NEEDS_PLAN／BUILDING／DONE

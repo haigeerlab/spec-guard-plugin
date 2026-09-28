@@ -30,12 +30,21 @@ PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pw
 CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 ```
 
-解析出 `hookSpecificOutput.additionalContext`，按这个格式呈现：
+解析出 `hookSpecificOutput.additionalContext`，原样呈现当前阶段、当前模块、全局计数与建议下一步。阶段含义：
 
-- 当前阶段
-- 各层事实（tracker / spec / plan / GitHub / git）
-- 断链项（如有，逐条列出并说明修复方式）
-- 建议下一步
+| 阶段 | 含义 |
+|---|---|
+| `IDLE` | 还没有能力图 |
+| `MAP_ONLY` | 有能力图，还没有任何模块 Spec |
+| `NEEDS_SPEC` | 当前模块缺 `spec/<id>.md` |
+| `NEEDS_PLAN` | 当前模块有 Spec，缺 `tasks/<id>/plan.md` |
+| `BUILDING` | 当前模块的 `tasks/<id>/todo.md` 还有未勾选项 |
+| `DONE` | 能力图中所有模块都有 Plan 且没有未勾选项；新需求走 Proposal |
+| `MAP_INVALID` | 能力图无法按严格规则解析 |
+| `UNKNOWN` | 阶段无法计算（例如任务文件无法读取） |
+
+当前模块取 `.agent/state.json` 的 `activeModule`（须是能力图中的模块），否则取 Build order 中第一个未完成的模块。
+阶段只依据本地文件，不读取 tracker、GitHub 或 Git 历史。
 
 **无输出**说明当前项目没装约定，提示用户跑 `/spec-guard:setup-convention`。
 

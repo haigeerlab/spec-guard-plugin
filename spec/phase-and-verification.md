@@ -14,7 +14,10 @@
 - **激活信号**：`CLAUDE.md` 或 `AGENTS.md` 中独占一行的受管声明块标记，或 `tracker` 为 `none`、`github`、`gitlab`
   的 `.agent/state.json`。正文里提到标记、或其他工具写的 `.agent/state.json` 都不激活。
 - **阶段注入**（`hooks/phase-guard.sh`，经 `hooks.json` 的 UserPromptSubmit 注册，Claude 与 Codex 共用）：输出
-  宿主接受的 JSON，阶段为 `IDLE`、`MAP_ONLY`、`SPECED` 或 `LEGACY_TRACKER_RETIRED`。已启用但缺 python3 时注入可
+  宿主接受的 JSON。无能力图为 `IDLE`，无模块 Spec 为 `MAP_ONLY`；否则由 `hooks/module_stage.py` 取 `activeModule` 或
+  Build order 中第一个未完成的模块，按 Spec、`tasks/<id>/plan.md` 与 `tasks/<id>/todo.md` 的未勾选项报告
+  `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING` 或 `DONE`，并附全局计数；能力图无效为 `MAP_INVALID`，无法计算为
+  `UNKNOWN`；旧 tracker 状态为 `LEGACY_TRACKER_RETIRED`。已启用但缺 python3 时注入可
   诊断的 JSON，而不是静默成“未启用”。只依赖 `bash`、`git` 与 `python3`。
 - **产物校验**（`hooks/verify-artifacts.sh`）：能力图通过与 Proposal 相同的严格解析；`spec/` 下每个模块 Spec 都是
   能力图中的模块；项目根目录没有 `SPEC*.md`。python3 不可用或解析器异常时报“未验证”，不判为违规。
@@ -39,6 +42,7 @@ CLAUDE_PROJECT_DIR=<project> /bin/bash plugins/spec-guard/hooks/verify-artifacts
 ```text
 plugins/spec-guard/hooks/hooks.json            -> UserPromptSubmit 注册
 plugins/spec-guard/hooks/phase-guard.sh        -> 激活判定与阶段注入
+plugins/spec-guard/hooks/module_stage.py       -> 当前模块与各模块进度（只读）
 plugins/spec-guard/hooks/verify-artifacts.sh   -> 只读产物校验
 plugins/spec-guard/references/workflow-checkpoints.md -> 共享检查点规则
 plugins/spec-guard/commands/{phase,verify-artifacts}.md, mcp/claude_desktop_server.mjs
@@ -50,7 +54,6 @@ plugins/spec-guard/commands/{phase,verify-artifacts}.md, mcp/claude_desktop_serv
 - `test-verify-artifacts.sh`：覆盖围栏与第二张表、无效能力图、缺 python3 与解析器异常。
 - 两边若加入相同判据，必须一致并各有正反回归。
 - 已知缺口：`hooks.json` 在插件根变量都缺失时回退执行项目内脚本（审计 P1-2）；Codex 下以当前目录而非 Git 根定位项目。
-  阶段只到 `SPECED`，不识别 plan 与 todo（审计 P1-3）。
 
 ## Boundaries
 
