@@ -14,9 +14,10 @@ Governance: the accepted Proposal and its attestation
 (`spec/proposal-acceptances/collaboration-messaging-*.json`) cover the loopback XATS runtime only.
 The experimental native transport below was added afterwards without a Proposal revision and was
 brought into scope by the one-time registration of 2026-09-28
-(`docs/decisions/2026-09-28-single-capability-map.md`). Promoting native to the default transport is a
-new requirement and goes through the Proposal process. The evidence threshold for that Proposal and the
-one-minor XATS retirement that follows it are fixed in `docs/decisions/2026-09-28-xats-sunset.md`.
+(`docs/decisions/2026-09-28-single-capability-map.md`). Promoting native to the default transport changes
+this module, so it is a reviewed edit of this Spec and its capability-map row (Proposals only add modules). The
+single-host evidence threshold for that change and the one-minor XATS retirement that follows it are fixed in
+`docs/decisions/2026-09-28-xats-sunset.md`.
 
 ## Runtime contract
 
