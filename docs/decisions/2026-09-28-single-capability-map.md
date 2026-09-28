@@ -41,7 +41,15 @@
 - 历史账本不再有活跃 initiative（`capability-history.py active` 报告没有唯一活跃项），与 PR #7 之前相同。
   一张图模型下，历史账本只保存已归档的旧 initiative。
 
-## 后续
+## 补登更早交付的能力（同日，第二个 PR）
 
-- 本地多模块约定（phase、verify-artifacts）、能力历史、文档治理等更早交付的能力，按用户决定另开一个 PR，
-  按现状写当前模块 Spec 后登记到本图。
+- 在末尾追加 6 个模块：`local-convention`、`phase-and-verification`、`capability-history`、
+  `documentation-baseline`、`documentation-impact`、`documentation-verification`。都是既有能力的一次性人工登记，
+  未经 Proposal 流程。
+- 能力图解析器与唯一指纹算法 `spec-digest.py` 是 `proposal-contract` 已有的共享基础；需要它们的新模块在
+  Depends on 中声明 `proposal-contract`，而不是新增一个排在最前面的模块，以免改写已有行或插到首位。
+- 三个新模块的 Spec 按现有实现重写；文档治理三个模块的 Spec 与 Plan 沿用归档版本，登记时核对与实现一致。
+  每个模块都有登记型 Plan，写明交付范围、验证方式与已知缺口。
+- 未交付的 `workflow-roadmap`（`/spec-guard:roadmap`）不登记；已退役的 initiative 生命周期命令不属于
+  `capability-history`。
+- 目标陈述在这次一并改为不含临时状态的稳定表述，登记来源移到各模块 Spec。此后只追加模块，不再改写目标或已有行。
