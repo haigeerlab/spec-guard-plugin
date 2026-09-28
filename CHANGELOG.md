@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 破坏性变更
+
+- **移除 XATS channel 唤醒实验开关。** 删除 `collaboration_claude.py --enable-channel-wake` 与
+  `collaboration_adapters.py claude --include-channel`。它们只在打印的片段和启动器临时配置里生成
+  `spec-guard-collaboration-channel` 条目，从未写入持久配置，所以无需清理。Anthropic 的开发通道确认页警告不要用它
+  加载下载的 Channel，文档也一直不建议使用，真实 CLI 上从未观察到唤醒。包装器仍拒绝
+  `--dangerously-load-development-channels`；Claude CLI 的 tmux 提醒不受影响。
+
 ### 修复
 
 - **Codex smoke 认可全角冒号。** 模型复述注入内容时可能写成 `当前阶段：IDLE`，判定此前只匹配半角 `当前阶段:`，会把已执行的

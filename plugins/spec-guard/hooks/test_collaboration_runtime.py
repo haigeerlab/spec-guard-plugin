@@ -7,17 +7,18 @@ import stat
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import collaboration_runtime
-from collaboration_adapters import (CHANNEL_SERVER_NAME, MCP_SERVER_NAME, TOKEN_ENV_VAR,
+from collaboration_adapters import (MCP_SERVER_NAME, TOKEN_ENV_VAR,
                                     claude_mcp_config, codex_toml_fragment, install_claude_config,
-                                    install_codex_config)
+                                    install_codex_config, main as adapters_main)
 from collaboration_auth_header import authorization_header, main as auth_header_main
 from collaboration_claude import (build_claude_command, build_tmux_command,
-                                  launch_tmux_claude, write_ephemeral_mcp_config)
+                                  launch_tmux_claude, main as claude_launcher_main,
+                                  write_ephemeral_mcp_config)
 from collaboration_claude_stdio import (MCP_REMOTE_AUTH_ENV_VAR, MCP_REMOTE_PACKAGE,
                                         MCP_REMOTE_VERSION, mcp_remote_command)
 from collaboration_runtime import (HEALTH_PROTOCOL_VERSION, LOCAL_NAMESPACE, PACKAGE_NAME, PACKAGE_VERSION, RuntimeContractError,
@@ -431,15 +432,12 @@ class CollaborationRuntimeTests(unittest.TestCase):
     def test_host_fragments_are_non_secret_and_pin_the_runtime_package(self):
         self.write_config()
         config = read_runtime_config(self.config_dir)
-        claude = claude_mcp_config(config, include_channel=True)
+        claude = claude_mcp_config(config)
+        self.assertEqual(list(claude["mcpServers"]), [MCP_SERVER_NAME])
         http_server = claude["mcpServers"][MCP_SERVER_NAME]
         self.assertEqual(http_server["url"], "http://127.0.0.1:9100/mcp")
         self.assertEqual(http_server["headers"]["Authorization"],
                          "Bearer ${SPEC_GUARD_COLLABORATION_TOKEN}")
-        channel = claude["mcpServers"][CHANNEL_SERVER_NAME]
-        self.assertIn("cross-agent-teams-mcp@0.8.6", channel["args"])
-        self.assertEqual(channel["env"]["CROSS_AGENT_TEAMS_MCP_TOKEN"],
-                         "${SPEC_GUARD_COLLABORATION_TOKEN}")
 
         fragment = codex_toml_fragment(
             config, Path("/opt/spec-guard/collaboration_auth_header.py"), self.config_dir)
@@ -452,48 +450,42 @@ class CollaborationRuntimeTests(unittest.TestCase):
 
     def test_claude_launcher_config_is_ephemeral_non_secret_and_cannot_be_overridden(self):
         self.write_config()
-        generated = write_ephemeral_mcp_config(self.config_dir, include_channel=True)
+        generated = write_ephemeral_mcp_config(self.config_dir)
         self.addCleanup(generated.unlink, missing_ok=True)
         contents = generated.read_text(encoding="utf-8")
         self.assertIn("SPEC_GUARD_COLLABORATION_TOKEN", contents)
-        self.assertIn(CHANNEL_SERVER_NAME, contents)
+        self.assertEqual(list(json.loads(contents)["mcpServers"]), [MCP_SERVER_NAME])
         self.assertNotIn("test-only-token", contents)
         self.assertEqual(stat.S_IMODE(generated.stat().st_mode), 0o600)
 
-        command = build_claude_command("claude", generated, True, ["--model", "sonnet"])
-        self.assertEqual(command[:3], ["claude", "--mcp-config", str(generated)])
-        self.assertIn("server:" + CHANNEL_SERVER_NAME, command)
+        command = build_claude_command("claude", generated, ["--model", "sonnet"])
+        self.assertEqual(command, ["claude", "--mcp-config", str(generated), "--model", "sonnet"])
         self.assertNotIn("test-only-token", " ".join(command))
         with self.assertRaisesRegex(ValueError, "MCP options"):
-            build_claude_command("claude", generated, False, ["--mcp-config", "other.json"])
+            build_claude_command("claude", generated, ["--mcp-config", "other.json"])
 
-    def test_claude_launcher_rejects_equals_form_mcp_overrides(self):
+    def test_claude_launcher_refuses_mcp_and_development_channel_overrides(self):
         for option in (
             "--mcp-config=other.json",
+            "--dangerously-load-development-channels",
             "--dangerously-load-development-channels=server:other",
         ):
             with self.subTest(option=option):
                 with self.assertRaisesRegex(ValueError, "MCP options"):
-                    build_claude_command("claude", Path("/tmp/selected.json"), True, [option])
+                    build_claude_command("claude", Path("/tmp/selected.json"), [option])
 
-    def test_claude_launcher_default_does_not_enable_channel(self):
-        self.write_config()
-        generated = write_ephemeral_mcp_config(self.config_dir, include_channel=False)
-        self.addCleanup(generated.unlink, missing_ok=True)
-        contents = generated.read_text(encoding="utf-8")
-        self.assertNotIn(CHANNEL_SERVER_NAME, contents)
-        self.assertNotIn("test-only-token", contents)
-        command = build_claude_command("claude", generated, False, ["--model", "sonnet"])
-        self.assertNotIn("--dangerously-load-development-channels", command)
+    def test_channel_wake_options_are_retired(self):
+        for main_function, argv in ((claude_launcher_main, ["--enable-channel-wake"]),
+                                    (adapters_main, ["claude", "--include-channel"])):
+            with self.subTest(argv=argv), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as raised:
+                    main_function(argv)
+                self.assertEqual(raised.exception.code, 2)
 
-    def test_claude_launcher_preserves_chrome_flag_with_optional_wake(self):
-        for include_channel in (False, True):
-            with self.subTest(include_channel=include_channel):
-                command = build_claude_command(
-                    "claude", Path("/tmp/collab.json"), include_channel,
-                    ["--chrome", "--model", "sonnet"],
-                )
-                self.assertEqual(command[-3:], ["--chrome", "--model", "sonnet"])
+    def test_claude_launcher_preserves_chrome_flag(self):
+        command = build_claude_command(
+            "claude", Path("/tmp/collab.json"), ["--chrome", "--model", "sonnet"])
+        self.assertEqual(command[-3:], ["--chrome", "--model", "sonnet"])
 
     def test_tmux_launcher_uses_direct_arguments_and_unique_session_name(self):
         command = build_tmux_command(
@@ -514,7 +506,7 @@ class CollaborationRuntimeTests(unittest.TestCase):
                 with patch("collaboration_claude.subprocess.run") as run:
                     result = launch_tmux_claude(self.config_dir, "claude", ["--model", "sonnet"])
         self.assertEqual(result, 7)
-        launch.assert_called_once_with(self.config_dir, "claude", False, ["--model", "sonnet"])
+        launch.assert_called_once_with(self.config_dir, "claude", ["--model", "sonnet"])
         run.assert_not_called()
 
     def test_tmux_launcher_refuses_missing_tmux_or_noninteractive_terminal(self):
