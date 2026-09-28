@@ -152,14 +152,25 @@ Gamma is separate.
     def test_changed_remote_tip_is_unknown_not_a_new_snapshot(self):
         replies = iter((
             SimpleNamespace(stdout="/tmp/remote\n"),
-            SimpleNamespace(stdout="ref: refs/heads/trunk HEAD\nabc HEAD\n"),
+            SimpleNamespace(stdout="ref: refs/heads/trunk HEAD\n%s HEAD\n" % ("a" * 40)),
             SimpleNamespace(stdout=""), SimpleNamespace(stdout=""),
-            SimpleNamespace(stdout="def\n"),
+            SimpleNamespace(stdout="%s\n" % ("d" * 40)),
         ))
         with patch("proposal_publication._run", side_effect=lambda *args, **kwargs: next(replies)):
             result = read_published(self.consumer, "gamma")
         self.assertEqual(result.state, "unknown")
+        self.assertEqual(result.diagnostic, "remote default branch moved or fetch failed")
         self.assertIsNone(result.review_commit)
+
+    def test_malformed_remote_head_is_unavailable_before_any_snapshot(self):
+        replies = iter((
+            SimpleNamespace(stdout="/tmp/remote\n"),
+            SimpleNamespace(stdout="ref: refs/heads/trunk HEAD\nnot-a-commit HEAD\n"),
+        ))
+        with patch("proposal_publication._run", side_effect=lambda *args, **kwargs: next(replies)):
+            result = read_published(self.consumer, "gamma")
+        self.assertEqual(result.state, "unknown")
+        self.assertEqual(result.diagnostic, "remote default branch is unavailable")
 
     def test_pool_reads_only_published_remote_proposals_from_one_snapshot(self):
         dirty = self.consumer / "spec/proposals/local-only.md"
