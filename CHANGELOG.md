@@ -4,6 +4,17 @@
 
 ### 修复
 
+- **文档与代码脱节的三处更正，不改变任何行为。** `spec/documentation-verification.md` 此前仍承诺
+  `/verify-artifacts` 显示文档核验事实，该集成已在 `55278e9` 移除（`verify-artifacts.sh`、
+  `phase-guard.sh` 均不再提及 documentation）；现改为只通过 `/spec-guard:documentation-verification`
+  显式调用。`commands/phase.md` 的 `DONE` 行此前笼统地说"能力图中所有模块都有 Plan 且没有未勾选项；
+  新需求走 Proposal"，与 `module_stage.py` 的实际语义有出入——`DONE` 报告的是**当前模块**（`activeModule`
+  或 Build order 中第一个未完成模块），当 `activeModule` 明确指向一个已完成模块时，即使其他模块仍未完成
+  也会报 `DONE`；新需求默认走 `/spec-guard:add-module`，只有需要留痕的评审决定时才用 Proposal。
+  `docs/decisions/2026-09-28-quick-insert.md` 的状态行更正为已随 0.24.0 实现并发布。
+  `spec/collaboration-messaging.md` 的 Commands 与测试清单补齐已存在但未列出的脚本和测试
+  （`native_collaboration_archive.py`/`_cutover.py`/`_retire.py`、`collaboration_claude.py`、
+  `host_config_removal.py` 及其对应测试）。
 - **新增命令↔skill 路由对应检查，`local-ticket-ledger-ops` 补上 Codex 的 adapter 安装路由。**
   `scripts/check-command-parity.py` 校验 `commands/*.md` 引用的每个 `hooks/<脚本>` 都在至少一个
   `skills/*/SKILL.md` 里有对应路由——Codex 只读 skill，不读 command，两者此前没有任何检查比对。
