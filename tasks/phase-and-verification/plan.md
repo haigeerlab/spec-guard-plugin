@@ -10,13 +10,12 @@
 
 - hooks/hooks.json、hooks/phase-guard.sh、hooks/verify-artifacts.sh
 - references/workflow-checkpoints.md
-- commands/phase.md、commands/verify-artifacts.md、skills/spec-guard-ops/SKILL.md（phase and verify）、mcp/claude_desktop_server.mjs（phase、verify）
+- commands/phase.md、commands/verify-artifacts.md、skills/spec-guard-ops/SKILL.md（phase and verify）；Claude Desktop MCPB 的 phase、verify 已随 MCPB 退役
 
 ## 验证
 
 - test-phase-guard.sh（9 例）
 - test-verify-artifacts.sh（8 例）
-- test-claude-desktop-mcp.sh
 - `/bin/bash scripts/validate.sh`
 
 ## 已知缺口

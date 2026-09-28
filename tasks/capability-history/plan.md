@@ -9,7 +9,7 @@
 ## 实现文件（plugins/spec-guard/ 下）
 
 - hooks/capability-history.py、hooks/verify-history.sh、hooks/history-migration.py
-- commands/history-integrity.md、skills/spec-guard-ops/SKILL.md（history）、mcp/claude_desktop_server.mjs（verify_history、audit_history）
+- commands/history-integrity.md、skills/spec-guard-ops/SKILL.md（history）；Claude Desktop MCPB 的 verify_history、audit_history 已随 MCPB 退役
 
 ## 验证
 

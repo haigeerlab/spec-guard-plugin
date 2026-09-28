@@ -9,7 +9,6 @@ REQUIRED = (
     ".claude-plugin/marketplace.json",
     "plugins/spec-guard/.claude-plugin/plugin.json",
     "plugins/spec-guard/.codex-plugin/plugin.json",
-    "plugins/spec-guard/manifest.json",
 )
 
 

@@ -22,7 +22,7 @@
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
 | Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `installed-verified` / `host-verified`（v0.13.0）：重启后的桌面会话收到 UserPromptSubmit 阶段注入，见 [v0.13.0-claude.json](v0.13.0-claude.json) | 不因其他宿主而获得写入结论 |
-| Claude Desktop MCPB | `source-verified`：`test-claude-desktop-mcp.sh` | `not-verified`：未记录已安装 MCPB 会话 | 只读；没有写入工具 |
+| Claude Desktop MCPB | 已于 2026-09-28 退役，见 [退役记录](../retirements/claude-desktop-mcpb.md) | `not-verified`：退役前从未记录已安装 MCPB 会话 | 不再提供 |
 
 以上行不等同于 GitHub/GitLab 项目验收；项目验收必须另行记录目标仓库、操作范围和
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
