@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.22.0" },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.22.0;test:marketplace-update-20260928"
+      },
+      "observedAt": "2026-09-28T06:27:40Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.21.1 to 0.22.0 for scope user and remained enabled",
+        "result:the installed 0.22.0 collaboration launcher and adapter contain no channel wake switch"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.22.0;test:isolated-module-stage-hook-20260928"
+      },
+      "observedAt": "2026-09-28T06:28:09Z",
+      "evidence": [
+        "scope:a temporary consumer Git repository was set up with the installed 0.22.0 setup-convention after a dry-run; the source repository was not modified",
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events loaded spec-guard 0.22.0",
+        "result:after adding spec/example-a.md, UserPromptSubmit injected NEEDS_PLAN with the per-module stage report",
+        "result:the temporary consumer directory was removed after the check"
+      ]
+    }
+  ]
+}
