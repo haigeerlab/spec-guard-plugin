@@ -4,6 +4,11 @@
 
 ### 修复
 
+- **setup 与 teardown 不再留下半完成状态。** `setup-convention.sh` 在任何写入之前校验已有声明块，标记重复、缺失或
+  顺序错误时拒绝且不建目录、不改文件（此前 `--replace` 只替换第一块，缺 END 时在建好目录后才抛出 traceback）；
+  `--replace` 改用受管的 `managed-block.py replace`。setup 与 teardown 都按独占一行识别标记，正文里提到标记不再
+  被当作声明块。setup→teardown 往返后指令文件逐字节还原（此前末尾多出一个换行）。`/spec-guard:setup-convention`
+  先预览，用户确认后才写入。
 - **移除失效的 Claude 协作条目不再超时。** `uninstall-claude` 不再先调用 `claude mcp get`：它会对条目做连接健康
   检查，失效端点实测需 17 秒，超过 10 秒超时后被误报为“无法检查配置”，而这正是最需要移除的情形。现在直接
   运行 `claude mcp remove --scope user`，按其结果区分已移除与本就不存在。
@@ -64,6 +69,8 @@
 
 ### 测试
 
+- **setup 与 teardown 回归。** 新增 `test-setup-teardown.sh`（14 例）并接入 `validate.sh`：覆盖预览、首次安装、
+  重复安装、`--replace`、无效标记、正文提及标记、往返逐字节还原、`--keep-state`、未启用项目与 Codex 主机。
 - **协作运维回归。** 覆盖 Codex 表的逐字删除与拒绝（改动、追加键、重复、带引号子表、符号链接）、XATS 与
   native 的安装→卸载往返、退役命令的未读拦截与结果核验；拒绝清单与邮箱工具清单改为逐字写死，不再用被测
   常量验证自己。

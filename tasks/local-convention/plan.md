@@ -14,11 +14,12 @@
 
 ## 验证
 
+- test-setup-teardown.sh（14 例：预览、安装、重复安装、`--replace`、无效标记、正文提及标记、往返逐字节还原、`--keep-state`、未启用项目、Codex 主机）
 - test_workflow_checkpoints.py（模板中的检查点指令可达）
 - scripts/check-readme-sync.py（README 内嵌声明块与模板一致）
 - `/bin/bash scripts/validate.sh`
 
 ## 已知缺口
 
-- setup 与 teardown 没有回归测试；`--replace` 前不做标记校验，缺 END 标记时会在建好目录后才报错（审计 P2-14）
-- teardown 往返会多出一个换行
+- 审计 P2-14 的三项（无测试、`--replace` 不校验标记、往返多一个换行）已在 2026-09-28 修复。
+- teardown 结束时的提示仍提到已退役的 issue 编号映射与 GitHub issue（审计 P3）。

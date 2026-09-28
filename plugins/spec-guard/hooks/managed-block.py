@@ -71,6 +71,10 @@ def main(argv):
         # malformed input before touching any file.
         while len(output) > start > 0 and output[start - 1].strip() == "" and start < len(output) and output[start].strip() == "":
             del output[start]
+        # setup appends a separating blank line before a block at the end of a file;
+        # reclaim it so an install/remove round trip leaves the file byte-identical.
+        if start == len(output) and start > 0 and output[start - 1].strip() == "":
+            del output[start - 1]
         atomic_write(path, "".join(output))
         print(finish - start + 1)
         return

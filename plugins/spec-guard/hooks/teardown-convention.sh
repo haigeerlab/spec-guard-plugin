@@ -67,12 +67,15 @@ case "$HOST" in
 esac
 STATE=".agent/state.json"
 
+# 标记必须独占一行（与 managed-block.py、phase-guard 相同）；正文里提到标记不算声明块。
+has_marker_line() {  # $1=文件 $2=标记
+  grep -Eq "^[[:space:]]*$2[[:space:]]*$" "$1" 2>/dev/null
+}
+
 # 任何无效的目标声明块都要在 state 处理前拒绝，避免“块没拆掉、state 却被停用”的半完成状态。
 HAS_TARGET_MARKER=false
 if [ -f "$INSTRUCTIONS" ]; then
-  if grep -Fq "$MARK_B" "$INSTRUCTIONS" 2>/dev/null; then
-    HAS_TARGET_MARKER=true
-  elif grep -Fq "$MARK_E" "$INSTRUCTIONS" 2>/dev/null; then
+  if has_marker_line "$INSTRUCTIONS" "$MARK_B" || has_marker_line "$INSTRUCTIONS" "$MARK_E"; then
     HAS_TARGET_MARKER=true
   fi
 fi
@@ -89,12 +92,12 @@ echo "  作用目录: ${ROOT}"
 
 DID=0
 OTHER_ACTIVE=false
-if [ -f "$OTHER_INSTRUCTIONS" ] && grep -q "$OTHER_MARK_B" "$OTHER_INSTRUCTIONS" 2>/dev/null; then
+if [ -f "$OTHER_INSTRUCTIONS" ] && has_marker_line "$OTHER_INSTRUCTIONS" "$OTHER_MARK_B"; then
   OTHER_ACTIVE=true
 fi
 
 # ── 1. 指令文件的声明块 ──
-if [ -f "$INSTRUCTIONS" ] && grep -Fq "${MARK_B}" "$INSTRUCTIONS" 2>/dev/null; then
+if [ "$HAS_TARGET_MARKER" = true ]; then
   if [ "$DRY" = true ]; then
     N=$(python3 "$BLOCK_TOOL" validate "$INSTRUCTIONS" "$MARK_B" "$MARK_E") || exit 1
   else

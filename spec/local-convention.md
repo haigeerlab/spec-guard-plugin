@@ -16,12 +16,14 @@
   退役，脚本拒绝它们且不写文件，没有回退。Claude 写入 `CLAUDE.md` 的 `agent-skills-convention` 块，Codex 写入
   `AGENTS.md` 的 `spec-guard-codex-convention` 块；内容来自 `templates/claude-block-local.md`、
   `templates/codex-block-local.md`，能力图模板为 `templates/CAPABILITY-MAP.md`。
-- `--dry-run` 只报告将要做的改动。已有声明块时拒绝覆盖，只有 `--replace` 才升级该块。已有 `.agent/state.json`
-  时不改写它。
+- `--dry-run` 只报告将要做的改动。已有声明块时拒绝覆盖，只有 `--replace` 才升级该块（经 `managed-block.py
+  replace`）。已有 `.agent/state.json` 时不改写它。任何写入之前先校验已有声明块，标记重复、缺失或顺序错误时拒绝，
+  不建目录、不改文件。
 - `teardown-convention.sh [--dry-run] [--keep-state]` 只移除受管声明块，把 `.agent/state.json` 改名为
   `.agent/state.json.disabled`（`--keep-state` 时保留，hook 会继续激活），不碰 `spec/`、`tasks/` 中的用户内容；
   完成后实际运行一次 `phase-guard.sh` 核对 hook 已停止注入。
-- 声明块标记必须独占一行；标记缺失、重复或顺序错误时，`managed-block.py` 拒绝移除。
+- 声明块标记必须独占一行，setup、teardown、`managed-block.py` 与 phase-guard 识别方式一致；正文里提到标记不算
+  声明块。setup→teardown 往返后指令文件逐字节还原。
 - 模板中的检查点指令指向 `spec-guard-ops` 的共享检查点规则（`references/workflow-checkpoints.md`）。
 
 ## Commands
@@ -30,6 +32,7 @@
 CLAUDE_PROJECT_DIR=<project> /bin/bash plugins/spec-guard/hooks/setup-convention.sh local --dry-run
 CLAUDE_PROJECT_DIR=<project> /bin/bash plugins/spec-guard/hooks/teardown-convention.sh --dry-run
 python3 plugins/spec-guard/hooks/managed-block.py validate|remove <file> <begin> <end>
+/bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh
 python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py
 python3 scripts/check-readme-sync.py
 /bin/bash scripts/validate.sh
@@ -49,7 +52,8 @@ plugins/spec-guard/commands/{setup,teardown}-convention.md, skills/spec-guard-op
 
 - `test_workflow_checkpoints.py` 核对模板中的检查点指令可达；`check-readme-sync.py` 核对 README 内嵌的声明块与模板
   一致。
-- 已知缺口：setup 与 teardown 没有回归测试（审计 P2-14）；`--replace` 前不做标记校验，teardown 往返会多出一个换行。
+- `test-setup-teardown.sh`（14 例）覆盖预览、首次安装、重复安装、`--replace`、无效标记、正文提及标记、往返逐字节
+  还原、`--keep-state`、未启用项目与 Codex 主机。
 
 ## Boundaries
 

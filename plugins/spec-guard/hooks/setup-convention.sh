@@ -36,8 +36,26 @@ else
   END='<!-- END:agent-skills-convention -->'
 fi
 
+BLOCK_TOOL="$HERE/managed-block.py"
+
+# 标记必须独占一行（与 managed-block.py、phase-guard 相同）；正文里提到标记不算已有声明块。
+marker_lines() {
+  [ -f "$TARGET" ] || { echo 0; return; }
+  grep -Ec "^[[:space:]]*($BEGIN|$END)[[:space:]]*$" "$TARGET" || true
+}
+
+# 任何写入之前先校验已有声明块：重复、缺失或顺序错误都拒绝，不留下半完成的目录或文件。
+HAS_BLOCK=false
+if [ "$(marker_lines)" -gt 0 ]; then
+  python3 "$BLOCK_TOOL" validate "$TARGET" "$BEGIN" "$END" >/dev/null || {
+    echo "  ❌ ${TARGET} 的声明块标记无效，未改动任何文件；请先人工修正标记" >&2
+    exit 1
+  }
+  HAS_BLOCK=true
+fi
+
 install_block() {
-  if grep -qF "$BEGIN" "$TARGET" 2>/dev/null; then
+  if [ "$HAS_BLOCK" = true ]; then
     if [ "$REPLACE" != true ]; then
       printf '  ⏭ %s already has a convention block (use --replace to update it)\n' "$TARGET"
       return
@@ -46,16 +64,7 @@ install_block() {
       printf '  • replace the convention block in %s\n' "$TARGET"
       return
     fi
-    python3 - "$TARGET" "$BEGIN" "$END" "$TEMPLATE" <<'PY'
-from pathlib import Path
-import sys
-target, begin, end, template = sys.argv[1:]
-text = Path(target).read_text(encoding="utf-8")
-start = text.index(begin) + len(begin)
-finish = text.index(end, start)
-replacement = "\n" + Path(template).read_text(encoding="utf-8").rstrip() + "\n"
-Path(target).write_text(text[:start] + replacement + text[finish:], encoding="utf-8")
-PY
+    python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$TEMPLATE" >/dev/null
     printf '  ✅ updated %s\n' "$TARGET"
     return
   fi
