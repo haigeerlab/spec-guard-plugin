@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 破坏性变更
+
+- **裁剪能力历史里只服务于 initiative 轮换的部分。** 整个插件改用一张能力图后，账本只保存已归档的旧 initiative，
+  不再追加生命周期事件。删除 `capability-history.py` 的 `ensure`、`append`、`checkpoint`、`active`、
+  `verify-checkpoint`，以及自 `55278e9` 起就没有调用方的 `artifact_history.py`。保留 `validate`、`status`、
+  `verify`、`audit`、`correct --confirm`，以及迁移导入要用的 `create`。已有账本的格式不变，核验与审计结果不受影响。
+
 ## [0.22.0] - 2026-09-28
 
 ### 破坏性变更

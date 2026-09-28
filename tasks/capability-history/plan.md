@@ -20,5 +20,6 @@
 
 ## 已知缺口
 
-- `history-migration.py import --confirm` 与写入动词没有命令或 skill 入口；是否开放需另行决定
-- `artifact_history.py` 已不被 verify-artifacts 调用，是否删除或重新接入需另行决定
+- `history-migration.py import --confirm` 没有命令或 skill 入口；是否开放需另行决定
+- 2026-09-28 移除只服务于 initiative 轮换的 `ensure`、`append`、`checkpoint`、`active`、`verify-checkpoint`
+  与 `artifact_history.py`，均无调用方
