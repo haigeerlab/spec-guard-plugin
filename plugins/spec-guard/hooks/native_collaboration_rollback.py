@@ -4,6 +4,7 @@
 The operator must independently confirm both services' session state. This
 command never stops or starts a service and never acknowledges any message.
 """
+from __future__ import annotations
 import argparse
 import json
 import os

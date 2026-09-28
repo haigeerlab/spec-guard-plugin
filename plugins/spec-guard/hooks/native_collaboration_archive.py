@@ -3,6 +3,7 @@
 The command requires an operator assertion that XATS is stopped. It cannot
 establish session liveness or stop the service itself.
 """
+from __future__ import annotations
 import argparse
 import hashlib
 import json

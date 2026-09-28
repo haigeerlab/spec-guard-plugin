@@ -4,6 +4,7 @@
 The mutating commands run only when an operator invokes them. They never place a
 token in an argv, project file, or diagnostic output.
 """
+from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 import json

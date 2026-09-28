@@ -110,6 +110,10 @@ echo "═══ Checkpoint contract discoverability ═══"
 python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py || F=1
 echo ""
 
+echo "═══ Python 3.9 兼容（macOS 自带 python3）═══"
+python3 -B plugins/spec-guard/hooks/test_python_compat.py || F=1
+echo ""
+
 echo "═══ Hook 入口命令回归 ═══"
 /bin/bash plugins/spec-guard/hooks/test-hook-entry.sh || F=1
 

@@ -1,4 +1,5 @@
 """Read-only contract and diagnostics for the optional local Epiq ticket ledger."""
+from __future__ import annotations
 import argparse
 import json
 import re

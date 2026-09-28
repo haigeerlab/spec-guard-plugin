@@ -5,6 +5,7 @@ No command in this module creates a marker or changes either transport. A
 separate explicit cutover must write the private marker only after old-mail
 preflight; until then its absence means the existing XATS entry.
 """
+from __future__ import annotations
 import argparse
 import json
 import os
