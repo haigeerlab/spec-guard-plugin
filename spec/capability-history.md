@@ -24,7 +24,7 @@ complete 等）已退役，不在本模块范围。改为全插件一张能力�
 - **更正**（`correct --confirm`）：只追加更正记录，不改写原事件；需要用户明确确认。
 - **迁移预览**（`history-migration.py preview`）：只读列出旧项目可导入的证据与冲突。
 - 入口：Claude `/spec-guard:history-integrity`（audit、correct）；Codex `spec-guard-ops` 的 history 节（verify、
-  audit、迁移 preview）；Claude Desktop MCP 工具 `verify_history`、`audit_history`。
+  audit、迁移 preview）。Claude Desktop MCPB 已于 2026-09-28 退役。
 
 ## Commands
 
@@ -44,7 +44,7 @@ python3 plugins/spec-guard/hooks/history-migration.py preview <project>
 plugins/spec-guard/hooks/capability-history.py  -> 账本校验、核验、审计、更正与写入原语
 plugins/spec-guard/hooks/verify-history.sh      -> 只读核验入口
 plugins/spec-guard/hooks/history-migration.py   -> 旧证据迁移预览与导入
-plugins/spec-guard/commands/history-integrity.md, skills/spec-guard-ops/SKILL.md, mcp/claude_desktop_server.mjs
+plugins/spec-guard/commands/history-integrity.md, skills/spec-guard-ops/SKILL.md
 ```
 
 ## Testing strategy

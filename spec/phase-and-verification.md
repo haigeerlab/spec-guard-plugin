@@ -23,8 +23,8 @@
   能力图中的模块；项目根目录没有 `SPEC*.md`。python3 不可用或解析器异常时报“未验证”，不判为违规。
 - **共享检查点规则**：`references/workflow-checkpoints.md`，由 `/phase`、`/verify-artifacts` 与 `spec-guard-ops`
   引用，规定阶段交接、确认与停止时如何预告下一步。
-- 入口：Claude `/spec-guard:phase`、`/spec-guard:verify-artifacts`；Codex `spec-guard-ops` 的 phase and verify 节；
-  Claude Desktop MCP 工具 `phase`、`verify`。
+- 入口：Claude `/spec-guard:phase`、`/spec-guard:verify-artifacts`；Codex `spec-guard-ops` 的 phase and verify 节。
+  Claude Desktop MCPB 已于 2026-09-28 退役（`docs/retirements/claude-desktop-mcpb.md`）。
 
 ## Commands
 
@@ -33,7 +33,6 @@ CLAUDE_PROJECT_DIR=<project> /bin/bash plugins/spec-guard/hooks/phase-guard.sh
 CLAUDE_PROJECT_DIR=<project> /bin/bash plugins/spec-guard/hooks/verify-artifacts.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
-/bin/bash plugins/spec-guard/hooks/test-claude-desktop-mcp.sh
 /bin/bash scripts/validate.sh
 ```
 
@@ -45,7 +44,7 @@ plugins/spec-guard/hooks/phase-guard.sh        -> 激活判定与阶段注入
 plugins/spec-guard/hooks/module_stage.py       -> 当前模块与各模块进度（只读）
 plugins/spec-guard/hooks/verify-artifacts.sh   -> 只读产物校验
 plugins/spec-guard/references/workflow-checkpoints.md -> 共享检查点规则
-plugins/spec-guard/commands/{phase,verify-artifacts}.md, mcp/claude_desktop_server.mjs
+plugins/spec-guard/commands/{phase,verify-artifacts}.md
 ```
 
 ## Testing strategy

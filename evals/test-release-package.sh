@@ -16,8 +16,7 @@ make_artifact() {
   printf '%s\n' '{"name":"spec-guard-marketplace","plugins":[{"name":"spec-guard","source":"./plugins/spec-guard"}]}' > "$artifact/.claude-plugin/marketplace.json"
   printf '%s\n' '{"name":"spec-guard","version":"0.8.0"}' > "$artifact/plugins/spec-guard/.claude-plugin/plugin.json"
   printf '%s\n' '{"name":"spec-guard","version":"0.8.0"}' > "$artifact/plugins/spec-guard/.codex-plugin/plugin.json"
-  printf '%s\n' '{"name":"spec-guard","version":"0.8.0"}' > "$artifact/plugins/spec-guard/manifest.json"
-  printf '%s\n' '{"schemaVersion":1,"artifactKind":"spec-guard-plugin","version":"0.8.0","files":[".claude-plugin/marketplace.json","plugins/spec-guard/.claude-plugin/plugin.json","plugins/spec-guard/.codex-plugin/plugin.json","plugins/spec-guard/manifest.json"]}' > "$artifact/ARTIFACT-MANIFEST.json"
+  printf '%s\n' '{"schemaVersion":1,"artifactKind":"spec-guard-plugin","version":"0.8.0","files":[".claude-plugin/marketplace.json","plugins/spec-guard/.claude-plugin/plugin.json","plugins/spec-guard/.codex-plugin/plugin.json"]}' > "$artifact/ARTIFACT-MANIFEST.json"
 }
 
 GOOD="$TMP/good"; make_artifact "$GOOD"

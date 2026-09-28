@@ -60,17 +60,6 @@ def main() -> int:
                 print(f"  ❌ {name}: Codex hooks 必须是 ./hooks/hooks.json")
                 ok = False
 
-        # Claude Desktop MCPB 清单是第三个交付表面，版本必须同步发布。
-        desktop_path = os.path.join(src, "manifest.json")
-        if os.path.exists(desktop_path):
-            desktop = json.load(open(desktop_path, encoding="utf-8"))
-            if desktop.get("name") != pj.get("name"):
-                print(f"  ❌ Desktop 名称不一致: Claude={pj.get('name')} Desktop={desktop.get('name')}")
-                ok = False
-            if desktop.get("version") != pj.get("version"):
-                print(f"  ❌ Desktop 版本不一致: Claude={pj.get('version')} Desktop={desktop.get('version')}")
-                ok = False
-
         # 目录存在性（有则校验，无则跳过——都是可选目录）
         for d in ("commands", "hooks", "skills", "agents"):
             path = os.path.join(src, d)

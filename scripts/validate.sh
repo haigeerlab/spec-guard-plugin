@@ -108,10 +108,6 @@ echo "═══ Checkpoint contract discoverability ═══"
 python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py || F=1
 echo ""
 
-echo "═══ Claude Desktop MCP regression ═══"
-/bin/bash plugins/spec-guard/hooks/test-claude-desktop-mcp.sh || F=1
-echo ""
-
 echo "═══ Setup/teardown regression ═══"
 /bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh || F=1
 echo ""

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 破坏性变更
+
+- **退役 Claude Desktop MCPB。** 删除 `manifest.json`、`mcp/claude_desktop_server.mjs` 及其测试、清单检查与文档。它从未
+  进入发布流程，本机安装副本停留在 0.7.51。已安装扩展的用户请在 Claude Desktop 的 Settings → Extensions 中卸载；
+  阶段与产物检查请改用 Claude Code 的斜杠命令或 Codex 的 `spec-guard-ops`。见
+  `docs/retirements/claude-desktop-mcpb.md`。
+
 ### 修复
 
 - **setup 与 teardown 不再留下半完成状态。** `setup-convention.sh` 在任何写入之前校验已有声明块，标记重复、缺失或
