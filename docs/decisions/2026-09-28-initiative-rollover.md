@@ -1,6 +1,7 @@
 # Spec: 能力图交接——结束 Proposal initiative，登记本机协作与事项
 
-状态：已批准并实施（2026-09-28）
+状态：已被取代（2026-09-28）。同日改为全插件一张能力图，见
+[`2026-09-28-single-capability-map.md`](2026-09-28-single-capability-map.md)。本文件保留原方案作为记录。
 
 ## 背景
 

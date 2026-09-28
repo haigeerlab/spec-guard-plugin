@@ -16,9 +16,10 @@ synchronizes remote Issues.
 
 ## Proposal boundary
 
-The Proposal lifecycle was delivered as a seven-module initiative, now archived
-in capability history as `proposal-lifecycle`; the current capability map is
-the local collaboration and tickets initiative. Proposal v2 binds its published
+`spec/CAPABILITY-MAP.md` is the single capability map for the whole plugin: an
+accepted Proposal inserts its module after a declared anchor or at the end,
+instead of starting a new map. The Proposal lifecycle is seven modules in it.
+Proposal v2 binds its published
 contents to a revision digest. A normal author branch can publish and read a
 Proposal, but only the policy-defined mainline may evaluate it at an explicit
 module boundary. Mainline identity is Git topology plus protected remote policy,
