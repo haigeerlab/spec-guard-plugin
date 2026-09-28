@@ -3,6 +3,10 @@ description: 在验证后的主链模块边界提交显式 Proposal 裁决；只
 allowed-tools: Bash
 ---
 
+主链分支（policy 的 `reviewRef`）必须包含远端默认分支的最新提交。若结果是
+`mainline-review-commit-not-ancestor`，说明主链分支落后：在主链 checkout 上运行
+`git fetch origin && git merge --ff-only origin/<默认分支>` 后再试；不能快进时停止并报告，不要改用其他分支。
+
 先通过 proposal-mainline-candidates 发现 Proposal，再由主链人工明确选择 decision：
 
 ~~~bash

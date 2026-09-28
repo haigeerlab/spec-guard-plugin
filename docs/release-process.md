@@ -18,6 +18,8 @@
 3. 推送提交和 tag。
 4. 刷新 marketplace，并在新会话中安装/启用更新后的插件。
 5. 在 `/hooks` 审核 `UserPromptSubmit`，然后从临时消费者项目运行真实 Codex smoke。
+6. 把主链评审分支快进到发布提交：`git push origin <发布提交>:refs/heads/integration/mainline`。该分支受保护，
+   只接受快进；推送被拒说明它有 `main` 之外的提交，应停止并调查，不要强推。
 
 不同宿主的 marketplace 刷新命令与权限策略可能不同；先以 `codex plugin marketplace --help`
 或宿主 UI 显示的当前命令为准，不要假定工作区 HEAD 已被运行时自动采用。
