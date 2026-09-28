@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **Codex 从仓库子目录启动时，阶段注入不再消失。** Codex 不提供 `CLAUDE_PROJECT_DIR`，并在会话目录里运行 hook；
+  `phase-guard.sh` 此前直接用当前目录判断激活，在子目录里找不到根目录的声明块，于是静默。2026-09-28 在真实 Codex
+  上复现：根目录注入 `IDLE`，子目录回复 `HOOK_NOT_RUN`。现在没有 `CLAUDE_PROJECT_DIR` 时先用 git 仓库根目录，
+  不在仓库里才用当前目录。回归新增三例：子目录注入、无激活信号的仓库子目录静默、非 git 目录退回当前目录。
+
 ### 新增
 
 - **已有验收记录不可改写。** 新增 `scripts/check-acceptance-immutable.py`，经 `validate.sh` 与预推送 hook 运行：
