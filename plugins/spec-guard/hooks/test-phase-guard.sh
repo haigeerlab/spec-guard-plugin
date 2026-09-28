@@ -113,4 +113,35 @@ ln -sf "$(command -v grep)" "$WORK/nopy/grep"
 RUN_PATH="$WORK/nopy" injects "已启用但缺 python3 时注入诊断" "$local_project" "python3 不可用"
 [ -z "$(RUN_PATH="$WORK/nopy" run "$WORK/other-state")" ] || fail "缺 python3 时无关项目也必须静默"
 
+# Codex 不提供 CLAUDE_PROJECT_DIR，hook 在会话目录里运行（2026-09-28 真实 Codex 核实）。
+# 从仓库子目录启动时，必须按 git 仓库根目录判断激活，而不是只看当前目录。
+run_from() {  # $1=工作目录；不设 CLAUDE_PROJECT_DIR，模拟 Codex
+  (cd "$1" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)
+}
+git_project="$WORK/git-project"
+mkdir -p "$git_project/src/deep"
+git -C "$git_project" init -q
+printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$git_project/AGENTS.md"
+out="$(run_from "$git_project/src/deep")"
+python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+assert "当前阶段: **IDLE**" in text, text
+' <<<"$out" || fail "Codex 从仓库子目录启动时应按仓库根目录注入阶段
+$out"
+echo "  ✅ Codex 从仓库子目录启动时按仓库根目录注入"; PASS=$((PASS + 1))
+unrelated="$WORK/unrelated-git"
+mkdir -p "$unrelated/sub"
+git -C "$unrelated" init -q
+[ -z "$(run_from "$unrelated/sub")" ] || fail "无激活信号的仓库子目录必须静默"
+echo "  ✅ 无激活信号的仓库子目录静默"; PASS=$((PASS + 1))
+plain="$WORK/not-git"
+mkdir -p "$plain"
+printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$plain/AGENTS.md"
+python3 -c '
+import json, sys
+assert "当前阶段: **IDLE**" in json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+' <<<"$(run_from "$plain")" || fail "非 git 目录应退回当前目录判断"
+echo "  ✅ 非 git 目录退回当前目录"; PASS=$((PASS + 1))
+
 echo "phase-guard regression passed (${PASS} cases)"

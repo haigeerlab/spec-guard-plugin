@@ -5,7 +5,14 @@ set -u
 # 只用 bash 内建取脚本目录：本 hook 只能依赖 bash、git 与 python3。
 case "${BASH_SOURCE[0]}" in */*) HOOKDIR="${BASH_SOURCE[0]%/*}" ;; *) HOOKDIR=. ;; esac
 HOOKDIR="$(cd "$HOOKDIR" && pwd)"
-ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+# Claude Code 提供 CLAUDE_PROJECT_DIR；Codex 不提供，并在会话目录里运行 hook。
+# 从仓库子目录启动时按 git 仓库根目录判断激活，不在仓库里时才用当前目录。
+if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+  ROOT="$CLAUDE_PROJECT_DIR"
+else
+  ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+  [ -n "$ROOT" ] || ROOT="$(pwd)"
+fi
 cd "$ROOT" 2>/dev/null || exit 0
 
 # 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或带已知

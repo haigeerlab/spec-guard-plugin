@@ -13,6 +13,8 @@
 
 - **激活信号**：`CLAUDE.md` 或 `AGENTS.md` 中独占一行的受管声明块标记，或 `tracker` 为 `none`、`github`、`gitlab`
   的 `.agent/state.json`。正文里提到标记、或其他工具写的 `.agent/state.json` 都不激活。
+- **项目根目录**：优先用宿主提供的 `CLAUDE_PROJECT_DIR`（Claude Code）；没有时（Codex）用 `git rev-parse --show-toplevel`，
+  不在 git 仓库里才用当前目录。这样从仓库子目录启动的 Codex 会话也能看到根目录的激活信号。
 - **阶段注入**（`hooks/phase-guard.sh`，经 `hooks.json` 的 UserPromptSubmit 注册，Claude 与 Codex 共用）：输出
   宿主接受的 JSON。无能力图为 `IDLE`，无模块 Spec 为 `MAP_ONLY`；否则由 `hooks/module_stage.py` 取 `activeModule` 或
   Build order 中第一个未完成的模块，按 Spec、`tasks/<id>/plan.md` 与 `tasks/<id>/todo.md` 的未勾选项报告
