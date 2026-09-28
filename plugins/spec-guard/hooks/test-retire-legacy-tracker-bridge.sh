@@ -2,9 +2,16 @@
 # The legacy tracker bridge must be removed from the shipped plugin, not merely
 # hidden from a phase suggestion.  Released evidence and retirement documents
 # are intentionally outside this assertion.
+#
+# Optional $1: an alternate repo root to scan (a fixture tree in tests).
+# Defaults to this checkout's root, computed from the script's own location.
 set -u
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+if [ "${1:-}" != "" ]; then
+  ROOT="$(cd "$1" && pwd)" || { echo "cannot resolve root: $1" >&2; exit 2; }
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+fi
 PLUGIN="$ROOT/plugins/spec-guard"
 FAIL=0
 
@@ -65,6 +72,92 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
   "$PLUGIN/hooks/proposal_review.py" \
   "$PLUGIN/hooks/proposal_promotion_proof.py" \
   "$PLUGIN/hooks/proposal_boundary_guidance.py"
+
+# ── broadened scan: every non-test file under plugins/spec-guard (R6) ──────
+#
+# The checks above only look at a fixed list of paths and a handful of
+# hand-picked files. That scope has a hole: a *new* command or hook script
+# that reuses a retired identifier, or that starts writing tracker Issues
+# again, would ship silently — nothing above would ever see it. This scans
+# every shipped, non-test file under the plugin instead.
+#
+# "non-test" = basename does not start with test_ or test- (this script's own
+# name matches that pattern, so `find` excludes it without a special case),
+# and the file is not inside a __pycache__ directory.
+#
+# Two files intentionally reference a retired name today, only to say it is
+# NOT invoked (docs/lenses.md style negative statement). They are allowlisted
+# below by exact path + the allowed line's own (trimmed) text, not by line
+# number: line numbers already drifted once in this module (this exact
+# proposal-promotion-proof.md line moved 30→33 when Task 1 edited the file
+# above it), and matching by line number would turn every future edit above
+# an allowed line into a false "active shipped surface still references..."
+# failure — a false alarm (docs/lenses.md A1). Matching by path + text means
+# only the allowed line itself, not its position, has to stay in the clear;
+# a *different* retired-identifier line added anywhere in the same file still
+# gets caught, since its text won't match any entry.
+ALLOWLIST_PATH=(
+  "plugins/spec-guard/references/proposal-promotion-proof.md"
+  "plugins/spec-guard/references/proposal-boundary-guidance.md"
+)
+ALLOWLIST_TEXT=(
+  '`.agent/state.json`. It does not invoke `spec-github-bridge` or `/sync-map`.'
+  '`spec-github-bridge` 或 `/sync-map`。'
+)
+ALLOWLIST_REASON=(
+  "negative statement — says the prove action does not invoke the retired bridge or /sync-map, not a real call site"
+  "negative statement — says the candidate-pool reminder does not invoke the retired bridge or /sync-map, not a real call site"
+)
+
+trim() {
+  local s="$1"
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+  printf '%s' "$s"
+}
+
+# $1=file path relative to $ROOT  $2=trimmed line text
+# Echoes the matching entry's index and returns 0 on a match; returns 1 otherwise.
+allowed_index() {
+  local i=0 n=${#ALLOWLIST_PATH[@]}
+  while [ "$i" -lt "$n" ]; do
+    if [ "${ALLOWLIST_PATH[$i]}" = "$1" ] && [ "${ALLOWLIST_TEXT[$i]}" = "$2" ]; then
+      printf '%s' "$i"
+      return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
+RETIRED_PATTERN='sync-map|spec-github-bridge|spec-gitlab-bridge|workspace_binding|bind-workspace'
+ISSUE_WRITE_PATTERN='gh issue (create|edit)|glab issue (create|update)'
+
+scan_surface() {
+  local pattern="$1" label="$2"
+  local file lineno content rel trimmed idx
+  while IFS= read -r file; do
+    while IFS=: read -r lineno content; do
+      [ -n "$lineno" ] || continue
+      rel="${file#"$ROOT"/}"
+      trimmed="$(trim "$content")"
+      if idx="$(allowed_index "$rel" "$trimmed")"; then
+        printf '  ⏭  %s:%s (allowlisted %s hit: %s)\n' "$rel" "$lineno" "$label" "${ALLOWLIST_REASON[$idx]}"
+        continue
+      fi
+      printf '  ❌ %s references %s: %s:%s\n%s\n' "$rel" "$label" "$rel" "$lineno" "    $content"
+      FAIL=$((FAIL + 1))
+    done < <(grep -nE "$pattern" "$file" 2>/dev/null)
+  done < <(find "$PLUGIN" -type f \
+             -not -path '*/__pycache__/*' \
+             -not -name 'test_*' \
+             -not -name 'test-*')
+}
+
+echo ''
+echo '═══ broadened surface scan (all non-test files under plugins/spec-guard) ═══'
+scan_surface "$RETIRED_PATTERN" 'retired identifier'
+scan_surface "$ISSUE_WRITE_PATTERN" 'Issue-writing command'
 
 [ "$FAIL" -eq 0 ] || exit 1
 printf '  ✅ legacy tracker bridge is absent from the distributed surface\n'

@@ -286,6 +286,92 @@ mkrref "$TMP/rsrefgood" 1.2.3
 want fail "readme-sync: 安装命令的 --ref 落后于清单版本 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefbad"
 want pass "readme-sync: 安装命令的 --ref 等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefgood"
 
+# ── check-command-parity.py ──
+# Task 8 / R4 后半：commands/*.md 引用的每个 hooks/<脚本> 都要在至少一个
+# skill 里有路由，否则 Codex（只读 skills/*/SKILL.md）永远够不到它。
+mkparity() {  # $1=目录
+  rm -rf "$1"
+  mkdir -p "$1/plugins/spec-guard/commands" "$1/plugins/spec-guard/skills/ops"
+  printf -- '---\ndescription: d\n---\n运行 `hooks/covered.py` 完成检查。\n' \
+    > "$1/plugins/spec-guard/commands/covered.md"
+  printf -- '---\nname: ops\n---\n用 `"$ROOT/hooks/covered.py"` 处理。\n' \
+    > "$1/plugins/spec-guard/skills/ops/SKILL.md"
+}
+mkparity "$TMP/paritygood"
+want pass "command-parity: 命令引用的 hook 在 skill 里有路由 → 放行" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/paritygood"
+
+mkparity "$TMP/paritybad"
+printf -- '---\ndescription: d\n---\n运行 `hooks/uncovered.py` 完成检查。\n' \
+  > "$TMP/paritybad/plugins/spec-guard/commands/uncovered.md"
+want fail "command-parity: 新命令引用的 hook 没有任何 skill 提供 → 报错" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/paritybad"
+
+rm -rf "$TMP/parityempty"; mkdir -p "$TMP/parityempty/plugins/spec-guard/skills/ops"
+printf -- '---\nname: ops\n---\n什么都没有。\n' > "$TMP/parityempty/plugins/spec-guard/skills/ops/SKILL.md"
+want fail "command-parity: 零个命令文件 → 不算通过" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityempty"
+
+# ── test-retire-legacy-tracker-bridge.sh（广度扫描，R6）──
+# 扩大后的扫描要能对着一棵干净夹具树全绿，对反例喂 gh issue create 和
+# 残留在 hook 脚本里的 /sync-map 各报一次，而带理由的允许清单不受影响。
+mkretire() {  # $1=目录：拼出让原有断言也能全绿的最小干净树
+  rm -rf "$1"
+  mkdir -p "$1/plugins/spec-guard/commands" "$1/plugins/spec-guard/skills" \
+    "$1/plugins/spec-guard/templates" "$1/plugins/spec-guard/hooks" \
+    "$1/plugins/spec-guard/references" "$1/docs"
+  printf 'phase\n' > "$1/plugins/spec-guard/commands/phase.md"
+  : > "$1/plugins/spec-guard/hooks/hooks.json"
+  for f in proposal_contract proposal_publication proposal_tracker_read \
+           proposal_review proposal_promotion_proof proposal_boundary_guidance; do
+    printf '# clean\n' > "$1/plugins/spec-guard/hooks/$f.py"
+  done
+  printf '# README\n' > "$1/README.md"
+  printf '# AGENTS\n' > "$1/AGENTS.md"
+  printf '# design\n' > "$1/docs/design.md"
+  printf '# maintainer workflow\n' > "$1/docs/maintainer-workflow.md"
+}
+
+mkretire "$TMP/retiregood"
+want pass "retire-scan: 干净夹具树 → 放行" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retiregood"
+
+mkretire "$TMP/retirebad-ghissue"
+printf 'run `gh issue create --title x`\n' > "$TMP/retirebad-ghissue/plugins/spec-guard/commands/bad.md"
+want fail "retire-scan: 命令文件含 gh issue create → 报错" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retirebad-ghissue"
+
+mkretire "$TMP/retirebad-syncmap"
+printf '#!/usr/bin/env bash\necho "/sync-map"\n' > "$TMP/retirebad-syncmap/plugins/spec-guard/hooks/phase-guard.sh"
+want fail "retire-scan: hook 脚本里出现 /sync-map → 报错" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retirebad-syncmap"
+
+# 允许清单按「路径 + 该行原文」匹配，不认行号——本模块已经因为 Task 1 改动
+# proposal-promotion-proof.md 而把这一行从 30 挪到 33，按行号匹配的话，
+# 任何未来在这行**之上**的编辑都会重演一次同样的漂移，把合法的否定说明误判成
+# 新增违规（docs/lenses.md A1）。下面三个用例分别验证：原文在别的行号上依然
+# 放行、同一文件里新增一条不同文本的违规依然被抓、以及正常情形不受影响。
+ALLOWED_TEXT='`.agent/state.json`. It does not invoke `spec-github-bridge` or `/sync-map`.'
+
+mkretire "$TMP/retireallow"
+{
+  echo "# 前面插入几行无关内容，让允许的这句话落在跟真实仓库不同的行号上"
+  echo ""
+  printf '%s\n' "$ALLOWED_TEXT"
+} > "$TMP/retireallow/plugins/spec-guard/references/proposal-promotion-proof.md"
+want pass "retire-scan: 允许清单按“路径+原文”匹配，同一句话换了行号仍放行" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow"
+
+mkretire "$TMP/retireallow-newhit"
+{
+  echo "# 同一个允许清单文件"
+  echo ""
+  printf '%s\n' "$ALLOWED_TEXT"
+  printf '%s\n' 'call spec-github-bridge directly from here'
+} > "$TMP/retireallow-newhit/plugins/spec-guard/references/proposal-promotion-proof.md"
+want fail "retire-scan: 同一允许清单文件里新增一条不同文本的违规仍报错" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow-newhit"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1

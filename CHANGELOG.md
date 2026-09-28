@@ -4,6 +4,24 @@
 
 ### 修复
 
+- **新增命令↔skill 路由对应检查，`local-ticket-ledger-ops` 补上 Codex 的 adapter 安装路由。**
+  `scripts/check-command-parity.py` 校验 `commands/*.md` 引用的每个 `hooks/<脚本>` 都在至少一个
+  `skills/*/SKILL.md` 里有对应路由——Codex 只读 skill，不读 command，两者此前没有任何检查比对。
+  检查发现唯一一处不对称：`commands/local-ticket-ledger.md` 的 `hooks/local_ledger_adapters.py
+  install-codex --confirm-install` 没有写进 `local-ticket-ledger-ops` skill（该 skill 只提到
+  adapter 的裸文件名，没有给出可运行的 Codex 安装命令），而这条路由确实适用于 Codex（与
+  `collaboration-ops` skill 对 `collaboration_adapters.py` 的处理方式一致）。现在该 skill 补上
+  `install-codex --confirm-install` 与 `install-claude --confirm-install` 的可运行命令，确认规则
+  与命令文档一致。检查器接入 `scripts/validate.sh`，`scripts/test-checkers.sh` 新增一正一反外加零
+  命令文件用例。
+- **退役扫描覆盖 `plugins/spec-guard/` 下所有非测试文件，不再只查固定路径。**
+  `test-retire-legacy-tracker-bridge.sh` 此前只检查 10 个精确路径和少量文件的正则；新增一个使用
+  `gh issue create`/`edit`、`glab issue create`/`update` 的命令，或让 `sync-map`、
+  `spec-github-bridge`、`spec-gitlab-bridge`、`workspace_binding`、`bind-workspace` 出现在任意
+  hook 脚本里，都不会被发现。现在扫描范围扩大到插件下所有非测试文件（排除 `test_*`/`test-*` 与
+  `__pycache__`）；`references/proposal-promotion-proof.md` 与
+  `references/proposal-boundary-guidance.md` 里现有的两处"不调用旧 bridge"否定说明用带理由的
+  显式允许清单（精确到路径:行号）放行。脚本现在接受一个可选的根目录参数，便于对着夹具树验证。
 - **Codex 侧 `spec-guard-ops` 补齐 teardown 与历史 `correct` 路由。** `docs/workflow.md:136` 一直声称
   Codex 通过 `spec-guard-ops` skill 移除约定，但该 skill 只有 setup / phase and verify / add-module /
   documentation / proposal / history 六节，没有 teardown 一节——Codex 用户没有入口做 Claude 侧
