@@ -12,4 +12,4 @@
 - [x] Checkpoint B：三条最小验证 + `/usr/bin/python3` 套件，向用户汇报
 - [x] Task 9：用户与规约文档一致——documentation-verification、phase.md、quick-insert 决策、collaboration spec
 - [x] Task 10：维护者文档一致——CLAUDE.md、lenses、CONTRIBUTING、install-git-hooks 注释、migration-strict-serial
-- [ ] Checkpoint C：完成核对，阶段变为 DONE
+- [x] Checkpoint C：完成核对，阶段变为 DONE
