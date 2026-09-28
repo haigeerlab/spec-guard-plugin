@@ -1,6 +1,6 @@
 # 使用流程
 
-这一页讲三件事：新项目怎么从零开始、项目做到一半来了新需求怎么走 Proposal、能力图有哪些规则。
+这一页讲三件事：新项目怎么从零开始、项目做到一半来了新需求怎么加进能力图、能力图有哪些规则。
 名词解释见[设计理念与术语](concepts.md)。
 
 ## 新项目：从零到交付
@@ -36,21 +36,41 @@
 | `NEEDS_SPEC` | 当前模块缺 Spec | 写 `spec/<模块>.md` |
 | `NEEDS_PLAN` | 当前模块有 Spec、缺 Plan | 用 `/plan` 生成 plan 和 todo |
 | `BUILDING` | todo 还有 N 项没勾 | 继续 `/build` |
-| `DONE` | 当前模块或全部模块已完成 | 切到下一个模块；全部完成后，新需求走 Proposal |
+| `DONE` | 当前模块或全部模块已完成 | 切到下一个模块；全部完成后，新需求用 `/spec-guard:add-module` 插入 |
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 随时想看完整状态，用 `/spec-guard:phase`。
 
-## 已有项目：新需求走 Proposal
+## 已有项目：加新需求
 
-Proposal 只做一件事：**给已有的能力图新增一个独立模块**。修改、删除或调整已有模块的顺序都不走 Proposal，
-直接改能力图并人工评审。
+项目做到一半冒出新需求时，有两种方式把它作为新模块加进能力图：
 
-**Proposal 是可选的。** 插件不会强制你走它。新增模块时有两种做法：
+| 方式 | 适合 | 步骤 |
+|---|---|---|
+| **快速插入**（默认） | 个人或小团队，需求已经理顺 | 一次预览、一次确认 |
+| **Proposal** | 需要留下「谁在什么时候接受了哪个版本」的记录，或需要多人确认 | 九步，要先做一次性准备 |
 
-- **直接改能力图**：把新模块加进模块表和 Build order，人工评审后提交。适合个人项目或不需要留痕的小团队。
-- **走 Proposal**：需要留下「谁在什么时候接受了哪个版本」的记录，或者需要多人确认时使用。代价是要先做下文的一次性准备。
+两种方式都只**新增**模块。修改、删除或调整已有模块的顺序，直接改能力图并人工评审。
+
+### 快速插入
+
+在一个模块做完、或还没开始的检查点，把理顺的需求上下文交给 agent，运行 `/spec-guard:add-module`
+（Codex 里说「用 spec-guard 插入一个新模块」）：
+
+1. agent 读能力图，提出新模块的 id、职责、依赖和插入位置（`after:<某模块>` 或 `end`），每项说明理由；
+2. 命令预览：给出新行、新 Build order、能力图改动对比，以及插入后当前模块会不会变；
+3. 你确认后才写入。只改 `spec/CAPABILITY-MAP.md`，不建文件、不动 `tasks/` 和 `.agent/state.json`，也不做 Git 操作；
+4. 新模块排到当前位置时，阶段变为 `NEEDS_SPEC`，接着照常写并评审它的 Spec，再 Plan、Build。
+
+命令会先校验，任何一条不满足就拒绝，什么都不写：
+
+- 当前模块做到一半（todo 里既有已勾、又有未勾的项）；
+- 依赖不存在、依赖排在插入位置之后、出现循环依赖，或 id 重复、不是 kebab-case；
+- 插入会改动 `## 目标`、已有模块行，或已有模块在 Build order 中的先后；
+- `spec/<id>.md` 已经存在。
+
+### Proposal（需要留痕时）
 
 ```text
 写 Proposal → 合进 main（发布）→ 开 Issue → 评审 → 主链裁决 → 人工接受
@@ -101,7 +121,7 @@ python3 -c "import sys; sys.path.insert(0, '<插件目录>/hooks'); import propo
 ## 能力图的规则
 
 - **每个项目只有一张在用的能力图**，路径固定为 `spec/CAPABILITY-MAP.md`。阶段提示和产物校验都只认这一张。
-- **新需求插进同一张图**：按 Proposal 声明的锚点插到某个模块后面，或追加到末尾，不再为新需求另开一张图。
+- **新需求插进同一张图**：用快速插入或 Proposal，按锚点插到某个模块后面或追加到末尾，不再为新需求另开一张图。
 - **和当前项目无关的独立产品**，另开一个项目，用它自己的能力图。
 - **改 `## 目标` 要慎重**：这一节的摘要是 Proposal 评审的基准，改了会让所有已发布的 Proposal 判为过期。
   只是追加模块时不用改它。
@@ -115,6 +135,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 |---|---|---|
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
+| 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 评审、主链、预检、证明 | `/spec-guard:proposal-*` 五条命令 | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
 | 能力历史 | `/spec-guard:history-integrity` | `spec-guard-ops` skill |
