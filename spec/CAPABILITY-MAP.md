@@ -2,12 +2,13 @@
 
 ## 目标
 
-Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能力图：新需求以 Proposal 提出，经主链评审与人工接受后，
-按声明的锚点插入到已有模块之后或追加到末尾，不为每个需求另建一张图；只有与本插件无关的独立产品才另起能力图。
+Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能力图：新需求在模块检查点经带校验的快速插入加进本图，
+需要留痕时改走 Proposal（经主链评审与人工接受后插入）；两种方式都按声明的锚点插到已有模块之后或追加到末尾，不为每个
+需求另建一张图；只有与本插件无关的独立产品才另起能力图。
 
 插件的能力分四类：只读的 Proposal 生命周期（共享事实只来自远端默认分支快照，GitHub/GitLab 只作为只读 Proposal Issue
 来源，不创建或修改 Issue、PR、分支或任务）；防止多模块产物互相覆盖的本地约定，以及只报告事实的阶段注入与产物校验；
-可核验的能力历史与显式的文档治理；以及需显式启用的本机协作邮箱与本地事项账本，二者都不替代、不同步远端 Issue。
+在检查点把新模块校验后插进能力图的快速插入；可核验的能力历史与显式的文档治理；以及需显式启用的本机协作邮箱与本地事项账本，二者都不替代、不同步远端 Issue。
 各模块的登记来源写在其模块 Spec 中。
 
 ## 模块
@@ -25,12 +26,13 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | local-ticket-ledger | Provide an optional local-first, worktree-shared ticket ledger and narrow Claude Code/Codex access without imposing workflow ownership or project topology. | — |
 | local-convention | Install and remove the local multi-module directory convention and its managed declaration block, without touching user specs or plans. | — |
 | phase-and-verification | Inject the current phase for activated projects and verify landed artifacts read-only, degrading to unverified when probes fail. | local-convention, proposal-contract |
+| module-insert | At a module checkpoint, validate and insert one new module into the capability map with a spec skeleton, after previewing and explicit confirmation. | local-convention, phase-and-verification |
 | capability-history | Keep verifiable history of archived capability maps and artifacts, with read-only verify and audit, append-only corrections, and migration preview. | proposal-contract |
 | documentation-baseline | 定义显式启用的项目级文档基线协议、解析事实和初始化入口 | — |
 | documentation-impact | 在模块 Spec、Plan 与交付前表达并收口对文档基线的遵循、补全、变更或不适用结论 | documentation-baseline |
 | documentation-verification | 提供只读核验、保守提醒和跨宿主回归，确保缺失或未知不被伪装为文档完成 | documentation-baseline, documentation-impact |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → local-ticket-ledger → local-convention → phase-and-verification → capability-history → documentation-baseline → documentation-impact → documentation-verification
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → local-ticket-ledger → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification
 
 ---
 
