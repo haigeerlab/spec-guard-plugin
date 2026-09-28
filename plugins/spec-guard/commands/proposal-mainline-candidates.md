@@ -3,6 +3,10 @@ description: 仅在已验证主链模块边界读取远端 Proposal 候选；不
 allowed-tools: Bash
 ---
 
+主链分支（policy 的 `reviewRef`）必须包含远端默认分支的最新提交。若结果是
+`mainline-review-commit-not-ancestor`，说明主链分支落后：在主链 checkout 上运行
+`git fetch origin && git merge --ff-only origin/<默认分支>` 后再试；不能快进时停止并报告，不要改用其他分支。
+
 只有正在主链的调用者，且边界确为 module-deliver 或 module-advance，才运行：
 
 ~~~bash

@@ -20,6 +20,7 @@
 - 调用方只能显式声明 authority id、boundary、current module id、受限 observation 和 decision。当前 branch、upstream、local HEAD 与 remote review commit 由工具读取并验证，不能由调用方文本替代。
 - 合法上下文要求：当前 branch 精确匹配 policy review ref；其 upstream 精确匹配 policy remote/ref；local HEAD 包含固定 review commit；current module id 在 review map 中存在。
 - Git 元数据不能证明操作者身份。policy 的 review ref 和 acceptance attestation 路径必须由仓库保护规则、CODEOWNERS 或同等外部授权机制保护；本模块只验证可观察的仓库/分支/工作流上下文，绝不伪称认证人类身份。
+- 本仓库的 review ref `integration/mainline` 自 2026-09-28 起受 GitHub 分支保护（禁止 force push 与删除），通过快进与 `main` 保持一致：主链评审前、以及每次发布后快进（见 `docs/release-process.md`）。acceptance attestation 路径尚未单独保护。
 
 ### Candidate discovery and local observations
 
