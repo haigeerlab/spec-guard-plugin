@@ -59,6 +59,7 @@ echo ""
 echo "═══ 用户可见输出里的命令名 ═══"
 python3 scripts/check-command-names.py || F=1
 python3 scripts/check-no-parallel-surface.py || F=1
+python3 scripts/check-acceptance-immutable.py || F=1
 
 echo ""
 echo "═══ 校验器自身的回归 ═══"
