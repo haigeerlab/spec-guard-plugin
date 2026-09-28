@@ -74,6 +74,7 @@ echo ""
 
 echo "═══ Proposal 与本地结构回归 ═══"
 /bin/bash evals/test-codex-command-roots.sh || F=1
+/bin/bash evals/test-codex-skill-teardown-history.sh || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_baseline.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_impact.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_verification.py || F=1

@@ -41,6 +41,29 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local 
 已有声明块要升级时追加 `--replace`。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
 
+## teardown
+
+移除本项目的 spec-guard 约定前先确认用户真的要移除，说明会发生什么：删 `AGENTS.md` 里
+`BEGIN`/`END` 标记之间的内容（标记外一个字节不动）；把 `.agent/state.json` 改名为
+`.agent/state.json.disabled`（这才是真正的「移除」——只删声明块留着 `state.json`，项目会变成
+零足迹模式而不是约定被移除）；脚本会实际跑一遍 `phase-guard.sh` 验证，而不是让人相信
+「无输出即为成功」这句话。不碰 `spec/`、`tasks/` 里的内容，也不碰远端 Issue 与本地事项账本。
+
+先 `--dry-run` 预览，原样转述输出：
+
+```bash
+CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/teardown-convention.sh" --host=codex --dry-run
+```
+
+等用户明确确认后，才去掉 `--dry-run` 重新运行一次：
+
+```bash
+CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/teardown-convention.sh" --host=codex
+```
+
+只有用户明确要求零足迹模式（`.agent/state.json` 继续激活 hook）时才加 `--keep-state`。原样转述
+结果；退出码 2 表示本项目没有启用过约定，什么都没做。
+
 ## phase and verify
 
 两者均为只读：
@@ -116,5 +139,20 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
 python3 "$ROOT/hooks/capability-history.py" audit "$PROJECT/spec/CAPABILITY-HISTORY.json" "$PROJECT"
 python3 "$ROOT/hooks/history-migration.py" preview "$PROJECT"
 ```
+
+审计报告中的 `unknown` 不是失败时可以猜测补齐的值，不得从当前 `activeModule`、文件名或当前
+时间推断责任、依赖、状态或历史时间。`correct` 是写操作，只有用户明确确认该次补正后才允许
+调用；它会向账本追加 `history-correction` 记录，绝不重写 checkpoint，只会标记原值、修正值与
+身份均精确匹配的 audit finding 为 `corrected`：
+
+```bash
+python3 "$ROOT/hooks/capability-history.py" correct --confirm \
+  "$PROJECT/spec/CAPABILITY-HISTORY.json" <audit-report.json> <correction.json>
+```
+
+`<audit-report.json>` 与 `<correction.json>` 必须是用户审阅过的文件，补正须包含原值、修正值、
+审计报告哈希、审计时间、`initiativeId`、`eventIndex`、对应的 `checkpointId`（无 checkpoint 时为
+`null`）与 audit finding。没有 `--confirm`、审计报告哈希不匹配、证据矛盾，或把 `unknown` 升级
+成 `completed` 的请求都会被拒绝，且不会写入。
 
 历史快照与旧 state 是证据，不是恢复旧 tracker 工作流的授权。

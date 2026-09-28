@@ -4,6 +4,16 @@
 
 ### 修复
 
+- **Codex 侧 `spec-guard-ops` 补齐 teardown 与历史 `correct` 路由。** `docs/workflow.md:136` 一直声称
+  Codex 通过 `spec-guard-ops` skill 移除约定，但该 skill 只有 setup / phase and verify / add-module /
+  documentation / proposal / history 六节，没有 teardown 一节——Codex 用户没有入口做 Claude 侧
+  `/spec-guard:teardown-convention` 能做的事；history 一节也只跑 `verify-history.sh`、`capability-history.py
+  audit` 与 `history-migration.py preview`，没有 `correct` 路由。现在 `spec-guard-ops` 新增 teardown 一节
+  （先 `--host=codex --dry-run` 预览并原样转述，用户明确确认后才去掉 `--dry-run` 重新运行；仅在用户要求
+  零足迹模式时才加 `--keep-state`），history 一节补上 `correct --confirm` 的完整参数形状与拒绝条件（缺
+  `--confirm`、审计报告哈希不匹配、证据矛盾、把 `unknown` 升级成 `completed` 均拒绝且不写入）；
+  `docs/workflow.md` 命令对照表随之更新为具体小节。新增 `evals/test-codex-skill-teardown-history.sh` 断言
+  这两节存在且用真实 Codex（AGENTS.md）项目验证 teardown 命令行的参数确实被脚本接受。
 - **历史孤立目录检测覆盖三棵树，不再只查 `spec/history`。** `verify-history.sh` 此前把"期望目录集合"
   只算作能力图所在目录，且只在 `spec/history` 下报 `orphan history evidence`；`tasks/history`、
   `.agent/history` 下未登记的目录会让校验"通过"。现在期望目录集合改为取账本中每条记录（能力图、state、
