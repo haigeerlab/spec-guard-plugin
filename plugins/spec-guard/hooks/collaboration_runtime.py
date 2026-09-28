@@ -191,9 +191,19 @@ def clear_stale_daemon_pid(config_dir: Path) -> None:
         return
 
 
+def _private_database(config_dir: Path) -> None:
+    """Keep the mailbox and its SQLite sidecars owner-only; XATS creates them with the caller's umask."""
+    for suffix in ("", "-wal", "-shm"):
+        path = Path(config_dir) / (DATABASE_FILENAME + suffix)
+        if path.exists() or path.is_symlink():
+            _regular_file(path, "collaboration database")
+            path.chmod(0o600)
+
+
 def start_daemon(config_dir: Path, health_attempts: int = 20) -> dict[str, Any]:
     """Start the pinned daemon with a child-only token, then await its health check."""
     config = read_runtime_config(config_dir)
+    _private_database(config_dir)
     if health(config):
         return {"state": "running", "host": config.host, "port": config.port}
     clear_stale_daemon_pid(config_dir)
@@ -202,7 +212,7 @@ def start_daemon(config_dir: Path, health_attempts: int = 20) -> dict[str, Any]:
     environment["CROSS_AGENT_TEAMS_MCP_TOKEN"] = read_private_token(config.token_file)
     try:
         process = subprocess.Popen(
-            daemon_command(config_dir, config), env=environment, start_new_session=True,
+            daemon_command(config_dir, config), env=environment, start_new_session=True, umask=0o077,
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except OSError as error:
@@ -371,6 +381,8 @@ def serve_daemon(config_dir: Path, npx_executable: str) -> None:
     environment["CROSS_AGENT_TEAMS_MCP_TOKEN"] = read_private_token(config.token_file)
     command = daemon_command(config_dir, config)
     command[0] = str(npx_path)
+    _private_database(config_dir)
+    os.umask(0o077)
     os.execvpe(str(npx_path), command, environment)
 
 
