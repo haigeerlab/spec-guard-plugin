@@ -4,6 +4,13 @@
 
 ### 修复
 
+- **协作切换后不再遗留另一套后端。** 新增 XATS 与 native 的 `uninstall-claude`／`uninstall-codex`
+  （需 `--confirm-uninstall`）：Claude 经 `claude mcp remove` 移除，Codex 表只有与安装时逐字一致才删除，
+  被改过的表拒绝并给出行号。参考文档新增切换与回退检查清单，包括停用 XATS LaunchAgent 与移除旧条目。
+- **回退前置条件可以达成。** 新增操作员命令 `native_collaboration_retire.py --name <精确名称> --confirm-retire`，
+  经固定版 CLI 以 `--keep-backlog` 退役单个 native 身份；仍有未确认投递时拒绝，不会把未读消息标成已处理。
+- **XATS Codex 接入不再崩溃。** `~/.codex/` 已存在而 `config.toml` 不存在时，`install-codex` 不再抛出
+  `FileExistsError`。
 - **共享检查点规则可达。** `spec-guard-ops` 重新链接 `references/workflow-checkpoints.md`；
   本地约定模板、`/phase` 与 `/verify-artifacts` 让 agent 加载的检查点规则不再指向空内容。
 - **Desktop 文档对齐实现。** `docs/claude-desktop.md` 移除已退役的同步预览说明，补充
@@ -13,6 +20,9 @@
 
 ### 变更
 
+- **native 工具面不能静默扩大。** `probe` 要求固定版的工具目录与“邮箱工具＋拒绝工具”完全一致；上游新增
+  任何未审查的工具都会让探测失败并报出名称。`collab` 在选择 native 但工具不可用时只报告并转交运维，
+  不改用残留的 XATS 工具。
 - **本地事项账本高风险工具门控。** `epiq_sync`（推送事项到 Git 远端）、`epiq_project_init`、
   `epiq_skill_install`、项目级删除／移除与贡献者邮箱工具共 10 个，在 `ticket` skill 与命令中改为逐次
   确认；`install-claude` 同时写入用户级 `permissions.ask`，`install-codex` 以 `enabled_tools` 白名单只暴露
@@ -25,6 +35,9 @@
 
 ### 测试
 
+- **协作运维回归。** 覆盖 Codex 表的逐字删除与拒绝（改动、追加键、重复、带引号子表、符号链接）、XATS 与
+  native 的安装→卸载往返、退役命令的未读拦截与结果核验；拒绝清单与邮箱工具清单改为逐字写死，不再用被测
+  常量验证自己。
 - **检查点规则可发现性回归。** 任何提到共享检查点规则的命令、skill 或模板都必须能到达它。
 - **Claude Desktop MCP 回归恢复。** `test-claude-desktop-mcp.sh` 按当前 5 个工具重建并进入
   `validate.sh`：核对每个工具分派到对应 hook、hook 失败以 `isError` 返回、已移除的
