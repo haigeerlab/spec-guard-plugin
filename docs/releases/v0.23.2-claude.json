@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.23.2" },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.23.2;test:marketplace-update-20260928"
+      },
+      "observedAt": "2026-09-28T07:54:46Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.23.1 to 0.23.2 for scope user and remained enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.23.2;test:isolated-module-stage-hook-20260928"
+      },
+      "observedAt": "2026-09-28T07:55:37Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events loaded spec-guard 0.23.2 in a temporary consumer repository",
+        "result:UserPromptSubmit injected NEEDS_PLAN with the per-module stage report"
+      ]
+    }
+  ]
+}
