@@ -36,7 +36,7 @@ done < <(find . -name "*.sh" -not -path "./.git/*")
 echo ""
 echo "═══ 可执行位 ═══"
 while IFS= read -r s; do
-  [ -x "$s" ] && say "✅" "$s" || { say "⚠️ " "$s 缺执行位（git update-index --chmod=+x ${s}）"; }
+  [ -x "$s" ] && say "✅" "$s" || { say "❌" "$s 缺执行位（git update-index --chmod=+x ${s}）"; F=1; }
 done < <(find . -name "*.sh" -not -path "./.git/*")
 
 echo ""
@@ -48,7 +48,7 @@ echo ""
 echo "═══ gh --json 字段是否真实存在 ═══"
 # shellcheck disable=SC2046
 python3 scripts/check-gh-json-fields.py \
-  $(find plugins scripts -type f \( -name "*.md" -o -name "*.sh" \)) || F=1
+  $(find plugins scripts -type f \( -name "*.md" -o -name "*.sh" \)) $(find plugins -type f -name "*.py") || F=1
 
 echo ""
 echo "═══ 管道 + grep -q（SIGPIPE 陷阱）═══"

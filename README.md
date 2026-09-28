@@ -128,11 +128,13 @@ as v2 before acceptance or promotion. See the
 ## Verification
 
 ```bash
-/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh
+/bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
-/bin/bash scripts/validate.sh
 ```
+
+These are the same three checks the pre-push hook runs; `validate.sh` already
+includes the manifest, checker, retirement, and Codex smoke self-test suites.
 
 The complete validation suite is offline.  Publishing, tagging, and any remote
 action require separate authorization.

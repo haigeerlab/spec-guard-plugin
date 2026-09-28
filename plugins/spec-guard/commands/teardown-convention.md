@@ -26,7 +26,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 | 实际跑一遍 `phase-guard.sh` 验证 | 而不是让人相信「无输出即为成功」这句话 |
 
 **不碰**：`spec/`、`tasks/` 里的内容（那是用户的规格和计划），
-以及 GitHub 上已创建的 issue。
+以及远端 Issue 与本地事项账本。
 
 ## 为什么要动 state.json
 
@@ -35,7 +35,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 而是**变成了零足迹模式** —— 0.7.5 之后 hook 还会每轮注入「先加载 skill」，
 比移除前更黏。
 
-改名而不是删除：issue 编号映射删了就找不回来，改回原名即可恢复。
+改名而不是删除：模块状态与 activeModule 删了就找不回来，改回原名即可恢复。
 
 `--keep-state` 保留原名，**hook 会继续激活**，只在确实想切到零足迹模式时用。
 

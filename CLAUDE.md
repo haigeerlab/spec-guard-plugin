@@ -16,9 +16,10 @@
 
 spec-guard 为 `addyosmani/agent-skills` 提供：
 
-1. 多模块 Spec 目录约定；
-2. GitHub / GitLab Issue 流程衔接；
-3. UserPromptSubmit 链路断裂检测。
+1. 本地多模块 Spec 约定：一张能力图、模块 Spec、Plan 与任务清单；
+2. Proposal 生命周期：只读地评审 GitHub / GitLab Proposal Issue，把新需求按锚点插入能力图；
+3. UserPromptSubmit 阶段注入：报告当前模块缺 Spec、缺 Plan、在构建中还是已完成；
+4. 可选的本机能力：agent 协作信箱与本地事项账本。
 
 改动前先阅读 [docs/design.md](docs/design.md)；已有故障模式和审查方法在
 [docs/lenses.md](docs/lenses.md)。
@@ -55,9 +56,9 @@ scripts/validate.sh                      ← 仓库完整性校验
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
-python3 scripts/check-manifests.py
-/bin/bash evals/codex-plugin-smoke.sh --selftest
 ```
+
+这三条与预推送 hook 一致；`validate.sh` 已包含清单一致性、检查器回归、退役扫描与 Codex smoke 判决器自检。
 
 按变更范围选择更多检查、真实宿主 smoke、变异测试和预推送 hook；完整规则见
 [docs/maintainer-workflow.md](docs/maintainer-workflow.md)。发版与安装副本同步见

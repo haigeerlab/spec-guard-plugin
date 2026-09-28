@@ -21,11 +21,12 @@ Spec Guard 已移除全部 `parallel-*` 命令以及 worker、worktree、lease�
 2. 删除脚本、runbook 和 CI 中对以下命令的调用：
    `parallel-readiness`、`parallel-safety-gate`、`parallel-guidance`、`parallel-status`、
    `parallel-execute`、`parallel-integrate`、`parallel-reclaim`、`parallel-register-worker`。
-   它们没有一对一替代品；日常推进使用 `roadmap`、`next`、`deliver`，并一次只推进一个模块。
+   它们没有一对一替代品；日常推进用 `/spec-guard:phase` 查看当前模块，再用 agent-skills 的
+   `/spec`、`/plan`、`/build` 一次只推进一个模块。
 3. 运行项目检查；若能力图仍使用上游的逗号格式，核对展开后的左到右顺序符合团队预期：
 
    ```bash
-   /spec-guard:roadmap
+   /spec-guard:phase
    /spec-guard:verify-artifacts
    /bin/bash scripts/validate.sh       # 插件维护者在源码仓库运行
    ```

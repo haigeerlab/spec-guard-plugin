@@ -19,7 +19,7 @@
 #                 只在你确实想切到那个模式时才用。
 #
 # 默认行为：把 state.json 改名为 state.json.disabled —— 既让 hook 真的停，
-# 又不丢 issue 编号映射（删了就找不回来）。
+# 又不丢模块状态与 activeModule（删了就找不回来）。
 # ─────────────────────────────────────────────────────────────
 set -uo pipefail
 
@@ -119,7 +119,7 @@ if [ -f "${STATE}" ]; then
     note "保留 ${STATE}—— ${OTHER_HOST} 声明块仍在，host 继续激活"
   else
     [ "${DRY}" = false ] && mv "${STATE}" "${STATE}.disabled"
-    act "${STATE} → ${STATE}.disabled（hook 就此停用，issue 编号映射保留）"
+    act "${STATE} → ${STATE}.disabled（hook 就此停用，模块状态保留）"
     DID=1
   fi
 else
@@ -159,8 +159,8 @@ cat <<'EOF'
 以下内容**保留**，确认不需要后自行删除：
   spec/                     你的能力图和模块规格
   tasks/                    你的计划文档
-  .agent/state.json.disabled  模块 ↔ issue 编号映射（改回原名即可恢复约定）
+  .agent/state.json.disabled  模块状态与 activeModule（改回原名即可恢复约定）
 
-GitHub 上已创建的 issue 不受影响。
+远端 Issue 与本地事项账本不受影响。
 插件本身仍然装着。要完全卸载：/plugin uninstall spec-guard
 EOF

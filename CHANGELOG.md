@@ -11,6 +11,18 @@
 
 ### 修复
 
+- **检查器覆盖真实调用面。** `check-gh-json-fields.py` 此前只认 `gh <sub> view --json` 命令行写法，而插件里唯一的
+  `--json` 调用是 `proposal_tracker_read.py` 中 `gh issue list` 的 Python 参数列表，从未被检查；现在同时检查
+  `view`／`list` 与跨行的参数列表写法，并扫描 `plugins/**/*.py`。`check-no-parallel-surface.py` 可传入夹具根目录，
+  补了一正两反用例。
+- **退役扫描不再假通过。** `test-retire-legacy-tracker-bridge.sh` 改用 `grep` 并区分“无命中”与“扫描出错”：此前缺少
+  `rg` 或路径不存在（例如已删除的 `mcp/`）都会被当成无命中。扫描范围加入 `skills/`。
+- **`spec-digest.py compute` 出错时退出 1。** 此前读不到或解析不了能力图时仍输出空摘要并返回 0。
+- **脚本执行位由校验强制。** 补上 7 个脚本缺失的执行位；`validate.sh` 缺执行位时由警告改为失败。
+- **文档与现状对齐。** `CLAUDE.md` 的插件目的改为当前的四项能力；严格串行迁移指南不再引用不存在的
+  `/spec-guard:roadmap`、`next`、`deliver`；teardown 的说明不再称 `state.json` 保存 issue 编号映射；
+  `history-migration.py` 说明 `import` 会写入；README、`CLAUDE.md` 与维护者流程的验证清单统一为预推送 hook 的三条。
+
 - **setup 与 teardown 不再留下半完成状态。** `setup-convention.sh` 在任何写入之前校验已有声明块，标记重复、缺失或
   顺序错误时拒绝且不建目录、不改文件（此前 `--replace` 只替换第一块，缺 END 时在建好目录后才抛出 traceback）；
   `--replace` 改用受管的 `managed-block.py replace`。setup 与 teardown 都按独占一行识别标记，正文里提到标记不再

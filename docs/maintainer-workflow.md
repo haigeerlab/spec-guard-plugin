@@ -12,10 +12,13 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 
 ## 验证矩阵
 
-每次改动先运行：
+每次改动先运行下面三条（与预推送 hook 一致；`validate.sh` 已包含清单一致性、检查器回归、
+退役扫描与 Codex smoke 判决器自检）：
 
 ```bash
 /bin/bash scripts/validate.sh
+/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
+/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
 ```
 
 下列改动还必须运行相应聚焦检查：
@@ -36,7 +39,6 @@ macOS 上必须用 `/bin/bash`，以覆盖系统自带 bash 3.2；不要让 Home
 
 ```bash
 /bin/bash evals/module-namespace.sh --scaffold-only
-/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh
 ```
 
 `module-namespace` 的非 scaffold 模式会调用真实宿主；运行时不要同时测试、编辑或提交，

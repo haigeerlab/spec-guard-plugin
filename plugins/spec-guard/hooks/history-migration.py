@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Produce a conservative, read-only preview of legacy spec-guard evidence."""
+"""Migrate legacy spec-guard evidence into the capability history ledger.
+
+`preview <project>` is read-only: it reports migration candidates and conflicts.
+`import --confirm <project>` writes: it snapshots the capability map under
+`spec/history/` and creates the ledger entry through `capability-history.py`,
+refusing on any conflict and rolling back its own files on failure.
+"""
 import json
 import os
 import sys

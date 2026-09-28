@@ -20,12 +20,18 @@ missing() {
 absent_from() {
   local needle="$1"
   shift
-  if rg -n --glob '!test-retire-legacy-tracker-bridge.sh' "$needle" "$@" >/dev/null 2>&1; then
-    printf '  ❌ active shipped surface still references %s\n' "$needle"
-    rg -n --glob '!test-retire-legacy-tracker-bridge.sh' "$needle" "$@"
+  local hits rc
+  # grep 退出码：0 命中、1 无命中、>1 出错（例如路径不存在）。出错不能当作“无命中”。
+  hits="$(grep -rnE --exclude=test-retire-legacy-tracker-bridge.sh "$needle" "$@" 2>&1)"
+  rc=$?
+  if [ "$rc" -eq 1 ]; then
+    printf '  ✅ active shipped surface has no %s reference\n' "$needle"
+  elif [ "$rc" -eq 0 ]; then
+    printf '  ❌ active shipped surface still references %s\n%s\n' "$needle" "$hits"
     FAIL=$((FAIL + 1))
   else
-    printf '  ✅ active shipped surface has no %s reference\n' "$needle"
+    printf '  ❌ cannot scan for %s (grep exit %s)\n%s\n' "$needle" "$rc" "$hits"
+    FAIL=$((FAIL + 1))
   fi
 }
 
@@ -45,7 +51,7 @@ for path in \
 done
 
 absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map-gitlab|gitlab-bridge\.sh|workspace_binding' \
-  "$PLUGIN/commands" "$PLUGIN/templates" "$PLUGIN/mcp" "$PLUGIN/hooks/hooks.json"
+  "$PLUGIN/commands" "$PLUGIN/skills" "$PLUGIN/templates" "$PLUGIN/hooks/hooks.json"
 
 absent_from 'spec-github-bridge`|spec-gitlab-bridge`|/sync-map' \
   "$ROOT/README.md" "$ROOT/AGENTS.md" "$ROOT/docs/design.md" "$ROOT/docs/maintainer-workflow.md"
