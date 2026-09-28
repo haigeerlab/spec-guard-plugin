@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.21.1" },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.21.1;test:marketplace-update-20260928"
+      },
+      "observedAt": "2026-09-28T05:38:49Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.21.0 to 0.21.1 for scope user and remained enabled",
+        "host:a new claude -p --no-session-persistence session reported spec-guard 0.21.1 loaded"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.21.1;test:isolated-module-stage-hook-20260928"
+      },
+      "observedAt": "2026-09-28T05:39:23Z",
+      "evidence": [
+        "scope:a temporary consumer Git repository was set up with the installed 0.21.1 setup-convention after a dry-run; the source repository was not modified",
+        "result:the written capability map template carried the 0.21.1 goal comment about the Proposal goal digest",
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events ran against the installed 0.21.1 plugin",
+        "result:after adding spec/example-a.md, UserPromptSubmit injected NEEDS_PLAN with the per-module stage report",
+        "result:the temporary consumer directory was removed after the check"
+      ]
+    }
+  ]
+}
