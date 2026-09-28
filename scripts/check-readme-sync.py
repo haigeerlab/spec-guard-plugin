@@ -67,4 +67,16 @@ for name in ("claude-block-local",):
         )
         print("     改了模板就要同步 README —— 内嵌是刻意的，分叉不是。")
 
+# README 的 Codex 安装命令写死了 `--ref v<版本>`：发版时漏改，新用户就会装到旧版。
+# 只在能找到插件清单时比对，让上面的夹具不必为此多造一份清单。
+MANIFEST = ROOT / "plugins/spec-guard/.claude-plugin/plugin.json"
+if MANIFEST.exists():
+    import json
+    version = json.loads(MANIFEST.read_text(encoding="utf-8")).get("version")
+    for ref in re.findall(r"--ref v(\S+)", text):
+        if ref == version:
+            print(f"  ✅ README 的安装命令指向当前版本 v{version}")
+        else:
+            bad(f"README 的安装命令写的是 --ref v{ref}，插件清单是 v{version}；发版时要同步改 README")
+
 sys.exit(FAIL)

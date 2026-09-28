@@ -4,7 +4,8 @@
 
 ## 发布前
 
-1. 确认 Claude 与 Codex manifest 的版本一致。
+1. 确认 Claude 与 Codex manifest 的版本一致，并把 README 里 Codex 安装命令的 `--ref` 改成新版本；
+   `check-readme-sync.py` 会拦下不一致。
 2. 按用户影响更新 `CHANGELOG.md`。
 3. 若存在破坏性行为变更，先提供迁移指南；严格串行变更见
    [migration-strict-serial.md](migration-strict-serial.md)。
