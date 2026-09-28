@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.22.0" },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:eaadc80f11c31002be6e2c7e43bc7e57c4cfa12f"
+      },
+      "observedAt": "2026-09-28T06:26:26Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:python3 scripts/check-manifests.py",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "result:all checks passed on the source candidate; the repository has no CI"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "not-verified",
+      "target": { "kind": "package", "id": "version:0.22.0" },
+      "reason": "No v0.22.0 package, tag, or published Release has been created"
+    }
+  ]
+}
