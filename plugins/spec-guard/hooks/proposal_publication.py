@@ -11,6 +11,7 @@ from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal
 
 
 MAX_POOL_SIZE = 100
+ATTESTATION_PATH_TEMPLATE = "spec/proposal-acceptances/%s-%s.json"
 
 
 class Publication(object):
@@ -125,7 +126,7 @@ def _attested_review_commit(repo, observed_commit, proposal, proposal_text, poli
     """Keep a v2 attestation's prior snapshot only while all reviewed facts match."""
     if getattr(proposal, "version", None) != "v2":
         return observed_commit
-    attestation_path = "spec/proposal-acceptances/%s-%s.json" % (
+    attestation_path = ATTESTATION_PATH_TEMPLATE % (
         proposal.proposal_id, proposal.revision)
     try:
         attestation = json.loads(_show(repo, observed_commit, attestation_path))
@@ -250,7 +251,7 @@ def read_published_pool(project, remote="origin"):
                                             proposal=proposal, baseline_map=baseline_map,
                                             review_map=publication_map))
             if proposal.version == "v2":
-                attestation_path = "spec/proposal-acceptances/%s-%s.json" % (
+                attestation_path = ATTESTATION_PATH_TEMPLATE % (
                     proposal.proposal_id, proposal.revision)
                 text = _show(repo, observed_commit, attestation_path)
                 if text is not None:

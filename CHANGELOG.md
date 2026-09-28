@@ -4,6 +4,12 @@
 
 ### 修复
 
+- **主链裁决为 accepted-candidate 时输出可直接复制的验收记录。** 此前接受一个 Proposal 要求手写一份精确
+  七字段的 `spec/proposal-acceptances/<id>-<revision>.json`，包括规范化 JSON 的 `policyDigest`，但没有任何
+  文档、命令或 skill 说明这些字段或摘要算法。现在 `proposal_mainline_review.py` 在结果为 `accepted-candidate`
+  时，附带 `attestation`（可直接复制写入的记录）与 `attestationPath`（应写入的相对路径）；命令本身仍不写
+  任何文件，`accepted()` 的校验逻辑不变。字段与路径说明见 `references/proposal-mainline-review.md`，
+  `docs/workflow.md` 第 6 步已引用。
 - **晋级证明区分"尚未晋级"与"晋级内容违反声明"。** `proposal_promotion_proof.py --prove` 此前在没有任何
   提交把新 module 纳入远端默认分支能力图时，也返回 `invalid`，与晋级内容确实违反声明（职责、依赖、位置或
   diff 越界）无法区分。现在这种情况返回新状态 `not-promoted`（诊断 `promotion-not-found`），命令文档说明
