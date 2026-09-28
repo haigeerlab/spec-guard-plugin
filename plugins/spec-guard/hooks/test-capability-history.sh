@@ -258,23 +258,17 @@ if [ "$CREATE_READY" = true ] && python3 "$HISTORY" validate "$LEDGER" >/dev/nul
 else
   bad "正：新建账本立即可读"
 fi
-PAUSE="$TMP/pause.json"
-write_history "$PAUSE" '{"type":"paused","at":"2026-09-03T09:00:00Z","checkpoint":{"id":"20260903T090000Z-0002","map":{"path":"spec/history/new/20260903T090000Z-0002/CAPABILITY-MAP.md","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"modules":[]}}'
-if [ "$CREATE_READY" = true ] && python3 "$HISTORY" append "$LEDGER" new "$PAUSE" >/dev/null 2>&1 \
-  && [ "$(python3 "$HISTORY" status "$LEDGER" new 2>/dev/null || true)" = "paused" ]; then
-  ok "正：追加合法事件并更新派生状态"
-  APPEND_READY=true
-else
-  bad "正：追加合法事件并更新派生状态"
-  APPEND_READY=false
-fi
+# 只为已退役的 initiative 轮换服务的动词已移除：账本只保存已归档的历史，不再追加生命周期事件。
 BEFORE="$(shasum -a 256 "$LEDGER" 2>/dev/null | awk '{print $1}')"
-if [ "$APPEND_READY" = true ] && ! python3 "$HISTORY" append "$LEDGER" new "$NEW_INIT" >/dev/null 2>&1 \
-  && [ "$BEFORE" = "$(shasum -a 256 "$LEDGER" | awk '{print $1}')" ]; then
-  ok "反：非法追加不改写原账本"
-else
-  bad "反：非法追加不改写原账本"
-fi
+for verb in ensure append checkpoint active verify-checkpoint; do
+  python3 "$HISTORY" "$verb" "$LEDGER" new "$NEW_INIT" >/dev/null 2>&1
+  rc=$?
+  if [ "$rc" -eq 2 ] && [ "$BEFORE" = "$(shasum -a 256 "$LEDGER" | awk '{print $1}')" ]; then
+    ok "反：已移除的 ${verb} 被拒绝且不改动账本"
+  else
+    bad "反：已移除的 ${verb} 被拒绝且不改动账本（rc=${rc}）"
+  fi
+done
 
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

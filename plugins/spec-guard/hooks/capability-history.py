@@ -242,34 +242,6 @@ def create(ledger_path, initiative_path):
     write_atomic(ledger_path, {"schemaVersion": 1, "initiatives": [initiative]})
 
 
-def ensure(ledger_path, initiative_path):
-    with open(initiative_path, encoding="utf-8") as handle:
-        initiative = json.load(handle)
-    check_initiative(initiative)
-    if not os.path.exists(ledger_path):
-        write_atomic(ledger_path, {"schemaVersion": 1, "initiatives": [initiative]})
-        return
-    data = load(ledger_path)
-    if any(item["id"] == initiative["id"] for item in data["initiatives"]):
-        return
-    data["initiatives"].append(initiative)
-    validate_data(data)
-    write_atomic(ledger_path, data)
-
-
-def append(ledger_path, initiative_id, event_path):
-    data = load(ledger_path)
-    with open(event_path, encoding="utf-8") as handle:
-        event = json.load(handle)
-    for initiative in data["initiatives"]:
-        if initiative["id"] == initiative_id:
-            initiative["events"].append(event)
-            validate_data(data)
-            write_atomic(ledger_path, data)
-            return
-    fail("initiative not found")
-
-
 def digest(path):
     with open(path, "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest()
@@ -308,33 +280,6 @@ def initiative_by_id(data, initiative_id):
         if initiative["id"] == initiative_id:
             return initiative
     fail("initiative not found")
-
-
-def paused_checkpoint(data, initiative_id):
-    initiative = initiative_by_id(data, initiative_id)
-    event = initiative["events"][-1]
-    if event["type"] != "paused":
-        fail("initiative is not paused")
-    return event["checkpoint"]
-
-
-def active_initiative(data):
-    active = [item["id"] for item in data["initiatives"] if item["events"][-1]["type"] in {"created", "resumed"}]
-    if len(active) != 1:
-        fail("expected exactly one active initiative")
-    return active[0]
-
-
-def verify_checkpoint(data, root_path, initiative_id):
-    root = os.path.realpath(root_path)
-    if not os.path.isdir(root):
-        fail("project root is not a directory")
-    checkpoint = paused_checkpoint(data, initiative_id)
-    verify_artifact(root, checkpoint["map"])
-    verify_artifact(root, checkpoint.get("state"))
-    for module in checkpoint["modules"]:
-        verify_artifact(root, module["spec"])
-        verify_artifact(root, module["plan"])
 
 
 def audit(data, root_path):
@@ -487,8 +432,8 @@ def append_correction(ledger_path, audit_path, correction_path):
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in {"validate", "status", "verify", "audit", "correct", "active", "checkpoint", "verify-checkpoint", "create", "ensure", "append"}:
-        print("usage: capability-history.py validate <file> | status <file> <initiative-id> | verify <file> <project-root> | audit <file> <project-root> | correct --confirm <ledger> <audit-report> <correction> | checkpoint <file> <initiative-id> | verify-checkpoint <file> <project-root> <initiative-id> | create <ledger> <initiative> | ensure <ledger> <initiative> | append <ledger> <initiative-id> <event>", file=sys.stderr)
+    if len(argv) < 2 or argv[0] not in {"validate", "status", "verify", "audit", "correct", "create"}:
+        print("usage: capability-history.py validate <file> | status <file> <initiative-id> | verify <file> <project-root> | audit <file> <project-root> | correct --confirm <ledger> <audit-report> <correction> | create <ledger> <initiative>", file=sys.stderr)
         return 2
     try:
         if argv[0] == "correct":
@@ -501,18 +446,6 @@ def main(argv):
             if len(argv) != 3:
                 return 2
             create(argv[1], argv[2])
-            print("ok")
-            return 0
-        if argv[0] == "ensure":
-            if len(argv) != 3:
-                return 2
-            ensure(argv[1], argv[2])
-            print("ok")
-            return 0
-        if argv[0] == "append":
-            if len(argv) != 4:
-                return 2
-            append(argv[1], argv[2], argv[3])
             print("ok")
             return 0
         data = load(argv[1])
@@ -532,23 +465,6 @@ def main(argv):
                 return 2
             json.dump(audit(data, argv[2]), sys.stdout, ensure_ascii=False, sort_keys=True)
             sys.stdout.write("\n")
-            return 0
-        if argv[0] == "checkpoint":
-            if len(argv) != 3:
-                return 2
-            json.dump(paused_checkpoint(data, argv[2]), sys.stdout, ensure_ascii=False)
-            sys.stdout.write("\n")
-            return 0
-        if argv[0] == "active":
-            if len(argv) != 2:
-                return 2
-            print(active_initiative(data))
-            return 0
-        if argv[0] == "verify-checkpoint":
-            if len(argv) != 4:
-                return 2
-            verify_checkpoint(data, argv[2], argv[3])
-            print("ok")
             return 0
         if len(argv) != 3:
             return 2

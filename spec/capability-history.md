@@ -16,7 +16,8 @@ complete 等）已退役，不在本模块范围。改为全插件一张能力�
 - **账本格式**：`schemaVersion` 1；事件类型 `created`、`paused`、`resumed`、`completed`、`abandoned`、
   `superseded`；模块状态 `not-started`、`in-progress`、`completed`、`abandoned`、`unknown`。checkpoint 的能力图、
   Spec、Plan 与 state 快照分别位于 `spec/history/<id>/<checkpoint>/`、`tasks/history/<id>/<checkpoint>/<module>/`、
-  `.agent/history/<id>/<checkpoint>/`。`capability-history.py` 是唯一的读写实现。
+  `.agent/history/<id>/<checkpoint>/`。`capability-history.py` 是唯一的读写实现。整个插件只用一张能力图，账本
+  只保存已归档的旧 initiative，不再追加生命周期事件；写入只有迁移导入用的 `create` 与更正用的 `correct`。
 - **核验**（`verify-history.sh`）：没有账本时报“未验证”并以 0 退出；有账本时核对每个文件的 sha256，并拒绝未登记的
   历史目录。
 - **审计**（`capability-history.py audit`）：独立于核验，报告无法由证据确立的字段，例如模块状态不是 `unknown`、事件
@@ -41,7 +42,7 @@ python3 plugins/spec-guard/hooks/history-migration.py preview <project>
 ## Project structure
 
 ```text
-plugins/spec-guard/hooks/capability-history.py  -> 账本校验、核验、审计、更正与写入原语
+plugins/spec-guard/hooks/capability-history.py  -> 账本校验、核验、审计、更正，以及供迁移导入的 create
 plugins/spec-guard/hooks/verify-history.sh      -> 只读核验入口
 plugins/spec-guard/hooks/history-migration.py   -> 旧证据迁移预览与导入
 plugins/spec-guard/commands/history-integrity.md, skills/spec-guard-ops/SKILL.md
@@ -51,9 +52,9 @@ plugins/spec-guard/commands/history-integrity.md, skills/spec-guard-ops/SKILL.md
 
 - `test-capability-history.sh` 覆盖账本校验与篡改检测；`test-history-verification.sh` 与 `test-history-migration.sh`
   任一断言失败即退出。
-- 已知缺口：`history-migration.py import --confirm` 与 `capability-history.py` 的写入动词（`create`、`ensure`、
-  `append`、`checkpoint` 等）存在于 CLI，但没有命令或 skill 入口；`artifact_history.py` 已不再被 verify-artifacts
-  调用（审计 F3-4、F7-2）。
+- `ensure`、`append`、`checkpoint`、`active`、`verify-checkpoint` 与 `artifact_history.py` 只服务于已退役的
+  initiative 轮换，已于 2026-09-28 移除；测试断言这些动词被拒绝且不改动账本。
+- 已知缺口：`history-migration.py import --confirm` 没有命令或 skill 入口。
 
 ## Boundaries
 
