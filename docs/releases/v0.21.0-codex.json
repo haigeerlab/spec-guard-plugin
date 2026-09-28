@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.21.0" },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.21.0;test:marketplace-ref-upgrade-20260928"
+      },
+      "observedAt": "2026-09-28T05:18:40Z",
+      "evidence": [
+        "change:the user Codex config pinned marketplaces.spec-guard-marketplace ref to v0.20.1; only that ref was changed to v0.21.0",
+        "command:codex plugin marketplace upgrade spec-guard-marketplace",
+        "command:codex plugin list --json",
+        "result:spec-guard@spec-guard-marketplace version 0.21.0 is installed and enabled from the marketplace checkout at tag v0.21.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.21.0;test:user-prompt-submit-smoke-20260928"
+      },
+      "reason": "hooks.json changed in 0.21.0, so the previously trusted hook hash no longer matches; codex-plugin-smoke.sh exited 2 (hook not trusted) until the user reviews the hook in /hooks"
+    }
+  ]
+}
