@@ -7,7 +7,7 @@
 - [x] Checkpoint A：三条最小验证 + Proposal 聚焦套件，向用户汇报
 - [x] Task 5：历史孤立目录覆盖三棵树——`verify-history.sh`
 - [x] Task 6：归档不留下 `-shm` 临时文件——两种 SQLite 下都通过
-- [ ] Task 7：Codex 补 teardown 与 history correct 路由——spec-guard-ops、workflow 对照
+- [x] Task 7：Codex 补 teardown 与 history correct 路由——spec-guard-ops、workflow 对照
 - [ ] Task 8：命令与 skill 入口对应检查，扩大退役扫描——两个检查器一正一反
 - [ ] Checkpoint B：三条最小验证 + `/usr/bin/python3` 套件，向用户汇报
 - [ ] Task 9：用户与规约文档一致——documentation-verification、phase.md、quick-insert 决策、collaboration spec
