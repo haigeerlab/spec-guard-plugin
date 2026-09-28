@@ -30,6 +30,14 @@
   缺 tracker Issue、缺 Proposal、验收记录无效等不同原因因此显示为同一个诊断。现在两者保留下层已给出的具体
   诊断（例如 `publication-absent`、`tracker-absent`、`acceptance-attestation-invalid`、`proposal-pool-<state>`），
   只有诊断缺失或不是稳定码形态时才退回原来的折叠字符串；`state` 取值不变。
+- **归档不再在归档目录里留下 SQLite 临时文件。** `native_collaboration_archive.py` 备份到暂存文件后只用
+  `with sqlite3.connect(...) as x:` 管理事务，从不关闭连接；较新的 SQLite（如 macOS 自带 Python 3.9 的
+  3.43.2）在暂存文件仍是 WAL 来源、切到 DELETE 日志模式后，`-shm` 附属文件不会随之消失，`finally` 又只删了
+  暂存文件本身，归档目录因此残留 `.messages-*.sqlite-shm`，成功与失败路径皆有此问题。现在源库与暂存库连接
+  都显式 `close()`，`finally` 同时清理暂存文件的 `-wal`/`-shm`/`-journal` 附属文件（只针对暂存文件，不碰
+  原始信箱）；切换日志模式后也会检查返回值，不是 `delete` 就拒绝归档，避免日志模式切换失败时摘要与清单
+  基于不完整的文件计算。备份内容、完整性校验、清单比对与 `os.link` 不覆盖语义不变。这是实验性原生切换
+  归档步骤的修复，仅影响该未启用路径。
 - **macOS 自带的 Python 3.9 下阶段提示不再显示 `UNKNOWN`。** 15 个 hook 模块在类型注解里用了 3.10 才支持的
   `X | None`，在 `/usr/bin/python3`（3.9）下一导入就失败：阶段提示每轮都是 `UNKNOWN`，`/spec-guard:add-module`、
   协作信箱与本地事项账本的脚本也无法运行。现在这些模块都延迟求值注解；新增回归会静态检查注解写法，并在本机

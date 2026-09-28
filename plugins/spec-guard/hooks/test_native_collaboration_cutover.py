@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from native_collaboration_cutover import inspect_legacy_mailbox, inspect_native_mailbox
 from native_collaboration_archive import ArchiveError, archive_legacy_mailbox
@@ -212,6 +213,51 @@ class LegacyMailboxArchiveTests(unittest.TestCase):
             self.assertEqual(connection.execute(
                 "SELECT last_processed_event_id FROM agents WHERE agent_id='a'").fetchone()[0], 0)
         self.assertEqual(inspect_legacy_mailbox(self.database), expected)
+
+    def test_archive_failure_leaves_no_staging_file_or_sidecar(self):
+        archive_dir = Path(self.tmp.name) / "archive"
+        archive_dir.mkdir(mode=0o700)
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute("INSERT INTO messages VALUES (?, ?, ?, ?, ?, ?)",
+                               ("wal", 10, "spec-guard-local", "a", None, "uncheckpointed mail"))
+            connection.commit()
+        before = {"state": "clear", "registeredIdentities": 0,
+                  "unreadDeliveries": 0, "activeSessions": "none-registered"}
+        changed = {**before, "unreadDeliveries": 1}
+        with patch("native_collaboration_archive.inspect_legacy_mailbox",
+                   side_effect=[before, changed]):
+            with self.assertRaises(ArchiveError):
+                archive_legacy_mailbox(self.database, archive_dir)
+        self.assertEqual(list(archive_dir.iterdir()), [])
+
+    def test_archive_rejects_journal_mode_switch_that_did_not_take(self):
+        archive_dir = Path(self.tmp.name) / "archive"
+        archive_dir.mkdir(mode=0o700)
+        real_connect = sqlite3.connect
+
+        class _StubbedJournalModeConnection(sqlite3.Connection):
+            """A real sqlite3.Connection (so source.backup() still accepts it)
+            that reports staying in wal when asked to switch to delete."""
+
+            def execute(self, sql, *args, **kwargs):
+                cursor = super().execute(sql, *args, **kwargs)
+                if sql.strip().upper().startswith("PRAGMA JOURNAL_MODE=DELETE"):
+                    class _FakeCursor:
+                        def fetchone(self_inner):
+                            return ("wal",)
+                    return _FakeCursor()
+                return cursor
+
+        def fake_connect(target, *args, **kwargs):
+            if not kwargs.get("uri") and Path(str(target)).name.startswith(".messages-"):
+                return real_connect(target, *args, factory=_StubbedJournalModeConnection, **kwargs)
+            return real_connect(target, *args, **kwargs)
+
+        with patch("native_collaboration_archive.sqlite3.connect", side_effect=fake_connect):
+            with self.assertRaises(ArchiveError):
+                archive_legacy_mailbox(self.database, archive_dir)
+        self.assertEqual(list(archive_dir.iterdir()), [])
 
     def test_archive_refuses_to_overwrite_or_use_unsafe_paths(self):
         archive_dir = Path(self.tmp.name) / "archive"
