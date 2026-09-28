@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-28
+
 ### 破坏性变更
 
 - **删除旧 tracker 迁移提示。** `tracker` 为 `github`、`gitlab` 的 `.agent/state.json` 不再触发
