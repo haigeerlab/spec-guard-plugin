@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.23.1" },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.23.1;test:marketplace-ref-upgrade-20260928"
+      },
+      "observedAt": "2026-09-28T07:37:39Z",
+      "evidence": [
+        "change:only marketplaces.spec-guard-marketplace ref in the user Codex config was changed from v0.23.0 to v0.23.1",
+        "command:codex plugin marketplace upgrade spec-guard-marketplace",
+        "result:spec-guard@spec-guard-marketplace version 0.23.1 is installed and enabled from the marketplace checkout at tag v0.23.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook-subdirectory",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.23.1;test:subdirectory-hook-20260928"
+      },
+      "observedAt": "2026-09-28T07:38:03Z",
+      "evidence": [
+        "scope:a temporary Git repository with the Codex convention block at its root; codex exec was started in sub/deep",
+        "before:with 0.23.0 installed, the same layout started in sub/ replied HOOK_NOT_RUN while the repository root injected IDLE",
+        "result:with 0.23.1 installed, the session started in sub/deep received the injected stage (IDLE)",
+        "result:the temporary project trust entries were removed afterwards"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.23.1;test:user-prompt-submit-smoke-20260928"
+      },
+      "observedAt": "2026-09-28T07:38:13Z",
+      "evidence": [
+        "scope:hooks.json is unchanged since 0.21.1, so the existing hook trust still applied",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and left no temporary project trust entry in the Codex config",
+        "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
+      ]
+    }
+  ]
+}
