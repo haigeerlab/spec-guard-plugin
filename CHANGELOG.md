@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-09-28
+
 ### 修复
 
 - **GitLab 上能找到 Proposal Issue 了。** 读取器此前用 marker 调 `search=`，而 GitLab 的搜索匹配不到 HTML 注释里的
