@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-09-28
+
 ### 修复
 
 - **Codex 从仓库子目录启动时，阶段注入不再消失。** Codex 不提供 `CLAUDE_PROJECT_DIR`，并在会话目录里运行 hook；
