@@ -101,7 +101,8 @@
   `collaboration-messaging`，目标改写为产品级，并在末尾登记 `local-ticket-ledger`（既有能力的一次性人工登记，
   未经 Proposal 流程）。新需求经 Proposal 按锚点插入模块，不再为每个需求另建一张图。同日较早的“按 initiative
   分图”方案（归档为 `proposal-lifecycle`、另建 `local-collaboration`）已撤回，历史账本恢复原状。README 与设计文档
-  写明可选的协作邮箱与本地事项账本，二者都不替代、不同步 GitHub/GitLab Issue。决策见
+  写明可选的协作邮箱与本地事项账本，二者都不替代、不同步 GitHub/GitLab Issue。随后补登 6 个更早交付的模块：
+  本地约定、阶段注入与产物校验、能力历史、文档基线／影响／核验，各有当前模块 Spec 与登记型 Plan。决策见
   `docs/decisions/2026-09-28-single-capability-map.md`。
 
 ## [0.20.1] - 2026-09-27
