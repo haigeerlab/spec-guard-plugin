@@ -53,6 +53,8 @@ done
 absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map-gitlab|gitlab-bridge\.sh|workspace_binding' \
   "$PLUGIN/commands" "$PLUGIN/skills" "$PLUGIN/templates" "$PLUGIN/hooks/hooks.json"
 
+absent_from 'Epic issue|远端 tracker|feat/<id>' "$PLUGIN/templates"
+
 absent_from 'spec-github-bridge`|spec-gitlab-bridge`|/sync-map' \
   "$ROOT/README.md" "$ROOT/AGENTS.md" "$ROOT/docs/design.md" "$ROOT/docs/maintainer-workflow.md"
 

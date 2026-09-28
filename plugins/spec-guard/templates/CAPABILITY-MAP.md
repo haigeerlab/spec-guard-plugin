@@ -7,8 +7,8 @@
 
 [1-3 句话：这个 initiative 要解决什么问题、给谁用。]
 
-<!-- 这一段是 Epic issue 正文摘要的**唯一来源**，也是它的指纹底本。
-     改了这里后先人工评审；本插件不会同步到远端 tracker。
+<!-- 这一段是 Proposal 评审的目标指纹底本（`spec-digest.py` 计算）。
+     改写目标会让已发布的 Proposal 被判为过期，所以改了先人工评审；追加模块不需要改这里。
      标题必须是 `## 目标`（或 `## Goal`）—— 指纹脚本按标题定位这一节。 -->
 
 ## 模块
@@ -29,8 +29,8 @@ Build order: example-a → example-b
 - [ ] 模块边界确认（砍掉或替换一个模块，不需要重写其他模块的需求）
 - [ ] 依赖方向单向无环（互相依赖 = 它们本来就是一个模块）
 - [ ] module id 已定稿（kebab-case，之后绝不改名 —— 同一个 id 同时是
-      `spec/<id>.md`、`tasks/<id>/`、`state.json`、`feat/<id>` 分支和 issue 标题的名字，
-      其中后两处改不动）
+      `spec/<id>.md`、`tasks/<id>/`、`.agent/state.json` 的 `activeModule` 和 Proposal 中的模块名，
+      已发布的 Proposal 改不动）
 - [ ] 构建顺序符合依赖拓扑
 
 评审人：
