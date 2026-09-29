@@ -399,19 +399,17 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertEqual(result["new_current"], "gamma")
         self.assertIn("activeModule 改为 `delta`", module_insert.format_report(result))
 
-    def test_interrupt_refused_when_another_module_already_paused(self):
+    def test_interrupt_allowed_while_another_module_is_also_half_done(self):
+        # pwa-platform shape: the current module waits on external facts while a later
+        # module is being built in parallel; neither blocks an explicit interrupt.
         self.make_half("alpha")
         self.make_half("beta")
         self.write(".agent/state.json", '{"activeModule": "beta"}\n')
-        before = self.snapshot()
-        digest = module_insert.compute(str(self.map_path))
-        with self.assertRaises(InsertError) as ctx:
-            preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
-        self.assertIn("已有暂停中的模块 `alpha`，只支持一层插队", str(ctx.exception))
-        with self.assertRaises(InsertError):
-            module_insert.write(self.root, "delta", "Fourth", "—", "end", interrupt=True)
-        self.assertEqual(before, self.snapshot())
-        self.assertEqual(digest, module_insert.compute(str(self.map_path)))
+        result = preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertEqual(result["interrupted"]["id"], "beta")
+        self.assertNotIn("只支持一层插队", module_insert.format_report(result))
+        module_insert.write(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertIn("delta", module_insert.parse_map(self.map_path).order)
 
     def test_interrupt_does_not_bypass_other_validations(self):
         self.make_done("alpha", "beta")

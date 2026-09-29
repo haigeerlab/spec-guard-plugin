@@ -87,7 +87,7 @@ Codex 里用 `spec-guard-ops` 的 `add-module`，带同样的 `--interrupt` 参�
   命令本身仍只写 `spec/CAPABILITY-MAP.md`；
 - 插入后，每轮阶段行都带 `Paused: …`，提醒被暂停的模块还没做完；
 - 插队模块做完后，`MODULE_DONE` 会提示回到被暂停的模块，把 `activeModule` 改回它即可；
-- 只支持一层：已有被暂停的模块时再插队会被拒绝；
+- 其他模块同时做到一半（并行推进）不影响插队；它们都会出现在 `Paused` 行里，插队模块做完后按 Build order 回到第一个被暂停的模块；
 - 不带 `--interrupt` 时行为不变，当前模块做到一半仍然拒绝；当前模块没有做到一半时，`--interrupt` 不改变任何行为。
 
 Proposal 路径同样适用：主链评审接受 `--boundary module-interrupt`（行为与 `module-advance` 相同，不进入验收记录）。

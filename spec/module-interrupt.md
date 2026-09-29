@@ -23,7 +23,7 @@
 新模块完成后阶段提示会指回做到一半的模块。底层能跑通，但要靠伪装当前模块，没有写进文档，而且插队期间阶段提示
 完全不提被搁下的模块。
 
-本模块把"插队"做成显式、可预览、只有一层的正式流程。
+本模块把"插队"做成显式、可预览的正式流程。
 
 登记：2026-09-29 按用户决定经 `/spec-guard:add-module` 快速插入能力图。
 
@@ -31,7 +31,14 @@
 
 用户已于 2026-09-29 确认：
 
-1. 只支持一层插队：已经有一个被暂停的模块时，不能再插队。
+1. ~~只支持一层插队~~（2026-09-29 检查点时撤回，见下）。
+
+   **修订（2026-09-29，用户决定）：取消一层限制。** 检查点按 pwa-platform 的真实能力图、Spec 与 todo（只读导出到临时目录）
+   端到端验收时，插队被误拒：pwa 同时有两个做到一半的模块——当前模块 `cloudflare-test-deployment`（Build order 第 28 组，
+   等外部条件）与 `stable-release-qualification`（第 34 组，当天仍在推进）。插件不记录"哪个模块是被插队暂停的"（前提 3：
+   不写 `state.json`），只看 todo 无法区分"被插队暂停"与"本来就在并行推进"，层数无法可靠判定。因此 `--interrupt`
+   只放宽"当前模块做到一半"这一条；`Paused` 行列出所有做到一半的非当前模块；插队模块完成后按 Build order 回到第一个
+   被暂停的模块。
 2. 插队必须由用户显式选择（`--interrupt`）；不带它时现有检查不变。
 3. add-module 仍然只写 `spec/CAPABILITY-MAP.md`，不写 `.agent/state.json`；需要改 `activeModule` 时在预览里告诉用户。
 4. 先做插队；"等待外部条件"的 todo 标记以后按需要再加，不在本模块内。
@@ -52,7 +59,6 @@
 - 不带 `--interrupt`：行为不变；当前模块做到一半时仍拒绝，拒绝信息补一句可以用 `--interrupt` 显式插队。
 - 带 `--interrupt`：
   - 当前模块做到一半时放行；其余所有校验（依赖、锚点、id、已有行不变、Spec 不存在）照旧；
-  - 若另有模块已被暂停（当前模块之外还有做到一半的模块），拒绝："已有暂停中的模块 `<id>`，只支持一层插队"；
   - 预览写明被暂停的模块及进度（已勾/总数），以及插入后的当前模块；若插入后新模块不会成为当前模块（锚点在
     被暂停模块之后，或 `activeModule` 仍指向被暂停模块），提示用户把 `activeModule` 改为新模块；
   - `--confirm` 重新执行全部校验，仍然只写能力图。
@@ -109,7 +115,7 @@ plugins/spec-guard/commands/*.md, skills/spec-guard-ops/SKILL.md,
 - `test_module_insert.py`：
   - 不带 `--interrupt` 仍拒绝，且拒绝信息提到 `--interrupt`；
   - 带 `--interrupt` 时放行，预览含被暂停模块与进度；锚点在被暂停模块之后或 `activeModule` 指向它时，预览提示改 `activeModule`；
-  - 已有被暂停模块时再插队被拒绝，且不写任何文件；
+  - 已有别的做到一半的模块（并行推进）时，`--interrupt` 仍然放行，预览照常；
   - 其余校验在 `--interrupt` 下照旧拒绝；
   - 端到端：插队 → 新模块成为当前模块并显示 `Paused` → 新模块完成 → 阶段指回被暂停的模块。
 - 主链评审测试：`module-interrupt` 被接受，与 `module-advance` 得到相同结论；未知取值仍为 `mainline-boundary-invalid`。
@@ -118,14 +124,14 @@ plugins/spec-guard/commands/*.md, skills/spec-guard-ops/SKILL.md,
 ## Boundaries
 
 - Always：先红后绿；插队只能显式选择；复用"做到一半"的同一判据，不复制；hook 只读、输出合法 JSON。
-- Ask first：支持多层插队；自动修改 `.agent/state.json`；新增"等待外部条件"的 todo 标记；改变单个模块的完成判据。
+- Ask first：自动修改 `.agent/state.json`；新增"等待外部条件"的 todo 标记；改变单个模块的完成判据。
 - Never：不带 `--interrupt` 时放宽现有检查；add-module 写能力图以外的文件；让 boundary 进入验收记录或 policy 摘要。
 
 ## Success criteria
 
 - 在 pwa-platform 这种"当前模块做到一半且要等外部条件"的项目里，用户能用一次预览、一次确认把新模块插到前面，
   随后阶段提示指向新模块并一直显示被暂停的模块；新模块完成后阶段提示指回被暂停的模块。
-- 不带 `--interrupt` 时所有现有行为不变；已有被暂停模块时不能再插队。
+- 不带 `--interrupt` 时所有现有行为不变；另有模块在并行推进时仍能插队（pwa-platform 的真实能力图上复现通过）。
 - Proposal 主链评审可以在插队边界进行，已有验收记录不受影响。
 - 文档说明插队流程，不再把"只在检查点插入"写成无例外的规则。
 - 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过。

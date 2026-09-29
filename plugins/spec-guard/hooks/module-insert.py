@@ -54,8 +54,8 @@ def _current_module(project, order):
     by_id = {state["id"]: state for state in states}
     active = active_module(project)
     if active and active in by_id:
-        return by_id[active], active, states
-    return next((state for state in states if state["stage"] != "DONE"), None), active, states
+        return by_id[active], active
+    return next((state for state in states if state["stage"] != "DONE"), None), active
 
 
 def _module_table_rows(lines):
@@ -133,15 +133,12 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
         raise InsertError("能力图无效: %s" % error)
 
     order = list(parsed.order)
-    current, active, states = _current_module(project, order)
+    current, active = _current_module(project, order)
     interrupted = None
     if current is not None and current["half"]:
         if not interrupt:
             raise InsertError("当前模块 `%s` 做到一半（既有已勾选项又有未勾选项）；请先完成它"
                               "；如确需先做新模块，可加 --interrupt 显式插队。" % current["id"])
-        paused = paused_modules(states, current)
-        if paused:
-            raise InsertError("已有暂停中的模块 `%s`，只支持一层插队。" % paused[0]["id"])
         todo = project / "tasks" / current["id"] / "todo.md"
         checked = len(CHECKED.findall(todo.read_text(encoding="utf-8")))
         interrupted = {"id": current["id"], "checked": checked, "total": checked + current["open"]}
@@ -245,7 +242,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
     if [module_id_ for module_id_ in new_parsed.order if module_id_ in existing_ids] != order:
         raise InsertError("插入改变了已有模块在 Build order 中的相对顺序")
 
-    new_current, _, _ = _current_module(project, list(new_parsed.order))
+    new_current, _ = _current_module(project, list(new_parsed.order))
 
     proposal_path = project / "spec" / "proposals" / ("%s.md" % module_id)
 
@@ -355,7 +352,7 @@ def main(argv=None):
     parser.add_argument("--depends-on", required=True, dest="depends_on")
     parser.add_argument("--anchor", required=True)
     parser.add_argument("--interrupt", action="store_true",
-                        help="允许在当前模块做到一半时显式插队（只支持一层）")
+                        help="允许在当前模块做到一半时显式插队")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
 
