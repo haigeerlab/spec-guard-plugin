@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **显式一层插队：`/spec-guard:add-module --interrupt`。** 当前模块做到一半又在等外部条件时，可以把新模块插到它前面；预览写明被暂停的模块及进度，并在新模块不会成为当前模块时提示改 `activeModule`。已有被暂停的模块时拒绝再次插队。
+- **阶段行新增 `Paused` 行与回到被暂停模块的提示。** 存在被暂停的模块时，`NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 都会列出它；插队模块完成后 `MODULE_DONE` 指回它。
+- **Proposal 主链评审接受 `--boundary module-interrupt`。** 与 `module-advance` 同样检查，boundary 不进入验收记录；已有验收记录不受影响。不带 `--interrupt` 时行为与此前完全相同。
+
 ## [0.28.0] - 2026-09-29
 
 ### 变更
