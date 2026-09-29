@@ -101,7 +101,7 @@ responsibility、depends-on 或 anchor 中任何一项，都要先重新预览�
 
 写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
 Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
-并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 九步流程，而不是本命令。
+并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 八步流程，而不是本命令。
 
 ## documentation
 
@@ -124,17 +124,13 @@ Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 G
 # 任何分支：单个 Proposal 的新鲜度与阶段
 python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
-# 仅主链模块交付／推进边界：候选列表；加 --proposal-id 与 --decision 记录人工裁决
-python3 -B "$ROOT/hooks/proposal_mainline_review.py" --project "$PROJECT" \
-  --platform <github|gitlab> --target <target> --authority-id <id> \
-  --boundary <module-deliver|module-advance|module-interrupt> --current-module-id <module-id>
-# 人工写入 accepted 后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
+# Issue 阶段标签 proposal-stage:accepted 加新鲜评审后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
 ```
 
-原样报告 JSON；除 `candidate-list`、`accepted-candidate`、`ready`、`proved` 外的状态都要停下并说明
-`diagnostic`。`accepted-candidate` 不是 Issue 阶段，`ready` 不创建分支，`proved` 不回写 Issue。
+原样报告 JSON；除 `ready`、`proved` 外的状态都要停下并说明
+`diagnostic`。`ready` 不创建分支，`proved` 不回写 Issue。
 
 ## history
 

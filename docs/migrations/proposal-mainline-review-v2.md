@@ -1,3 +1,5 @@
+> Superseded: the mainline review layer was retired; see [the retirement note](../retirements/proposal-mainline-review.md).
+
 # Proposal v2 mainline-review migration
 
 Existing published v1 Proposals remain readable from the remote default branch and

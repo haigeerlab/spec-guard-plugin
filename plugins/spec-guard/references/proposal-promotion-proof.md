@@ -1,27 +1,32 @@
 # Proposal promotion proof
 
 `prove(project, publication, review_result, remote="origin")` proves a Proposal
-module's first matching inclusion in the remote default branch. It accepts only a
-fresh v2 `published` Publication and an `accepted` mainline result with matching
-Proposal revision, review-commit and authority identities. A tracker accepted label
-alone is not sufficient.
+module's first matching inclusion in the remote default branch. It accepts a fresh
+v2 `published` Publication whose Issue stage is `proposal-stage:accepted` or
+`proposal-stage:promoted` (so the proof can be rerun after the promoted label is
+applied). Acceptance is that Issue label plus a fresh review; no mainline policy or
+acceptance attestation is read.
 
 The function observes a newly fixed, temporary bare Git snapshot. It walks the
-remote default branch's first-parent history from the review commit toward the
-snapshot tip and returns `proved` only when the first map containing the proposed
-module has a first parent without that module and exactly matches the Proposal's
-responsibility, dependencies and build-order anchor. A normal merge therefore proves
-the merge commit, never an already-merged feature-branch commit. The promotion diff
-must contain only the capability map, module Spec and module Plan, and both artifacts
-must be present; it may additionally include the module's `tasks/<id>/todo.md`, which
-is optional and never required. When no commit yet contains the module, `prove`
-returns `not-promoted`: merge the promotion branch into the remote default branch,
-then rerun.
+remote default branch's first-parent history from the Proposal's baseline commit
+toward the snapshot tip and finds the first commit C whose capability map contains
+the proposed module; P is C's first parent. The result is `invalid` when P already
+contains the module, when C's row, dependencies or build-order position differ from
+the Proposal, or when any other module row (or the order of the other modules)
+changed between P and C. Freshness (baseline not drifted, module not yet present,
+dependencies present, anchor valid) is judged on P's map, not the current one, and a
+non-fresh P returns `stale` with the review diagnostic. Otherwise the result is
+`proved` with `reviewCommit` = P and `promotionCommit` = C. A normal merge therefore
+proves the merge commit, never an already-merged feature-branch commit. The
+promotion commit may touch any other paths (a PR merge commit carries the whole PR);
+it is not required to carry the module Spec or Plan. When no commit yet contains the
+module, `prove` returns `not-promoted`: merge the promotion branch into the remote
+default branch, then rerun.
 
 `proposal_promotion_proof.py --prove` (and `/spec-guard:proposal-promotion-proof`)
-first re-establishes acceptance from the same fresh snapshot, the current Issue stage
-and the revision-addressed attestation, then runs `prove`. A missing Proposal returns
-`absent`; an unreadable or invalid pool returns `unknown` or `invalid`.
+first re-establishes the pool and Issue stage from the same fresh snapshot, then runs
+`prove`. A missing Proposal returns `absent`; an unreadable or invalid pool returns
+`unknown` or `invalid`.
 
 A promoted Proposal excluded from the pool (see
 [proposal-publication.md](proposal-publication.md#pool-reading-and-isolated-proposals))
@@ -32,10 +37,12 @@ Proposal was excluded; otherwise the output is unchanged. `diagnostic` is one of
 `proposal-baseline-remote-mismatch`, `proposal-baseline-unavailable` or
 `proposal-invalid`; raw errors are never emitted.
 
-The preflight function rereads the remote Proposal pool, policy and
-revision-addressed attestation before it returns a ready base commit. It is a
-read-only prerequisite for a human-created promotion branch; it does not create
-that branch or update any tracker stage.
+The preflight function rereads the remote Proposal pool and the Issue stage, runs a
+fresh review against the observed remote-default commit, and returns a ready base
+commit only when the stage is `proposal-stage:accepted` and the review is fresh. If
+the baseline has drifted it returns `stale` with the review diagnostic (for example
+`proposal-baseline-drifted`). It is a read-only prerequisite for a human-created
+promotion branch; it does not create that branch or update any tracker stage.
 
 It never reads a consumer worktree capability map as a shared fact and never creates
 or updates a commit, branch, PR, Issue, label, task, Proposal, capability map or
@@ -44,25 +51,21 @@ or updates a commit, branch, PR, Issue, label, task, Proposal, capability map or
 `as_json(proof_result)` and `preflight_as_json(preflight_result)` expose only state,
 stable proof identifiers and a stable diagnostic code. They omit remote URLs,
 capability-map text, Proposal/Issue bodies, temporary paths and raw transport
-errors. `unknown`, `invalid`, `not-accepted`, and `not-promoted` are not promotion
+errors. `unknown`, `invalid`, `stale`, `not-accepted`, and `not-promoted` are not promotion
 proof.
 
 Both functions pass through the lower layer's own diagnostic when it is a stable
-code (matching `proposal_mainline_review.DIAGNOSTIC_CODE`), the same rule
-`proposal_mainline_review.as_json` uses. Only a missing or non-code diagnostic
+code. Only a missing or non-code diagnostic
 falls back to a generic `promotion-preflight-<state>` / `promotion-<state>`
-string, so a missing tracker Issue, a missing Proposal and an invalid acceptance
-attestation are distinguishable even though their `state` can coincide:
+string, so a missing tracker Issue, a missing Proposal and a stale review are distinguishable even though their `state` can coincide:
 
 | Cause | Diagnostic |
 | --- | --- |
 | The remote Proposal pool snapshot could not be read or does not parse | `proposal-pool-unknown` / `proposal-pool-invalid` |
 | The Proposal is not in the published pool | `publication-absent` |
-| The publication's attested review map no longer matches the pool's | `proposal-stale` |
+| The review finds the Proposal stale (baseline drifted, and so on) | the review's diagnostic, such as `proposal-baseline-drifted`; fallback `promotion-stale` |
 | No tracker Issue carries the Proposal's marker | `tracker-absent` |
 | The tracker Issue or its labels fail the tracker contract | `tracker-invalid` |
-| The acceptance record is missing, malformed or does not match the policy digest, revision or decision | `acceptance-attestation-invalid` |
-| The mainline policy stored in the snapshot is missing or invalid | `mainline-policy-invalid` |
 
 A diagnostic that names neither a layer nor a specific cause (Git plumbing
 failures inside `prove`, for example) keeps the generic `promotion-<state>` /

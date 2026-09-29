@@ -11,7 +11,6 @@ from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal
 
 
 MAX_POOL_SIZE = 100
-ATTESTATION_PATH_TEMPLATE = "spec/proposal-acceptances/%s-%s.json"
 BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
 BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
 _SKIPPED_CODES = {
@@ -39,13 +38,11 @@ class Publication(object):
 
 class PublicationPool(object):
     def __init__(self, state, review_commit=None, publications=(), review_map=None,
-                 policy_text=None, attestation_texts=None, diagnostic=None, skipped=()):
+                 diagnostic=None, skipped=()):
         self.state = state
         self.review_commit = review_commit
         self.publications = tuple(publications)
         self.review_map = review_map
-        self.policy_text = policy_text
-        self.attestation_texts = dict(attestation_texts or {})
         self.diagnostic = diagnostic
         self.skipped = tuple(skipped)
 
@@ -135,30 +132,6 @@ def _show(repo, commit, path):
     return result.stdout if result else None
 
 
-def _attested_review_commit(repo, observed_commit, proposal, proposal_text, policy_text):
-    """Keep a v2 attestation's prior snapshot only while all reviewed facts match."""
-    if getattr(proposal, "version", None) != "v2":
-        return observed_commit
-    attestation_path = ATTESTATION_PATH_TEMPLATE % (
-        proposal.proposal_id, proposal.revision)
-    try:
-        attestation = json.loads(_show(repo, observed_commit, attestation_path))
-    except (TypeError, ValueError):
-        return observed_commit
-    review_commit = attestation.get("reviewCommit") if isinstance(attestation, dict) else None
-    if not isinstance(review_commit, str) or not COMMIT.fullmatch(review_commit):
-        return observed_commit
-    ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
-                     review_commit, observed_commit])
-    paths = (
-        ("spec/proposals/%s.md" % proposal.proposal_id, proposal_text),
-        ("spec/proposal-mainline-policy.json", policy_text),
-    )
-    if not ancestor or any(_show(repo, review_commit, path) != text for path, text in paths):
-        return observed_commit
-    return review_commit
-
-
 def read_published(project, proposal_id, remote="origin"):
     """Return only remote-default facts; never read consumer proposal/map files."""
     if not isinstance(proposal_id, str) or not PROPOSAL_ID.fullmatch(proposal_id):
@@ -193,13 +166,7 @@ def read_published(project, proposal_id, remote="origin"):
             parse_map(review_path)
         except (ContractError, MapError, OSError, UnicodeError) as error:
             return Publication("invalid", review_commit=observed_commit, diagnostic=str(error))
-        policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
-        review_commit = _attested_review_commit(repo, observed_commit, proposal, proposal_text,
-                                                policy_text)
-        review_map = _show(repo, review_commit, "spec/CAPABILITY-MAP.md")
-        if review_map is None:
-            return Publication("unknown", diagnostic="attested review map is unavailable")
-        return Publication("published", review_commit=review_commit, proposal=proposal,
+        return Publication("published", review_commit=observed_commit, proposal=proposal,
                            baseline_map=baseline_map, review_map=review_map)
 
 
@@ -225,8 +192,6 @@ def read_published_pool(project, remote="origin"):
         publications = []
         skipped = []
         proposal_ids = set()
-        policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
-        attestation_texts = {}
         prefix = "spec/proposals/"
         paths = sorted(line for line in listed.stdout.splitlines()
                        if line.startswith(prefix) and line.endswith(".md"))
@@ -261,25 +226,12 @@ def read_published_pool(project, remote="origin"):
                 return PublicationPool("invalid", review_commit=observed_commit,
                                        diagnostic="proposal pool contains a duplicate id")
             proposal_ids.add(proposal.proposal_id)
-            review_commit = _attested_review_commit(repo, observed_commit, proposal,
-                                                     proposal_text, policy_text)
-            publication_map = _show(repo, review_commit, "spec/CAPABILITY-MAP.md")
-            if publication_map is None:
-                return PublicationPool("unknown", review_commit=observed_commit,
-                                       diagnostic="attested review map is unavailable")
-            publications.append(Publication("published", review_commit=review_commit,
+            publications.append(Publication("published", review_commit=observed_commit,
                                             proposal=proposal, baseline_map=baseline_map,
-                                            review_map=publication_map))
-            if proposal.version == "v2":
-                attestation_path = ATTESTATION_PATH_TEMPLATE % (
-                    proposal.proposal_id, proposal.revision)
-                text = _show(repo, observed_commit, attestation_path)
-                if text is not None:
-                    attestation_texts[proposal.proposal_id] = text
+                                            review_map=review_map))
         return PublicationPool("published", review_commit=observed_commit,
                                publications=publications, review_map=review_map,
-                               policy_text=policy_text,
-                               attestation_texts=attestation_texts, skipped=skipped)
+                               skipped=skipped)
 
 
 def main(argv=None):

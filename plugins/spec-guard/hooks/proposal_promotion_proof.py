@@ -1,14 +1,20 @@
 """Read-only remote-default proof that a Proposal module was promoted."""
 import argparse
+import copy
 import json
+import re
 import subprocess
 from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
-from proposal_mainline_review import DIAGNOSTIC_CODE, accepted_from_pool
-from proposal_publication import fixed_snapshot, read_published_pool, skipped_as_json
+from proposal_publication import (
+    Publication, fixed_snapshot, read_published_pool, skipped_as_json)
+from proposal_review import STAGES, Review, review
 from proposal_tracker_read import read_tracker
+
+# 只有稳定诊断码可以出现在输出里；说明文字和原始异常一律退回 promotion-<state>。
+DIAGNOSTIC_CODE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
 class Proof(object):
@@ -60,13 +66,24 @@ def as_json(result):
             data[key] = value
     if result.state == "not-promoted":
         data["diagnostic"] = result.diagnostic or "promotion-not-found"
-    elif result.state in ("invalid", "unknown", "not-accepted"):
+    elif result.state in ("invalid", "unknown", "not-accepted", "stale"):
         code = result.diagnostic
         data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
                               else "promotion-%s" % result.state)
     if result.skipped_proposals:
         data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     return data
+
+
+def accepted(publication, tracker, platform, target):
+    """A published v2 Proposal whose Issue stage is accepted and whose review is fresh."""
+    proposal = getattr(publication, "proposal", None)
+    if getattr(proposal, "version", None) != "v2" or not getattr(proposal, "revision", None):
+        return Review("legacy-revision-required",
+                      review_commit=getattr(publication, "review_commit", None),
+                      proposal_id=getattr(proposal, "proposal_id", None),
+                      revision=getattr(proposal, "revision", None))
+    return review(publication, tracker, platform, target)
 
 
 def _run(args):
@@ -116,18 +133,17 @@ def _first_parent(repo, commit):
     return fields[1] if len(fields) >= 2 and fields[0] == commit else "invalid"
 
 
-def _promotion_paths(repo, parent, commit):
-    result = _run(["git", "-C", str(repo), "diff-tree", "--no-commit-id",
-                   "--name-only", "-r", parent, commit])
-    return set(result.stdout.splitlines()) if result else None
+def _rows(capability_map):
+    return dict((row.module_id, (row.responsibility, tuple(row.depends_on)))
+                for row in capability_map.rows)
 
 
-def _has_module_artifacts(repo, commit, proposal):
-    module_id = proposal.change.module_id
-    spec = _show(repo, commit, "spec/%s.md" % module_id)
-    plan = _show(repo, commit, "tasks/%s/plan.md" % module_id)
-    return (isinstance(spec, str) and spec.startswith("# Spec: %s" % module_id) and
-            isinstance(plan, str) and plan.startswith("# Plan:"))
+def _only_adds(module_id, parent_map, commit_map):
+    """The commit adds exactly this module row and leaves every other row untouched."""
+    parent_rows, commit_rows = _rows(parent_map), _rows(commit_map)
+    commit_rows.pop(module_id, None)
+    return (parent_rows == commit_rows and
+            [item for item in commit_map.order if item != module_id] == list(parent_map.order))
 
 
 def _blocked(state, diagnostic=None):
@@ -135,7 +151,7 @@ def _blocked(state, diagnostic=None):
 
 
 def preflight(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
-    """Freshly require remote policy, Issue and attestation before branch creation."""
+    """Freshly require an accepted Issue stage and a fresh review before branch creation."""
     pool = read_published_pool(project, remote)
     result = _preflight(pool, proposal_id, platform, target, tracker_reader)
     if getattr(pool, "state", None) == "published":
@@ -152,13 +168,9 @@ def _preflight(pool, proposal_id, platform, target, tracker_reader):
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:
         return Preflight("absent", diagnostic="publication-absent")
-    if publication.review_map != pool.review_map:
-        return Preflight("stale", proposal_id=proposal_id,
-                         revision=getattr(publication.proposal, "revision", None),
-                         diagnostic="proposal-stale")
     reader = read_tracker if tracker_reader is None else tracker_reader
     tracker = reader(publication.proposal, platform, target)
-    acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
+    acceptance = accepted(publication, tracker, platform, target)
     if acceptance.state != "accepted":
         return Preflight(acceptance.state, proposal_id=proposal_id,
                          revision=getattr(publication.proposal, "revision", None),
@@ -168,47 +180,48 @@ def _preflight(pool, proposal_id, platform, target, tracker_reader):
                      base_commit=pool.review_commit)
 
 
-def prove(project, publication, review_result, remote="origin"):
+def prove(project, publication, tracker, platform, target, remote="origin"):
     """Prove the first matching module commit from a fresh remote-default snapshot."""
     publication_state = getattr(publication, "state", None)
     if publication_state in ("absent", "invalid", "unknown"):
         return _blocked(publication_state, getattr(publication, "diagnostic", None))
     if publication_state != "published":
         return _blocked("unknown")
-    review_state = getattr(review_result, "state", None)
-    review_diagnostic = getattr(review_result, "diagnostic", None)
-    if review_state in ("invalid", "unknown"):
-        return _blocked(review_state, review_diagnostic)
-    if review_state != "accepted":
-        return _blocked("not-accepted", review_diagnostic)
+    tracker_state = getattr(tracker, "state", None)
+    if tracker_state != "verified":
+        state = tracker_state if tracker_state in ("absent", "invalid") else "unknown"
+        return _blocked(state, "tracker-%s" % state)
     proposal = getattr(publication, "proposal", None)
-    review_commit = getattr(publication, "review_commit", None)
-    if (proposal is None or not isinstance(review_commit, str) or
-            not COMMIT.fullmatch(review_commit) or
-            getattr(proposal, "version", None) != "v2" or
+    if (proposal is None or getattr(proposal, "version", None) != "v2" or
             not isinstance(getattr(proposal, "revision", None), str) or
-            getattr(review_result, "review_commit", None) != review_commit or
-            getattr(review_result, "proposal_id", None) != proposal.proposal_id or
-            getattr(review_result, "revision", None) != proposal.revision or
-            not isinstance(getattr(review_result, "authority_id", None), str)):
+            not COMMIT.fullmatch(str(getattr(proposal.baseline, "commit", None))) or
+            getattr(tracker, "proposal_id", None) != proposal.proposal_id or
+            getattr(tracker, "platform", None) != platform or
+            getattr(tracker, "target", None) != target):
         return _blocked("invalid")
+    if tracker.stage not in ("proposal-stage:accepted", "proposal-stage:promoted"):
+        if tracker.stage not in STAGES:
+            return _blocked("invalid")
+        return _blocked("not-accepted")
+    baseline_commit = proposal.baseline.commit
+    module_id = proposal.change.module_id
     with fixed_snapshot(project, remote, "sg-proposal-promotion-proof-") as snapshot:
         if snapshot.failure:
             return _blocked("unknown")
         repo, temp, observed_commit = snapshot.repo, snapshot.temp, snapshot.commit
         ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
-                         review_commit, observed_commit])
+                         baseline_commit, observed_commit])
         if not ancestor:
             return _blocked("invalid")
         commits = _run(["git", "-C", str(repo), "rev-list", "--first-parent",
-                        "--reverse", "%s..%s" % (review_commit, observed_commit)])
+                        "--reverse", "%s..%s" % (baseline_commit, observed_commit)])
         if not commits:
             return _blocked("unknown")
         for commit in commits.stdout.splitlines():
             capability_map = _map(repo, commit, temp)
             if capability_map == "invalid":
                 return _blocked("invalid")
-            if proposal.change.module_id not in capability_map.order:
+            if module_id not in capability_map.order:
                 continue
             parent = _first_parent(repo, commit)
             if parent is None:
@@ -216,25 +229,33 @@ def prove(project, publication, review_result, remote="origin"):
             if parent == "invalid":
                 return _blocked("invalid")
             parent_map = _map(repo, parent, temp)
-            if parent_map == "invalid":
+            parent_text = _show(repo, parent, "spec/CAPABILITY-MAP.md")
+            if parent_map == "invalid" or parent_text is None:
                 return _blocked("invalid")
-            required_paths = {
-                "spec/CAPABILITY-MAP.md",
-                "spec/%s.md" % proposal.change.module_id,
-                "tasks/%s/plan.md" % proposal.change.module_id,
-            }
-            allowed_paths = required_paths | {"tasks/%s/todo.md" % proposal.change.module_id}
-            paths = _promotion_paths(repo, parent, commit)
-            if (proposal.change.module_id in parent_map.order or
+            if (module_id in parent_map.order or
                     not _matches(proposal, capability_map) or
-                    paths is None or not required_paths.issubset(paths) or
-                    not paths.issubset(allowed_paths) or
-                    not _has_module_artifacts(repo, commit, proposal)):
+                    not _only_adds(module_id, parent_map, capability_map)):
                 return _blocked("invalid")
-            return Proof("proved", review_commit=review_commit, proposal_id=proposal.proposal_id,
-                         module_id=proposal.change.module_id, promotion_commit=commit)
+            # 晋级那一刻的新鲜度：在父提交的能力图上评审，accepted 与 promoted 阶段等价。
+            at_parent = Publication(
+                "published", review_commit=parent, proposal=proposal,
+                baseline_map=getattr(publication, "baseline_map", None), review_map=parent_text)
+            facts = review(at_parent, _as_accepted(tracker), platform, target)
+            if facts.state == "stale":
+                return _blocked("stale", facts.diagnostic)
+            if facts.state != "accepted":
+                return _blocked(facts.state if facts.state in ("invalid", "unknown")
+                                else "unknown", facts.diagnostic)
+            return Proof("proved", review_commit=parent, proposal_id=proposal.proposal_id,
+                         module_id=module_id, promotion_commit=commit)
     return Proof("not-promoted", proposal_id=proposal.proposal_id,
-                 module_id=proposal.change.module_id, diagnostic="promotion-not-found")
+                 module_id=module_id, diagnostic="promotion-not-found")
+
+
+def _as_accepted(tracker):
+    relaxed = copy.copy(tracker)
+    relaxed.stage = "proposal-stage:accepted"
+    return relaxed
 
 
 def prove_from_remote(project, proposal_id, platform, target, remote="origin",
@@ -252,8 +273,7 @@ def prove_from_remote(project, proposal_id, platform, target, remote="origin",
     else:
         reader = read_tracker if tracker_reader is None else tracker_reader
         tracker = reader(publication.proposal, platform, target)
-        acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
-        result = prove(project, publication, acceptance, remote)
+        result = prove(project, publication, tracker, platform, target, remote)
     result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
     return result
 

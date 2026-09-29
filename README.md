@@ -81,7 +81,7 @@ codex plugin add spec-guard@spec-guard-marketplace
 | 文档 | 内容 |
 |---|---|
 | [使用流程](docs/workflow.md) | 新项目从零到交付、快速插入与 Proposal 两种加需求方式、能力图规则、Claude 与 Codex 命令对照 |
-| [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、主链、验收记录等术语的含义 |
+| [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、Proposal、revision 等术语的含义 |
 | [可选能力](docs/optional-features.md) | 协作信箱、本地事项账本、文档治理、能力历史：各自解决什么、怎么启用 |
 | [更新日志](CHANGELOG.md) | 每个版本改了什么 |
 

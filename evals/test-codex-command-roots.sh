@@ -9,8 +9,6 @@ COMMANDS=(
   documentation-verification
   history-integrity
   phase
-  proposal-mainline-candidates
-  proposal-mainline-review
   proposal-promotion-preflight
   proposal-promotion-proof
   proposal-review

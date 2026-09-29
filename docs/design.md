@@ -23,11 +23,11 @@ synchronizes remote Issues.
 accepted Proposal inserts its module after a declared anchor or at the end,
 instead of starting a new map. The Proposal lifecycle is seven modules in it.
 Proposal v2 binds its published
-contents to a revision digest. A normal author branch can publish and read a
-Proposal, but only the policy-defined mainline may evaluate it at an explicit
-module boundary. Mainline identity is Git topology plus protected remote policy,
-not a person or agent name. Acceptance additionally requires a revision-bound
-immutable attestation and a separately human-written Issue stage.
+contents to a revision digest. Acceptance is a human-written Issue stage label
+(`proposal-stage:accepted`) plus a fresh review of the published Proposal
+against the remote default branch; no mainline policy, acceptance attestation
+or authority identity is read. The post-merge proof starts from the Proposal's
+baseline commit and judges freshness on the promotion commit's parent.
 
 The tracker adapters are read-only and only recover a normal Proposal Issue by
 its complete identity marker in an explicitly supplied container. A preflight

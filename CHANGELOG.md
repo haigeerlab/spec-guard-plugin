@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### 移除
+
+- **Proposal 主链裁决层整体删除。** 命令 `/spec-guard:proposal-mainline-candidates`、`/spec-guard:proposal-mainline-review`，hook `proposal_mainline_review.py`、`proposal_boundary_guidance.py` 及其参考文档，以及主链策略文件、验收记录（attestation）、`--authority-id` / `--boundary` / `--current-module-id`、受保护的 `integration/mainline` 分支这些要求都不再存在，也不设过渡版本。说明与迁移见[退役说明](docs/retirements/proposal-mainline-review.md)：已在 accepted 阶段的 Proposal 确认 Issue 标签为 `proposal-stage:accepted` 后直接跑预检；已有的策略文件与验收记录可保留或自行删除，插件不再读取（`scripts/check-acceptance-immutable.py` 仍保护已有验收记录）；原先在模块边界用 mainline-candidates 看候选的，改用 `/spec-guard:proposal-review` 逐个查看。
+
+### 变更
+
+- **接受只看 Issue 标签与评审新鲜度。** 已发布的 v2 Proposal 加上 Issue 标签 `proposal-stage:accepted`，且评审新鲜（基线未漂移、模块还不在能力图中、依赖齐全、锚点有效）即为接受；v1 仍返回 `legacy-revision-required`。预检不再读取主链策略与验收记录，基线漂移时返回 `stale` 与评审的诊断（如 `proposal-baseline-drifted`），通过时 `ready` 并给出 `baseCommit`。`skippedProposals` 保持不变。
+- **晋级证明从基线起算，收尾可重复执行。** 证明接受 Issue 阶段 `accepted` 或 `promoted`，从 Proposal 的基线提交起沿远端默认分支的 first-parent 找到第一个纳入该模块的提交，核对该行与声明一致且没有其他模块行被改动，并在其父提交的能力图上判断新鲜度。不再要求该提交同时带 Spec 与 Plan（PR 合并提交可带其他文件）。`reviewCommit` 现在是晋级提交的父提交；新增状态 `stale`（诊断缺省为 `promotion-stale`）。
+- **Proposal 池不再读取主链策略与验收记录。** 每个 publication 的 `review_commit` 一律是观察到的远端默认分支提交。
+
 ## [0.31.0] - 2026-09-29
 
 ### 修复

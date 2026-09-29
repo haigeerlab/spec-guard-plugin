@@ -26,8 +26,7 @@
 默认分支后才成为共享事实；不要把它塞进当前模块或任务。可用的只读入口：
 
 - `/spec-guard:proposal-review`：任何分支查看单个 Proposal 的新鲜度与 Issue 阶段；
-- `/spec-guard:proposal-mainline-candidates`：仅主链，在 `module-deliver`、`module-advance` 或 `module-interrupt` 边界列出候选；
-- `/spec-guard:proposal-promotion-preflight`、`/spec-guard:proposal-promotion-proof`：人工接受后的基点预检与合并后证明。
+- `/spec-guard:proposal-promotion-preflight`、`/spec-guard:proposal-promotion-proof`：Issue 阶段标签 `proposal-stage:accepted` 加新鲜评审后的基点预检与合并后证明。
 
 这些提醒不阻断交付或推进。Codex 中对应命令见 `spec-guard-ops` 的 proposal 一节。
 

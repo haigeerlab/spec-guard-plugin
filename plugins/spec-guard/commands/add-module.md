@@ -58,5 +58,5 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 不执行任何 Git 或远端操作。成功后原样转述写入结果与阶段提示；如果新模块因此成为当前模块，阶段会是
 `NEEDS_SPEC`——下一步是写并评审 `spec/<id>.md`（例如用 `/spec`），不是本命令的职责。
 
-如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 九步流程（见 `docs/workflow.md`），
+如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 八步流程（见 `docs/workflow.md`），
 而不是本命令。
