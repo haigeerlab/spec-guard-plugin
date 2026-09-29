@@ -53,8 +53,11 @@
 
 - 两个命令的 JSON 结果在 `skipped` 非空时附加 `"skippedProposals": [{"proposalId": ..., "diagnostic": ...}]`；
   为空时输出逐字不变。
-- 被排除的 Proposal 若正是本次查询的对象：预检／证明返回与"池中不存在该 Proposal"相同的现有结论
-  （`publication-absent`），不新增状态。
+- `diagnostic` 沿用现有 JSON 只输出短码、不外露原始报错的约定（用户 2026-09-29 确认）：基线 remote／默认分支
+  不一致 → `proposal-baseline-remote-mismatch`；基线提交不在默认分支上或基线能力图缺失 →
+  `proposal-baseline-unavailable`；其余 → `proposal-invalid`。池结果的 `skipped` 内部保留原始诊断。
+- 被排除的 Proposal 若正是本次查询的对象：预检／证明／主链裁决返回与"池中不存在该 Proposal"相同的现有结论
+  （预检 `publication-absent`、证明 `absent`、裁决 `proposal-not-published`），不新增状态。
 
 ### P3 文档
 
