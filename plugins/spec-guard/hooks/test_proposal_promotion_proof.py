@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,10 +14,9 @@ from capability_map import parse_map
 from proposal_contract import Change, compute, compute_revision
 from proposal_publication import (
     Publication, PublicationPool, read_published, skipped_as_json)
+import proposal_promotion_proof
 from proposal_promotion_proof import (
     Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, prove)
-from proposal_mainline_review import accepted, policy_digest
-from proposal_review import Review
 from proposal_tracker_read import TrackerRead
 
 
@@ -46,22 +46,25 @@ PROMOTION_MAP = BASE_MAP.replace(
         "Build order: alpha", "Build order: alpha → gamma")
 
 
+DRIFT_MAP = BASE_MAP.replace("Existing capability", "Changed capability")
+
+# Still imported by test_proposal_mainline_review.py until that module is removed.
 REMOTE_POLICY = {
     "schemaVersion": 1, "authorityId": "mainline", "remote": "origin",
     "reviewRef": "refs/heads/integration/mainline",
     "workflowId": "capability-map-integration",
 }
 
+LEGACY_POLICY = "{ this is not valid policy json"
 
 class PromotionFixture(unittest.TestCase):
     promotion_map = PROMOTION_MAP
     merge_promotion = False
     include_artifacts = True
     include_extra_file = False
-    include_todo = False
-    bad_spec_header = False
     skip_promotion = False
-    attested = False
+    legacy_files = False
+    drift_map = None
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-promotion-proof-")
@@ -81,35 +84,19 @@ class PromotionFixture(unittest.TestCase):
         self.baseline = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.write_proposal()
         self.git(self.seed, "add", "spec/proposals/gamma.md")
-        if self.attested:
-            (self.seed / "spec/proposal-mainline-policy.json").write_text(
-                json.dumps(REMOTE_POLICY), encoding="utf-8")
-            self.git(self.seed, "add", "spec/proposal-mainline-policy.json")
+        if self.legacy_files:
+            self.write_legacy_files()
         self.git(self.seed, "commit", "-m", "publish proposal")
-        if self.attested:
-            self.write_attestation()
+        self.publish_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.git(self.seed, "remote", "add", "origin", str(self.remote))
         self.git(self.seed, "push", "origin", "trunk")
         self.git(self.root, "clone", str(self.remote), str(self.consumer))
         self.publication = read_published(self.consumer, "gamma")
-        self.policy = {
-            "authorityId": "mainline", "remote": "origin",
-            "reviewRef": "refs/heads/integration/mainline",
-            "workflowId": "capability-map-integration",
-        }
-        evidence = {
-            "schemaVersion": 1, "proposalId": "gamma",
-            "revision": self.publication.proposal.revision,
-            "reviewCommit": self.publication.review_commit,
-            "policyDigest": policy_digest(self.policy),
-            "authorityId": "mainline", "decision": "accept",
-        }
-        self.accepted = accepted(
-            self.publication,
-            TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
-                        proposal_id="gamma", platform="github", target="octo/spec-guard"),
-            "github", "octo/spec-guard", self.policy, evidence)
-        self.assertEqual(self.accepted.state, "accepted")
+        if self.drift_map is not None:
+            (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.drift_map, encoding="utf-8")
+            self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
+            self.git(self.seed, "commit", "-m", "drift alpha")
+            self.drift_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
         if self.skip_promotion:
             (self.seed / "README.md").write_text("still unpromoted\n", encoding="utf-8")
             self.git(self.seed, "add", "README.md")
@@ -124,13 +111,33 @@ class PromotionFixture(unittest.TestCase):
             (self.seed / "README.md").write_text("mainline change\n", encoding="utf-8")
             self.git(self.seed, "add", "README.md")
             self.git(self.seed, "commit", "-m", "mainline change")
+            self.pre_merge_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
             self.git(self.seed, "merge", "--no-ff", "proposal-gamma", "-m", "merge gamma")
             self.promotion_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
         else:
+            self.parent_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
             self.write_promotion_artifacts()
             self.git(self.seed, "commit", "-m", "promote gamma")
             self.promotion_commit = self.git(self.seed, "rev-parse", "HEAD").strip()
         self.git(self.seed, "push", "origin", "trunk")
+
+    def tracker(self, stage="proposal-stage:accepted"):
+        return TrackerRead("verified", issue_id=42, stage=stage, proposal_id="gamma",
+                           platform="github", target="octo/spec-guard")
+
+    def prove(self, stage="proposal-stage:accepted"):
+        return prove(self.consumer, self.publication, self.tracker(stage),
+                     "github", "octo/spec-guard")
+
+    def write_legacy_files(self):
+        """Leftover policy and acceptance record that must never influence anything."""
+        (self.seed / "spec/proposal-mainline-policy.json").write_text(LEGACY_POLICY,
+                                                                       encoding="utf-8")
+        (self.seed / "spec/proposal-acceptances").mkdir()
+        (self.seed / "spec/proposal-acceptances/gamma-stray.json").write_text(
+            "{}", encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposal-mainline-policy.json",
+                 "spec/proposal-acceptances")
 
     def git(self, cwd, *args):
         result = subprocess.run(["git", "-C", str(cwd)] + list(args), text=True,
@@ -200,58 +207,54 @@ Gamma is separate.
         path.write_text(text, encoding="utf-8")
         path.write_text(text.replace("0" * 64, compute_revision(path)), encoding="utf-8")
 
-    def write_attestation(self):
-        reviewed = self.git(self.seed, "rev-parse", "HEAD").strip()
-        revision = compute_revision(self.seed / "spec/proposals/gamma.md")
-        (self.seed / "spec/proposal-acceptances").mkdir()
-        (self.seed / ("spec/proposal-acceptances/gamma-%s.json" % revision)).write_text(json.dumps({
-            "schemaVersion": 1, "proposalId": "gamma", "revision": revision,
-            "reviewCommit": reviewed, "policyDigest": policy_digest(REMOTE_POLICY),
-            "authorityId": "mainline", "decision": "accept",
-        }), encoding="utf-8")
-        self.git(self.seed, "add", "spec/proposal-acceptances")
-        self.git(self.seed, "commit", "-m", "attest gamma")
-
     def write_promotion_artifacts(self):
         (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.promotion_map,
                                                            encoding="utf-8")
-        if self.include_artifacts:
-            header = "# Wrong header\n" if self.bad_spec_header else "# Spec: gamma\n"
-            (self.seed / "spec/gamma.md").write_text(header, encoding="utf-8")
-            (self.seed / "tasks/gamma").mkdir(parents=True)
-            (self.seed / "tasks/gamma/plan.md").write_text("# Plan: gamma\n", encoding="utf-8")
-            if self.include_todo:
-                (self.seed / "tasks/gamma/todo.md").write_text("# Todo: gamma\n",
-                                                                encoding="utf-8")
-        if self.include_extra_file:
-            (self.seed / "README.md").write_text("unrelated\n", encoding="utf-8")
         paths = ["spec/CAPABILITY-MAP.md"]
         if self.include_artifacts:
+            (self.seed / "spec/gamma.md").write_text("# Spec: gamma\n", encoding="utf-8")
+            (self.seed / "tasks/gamma").mkdir(parents=True)
+            (self.seed / "tasks/gamma/plan.md").write_text("# Plan: gamma\n", encoding="utf-8")
             paths.extend(("spec/gamma.md", "tasks/gamma/plan.md"))
-            if self.include_todo:
-                paths.append("tasks/gamma/todo.md")
         if self.include_extra_file:
+            (self.seed / "README.md").write_text("unrelated\n", encoding="utf-8")
             paths.append("README.md")
         self.git(self.seed, "add", *paths)
 
+
 class PromotionProofStateTests(PromotionFixture):
-    def test_nonaccepted_invalid_and_unknown_reviews_stop_before_remote_access(self):
+    def test_unusable_tracker_or_stage_stops_before_remote_access(self):
         cases = (
-            (Review("awaiting-review"), "not-accepted"),
-            (Review("invalid"), "invalid"),
-            (Review("unknown"), "unknown"),
-            (Review("accepted", review_commit="b" * 40, proposal_id="gamma",
-                    platform="github", target="octo/spec-guard"), "invalid"),
+            (TrackerRead("absent"), "absent"),
+            (TrackerRead("invalid"), "invalid"),
+            (TrackerRead("unknown"), "unknown"),
+            (self.tracker("proposal-stage:in-review"), "not-accepted"),
+            (self.tracker("proposal-stage:rejected"), "not-accepted"),
+            (self.tracker("proposal-stage:made-up"), "invalid"),
+            (TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
+                         proposal_id="other", platform="github",
+                         target="octo/spec-guard"), "invalid"),
         )
         with patch("proposal_publication._remote") as remote:
-            for review_result, expected in cases:
-                result = prove(self.consumer, self.publication, review_result)
-                self.assertEqual(result.state, expected)
+            for tracker, expected in cases:
+                with self.subTest(expected=expected, stage=getattr(tracker, "stage", None)):
+                    result = prove(self.consumer, self.publication, tracker,
+                                   "github", "octo/spec-guard")
+                    self.assertEqual(result.state, expected)
         remote.assert_not_called()
+
+    def test_v1_or_unpublished_input_never_proves(self):
+        v1 = Publication("published", review_commit=self.publication.review_commit,
+                         proposal=SimpleNamespace(version="v1", revision=None,
+                                                  proposal_id="gamma"))
+        self.assertEqual(prove(self.consumer, v1, self.tracker(), "github",
+                               "octo/spec-guard").state, "invalid")
+        self.assertEqual(prove(self.consumer, Publication("absent"), self.tracker(),
+                               "github", "octo/spec-guard").state, "absent")
 
 
 class PromotionProofRemoteTests(PromotionFixture):
-    def test_proves_the_first_remote_commit_and_ignores_dirty_consumer_files(self):
+    def test_proves_a_map_only_promotion_from_its_parent_without_policy_or_attestation(self):
         dirty = self.consumer / "spec/CAPABILITY-MAP.md"
         dirty.write_text("not shared remote fact", encoding="utf-8")
         (self.seed / "README.md").write_text("later unrelated commit\n", encoding="utf-8")
@@ -259,26 +262,52 @@ class PromotionProofRemoteTests(PromotionFixture):
         self.git(self.seed, "commit", "-m", "later change")
         self.git(self.seed, "push", "origin", "trunk")
 
-        result = prove(self.consumer, self.publication, self.accepted)
+        result = self.prove()
 
         self.assertEqual(result.state, "proved")
-        self.assertEqual(result.review_commit, self.publication.review_commit)
+        self.assertEqual(result.review_commit, self.parent_commit)
         self.assertEqual(result.promotion_commit, self.promotion_commit)
         self.assertEqual((result.proposal_id, result.module_id), ("gamma", "gamma"))
         self.assertEqual(dirty.read_text(encoding="utf-8"), "not shared remote fact")
 
+    def test_promoted_stage_still_proves(self):
+        result = self.prove("proposal-stage:promoted")
+        self.assertEqual((result.state, result.promotion_commit),
+                         ("proved", self.promotion_commit))
+
     def test_unavailable_remote_is_unknown(self):
         with patch("proposal_publication._head", return_value=None):
-            self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "unknown")
+            self.assertEqual(self.prove().state, "unknown")
 
     def test_json_exposes_only_safe_proof_identifiers(self):
-        result = prove(self.consumer, self.publication, self.accepted)
-        data = as_json(result)
+        data = as_json(self.prove())
         self.assertEqual(data["state"], "proved")
         self.assertEqual(data["promotionCommit"], self.promotion_commit)
+        self.assertEqual(data["reviewCommit"], self.parent_commit)
         self.assertEqual(data["proposalId"], "gamma")
         self.assertNotIn(str(self.remote), json.dumps(data))
         self.assertNotIn("Capability Map", json.dumps(data))
+
+
+class LegacyFilesPromotionProofTests(PromotionFixture):
+    legacy_files = True
+
+    def test_invalid_policy_and_stray_attestation_do_not_change_the_proof(self):
+        result = self.prove()
+        self.assertEqual((result.state, result.promotion_commit),
+                         ("proved", self.promotion_commit))
+
+
+class MapOnlyPromotionProofTests(PromotionFixture):
+    include_artifacts = False
+
+    def test_promotion_changing_only_the_capability_map_is_proved(self):
+        paths = self.git(self.seed, "diff-tree", "--no-commit-id", "--name-only", "-r",
+                         self.promotion_commit).split()
+        self.assertEqual(paths, ["spec/CAPABILITY-MAP.md"])
+        result = self.prove()
+        self.assertEqual((result.state, result.review_commit, result.promotion_commit),
+                         ("proved", self.parent_commit, self.promotion_commit))
 
 
 class InvalidPromotionProofRemoteTests(PromotionFixture):
@@ -286,38 +315,59 @@ class InvalidPromotionProofRemoteTests(PromotionFixture):
                                           "| gamma | Different responsibility | alpha |")
 
     def test_mismatched_first_remote_module_is_invalid(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+        self.assertEqual(self.prove().state, "invalid")
 
 
 class MergePromotionProofRemoteTests(PromotionFixture):
     merge_promotion = True
 
-    def test_proves_the_merge_commit_not_the_merged_branch_commit(self):
-        result = prove(self.consumer, self.publication, self.accepted)
+    def test_proves_the_merge_commit_carrying_spec_plan_and_unrelated_files(self):
+        parents = self.git(self.seed, "rev-list", "--parents", "-n", "1",
+                           self.promotion_commit).split()
+        self.assertEqual(len(parents), 3)
+        merged = self.git(self.seed, "diff-tree", "--no-commit-id", "--name-only", "-r",
+                          parents[1], self.promotion_commit).split()
+        self.assertIn("spec/gamma.md", merged)
+        self.assertIn("tasks/gamma/plan.md", merged)
+        result = self.prove()
         self.assertEqual(result.state, "proved")
         self.assertEqual(result.promotion_commit, self.promotion_commit)
         self.assertNotEqual(result.promotion_commit, self.feature_commit)
-
-
-class MissingPromotionArtifactTests(PromotionFixture):
-    include_artifacts = False
-
-    def test_missing_module_spec_or_plan_is_invalid(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+        self.assertEqual(result.review_commit, self.pre_merge_commit)
 
 
 class ExtraPromotionFileTests(PromotionFixture):
     include_extra_file = True
 
-    def test_promotion_commit_cannot_carry_unrelated_files(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+    def test_promotion_commit_may_carry_unrelated_files(self):
+        self.assertEqual(self.prove().state, "proved")
+
+
+class OtherRowPromotionTests(PromotionFixture):
+    promotion_map = PROMOTION_MAP.replace("| alpha | Existing capability | — |",
+                                          "| alpha | Rewritten capability | — |")
+
+    def test_promotion_that_also_edits_another_module_row_is_invalid(self):
+        self.assertEqual(self.prove().state, "invalid")
+
+
+class DriftedBaselinePromotionTests(PromotionFixture):
+    drift_map = DRIFT_MAP
+    promotion_map = PROMOTION_MAP.replace("Existing capability", "Changed capability")
+
+    def test_baseline_drifted_before_promotion_is_stale(self):
+        result = self.prove()
+        self.assertEqual((result.state, result.diagnostic),
+                         ("stale", "proposal-baseline-drifted"))
+        self.assertEqual(as_json(result),
+                         {"state": "stale", "diagnostic": "proposal-baseline-drifted"})
 
 
 class NotYetPromotedProofTests(PromotionFixture):
     skip_promotion = True
 
     def test_no_promotion_commit_yet_is_not_promoted_not_invalid(self):
-        result = prove(self.consumer, self.publication, self.accepted)
+        result = self.prove()
         self.assertEqual(result.state, "not-promoted")
         self.assertIsNone(self.promotion_commit)
         data = as_json(result)
@@ -326,26 +376,12 @@ class NotYetPromotedProofTests(PromotionFixture):
         self.assertEqual(data["moduleId"], "gamma")
 
 
-class PromotionWithTodoFileTests(PromotionFixture):
-    include_todo = True
-
-    def test_promotion_commit_may_additionally_carry_todo_md(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "proved")
-
-
 class DependencyMismatchPromotionProofTests(PromotionFixture):
     promotion_map = PROMOTION_MAP.replace("| gamma | Gamma. | alpha |",
                                           "| gamma | Gamma. | — |")
 
     def test_dependency_mismatch_with_the_proposal_declaration_is_invalid(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
-
-
-class BadSpecHeaderPromotionProofTests(PromotionFixture):
-    bad_spec_header = True
-
-    def test_wrong_module_spec_header_is_invalid(self):
-        self.assertEqual(prove(self.consumer, self.publication, self.accepted).state, "invalid")
+        self.assertEqual(self.prove().state, "invalid")
 
 
 class MatchesAnchorMutantTests(unittest.TestCase):
@@ -384,94 +420,74 @@ class MatchesAnchorMutantTests(unittest.TestCase):
 
 
 class PromotionPreflightTests(PromotionFixture):
-    def test_preflight_requires_fresh_pool_attestation_and_issue(self):
-        from proposal_publication import PublicationPool
-        from unittest.mock import patch
-        remote_policy = dict(self.policy, schemaVersion=1)
-        evidence = {
-            "schemaVersion": 1, "proposalId": "gamma",
-            "revision": self.publication.proposal.revision,
-            "reviewCommit": self.publication.review_commit,
-            "policyDigest": policy_digest(remote_policy),
-            "authorityId": "mainline", "decision": "accept",
-        }
-        pool = PublicationPool("published", review_commit=self.publication.review_commit,
-                               publications=(self.publication,), review_map=self.publication.review_map,
-                               policy_text=__import__("json").dumps(remote_policy),
-                               attestation_texts={"gamma": __import__("json").dumps(evidence)})
-        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
-                              proposal_id="gamma", platform="github", target="octo/spec-guard")
-        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
-            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
-                               tracker_reader=lambda *ignored: tracker)
-        self.assertEqual((result.state, result.base_commit), ("ready", pool.review_commit))
+    skip_promotion = True
 
-    def test_stale_remote_review_never_returns_a_promotion_base(self):
-        from proposal_publication import PublicationPool
-        remote_policy = dict(self.policy, schemaVersion=1)
-        evidence = {
-            "schemaVersion": 1, "proposalId": "gamma",
-            "revision": self.publication.proposal.revision,
-            "reviewCommit": self.publication.review_commit,
-            "policyDigest": policy_digest(remote_policy),
-            "authorityId": "mainline", "decision": "accept",
-        }
-        stale_publication = Publication(
-            "published", review_commit=self.publication.review_commit,
-            proposal=self.publication.proposal, baseline_map=self.publication.baseline_map,
-            review_map=PROMOTION_MAP)
-        pool = PublicationPool(
-            "published", review_commit=self.publication.review_commit,
-            publications=(stale_publication,), review_map=PROMOTION_MAP,
-            policy_text=json.dumps(remote_policy),
-            attestation_texts={"gamma": json.dumps(evidence)})
-        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
-                              proposal_id="gamma", platform="github", target="octo/spec-guard")
-        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
-            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
-                               tracker_reader=lambda *ignored: tracker)
-        self.assertEqual((result.state, result.base_commit), ("stale", None))
+    def run_preflight(self, stage="proposal-stage:accepted"):
+        return preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                         tracker_reader=lambda *ignored: self.tracker(stage))
+
+    def test_accepted_and_fresh_is_ready_without_policy_or_attestation(self):
+        result = self.run_preflight()
+        self.assertEqual((result.state, result.proposal_id, result.revision),
+                         ("ready", "gamma", self.publication.proposal.revision))
+        self.assertEqual(result.base_commit, self.git(self.seed, "rev-parse", "HEAD").strip())
+        self.assertEqual(preflight_as_json(result)["state"], "ready")
+
+    def test_only_the_accepted_stage_is_ready(self):
+        for stage in ("proposal-stage:in-review", "proposal-stage:promoted",
+                      "proposal-stage:rejected"):
+            with self.subTest(stage=stage):
+                result = self.run_preflight(stage)
+                self.assertNotEqual(result.state, "ready")
+                self.assertIsNone(result.base_commit)
+
+    def test_v1_proposal_requires_a_revision(self):
+        v1 = Publication("published", review_commit=self.publication.review_commit,
+                         proposal=SimpleNamespace(version="v1", revision=None,
+                                                  proposal_id="gamma"))
+        result = proposal_promotion_proof.accepted(
+            v1, self.tracker(), "github", "octo/spec-guard")
+        self.assertEqual(result.state, "legacy-revision-required")
+
+    def test_accepted_helper_passes_review_states_through(self):
+        result = proposal_promotion_proof.accepted(
+            self.publication, self.tracker("proposal-stage:in-review"),
+            "github", "octo/spec-guard")
+        self.assertEqual(result.state, "in-review")
+        result = proposal_promotion_proof.accepted(
+            self.publication, self.tracker(), "github", "octo/spec-guard")
+        self.assertEqual(result.state, "accepted")
 
     def test_preflight_reports_publication_absent_diagnostic_for_missing_proposal(self):
-        remote_policy = dict(self.policy, schemaVersion=1)
-        pool = PublicationPool("published", review_commit=self.publication.review_commit,
-                               publications=(), review_map=self.publication.review_map,
-                               policy_text=json.dumps(remote_policy))
-        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
-            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
-                               tracker_reader=lambda *ignored: TrackerRead("absent"))
+        result = preflight(self.consumer, "missing", "github", "octo/spec-guard",
+                           tracker_reader=lambda *ignored: TrackerRead("absent"))
         self.assertEqual((result.state, result.diagnostic), ("absent", "publication-absent"))
 
     def test_preflight_reports_tracker_absent_diagnostic_for_missing_issue(self):
-        remote_policy = dict(self.policy, schemaVersion=1)
-        pool = PublicationPool("published", review_commit=self.publication.review_commit,
-                               publications=(self.publication,), review_map=self.publication.review_map,
-                               policy_text=json.dumps(remote_policy))
-        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
-            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
-                               tracker_reader=lambda *ignored: TrackerRead("absent"))
+        result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                           tracker_reader=lambda *ignored: TrackerRead("absent"))
         self.assertEqual((result.state, result.diagnostic), ("absent", "tracker-absent"))
 
-    def test_preflight_reports_acceptance_attestation_invalid_diagnostic(self):
-        remote_policy = dict(self.policy, schemaVersion=1)
-        evidence = {
-            "schemaVersion": 1, "proposalId": "gamma",
-            "revision": self.publication.proposal.revision,
-            "reviewCommit": self.publication.review_commit,
-            "policyDigest": policy_digest(remote_policy),
-            "authorityId": "mainline", "decision": "defer",
-        }
-        pool = PublicationPool("published", review_commit=self.publication.review_commit,
-                               publications=(self.publication,), review_map=self.publication.review_map,
-                               policy_text=json.dumps(remote_policy),
-                               attestation_texts={"gamma": json.dumps(evidence)})
-        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
-                              proposal_id="gamma", platform="github", target="octo/spec-guard")
-        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
-            result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
-                               tracker_reader=lambda *ignored: tracker)
-        self.assertEqual((result.state, result.diagnostic),
-                         ("blocked", "acceptance-attestation-invalid"))
+
+class LegacyFilesPreflightTests(PromotionPreflightTests):
+    legacy_files = True
+
+    def test_invalid_policy_and_stray_attestation_give_the_identical_ready_result(self):
+        result = self.run_preflight()
+        self.assertEqual((result.state, result.diagnostic), ("ready", None))
+        self.assertEqual(preflight_as_json(result)["state"], "ready")
+
+
+class DriftedPreflightTests(PromotionFixture):
+    skip_promotion = True
+    drift_map = DRIFT_MAP
+
+    def test_baseline_drift_is_stale_and_never_returns_a_base(self):
+        result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                           tracker_reader=lambda *ignored: self.tracker())
+        self.assertEqual((result.state, result.diagnostic, result.base_commit),
+                         ("stale", "proposal-baseline-drifted", None))
+        self.assertEqual(preflight_as_json(result)["diagnostic"], "proposal-baseline-drifted")
 
 
 class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
@@ -479,8 +495,10 @@ class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
 
     def test_as_json_keeps_only_code_shaped_diagnostics(self):
         self.assertEqual(
-            as_json(Proof("not-accepted", diagnostic="acceptance-attestation-invalid")),
-            {"state": "not-accepted", "diagnostic": "acceptance-attestation-invalid"})
+            as_json(Proof("stale", diagnostic="proposal-baseline-drifted")),
+            {"state": "stale", "diagnostic": "proposal-baseline-drifted"})
+        self.assertEqual(as_json(Proof("stale")),
+                         {"state": "stale", "diagnostic": "promotion-stale"})
         for raw in ("review capability map is missing", "Traceback: /tmp/x", None,
                     "Promotion-Invalid", "code-"):
             with self.subTest(raw=raw):
@@ -498,7 +516,6 @@ class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
 
 
 class PromotionProofCliTests(PromotionFixture):
-    attested = True
 
     def run_cli(self, *extra, stage="proposal-stage:accepted"):
         tracker = TrackerRead("verified", issue_id=42, stage=stage,
@@ -521,17 +538,11 @@ class PromotionProofCliTests(PromotionFixture):
                                       stage="proposal-stage:in-review"),
                          {"state": "not-accepted", "diagnostic": "promotion-not-accepted"})
 
-    def test_prove_cli_rejects_an_accepted_label_without_a_matching_attestation(self):
-        # Issue 仍是 accepted，但远端 attestation 不再是 accept：只有标签不足以证明。
-        path = next((self.seed / "spec/proposal-acceptances").glob("gamma-*.json"))
-        attestation = json.loads(path.read_text(encoding="utf-8"))
-        attestation["decision"] = "defer"
-        path.write_text(json.dumps(attestation), encoding="utf-8")
-        self.git(self.seed, "add", str(path))
-        self.git(self.seed, "commit", "-m", "withdraw attestation")
-        self.git(self.seed, "push", "origin", "trunk")
-        self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
-                         {"state": "not-accepted", "diagnostic": "acceptance-attestation-invalid"})
+    def test_prove_cli_still_proves_after_the_issue_is_labeled_promoted(self):
+        result = self.run_cli("--proposal-id", "gamma", "--prove",
+                              stage="proposal-stage:promoted")
+        self.assertEqual(result["state"], "proved")
+        self.assertEqual(result["reviewCommit"], self.parent_commit)
 
     def test_prove_cli_reports_a_missing_proposal_and_an_unreachable_remote(self):
         self.assertEqual(self.run_cli("--proposal-id", "missing", "--prove"),
@@ -545,13 +556,13 @@ class PromotionProofCliTests(PromotionFixture):
                    side_effect=AssertionError("preflight must not prove")):
             result = self.run_cli("--proposal-id", "gamma")
         # 晋级后能力图已变，preflight 只能报告 stale，绝不输出晋级证明。
-        self.assertEqual(result["state"], "stale")
+        self.assertEqual((result["state"], result["diagnostic"]),
+                         ("stale", "proposal-module-already-present"))
         self.assertNotIn("promotionCommit", result)
 
 
 class SkippedProposalOutputTests(PromotionFixture):
     """A promoted, unusable historical Proposal is reported but never blocks others."""
-    attested = True
     UNAVAILABLE = [{"proposalId": "beta", "diagnostic": "proposal-baseline-unavailable"}]
 
     run_cli = PromotionProofCliTests.run_cli
