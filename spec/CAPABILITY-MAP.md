@@ -25,6 +25,7 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | collaboration-messaging | Provide a private same-Mac mailbox and host adapters for direct Claude Code and Codex session communication. | — |
 | collaboration-safe-defaults | 协作信箱默认不绑定唤醒、Claude 启动器不把 token 放进会话环境，并用测试防止回退。 | collaboration-messaging |
 | local-ticket-ledger | Provide an optional local-first, worktree-shared ticket ledger and narrow Claude Code/Codex access without imposing workflow ownership or project topology. | — |
+| ledger-dependency-lock | 用插件附带的 lockfile 与 npm ci 安装本地事项账本运行时，校验全部依赖的完整性，并写明 XATS 依赖尚未锁定的剩余风险。 | local-ticket-ledger |
 | local-convention | Install and remove the local multi-module directory convention and its managed declaration block, without touching user specs or plans. | — |
 | phase-and-verification | Inject the current phase for activated projects and verify landed artifacts read-only, degrading to unverified when probes fail. | local-convention, proposal-contract |
 | module-insert | At a module checkpoint, validate and insert one new module into the capability map with a spec skeleton, after previewing and explicit confirmation. | local-convention, phase-and-verification |
@@ -34,7 +35,7 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | documentation-verification | 提供只读核验、保守提醒和跨宿主回归，确保缺失或未知不被伪装为文档完成 | documentation-baseline, documentation-impact |
 | audit-remediation | 修复项目审计中已核实、不改变设计的缺陷：假成功、诊断丢失、Codex 路由与校验缺口、文档漂移。 | proposal-mainline-review, proposal-promotion-proof, collaboration-messaging, local-convention, module-insert, capability-history, documentation-verification |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation
 
 ---
 
