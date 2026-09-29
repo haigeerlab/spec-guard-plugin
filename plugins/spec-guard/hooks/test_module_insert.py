@@ -245,6 +245,44 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertEqual(outcome["stage_module"], "delta")
         self.assertEqual(outcome["stage_hint"], "NEEDS_SPEC")
 
+    def finish_alpha_active(self, done=("alpha",)):
+        for module_id in done:
+            self.write("spec/%s.md" % module_id, "# Spec: %s\n" % module_id)
+            self.write("tasks/%s/plan.md" % module_id, "# Plan: %s\n" % module_id)
+            self.write("tasks/%s/todo.md" % module_id, "- [x] done\n")
+        self.write(".agent/state.json", '{"activeModule": "alpha"}\n')
+
+    def test_confirm_reports_module_done_when_active_module_done_and_others_pending(self):
+        self.finish_alpha_active()
+        outcome = module_insert.write(self.root, "delta", "Fourth module", "—", "end")
+        self.assertEqual(outcome["stage_module"], "alpha")
+        self.assertEqual(outcome["stage_hint"], "MODULE_DONE")
+        # Build order is alpha, beta -> gamma -> delta; beta is the first unfinished.
+        self.assertEqual(outcome["stage_pending"], ("beta", "NEEDS_SPEC"))
+
+    def test_confirm_cli_prints_module_done_hint_naming_next_module(self):
+        # Every existing module is done; activeModule still points at alpha.
+        self.finish_alpha_active(done=("alpha", "beta", "gamma"))
+        args = ["--project", str(self.root), "--id", "delta", "--responsibility", "Fourth",
+                "--depends-on", "gamma", "--anchor", "end", "--confirm"]
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            self.assertEqual(main(args), 0)
+        self.assertIn(
+            "当前阶段提示: `alpha` 处于 MODULE_DONE；Build order 中下一个未完成模块是 `delta`（NEEDS_SPEC）",
+            out.getvalue())
+        self.assertNotIn("`alpha` 处于 DONE", out.getvalue())
+
+    def test_stage_hint_line_all_done_and_plain_stage(self):
+        # Insertion always adds an unfinished module, so the all-done path is not
+        # reachable through write(); check the formatter directly.
+        self.assertEqual(module_insert.format_stage_hint(
+            {"stage_module": "alpha", "stage_hint": "DONE", "stage_pending": None}),
+            "当前阶段提示: DONE")
+        self.assertEqual(module_insert.format_stage_hint(
+            {"stage_module": "delta", "stage_hint": "NEEDS_SPEC", "stage_pending": ("delta", "NEEDS_SPEC")}),
+            "当前阶段提示: `delta` 处于 NEEDS_SPEC")
+
     def test_confirm_failed_replace_leaves_map_untouched_and_no_stray_temp_file(self):
         original = self.map_path.read_text(encoding="utf-8")
 

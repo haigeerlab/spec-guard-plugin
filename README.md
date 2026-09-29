@@ -71,7 +71,7 @@ codex plugin add spec-guard@spec-guard-marketplace
    Suggested next step: write the first reviewed module spec under `spec/`.
    ```
 
-4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`。
+4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`；模块做完但还有别的模块时显示 `MODULE_DONE`，`DONE` 表示全部模块都完成。
 
 项目做到一半来了新需求，在检查点用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，
 见[使用流程](docs/workflow.md)。

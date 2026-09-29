@@ -31,6 +31,20 @@ $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
 
+# 与 injects 相同的 JSON 校验，但要求正文不包含指定文本。
+lacks() {  # $1=用例名 $2=项目目录 $3=正文不得包含的文本
+  local out
+  out="$(run "$2")"
+  python3 -c '
+import json, sys
+output = json.loads(sys.stdin.read())["hookSpecificOutput"]
+assert output["hookEventName"] == "UserPromptSubmit"
+assert sys.argv[1] not in output["additionalContext"], output["additionalContext"]
+' "$3" <<<"$out" || fail "$1: 输出不是期望的 hook JSON，或含有不该出现的文本
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
 map() {  # $1=项目目录
   mkdir -p "$1/spec"
   printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
@@ -87,11 +101,30 @@ printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.ag
 injects "activeModule 优先于 Build order" "$stages" 'Current module: `alpha` (activeModule)'
 printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "activeModule 不在图中时提示并回退" "$stages" 'activeModule `ghost` is not in the capability map'
+# 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
+printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+injects "activeModule 已完成但项目未完成时报告 MODULE_DONE" "$stages" "当前阶段: **MODULE_DONE**"
+injects "MODULE_DONE 仍指出当前模块" "$stages" 'Current module: `alpha` (activeModule)'
+injects "MODULE_DONE 指向 Build order 中第一个未完成模块" "$stages" '`beta`'
+injects "MODULE_DONE 报告该模块自己的阶段" "$stages" 'NEEDS_PLAN'
+lacks "MODULE_DONE 不再冒充项目 DONE" "$stages" "当前阶段: **DONE**"
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
+# 全部完成且 activeModule 不在图中：回退后仍是项目 DONE（与拆分前同一场景）。
+printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
+# 全部完成但 activeModule 仍指向已完成模块：仍是项目 DONE，并提示可清除。
+printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+injects "全部完成且 activeModule 未清除时仍报告 DONE" "$stages" "当前阶段: **DONE**"
+injects "全部完成且 activeModule 未清除时指向 add-module" "$stages" "/spec-guard:add-module"
+injects "全部完成且 activeModule 未清除时提示可清除" "$stages" 'activeModule `alpha` is already done and can be cleared'
+lacks "全部完成时不出现模块级提示" "$stages" "before building it"
+# 全部完成且没有 activeModule：输出不带清除提示。
+printf '{"tracker":"none","modules":{},"activeModule":""}\n' > "$stages/.agent/state.json"
+injects "全部完成且无 activeModule 时报告 DONE" "$stages" "当前阶段: **DONE**"
+lacks "全部完成且无 activeModule 时无清除提示" "$stages" "can be cleared"
 rm "$stages/spec/beta.md"
 injects "缺 Spec 的模块报告 NEEDS_SPEC" "$stages" "当前阶段: **NEEDS_SPEC**"
 printf '%s\n' '| alpha | x | — |' > "$stages/spec/CAPABILITY-MAP.md"
