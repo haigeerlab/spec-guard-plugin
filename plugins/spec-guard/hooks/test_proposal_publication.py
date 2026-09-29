@@ -197,6 +197,59 @@ Gamma is separate.
         self.git(self.seed, "push", "origin", "trunk")
         self.assertEqual(read_published_pool(self.consumer).state, "invalid")
 
+    def publish_broken_baseline(self, proposal_id, module_id):
+        """Publish a parseable Proposal whose baseline commit is not on the default branch."""
+        text = (self.seed / "spec/proposals/gamma.md").read_text(encoding="utf-8")
+        text = text.replace("| Module id | gamma |", "| Module id | %s |" % module_id)
+        text = text.replace("gamma", proposal_id).replace(self.baseline, "0" * 40)
+        (self.seed / ("spec/proposals/%s.md" % proposal_id)).write_text(text, encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposals/%s.md" % proposal_id)
+        self.git(self.seed, "commit", "-m", "publish %s" % proposal_id)
+        self.git(self.seed, "push", "origin", "trunk")
+
+    def test_pool_isolates_promoted_proposal_with_broken_baseline(self):
+        self.publish_broken_baseline("beta", "alpha")
+        pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "published")
+        self.assertEqual([item.proposal.proposal_id for item in pool.publications], ["gamma"])
+        self.assertEqual(pool.skipped, (
+            ("beta", "Proposal baseline commit is not on remote default branch"),))
+
+    def test_pool_rejects_unpromoted_proposal_with_broken_baseline(self):
+        self.publish_broken_baseline("beta", "delta")
+        pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "invalid")
+        self.assertEqual(pool.diagnostic, "Proposal baseline commit is not on remote default branch")
+        self.assertEqual(pool.skipped, ())
+
+    def test_pool_rejects_unparseable_proposal_even_when_others_are_fine(self):
+        (self.seed / "spec/proposals/aaa-broken.md").write_text("not a proposal", encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposals/aaa-broken.md")
+        self.git(self.seed, "commit", "-m", "unparseable proposal")
+        self.git(self.seed, "push", "origin", "trunk")
+        pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "invalid")
+        self.assertEqual(pool.skipped, ())
+
+    def test_pool_keeps_healthy_promoted_proposal_and_skips_nothing(self):
+        (self.seed / "spec/CAPABILITY-MAP.md").write_text(
+            MAP.replace("| alpha | First | — |", "| alpha | First | — |\n| gamma | Gamma. | alpha |")
+               .replace("Build order: alpha", "Build order: alpha, gamma"), encoding="utf-8")
+        self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
+        self.git(self.seed, "commit", "-m", "promote gamma")
+        self.git(self.seed, "push", "origin", "trunk")
+        pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "published")
+        self.assertEqual([item.proposal.proposal_id for item in pool.publications], ["gamma"])
+        self.assertEqual(pool.skipped, ())
+
+    def test_pool_without_bad_proposals_has_no_skipped_entries(self):
+        pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "published")
+        self.assertEqual([item.proposal.proposal_id for item in pool.publications], ["gamma"])
+        self.assertIsNone(pool.diagnostic)
+        self.assertEqual(pool.skipped, ())
+
     def test_v2_attestation_keeps_its_pre_acceptance_review_snapshot(self):
         digest = _digest.compute(str(self.seed / "spec/CAPABILITY-MAP.md"))
         rows = "\n".join("| %s | %s |" % (item["id"], item["rowDigest"])

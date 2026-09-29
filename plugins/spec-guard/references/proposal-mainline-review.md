@@ -42,6 +42,16 @@ candidate, with `legacy-revision-required` or `review-<state>` (for example
 `review-absent` when no Proposal Issue exists). An empty candidate list therefore
 still says what was seen.
 
+Both the candidate list and the decision JSON also carry `"skippedProposals":
+[{"proposalId": ..., "diagnostic": ...}]` when the pool excluded already-promoted
+Proposals that fail validation (see
+[proposal-publication.md](proposal-publication.md#pool-reading-and-isolated-proposals)),
+and omit the key otherwise. This is separate from `skipped` above, which lists
+candidate skip reasons. `diagnostic` is `proposal-baseline-remote-mismatch`,
+`proposal-baseline-unavailable` or `proposal-invalid`. Deciding on an excluded
+Proposal returns `invalid` / `proposal-not-published`, as for any Proposal not in the
+pool.
+
 ## The accepted-candidate attestation
 
 When `evaluate` returns `accepted-candidate`, its JSON additionally carries an

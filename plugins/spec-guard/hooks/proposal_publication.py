@@ -12,6 +12,18 @@ from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal
 
 MAX_POOL_SIZE = 100
 ATTESTATION_PATH_TEMPLATE = "spec/proposal-acceptances/%s-%s.json"
+BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
+BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
+_SKIPPED_CODES = {
+    BASELINE_REMOTE_MISMATCH: "proposal-baseline-remote-mismatch",
+    BASELINE_UNAVAILABLE: "proposal-baseline-unavailable",
+}
+
+
+def skipped_as_json(skipped):
+    """Serialize `PublicationPool.skipped` as stable codes; raw errors never leave here."""
+    return [{"proposalId": proposal_id, "diagnostic": _SKIPPED_CODES.get(error, "proposal-invalid")}
+            for proposal_id, error in skipped]
 
 
 class Publication(object):
@@ -27,7 +39,7 @@ class Publication(object):
 
 class PublicationPool(object):
     def __init__(self, state, review_commit=None, publications=(), review_map=None,
-                 policy_text=None, attestation_texts=None, diagnostic=None):
+                 policy_text=None, attestation_texts=None, diagnostic=None, skipped=()):
         self.state = state
         self.review_commit = review_commit
         self.publications = tuple(publications)
@@ -35,6 +47,7 @@ class PublicationPool(object):
         self.policy_text = policy_text
         self.attestation_texts = dict(attestation_texts or {})
         self.diagnostic = diagnostic
+        self.skipped = tuple(skipped)
 
 
 def as_json(result):
@@ -168,12 +181,12 @@ def read_published(project, proposal_id, remote="origin"):
         try:
             proposal = parse_proposal(proposal_path)
             if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
-                raise ContractError("Proposal baseline remote or default branch differs")
+                raise ContractError(BASELINE_REMOTE_MISMATCH)
             ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                              proposal.baseline.commit, observed_commit])
             baseline_map = _show(repo, proposal.baseline.commit, "spec/CAPABILITY-MAP.md")
             if not ancestor or baseline_map is None:
-                raise ContractError("Proposal baseline commit is not on remote default branch")
+                raise ContractError(BASELINE_UNAVAILABLE)
             baseline_path = Path(temp) / "baseline-map.md"
             baseline_path.write_text(baseline_map, encoding="utf-8")
             validate_proposal(proposal_path, baseline_path)
@@ -205,11 +218,12 @@ def read_published_pool(project, remote="origin"):
         try:
             review_path = Path(temp) / "review-map.md"
             review_path.write_text(review_map, encoding="utf-8")
-            parse_map(review_path)
+            review_module_ids = {row.module_id for row in parse_map(review_path).rows}
         except (MapError, OSError, UnicodeError):
             return PublicationPool("invalid", review_commit=observed_commit,
                                    diagnostic="review capability map is invalid")
         publications = []
+        skipped = []
         proposal_ids = set()
         policy_text = _show(repo, observed_commit, "spec/proposal-mainline-policy.json")
         attestation_texts = {}
@@ -225,17 +239,23 @@ def read_published_pool(project, remote="origin"):
             proposal_path.write_text(proposal_text, encoding="utf-8")
             try:
                 proposal = parse_proposal(proposal_path)
+            except (ContractError, OSError, UnicodeError) as error:
+                return PublicationPool("invalid", review_commit=observed_commit, diagnostic=str(error))
+            try:
                 if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
-                    raise ContractError("Proposal baseline remote or default branch differs")
+                    raise ContractError(BASELINE_REMOTE_MISMATCH)
                 ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                                  proposal.baseline.commit, observed_commit])
                 baseline_map = _show(repo, proposal.baseline.commit, "spec/CAPABILITY-MAP.md")
                 if not ancestor or baseline_map is None:
-                    raise ContractError("Proposal baseline commit is not on remote default branch")
+                    raise ContractError(BASELINE_UNAVAILABLE)
                 baseline_path = Path(temp) / "baseline-map.md"
                 baseline_path.write_text(baseline_map, encoding="utf-8")
                 validate_proposal(proposal_path, baseline_path)
             except (ContractError, OSError, UnicodeError) as error:
+                if proposal.change.module_id in review_module_ids:
+                    skipped.append((proposal.proposal_id, str(error)))
+                    continue
                 return PublicationPool("invalid", review_commit=observed_commit, diagnostic=str(error))
             if proposal.proposal_id in proposal_ids:
                 return PublicationPool("invalid", review_commit=observed_commit,
@@ -259,7 +279,7 @@ def read_published_pool(project, remote="origin"):
         return PublicationPool("published", review_commit=observed_commit,
                                publications=publications, review_map=review_map,
                                policy_text=policy_text,
-                               attestation_texts=attestation_texts)
+                               attestation_texts=attestation_texts, skipped=skipped)
 
 
 def main(argv=None):

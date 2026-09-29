@@ -7,13 +7,14 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
 from proposal_mainline_review import DIAGNOSTIC_CODE, accepted_from_pool
-from proposal_publication import fixed_snapshot, read_published_pool
+from proposal_publication import fixed_snapshot, read_published_pool, skipped_as_json
 from proposal_tracker_read import read_tracker
 
 
 class Proof(object):
     def __init__(self, state, review_commit=None, proposal_id=None, module_id=None,
-                 promotion_commit=None, diagnostic=None):
+                 promotion_commit=None, diagnostic=None, skipped_proposals=()):
+        self.skipped_proposals = tuple(skipped_proposals)
         self.state = state
         self.review_commit = review_commit
         self.proposal_id = proposal_id
@@ -24,7 +25,8 @@ class Proof(object):
 
 class Preflight(object):
     def __init__(self, state, proposal_id=None, revision=None, base_commit=None,
-                 diagnostic=None):
+                 diagnostic=None, skipped_proposals=()):
+        self.skipped_proposals = tuple(skipped_proposals)
         self.state = state
         self.proposal_id = proposal_id
         self.revision = revision
@@ -42,6 +44,8 @@ def preflight_as_json(result):
         code = result.diagnostic
         data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
                               else "promotion-preflight-%s" % result.state)
+    if result.skipped_proposals:
+        data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     return data
 
 
@@ -60,6 +64,8 @@ def as_json(result):
         code = result.diagnostic
         data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
                               else "promotion-%s" % result.state)
+    if result.skipped_proposals:
+        data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     return data
 
 
@@ -131,6 +137,13 @@ def _blocked(state, diagnostic=None):
 def preflight(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
     """Freshly require remote policy, Issue and attestation before branch creation."""
     pool = read_published_pool(project, remote)
+    result = _preflight(pool, proposal_id, platform, target, tracker_reader)
+    if getattr(pool, "state", None) == "published":
+        result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
+    return result
+
+
+def _preflight(pool, proposal_id, platform, target, tracker_reader):
     pool_state = getattr(pool, "state", None)
     if pool_state != "published":
         state = pool_state if pool_state in ("invalid", "unknown") else "unknown"
@@ -235,11 +248,14 @@ def prove_from_remote(project, proposal_id, platform, target, remote="origin",
     publication = next((item for item in pool.publications
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:
-        return Proof("absent", proposal_id=proposal_id)
-    reader = read_tracker if tracker_reader is None else tracker_reader
-    tracker = reader(publication.proposal, platform, target)
-    acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
-    return prove(project, publication, acceptance, remote)
+        result = Proof("absent", proposal_id=proposal_id)
+    else:
+        reader = read_tracker if tracker_reader is None else tracker_reader
+        tracker = reader(publication.proposal, platform, target)
+        acceptance = accepted_from_pool(pool, publication, tracker, platform, target)
+        result = prove(project, publication, acceptance, remote)
+    result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
+    return result
 
 
 def main(argv=None):

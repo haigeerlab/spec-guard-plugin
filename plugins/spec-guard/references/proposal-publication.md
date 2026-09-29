@@ -15,3 +15,27 @@ The response contains `state` and, when known, `reviewCommit`. A `published` res
 - `unknown`: remote observation could not safely complete; this is not a successful remote verification.
 
 Publication does not read GitHub/GitLab Issues. Tracker marker and stage validation belongs to `proposal-tracker-read`.
+
+## Pool reading and isolated Proposals
+
+`read_published_pool` reads every Proposal in the snapshot. One already-promoted Proposal
+that has gone stale must not block the rest of the pool, so it is excluded instead of
+invalidating the pool, and only when all of these hold:
+
+- it parses;
+- its declared `Module id` is already in the remote default-branch capability map (it has been promoted); and
+- its baseline check (remote/default branch mismatch, baseline commit not on the default
+  branch, or its baseline map missing) or validation fails.
+
+A typical cause is a repository migration after which a long-promoted historical
+Proposal's baseline commit no longer exists.
+
+Everything else is unchanged: parse failures, failures of a Proposal not yet promoted,
+duplicate ids, a missing or invalid capability map and the pool size limit still make the
+pool invalid or unknown. Healthy promoted Proposals stay in the pool, and attestations and
+the policy digest are unaffected. An excluded Proposal takes no part in attestation lookup
+and is reported in the pool's `skipped` list; querying it by id behaves as if it were not
+in the pool.
+
+`read_published` (one Proposal, used by `/spec-guard:proposal-review`) is not affected: it
+still reports such a Proposal as `invalid`, which is how to see the full reason.

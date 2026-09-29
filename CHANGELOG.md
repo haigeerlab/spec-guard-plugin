@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **已晋级 Proposal 的基线失效，不再让整个 Proposal 池失效。** 读取 Proposal 池时，若某个 Proposal 能解析、其 `Module id` 已在远端默认分支的能力图里（已晋级），且基线检查（远端与默认分支不符、基线提交不在默认分支上或其基线能力图缺失）或校验失败，就只把它排除，而不是让整个池 `invalid`；典型成因是仓库迁移后，早已晋级的历史 Proposal 的基线提交不复存在。解析失败、尚未晋级的 Proposal 出错、重复 id、能力图缺失或无效、池超出大小上限仍使整个池失效；健康的已晋级 Proposal 留在池中，验收记录与策略摘要不受影响。被排除的 Proposal 按“不在池中”处理：预检 `absent` / `publication-absent`、证明 `absent`、主链决策 `invalid` / `proposal-not-published`。单个评审（`/spec-guard:proposal-review`）仍如实报告其为 `invalid`，可据此查看完整原因。
+
+### 变更
+
+- **晋级预检／证明与主链候选／决策的 JSON 在有 Proposal 被排除时新增 `skippedProposals`。** 形如 `[{"proposalId": ..., "diagnostic": ...}]`，仅在非空时出现，否则输出与此前逐字节一致。`diagnostic` 只有短码 `proposal-baseline-remote-mismatch`、`proposal-baseline-unavailable`、`proposal-invalid`，不输出原始错误；在主链评审里与既有的 `skipped`（候选跳过原因）是两个独立的键。
+
 ## [0.30.0] - 2026-09-29
 
 ### 新增

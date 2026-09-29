@@ -11,7 +11,8 @@ from unittest.mock import patch
 
 from capability_map import parse_map
 from proposal_contract import Change, compute, compute_revision
-from proposal_publication import Publication, PublicationPool, read_published
+from proposal_publication import (
+    Publication, PublicationPool, read_published, skipped_as_json)
 from proposal_promotion_proof import (
     Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, prove)
 from proposal_mainline_review import accepted, policy_digest
@@ -546,6 +547,66 @@ class PromotionProofCliTests(PromotionFixture):
         # 晋级后能力图已变，preflight 只能报告 stale，绝不输出晋级证明。
         self.assertEqual(result["state"], "stale")
         self.assertNotIn("promotionCommit", result)
+
+
+class SkippedProposalOutputTests(PromotionFixture):
+    """A promoted, unusable historical Proposal is reported but never blocks others."""
+    attested = True
+    UNAVAILABLE = [{"proposalId": "beta", "diagnostic": "proposal-baseline-unavailable"}]
+
+    run_cli = PromotionProofCliTests.run_cli
+
+    def publish_broken_baseline(self, proposal_id="beta", module_id="alpha"):
+        text = (self.seed / "spec/proposals/gamma.md").read_text(encoding="utf-8")
+        text = text.replace("| Module id | gamma |", "| Module id | %s |" % module_id)
+        text = text.replace("gamma", proposal_id).replace(self.baseline, "0" * 40)
+        text = text.replace(self.publication.proposal.revision, "0" * 64)
+        path = self.seed / ("spec/proposals/%s.md" % proposal_id)
+        path.write_text(text, encoding="utf-8")
+        path.write_text(text.replace("0" * 64, compute_revision(path)), encoding="utf-8")
+        self.git(self.seed, "add", "spec/proposals/%s.md" % proposal_id)
+        self.git(self.seed, "commit", "-m", "publish %s" % proposal_id)
+        self.git(self.seed, "push", "origin", "trunk")
+
+    def test_healthy_output_has_no_skipped_key(self):
+        self.assertNotIn("skippedProposals", self.run_cli("--proposal-id", "gamma", "--prove"))
+        self.assertNotIn("skippedProposals", self.run_cli("--proposal-id", "gamma"))
+        self.assertEqual(preflight_as_json(Preflight("absent", diagnostic="publication-absent")),
+                         {"state": "absent", "diagnostic": "publication-absent"})
+        self.assertEqual(as_json(Proof("absent", proposal_id="x")),
+                         {"state": "absent", "proposalId": "x"})
+
+    def test_other_proposals_keep_their_state_and_report_the_skipped_one(self):
+        proof_before = self.run_cli("--proposal-id", "gamma", "--prove")
+        preflight_before = self.run_cli("--proposal-id", "gamma")
+        self.publish_broken_baseline()
+        proof = self.run_cli("--proposal-id", "gamma", "--prove")
+        self.assertEqual(proof, dict(proof_before, skippedProposals=self.UNAVAILABLE))
+        preflight_result = self.run_cli("--proposal-id", "gamma")
+        self.assertEqual(preflight_result,
+                         dict(preflight_before, skippedProposals=self.UNAVAILABLE))
+
+    def test_querying_the_excluded_proposal_is_plainly_absent(self):
+        self.publish_broken_baseline()
+        proof = self.run_cli("--proposal-id", "beta", "--prove")
+        self.assertEqual(proof, {"state": "absent", "proposalId": "beta",
+                                 "skippedProposals": self.UNAVAILABLE})
+        result = preflight(self.consumer, "beta", "github", "octo/spec-guard")
+        self.assertEqual((result.state, result.diagnostic), ("absent", "publication-absent"))
+        self.assertEqual(preflight_as_json(result)["skippedProposals"], self.UNAVAILABLE)
+
+    def test_serializer_maps_each_raw_error_to_a_short_code_and_hides_the_text(self):
+        raw = (
+            ("a", "Proposal baseline remote or default branch differs"),
+            ("b", "Proposal baseline commit is not on remote default branch"),
+            ("c", "Proposal Module digests differ from /private/path"),
+        )
+        data = skipped_as_json(raw)
+        self.assertEqual(data, [
+            {"proposalId": "a", "diagnostic": "proposal-baseline-remote-mismatch"},
+            {"proposalId": "b", "diagnostic": "proposal-baseline-unavailable"},
+            {"proposalId": "c", "diagnostic": "proposal-invalid"}])
+        self.assertNotIn("private", json.dumps(data))
 
 
 if __name__ == "__main__":
