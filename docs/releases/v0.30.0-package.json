@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.30.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.30.0;asset:spec-guard-v0.30.0.tar.gz;sha256:46a38abc2d01af4b4fdaf89e89a76d223a847019975cf54530ea093adab06d5d"
+      },
+      "observedAt": "2026-09-29T13:08:01Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.30.0",
+        "asset:spec-guard-v0.30.0.tar.gz;size:264191",
+        "source-tag:v0.30.0@5e6dddab325fbe437f67a72705f5094cd1f085d3",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.30.0",
+        "result:the package was built from the v0.30.0 tag with git archive of .claude-plugin and plugins/spec-guard plus ARTIFACT-MANIFEST.json, the method that rebuilt v0.24.0 file-for-file identical to its published asset",
+        "result:release-package.py validated the artifact directory before archiving and again after extracting the archive; the archive contains no AppleDouble entries",
+        "result:the locally built archive and the downloaded published GitHub asset both have SHA-256 46a38abc2d01af4b4fdaf89e89a76d223a847019975cf54530ea093adab06d5d, matching the digest GitHub reports",
+        "content:hooks/module_stage.py and hooks/verify-artifacts.sh in the package contain the missing-todo note, the summary warning and the retired-tracker exemption",
+        "result:the required GitHub Actions checks validate (ubuntu-latest) and validate (macos-latest) passed on c3b2086, the release pull request head whose tree is identical to the tagged merge commit"
+      ]
+    }
+  ]
+}
