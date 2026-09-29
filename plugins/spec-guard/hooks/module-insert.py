@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
-from module_stage import active_module, module_state, paused_modules, project_stage
+from module_stage import CHECKED, active_module, module_state, paused_modules, project_stage
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -54,8 +54,8 @@ def _current_module(project, order):
     by_id = {state["id"]: state for state in states}
     active = active_module(project)
     if active and active in by_id:
-        return by_id[active], active
-    return next((state for state in states if state["stage"] != "DONE"), None), active
+        return by_id[active], active, states
+    return next((state for state in states if state["stage"] != "DONE"), None), active, states
 
 
 def _module_table_rows(lines):
@@ -121,7 +121,7 @@ def _assert_new_module_present(parsed, module_id):
         raise InsertError("插入后的能力图未在 Build order 中包含新模块: %s" % module_id)
 
 
-def preview(project, module_id, responsibility, depends_on_raw, anchor):
+def preview(project, module_id, responsibility, depends_on_raw, anchor, interrupt=False):
     """Validate a quick insertion and describe it; never writes a file."""
     project = Path(project)
     map_path = project / "spec" / "CAPABILITY-MAP.md"
@@ -133,9 +133,18 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
         raise InsertError("能力图无效: %s" % error)
 
     order = list(parsed.order)
-    current, active = _current_module(project, order)
+    current, active, states = _current_module(project, order)
+    interrupted = None
     if current is not None and current["half"]:
-        raise InsertError("当前模块 `%s` 做到一半（既有已勾选项又有未勾选项）；请先完成它。" % current["id"])
+        if not interrupt:
+            raise InsertError("当前模块 `%s` 做到一半（既有已勾选项又有未勾选项）；请先完成它"
+                              "；如确需先做新模块，可加 --interrupt 显式插队。" % current["id"])
+        paused = paused_modules(states, current)
+        if paused:
+            raise InsertError("已有暂停中的模块 `%s`，只支持一层插队。" % paused[0]["id"])
+        todo = project / "tasks" / current["id"] / "todo.md"
+        checked = len(CHECKED.findall(todo.read_text(encoding="utf-8")))
+        interrupted = {"id": current["id"], "checked": checked, "total": checked + current["open"]}
 
     if not MODULE_ID.match(module_id):
         raise InsertError("id 不是合法的 kebab-case: %s" % module_id)
@@ -236,7 +245,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
     if [module_id_ for module_id_ in new_parsed.order if module_id_ in existing_ids] != order:
         raise InsertError("插入改变了已有模块在 Build order 中的相对顺序")
 
-    new_current, _ = _current_module(project, list(new_parsed.order))
+    new_current, _, _ = _current_module(project, list(new_parsed.order))
 
     proposal_path = project / "spec" / "proposals" / ("%s.md" % module_id)
 
@@ -251,12 +260,13 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
         "new_current": new_current["id"] if new_current else None,
         "proposal_conflict": proposal_path.is_file(),
         "module_id": module_id,
+        "interrupted": interrupted,
         "responsibility": responsibility,
         "new_text": new_text,
     }
 
 
-def write(project, module_id, responsibility, depends_on_raw, anchor):
+def write(project, module_id, responsibility, depends_on_raw, anchor, interrupt=False):
     """Re-run every preview check, then atomically write the capability map.
 
     Writes only `spec/CAPABILITY-MAP.md` (temp file in the same directory,
@@ -265,7 +275,7 @@ def write(project, module_id, responsibility, depends_on_raw, anchor):
     would jump straight to NEEDS_PLAN, skipping "write and review the spec".
     """
     project = Path(project)
-    result = preview(project, module_id, responsibility, depends_on_raw, anchor)
+    result = preview(project, module_id, responsibility, depends_on_raw, anchor, interrupt)
     map_path = project / "spec" / "CAPABILITY-MAP.md"
     mode = stat.S_IMODE(os.stat(map_path).st_mode)
 
@@ -323,6 +333,13 @@ def format_report(result):
         lines.append("插入后当前模块不变: %s" % old_current)
     else:
         lines.append("插入后当前模块将从 %s 变为 %s" % (old_current, new_current))
+    interrupted = result.get("interrupted")
+    if interrupted:
+        lines.append("插队：被暂停的模块 `%s`，进度 已勾 %d/%d"
+                     % (interrupted["id"], interrupted["checked"], interrupted["total"]))
+        if result["new_current"] == interrupted["id"]:
+            lines.append("插入后当前模块仍是 `%s`；请把 .agent/state.json 的 activeModule 改为 `%s` 再开始构建"
+                         % (interrupted["id"], result["module_id"]))
     if result["proposal_conflict"]:
         lines.append("")
         lines.append("警告: 本地存在 spec/proposals/%s.md；若该 Proposal 之后发布，"
@@ -337,13 +354,15 @@ def main(argv=None):
     parser.add_argument("--responsibility", required=True)
     parser.add_argument("--depends-on", required=True, dest="depends_on")
     parser.add_argument("--anchor", required=True)
+    parser.add_argument("--interrupt", action="store_true",
+                        help="允许在当前模块做到一半时显式插队（只支持一层）")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
 
     if args.confirm:
         try:
             outcome = write(args.project, args.module_id, args.responsibility,
-                            args.depends_on, args.anchor)
+                            args.depends_on, args.anchor, args.interrupt)
         except InsertError as error:
             print("校验失败: %s" % error, file=sys.stderr)
             return 1
@@ -356,7 +375,7 @@ def main(argv=None):
 
     try:
         result = preview(args.project, args.module_id, args.responsibility,
-                         args.depends_on, args.anchor)
+                         args.depends_on, args.anchor, args.interrupt)
     except InsertError as error:
         print("校验失败: %s" % error, file=sys.stderr)
         return 1
