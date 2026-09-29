@@ -10,6 +10,8 @@ from unittest import mock
 from pathlib import Path
 
 import module_stage
+import proposal_promotion_proof
+import test_proposal_promotion_proof as fixtures
 
 
 _spec = importlib.util.spec_from_file_location(
@@ -682,6 +684,196 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         after_mode = stat.S_IMODE(os.stat(map_path).st_mode)
         self.assertEqual(after_mode, 0o644)
+
+
+GROUPED_MAP = fixtures.BASE_MAP.replace(
+    "| alpha | Existing capability | — |",
+    "| alpha | Existing capability | — |\n| beta | Sibling capability | — |").replace(
+        "Build order: alpha", "Build order: alpha, beta")
+
+
+class ProposalPromotionFixture(fixtures.PromotionFixture):
+    """A real temp remote and consumer clone with a published Proposal for `gamma`."""
+    skip_promotion = True
+    base_map = None
+    stage = "proposal-stage:accepted"
+
+    def setUp(self):
+        if self.base_map is not None:
+            patcher = mock.patch.object(fixtures, "BASE_MAP", self.base_map)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        super().setUp()
+        self.map_file = self.consumer / "spec" / "CAPABILITY-MAP.md"
+        self.git(self.consumer, "config", "user.email", "test@example.invalid")
+        self.git(self.consumer, "config", "user.name", "test")
+
+    def write_proposal(self):
+        super().write_proposal()
+        if self.base_map is None:
+            return
+        path = self.seed / "spec/proposals/gamma.md"
+        text = path.read_text(encoding="utf-8").replace(
+            "| Build order | alpha |", "| Build order | alpha, beta |")
+        placeholder = "0" * 64
+        path.write_text(text.replace(
+            text.split("revision=sha256:", 1)[1].split(" ", 1)[0], placeholder),
+            encoding="utf-8")
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            placeholder, fixtures.compute_revision(path)), encoding="utf-8")
+
+    def reader(self, *ignored):
+        return self.tracker(self.stage)
+
+    def snapshot(self):
+        return dict((str(path), path.read_bytes())
+                    for path in self.consumer.rglob("*")
+                    if path.is_file() and ".git" not in path.relative_to(self.consumer).parts)
+
+    def run_main(self, *extra, proposal=("--proposal", "gamma"),
+                 platform=("--platform", "github", "--target", "octo/spec-guard")):
+        argv = ["--project", str(self.consumer)] + list(proposal) + list(platform) + list(extra)
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = main(argv, tracker_reader=self.reader)
+        return code, out.getvalue(), err.getvalue()
+
+    def assert_rejected(self, *extra, message=None, **kwargs):
+        before = self.snapshot()
+        for flags in ((), ("--confirm",)):
+            code, out, err = self.run_main(*(extra + flags), **kwargs)
+            self.assertNotEqual(code, 0, (out, err))
+            if message:
+                self.assertIn(message, err)
+            self.assertEqual(before, self.snapshot())
+        return err
+
+
+class ProposalPromotionTests(ProposalPromotionFixture):
+    def base_commit(self):
+        return self.git(self.seed, "rev-parse", "HEAD").strip()
+
+    def test_preview_shows_declared_row_and_identity_without_writing(self):
+        before = self.snapshot()
+        code, out, err = self.run_main()
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("| gamma | Gamma. | alpha |", out)
+        self.assertIn("Build order: alpha → gamma", out)
+        self.assertIn("gamma", out.splitlines()[0])
+        self.assertIn(self.publication.proposal.revision, out)
+        self.assertIn(self.base_commit(), out)
+        self.assertNotIn("本地存在", out)
+        self.assertEqual(before, self.snapshot())
+
+    def test_confirm_changes_only_the_capability_map(self):
+        before = self.snapshot()
+        code, out, err = self.run_main("--confirm")
+        self.assertEqual((code, err), (0, ""))
+        after = self.snapshot()
+        changed = set(path for path in set(before) | set(after) if before.get(path) != after.get(path))
+        self.assertEqual(changed, {str(self.map_file)})
+        self.assertIn("| gamma | Gamma. | alpha |", self.map_file.read_text(encoding="utf-8"))
+
+    def test_confirmed_promotion_pushed_to_the_remote_is_proved(self):
+        base = self.base_commit()
+        self.git(self.consumer, "fetch", "origin")
+        self.git(self.consumer, "switch", "-c", "promote-gamma", base)
+        code, out, err = self.run_main("--confirm")
+        self.assertEqual((code, err), (0, ""))
+        self.git(self.consumer, "add", "spec/CAPABILITY-MAP.md")
+        self.git(self.consumer, "commit", "-m", "promote gamma")
+        self.git(self.consumer, "push", "origin", "HEAD:trunk")
+        proof = proposal_promotion_proof.prove_from_remote(
+            self.consumer, "gamma", "github", "octo/spec-guard", tracker_reader=self.reader)
+        self.assertEqual((proof.state, proof.module_id), ("proved", "gamma"))
+
+    def test_string_proposal_flag_keeps_gitlab_numeric_target_as_int(self):
+        seen = []
+
+        def reader(proposal, platform, target):
+            seen.append((platform, target))
+            return self.tracker(self.stage)
+
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            main(["--project", str(self.consumer), "--proposal", "gamma",
+                  "--platform", "gitlab", "--target", "123"], tracker_reader=reader)
+        self.assertEqual(seen[0], ("gitlab", 123))
+
+    def test_field_flags_are_rejected_with_proposal(self):
+        for flags in (("--id", "delta"), ("--responsibility", "Other"),
+                      ("--depends-on", "alpha"), ("--anchor", "end")):
+            with self.subTest(flags=flags):
+                self.assert_rejected(*flags)
+
+    def test_platform_and_target_are_required_with_proposal(self):
+        self.assert_rejected(platform=("--target", "octo/spec-guard"))
+        self.assert_rejected(platform=("--platform", "github"))
+        self.assert_rejected(platform=())
+
+    def test_half_done_current_module_needs_interrupt(self):
+        (self.consumer / "tasks/alpha").mkdir(parents=True)
+        (self.consumer / "tasks/alpha/todo.md").write_text("- [x] one\n- [ ] two\n",
+                                                            encoding="utf-8")
+        self.assert_rejected(message="--interrupt")
+        code, out, err = self.run_main("--interrupt")
+        self.assertEqual((code, err), (0, ""))
+
+    def test_existing_module_spec_is_rejected(self):
+        (self.consumer / "spec/gamma.md").write_text("# Spec: gamma\n", encoding="utf-8")
+        self.assert_rejected(message="spec/gamma.md")
+
+    def test_local_map_differing_from_base_commit_is_rejected_with_the_commit(self):
+        self.map_file.write_text(self.map_file.read_text(encoding="utf-8") + "\nExtra.\n",
+                                 encoding="utf-8")
+        err = self.assert_rejected()
+        self.assertIn(self.base_commit(), err)
+        self.assertIn("git switch -c", err)
+
+    def test_nothing_local_about_the_proposal_is_needed_or_warned(self):
+        code, out, err = self.run_main()
+        self.assertEqual(code, 0)
+        self.assertNotIn("警告", out)
+
+    def test_unknown_proposal_is_rejected_with_its_state(self):
+        err = self.assert_rejected(proposal=("--proposal", "missing"), message="absent")
+        self.assertIn("publication-absent", err)
+
+
+class InReviewProposalPromotionTests(ProposalPromotionFixture):
+    stage = "proposal-stage:in-review"
+
+    def test_non_accepted_stage_is_rejected_with_state_and_diagnostic(self):
+        err = self.assert_rejected(message="in-review")
+        self.assertNotIn("Traceback", err)
+
+
+class DriftedProposalPromotionTests(ProposalPromotionFixture):
+    drift_map = fixtures.DRIFT_MAP
+
+    def test_baseline_drift_is_rejected(self):
+        self.assert_rejected(message="proposal-baseline-drifted")
+
+
+class GroupedSegmentProposalPromotionTests(ProposalPromotionFixture):
+    base_map = GROUPED_MAP
+
+    def test_anchor_inside_a_grouped_segment_would_not_be_provable(self):
+        self.assertEqual(self.publication.proposal.change.anchor, "after:alpha")
+        self.assert_rejected(message="并行段")
+
+    def test_without_proposal_the_same_insertion_is_still_allowed(self):
+        result = preview(self.consumer, "gamma", "Gamma.", "alpha", "after:alpha")
+        self.assertEqual(result["build_order_line"], "Build order: alpha, beta → gamma")
+
+
+class ProposalArgumentTests(unittest.TestCase):
+    def test_missing_fields_without_proposal_still_fail_in_argparse(self):
+        err = io.StringIO()
+        with redirect_stderr(err), self.assertRaises(SystemExit) as raised:
+            main(["--id", "delta"])
+        self.assertEqual(raised.exception.code, 2)
+        self.assertIn("the following arguments are required: --responsibility, --depends-on, "
+                      "--anchor", err.getvalue())
 
 
 if __name__ == "__main__":

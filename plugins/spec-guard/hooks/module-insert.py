@@ -21,6 +21,7 @@ from pathlib import Path
 
 from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
 from module_stage import CHECKED, active_module, module_state, paused_modules, project_stage
+from proposal_promotion_proof import _matches, preflight_as_json, promotion_base
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -318,8 +319,68 @@ def format_stage_hint(outcome):
     return "当前阶段提示: DONE"
 
 
+def prepare_proposal(project, proposal_id, platform, target, interrupt=False,
+                     tracker_reader=None):
+    """Resolve a published, accepted Proposal into a validated insertion; never writes.
+
+    Returns the insertion arguments and the preview result. Every rejection is an
+    InsertError, so a caller that only writes after this returns cannot write an
+    insertion that `proposal-promotion-proof` would not accept.
+    """
+    project = Path(project)
+    ready, base_map, proposal = promotion_base(
+        project, proposal_id, platform, target, tracker_reader=tracker_reader)
+    if ready.state != "ready":
+        data = preflight_as_json(ready)
+        raise InsertError("Proposal `%s` 预检未通过: state=%s, diagnostic=%s"
+                          % (proposal_id, data["state"], data.get("diagnostic", "-")))
+    map_path = project / "spec" / "CAPABILITY-MAP.md"
+    try:
+        local_text = map_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise InsertError("无法读取本地能力图: %s" % error)
+    if local_text != base_map:
+        raise InsertError("本地 spec/CAPABILITY-MAP.md 与基线提交 %s 上的能力图不一致；"
+                          "请先从该提交开晋级分支: git switch -c <晋级分支> %s"
+                          % (ready.base_commit, ready.base_commit))
+    change = proposal.change
+    args = (change.module_id, change.responsibility,
+            ", ".join(change.depends_on) or "—", change.anchor)
+    result = preview(project, *args, interrupt=interrupt)
+
+    tmp_fd, tmp_path_str = tempfile.mkstemp(prefix="spec-guard-module-insert-", suffix=".md")
+    tmp_path = Path(tmp_path_str)
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as handle:
+            handle.write(result["new_text"])
+        try:
+            new_parsed = parse_map(tmp_path)
+        except MapError as error:
+            raise InsertError("插入后的能力图未通过严格校验: %s" % error)
+    finally:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+    if not _matches(proposal, new_parsed):
+        raise InsertError("按 Proposal `%s` 的声明插入后，新行或位置与声明不符"
+                          "（例如锚点 `%s` 位于 Build order 的并行段中，新模块会被插到整段之后），"
+                          "合并后无法被 proposal-promotion-proof 证明；未写入。"
+                          % (proposal_id, change.anchor))
+    result["proposal"] = {"id": proposal.proposal_id, "revision": proposal.revision,
+                          "base_commit": ready.base_commit}
+    result["proposal_conflict"] = False
+    return args, result
+
+
 def format_report(result):
-    lines = ["新行:", "  " + result["row_text"], "", "新的 Build order:",
+    lines = []
+    proposal = result.get("proposal")
+    if proposal:
+        lines.extend(["Proposal: %s" % proposal["id"],
+                      "revision: %s" % proposal["revision"],
+                      "baseCommit: %s" % proposal["base_commit"], ""])
+    lines += ["新行:", "  " + result["row_text"], "", "新的 Build order:",
              "  " + result["build_order_line"], "", "能力图 diff:"]
     lines.extend(result["diff"] or ["（无变化）"])
     lines.append("")
@@ -344,18 +405,35 @@ def format_report(result):
     return "\n".join(lines)
 
 
-def main(argv=None):
+def main(argv=None, tracker_reader=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", default=".")
-    parser.add_argument("--id", required=True, dest="module_id")
-    parser.add_argument("--responsibility", required=True)
-    parser.add_argument("--depends-on", required=True, dest="depends_on")
-    parser.add_argument("--anchor", required=True)
+    parser.add_argument("--id", dest="module_id")
+    parser.add_argument("--responsibility")
+    parser.add_argument("--depends-on", dest="depends_on")
+    parser.add_argument("--anchor")
+    parser.add_argument("--proposal",
+                        help="从远端已发布且已接受的 Proposal 取出 id、职责、依赖与锚点；"
+                             "不可与 --id/--responsibility/--depends-on/--anchor 同用")
+    parser.add_argument("--platform", choices=("github", "gitlab"),
+                        help="仅与 --proposal 同用")
+    parser.add_argument("--target", help="仅与 --proposal 同用")
     parser.add_argument("--interrupt", action="store_true",
                         help="允许在当前模块做到一半时显式插队")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
 
+    if args.proposal is None:
+        missing = [flag for flag, value in (
+            ("--id", args.module_id), ("--responsibility", args.responsibility),
+            ("--depends-on", args.depends_on), ("--anchor", args.anchor)) if value is None]
+        if missing:
+            parser.error("the following arguments are required: %s" % ", ".join(missing))
+        return _main_fields(args)
+    return _main_proposal(args, tracker_reader)
+
+
+def _main_fields(args):
     if args.confirm:
         try:
             outcome = write(args.project, args.module_id, args.responsibility,
@@ -378,6 +456,33 @@ def main(argv=None):
         return 1
 
     print(format_report(result))
+    return 0
+
+
+def _main_proposal(args, tracker_reader):
+    try:
+        given = [flag for flag, value in (
+            ("--id", args.module_id), ("--responsibility", args.responsibility),
+            ("--depends-on", args.depends_on), ("--anchor", args.anchor)) if value is not None]
+        if given:
+            raise InsertError("--proposal 不可与 %s 同用；这些字段全部取自 Proposal" % ", ".join(given))
+        if not args.platform or not args.target:
+            raise InsertError("--proposal 需要同时给出 --platform 与 --target")
+        target = int(args.target) if args.platform == "gitlab" and args.target.isdigit() else args.target
+        fields, result = prepare_proposal(args.project, args.proposal, args.platform, target,
+                                          args.interrupt, tracker_reader)
+        if not args.confirm:
+            print(format_report(result))
+            return 0
+        outcome = write(args.project, *fields, interrupt=args.interrupt)
+    except InsertError as error:
+        print("校验失败: %s" % error, file=sys.stderr)
+        return 1
+    except OSError as error:
+        print("写入失败: %s" % error, file=sys.stderr)
+        return 1
+    print("已写入: %s" % outcome["map_path"])
+    print(format_stage_hint(outcome))
     return 0
 
 
