@@ -23,7 +23,6 @@ from host_config_removal import add_claude_server, remove_claude_server, remove_
 
 
 MCP_SERVER_NAME = "spec-guard-collaboration"
-TOKEN_ENV_VAR = "SPEC_GUARD_COLLABORATION_TOKEN"
 CODEX_TABLE_NAME = MCP_SERVER_NAME.replace("-", "_")
 
 
@@ -31,19 +30,29 @@ def mcp_url(config: RuntimeConfig) -> str:
     return f"http://{config.host}:{config.port}/mcp"
 
 
-def claude_mcp_config(config: RuntimeConfig) -> dict[str, Any]:
-    """Return Claude Code's no-secret HTTP configuration.
+def claude_stdio_server(
+    stdio_helper: Path, runtime_dir: Path, python_executable: str, npx_executable: str,
+) -> dict[str, Any]:
+    """Return Claude's stdio server definition; the helper reads the token file itself."""
+    helper = Path(stdio_helper).resolve()
+    npx_path = Path(npx_executable).resolve()
+    if not helper.is_file():
+        raise ValueError("Claude stdio helper is unavailable")
+    if not npx_path.is_absolute() or not npx_path.is_file():
+        raise ValueError("Claude stdio npx executable is unavailable")
+    return {
+        "type": "stdio",
+        "command": python_executable,
+        "args": ["-B", str(helper), "--config-dir", str(Path(runtime_dir)), "--npx", str(npx_path)],
+    }
 
-    The caller must launch Claude with ``TOKEN_ENV_VAR`` set from the private
-    token file.
-    """
-    return {"mcpServers": {
-        MCP_SERVER_NAME: {
-            "type": "http",
-            "url": mcp_url(config),
-            "headers": {"Authorization": f"Bearer ${{{TOKEN_ENV_VAR}}}"},
-        }
-    }}
+
+def claude_mcp_config(
+    stdio_helper: Path, runtime_dir: Path, python_executable: str, npx_executable: str,
+) -> dict[str, Any]:
+    """Return the no-secret Claude MCP configuration shared by the launcher and inspection."""
+    return {"mcpServers": {MCP_SERVER_NAME: claude_stdio_server(
+        stdio_helper, runtime_dir, python_executable, npx_executable)}}
 
 
 def codex_toml_fragment(
@@ -97,16 +106,9 @@ def install_claude_config(
 ) -> None:
     """Add a user-scoped Claude stdio MCP server with no secret configuration."""
     read_runtime_config(runtime_dir)
-    helper = Path(stdio_helper).resolve()
-    npx_path = Path(npx_executable).resolve()
-    if not helper.is_file():
-        raise ValueError("Claude stdio helper is unavailable")
-    if not npx_path.is_absolute() or not npx_path.is_file():
-        raise ValueError("Claude stdio npx executable is unavailable")
+    server = claude_stdio_server(stdio_helper, runtime_dir, python_executable, npx_executable)
     add_claude_server(claude_bin, [
-        "add", "--scope", "user", MCP_SERVER_NAME, "--",
-        python_executable, "-B", str(helper), "--config-dir", str(Path(runtime_dir)),
-        "--npx", str(npx_path),
+        "add", "--scope", "user", MCP_SERVER_NAME, "--", server["command"], *server["args"],
     ], MCP_SERVER_NAME)
 
 
@@ -151,7 +153,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _uninstall(args)
     config = read_runtime_config(args.config_dir)
     if args.host == "claude":
-        print(json.dumps(claude_mcp_config(config), indent=2, sort_keys=True))
+        if not args.npx:
+            raise ValueError("Claude stdio npx executable is unavailable")
+        print(json.dumps(claude_mcp_config(
+            args.stdio_helper, args.config_dir, args.python_executable, args.npx,
+        ), indent=2, sort_keys=True))
     elif args.host == "codex":
         print(codex_toml_fragment(config, args.header_helper, args.config_dir), end="")
     elif args.host == "install-codex":
