@@ -1,5 +1,5 @@
 ---
-description: 在模块检查点，用上下文提出新模块并预览校验后插入能力图
+description: 在模块检查点（或显式插队时），用上下文提出新模块并预览校验后插入能力图
 argument-hint: "[需求上下文]"
 allowed-tools: Bash
 ---
