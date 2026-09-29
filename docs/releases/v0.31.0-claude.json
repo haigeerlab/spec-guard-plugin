@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.31.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.31.0;test:marketplace-update-20260929"
+      },
+      "observedAt": "2026-09-29T15:26:27Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.30.0 to 0.31.0 for scope user; the cached plugin is file-for-file identical to git archive v0.31.0 apart from the host's .in_use marker"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.31.0;test:system-python39-building-20260929"
+      },
+      "observedAt": "2026-09-29T15:27:20Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events --output-format stream-json ran with PATH=~/.local/bin:/usr/bin:/bin, so the hook could only use the macOS system python3 3.9.6",
+        "result:the session init loaded spec-guard 0.31.0 from the plugin cache and the spec-guard UserPromptSubmit hook exited 0",
+        "result:in a temporary local-mode consumer repository whose activeModule alpha had one unchecked todo item, the hook injected BUILDING for alpha",
+        "result:test_proposal_publication.py and test_proposal_promotion_proof.py from the plugin cache passed under the system python3 3.9.6",
+        "limit:the cache holds only plugins/spec-guard, so test_proposal_mainline_review.py's check of the source repository's own spec/proposal-mainline-policy.json fails there (1 of 28, same as the 0.30.0 cache); its other 27 tests pass, and the full file passes in the Codex marketplace checkout and in the source repository",
+        "limit:the pool isolation itself was not exercised through a host prompt; the Proposal tests and a read-only consumer project snapshot cover it"
+      ]
+    }
+  ]
+}
