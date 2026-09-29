@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.29.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.29.0;test:marketplace-update-20260929"
+      },
+      "observedAt": "2026-09-29T10:16:22Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.28.0 to 0.29.0 for scope user; the cached plugin is file-for-file identical to git archive v0.29.0 apart from the host's .in_use marker"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.29.0;test:system-python39-interrupt-20260929"
+      },
+      "observedAt": "2026-09-29T10:16:50Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events --output-format stream-json ran twice with PATH=~/.local/bin:/usr/bin:/bin, so the hook and the installed add-module could only use the macOS system python3 3.9.6",
+        "result:both session inits loaded spec-guard 0.29.0 from the plugin cache and UserPromptSubmit exited 0 each time",
+        "result:in a temporary consumer repository whose current module infra was half done, the hook injected BUILDING for infra",
+        "command:python3 <plugin cache 0.29.0>/hooks/module-insert.py --id urgent --depends-on base --anchor after:base --interrupt --confirm",
+        "result:the installed add-module accepted the interrupt and wrote only the capability map; the next session's hook injected NEEDS_SPEC for urgent with the line Paused: infra (1 unchecked item(s))",
+        "limit:the resume-after-interrupt MODULE_DONE hint and the module-interrupt mainline boundary were not exercised on the host; test-phase-guard.sh, test_module_insert.py and test_proposal_mainline_review.py cover them"
+      ]
+    }
+  ]
+}
