@@ -42,6 +42,20 @@ T1 与 T2 共用"plan 存在、todo 不存在"这一判据：T1 在 `module_stat
 
 ## Checkpoint：完成
 
-- 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过；在本仓库、pwa-platform、x9-live-player 的只读副本上核对
-  "无触发条件时阶段输出不变、verify-artifacts 只多一条汇总警告"，并复现 pwa 的 activeModule 场景看到提醒；检查点勾选随
+- 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过；在本仓库与抽查的消费者项目只读副本上核对
+  "无触发条件时阶段输出不变、verify-artifacts 只多一条汇总警告"，并复现"activeModule 指向只有 Plan 的新模块"的场景看到提醒；检查点勾选随
   模块 PR 一起提交，由分支保护的两项必需 CI 把关合并；阶段变为 DONE。
+
+## Task 4：已退役 tracker 模式的项目不提醒（修订）
+
+- `module_stage.py`：读取 `.agent/state.json` 的 `tracker`（与 `active_module` 同一次读取或同一辅助函数）；为 `github` 或
+  `gitlab` 时不加 T1 提醒行。
+- `verify-artifacts.sh`：同一条件下不发缺 todo 汇总；判据复用 `module_stage` 的函数，不在 shell 里重复解析 tracker。
+- 测试：两个脚本各加 tracker=github、tracker=gitlab 的反例（有 activeModule 指向只有 Plan 的模块、有多个只有 Plan 的模块），
+  以及 tracker=none 的正例（行为不变）。
+- **验收：** 新断言在当前代码上失败、修改后通过；已有断言全部保留。
+- **文件：** `module_stage.py`、`verify-artifacts.sh`、两个回归脚本、`phase.md`、`verify-artifacts.md`、`CHANGELOG.md`。
+
+## Checkpoint 2
+
+- 两种 Python 下三条最小验证；在本仓库与抽查的消费者项目只读副本上核对：tracker 项目不再出现提醒与汇总，本地模式项目行为不变。

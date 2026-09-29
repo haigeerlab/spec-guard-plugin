@@ -400,7 +400,7 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertIn("activeModule 改为 `delta`", module_insert.format_report(result))
 
     def test_interrupt_allowed_while_another_module_is_also_half_done(self):
-        # pwa-platform shape: the current module waits on external facts while a later
+        # Consumer-project shape: the current module waits on external facts while a later
         # module is being built in parallel; neither blocks an explicit interrupt.
         self.make_half("alpha")
         self.make_half("beta")

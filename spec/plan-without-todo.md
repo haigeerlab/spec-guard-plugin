@@ -5,17 +5,11 @@
 `module_stage.module_state` 把"有 `tasks/<id>/plan.md`、没有未勾选项"的模块判为完成；没有 `todo.md` 时未勾选项为 0，
 所以只有 Plan 的模块一律算完成。
 
-2026-09-29 在 `haigeerlab/pwa-platform` 实际撞上：插队插入的 `ai-onboarding` 有 Spec 与 Plan（任务写成 `### AO1`…`### AO16`
-标题，没有勾选项）、没有 `todo.md`。即使把 `activeModule` 设为它，阶段也报 `MODULE_DONE`，并提示回到被暂停的模块——
-新模块被当成已经做完。当时靠在 PR #88 里补一份 `todo.md` 才解决。
+2026-09-29 在一个消费者项目中实际撞上：插队插入的新模块有 Spec 与 Plan（任务写成标题、没有勾选项），没有 `todo.md`。
+即使把 `activeModule` 设为它，阶段也报 `MODULE_DONE`，并提示回到被暂停的模块——新模块被当成已经做完。补一份 `todo.md` 才解决。
 
-但"只有 Plan"在现有项目里是常见的历史写法，而且绝大多数是早已交付的模块：
-
-| 项目 | 模块数 | 有 Plan 无 todo |
-|---|---|---|
-| spec-guard（本仓库） | 21 | 15 |
-| pwa-platform | 27 | 15 |
-| x9-live-player | 24 | 24 |
+但"只有 Plan"在现有项目里很常见，而且绝大多数是早已交付的模块：本仓库 21 个模块中有 15 个，另外抽查的两个消费者项目里
+分别过半和全部如此。原因见下方"修订"：它们来自已退役的远端 tracker 模式。
 
 因此不能改完成判据，也不能对每个这样的模块都警告；只在会误导的地方提醒。
 
@@ -30,11 +24,21 @@
 
 以下为本 Spec 提出、待评审确认的范围：
 
-3. 阶段提示只在一种情况下提醒：`activeModule` 明确指向的模块"因为缺 `todo.md` 而被判为完成"。这正是 pwa 的场景
+3. 阶段提示只在一种情况下提醒：`activeModule` 明确指向的模块"因为缺 `todo.md` 而被判为完成"。这正是上面那个消费者项目的场景
    （用户显式要做它，它却显示已完成）；没有设置 `activeModule`、或它指向的模块有 `todo.md` 时，输出与现在逐字相同。
 4. `verify-artifacts` 汇总成一条警告，列出所有"有 Plan 无 todo"的模块（按 Build order，最多列 10 个，其余只给数量），
    说明它们按已完成计；它按需运行，不会每轮出现。
 5. 不改 `/plan` 或 agent-skills 的模板；新模块仍按约定由 `/plan` 同时生成 plan 与 todo。
+
+## 修订：已退役的远端 tracker 模式（2026-09-29，用户决定）
+
+2026-09-15 之前，spec-guard 支持 `tracker: github` / `gitlab`：`/plan` 只写 `plan.md`，任务同步成远端 Issue，进度记在 Issue 上，
+因此这类模块**按设计就没有 `todo.md`**。该模式已退役（`docs/retirements/spec-github-bridge-retirement.md`），但仍有项目保留
+`.agent/state.json` 中的 `tracker` 值。对这类项目，缺 `todo.md` 不是遗漏，T1 的提醒与 T2 的汇总都是误报。
+
+因此：`.agent/state.json` 的 `tracker` 为 `github` 或 `gitlab` 时，T1 不加提醒行，T2 不发缺 todo 汇总（这类项目已经会收到
+`verify-artifacts` 的"检测到历史状态文件"警告）。`tracker` 为 `none`、没有 `tracker` 字段或没有 `state.json` 时（本地模式），
+行为不变：本地模式下 `todo.md` 是 `/build` 取任务与阶段判断的依据，必须存在。
 
 ## Contract
 
@@ -99,6 +103,6 @@ plugins/spec-guard/commands/phase.md, verify-artifacts.md, docs/workflow.md, CHA
 
 ## Success criteria
 
-- pwa-platform 的场景（`activeModule` 指向只有 Plan 的新模块）每轮都能看到提醒，知道要补 `todo.md`。
-- 本仓库、pwa-platform、x9-live-player 在没有触发条件时阶段输出不变；`verify-artifacts` 只多一条汇总警告。
+- 本地模式下 `activeModule` 指向只有 Plan 的新模块时，每轮都能看到提醒，知道要补 `todo.md`。
+- 本仓库与抽查的消费者项目在没有触发条件时阶段输出不变；`verify-artifacts` 只多一条汇总警告。
 - 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过。
