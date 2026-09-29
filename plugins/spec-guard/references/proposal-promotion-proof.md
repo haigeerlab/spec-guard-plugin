@@ -23,6 +23,15 @@ first re-establishes acceptance from the same fresh snapshot, the current Issue 
 and the revision-addressed attestation, then runs `prove`. A missing Proposal returns
 `absent`; an unreadable or invalid pool returns `unknown` or `invalid`.
 
+A promoted Proposal excluded from the pool (see
+[proposal-publication.md](proposal-publication.md#pool-reading-and-isolated-proposals))
+is queried as not in the pool: preflight returns `absent` / `publication-absent` and
+`--prove` returns `absent`. Preflight and proof JSON add
+`"skippedProposals": [{"proposalId": ..., "diagnostic": ...}]` only when at least one
+Proposal was excluded; otherwise the output is unchanged. `diagnostic` is one of
+`proposal-baseline-remote-mismatch`, `proposal-baseline-unavailable` or
+`proposal-invalid`; raw errors are never emitted.
+
 The preflight function rereads the remote Proposal pool, policy and
 revision-addressed attestation before it returns a ready base commit. It is a
 read-only prerequisite for a human-created promotion branch; it does not create
