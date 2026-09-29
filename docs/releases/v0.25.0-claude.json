@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.25.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.25.0;test:marketplace-update-20260929"
+      },
+      "observedAt": "2026-09-29T01:02:20Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.24.0 to 0.25.0 for scope user; the cached plugin is file-for-file identical to git archive v0.25.0 apart from the host's .in_use marker"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.25.0;test:system-python39-phase-20260929"
+      },
+      "observedAt": "2026-09-29T01:02:27Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events --output-format stream-json ran with PATH=~/.local/bin:/usr/bin:/bin, so the hook could only use the macOS system python3 3.9.6",
+        "result:the session init loaded spec-guard 0.25.0 from the plugin cache, and in a temporary consumer repository whose active module had one open todo item, UserPromptSubmit exited 0 and injected BUILDING with the correct module, counts and next step",
+        "limit:v0.24.0 injected UNKNOWN in this environment; this is the host-level check of the Python 3.9 fix, not of every command"
+      ]
+    }
+  ]
+}
