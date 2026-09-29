@@ -152,11 +152,20 @@ def _blocked(state, diagnostic=None):
 
 def preflight(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
     """Freshly require an accepted Issue stage and a fresh review before branch creation."""
+    return promotion_base(project, proposal_id, platform, target, remote, tracker_reader)[0]
+
+
+def promotion_base(project, proposal_id, platform, target, remote="origin", tracker_reader=None):
+    """Run the preflight once and, when ready, also return the base map text and Proposal."""
     pool = read_published_pool(project, remote)
     result = _preflight(pool, proposal_id, platform, target, tracker_reader)
     if getattr(pool, "state", None) == "published":
         result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
-    return result
+    if result.state != "ready":
+        return result, None, None
+    publication = next(item for item in pool.publications
+                       if item.proposal.proposal_id == proposal_id)
+    return result, pool.review_map, publication.proposal
 
 
 def _preflight(pool, proposal_id, platform, target, tracker_reader):
