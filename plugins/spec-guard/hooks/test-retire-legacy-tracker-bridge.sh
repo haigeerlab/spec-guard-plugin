@@ -70,8 +70,7 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
   "$PLUGIN/hooks/proposal_publication.py" \
   "$PLUGIN/hooks/proposal_tracker_read.py" \
   "$PLUGIN/hooks/proposal_review.py" \
-  "$PLUGIN/hooks/proposal_promotion_proof.py" \
-  "$PLUGIN/hooks/proposal_boundary_guidance.py"
+  "$PLUGIN/hooks/proposal_promotion_proof.py"
 
 # ── broadened scan: every non-test file under plugins/spec-guard (R6) ──────
 #
@@ -98,15 +97,12 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
 # gets caught, since its text won't match any entry.
 ALLOWLIST_PATH=(
   "plugins/spec-guard/references/proposal-promotion-proof.md"
-  "plugins/spec-guard/references/proposal-boundary-guidance.md"
 )
 ALLOWLIST_TEXT=(
   '`.agent/state.json`. It does not invoke `spec-github-bridge` or `/sync-map`.'
-  '`spec-github-bridge` 或 `/sync-map`。'
 )
 ALLOWLIST_REASON=(
   "negative statement — says the prove action does not invoke the retired bridge or /sync-map, not a real call site"
-  "negative statement — says the candidate-pool reminder does not invoke the retired bridge or /sync-map, not a real call site"
 )
 
 trim() {

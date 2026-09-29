@@ -48,13 +48,6 @@ PROMOTION_MAP = BASE_MAP.replace(
 
 DRIFT_MAP = BASE_MAP.replace("Existing capability", "Changed capability")
 
-# Still imported by test_proposal_mainline_review.py until that module is removed.
-REMOTE_POLICY = {
-    "schemaVersion": 1, "authorityId": "mainline", "remote": "origin",
-    "reviewRef": "refs/heads/integration/mainline",
-    "workflowId": "capability-map-integration",
-}
-
 LEGACY_POLICY = "{ this is not valid policy json"
 
 class PromotionFixture(unittest.TestCase):

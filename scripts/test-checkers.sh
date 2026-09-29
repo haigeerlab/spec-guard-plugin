@@ -323,7 +323,7 @@ mkretire() {  # $1=目录：拼出让原有断言也能全绿的最小干净树
   printf 'phase\n' > "$1/plugins/spec-guard/commands/phase.md"
   : > "$1/plugins/spec-guard/hooks/hooks.json"
   for f in proposal_contract proposal_publication proposal_tracker_read \
-           proposal_review proposal_promotion_proof proposal_boundary_guidance; do
+           proposal_review proposal_promotion_proof; do
     printf '# clean\n' > "$1/plugins/spec-guard/hooks/$f.py"
   done
   printf '# README\n' > "$1/README.md"

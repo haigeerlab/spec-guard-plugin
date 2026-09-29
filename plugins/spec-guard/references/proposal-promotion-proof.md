@@ -48,8 +48,7 @@ errors. `unknown`, `invalid`, `not-accepted`, and `not-promoted` are not promoti
 proof.
 
 Both functions pass through the lower layer's own diagnostic when it is a stable
-code (matching `proposal_mainline_review.DIAGNOSTIC_CODE`), the same rule
-`proposal_mainline_review.as_json` uses. Only a missing or non-code diagnostic
+code. Only a missing or non-code diagnostic
 falls back to a generic `promotion-preflight-<state>` / `promotion-<state>`
 string, so a missing tracker Issue, a missing Proposal and an invalid acceptance
 attestation are distinguishable even though their `state` can coincide:
