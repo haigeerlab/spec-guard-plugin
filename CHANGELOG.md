@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-09-29
+
 ### 变更
 
 - **阶段行新增 `MODULE_DONE`，`DONE` 现在只表示「全部模块已完成」。** 此前当前模块做完而后面还有未完成模块时也会报 `DONE`，与「全部完成」无法区分；现在前者报 `MODULE_DONE`，并指出 Build order 中第一个未完成的模块及其阶段。全部完成但 activeModule 仍指向已完成模块时报 `DONE`，并提示该 activeModule 可清除。把 `DONE` 当作「全部完成」的用法不受影响。
