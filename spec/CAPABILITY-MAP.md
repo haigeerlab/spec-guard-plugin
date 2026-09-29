@@ -34,8 +34,9 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | documentation-impact | 在模块 Spec、Plan 与交付前表达并收口对文档基线的遵循、补全、变更或不适用结论 | documentation-baseline |
 | documentation-verification | 提供只读核验、保守提醒和跨宿主回归，确保缺失或未知不被伪装为文档完成 | documentation-baseline, documentation-impact |
 | audit-remediation | 修复项目审计中已核实、不改变设计的缺陷：假成功、诊断丢失、Codex 路由与校验缺口、文档漂移。 | proposal-mainline-review, proposal-promotion-proof, collaboration-messaging, local-convention, module-insert, capability-history, documentation-verification |
+| done-stage-split | 把阶段提示里的 DONE 拆成两种：当前模块已完成但还有别的模块未完成、全部模块已完成，各给出正确的下一步。 | phase-and-verification, module-insert |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split
 
 ---
 
