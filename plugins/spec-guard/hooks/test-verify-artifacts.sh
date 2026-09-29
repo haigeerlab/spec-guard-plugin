@@ -69,4 +69,44 @@ printf '%s\n' '#!/bin/sh' 'echo broken; exit 1' > "$WORK/brokenpy/python3"
 chmod +x "$WORK/brokenpy/python3"
 RUN_PATH="$WORK/brokenpy:$PATH" check "解析器异常时报未验证而非失败" 0 "未验证：能力图解析器没有正常运行"
 
+# 有 Plan 无 todo.md 的模块按已完成计：汇总成一条警告，不改退出码。
+# $1=目录 $2=模块数；每个模块都有 spec，m01..mNN 全部在 Build order 内。
+many_modules() {
+  local i id ids="" rows=()
+  PROJECT="$WORK/$1"; mkdir -p "$PROJECT/spec"
+  for i in $(seq 1 "$2"); do
+    id="$(printf m%02d "$i")"; ids="${ids}${ids:+, }${id}"
+    rows+=("| ${id} | x | — |"); touch "$PROJECT/spec/${id}.md"
+  done
+  printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Responsibility | Depends on |' \
+    '| --- | --- | --- |' "${rows[@]}" '' "Build order: ${ids}" > "$PROJECT/spec/CAPABILITY-MAP.md"
+}
+# $1=模块 id：只放 plan.md
+plan_only() { mkdir -p "$PROJECT/tasks/$1"; touch "$PROJECT/tasks/$1/plan.md"; }
+# $1=用例名 $2=不得出现的文本
+check_absent() {
+  local out
+  out="$(CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$HOOKDIR/verify-artifacts.sh" 2>&1)" || true
+  ! grep -F -- "$2" >/dev/null <<<"$out" || fail "$1: 输出不应包含「$2」
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
+many_modules no-todo-none 3
+plan_only m01; touch "$PROJECT/tasks/m01/todo.md"
+check "0 个缺 todo 的模块时警告数为 0" 0 "0 警告"
+check_absent "0 个缺 todo 的模块时没有汇总警告" "没有 todo.md"
+
+many_modules no-todo-one 3
+plan_only m02
+check "1 个缺 todo 的模块发一条警告并点名" 0 "1 个模块有 Plan 但没有 todo.md，按已完成计：m02"
+check "1 个缺 todo 的模块警告数为 1、退出码不变" 0 "1 警告"
+
+many_modules no-todo-twelve 12
+for i in 01 02 03 04 05 06 07 08 09 10 11 12; do plan_only "m$i"; done
+check "12 个缺 todo 的模块只列前 10 个并以等 12 个结尾" 0 \
+  "12 个模块有 Plan 但没有 todo.md，按已完成计：m01, m02, m03, m04, m05, m06, m07, m08, m09, m10 等 12 个"
+check "12 个缺 todo 的模块仍只多一条警告" 0 "1 警告"
+check_absent "12 个缺 todo 的模块不列出第 11 个 id" "m11,"
+
 echo "verify-artifacts regression passed ($PASS cases)"
