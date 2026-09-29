@@ -180,6 +180,45 @@ ln -sf "$(command -v grep)" "$WORK/nopy/grep"
 RUN_PATH="$WORK/nopy" injects "已启用但缺 python3 时注入诊断" "$local_project" "python3 不可用"
 [ -z "$(RUN_PATH="$WORK/nopy" run "$WORK/other-state")" ] || fail "缺 python3 时无关项目也必须静默"
 
+# 有 Plan 无 todo.md 的模块按已完成计；activeModule 指向它时给出提醒。
+notodo="$WORK/notodo"
+mkdir -p "$notodo/spec" "$notodo/tasks/base" "$notodo/tasks/alpha" "$notodo/tasks/beta" "$notodo/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$notodo/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| base | x | — |' '| alpha | y | base |' '| beta | z | alpha |' '' 'Build order: base → alpha → beta' > "$notodo/spec/CAPABILITY-MAP.md"
+touch "$notodo/spec/base.md" "$notodo/spec/alpha.md" "$notodo/spec/beta.md"
+printf '# Plan\n' | tee "$notodo/tasks/base/plan.md" "$notodo/tasks/alpha/plan.md" "$notodo/tasks/beta/plan.md" > /dev/null
+printf '%s\n' '- [x] done' > "$notodo/tasks/base/todo.md"
+printf '%s\n' '- [x] a' '- [ ] b' > "$notodo/tasks/beta/todo.md"
+printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
+NOTODO_NOTE='activeModule `alpha` has a plan but no `tasks/alpha/todo.md`, so it counts as done; add the todo if work remains.'
+injects "无 todo 的 activeModule 且项目未完成时报告 MODULE_DONE" "$notodo" "当前阶段: **MODULE_DONE**"
+injects "MODULE_DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
+python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+note, counts, paused = sys.argv[1], "- Modules 3", "- Paused:"
+assert counts in text and paused in text and note in text, text
+assert text.index(counts) < text.index(note) < text.index(paused), text
+' "$NOTODO_NOTE" <<<"$(run "$notodo")" || fail "缺 todo 提醒应在计数行之后、Paused 行之前"
+echo "  ✅ 缺 todo 提醒位于计数行与 Paused 行之间"; PASS=$((PASS + 1))
+printf '%s\n' '- [x] a' '- [x] b' > "$notodo/tasks/beta/todo.md"
+injects "无 todo 的 activeModule 且全部完成时报告 DONE" "$notodo" "当前阶段: **DONE**"
+injects "DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
+injects "DONE 仍保留可清除提示" "$notodo" 'activeModule `alpha` is already done and can be cleared'
+python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+assert text.index(sys.argv[1]) < text.index("already done and can be cleared"), text
+' "$NOTODO_NOTE" <<<"$(run "$notodo")" || fail "DONE 中缺 todo 提醒应在可清除提示之前"
+echo "  ✅ DONE 中缺 todo 提醒先于可清除提示"; PASS=$((PASS + 1))
+printf '{"tracker":"none","modules":{},"activeModule":"base"}\n' > "$notodo/.agent/state.json"
+lacks "activeModule 有全勾 todo 时无缺 todo 提醒" "$notodo" "has a plan but no"
+rm "$notodo/.agent/state.json"
+lacks "无 activeModule 时不因其他缺 todo 模块提醒" "$notodo" "has a plan but no"
+printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$notodo/.agent/state.json"
+lacks "activeModule 不在图中时无缺 todo 提醒" "$notodo" "has a plan but no"
+
 # Codex 不提供 CLAUDE_PROJECT_DIR，hook 在会话目录里运行（2026-09-28 真实 Codex 核实）。
 # 从仓库子目录启动时，必须按 git 仓库根目录判断激活，而不是只看当前目录。
 run_from() {  # $1=工作目录；不设 CLAUDE_PROJECT_DIR，模拟 Codex

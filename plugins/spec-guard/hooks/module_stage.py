@@ -35,7 +35,7 @@ def module_state(root: Path, module_id: str) -> dict:
     else:
         stage = "DONE"
     return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
-            "half": half}
+            "half": half, "todo": todo.is_file()}
 
 
 def active_module(root: Path) -> str | None:
@@ -86,11 +86,18 @@ def describe(root: Path) -> str:
     notes = []
     if active and active not in by_id:
         notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
+    active_state = by_id.get(active) if active else None
+    no_todo_note = ""
+    if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
+        no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
+                        "add the todo if work remains." % (active, active))
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
     paused = paused_modules(states, current) if stage != "DONE" else []
     if stage == "DONE":
+        if no_todo_note:
+            notes.append(no_todo_note)
         if current is not None:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
@@ -99,6 +106,8 @@ def describe(root: Path) -> str:
                 "(Codex: spec-guard-ops add-module) at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
+    if no_todo_note:
+        counts += "\n" + no_todo_note
     counts += "".join("\n- Paused: `%s` (%d unchecked item(s)); resume it after `%s`." % (p["id"], p["open"], module)
                       for p in paused)
     if stage == "MODULE_DONE" and paused:
