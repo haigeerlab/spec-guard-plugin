@@ -359,7 +359,7 @@ mkretire "$TMP/retireallow"
   echo ""
   printf '%s\n' "$ALLOWED_TEXT"
 } > "$TMP/retireallow/plugins/spec-guard/references/proposal-promotion-proof.md"
-want pass "retire-scan: 允许清单按“路径+原文”匹配，同一句话换了行号仍放行" \
+want pass "retire-scan: 允许清单按「路径+原文」匹配，同一句话换了行号仍放行" \
   bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow"
 
 mkretire "$TMP/retireallow-newhit"
