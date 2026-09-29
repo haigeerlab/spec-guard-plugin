@@ -24,6 +24,42 @@ class RuntimeContractError(ValueError):
     """The optional local-ledger runtime is absent or does not match its contract."""
 
 
+def validate_lock_files(lock_dir: Path) -> list[str]:
+    """Read-only drift check of the shipped package.json/package-lock.json; returns problems."""
+    problems: list[str] = []
+    documents: dict[str, Any] = {}
+    for name in ("package.json", "package-lock.json"):
+        try:
+            documents[name] = json.loads((Path(lock_dir) / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            problems.append(f"{name}: unreadable ({error.__class__.__name__})")
+    expected = {PACKAGE_NAME: PACKAGE_VERSION}
+    package = documents.get("package.json")
+    if package is not None and package.get("dependencies") != expected:
+        problems.append(f"package.json: dependencies must be exactly {expected}")
+    lock = documents.get("package-lock.json")
+    if lock is not None:
+        entries = lock.get("packages")
+        if lock.get("lockfileVersion") != 3:
+            problems.append("package-lock.json: lockfileVersion must be 3")
+        if not isinstance(entries, dict):
+            problems.append("package-lock.json: packages missing")
+            return problems
+        if (entries.get("") or {}).get("dependencies") != expected:
+            problems.append(f"package-lock.json: root dependencies must be exactly {expected}")
+        if (entries.get(f"node_modules/{PACKAGE_NAME}") or {}).get("version") != PACKAGE_VERSION:
+            problems.append(f"package-lock.json: {PACKAGE_NAME} must be locked at {PACKAGE_VERSION}")
+        for key, entry in entries.items():
+            if not key:
+                continue
+            if not (isinstance(entry, dict) and entry.get("resolved")):
+                problems.append(f"package-lock.json: {key} lacks resolved")
+            integrity = entry.get("integrity") if isinstance(entry, dict) else None
+            if not (isinstance(integrity, str) and re.match(r"^(sha512|sha1)-.+", integrity)):
+                problems.append(f"package-lock.json: {key} lacks integrity")
+    return problems
+
+
 def default_runtime_dir() -> Path:
     return Path.home() / ".spec-guard" / "local-ticket-ledger" / "runtime"
 

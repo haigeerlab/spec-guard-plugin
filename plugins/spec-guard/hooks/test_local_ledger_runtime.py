@@ -10,6 +10,10 @@ from unittest.mock import patch
 
 import local_ledger_runtime
 
+REAL_LOCK_DIR = (
+    Path(__file__).resolve().parents[1] / "locks" / "local-ticket-ledger"
+)
+
 
 class LocalLedgerRuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -345,6 +349,74 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
             ]), 1)
         self.assertEqual(json.loads(output.getvalue())["state"], "user-setup-required")
         initialize.assert_not_called()
+
+
+    def copy_lock_files(self, drop=()):
+        lock_dir = Path(self.tmp.name) / "lock-copy"
+        lock_dir.mkdir()
+        for name in ("package.json", "package-lock.json"):
+            if name not in drop:
+                (lock_dir / name).write_bytes((REAL_LOCK_DIR / name).read_bytes())
+        return lock_dir
+
+    def edit_json(self, path, mutate):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mutate(data)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_shipped_lock_files_match_the_version_constant_and_are_fully_hashed(self):
+        self.assertEqual(local_ledger_runtime.validate_lock_files(REAL_LOCK_DIR), [])
+        package = json.loads((REAL_LOCK_DIR / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(package["dependencies"], {
+            local_ledger_runtime.PACKAGE_NAME: local_ledger_runtime.PACKAGE_VERSION,
+        })
+        lock = json.loads((REAL_LOCK_DIR / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["lockfileVersion"], 3)
+        self.assertEqual(lock["packages"][""]["dependencies"], package["dependencies"])
+        self.assertEqual(
+            lock["packages"]["node_modules/epiq"]["version"], local_ledger_runtime.PACKAGE_VERSION,
+        )
+        entries = {key: value for key, value in lock["packages"].items() if key}
+        self.assertGreater(len(entries), 1)
+        for key, entry in entries.items():
+            self.assertTrue(entry.get("resolved"), key)
+            self.assertRegex(entry.get("integrity", ""), r"^(sha512|sha1)-.+", key)
+
+    def test_lock_check_fails_when_package_json_version_drifts_from_the_constant(self):
+        lock_dir = self.copy_lock_files()
+        self.edit_json(lock_dir / "package.json", lambda d: d["dependencies"].update(epiq="1.11.1"))
+        problems = local_ledger_runtime.validate_lock_files(lock_dir)
+        self.assertTrue(any("package.json" in problem for problem in problems), problems)
+
+    def test_lock_check_fails_when_the_lockfile_root_or_package_drifts(self):
+        lock_dir = self.copy_lock_files()
+        self.edit_json(
+            lock_dir / "package-lock.json",
+            lambda d: d["packages"]["node_modules/epiq"].update(version="1.11.1"),
+        )
+        self.assertTrue(local_ledger_runtime.validate_lock_files(lock_dir))
+
+    def test_lock_check_fails_when_a_package_lacks_integrity(self):
+        lock_dir = self.copy_lock_files()
+
+        def drop_integrity(data):
+            key = next(k for k in data["packages"] if k)
+            del data["packages"][key]["integrity"]
+
+        self.edit_json(lock_dir / "package-lock.json", drop_integrity)
+        problems = local_ledger_runtime.validate_lock_files(lock_dir)
+        self.assertTrue(any("integrity" in problem for problem in problems), problems)
+
+    def test_lock_check_fails_when_a_lock_file_is_missing(self):
+        for name in ("package.json", "package-lock.json"):
+            with self.subTest(missing=name):
+                lock_dir = Path(self.tmp.name) / ("without-" + name)
+                lock_dir.mkdir()
+                other = "package-lock.json" if name == "package.json" else "package.json"
+                (lock_dir / other).write_bytes((REAL_LOCK_DIR / other).read_bytes())
+                problems = local_ledger_runtime.validate_lock_files(lock_dir)
+                self.assertTrue(any(name in problem for problem in problems), problems)
+        self.assertTrue(local_ledger_runtime.validate_lock_files(Path(self.tmp.name) / "nowhere"))
 
 
 if __name__ == "__main__":
