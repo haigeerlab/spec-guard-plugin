@@ -53,5 +53,5 @@
 
 ## Checkpoint：完成
 
-- 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过；逐条核对 Spec 的成功标准（含按 pwa-platform 形状复现的
+- 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过；逐条核对 Spec 的成功标准（含在消费者项目能力图副本上复现的
   端到端场景）；检查点勾选随模块 PR 一起提交，由分支保护的两项必需 CI 把关合并；阶段变为 DONE。

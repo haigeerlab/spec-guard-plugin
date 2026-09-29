@@ -109,4 +109,14 @@ check "12 个缺 todo 的模块只列前 10 个并以等 12 个结尾" 0 \
 check "12 个缺 todo 的模块仍只多一条警告" 0 "1 警告"
 check_absent "12 个缺 todo 的模块不列出第 11 个 id" "m11,"
 
+# 已退役的远端 tracker 模式：state.json 仍是 github／gitlab 时不发缺 todo 汇总（历史状态文件警告仍在）。
+many_modules no-todo-github 3
+plan_only m02; mkdir -p "$PROJECT/.agent"
+printf '{"tracker":"github","modules":{}}\n' > "$PROJECT/.agent/state.json"
+check_absent "退役 tracker github 不发缺 todo 汇总" "没有 todo.md"
+printf '{"tracker":"gitlab","modules":{}}\n' > "$PROJECT/.agent/state.json"
+check_absent "退役 tracker gitlab 不发缺 todo 汇总" "没有 todo.md"
+printf '{"tracker":"none","modules":{}}\n' > "$PROJECT/.agent/state.json"
+check "tracker none 仍发缺 todo 汇总" 0 "1 个模块有 Plan 但没有 todo.md，按已完成计：m02"
+
 echo "verify-artifacts regression passed ($PASS cases)"

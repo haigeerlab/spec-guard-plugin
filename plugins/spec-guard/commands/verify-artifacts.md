@@ -43,7 +43,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/verify-artifacts.sh"
 `spec/` 下每个模块 spec 都是能力图中的模块；项目根目录没有 `SPEC*.md`。它不校验 plan、todo 的内容，也不检查
 分支或远端 Issue；对 plan 与 todo 只做下面这条存在性汇总。
 
-能力图通过解析后，若有模块有 `tasks/<id>/plan.md` 却没有 `tasks/<id>/todo.md`，会多一条汇总 ⚠️：`N 个模块有 Plan 但没有 todo.md，按已完成计：…`（按 Build order 最多列 10 个，其余以「等 N 个」收尾）。它只是提醒，不是失败，不改变退出码：这些模块按已完成计，已交付的可以不管；仍有活要做的，补 `tasks/<id>/todo.md` 列出剩余任务。
+能力图通过解析后，若有模块有 `tasks/<id>/plan.md` 却没有 `tasks/<id>/todo.md`，会多一条汇总 ⚠️：`N 个模块有 Plan 但没有 todo.md，按已完成计：…`（按 Build order 最多列 10 个，其余以「等 N 个」收尾）。它只是提醒，不是失败，不改变退出码：这些模块按已完成计，已交付的可以不管；仍有活要做的，补 `tasks/<id>/todo.md` 列出剩余任务。`.agent/state.json` 里 `tracker` 仍是 `github` 或 `gitlab` 的项目（已退役的远端 tracker 模式，任务当时在远端 Issue 里）不发这条汇总。
 
 ## 和 `/spec-guard:phase` 的分工
 

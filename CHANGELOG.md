@@ -4,7 +4,7 @@
 
 ### 新增
 
-- **有 Plan 却没有 `todo.md` 的模块，在会误导的地方给出提醒。** `activeModule` 指向这样的模块时，阶段行（`MODULE_DONE` / `DONE`）多一行提示它因缺 `todo.md` 而按已完成计，仍有活要做就补 `todo.md`；`verify-artifacts` 多一条汇总警告，列出所有这类模块（最多 10 个），不算失败、退出码不变。完成判据本身不变：有 Plan 且没有未勾选项仍算完成。
+- **有 Plan 却没有 `todo.md` 的模块，在会误导的地方给出提醒。** `activeModule` 指向这样的模块时，阶段行（`MODULE_DONE` / `DONE`）多一行提示它因缺 `todo.md` 而按已完成计，仍有活要做就补 `todo.md`；`verify-artifacts` 多一条汇总警告，列出所有这类模块（最多 10 个），不算失败、退出码不变。完成判据本身不变：有 Plan 且没有未勾选项仍算完成。`.agent/state.json` 里 `tracker` 仍是 `github` 或 `gitlab` 的项目（已退役的远端 tracker 模式，任务当时在远端 Issue 里）两处都不提醒。
 
 ## [0.29.0] - 2026-09-29
 
