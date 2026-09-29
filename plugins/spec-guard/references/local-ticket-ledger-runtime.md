@@ -56,16 +56,51 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" contract --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --format json
 ```
 
-它只调用固定的 `npm install --ignore-scripts --prefix <staging> epiq@1.11.0`，装进受管目录旁的临时目录，
-核对包名、版本和 `epiq-mcp` 入口通过后才原子改名为受管运行时。运行时存放在用户级受管目录，绝不写入项目
-`node_modules`。
+安装按插件自带的 lockfile 进行（`locks/local-ticket-ledger/` 下的 `package.json` 与 `package-lock.json`，
+固定 `epiq@1.11.0` 及其全部 269 个依赖包的版本和 sha512 完整性）：先把这两个文件复制进受管目录旁的临时目录，
+再在其中运行 `npm ci --ignore-scripts --no-audit --no-fund`，由 npm 逐个校验所有已锁定包的完整性；随后核对包名、
+版本和 `epiq-mcp` 入口，只有结果为 `ready` 且 `locked` 才原子改名为受管运行时。运行时存放在用户级受管目录，
+绝不写入项目 `node_modules`。
 
 - 没有 `--confirm-install` 时返回 `install-confirmation-required`，不创建目录也不调用 npm。
 - npm 失败或装出的包不符合合同时，只删除本次创建的临时目录，受管运行时保持 `absent`，可直接重试；诊断带
   npm 错误输出的最后一行。
 - 已安装且合同正确的目录拒绝覆盖；已存在但不合法的目录也拒绝覆盖，供用户先审查或显式清理。唯一例外是
   旧版本安装失败留下的**空目录**：它不含任何数据，安装会直接接管。
+- 完整性校验失败（例如 `EINTEGRITY`）同样属于 npm 失败：临时目录被删除，受管运行时保持不变。
 - 安装本身不初始化任何项目、不写 Git、不添加 Claude/Codex MCP 配置，也不启动 Epiq。
+
+## Lock status and replacing an unlocked runtime
+
+状态输出在运行时为 `ready` 时带 `lock` 字段：
+
+- `locked`：运行时目录里的 lockfile 与插件自带的一致，即按锁定的依赖树安装。
+- `unlocked`：运行时是旧方式（`npm install`，无 lockfile）安装的，或插件升级后更换了 lockfile。
+  `unlocked` 的运行时**照常可用**，状态检查、hook 与 MCP 都不会因此失败，也绝不自动替换。
+
+用户明确确认后，才可替换：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --replace-unlocked --format json
+```
+
+替换先在临时目录完成锁定安装并通过校验，才换下旧目录；失败时旧运行时原样保留。账本数据（`.epiq/`、
+`__epiq_state__`）不在运行时目录内，不受影响。替换后需重启 Claude Code／Codex 会话（或其 MCP 服务器），
+账本 MCP 进程才会使用新运行时。
+
+## 升级 Epiq 或重新生成 lockfile
+
+仅限维护者。改动 `local_ledger_runtime.py` 的 `PACKAGE_VERSION` 后，在临时目录重新生成 lockfile：
+
+```bash
+# 临时目录内放一个只声明 {"dependencies": {"epiq": "<version>"}} 的 package.json（恰好该版本，无范围符号）
+npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+```
+
+然后检查每个 `resolved` 都指向 `https://registry.npmjs.org/`，再把 `package.json` 与 `package-lock.json` 复制进
+`plugins/spec-guard/locks/local-ticket-ledger/`，运行 `hooks/test_local_ledger_runtime.py` 的漂移测试。维护者本机
+的 npm registry／镜像配置不得泄漏进 `resolved` URL；若出现镜像地址，用 `--registry=https://registry.npmjs.org/`
+重新生成。
 
 ## Initialization preflight
 

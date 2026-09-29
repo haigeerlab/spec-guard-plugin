@@ -10,6 +10,10 @@ from unittest.mock import patch
 
 import local_ledger_runtime
 
+REAL_LOCK_DIR = (
+    Path(__file__).resolve().parents[1] / "locks" / "local-ticket-ledger"
+)
+
 
 class LocalLedgerRuntimeTests(unittest.TestCase):
     def setUp(self):
@@ -157,12 +161,10 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "dirty")
         self.assertNotIn("origin", payload)
 
-    def test_install_command_pins_epiq_and_keeps_it_out_of_the_project(self):
-        command = local_ledger_runtime.install_command(
-            self.runtime_dir, npm_executable="/opt/homebrew/bin/npm")
+    def test_install_command_is_a_locked_npm_ci_without_package_spec_or_prefix(self):
+        command = local_ledger_runtime.install_command(npm_executable="/opt/homebrew/bin/npm")
         self.assertEqual(command, [
-            "/opt/homebrew/bin/npm", "install", "--ignore-scripts", "--prefix",
-            str(self.runtime_dir), "epiq@1.11.0",
+            "/opt/homebrew/bin/npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund",
         ])
         self.assertNotIn(str(self.project_dir), command)
 
@@ -184,7 +186,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
     def test_install_runs_the_pinned_command_then_validates_the_result(self):
         with patch("local_ledger_runtime.subprocess.run", return_value=subprocess.CompletedProcess([], 0)), \
              patch("local_ledger_runtime.runtime_status", side_effect=[
-                 {"state": "absent"}, {"state": "ready"},
+                 {"state": "absent"}, {"state": "ready", "lock": "locked"},
              ]) as runtime_status:
             result = local_ledger_runtime.install_runtime(
                 self.runtime_dir, npm_executable="/opt/homebrew/bin/npm")
@@ -193,9 +195,14 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime_status.call_count, 2)
 
     def fake_npm(self, script):
-        """A stand-in npm that really writes under --prefix, so install uses real directories."""
+        """A stand-in `npm ci`: works in its cwd (the staging dir), records argv/pwd/ls."""
         npm = Path(self.tmp.name) / "fake-npm"
-        npm.write_text("#!/bin/sh\n" + '[ "$3" = --prefix ] || exit 9\nprefix="$4"\n' + script, encoding="utf-8")
+        self.npm_record = Path(self.tmp.name) / "npm-record"
+        npm.write_text(
+            "#!/bin/sh\n"
+            'record="%s"\n' % self.npm_record +
+            'printf "%s\\n" "$*" > "$record"\npwd -P >> "$record"\nls >> "$record"\n'
+            '[ "$1" = ci ] || exit 9\nprefix="$PWD"\n' + script, encoding="utf-8")
         npm.chmod(0o755)
         return str(npm)
 
@@ -216,17 +223,52 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual((result["state"], result["directory"]), ("ready", str(self.runtime_dir)))
         self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir)["state"], "ready")
         self.assertEqual(self.leftovers(), [])
+        self.assertEqual(
+            (self.runtime_dir / "package-lock.json").read_bytes(),
+            (REAL_LOCK_DIR / "package-lock.json").read_bytes())
+
+    def test_install_runs_npm_ci_in_the_staging_dir_with_both_lock_files_present(self):
+        npm = self.fake_npm(self.installed_files())
+        local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        argv, cwd, *listing = self.npm_record.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(argv, "ci --ignore-scripts --no-audit --no-fund")
+        self.assertEqual(Path(cwd).parent, Path(self.tmp.name).resolve())
+        self.assertTrue(Path(cwd).name.startswith("runtime.installing-"))
+        self.assertIn("package.json", listing)
+        self.assertIn("package-lock.json", listing)
+
+    def test_missing_or_invalid_lock_dir_is_refused_before_staging_or_npm(self):
+        npm = self.fake_npm(self.installed_files())
+        broken = self.copy_lock_files(name="lock-drift")
+        self.edit_json(broken / "package.json", lambda d: d["dependencies"].update(epiq="1.11.1"))
+        for lock_dir in (Path(self.tmp.name) / "no-such-lock-dir",
+                         self.copy_lock_files(drop=("package-lock.json",), name="lock-partial"),
+                         broken):
+            with self.subTest(lock_dir=lock_dir.name):
+                with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "lock"):
+                    local_ledger_runtime.install_runtime(
+                        self.runtime_dir, npm_executable=npm, lock_dir=lock_dir)
+                self.assertEqual(self.leftovers(), [])
+                self.assertFalse(self.runtime_dir.exists())
+                self.assertFalse(self.npm_record.exists())
 
     def test_failed_npm_leaves_no_runtime_and_can_be_retried(self):
         npm = self.fake_npm('echo "npm ERR! code E404" >&2\nexit 1\n')
         with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError,
-                                    "npm install failed: npm ERR! code E404"):
+                                    "npm ci failed: npm ERR! code E404"):
             local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
         self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir), {"state": "absent"})
         self.assertEqual(self.leftovers(), [])
         result = local_ledger_runtime.install_runtime(
             self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()))
         self.assertEqual(result["state"], "ready")
+
+    def test_fresh_install_that_ends_up_unlocked_is_refused_and_cleaned_up(self):
+        npm = self.fake_npm(self.installed_files() + 'rm -f "$prefix/package-lock.json"\n')
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "audited contract"):
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir), {"state": "absent"})
+        self.assertEqual(self.sibling_leftovers(), [])
 
     def test_wrong_package_is_discarded_without_creating_the_runtime(self):
         npm = self.fake_npm(self.installed_files(version="9.9.9"))
@@ -261,6 +303,21 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
             ]), 1)
         payload = json.loads(output.getvalue())
         self.assertIn("npm ERR! network timeout", payload["diagnostic"])
+        self.assertFalse(self.runtime_dir.exists())
+
+    def test_install_reports_the_npm_error_code_instead_of_the_log_pointer(self):
+        # npm 11 prints the error code first and "A complete log ..." last; the last line alone hides EINTEGRITY.
+        npm = self.fake_npm(
+            'echo "npm error code EINTEGRITY" >&2\n'
+            'echo "npm error sha512-AAAA integrity checksum failed when using sha512: wanted sha512-AAAA but got sha512-BBBB. (123 bytes)" >&2\n'
+            'echo "npm error A complete log of this run can be found in: /tmp/_logs/debug-0.log" >&2\n'
+            'exit 1\n')
+        with self.assertRaises(local_ledger_runtime.RuntimeContractError) as raised:
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        message = str(raised.exception)
+        self.assertIn("EINTEGRITY", message)
+        self.assertIn("integrity checksum failed", message)
+        self.assertNotIn("A complete log of this run", message)
         self.assertFalse(self.runtime_dir.exists())
 
     def test_acceptance_without_a_runtime_reports_not_run_instead_of_passing(self):
@@ -345,6 +402,258 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
             ]), 1)
         self.assertEqual(json.loads(output.getvalue())["state"], "user-setup-required")
         initialize.assert_not_called()
+
+
+    def copy_lock_files(self, drop=(), name="lock-copy"):
+        lock_dir = Path(self.tmp.name) / name
+        lock_dir.mkdir()
+        for name in ("package.json", "package-lock.json"):
+            if name not in drop:
+                (lock_dir / name).write_bytes((REAL_LOCK_DIR / name).read_bytes())
+        return lock_dir
+
+    def edit_json(self, path, mutate):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        mutate(data)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_shipped_lock_files_match_the_version_constant_and_are_fully_hashed(self):
+        self.assertEqual(local_ledger_runtime.validate_lock_files(REAL_LOCK_DIR), [])
+        package = json.loads((REAL_LOCK_DIR / "package.json").read_text(encoding="utf-8"))
+        self.assertEqual(package["dependencies"], {
+            local_ledger_runtime.PACKAGE_NAME: local_ledger_runtime.PACKAGE_VERSION,
+        })
+        lock = json.loads((REAL_LOCK_DIR / "package-lock.json").read_text(encoding="utf-8"))
+        self.assertEqual(lock["lockfileVersion"], 3)
+        self.assertEqual(lock["packages"][""]["dependencies"], package["dependencies"])
+        self.assertEqual(
+            lock["packages"]["node_modules/epiq"]["version"], local_ledger_runtime.PACKAGE_VERSION,
+        )
+        entries = {key: value for key, value in lock["packages"].items() if key}
+        self.assertGreater(len(entries), 1)
+        for key, entry in entries.items():
+            self.assertTrue(entry.get("resolved"), key)
+            self.assertRegex(entry.get("integrity", ""), r"^(sha512|sha1)-.+", key)
+
+    def test_lock_check_fails_when_package_json_version_drifts_from_the_constant(self):
+        lock_dir = self.copy_lock_files()
+        self.edit_json(lock_dir / "package.json", lambda d: d["dependencies"].update(epiq="1.11.1"))
+        problems = local_ledger_runtime.validate_lock_files(lock_dir)
+        self.assertTrue(any("package.json" in problem for problem in problems), problems)
+
+    def test_lock_check_fails_when_the_lockfile_root_or_package_drifts(self):
+        lock_dir = self.copy_lock_files()
+        self.edit_json(
+            lock_dir / "package-lock.json",
+            lambda d: d["packages"]["node_modules/epiq"].update(version="1.11.1"),
+        )
+        self.assertTrue(local_ledger_runtime.validate_lock_files(lock_dir))
+
+    def test_lock_check_fails_when_a_package_lacks_integrity(self):
+        lock_dir = self.copy_lock_files()
+
+        def drop_integrity(data):
+            key = next(k for k in data["packages"] if k)
+            del data["packages"][key]["integrity"]
+
+        self.edit_json(lock_dir / "package-lock.json", drop_integrity)
+        problems = local_ledger_runtime.validate_lock_files(lock_dir)
+        self.assertTrue(any("integrity" in problem for problem in problems), problems)
+
+    def test_lock_check_fails_when_a_lock_file_is_missing(self):
+        for name in ("package.json", "package-lock.json"):
+            with self.subTest(missing=name):
+                lock_dir = Path(self.tmp.name) / ("without-" + name)
+                lock_dir.mkdir()
+                other = "package-lock.json" if name == "package.json" else "package.json"
+                (lock_dir / other).write_bytes((REAL_LOCK_DIR / other).read_bytes())
+                problems = local_ledger_runtime.validate_lock_files(lock_dir)
+                self.assertTrue(any(name in problem for problem in problems), problems)
+        self.assertTrue(local_ledger_runtime.validate_lock_files(Path(self.tmp.name) / "nowhere"))
+
+
+    # ---- L3: lock status and replacing an unlocked runtime ----
+
+    def snapshot(self, root):
+        """Paths + bytes (and symlink targets) of a tree, for byte-identical assertions."""
+        root = Path(root)
+        result = {}
+        for path in sorted(root.rglob("*")):
+            key = str(path.relative_to(root))
+            if path.is_symlink():
+                result[key] = ("link", str(path.readlink()))
+            elif path.is_dir():
+                result[key] = ("dir", None)
+            else:
+                result[key] = ("file", path.read_bytes())
+        return result
+
+    def sibling_leftovers(self):
+        return sorted(path.name for path in Path(self.tmp.name).iterdir()
+                      if ".installing-" in path.name or ".replaced-" in path.name)
+
+    def write_unlocked_runtime(self):
+        self.write_runtime()
+        (self.runtime_dir / "node_modules" / "epiq" / "old-marker.txt").write_text(
+            "old\n", encoding="utf-8")
+
+    def write_locked_runtime(self):
+        self.write_runtime()
+        (self.runtime_dir / "package-lock.json").write_bytes(
+            (REAL_LOCK_DIR / "package-lock.json").read_bytes())
+
+    def test_status_reports_locked_when_the_lockfile_matches_the_shipped_one(self):
+        self.write_locked_runtime()
+        status = local_ledger_runtime.runtime_status(self.runtime_dir)
+        self.assertEqual((status["state"], status["lock"]), ("ready", "locked"))
+
+    def test_status_reports_unlocked_when_the_lockfile_is_missing_or_different(self):
+        self.write_runtime()
+        status = local_ledger_runtime.runtime_status(self.runtime_dir)
+        self.assertEqual((status["state"], status["lock"]), ("ready", "unlocked"))
+        (self.runtime_dir / "package-lock.json").write_text("{}\n", encoding="utf-8")
+        status = local_ledger_runtime.runtime_status(self.runtime_dir)
+        self.assertEqual((status["state"], status["lock"]), ("ready", "unlocked"))
+        other = self.copy_lock_files(name="lock-other")
+        self.edit_json(other / "package-lock.json", lambda d: d.update(name="changed"))
+        (self.runtime_dir / "package-lock.json").write_bytes(
+            (REAL_LOCK_DIR / "package-lock.json").read_bytes())
+        status = local_ledger_runtime.runtime_status(self.runtime_dir, lock_dir=other)
+        self.assertEqual((status["state"], status["lock"]), ("ready", "unlocked"))
+
+    def test_status_has_no_lock_field_for_absent_or_invalid_runtimes(self):
+        self.assertNotIn("lock", local_ledger_runtime.runtime_status(self.runtime_dir))
+        self.write_runtime(version="9.9.9")
+        invalid = local_ledger_runtime.runtime_status(self.runtime_dir)
+        self.assertEqual(invalid["state"], "invalid")
+        self.assertNotIn("lock", invalid)
+
+    def test_install_refuses_a_locked_runtime_even_with_replace_unlocked(self):
+        self.write_locked_runtime()
+        before = self.snapshot(self.runtime_dir)
+        npm = self.fake_npm(self.installed_files())
+        for flag in (False, True):
+            with self.subTest(replace_unlocked=flag):
+                with self.assertRaisesRegex(
+                        local_ledger_runtime.RuntimeContractError, "already installed"):
+                    local_ledger_runtime.install_runtime(
+                        self.runtime_dir, npm_executable=npm, replace_unlocked=flag)
+        self.assertEqual(self.snapshot(self.runtime_dir), before)
+        self.assertFalse(self.npm_record.exists())
+
+    def test_install_refuses_an_unlocked_runtime_without_the_flag_and_says_how_to_replace(self):
+        self.write_unlocked_runtime()
+        before = self.snapshot(self.runtime_dir)
+        npm = self.fake_npm(self.installed_files())
+        with self.assertRaisesRegex(
+                local_ledger_runtime.RuntimeContractError, "unlocked.*--replace-unlocked"):
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        self.assertEqual(self.snapshot(self.runtime_dir), before)
+        self.assertFalse(self.npm_record.exists())
+        self.assertEqual(self.sibling_leftovers(), [])
+
+    def test_replace_unlocked_installs_locked_and_leaves_no_staging_or_backup(self):
+        self.write_unlocked_runtime()
+        result = local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()),
+            replace_unlocked=True)
+        self.assertEqual(result["state"], "ready")
+        status = local_ledger_runtime.runtime_status(self.runtime_dir)
+        self.assertEqual((status["state"], status["lock"]), ("ready", "locked"))
+        self.assertFalse((self.runtime_dir / "node_modules" / "epiq" / "old-marker.txt").exists())
+        self.assertEqual(self.sibling_leftovers(), [])
+        self.assertEqual(sorted(path.name for path in Path(self.tmp.name).iterdir()
+                                if path.name.startswith("runtime")), ["runtime"])
+
+    def test_replace_unlocked_on_an_absent_runtime_is_a_normal_install(self):
+        result = local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()),
+            replace_unlocked=True)
+        self.assertEqual(result["state"], "ready")
+        self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir)["lock"], "locked")
+
+    def test_failed_install_during_replace_keeps_the_old_runtime_byte_identical(self):
+        self.write_unlocked_runtime()
+        before = self.snapshot(self.runtime_dir)
+        for script in ('echo "npm ERR! code E404" >&2\nexit 1\n',
+                       self.installed_files(version="9.9.9")):
+            with self.subTest(script=script[:20]):
+                with self.assertRaises(local_ledger_runtime.RuntimeContractError):
+                    local_ledger_runtime.install_runtime(
+                        self.runtime_dir, npm_executable=self.fake_npm(script),
+                        replace_unlocked=True)
+                self.assertEqual(self.snapshot(self.runtime_dir), before)
+                self.assertEqual(self.sibling_leftovers(), [])
+
+    def test_failure_during_the_swap_restores_the_old_runtime_byte_identical(self):
+        self.write_unlocked_runtime()
+        before = self.snapshot(self.runtime_dir)
+        real_rename = Path.rename
+
+        def flaky(path, target):
+            if ".installing-" in path.name:
+                raise OSError("simulated rename failure")
+            return real_rename(path, target)
+
+        with patch.object(Path, "rename", flaky):
+            with self.assertRaisesRegex(
+                    local_ledger_runtime.RuntimeContractError, "unable to replace"):
+                local_ledger_runtime.install_runtime(
+                    self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()),
+                    replace_unlocked=True)
+        self.assertEqual(self.snapshot(self.runtime_dir), before)
+        self.assertEqual(self.sibling_leftovers(), [])
+
+    def test_replace_never_touches_paths_outside_the_runtime_directory(self):
+        self.write_unlocked_runtime()
+        self.write_project_config()
+        (self.project_dir / "notes.txt").write_text("keep\n", encoding="utf-8")
+        before = self.snapshot(self.project_dir)
+        local_ledger_runtime.install_runtime(
+            self.runtime_dir, npm_executable=self.fake_npm(self.installed_files()),
+            replace_unlocked=True)
+        self.assertEqual(self.snapshot(self.project_dir), before)
+        self.assertEqual(self.sibling_leftovers(), [])
+
+    def test_cli_replace_unlocked_requires_the_confirmation_flag_and_changes_nothing(self):
+        self.write_unlocked_runtime()
+        before = self.snapshot(self.runtime_dir)
+        npm = self.fake_npm(self.installed_files())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "install", "--runtime-dir", str(self.runtime_dir), "--npm", npm,
+                "--replace-unlocked", "--format", "json",
+            ]), 1)
+        self.assertEqual(json.loads(output.getvalue())["state"], "install-confirmation-required")
+        self.assertEqual(self.snapshot(self.runtime_dir), before)
+        self.assertFalse(self.npm_record.exists())
+
+    def test_cli_replace_unlocked_with_confirmation_replaces_the_runtime(self):
+        self.write_unlocked_runtime()
+        npm = self.fake_npm(self.installed_files())
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "install", "--runtime-dir", str(self.runtime_dir), "--npm", npm,
+                "--confirm-install", "--replace-unlocked", "--format", "json",
+            ]), 0)
+        payload = json.loads(output.getvalue())
+        self.assertEqual((payload["state"], payload["lock"]), ("ready", "locked"))
+
+    def test_cli_status_json_includes_the_lock_field(self):
+        self.write_runtime()
+        output = io.StringIO()
+        with patch("local_ledger_runtime.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "status", "--runtime-dir", str(self.runtime_dir),
+                "--project-dir", str(self.project_dir), "--format", "json",
+            ]), 0)
+        payload = json.loads(output.getvalue())
+        self.assertEqual(payload["runtime"]["state"], "ready")
+        self.assertEqual(payload["runtime"]["lock"], "unlocked")
 
 
 if __name__ == "__main__":

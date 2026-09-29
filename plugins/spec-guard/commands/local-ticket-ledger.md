@@ -20,6 +20,8 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 - `absent`：Epiq 运行时尚未安装。这是正常的未启用状态；不得自动下载。
 - `ready`：受管运行时可用，但当前仓库还没有本地账本。
 - `initialized`：当前仓库已有可用的 `.epiq/project.json`，可继续检查 MCP 接入。
+- `runtime.lock`（运行时为 `ready` 时出现）：`locked` 表示运行时按插件自带的 lockfile 安装；`unlocked` 表示
+  旧方式安装，或插件升级了 lockfile。`unlocked` 的运行时照常可用，不要自动替换。
 - `invalid`：原样说明诊断，不能删除、覆盖或尝试修复现有目录。若诊断为 `Epiq package directory is absent`
   且目录为空（旧版本安装失败的残留），用户明确要求安装时可直接重新安装，安装会接管这个空目录。
 
@@ -28,6 +30,15 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 ```bash
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --format json
 ```
+
+若 `lock` 为 `unlocked`，先向用户说明它仍可用、替换会在临时目录完成锁定安装并校验后才换下旧目录（失败则旧运行时
+原样保留），账本数据（`.epiq/`、`__epiq_state__`）不受影响。只有用户明确确认替换后，才运行：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --replace-unlocked --format json
+```
+
+替换后需重启 Claude Code／Codex 会话（或其 MCP 服务器），账本 MCP 进程才会使用新运行时。
 
 只有用户明确要求初始化当前仓库时，先运行 `preflight`，说明它会提交 `.epiq/project.json`、创建
 `__epiq_state__` 分支；工作树不干净时不得继续。发现 `origin` 时，必须另行向用户解释 Epiq 上游会尝试

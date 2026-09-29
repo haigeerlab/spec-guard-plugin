@@ -28,6 +28,18 @@ Explain `absent`, `ready`, `initialized`, and `invalid` accurately. Never instal
 repository, change Claude/Codex configuration, or start a service merely because a status check is
 successful.
 
+When the runtime is `ready`, status also shows `runtime.lock`: `locked` means it was installed from the
+shipped lockfile; `unlocked` means an older install or a newer shipped lockfile. An `unlocked` runtime keeps
+working; never replace it on your own. Replacing needs the user's explicit confirmation, then:
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --replace-unlocked --format json
+```
+
+The replacement is installed and verified in a temporary directory first; on any failure the old runtime is
+kept unchanged, and ledger data in `.epiq/` and `__epiq_state__` is never touched. After replacing, tell the
+user to restart the Claude/Codex session (or its MCP server) so the ledger MCP process uses the new runtime.
+
 Run runtime installation only after the user explicitly asks to install it, with
 `install --confirm-install`. Before initialization, run `preflight`; it requires a clean Git
 worktree. Tell the user that initialization creates a committed `.epiq/project.json` and a

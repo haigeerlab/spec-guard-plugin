@@ -24,6 +24,42 @@ class RuntimeContractError(ValueError):
     """The optional local-ledger runtime is absent or does not match its contract."""
 
 
+def validate_lock_files(lock_dir: Path) -> list[str]:
+    """Read-only drift check of the shipped package.json/package-lock.json; returns problems."""
+    problems: list[str] = []
+    documents: dict[str, Any] = {}
+    for name in ("package.json", "package-lock.json"):
+        try:
+            documents[name] = json.loads((Path(lock_dir) / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            problems.append(f"{name}: unreadable ({error.__class__.__name__})")
+    expected = {PACKAGE_NAME: PACKAGE_VERSION}
+    package = documents.get("package.json")
+    if package is not None and package.get("dependencies") != expected:
+        problems.append(f"package.json: dependencies must be exactly {expected}")
+    lock = documents.get("package-lock.json")
+    if lock is not None:
+        entries = lock.get("packages")
+        if lock.get("lockfileVersion") != 3:
+            problems.append("package-lock.json: lockfileVersion must be 3")
+        if not isinstance(entries, dict):
+            problems.append("package-lock.json: packages missing")
+            return problems
+        if (entries.get("") or {}).get("dependencies") != expected:
+            problems.append(f"package-lock.json: root dependencies must be exactly {expected}")
+        if (entries.get(f"node_modules/{PACKAGE_NAME}") or {}).get("version") != PACKAGE_VERSION:
+            problems.append(f"package-lock.json: {PACKAGE_NAME} must be locked at {PACKAGE_VERSION}")
+        for key, entry in entries.items():
+            if not key:
+                continue
+            if not (isinstance(entry, dict) and entry.get("resolved")):
+                problems.append(f"package-lock.json: {key} lacks resolved")
+            integrity = entry.get("integrity") if isinstance(entry, dict) else None
+            if not (isinstance(integrity, str) and re.match(r"^(sha512|sha1)-.+", integrity)):
+                problems.append(f"package-lock.json: {key} lacks integrity")
+    return problems
+
+
 def default_runtime_dir() -> Path:
     return Path.home() / ".spec-guard" / "local-ticket-ledger" / "runtime"
 
@@ -91,9 +127,21 @@ def _json_object(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def runtime_status(runtime_dir: Path) -> dict[str, str]:
+def _lock_state(runtime_dir: Path, lock_dir: Path) -> str:
+    """`locked` only when the runtime's package-lock.json is byte-identical to the shipped one."""
+    try:
+        _regular_file(runtime_dir / "package-lock.json", "runtime lockfile")
+        installed = (runtime_dir / "package-lock.json").read_bytes()
+        shipped = (Path(lock_dir) / "package-lock.json").read_bytes()
+    except (RuntimeContractError, OSError):
+        return "unlocked"
+    return "locked" if installed == shipped else "unlocked"
+
+
+def runtime_status(runtime_dir: Path, lock_dir: Path | None = None) -> dict[str, str]:
     """Validate the already-installed package without executing it."""
     runtime_dir = Path(runtime_dir)
+    lock_dir = Path(lock_dir) if lock_dir is not None else SHIPPED_LOCK_DIR
     if not runtime_dir.exists() and not runtime_dir.is_symlink():
         return {"state": "absent"}
     try:
@@ -113,6 +161,7 @@ def runtime_status(runtime_dir: Path) -> dict[str, str]:
         "directory": str(runtime_dir),
         "package": PACKAGE_NAME,
         "packageVersion": PACKAGE_VERSION,
+        "lock": _lock_state(runtime_dir, lock_dir),
     }
 
 
@@ -190,25 +239,73 @@ def initialization_preflight(
     }
 
 
-def install_command(runtime_dir: Path, npm_executable: str) -> list[str]:
-    """Build the fixed, project-independent npm installation command."""
-    return [
-        npm_executable, "install", "--ignore-scripts", "--prefix", str(Path(runtime_dir)),
-        PACKAGE_NAME + "@" + PACKAGE_VERSION,
-    ]
+SHIPPED_LOCK_DIR = Path(__file__).resolve().parent.parent / "locks" / "local-ticket-ledger"
+LOCK_FILE_NAMES = ("package.json", "package-lock.json")
 
 
-def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dict[str, str]:
-    """Install the fixed runtime only when explicitly invoked by the caller."""
+def _npm_failure_detail(stderr: str | None) -> str:
+    """Report npm's error code and its explanation, not the trailing "A complete log ..." pointer."""
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    meaningful = [line for line in lines if "A complete log of this run" not in line] or lines
+    code_index = next((index for index, line in enumerate(meaningful) if " code " in line), None)
+    if code_index is None:
+        picked = meaningful[-1] if meaningful else ""
+    else:
+        picked = "; ".join(meaningful[code_index:code_index + 2])
+    return (": " + picked[:300]) if picked else ""
+
+
+def install_command(npm_executable: str) -> list[str]:
+    """Build the fixed npm command; it runs in a directory holding the shipped lock files."""
+    return [npm_executable, "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+
+
+def _swap_runtime(runtime_dir: Path, staging: Path) -> None:
+    """Replace runtime_dir with the verified staging dir; on any failure the old one is restored."""
+    backup = Path(tempfile.mkdtemp(prefix=runtime_dir.name + ".replaced-", dir=runtime_dir.parent))
+    backup.rmdir()
+    try:
+        runtime_dir.rename(backup)
+    except OSError as error:
+        raise RuntimeContractError("unable to replace the unlocked runtime; it was left unchanged") from error
+    try:
+        staging.rename(runtime_dir)
+    except OSError as error:
+        try:
+            backup.rename(runtime_dir)
+        except OSError as restore_error:
+            raise RuntimeContractError(
+                "unable to replace the unlocked runtime and could not restore it; "
+                "the old runtime is at " + str(backup)) from restore_error
+        raise RuntimeContractError("unable to replace the unlocked runtime; the old runtime was restored") from error
+    shutil.rmtree(backup, ignore_errors=True)
+
+
+def install_runtime(
+    runtime_dir: Path, npm_executable: str | None = None, lock_dir: Path | None = None,
+    replace_unlocked: bool = False,
+) -> dict[str, str]:
+    """Install the locked runtime only when explicitly invoked by the caller."""
     runtime_dir = Path(runtime_dir)
-    existing = runtime_status(runtime_dir)
+    lock_dir = Path(lock_dir) if lock_dir is not None else SHIPPED_LOCK_DIR
+    existing = runtime_status(runtime_dir, lock_dir)
+    replacing = False
     if existing["state"] == "ready":
-        raise RuntimeContractError("local-ledger runtime is already installed")
+        if existing.get("lock") != "unlocked":
+            raise RuntimeContractError("local-ledger runtime is already installed")
+        if not replace_unlocked:
+            raise RuntimeContractError(
+                "local-ledger runtime is already installed but unlocked; "
+                "rerun with --replace-unlocked to replace it with the locked install")
+        replacing = True
     if existing["state"] == "invalid":
         # 旧版本安装失败会留下空目录；空目录没有任何数据，可以接管，其余无效运行时一律不碰。
         if (runtime_dir.is_symlink() or not runtime_dir.is_dir() or
                 any(runtime_dir.iterdir())):
             raise RuntimeContractError("refusing to overwrite an invalid local-ledger runtime")
+    problems = validate_lock_files(lock_dir)
+    if problems:
+        raise RuntimeContractError("shipped lock files are unusable: " + "; ".join(problems))
     npm_path = npm_executable or shutil.which("npm")
     if not npm_path:
         raise RuntimeContractError("npm executable is unavailable")
@@ -217,25 +314,29 @@ def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dic
     staging = Path(tempfile.mkdtemp(prefix=runtime_dir.name + ".installing-", dir=runtime_dir.parent))
     try:
         try:
+            for name in LOCK_FILE_NAMES:
+                shutil.copyfile(lock_dir / name, staging / name)
             completed = subprocess.run(
-                install_command(staging, npm_path), check=False, capture_output=True, text=True,
+                install_command(npm_path), cwd=staging, check=False, capture_output=True, text=True,
             )
         except OSError as error:
-            raise RuntimeContractError("unable to run npm install") from error
+            raise RuntimeContractError("unable to run npm ci") from error
         if completed.returncode != 0:
-            lines = [line.strip() for line in (completed.stderr or "").splitlines() if line.strip()]
-            detail = (": " + lines[-1][:200]) if lines else ""
-            raise RuntimeContractError("npm install failed" + detail)
-        installed = runtime_status(staging)
-        if installed["state"] != "ready":
+            raise RuntimeContractError("npm ci failed" + _npm_failure_detail(completed.stderr))
+        installed = runtime_status(staging, lock_dir)
+        if installed["state"] != "ready" or installed.get("lock") != "locked":
             raise RuntimeContractError(
                 "installed local-ledger runtime does not match the audited contract")
-        try:
-            if runtime_dir.exists() or runtime_dir.is_symlink():
-                runtime_dir.rmdir()
-            staging.rename(runtime_dir)
-        except OSError as error:
-            raise RuntimeContractError("unable to move the verified runtime into place") from error
+        if replacing:
+            _swap_runtime(runtime_dir, staging)
+            installed = dict(installed, directory=str(runtime_dir))
+        else:
+            try:
+                if runtime_dir.exists() or runtime_dir.is_symlink():
+                    runtime_dir.rmdir()
+                staging.rename(runtime_dir)
+            except OSError as error:
+                raise RuntimeContractError("unable to move the verified runtime into place") from error
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -395,6 +496,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
     parser.add_argument("--confirm-install", action="store_true")
+    parser.add_argument("--replace-unlocked", action="store_true")
     parser.add_argument("--confirm-initialize", action="store_true")
     parser.add_argument("--user-name", default=None)
     parser.add_argument("--preferred-editor", default=None)
@@ -415,7 +517,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     elif args.command == "install":
         try:
-            payload = install_runtime(args.runtime_dir, args.npm)
+            payload = install_runtime(
+                args.runtime_dir, args.npm, replace_unlocked=args.replace_unlocked)
         except RuntimeContractError as error:
             code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
         else:

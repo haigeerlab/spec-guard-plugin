@@ -18,7 +18,7 @@ process.
 
 ## Runtime contract
 
-- The backend is the MIT package `epiq@1.11.0`, installed with `npm install --ignore-scripts` into
+- The backend is the MIT package `epiq@1.11.0`, installed with the shipped lockfile via `npm ci --ignore-scripts` (see `spec/ledger-dependency-lock.md`) into
   a managed user-level directory (`~/.spec-guard/local-ticket-ledger/runtime/`), never into a
   project `node_modules`. Node.js 18+ is required. Any other package name or version is `invalid`.
 - Installation stages into a sibling temporary directory and moves into place only after the
