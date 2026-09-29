@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────
 # 装 pre-push 钩子。
 #
-# 为什么需要：`.github/workflows/validate.yml` 定义的 Actions job 是否真的
+# 为什么需要：`.github/workflows/ci.yml` 定义的 Actions job 是否真的
 # 在某次 push 上跑过，只能在 Actions 标签页或 `gh pr checks` 里看到，本地看
 # 不到、也管不了。hook 断言、校验器断言、shellcheck 因此不能只靠 CI 兜底 ——
 # 这个钩子让同样的三条检查无条件在本地跑一遍，不依赖任何人记得手动敲命令。
