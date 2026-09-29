@@ -43,6 +43,25 @@ def active_module(root: Path) -> str | None:
     return active if isinstance(active, str) and active else None
 
 
+def project_stage(states: list, active: str | None) -> tuple:
+    """Project-level stage: (stage, current, source, pending).
+
+    `pending` is the first module in Build order that is not done, or None when all are.
+    `current` is the activeModule's state when it names a mapped module, else `pending`.
+    `stage` is DONE only when every module is done; MODULE_DONE when the current module
+    is done but `pending` is not None; otherwise the current module's own stage.
+    """
+    by_id = {state["id"]: state for state in states}
+    pending = next((state for state in states if state["stage"] != "DONE"), None)
+    if active and active in by_id:
+        current, source = by_id[active], "activeModule"
+    else:
+        current, source = pending, "next in Build order"
+    if pending is None:
+        return "DONE", current, source, None
+    return ("MODULE_DONE" if current["stage"] == "DONE" else current["stage"]), current, source, pending
+
+
 def describe(root: Path) -> str:
     root = Path(root)
     try:
@@ -54,18 +73,16 @@ def describe(root: Path) -> str:
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
     active = active_module(root)
+    stage, current, source, pending = project_stage(states, active)
     notes = []
-    if active and active in by_id:
-        current, source = by_id[active], "activeModule"
-    else:
-        if active:
-            notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
-        current = next((state for state in states if state["stage"] != "DONE"), None)
-        source = "next in Build order"
+    if active and active not in by_id:
+        notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
-    if current is None:
+    if stage == "DONE":
+        if current is not None:
+            notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
                 "For new work, insert a module with /spec-guard:add-module "
@@ -76,10 +93,11 @@ def describe(root: Path) -> str:
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
         "BUILDING": "continue `/build` on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (module, current["open"], module),
-        "DONE": "`%s` is done; set activeModule to the next module before building it." % module,
-    }[current["stage"]]
+        "MODULE_DONE": "`%s` is done; next unfinished module in Build order is `%s` (%s). "
+                       "Set activeModule to it before building." % (module, pending["id"], pending["stage"]),
+    }[stage]
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
-            "\nSuggested next step: %s" % (current["stage"], module, source, counts,
+            "\nSuggested next step: %s" % (stage, module, source, counts,
                                           "".join(n + "\n" for n in notes), next_step))
 
 
