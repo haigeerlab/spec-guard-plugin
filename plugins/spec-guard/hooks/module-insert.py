@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
-from module_stage import UNCHECKED, active_module, module_state
+from module_stage import UNCHECKED, active_module, module_state, project_stage
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -294,13 +294,26 @@ def write(project, module_id, responsibility, depends_on_raw, anchor):
         raise
 
     final_parsed = parse_map(map_path)
-    final_current, _ = _current_module(project, list(final_parsed.order))
+    final_order = list(final_parsed.order)
+    states = [module_state(project, module_id) for module_id in final_order]
+    stage, final_current, _, pending = project_stage(states, active_module(project))
 
     return {
         "map_path": str(map_path),
         "stage_module": final_current["id"] if final_current else None,
-        "stage_hint": final_current["stage"] if final_current else "DONE",
+        "stage_hint": stage,
+        "stage_pending": (pending["id"], pending["stage"]) if pending else None,
     }
+
+
+def format_stage_hint(outcome):
+    if outcome["stage_hint"] == "MODULE_DONE" and outcome["stage_pending"]:
+        pending_id, pending_stage = outcome["stage_pending"]
+        return ("当前阶段提示: `%s` 处于 MODULE_DONE；Build order 中下一个未完成模块是 `%s`（%s）"
+                % (outcome["stage_module"], pending_id, pending_stage))
+    if outcome["stage_module"] and outcome["stage_hint"] != "DONE":
+        return "当前阶段提示: `%s` 处于 %s" % (outcome["stage_module"], outcome["stage_hint"])
+    return "当前阶段提示: DONE"
 
 
 def format_report(result):
@@ -343,10 +356,7 @@ def main(argv=None):
             print("写入失败: %s" % error, file=sys.stderr)
             return 1
         print("已写入: %s" % outcome["map_path"])
-        if outcome["stage_module"]:
-            print("当前阶段提示: `%s` 处于 %s" % (outcome["stage_module"], outcome["stage_hint"]))
-        else:
-            print("当前阶段提示: DONE")
+        print(format_stage_hint(outcome))
         return 0
 
     try:
