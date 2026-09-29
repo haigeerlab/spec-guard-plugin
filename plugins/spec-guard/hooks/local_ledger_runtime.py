@@ -127,9 +127,21 @@ def _json_object(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def runtime_status(runtime_dir: Path) -> dict[str, str]:
+def _lock_state(runtime_dir: Path, lock_dir: Path) -> str:
+    """`locked` only when the runtime's package-lock.json is byte-identical to the shipped one."""
+    try:
+        _regular_file(runtime_dir / "package-lock.json", "runtime lockfile")
+        installed = (runtime_dir / "package-lock.json").read_bytes()
+        shipped = (Path(lock_dir) / "package-lock.json").read_bytes()
+    except (RuntimeContractError, OSError):
+        return "unlocked"
+    return "locked" if installed == shipped else "unlocked"
+
+
+def runtime_status(runtime_dir: Path, lock_dir: Path | None = None) -> dict[str, str]:
     """Validate the already-installed package without executing it."""
     runtime_dir = Path(runtime_dir)
+    lock_dir = Path(lock_dir) if lock_dir is not None else SHIPPED_LOCK_DIR
     if not runtime_dir.exists() and not runtime_dir.is_symlink():
         return {"state": "absent"}
     try:
@@ -149,6 +161,7 @@ def runtime_status(runtime_dir: Path) -> dict[str, str]:
         "directory": str(runtime_dir),
         "package": PACKAGE_NAME,
         "packageVersion": PACKAGE_VERSION,
+        "lock": _lock_state(runtime_dir, lock_dir),
     }
 
 
@@ -235,15 +248,44 @@ def install_command(npm_executable: str) -> list[str]:
     return [npm_executable, "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
 
 
+def _swap_runtime(runtime_dir: Path, staging: Path) -> None:
+    """Replace runtime_dir with the verified staging dir; on any failure the old one is restored."""
+    backup = Path(tempfile.mkdtemp(prefix=runtime_dir.name + ".replaced-", dir=runtime_dir.parent))
+    backup.rmdir()
+    try:
+        runtime_dir.rename(backup)
+    except OSError as error:
+        raise RuntimeContractError("unable to replace the unlocked runtime; it was left unchanged") from error
+    try:
+        staging.rename(runtime_dir)
+    except OSError as error:
+        try:
+            backup.rename(runtime_dir)
+        except OSError as restore_error:
+            raise RuntimeContractError(
+                "unable to replace the unlocked runtime and could not restore it; "
+                "the old runtime is at " + str(backup)) from restore_error
+        raise RuntimeContractError("unable to replace the unlocked runtime; the old runtime was restored") from error
+    shutil.rmtree(backup, ignore_errors=True)
+
+
 def install_runtime(
     runtime_dir: Path, npm_executable: str | None = None, lock_dir: Path | None = None,
+    replace_unlocked: bool = False,
 ) -> dict[str, str]:
     """Install the locked runtime only when explicitly invoked by the caller."""
     runtime_dir = Path(runtime_dir)
     lock_dir = Path(lock_dir) if lock_dir is not None else SHIPPED_LOCK_DIR
-    existing = runtime_status(runtime_dir)
+    existing = runtime_status(runtime_dir, lock_dir)
+    replacing = False
     if existing["state"] == "ready":
-        raise RuntimeContractError("local-ledger runtime is already installed")
+        if existing.get("lock") != "unlocked":
+            raise RuntimeContractError("local-ledger runtime is already installed")
+        if not replace_unlocked:
+            raise RuntimeContractError(
+                "local-ledger runtime is already installed but unlocked; "
+                "rerun with --replace-unlocked to replace it with the locked install")
+        replacing = True
     if existing["state"] == "invalid":
         # 旧版本安装失败会留下空目录；空目录没有任何数据，可以接管，其余无效运行时一律不碰。
         if (runtime_dir.is_symlink() or not runtime_dir.is_dir() or
@@ -271,16 +313,20 @@ def install_runtime(
             lines = [line.strip() for line in (completed.stderr or "").splitlines() if line.strip()]
             detail = (": " + lines[-1][:200]) if lines else ""
             raise RuntimeContractError("npm ci failed" + detail)
-        installed = runtime_status(staging)
-        if installed["state"] != "ready":
+        installed = runtime_status(staging, lock_dir)
+        if installed["state"] != "ready" or installed.get("lock") != "locked":
             raise RuntimeContractError(
                 "installed local-ledger runtime does not match the audited contract")
-        try:
-            if runtime_dir.exists() or runtime_dir.is_symlink():
-                runtime_dir.rmdir()
-            staging.rename(runtime_dir)
-        except OSError as error:
-            raise RuntimeContractError("unable to move the verified runtime into place") from error
+        if replacing:
+            _swap_runtime(runtime_dir, staging)
+            installed = dict(installed, directory=str(runtime_dir))
+        else:
+            try:
+                if runtime_dir.exists() or runtime_dir.is_symlink():
+                    runtime_dir.rmdir()
+                staging.rename(runtime_dir)
+            except OSError as error:
+                raise RuntimeContractError("unable to move the verified runtime into place") from error
     except BaseException:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -440,6 +486,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
     parser.add_argument("--confirm-install", action="store_true")
+    parser.add_argument("--replace-unlocked", action="store_true")
     parser.add_argument("--confirm-initialize", action="store_true")
     parser.add_argument("--user-name", default=None)
     parser.add_argument("--preferred-editor", default=None)
@@ -460,7 +507,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         }
     elif args.command == "install":
         try:
-            payload = install_runtime(args.runtime_dir, args.npm)
+            payload = install_runtime(
+                args.runtime_dir, args.npm, replace_unlocked=args.replace_unlocked)
         except RuntimeContractError as error:
             code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
         else:
