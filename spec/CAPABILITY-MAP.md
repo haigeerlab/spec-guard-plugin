@@ -38,8 +38,11 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | module-interrupt | 支持显式插队：当前模块做到一半时，经预览确认把新模块插到它前面，阶段提示持续显示被暂停的模块，插队模块完成后回到它。 | module-insert, done-stage-split, proposal-mainline-review |
 | plan-without-todo | 有 Plan 却没有 todo.md 的模块会被判为已完成：阶段提示与 verify-artifacts 对此给出警告，完成判据保持不变，避免新插入的模块被误当成已完成。 | phase-and-verification, module-interrupt |
 | proposal-pool-isolation | Proposal 池中已晋级（模块已在能力图中）的 Proposal 不再参与基线校验，使一个基线失效的历史 Proposal 不会让整个池失效；验收记录指纹与 policy 摘要不变。 | proposal-publication, proposal-promotion-proof |
+| proposal-label-acceptance | Proposal 的接受只看 Issue 标签 proposal-stage:accepted 与评审新鲜度；晋级证明以 Proposal 基线提交为起点并接受只改能力图的晋级提交；删除主链裁决命令、策略文件与验收记录要求，已有文件保持可读。 | proposal-pool-isolation |
+| proposal-add-module-promotion | add-module --proposal <id> 按已发布 Proposal 声明的 id、职责、依赖与锚点插入能力图，内嵌远端预检（已接受、新鲜、模块未在图中），预览后确认写入。 | proposal-label-acceptance |
+| proposal-submit | 生成 Proposal 文档并自动计算基线、模块摘要与 revision，输出开 Issue 的现成命令；把使用流程、README 与发版流程改写为提交、接受、晋级、收尾四步。 | proposal-add-module-promotion |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit
 
 ---
 
