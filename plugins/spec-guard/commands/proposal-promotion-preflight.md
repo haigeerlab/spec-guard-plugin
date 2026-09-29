@@ -32,6 +32,7 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 ~~~
 
 仅当 JSON state 为 ready 时，baseCommit 才是人工创建 promotion 分支可使用的起点。
+`/spec-guard:add-module --proposal` 在插入前会通过 `promotion_base` 运行同一预检，因此本命令是可选的只读预览。
 命令本身不创建分支，也不更新 Issue、标签、能力图、模块 Spec、Plan、任务或 PR。
 任何其他状态都应原样报告并停止；不得根据旧 checkout 或另一个 worktree 猜测。
 

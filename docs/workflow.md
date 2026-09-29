@@ -99,7 +99,7 @@ Proposal 路径同样适用。
 
 ```text
 写 Proposal → 合进 main（发布）→ 开 Issue → 评审 → 人工接受（改标签）
-     → 预检 → 人工晋级（插进能力图）→ 合并 → 证明已纳入
+     → 预检 → 晋级（add-module --proposal 插进能力图）→ 合并 → 证明已纳入
 ```
 
 | # | 步骤 | 谁来做 | 怎么做 |
@@ -110,10 +110,10 @@ Proposal 路径同样适用。
 | 4 | 评审 | 命令 | `/spec-guard:proposal-review`：报告 Proposal 是否新鲜、过期或被卡住 |
 | 5 | 人工接受 | 人 | 把 Issue 标签改成 `proposal-stage:accepted`。接受只看这个标签加一次新鲜评审（基线未漂移、模块还不在能力图里、依赖齐全、锚点有效），不再需要策略文件、验收记录或主链分支 |
 | 6 | 预检 | 命令 | `/spec-guard:proposal-promotion-preflight`：重读远端最新状态，确认可以晋级 |
-| 7 | 晋级 | 人 | 开晋级分支，把新模块按锚点插进能力图并合并。能力图里加上这一行就够了；Spec 与 Plan 之后按正常流程补，不必和晋级放在同一个提交里 |
+| 7 | 晋级 | 人 + 命令 | 从 `baseCommit` 开晋级分支，运行 `/spec-guard:add-module --proposal <id> --platform … --target …`（Codex 同等入口），预览确认后加 `--confirm` 写入能力图，提交并合并。命令会自检写入结果能通过第 8 步的证明；能力图里加上这一行就够了，Spec 与 Plan 之后按正常流程补，不必和晋级放在同一个提交里 |
 | 8 | 证明 | 命令 | `/spec-guard:proposal-promotion-proof`：从 Proposal 的基线提交起沿远端默认分支找到第一个纳入该模块的提交，核对它与声明一致，并在它的父提交上重判新鲜度。通过后，人工把标签改成 `proposal-stage:promoted`；改成 promoted 之后重跑仍会得到 `proved` |
 
-晋级之后，这个模块就和其他模块一样进入 Spec → Plan → Build。命令从头到尾只读：Issue、标签、分支、能力图都由人来改。
+晋级之后，这个模块就和其他模块一样进入 Spec → Plan → Build。评审、预检、证明只读；晋级命令只写能力图，Issue、标签、分支与提交都由人来改。
 
 ### Proposal 文档怎么写
 

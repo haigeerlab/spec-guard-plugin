@@ -101,7 +101,22 @@ responsibility、depends-on 或 anchor 中任何一项，都要先重新预览�
 
 写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
 Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
-并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 八步流程，而不是本命令。
+并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 流程；已接受的 Proposal 用下面的 `--proposal` 晋级。
+
+从已接受的 Proposal 晋级（Issue 带 `proposal-stage:accepted` 且评审新鲜）：id、responsibility、depends-on、anchor
+全部取自远端已发布的 Proposal，与 `--id`／`--responsibility`／`--depends-on`／`--anchor` 同时出现即报错；
+必须给 `--platform` 与 `--target`。先预览（只读）：
+
+```bash
+python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
+  --proposal <id> --platform <github|gitlab> --target <target>
+```
+
+原样转述输出（Proposal id、revision、baseCommit 与新行、Build order、diff）。命令内嵌同一预检；预检非 `ready`、
+本地能力图与 baseCommit 上的不一致（提示 `git switch -c <晋级分支> <baseCommit>`）、锚点在 Build order 并行段中致使
+写入结果无法被 proposal-promotion-proof 证明、当前模块做到一半（`--interrupt` 规则同上）、`spec/<id>.md` 已存在，
+均原样说明并停下。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
+不改 Issue 标签。合并后运行 proposal 一节的 `--prove`，`proved` 后由人工把标签改为 `proposal-stage:promoted`。
 
 ## documentation
 

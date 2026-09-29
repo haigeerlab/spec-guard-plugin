@@ -71,3 +71,5 @@ A diagnostic that names neither a layer nor a specific cause (Git plumbing
 failures inside `prove`, for example) keeps the generic `promotion-<state>` /
 `promotion-preflight-<state>` form; only `not-promoted` keeps its own fixed
 `promotion-not-found`.
+
+`add-module --proposal` runs this same preflight (through `promotion_base`) before inserting, so the standalone preflight is an optional read-only preview.
