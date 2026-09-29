@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 变更
+
+- **协作 Claude 启动器不再把 bearer token 放进 Claude 会话的环境变量。** 启动器改为和 `install-claude` 一样经 stdio 代理连接，token 只由代理从 `0600` 文件读取，并仅出现在 `mcp-remote` 子进程环境里。
+
 ## [0.25.0] - 2026-09-29
 
 ### 新增

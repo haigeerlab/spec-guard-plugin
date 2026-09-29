@@ -5,15 +5,18 @@ import os
 import plistlib
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import collaboration_claude as claude_launcher
 import collaboration_runtime
-from collaboration_adapters import (MCP_SERVER_NAME, TOKEN_ENV_VAR,
-                                    claude_mcp_config, codex_toml_fragment, install_claude_config,
+from collaboration_adapters import (MCP_SERVER_NAME,
+                                    claude_stdio_server,
+                                    codex_toml_fragment, install_claude_config,
                                     install_codex_config, main as adapters_main)
 from collaboration_auth_header import authorization_header, main as auth_header_main
 from collaboration_claude import (build_claude_command, build_tmux_command,
@@ -432,31 +435,115 @@ class CollaborationRuntimeTests(unittest.TestCase):
     def test_host_fragments_are_non_secret_and_pin_the_runtime_package(self):
         self.write_config()
         config = read_runtime_config(self.config_dir)
-        claude = claude_mcp_config(config)
-        self.assertEqual(list(claude["mcpServers"]), [MCP_SERVER_NAME])
-        http_server = claude["mcpServers"][MCP_SERVER_NAME]
-        self.assertEqual(http_server["url"], "http://127.0.0.1:9100/mcp")
-        self.assertEqual(http_server["headers"]["Authorization"],
-                         "Bearer ${SPEC_GUARD_COLLABORATION_TOKEN}")
-
         fragment = codex_toml_fragment(
             config, Path("/opt/spec-guard/collaboration_auth_header.py"), self.config_dir)
         self.assertIn(f"[mcp_servers.{MCP_SERVER_NAME.replace('-', '_')}]", fragment)
         self.assertIn("http_headers_helper", fragment)
         self.assertIn(str(self.config_dir), fragment)
         self.assertNotIn("test-only-token", fragment)
-        self.assertNotIn("latest", json.dumps({"claude": claude, "codex": fragment}))
-        self.assertEqual(TOKEN_ENV_VAR, "SPEC_GUARD_COLLABORATION_TOKEN")
+        self.assertNotIn("latest", fragment)
 
-    def test_claude_launcher_config_is_ephemeral_non_secret_and_cannot_be_overridden(self):
+    def launcher_server(self):
+        helper = Path(claude_launcher.__file__).with_name("collaboration_claude_stdio.py")
+        return claude_stdio_server(helper, self.config_dir, sys.executable, "/bin/echo")
+
+    def test_claude_launcher_config_is_ephemeral_stdio_and_tokenless(self):
         self.write_config()
-        generated = write_ephemeral_mcp_config(self.config_dir)
+        with patch("collaboration_claude.shutil.which", return_value="/bin/echo"):
+            generated = write_ephemeral_mcp_config(self.config_dir)
         self.addCleanup(generated.unlink, missing_ok=True)
         contents = generated.read_text(encoding="utf-8")
-        self.assertIn("SPEC_GUARD_COLLABORATION_TOKEN", contents)
-        self.assertEqual(list(json.loads(contents)["mcpServers"]), [MCP_SERVER_NAME])
+        self.assertNotIn("SPEC_GUARD_COLLABORATION_TOKEN", contents)
         self.assertNotIn("test-only-token", contents)
+        parsed = json.loads(contents)
+        self.assertEqual(list(parsed["mcpServers"]), [MCP_SERVER_NAME])
+        server = parsed["mcpServers"][MCP_SERVER_NAME]
+        self.assertEqual(server["type"], "stdio")
+        self.assertEqual(server, self.launcher_server())
+        self.assertIn(str(self.config_dir), server["args"])
         self.assertEqual(stat.S_IMODE(generated.stat().st_mode), 0o600)
+
+        command = build_claude_command("claude", generated, ["--model", "sonnet"])
+        self.assertEqual(command, ["claude", "--mcp-config", str(generated), "--model", "sonnet"])
+        self.assertNotIn("test-only-token", " ".join(command))
+        with self.assertRaisesRegex(ValueError, "MCP options"):
+            build_claude_command("claude", generated, ["--mcp-config", "other.json"])
+
+    def test_claude_launcher_environment_never_carries_the_token(self):
+        self.write_config()
+        seen = {}
+
+        def fake_run(command, env=None, check=False):
+            seen["env"] = env
+            return subprocess.CompletedProcess(command, 0)
+
+        parent = {"PATH": "/usr/bin", "SPEC_GUARD_COLLABORATION_TOKEN": "leaked-parent-token"}
+        for parent_env in ({"PATH": "/usr/bin"}, parent):
+            with patch.dict("collaboration_claude.os.environ", parent_env, clear=True), \
+                    patch("collaboration_claude.shutil.which", return_value="/bin/echo"), \
+                    patch("collaboration_claude.subprocess.run", side_effect=fake_run):
+                self.assertEqual(claude_launcher.launch_claude(self.config_dir, "claude", []), 0)
+            self.assertNotIn("SPEC_GUARD_COLLABORATION_TOKEN", seen["env"])
+            self.assertNotIn("test-only-token", json.dumps(seen["env"]))
+            self.assertEqual(seen["env"]["PATH"], "/usr/bin")
+
+    def test_tmux_wake_path_ends_in_the_same_tokenless_launch(self):
+        self.write_config()
+        command = build_tmux_command(self.config_dir, "claude", [], session_name="spec-guard-x")
+        self.assertIn("--tmux-wake", command)
+        self.assertEqual(Path(command[command.index("-B") + 1]).name, "collaboration_claude.py")
+        seen = {}
+        with patch.dict("collaboration_claude.os.environ",
+                        {"TMUX_PANE": "%1", "SPEC_GUARD_COLLABORATION_TOKEN": "x"}, clear=True), \
+                patch("collaboration_claude.shutil.which", return_value="/bin/echo"), \
+                patch("collaboration_claude.subprocess.run",
+                      side_effect=lambda c, env=None, check=False: seen.update(env=env)
+                      or subprocess.CompletedProcess(c, 0)):
+            self.assertEqual(claude_launcher_main(
+                ["--config-dir", str(self.config_dir), "--tmux-wake"]), 0)
+        self.assertNotIn("SPEC_GUARD_COLLABORATION_TOKEN", seen["env"])
+
+    def test_claude_launcher_fails_closed_before_launching(self):
+        with patch("collaboration_claude.subprocess.run") as run:
+            self.assertEqual(claude_launcher_main(["--config-dir", str(self.config_dir / "missing")]), 1)
+            self.write_config()
+            with patch("collaboration_claude.shutil.which", return_value=None):
+                self.assertEqual(claude_launcher_main(["--config-dir", str(self.config_dir)]), 1)
+        run.assert_not_called()
+
+    def test_claude_launcher_rejects_an_unsafe_token_file_before_launching(self):
+        self.write_config()
+        token = self.config_dir / "token"
+        for label, prepare in (("0644", lambda: token.chmod(0o644)), ("absent", token.unlink),
+                                 ("whitespace-only", lambda: token.write_text("  \n", encoding="utf-8")),
+                                 ("embedded-whitespace",
+                                  lambda: token.write_text("bad\nvalue", encoding="utf-8"))):
+            with self.subTest(token_file=label):
+                prepare()
+                stderr = io.StringIO()
+                with patch("collaboration_claude.shutil.which", return_value="/bin/echo"), \
+                        patch("collaboration_claude.subprocess.run") as run, \
+                        redirect_stderr(stderr):
+                    self.assertEqual(claude_launcher_main(["--config-dir", str(self.config_dir)]), 1)
+                run.assert_not_called()
+                self.assertIn("launcher is unavailable", stderr.getvalue())
+                self.assertEqual(list(self.config_dir.glob("claude-mcp-*.json")), [])
+                token.unlink(missing_ok=True)
+                token.write_text("test-only-token\n", encoding="utf-8")
+                token.chmod(0o600)
+
+    def test_claude_inspection_output_equals_the_launcher_server_definition(self):
+        self.write_config()
+        buffer = io.StringIO()
+        with patch("collaboration_adapters.shutil.which", return_value="/bin/echo"), \
+                redirect_stdout(buffer):
+            self.assertEqual(adapters_main(["claude", "--config-dir", str(self.config_dir)]), 0)
+        inspected = json.loads(buffer.getvalue())
+        with patch("collaboration_claude.shutil.which", return_value="/bin/echo"):
+            generated = write_ephemeral_mcp_config(self.config_dir)
+        self.addCleanup(generated.unlink, missing_ok=True)
+        self.assertEqual(inspected, json.loads(generated.read_text(encoding="utf-8")))
+        self.assertNotIn("SPEC_GUARD_COLLABORATION_TOKEN", buffer.getvalue())
 
         command = build_claude_command("claude", generated, ["--model", "sonnet"])
         self.assertEqual(command, ["claude", "--mcp-config", str(generated), "--model", "sonnet"])

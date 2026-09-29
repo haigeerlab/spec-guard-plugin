@@ -12,19 +12,27 @@ import tempfile
 from typing import Sequence
 from uuid import uuid4
 
-from collaboration_adapters import TOKEN_ENV_VAR, claude_mcp_config
+from collaboration_adapters import claude_mcp_config
 from collaboration_auth_header import read_private_token
 from collaboration_runtime import RuntimeContractError, default_config_dir, read_runtime_config
 
 
 def write_ephemeral_mcp_config(config_dir: Path) -> Path:
-    """Create a private config containing only endpoint and env-variable names."""
-    config = read_runtime_config(config_dir)
+    """Create a private stdio config; the proxy reads the token file itself."""
+    # Validate the token file before launching; the value is discarded, never passed on.
+    read_private_token(read_runtime_config(config_dir).token_file)
+    npx_executable = shutil.which("npx")
+    if not npx_executable:
+        raise ValueError("Claude stdio npx executable is unavailable")
+    config = claude_mcp_config(
+        Path(__file__).with_name("collaboration_claude_stdio.py"), config_dir,
+        sys.executable, npx_executable,
+    )
     with tempfile.NamedTemporaryFile(
         mode="w", encoding="utf-8", prefix="claude-mcp-", suffix=".json",
         dir=config_dir, delete=False,
     ) as handle:
-        json.dump(claude_mcp_config(config), handle, separators=(",", ":"))
+        json.dump(config, handle, separators=(",", ":"))
         handle.write("\n")
         path = Path(handle.name)
     path.chmod(0o600)
@@ -46,12 +54,10 @@ def build_claude_command(
 
 
 def launch_claude(config_dir: Path, claude_bin: str, extra_args: Sequence[str]) -> int:
-    """Run Claude with a child-only token and remove the temporary config afterward."""
-    config = read_runtime_config(config_dir)
-    token = read_private_token(config.token_file)
+    """Run Claude without the bearer token in its environment; remove the temporary config after."""
     temporary_config = write_ephemeral_mcp_config(config_dir)
     environment = os.environ.copy()
-    environment[TOKEN_ENV_VAR] = token
+    environment.pop("SPEC_GUARD_COLLABORATION_TOKEN", None)
     try:
         command = build_claude_command(claude_bin, temporary_config, extra_args)
         return subprocess.run(command, env=environment, check=False).returncode
