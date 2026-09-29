@@ -39,7 +39,8 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 | `NEEDS_SPEC` | 当前模块缺 `spec/<id>.md` |
 | `NEEDS_PLAN` | 当前模块有 Spec，缺 `tasks/<id>/plan.md` |
 | `BUILDING` | 当前模块的 `tasks/<id>/todo.md` 还有未勾选项 |
-| `DONE` | 当前模块（`.agent/state.json` 的 `activeModule`，或 Build order 中第一个未完成模块）已有 Plan 且没有未勾选项；若 `activeModule` 明确指向一个已完成模块，即使能力图中其他模块仍未完成也会报 `DONE`。新需求默认用 `/spec-guard:add-module`，需要留痕的评审决定时走 Proposal |
+| `MODULE_DONE` | `.agent/state.json` 的 `activeModule` 指向一个已完成模块（已有 Plan 且没有未勾选项），但能力图中还有别的模块未完成；下一步点名 Build order 中第一个未完成的模块及其阶段，并建议把 `activeModule` 改成它 |
+| `DONE` | 能力图中每个模块都已有 Plan 且没有未勾选项。新需求默认用 `/spec-guard:add-module`，需要留痕的评审决定时走 Proposal；若 `activeModule` 仍指向已完成的模块，会多一行提示可以清除 |
 | `MAP_INVALID` | 能力图无法按严格规则解析 |
 | `UNKNOWN` | 阶段无法计算（例如任务文件无法读取） |
 

@@ -36,7 +36,8 @@
 | `NEEDS_SPEC` | 当前模块缺 Spec | 写 `spec/<模块>.md` |
 | `NEEDS_PLAN` | 当前模块有 Spec、缺 Plan | 用 `/plan` 生成 plan 和 todo |
 | `BUILDING` | todo 还有 N 项没勾 | 继续 `/build` |
-| `DONE` | 当前模块或全部模块已完成 | 切到下一个模块；全部完成后，新需求用 `/spec-guard:add-module` 插入 |
+| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做完 | 把 `activeModule` 改成提示里点名的下一个模块 |
+| `DONE` | 全部模块都已完成 | 新需求用 `/spec-guard:add-module` 插入；`activeModule` 还指着已完成模块时可以清掉 |
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
