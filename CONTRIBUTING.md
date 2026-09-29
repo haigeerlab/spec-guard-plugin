@@ -11,7 +11,7 @@
 三个都绿才提。
 
 **显式写 `/bin/bash`**：macOS 上 `bash` 可能是 Homebrew 的 5.x，而 3.2 才是
-这个项目踩过坑的版本。`.github/workflows/validate.yml` 定义了 Ubuntu + macOS 的
+这个项目踩过坑的版本。`.github/workflows/ci.yml` 定义了 Ubuntu + macOS 的
 job；某一次 push 或 PR 是否真的跑过，看 Actions 标签页或 `gh pr checks`。本地跑
 `scripts/validate.sh` 加上面两条回归脚本（即预推送 hook 那一套）是唯一必须满足
 的门禁。

@@ -156,7 +156,10 @@ selftest() {
   forget_project_trust "$SMOKE_TMP/config.toml" /custom
   [ "$(printf '%s\n' 'model = "x"' '' '[projects."/keep"]' 'trust_level = "trusted"' '' \
     '[projects."/custom"]' 'trust_level = "trusted"' 'note = "mine"')" = "$(cat "$SMOKE_TMP/config.toml")" ] || return 1
-  [ "$(stat -f %Lp "$SMOKE_TMP/config.toml" 2>/dev/null || stat -c %a "$SMOKE_TMP/config.toml")" = 640 ] || return 1
+  # GNU `stat -f` reports the file system (and prints it) instead of failing, so BSD/GNU stat
+  # fallbacks are not portable; read the mode through python3, which the smoke already requires.
+  [ "$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' \
+    "$SMOKE_TMP/config.toml")" = 640 ] || return 1
   echo "  ✅ selftest: 0=通过、1=行为失败、2=环境未就绪；只清理 smoke 自己留下的信任记录"
 }
 
