@@ -7,7 +7,7 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 |---|---|
 | 多个模块的 plan 和 todo 写到同一个文件里，互相覆盖 | 多模块目录约定：一张能力图，每个模块各自的 Spec、Plan、todo |
 | agent 不知道现在该做哪个模块、做到哪一步 | 每轮对话开头自动注入当前阶段，例如「`NEEDS_PLAN`：去给 `billing` 写 plan」 |
-| 做到一半冒出新需求，不知道插在哪，手改能力图容易改坏 | 快速插入：在检查点提出新模块，校验、预览后经你确认插进能力图；需要留痕时改走 Proposal |
+| 做到一半冒出新需求，不知道插在哪，手改能力图容易改坏 | 快速插入：在检查点（或显式插队）提出新模块，校验、预览后经你确认插进能力图；需要留痕时改走 Proposal |
 
 它只报告事实、给出建议，**不替你改 Issue、分支或能力图**，决定和写入都留给人。设计原因见[设计理念与术语](docs/concepts.md)。
 
@@ -73,7 +73,7 @@ codex plugin add spec-guard@spec-guard-marketplace
 
 4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`；模块做完但还有别的模块时显示 `MODULE_DONE`，`DONE` 表示全部模块都完成。
 
-项目做到一半来了新需求，在检查点用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，
+项目做到一半来了新需求，在检查点（或显式插队）用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，
 见[使用流程](docs/workflow.md)。
 
 ## 文档

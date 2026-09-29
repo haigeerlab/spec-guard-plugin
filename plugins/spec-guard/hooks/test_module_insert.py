@@ -9,6 +9,8 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 from pathlib import Path
 
+import module_stage
+
 
 _spec = importlib.util.spec_from_file_location(
     "spec_guard_module_insert", Path(__file__).with_name("module-insert.py"))
@@ -330,6 +332,153 @@ class ModuleInsertTests(unittest.TestCase):
                     anchor=scenario.get("anchor", "end"))
                 self.assertNotEqual(exit_code, 0, scenario["name"])
                 self.assertEqual(before, self.snapshot_of(root), scenario["name"])
+
+    # ---- --interrupt (I2) ----
+
+    def make_done(self, *ids):
+        for module_id in ids:
+            self.write("spec/%s.md" % module_id, "# Spec: %s\n" % module_id)
+            self.write("tasks/%s/plan.md" % module_id, "# Plan: %s\n" % module_id)
+            self.write("tasks/%s/todo.md" % module_id, "- [x] done\n")
+
+    def make_half(self, module_id):
+        self.write("spec/%s.md" % module_id, "# Spec: %s\n" % module_id)
+        self.write("tasks/%s/plan.md" % module_id, "# Plan: %s\n" % module_id)
+        self.write("tasks/%s/todo.md" % module_id, "- [x] one\n- [ ] two\n")
+
+    def interrupt_main(self, args_extra, root=None):
+        root = root or self.root
+        args = ["--project", str(root), "--id", "delta", "--responsibility", "Fourth",
+                "--depends-on", "—", "--anchor", "end"] + args_extra
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = main(args)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_without_interrupt_half_done_rejection_mentions_flag(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        before = self.snapshot()
+        with self.assertRaises(InsertError) as ctx:
+            preview(self.root, "delta", "Fourth", "—", "end")
+        self.assertIn("请先完成它", str(ctx.exception))
+        self.assertIn("--interrupt", str(ctx.exception))
+        self.assertEqual(before, self.snapshot())
+
+    def test_interrupt_allows_half_done_and_reports_progress(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        result = preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertEqual(result["interrupted"], {"id": "gamma", "checked": 1, "total": 2})
+        report = module_insert.format_report(result)
+        self.assertIn("gamma", report)
+        self.assertIn("已勾 1/2", report)
+
+    def test_interrupt_anchor_before_paused_module_new_becomes_current_no_hint(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        result = preview(self.root, "delta", "Fourth", "—", "after:beta", interrupt=True)
+        self.assertEqual(result["new_current"], "delta")
+        report = module_insert.format_report(result)
+        self.assertIn("插入后当前模块将从 gamma 变为 delta", report)
+        self.assertNotIn("activeModule", report)
+
+    def test_interrupt_anchor_after_paused_module_hints_active_module(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        result = preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        report = module_insert.format_report(result)
+        self.assertIn("插入后当前模块仍是 `gamma`；请把 .agent/state.json 的 activeModule "
+                      "改为 `delta` 再开始构建", report)
+
+    def test_interrupt_active_module_still_paused_module_hints_active_module(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        self.write(".agent/state.json", '{"activeModule": "gamma"}\n')
+        result = preview(self.root, "delta", "Fourth", "—", "after:beta", interrupt=True)
+        self.assertEqual(result["new_current"], "gamma")
+        self.assertIn("activeModule 改为 `delta`", module_insert.format_report(result))
+
+    def test_interrupt_allowed_while_another_module_is_also_half_done(self):
+        # pwa-platform shape: the current module waits on external facts while a later
+        # module is being built in parallel; neither blocks an explicit interrupt.
+        self.make_half("alpha")
+        self.make_half("beta")
+        self.write(".agent/state.json", '{"activeModule": "beta"}\n')
+        result = preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertEqual(result["interrupted"]["id"], "beta")
+        self.assertNotIn("只支持一层插队", module_insert.format_report(result))
+        module_insert.write(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertIn("delta", module_insert.parse_map(self.map_path).order)
+
+    def test_interrupt_does_not_bypass_other_validations(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        self.assert_no_write(lambda: preview(
+            self.root, "delta", "Fourth", "ghost", "end", interrupt=True))
+        self.assert_no_write(lambda: preview(
+            self.root, "delta", "Fourth", "—", "after:ghost", interrupt=True))
+        self.assert_no_write(lambda: preview(
+            self.root, "Bad_Id", "Fourth", "—", "end", interrupt=True))
+
+    def test_interrupt_is_noop_when_current_module_not_half_done(self):
+        plain = preview(self.root, "delta", "Fourth", "—", "end")
+        with_flag = preview(self.root, "delta", "Fourth", "—", "end", interrupt=True)
+        self.assertIsNone(with_flag["interrupted"])
+        self.assertEqual(module_insert.format_report(plain),
+                         module_insert.format_report(with_flag))
+
+    def test_cli_interrupt_confirm_writes_only_the_map(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        code, _, err = self.interrupt_main([])
+        self.assertEqual(code, 1)
+        self.assertIn("--interrupt", err)
+        code, out, _ = self.interrupt_main(["--interrupt"])
+        self.assertEqual(code, 0)
+        self.assertIn("已勾 1/2", out)
+        before = self.snapshot()
+        code, out, _ = self.interrupt_main(["--interrupt", "--confirm"])
+        self.assertEqual(code, 0)
+        after = self.snapshot()
+        self.assertEqual(set(before), set(after))
+        changed = [k for k in before if before[k] != after[k]]
+        self.assertEqual(changed, [str(self.map_path)])
+        self.assertIn("delta", self.map_path.read_text(encoding="utf-8"))
+
+    def test_interrupt_end_to_end_pause_and_resume(self):
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        outcome = module_insert.write(self.root, "delta", "Urgent", "beta", "after:beta",
+                                      interrupt=True)
+        self.assertEqual(outcome["stage_module"], "delta")
+        self.assertEqual(outcome["stage_hint"], "NEEDS_SPEC")
+        self.assertEqual(outcome["stage_paused"], ("gamma", "BUILDING"))
+        text = module_stage.describe(self.root)
+        self.assertIn("NEEDS_SPEC", text)
+        self.assertIn("Paused: `gamma`", text)
+        self.make_done("delta")
+        self.write(".agent/state.json", '{"activeModule": "delta"}\n')
+        text = module_stage.describe(self.root)
+        self.assertIn("MODULE_DONE", text)
+        self.assertIn("resume paused module `gamma`", text)
+
+    def test_stage_hint_paused_branch(self):
+        self.assertEqual(module_insert.format_stage_hint(
+            {"stage_module": "delta", "stage_hint": "MODULE_DONE", "stage_pending": ("gamma", "BUILDING"),
+             "stage_paused": ("gamma", "BUILDING")}),
+            "当前阶段提示: `delta` 处于 MODULE_DONE；被暂停的模块 `gamma`（BUILDING）应先恢复")
+
+    def test_stage_hint_paused_branch_via_confirm(self):
+        # alpha (done) is active, gamma is half done and paused: MODULE_DONE names it.
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        self.write(".agent/state.json", '{"activeModule": "alpha"}\n')
+        outcome = module_insert.write(self.root, "delta", "Fourth", "—", "end")
+        self.assertEqual(outcome["stage_hint"], "MODULE_DONE")
+        self.assertEqual(outcome["stage_paused"], ("gamma", "BUILDING"))
+        self.assertIn("被暂停的模块 `gamma`（BUILDING）应先恢复",
+                      module_insert.format_stage_hint(outcome))
 
     # ---- negative cases: each must leave every file untouched ----
 

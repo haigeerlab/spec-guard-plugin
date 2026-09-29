@@ -78,9 +78,15 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 ## add-module
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并
-说明先完成它。先读 `spec/CAPABILITY-MAP.md`，根据用户给的需求上下文提出 id（kebab-case、语义稳定）、单行
+说明先完成它（显式 `--interrupt` 插队除外，见下）。先读 `spec/CAPABILITY-MAP.md`，根据用户给的需求上下文提出 id（kebab-case、语义稳定）、单行
 responsibility、depends-on（既有模块 id，逗号分隔，没有填 `—`）、anchor（`after:<既有模块 id>` 或 `end`），
 每项都给一句对着能力图实际模块的理由。
+
+插队（`--interrupt`）：当前模块做到一半、又在等外部条件而确需先做新模块时，才在预览命令后加 `--interrupt`，
+显式跳到队前；其他模块同时做到一半（并行推进）不影响插队。预览会写明被暂停的模块及进度（已勾/总数）与插入后的
+当前模块，必须让用户看过并明确确认。当前模块没有做到一半时 `--interrupt` 不改变任何行为。预览提示“插入后当前模块仍是
+`<被暂停模块>`”时，提醒用户把 `.agent/state.json` 的 `activeModule` 改为新模块再开始构建（本命令不写 state.json）。
+确认时同样带 `--interrupt --confirm`，会重新执行全部校验。
 
 先预览（默认，只读）：
 
@@ -121,7 +127,7 @@ python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
 # 仅主链模块交付／推进边界：候选列表；加 --proposal-id 与 --decision 记录人工裁决
 python3 -B "$ROOT/hooks/proposal_mainline_review.py" --project "$PROJECT" \
   --platform <github|gitlab> --target <target> --authority-id <id> \
-  --boundary <module-deliver|module-advance> --current-module-id <module-id>
+  --boundary <module-deliver|module-advance|module-interrupt> --current-module-id <module-id>
 # 人工写入 accepted 后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>

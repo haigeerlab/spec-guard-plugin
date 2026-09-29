@@ -17,7 +17,11 @@ The pool-facing entry first parses the policy and attestation stored in the same
 remote-default snapshot as the Proposal pool. It then reads only the current
 worktree's branch, upstream and ancestor relation to that snapshot. Callers provide
 only authority id, explicit boundary and current module id; supplied branch or HEAD
-text is never accepted as authority evidence.
+text is never accepted as authority evidence. The boundary is one of
+`module-deliver`, `module-advance` or `module-interrupt`; the last is used when a
+half-done current module is explicitly interrupted (see /spec-guard:add-module
+--interrupt) and behaves exactly like `module-advance`. The boundary never enters
+the attestation, its path or the policy digest.
 
 The CLI reports the first failing layer with a stable diagnostic code and never
 free text or raw errors:

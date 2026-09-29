@@ -44,6 +44,8 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 | `MAP_INVALID` | 能力图无法按严格规则解析 |
 | `UNKNOWN` | 阶段无法计算（例如任务文件无法读取） |
 
+`- Paused:` 行表示有被暂停的模块：当前模块以外、todo 既有已勾又有未勾项的模块（显式插队留下的）。它出现在 `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下，`MODULE_DONE` 的下一步会指回它；没有被暂停的模块时不输出。
+
 当前模块取 `.agent/state.json` 的 `activeModule`（须是能力图中的模块），否则取 Build order 中第一个未完成的模块。
 阶段只依据本地文件，不读取 tracker、GitHub 或 Git 历史。
 

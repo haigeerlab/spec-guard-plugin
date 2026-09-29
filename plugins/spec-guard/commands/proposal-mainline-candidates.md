@@ -7,7 +7,7 @@ allowed-tools: Bash
 `mainline-review-commit-not-ancestor`，说明主链分支落后：在主链 checkout 上运行
 `git fetch origin && git merge --ff-only origin/<默认分支>` 后再试；不能快进时停止并报告，不要改用其他分支。
 
-只有正在主链的调用者，且边界确为 module-deliver 或 module-advance，才运行：
+只有正在主链的调用者，且边界确为 module-deliver、module-advance 或 module-interrupt，才运行：
 
 ~~~bash
 ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
@@ -30,9 +30,11 @@ fi
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 python3 -B "$ROOT/hooks/proposal_mainline_review.py" \
   --project . --platform "<github|gitlab>" --target "<target>" \
-  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance>" \
+  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance|module-interrupt>" \
   --current-module-id "<module-id>"
 ~~~
+
+`module-interrupt` 用于半途的当前模块被显式插队打断时（见 /spec-guard:add-module --interrupt），行为与 `module-advance` 相同。
 
 原样报告 JSON。candidate-list 只是待人工审阅的排序候选，绝不等于 accepted。
 若结果为 blocked、unknown、invalid 或 stale，停止，不从其他 worktree 补充事实；按 `diagnostic` 说明原因：
@@ -63,7 +65,7 @@ fi
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 python3 -B "$ROOT/hooks/proposal_mainline_review.py" \
   --project . --platform "<github|gitlab>" --target "<target>" \
-  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance>" \
+  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance|module-interrupt>" \
   --current-module-id "<module-id>" --proposal-id "<proposal-id>" \
   --decision "<accept|needs-revision|defer|reject>" --observations-json "[]"
 ~~~

@@ -1,7 +1,7 @@
 """Pure, non-blocking Proposal entry guidance at explicit module boundaries."""
 
 
-REMINDER_BOUNDARIES = frozenset(("module-deliver", "module-advance"))
+REMINDER_BOUNDARIES = frozenset(("module-deliver", "module-advance", "module-interrupt"))
 ENTRIES = ("intake", "review", "promotion-proof")
 MAINLINE_ENTRIES = ENTRIES + ("mainline-candidates", "mainline-review",
                               "promotion-preflight")

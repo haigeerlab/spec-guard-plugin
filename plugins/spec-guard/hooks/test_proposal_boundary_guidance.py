@@ -6,12 +6,15 @@ from proposal_boundary_guidance import as_json, guide
 
 
 class ProposalBoundaryGuidanceTests(unittest.TestCase):
-    def test_only_delivery_and_advance_boundaries_get_nonblocking_reminders(self):
-        for boundary in ("module-deliver", "module-advance"):
+    def test_only_delivery_advance_and_interrupt_boundaries_get_nonblocking_reminders(self):
+        for boundary in ("module-deliver", "module-advance", "module-interrupt"):
             result = guide(boundary)
             self.assertEqual(result.state, "reminder")
             self.assertEqual(result.boundary, boundary)
             self.assertEqual(result.entries, ("intake", "review", "promotion-proof"))
+
+    def test_unlisted_pause_like_boundary_gets_no_reminder(self):
+        self.assertEqual(guide("module-pause").state, "not-applicable")
 
     def test_ordinary_work_events_do_not_get_proposal_pool_reminders(self):
         result = guide("task-progress")

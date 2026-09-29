@@ -30,10 +30,12 @@ fi
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 python3 -B "$ROOT/hooks/proposal_mainline_review.py" \
   --project . --platform "<github|gitlab>" --target "<target>" \
-  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance>" \
+  --authority-id "<authority-id>" --boundary "<module-deliver|module-advance|module-interrupt>" \
   --current-module-id "<module-id>" --proposal-id "<proposal-id>" \
   --decision "<accept|needs-revision|defer|reject>" --observations-json "[]"
 ~~~
+
+`--boundary` 取 `module-deliver`、`module-advance` 或 `module-interrupt`；`module-interrupt` 用于半途的当前模块被显式插队打断时（见 /spec-guard:add-module --interrupt），行为与 `module-advance` 相同。
 
 observations 只能使用 package-boundary-conflict、public-contract-conflict、anchor-conflict、
 unmerged-public-contract-change、dependency-suggestion 或 anchor-suggestion 之一；moduleIds

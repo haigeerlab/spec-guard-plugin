@@ -36,12 +36,13 @@
 | `NEEDS_SPEC` | 当前模块缺 Spec | 写 `spec/<模块>.md` |
 | `NEEDS_PLAN` | 当前模块有 Spec、缺 Plan | 用 `/plan` 生成 plan 和 todo |
 | `BUILDING` | todo 还有 N 项没勾 | 继续 `/build` |
-| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做完 | 把 `activeModule` 改成提示里点名的下一个模块 |
+| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做完 | 把 `activeModule` 改成提示里点名的下一个模块；有被暂停的模块时点名它 |
 | `DONE` | 全部模块都已完成 | 新需求用 `/spec-guard:add-module` 插入；`activeModule` 还指着已完成模块时可以清掉 |
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 随时想看完整状态，用 `/spec-guard:phase`。
+存在被暂停的模块（见「插队」）时，`NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下会多一行 `Paused: …`。
 
 ## 已有项目：加新需求
 
@@ -56,7 +57,7 @@
 
 ### 快速插入
 
-在一个模块做完、或还没开始的检查点，把理顺的需求上下文交给 agent，运行 `/spec-guard:add-module`
+在一个模块做完、还没开始的检查点（或显式插队，见下一节），把理顺的需求上下文交给 agent，运行 `/spec-guard:add-module`
 （Codex 里说「用 spec-guard 插入一个新模块」）：
 
 1. agent 读能力图，提出新模块的 id、职责、依赖和插入位置（`after:<某模块>` 或 `end`），每项说明理由；
@@ -66,10 +67,31 @@
 
 命令会先校验，任何一条不满足就拒绝，什么都不写：
 
-- 当前模块做到一半（todo 里既有已勾、又有未勾的项）；
+- 当前模块做到一半（todo 里既有已勾、又有未勾的项）——唯一的例外是显式加 `--interrupt` 插队，见下一节；
 - 依赖不存在、依赖排在插入位置之后、出现循环依赖，或 id 重复、不是 kebab-case；
 - 插入会改动 `## 目标`、已有模块行，或已有模块在 Build order 中的先后；
 - `spec/<id>.md` 已经存在。
+
+### 插队
+
+当前模块做到一半、剩下的都要等外部条件（比如部署满七天后的复核），而新需求需要先做时，可以显式插队：
+
+```text
+/spec-guard:add-module … --interrupt
+```
+
+Codex 里用 `spec-guard-ops` 的 `add-module`，带同样的 `--interrupt` 参数。
+
+- 预览会写明被暂停的模块及进度（`已勾 X/Y`），以及插入后的当前模块。新模块不会成为当前模块时
+  （锚点在被暂停模块之后，或 `activeModule` 仍指向它），预览提示把 `.agent/state.json` 的 `activeModule` 改为新模块；
+  命令本身仍只写 `spec/CAPABILITY-MAP.md`；
+- 插入后，每轮阶段行都带 `Paused: …`，提醒被暂停的模块还没做完；
+- 插队模块做完后，`MODULE_DONE` 会提示回到被暂停的模块，把 `activeModule` 改回它即可；
+- 其他模块同时做到一半（并行推进）不影响插队；它们都会出现在 `Paused` 行里，插队模块做完后按 Build order 回到第一个被暂停的模块；
+- 不带 `--interrupt` 时行为不变，当前模块做到一半仍然拒绝；当前模块没有做到一半时，`--interrupt` 不改变任何行为。
+
+Proposal 路径同样适用：主链评审接受 `--boundary module-interrupt`（行为与 `module-advance` 相同，不进入验收记录）。
+晋级合并后，如果新模块没有成为当前模块，把 `activeModule` 改为它。
 
 ### Proposal（需要留痕时）
 
