@@ -66,6 +66,22 @@ for module in value.get("modules", []):
           bad "能力图上没有的模块 spec: ${module}"
         fi
       done
+      # 有 Plan 无 todo.md 的模块按已完成计（判据来自 module_stage.py）；这里只汇总，不判失败。
+      NOTODO="$(python3 -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from capability_map import parse_map
+from module_stage import module_state
+root = Path(".")
+parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
+order = list(parsed.order) or [row.module_id for row in parsed.rows]
+ids = [s["id"] for s in (module_state(root, m) for m in order) if s["plan"] and not s["todo"]]
+if ids:
+    listed = ", ".join(ids[:10]) + (" 等 %d 个" % len(ids) if len(ids) > 10 else "")
+    print("%d 个模块有 Plan 但没有 todo.md，按已完成计：%s" % (len(ids), listed))
+' "$HOOKDIR" 2>/dev/null </dev/null)" || NOTODO=""
+      [ -z "$NOTODO" ] || warn "$NOTODO"
     fi
   fi
 fi
