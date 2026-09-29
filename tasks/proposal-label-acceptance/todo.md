@@ -4,4 +4,4 @@
 - [x] Task 2：删除主链裁决与边界提醒——命令、hook、测试、参考文档与全部引用
 - [x] Task 3：池不再读取策略与验收记录——review_commit 恒为观察提交
 - [x] Task 4：文档、退役说明与 CHANGELOG
-- [ ] Checkpoint：两种 Python 下全部检查，消费者快照复现，勾选随模块 PR 提交
+- [x] Checkpoint：两种 Python 下全部检查，消费者快照复现，勾选随模块 PR 提交
