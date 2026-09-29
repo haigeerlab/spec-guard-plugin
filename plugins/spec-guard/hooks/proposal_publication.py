@@ -12,6 +12,18 @@ from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal
 
 MAX_POOL_SIZE = 100
 ATTESTATION_PATH_TEMPLATE = "spec/proposal-acceptances/%s-%s.json"
+BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
+BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
+_SKIPPED_CODES = {
+    BASELINE_REMOTE_MISMATCH: "proposal-baseline-remote-mismatch",
+    BASELINE_UNAVAILABLE: "proposal-baseline-unavailable",
+}
+
+
+def skipped_as_json(skipped):
+    """Serialize `PublicationPool.skipped` as stable codes; raw errors never leave here."""
+    return [{"proposalId": proposal_id, "diagnostic": _SKIPPED_CODES.get(error, "proposal-invalid")}
+            for proposal_id, error in skipped]
 
 
 class Publication(object):
@@ -169,12 +181,12 @@ def read_published(project, proposal_id, remote="origin"):
         try:
             proposal = parse_proposal(proposal_path)
             if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
-                raise ContractError("Proposal baseline remote or default branch differs")
+                raise ContractError(BASELINE_REMOTE_MISMATCH)
             ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                              proposal.baseline.commit, observed_commit])
             baseline_map = _show(repo, proposal.baseline.commit, "spec/CAPABILITY-MAP.md")
             if not ancestor or baseline_map is None:
-                raise ContractError("Proposal baseline commit is not on remote default branch")
+                raise ContractError(BASELINE_UNAVAILABLE)
             baseline_path = Path(temp) / "baseline-map.md"
             baseline_path.write_text(baseline_map, encoding="utf-8")
             validate_proposal(proposal_path, baseline_path)
@@ -231,12 +243,12 @@ def read_published_pool(project, remote="origin"):
                 return PublicationPool("invalid", review_commit=observed_commit, diagnostic=str(error))
             try:
                 if proposal.baseline.remote != remote or proposal.baseline.default_branch != branch:
-                    raise ContractError("Proposal baseline remote or default branch differs")
+                    raise ContractError(BASELINE_REMOTE_MISMATCH)
                 ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                                  proposal.baseline.commit, observed_commit])
                 baseline_map = _show(repo, proposal.baseline.commit, "spec/CAPABILITY-MAP.md")
                 if not ancestor or baseline_map is None:
-                    raise ContractError("Proposal baseline commit is not on remote default branch")
+                    raise ContractError(BASELINE_UNAVAILABLE)
                 baseline_path = Path(temp) / "baseline-map.md"
                 baseline_path.write_text(baseline_map, encoding="utf-8")
                 validate_proposal(proposal_path, baseline_path)

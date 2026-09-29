@@ -323,6 +323,31 @@ class ProposalMainlineReviewTests(unittest.TestCase):
         self.assertEqual(self.run_main(pool, *decide, context=(CONTEXT, None))["state"],
                          "accepted-candidate")
 
+    def test_skipped_proposals_are_reported_beside_candidates_and_decisions(self):
+        remote_policy = dict(POLICY, schemaVersion=1)
+        skipped = (("beta", "Proposal baseline commit is not on remote default branch"),)
+        expected = [{"proposalId": "beta", "diagnostic": "proposal-baseline-unavailable"}]
+        pool = PublicationPool("published", review_commit="a" * 40, review_map=MAP,
+                               publications=(publication(),), skipped=skipped,
+                               policy_text=json.dumps(remote_policy))
+        healthy = PublicationPool("published", review_commit="a" * 40, review_map=MAP,
+                                  publications=(publication(),),
+                                  policy_text=json.dumps(remote_policy))
+        listing = self.run_main(pool, context=(CONTEXT, None))
+        self.assertEqual(listing, dict(self.run_main(healthy, context=(CONTEXT, None)),
+                                       skippedProposals=expected))
+        self.assertNotIn("skippedProposals", self.run_main(healthy, context=(CONTEXT, None)))
+        self.assertNotIn("skipped", listing)
+        decide = ("--proposal-id", "gamma", "--decision", "accept")
+        self.assertEqual(self.run_main(pool, *decide, context=(CONTEXT, None))["skippedProposals"],
+                         expected)
+        # Querying the excluded proposal is the ordinary "not in pool" result.
+        excluded = self.run_main(pool, "--proposal-id", "beta", "--decision", "accept",
+                                 context=(CONTEXT, None))
+        self.assertEqual((excluded["state"], excluded["diagnostic"]),
+                         ("invalid", "proposal-not-published"))
+        self.assertEqual(excluded["skippedProposals"], expected)
+
     def test_json_keeps_only_code_shaped_diagnostics(self):
         self.assertEqual(as_json(MainlineReview("blocked", diagnostic="mainline-policy-invalid")),
                          {"state": "blocked", "diagnostic": "mainline-policy-invalid"})

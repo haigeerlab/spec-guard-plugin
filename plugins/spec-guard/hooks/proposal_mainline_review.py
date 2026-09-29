@@ -9,7 +9,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from proposal_review import review
-from proposal_publication import ATTESTATION_PATH_TEMPLATE, read_published_pool
+from proposal_publication import ATTESTATION_PATH_TEMPLATE, read_published_pool, skipped_as_json
 from proposal_tracker_read import read_tracker
 
 
@@ -46,7 +46,8 @@ class MainlineReview(object):
     def __init__(self, state, proposal_id=None, revision=None, review_commit=None,
                  authority_id=None, current_module_id=None, reason_codes=(),
                  diagnostic=None, candidates=(), skipped=(), attestation=None,
-                 attestation_path=None):
+                 attestation_path=None, skipped_proposals=()):
+        self.skipped_proposals = tuple(skipped_proposals)
         self.state = state
         self.proposal_id = proposal_id
         self.revision = revision
@@ -75,6 +76,8 @@ def as_json(result):
     if result.skipped:
         data["skipped"] = [{"proposalId": proposal_id, "reason": reason}
                            for proposal_id, reason in result.skipped]
+    if result.skipped_proposals:
+        data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     if result.reason_codes:
         data["reasonCodes"] = list(result.reason_codes)
     if result.attestation is not None:
@@ -326,9 +329,12 @@ def discover_from_pool(project, pool, tracker_for, platform, target, authority_i
     context, code = _local_mainline_context(project, pool, authority_id, boundary,
                                             current_module_id)
     if context is None:
-        return MainlineReview("blocked", diagnostic=code)
-    return discover(pool, tracker_for, platform, target, policy_from_pool(pool), context,
-                    boundary)
+        result = MainlineReview("blocked", diagnostic=code)
+    else:
+        result = discover(pool, tracker_for, platform, target, policy_from_pool(pool), context,
+                          boundary)
+    result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
+    return result
 
 
 def discover(pool, tracker_for, platform, target, policy, context, boundary):
@@ -448,6 +454,7 @@ def main(argv=None):
                                   read_tracker(publication.proposal, args.platform, target),
                                   args.platform, target, policy_from_pool(pool), context,
                                   args.decision, observations)
+            result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
     print(json.dumps(as_json(result), ensure_ascii=False))
     return 0
 
