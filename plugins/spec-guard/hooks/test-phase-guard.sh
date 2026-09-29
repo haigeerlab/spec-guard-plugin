@@ -109,6 +109,8 @@ injects "MODULE_DONE 指向 Build order 中第一个未完成模块" "$stages" '
 injects "MODULE_DONE 报告该模块自己的阶段" "$stages" 'NEEDS_PLAN'
 lacks "MODULE_DONE 不再冒充项目 DONE" "$stages" "当前阶段: **DONE**"
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
+# 全部完成且 activeModule 不在图中：回退后仍是项目 DONE（与拆分前同一场景）。
+printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
