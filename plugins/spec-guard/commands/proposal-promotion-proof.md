@@ -3,8 +3,8 @@ description: 晋级合并后从远端默认分支只读证明 Proposal module �
 allowed-tools: Bash
 ---
 
-只在 promotion 已合并到远端默认分支后运行。它会重新读取远端 Proposal、策略、acceptance
-attestation 与 Issue 阶段，确认接受仍然有效后再证明：
+只在 promotion 已合并到远端默认分支后运行。它会重新读取远端 Proposal 与 Issue 阶段
+（`proposal-stage:accepted` 或 `proposal-stage:promoted` 均可，所以标签改成 promoted 后可重跑），再证明：
 
 ~~~bash
 ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
@@ -31,13 +31,14 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 ~~~
 
 原样报告 JSON。只有 `proved` 才是晋级证明，并给出 promotion commit 与 module id。`not-accepted`
-表示 Issue 阶段或 attestation 不满足；`invalid` 表示首次纳入该 module 的提交不符合声明（职责、依赖、
-位置，或 diff 超出能力图、模块 Spec、Plan 与可选的 `tasks/<id>/todo.md`）；`not-promoted` 表示至今
+表示 Issue 阶段不是 accepted 或 promoted；`invalid` 表示首次纳入该 module 的提交不符合声明（职责、依赖、
+位置），或该提交改动了其他模块行；`stale` 表示晋级提交的父提交上评审已不新鲜（如基线漂移）；
+`reviewCommit` 是晋级提交的父提交；`not-promoted` 表示至今
 没有任何提交把该 module 纳入远端默认分支的能力图——下一步是合并晋级分支，再重新运行本命令；
 `unknown` 表示远端无法安全读取。
 
-`not-accepted`、`invalid`、`unknown` 附带的 `diagnostic` 会尽量透传下层已给出的具体原因（例如
-`acceptance-attestation-invalid`、`proposal-pool-unknown`），只有没有更具体原因时才是折叠后的
+`not-accepted`、`invalid`、`stale`、`unknown` 附带的 `diagnostic` 会尽量透传下层已给出的具体原因（例如
+`proposal-baseline-drifted`、`proposal-pool-unknown`），只有没有更具体原因时才是折叠后的
 `promotion-<state>`；`not-promoted` 固定是 `promotion-not-found`。详见
 `references/proposal-promotion-proof.md`。
 本命令不会把结果写回 Issue，也不创建或修改分支、能力图、Spec、Plan、任务或 PR。

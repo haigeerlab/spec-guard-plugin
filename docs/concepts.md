@@ -22,7 +22,7 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | 探测失败就降级，不误报 | 缺 `python3` 或读不到远端时报「未验证」或 `unknown`，不说「流程断了」 | 把环境问题说成流程违规，会让人不再信任提示 |
 | 共享事实只认远端默认分支 | Proposal 状态只从远端 main 的固定快照读，不看本地文件和其他 worktree | 多个 agent、多个 worktree 并行时，本地文件经常互相矛盾 |
 | 一个项目一张能力图 | 新需求经快速插入或 Proposal，按锚点插进同一张图；模块按 Build order 逐个推进 | 两张图会给出两份互相冲突的「现在该做什么」；逐个推进让每一步都能验收 |
-| 人工接受，记录不可改 | 接受 Proposal 要人来做，并留下写入后不能修改的验收记录 | 事后可以审计，谁接受了哪个版本一清二楚 |
+| 人工接受，只改标签 | 接受 Proposal 要人来做：把 Issue 标签改成 `proposal-stage:accepted`，插件再核对评审是否新鲜 | 决定留给人，又不要求额外的策略文件或记录，接受这一步足够轻 |
 | 可选能力显式启用 | 协作信箱、本地事项账本、文档治理都要单独开启 | 不用的人不背它们的依赖和风险 |
 
 ## 术语
@@ -40,6 +40,4 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | Proposal | 需要留痕时，给已有能力图新增一个模块的提案，写在 `spec/proposals/<id>.md`，合进远端 main 才算发布 |
 | Proposal Issue | GitHub 或 GitLab 上与 Proposal 一一对应的 Issue，用 `proposal-stage:*` 标签记录阶段 |
 | revision | Proposal 内容的 SHA-256。内容一改，revision 就变，旧的评审结论随之失效 |
-| 主链 | 由策略文件指定的一条评审分支，默认是 `integration/mainline`。只有在主链上才能给出「可接受」的候选结论 |
-| 验收记录 | `spec/proposal-acceptances/<id>-<revision>.json`，人工接受时写入，之后不能修改 |
 | 晋级 | 把已接受的 Proposal 按锚点插进能力图，并补上它的 Spec 和 Plan |

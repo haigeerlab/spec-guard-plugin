@@ -29,7 +29,7 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 | `verify-artifacts.sh` 或共享判据 | `test-verify-artifacts.sh` 与 `test-phase-guard.sh` |
 | Codex manifest 或 hook 注册 | `scripts/check-manifests.py`、`test-hook-entry.sh` 与 `evals/codex-plugin-smoke.sh --selftest` |
 | 旧 tracker bridge 退役 | `test-retire-legacy-tracker-bridge.sh` 与 Proposal focused suites |
-| Proposal mainline review、preflight 或 proof | `test_proposal_mainline_review.py`、`test_proposal_promotion_proof.py` 与完整 Proposal focused suites |
+| Proposal preflight 或 proof | `test_proposal_promotion_proof.py`、`test_proposal_publication.py` 与完整 Proposal focused suites |
 | `check-*.py` | `scripts/test-checkers.sh`，每条新判据都有一正一反用例 |
 | `spec-digest.py` | 其 self-test、phase 与 verify 两侧回归 |
 

@@ -85,7 +85,7 @@ revision 是规范化文档内容的 SHA-256。计算时 marker 的 revision 值
 字段表：Problem、In scope、Out of scope、Safety boundaries、Initial dependency
 assumptions、Acceptance intent。
 
-v1 Proposal 继续可读，不会被自动重写或删除；它不能进入新的主链接受或 promotion
+v1 Proposal 继续可读，不会被自动重写或删除；它不能进入新的接受或 promotion
 流程，直到作者发布有新 revision 的 v2 文档。v2 Issue 必须匹配完整 marker，不能复用
 同一 id 的旧 revision。阶段还允许 proposal-stage:needs-revision 和
 proposal-stage:deferred。

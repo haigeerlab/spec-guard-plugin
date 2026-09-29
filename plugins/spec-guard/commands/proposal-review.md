@@ -29,7 +29,7 @@ python3 -B "$ROOT/hooks/proposal_review.py" \
   --platform "<github|gitlab>" --target "<owner/repo 或 GitLab project id>"
 ~~~
 
-原样报告 JSON。`awaiting-review` 与 `in-review` 表示可进入主链评审；`stale` 表示能力图或基线已变化，
+原样报告 JSON。`awaiting-review` 与 `in-review` 表示可由人把 Issue 标签改成 `proposal-stage:accepted`；`stale` 表示能力图或基线已变化，
 需要作者按新基线重新发布；`absent` 表示远端默认分支上没有该 Proposal，或没有对应 Issue。
 `accepted` 与 `promoted-claim` 只是观察到的 Issue 标签，既不是晋级授权，也不是晋级证明。
 本命令不会创建或修改 Issue、标签、能力图、Proposal、分支、任务或 PR。

@@ -53,7 +53,7 @@
 | 方式 | 适合 | 步骤 |
 |---|---|---|
 | **快速插入**（默认） | 个人或小团队，需求已经理顺 | 一次预览、一次确认 |
-| **Proposal** | 需要留下「谁在什么时候接受了哪个版本」的记录，或需要多人确认 | 九步，要先做一次性准备 |
+| **Proposal** | 需要在 Issue 上留下评审与接受的记录，或需要多人确认 | 八步，要先做一次性准备 |
 
 两种方式都只**新增**模块。修改、删除或调整已有模块的顺序，直接改能力图并人工评审。
 
@@ -92,13 +92,13 @@ Codex 里用 `spec-guard-ops` 的 `add-module`，带同样的 `--interrupt` 参�
 - 其他模块同时做到一半（并行推进）不影响插队；它们都会出现在 `Paused` 行里，插队模块做完后按 Build order 回到第一个被暂停的模块；
 - 不带 `--interrupt` 时行为不变，当前模块做到一半仍然拒绝；当前模块没有做到一半时，`--interrupt` 不改变任何行为。
 
-Proposal 路径同样适用：主链评审接受 `--boundary module-interrupt`（行为与 `module-advance` 相同，不进入验收记录）。
+Proposal 路径同样适用。
 晋级合并后，如果新模块没有成为当前模块，把 `activeModule` 改为它。
 
 ### Proposal（需要留痕时）
 
 ```text
-写 Proposal → 合进 main（发布）→ 开 Issue → 评审 → 主链裁决 → 人工接受
+写 Proposal → 合进 main（发布）→ 开 Issue → 评审 → 人工接受（改标签）
      → 预检 → 人工晋级（插进能力图）→ 合并 → 证明已纳入
 ```
 
@@ -108,11 +108,10 @@ Proposal 路径同样适用：主链评审接受 `--boundary module-interrupt`�
 | 2 | 发布 | 人 | 合进远端 main。只在本地或只在分支上都不算发布 |
 | 3 | 开 Issue | 人 | 在 GitHub 或 GitLab 开 Issue，正文放同一行身份标记，打上 `proposal` 和 `proposal-stage:published` |
 | 4 | 评审 | 命令 | `/spec-guard:proposal-review`：报告 Proposal 是否新鲜、过期或被卡住 |
-| 5 | 主链裁决 | 命令，在主链上运行 | 模块交付完的节点上运行 `/spec-guard:proposal-mainline-candidates` 看候选，再用 `/spec-guard:proposal-mainline-review` 给出结论。它只给结论，不会替你接受 |
-| 6 | 人工接受 | 人 | 写入验收记录 `spec/proposal-acceptances/<id>-<revision>.json`，并把 Issue 标签改成 `proposal-stage:accepted`。裁决结果为 `accepted-candidate` 时，`/spec-guard:proposal-mainline-review` 的输出里附带一份可直接复制的 `attestation` 和它该写入的 `attestationPath`；命令本身仍不写文件，字段说明见[参考文档](../plugins/spec-guard/references/proposal-mainline-review.md#the-accepted-candidate-attestation) |
-| 7 | 预检 | 命令 | `/spec-guard:proposal-promotion-preflight`：重读远端最新状态，确认可以晋级 |
-| 8 | 晋级 | 人 | 开晋级分支，把新模块按锚点插进能力图，补上它的 Spec 和 Plan，然后合并 |
-| 9 | 证明 | 命令 | `/spec-guard:proposal-promotion-proof`：核对新模块已按声明纳入。通过后，人工把标签改成 `proposal-stage:promoted` |
+| 5 | 人工接受 | 人 | 把 Issue 标签改成 `proposal-stage:accepted`。接受只看这个标签加一次新鲜评审（基线未漂移、模块还不在能力图里、依赖齐全、锚点有效），不再需要策略文件、验收记录或主链分支 |
+| 6 | 预检 | 命令 | `/spec-guard:proposal-promotion-preflight`：重读远端最新状态，确认可以晋级 |
+| 7 | 晋级 | 人 | 开晋级分支，把新模块按锚点插进能力图并合并。能力图里加上这一行就够了；Spec 与 Plan 之后按正常流程补，不必和晋级放在同一个提交里 |
+| 8 | 证明 | 命令 | `/spec-guard:proposal-promotion-proof`：从 Proposal 的基线提交起沿远端默认分支找到第一个纳入该模块的提交，核对它与声明一致，并在它的父提交上重判新鲜度。通过后，人工把标签改成 `proposal-stage:promoted`；改成 promoted 之后重跑仍会得到 `proved` |
 
 晋级之后，这个模块就和其他模块一样进入 Spec → Plan → Build。命令从头到尾只读：Issue、标签、分支、能力图都由人来改。
 
@@ -139,9 +138,6 @@ python3 -c "import sys; sys.path.insert(0, '<插件目录>/hooks'); import propo
 ### 用 Proposal 之前的一次性准备
 
 - 装好并登录 GitHub CLI（`gh`），GitLab 项目则是 `glab`。命令只读 Issue，不写。
-- 在远端 main 上放一份主链策略 `spec/proposal-mainline-policy.json`，并建一条受保护的主链分支，默认叫
-  `integration/mainline`。主链要跟上 main：每次发布后把它快进到 main，否则主链裁决会报
-  `mainline-review-commit-not-ancestor`。可以参考本仓库的[策略文件](../spec/proposal-mainline-policy.json)。
 
 ## 能力图的规则
 
@@ -161,7 +157,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
-| Proposal 评审、主链、预检、证明 | `/spec-guard:proposal-*` 五条命令 | `spec-guard-ops` skill 的 proposal 一节 |
+| Proposal 评审、预检、证明 | `/spec-guard:proposal-*` 三条命令 | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
 | 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
 | 协作信箱 | `/spec-guard:collaboration`、`collab` skill | `collab`、`collaboration-ops` skill |

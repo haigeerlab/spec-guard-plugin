@@ -3,7 +3,9 @@ description: 在人工接受后读取新鲜远端事实，预览是否允许创�
 allowed-tools: Bash
 ---
 
-只在人工已明确写入 accepted 阶段之后运行：
+只在人工已把 Issue 标签改成 `proposal-stage:accepted` 之后运行。它重新读取远端 Proposal 池与
+Issue 阶段，并做一次新鲜评审（基线未漂移、模块还不在能力图中、依赖齐全、锚点有效）；
+不读取策略文件或验收记录：
 
 ~~~bash
 ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
@@ -34,6 +36,6 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 任何其他状态都应原样报告并停止；不得根据旧 checkout 或另一个 worktree 猜测。
 
 非 ready 状态附带的 `diagnostic` 会尽量透传下层已给出的具体原因，例如缺 Proposal 是
-`publication-absent`、缺 tracker Issue 是 `tracker-absent`、验收记录无效是
-`acceptance-attestation-invalid`；只有没有更具体原因时才是折叠后的
+`publication-absent`、缺 tracker Issue 是 `tracker-absent`、基线已漂移是
+`proposal-baseline-drifted`；只有没有更具体原因时才是折叠后的
 `promotion-preflight-<state>`。详见 `references/proposal-promotion-proof.md`。

@@ -32,9 +32,9 @@ Proposal's baseline commit no longer exists.
 
 Everything else is unchanged: parse failures, failures of a Proposal not yet promoted,
 duplicate ids, a missing or invalid capability map and the pool size limit still make the
-pool invalid or unknown. Healthy promoted Proposals stay in the pool, and attestations and
-the policy digest are unaffected. An excluded Proposal takes no part in attestation lookup
-and is reported in the pool's `skipped` list; querying it by id behaves as if it were not
+pool invalid or unknown. Healthy promoted Proposals stay in the pool. The pool never reads a mainline policy file
+or acceptance records: every publication's `review_commit` is the observed remote-default
+commit. An excluded Proposal is reported in the pool's `skipped` list; querying it by id behaves as if it were not
 in the pool.
 
 `read_published` (one Proposal, used by `/spec-guard:proposal-review`) is not affected: it
