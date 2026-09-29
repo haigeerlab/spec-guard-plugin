@@ -226,17 +226,21 @@ def initialization_preflight(
     }
 
 
-def install_command(runtime_dir: Path, npm_executable: str) -> list[str]:
-    """Build the fixed, project-independent npm installation command."""
-    return [
-        npm_executable, "install", "--ignore-scripts", "--prefix", str(Path(runtime_dir)),
-        PACKAGE_NAME + "@" + PACKAGE_VERSION,
-    ]
+SHIPPED_LOCK_DIR = Path(__file__).resolve().parent.parent / "locks" / "local-ticket-ledger"
+LOCK_FILE_NAMES = ("package.json", "package-lock.json")
 
 
-def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dict[str, str]:
-    """Install the fixed runtime only when explicitly invoked by the caller."""
+def install_command(npm_executable: str) -> list[str]:
+    """Build the fixed npm command; it runs in a directory holding the shipped lock files."""
+    return [npm_executable, "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
+
+
+def install_runtime(
+    runtime_dir: Path, npm_executable: str | None = None, lock_dir: Path | None = None,
+) -> dict[str, str]:
+    """Install the locked runtime only when explicitly invoked by the caller."""
     runtime_dir = Path(runtime_dir)
+    lock_dir = Path(lock_dir) if lock_dir is not None else SHIPPED_LOCK_DIR
     existing = runtime_status(runtime_dir)
     if existing["state"] == "ready":
         raise RuntimeContractError("local-ledger runtime is already installed")
@@ -245,6 +249,9 @@ def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dic
         if (runtime_dir.is_symlink() or not runtime_dir.is_dir() or
                 any(runtime_dir.iterdir())):
             raise RuntimeContractError("refusing to overwrite an invalid local-ledger runtime")
+    problems = validate_lock_files(lock_dir)
+    if problems:
+        raise RuntimeContractError("shipped lock files are unusable: " + "; ".join(problems))
     npm_path = npm_executable or shutil.which("npm")
     if not npm_path:
         raise RuntimeContractError("npm executable is unavailable")
@@ -253,15 +260,17 @@ def install_runtime(runtime_dir: Path, npm_executable: str | None = None) -> dic
     staging = Path(tempfile.mkdtemp(prefix=runtime_dir.name + ".installing-", dir=runtime_dir.parent))
     try:
         try:
+            for name in LOCK_FILE_NAMES:
+                shutil.copyfile(lock_dir / name, staging / name)
             completed = subprocess.run(
-                install_command(staging, npm_path), check=False, capture_output=True, text=True,
+                install_command(npm_path), cwd=staging, check=False, capture_output=True, text=True,
             )
         except OSError as error:
-            raise RuntimeContractError("unable to run npm install") from error
+            raise RuntimeContractError("unable to run npm ci") from error
         if completed.returncode != 0:
             lines = [line.strip() for line in (completed.stderr or "").splitlines() if line.strip()]
             detail = (": " + lines[-1][:200]) if lines else ""
-            raise RuntimeContractError("npm install failed" + detail)
+            raise RuntimeContractError("npm ci failed" + detail)
         installed = runtime_status(staging)
         if installed["state"] != "ready":
             raise RuntimeContractError(

@@ -161,12 +161,10 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "dirty")
         self.assertNotIn("origin", payload)
 
-    def test_install_command_pins_epiq_and_keeps_it_out_of_the_project(self):
-        command = local_ledger_runtime.install_command(
-            self.runtime_dir, npm_executable="/opt/homebrew/bin/npm")
+    def test_install_command_is_a_locked_npm_ci_without_package_spec_or_prefix(self):
+        command = local_ledger_runtime.install_command(npm_executable="/opt/homebrew/bin/npm")
         self.assertEqual(command, [
-            "/opt/homebrew/bin/npm", "install", "--ignore-scripts", "--prefix",
-            str(self.runtime_dir), "epiq@1.11.0",
+            "/opt/homebrew/bin/npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund",
         ])
         self.assertNotIn(str(self.project_dir), command)
 
@@ -197,9 +195,14 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime_status.call_count, 2)
 
     def fake_npm(self, script):
-        """A stand-in npm that really writes under --prefix, so install uses real directories."""
+        """A stand-in `npm ci`: works in its cwd (the staging dir), records argv/pwd/ls."""
         npm = Path(self.tmp.name) / "fake-npm"
-        npm.write_text("#!/bin/sh\n" + '[ "$3" = --prefix ] || exit 9\nprefix="$4"\n' + script, encoding="utf-8")
+        self.npm_record = Path(self.tmp.name) / "npm-record"
+        npm.write_text(
+            "#!/bin/sh\n"
+            'record="%s"\n' % self.npm_record +
+            'printf "%s\\n" "$*" > "$record"\npwd -P >> "$record"\nls >> "$record"\n'
+            '[ "$1" = ci ] || exit 9\nprefix="$PWD"\n' + script, encoding="utf-8")
         npm.chmod(0o755)
         return str(npm)
 
@@ -220,11 +223,39 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual((result["state"], result["directory"]), ("ready", str(self.runtime_dir)))
         self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir)["state"], "ready")
         self.assertEqual(self.leftovers(), [])
+        self.assertEqual(
+            (self.runtime_dir / "package-lock.json").read_bytes(),
+            (REAL_LOCK_DIR / "package-lock.json").read_bytes())
+
+    def test_install_runs_npm_ci_in_the_staging_dir_with_both_lock_files_present(self):
+        npm = self.fake_npm(self.installed_files())
+        local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        argv, cwd, *listing = self.npm_record.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(argv, "ci --ignore-scripts --no-audit --no-fund")
+        self.assertEqual(Path(cwd).parent, Path(self.tmp.name).resolve())
+        self.assertTrue(Path(cwd).name.startswith("runtime.installing-"))
+        self.assertIn("package.json", listing)
+        self.assertIn("package-lock.json", listing)
+
+    def test_missing_or_invalid_lock_dir_is_refused_before_staging_or_npm(self):
+        npm = self.fake_npm(self.installed_files())
+        broken = self.copy_lock_files(name="lock-drift")
+        self.edit_json(broken / "package.json", lambda d: d["dependencies"].update(epiq="1.11.1"))
+        for lock_dir in (Path(self.tmp.name) / "no-such-lock-dir",
+                         self.copy_lock_files(drop=("package-lock.json",), name="lock-partial"),
+                         broken):
+            with self.subTest(lock_dir=lock_dir.name):
+                with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "lock"):
+                    local_ledger_runtime.install_runtime(
+                        self.runtime_dir, npm_executable=npm, lock_dir=lock_dir)
+                self.assertEqual(self.leftovers(), [])
+                self.assertFalse(self.runtime_dir.exists())
+                self.assertFalse(self.npm_record.exists())
 
     def test_failed_npm_leaves_no_runtime_and_can_be_retried(self):
         npm = self.fake_npm('echo "npm ERR! code E404" >&2\nexit 1\n')
         with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError,
-                                    "npm install failed: npm ERR! code E404"):
+                                    "npm ci failed: npm ERR! code E404"):
             local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
         self.assertEqual(local_ledger_runtime.runtime_status(self.runtime_dir), {"state": "absent"})
         self.assertEqual(self.leftovers(), [])
@@ -351,8 +382,8 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         initialize.assert_not_called()
 
 
-    def copy_lock_files(self, drop=()):
-        lock_dir = Path(self.tmp.name) / "lock-copy"
+    def copy_lock_files(self, drop=(), name="lock-copy"):
+        lock_dir = Path(self.tmp.name) / name
         lock_dir.mkdir()
         for name in ("package.json", "package-lock.json"):
             if name not in drop:
