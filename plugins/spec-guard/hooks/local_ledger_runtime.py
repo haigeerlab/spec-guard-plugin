@@ -243,6 +243,18 @@ SHIPPED_LOCK_DIR = Path(__file__).resolve().parent.parent / "locks" / "local-tic
 LOCK_FILE_NAMES = ("package.json", "package-lock.json")
 
 
+def _npm_failure_detail(stderr: str | None) -> str:
+    """Report npm's error code and its explanation, not the trailing "A complete log ..." pointer."""
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    meaningful = [line for line in lines if "A complete log of this run" not in line] or lines
+    code_index = next((index for index, line in enumerate(meaningful) if " code " in line), None)
+    if code_index is None:
+        picked = meaningful[-1] if meaningful else ""
+    else:
+        picked = "; ".join(meaningful[code_index:code_index + 2])
+    return (": " + picked[:300]) if picked else ""
+
+
 def install_command(npm_executable: str) -> list[str]:
     """Build the fixed npm command; it runs in a directory holding the shipped lock files."""
     return [npm_executable, "ci", "--ignore-scripts", "--no-audit", "--no-fund"]
@@ -310,9 +322,7 @@ def install_runtime(
         except OSError as error:
             raise RuntimeContractError("unable to run npm ci") from error
         if completed.returncode != 0:
-            lines = [line.strip() for line in (completed.stderr or "").splitlines() if line.strip()]
-            detail = (": " + lines[-1][:200]) if lines else ""
-            raise RuntimeContractError("npm ci failed" + detail)
+            raise RuntimeContractError("npm ci failed" + _npm_failure_detail(completed.stderr))
         installed = runtime_status(staging, lock_dir)
         if installed["state"] != "ready" or installed.get("lock") != "locked":
             raise RuntimeContractError(

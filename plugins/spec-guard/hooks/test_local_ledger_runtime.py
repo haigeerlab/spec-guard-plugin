@@ -305,6 +305,21 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertIn("npm ERR! network timeout", payload["diagnostic"])
         self.assertFalse(self.runtime_dir.exists())
 
+    def test_install_reports_the_npm_error_code_instead_of_the_log_pointer(self):
+        # npm 11 prints the error code first and "A complete log ..." last; the last line alone hides EINTEGRITY.
+        npm = self.fake_npm(
+            'echo "npm error code EINTEGRITY" >&2\n'
+            'echo "npm error sha512-AAAA integrity checksum failed when using sha512: wanted sha512-AAAA but got sha512-BBBB. (123 bytes)" >&2\n'
+            'echo "npm error A complete log of this run can be found in: /tmp/_logs/debug-0.log" >&2\n'
+            'exit 1\n')
+        with self.assertRaises(local_ledger_runtime.RuntimeContractError) as raised:
+            local_ledger_runtime.install_runtime(self.runtime_dir, npm_executable=npm)
+        message = str(raised.exception)
+        self.assertIn("EINTEGRITY", message)
+        self.assertIn("integrity checksum failed", message)
+        self.assertNotIn("A complete log of this run", message)
+        self.assertFalse(self.runtime_dir.exists())
+
     def test_acceptance_without_a_runtime_reports_not_run_instead_of_passing(self):
         import os
         import test_local_ledger_acceptance
