@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.32.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:4041234c900295ee60d3d84e0b87dae405a644f7"
+      },
+      "observedAt": "2026-09-29T17:30:53Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:python3 scripts/check-manifests.py",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "result:all five commands passed on the source candidate under python3 3.10.7 and again under the macOS system python3 3.9.6 (PATH=/usr/bin:/bin)",
+        "result:the required GitHub Actions checks validate (ubuntu-latest) and validate (macos-latest) run on the release pull request and gate its merge through branch protection"
+      ]
+    },
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "not-verified",
+      "target": {
+        "kind": "package",
+        "id": "version:0.32.0"
+      },
+      "reason": "No v0.32.0 package, tag, or published Release has been created"
+    }
+  ]
+}
