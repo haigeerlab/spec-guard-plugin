@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-09-30
+
 ### 移除
 
 - **Proposal 主链裁决层整体删除。** 命令 `/spec-guard:proposal-mainline-candidates`、`/spec-guard:proposal-mainline-review`，hook `proposal_mainline_review.py`、`proposal_boundary_guidance.py` 及其参考文档，以及主链策略文件、验收记录（attestation）、`--authority-id` / `--boundary` / `--current-module-id`、受保护的 `integration/mainline` 分支这些要求都不再存在，也不设过渡版本。说明与迁移见[退役说明](docs/retirements/proposal-mainline-review.md)：已在 accepted 阶段的 Proposal 确认 Issue 标签为 `proposal-stage:accepted` 后直接跑预检；已有的策略文件与验收记录可保留或自行删除，插件不再读取（`scripts/check-acceptance-immutable.py` 仍保护已有验收记录）；原先在模块边界用 mainline-candidates 看候选的，改用 `/spec-guard:proposal-review` 逐个查看。
