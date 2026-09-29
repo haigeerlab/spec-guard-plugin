@@ -2,7 +2,7 @@
 import io
 import json
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -288,14 +288,15 @@ class ProposalMainlineReviewTests(unittest.TestCase):
                                             "module-deliver", "alpha")
                 self.assertEqual(as_json(result), {"state": "blocked", "diagnostic": code})
 
-    def run_main(self, pool, *extra, context=(None, "mainline-context-invalid")):
+    def run_main(self, pool, *extra, context=(None, "mainline-context-invalid"),
+                 boundary="module-deliver"):
         output = io.StringIO()
         with patch("proposal_mainline_review.read_published_pool", return_value=pool), patch(
                 "proposal_mainline_review._local_mainline_context", return_value=context), patch(
                 "proposal_mainline_review.read_tracker", return_value=self.tracker()), \
                 redirect_stdout(output):
             self.assertEqual(main(["--platform", "github", "--target", "octo/repo",
-                                   "--authority-id", "mainline", "--boundary", "module-deliver",
+                                   "--authority-id", "mainline", "--boundary", boundary,
                                    "--current-module-id", "alpha"] + list(extra)), 0)
         return json.loads(output.getvalue())
 
@@ -399,6 +400,91 @@ class ProposalMainlineReviewTests(unittest.TestCase):
         self.assertEqual(blocked.state, "blocked")
         self.assertNotIn("attestation", as_json(blocked))
         self.assertNotIn("attestationPath", as_json(blocked))
+
+    BOUNDARIES = ("module-deliver", "module-advance", "module-interrupt")
+
+    def test_boundary_set_is_defined_once_and_matches_the_guidance_set(self):
+        import proposal_mainline_review as review_module
+        from proposal_boundary_guidance import REMINDER_BOUNDARIES
+        self.assertEqual(review_module.MAINLINE_BOUNDARIES, frozenset(self.BOUNDARIES))
+        self.assertEqual(REMINDER_BOUNDARIES, review_module.MAINLINE_BOUNDARIES)
+
+    def test_module_interrupt_is_treated_exactly_like_module_advance(self):
+        remote_policy = dict(POLICY, schemaVersion=1)
+        pool = PublicationPool("published", review_commit="a" * 40,
+                               publications=(publication(),), review_map=MAP,
+                               policy_text=json.dumps(remote_policy))
+        mainline = ("refs/heads/integration/mainline", "origin/integration/mainline")
+        contexts = {}
+        discovered = {}
+        for boundary in ("module-advance", "module-interrupt"):
+            with patch("proposal_mainline_review._git_text", side_effect=mainline), patch(
+                    "proposal_mainline_review.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0)):
+                contexts[boundary] = local_mainline_context(
+                    "/fixture", pool, "mainline", boundary, "alpha")
+            with patch("proposal_mainline_review._git_text", side_effect=mainline), patch(
+                    "proposal_mainline_review.subprocess.run",
+                    return_value=SimpleNamespace(returncode=0)):
+                discovered[boundary] = as_json(discover_from_pool(
+                    "/fixture", pool, lambda ignored: self.tracker(), "github",
+                    "octo/repo", "mainline", boundary, "alpha"))
+        self.assertEqual(contexts["module-interrupt"], CONTEXT)
+        self.assertEqual(contexts["module-interrupt"], contexts["module-advance"])
+        self.assertEqual(discovered["module-interrupt"]["state"], "candidate-list")
+        self.assertEqual(discovered["module-interrupt"], discovered["module-advance"])
+        self.assertEqual(discover(pool, lambda ignored: self.tracker(), "github", "octo/repo",
+                                  POLICY, CONTEXT, "module-interrupt").candidates, ("gamma",))
+
+    def test_unknown_boundary_is_still_invalid_in_every_entry(self):
+        remote_policy = dict(POLICY, schemaVersion=1)
+        pool = PublicationPool("published", review_commit="a" * 40,
+                               publications=(publication(),), review_map=MAP,
+                               policy_text=json.dumps(remote_policy))
+        self.assertIsNone(local_mainline_context("/fixture", pool, "mainline",
+                                                 "module-pause", "alpha"))
+        result = discover_from_pool("/fixture", pool, lambda ignored: self.tracker(),
+                                    "github", "octo/repo", "mainline", "module-pause", "alpha")
+        self.assertEqual(as_json(result),
+                         {"state": "blocked", "diagnostic": "mainline-boundary-invalid"})
+        blocked = discover(pool, lambda ignored: self.tracker(), "github", "octo/repo",
+                           POLICY, CONTEXT, "module-pause")
+        self.assertEqual(as_json(blocked),
+                         {"state": "blocked", "diagnostic": "mainline-boundary-invalid"})
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main(["--platform", "github", "--target", "octo/repo", "--authority-id",
+                  "mainline", "--boundary", "module-pause", "--current-module-id", "alpha"])
+
+    def test_cli_accepts_module_interrupt(self):
+        pool = PublicationPool("unknown", diagnostic="remote default branch moved or fetch failed")
+        output = io.StringIO()
+        with patch("proposal_mainline_review.read_published_pool", return_value=pool), \
+                redirect_stdout(output):
+            self.assertEqual(main(["--platform", "github", "--target", "octo/repo",
+                                   "--authority-id", "mainline", "--boundary",
+                                   "module-interrupt", "--current-module-id", "alpha"]), 0)
+        self.assertEqual(json.loads(output.getvalue()),
+                         {"state": "unknown", "diagnostic": "proposal-pool-unknown"})
+
+    def test_boundary_never_enters_the_attestation_or_policy_digest(self):
+        import inspect
+        self.assertNotIn("boundary", inspect.signature(evaluate).parameters)
+        self.assertNotIn("boundary", inspect.signature(attestation_for).parameters)
+        self.assertNotIn("boundary", inspect.signature(policy_digest).parameters)
+        self.assertNotIn("boundary", inspect.signature(attestation_path_for).parameters)
+        self.assertNotIn("boundary", CONTEXT)
+        results = [self.run_main(
+            PublicationPool("published", review_commit="a" * 40, review_map=MAP,
+                            publications=(publication(),),
+                            policy_text=json.dumps(dict(POLICY, schemaVersion=1))),
+            "--proposal-id", "gamma", "--decision", "accept", context=(CONTEXT, None),
+            boundary=boundary) for boundary in self.BOUNDARIES]
+        self.assertEqual(results[0]["state"], "accepted-candidate")
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[0], results[2])
+        self.assertNotIn("boundary", json.dumps(results[0]["attestation"]))
+        self.assertNotIn("module-", json.dumps(results[0]["attestation"]))
+        self.assertNotIn("module-", results[0]["attestationPath"])
 
 
 class EmittedAttestationPoolReaderTests(PromotionFixture):

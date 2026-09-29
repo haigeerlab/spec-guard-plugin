@@ -1,6 +1,6 @@
 # Proposal boundary guidance
 
-`guide("module-deliver")` 与 `guide("module-advance")` 返回同一组非阻断
+`guide("module-deliver")`、`guide("module-advance")` 与 `guide("module-interrupt")`（半途的当前模块被显式插队打断时使用，见 /spec-guard:add-module --interrupt）返回同一组非阻断
 Proposal 入口：`intake`、`review`、`promotion-proof`。其他工作事件返回
 `not-applicable`，因此日常执行中不会出现候选池提醒。
 

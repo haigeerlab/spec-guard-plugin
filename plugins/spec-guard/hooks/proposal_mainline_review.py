@@ -13,6 +13,8 @@ from proposal_publication import ATTESTATION_PATH_TEMPLATE, read_published_pool
 from proposal_tracker_read import read_tracker
 
 
+# Boundaries at which a mainline caller may review; `module-interrupt` behaves as `module-advance`.
+MAINLINE_BOUNDARIES = frozenset(("module-deliver", "module-advance", "module-interrupt"))
 HARD_CONFLICTS = frozenset((
     "package-boundary-conflict",
     "public-contract-conflict",
@@ -219,7 +221,7 @@ def _git_text(project, args):
 def _local_mainline_context(project, pool, authority_id, boundary, current_module_id):
     """Return (context, None) or (None, stable diagnostic code) for this worktree."""
     policy = policy_from_pool(pool)
-    if boundary not in ("module-deliver", "module-advance"):
+    if boundary not in MAINLINE_BOUNDARIES:
         return None, "mainline-boundary-invalid"
     if policy is None:
         return None, "mainline-policy-invalid"
@@ -331,7 +333,7 @@ def discover_from_pool(project, pool, tracker_for, platform, target, authority_i
 
 def discover(pool, tracker_for, platform, target, policy, context, boundary):
     """Return a complete, sorted mainline candidate list from already-read facts."""
-    if boundary not in ("module-deliver", "module-advance"):
+    if boundary not in MAINLINE_BOUNDARIES:
         return MainlineReview("blocked", diagnostic="mainline-boundary-invalid")
     if not _matching_context(policy, context):
         return MainlineReview("blocked", diagnostic="mainline-context-invalid")
@@ -407,7 +409,7 @@ def main(argv=None):
     parser.add_argument("--platform", choices=("github", "gitlab"), required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--authority-id", required=True)
-    parser.add_argument("--boundary", choices=("module-deliver", "module-advance"),
+    parser.add_argument("--boundary", choices=sorted(MAINLINE_BOUNDARIES),
                         required=True)
     parser.add_argument("--current-module-id", required=True)
     parser.add_argument("--remote", default="origin")

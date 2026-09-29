@@ -127,7 +127,7 @@ python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
 # 仅主链模块交付／推进边界：候选列表；加 --proposal-id 与 --decision 记录人工裁决
 python3 -B "$ROOT/hooks/proposal_mainline_review.py" --project "$PROJECT" \
   --platform <github|gitlab> --target <target> --authority-id <id> \
-  --boundary <module-deliver|module-advance> --current-module-id <module-id>
+  --boundary <module-deliver|module-advance|module-interrupt> --current-module-id <module-id>
 # 人工写入 accepted 后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
