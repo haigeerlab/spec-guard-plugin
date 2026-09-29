@@ -3,7 +3,7 @@
 ## Objective
 
 本地事项账本（`local-ticket-ledger`）的运行时是外部 npm 包 `epiq@1.11.0`。现在的安装命令是
-`npm install --ignore-scripts --prefix <staging> epiq@1.11.0`：只固定了顶层包，15 个传递依赖是浮动的版本范围，
+`npm install --ignore-scripts --prefix <staging> epiq@1.11.0`：只固定了顶层包；epiq 有 15 个直接依赖，其版本范围是浮动的，解析后整棵树共 269 个包，
 插件既不附带 lockfile，也不校验任何安装包的完整性。两次安装可能装上不同的代码；某个依赖一旦被投毒，
 导入时就会以用户权限执行（`--ignore-scripts` 只能挡住安装脚本）。
 
