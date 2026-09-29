@@ -38,13 +38,22 @@ def module_state(root: Path, module_id: str) -> dict:
             "half": half, "todo": todo.is_file()}
 
 
-def active_module(root: Path) -> str | None:
+def _state(root: Path) -> dict:
     try:
         value = json.loads((root / ".agent" / "state.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return None
-    active = value.get("activeModule") if isinstance(value, dict) else None
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def active_module(root: Path) -> str | None:
+    active = _state(root).get("activeModule")
     return active if isinstance(active, str) and active else None
+
+
+def retired_tracker(root: Path) -> bool:
+    """True when state.json still names the retired remote tracker mode (tasks lived in Issues)."""
+    return _state(root).get("tracker") in ("github", "gitlab")
 
 
 def project_stage(states: list, active: str | None) -> tuple:
@@ -88,7 +97,8 @@ def describe(root: Path) -> str:
         notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
     active_state = by_id.get(active) if active else None
     no_todo_note = ""
-    if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
+    if (active_state and active_state["stage"] == "DONE" and not active_state["todo"]
+            and not retired_tracker(root)):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
                         "add the todo if work remains." % (active, active))
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
