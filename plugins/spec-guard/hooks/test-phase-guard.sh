@@ -134,6 +134,38 @@ printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '
 printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
 injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶段: **UNKNOWN**"
 
+# 插队：base 完成、infra 做到一半，当前模块是 urgent。
+paused="$WORK/paused"
+mkdir -p "$paused/spec" "$paused/tasks/base" "$paused/tasks/urgent" "$paused/tasks/infra" "$paused/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$paused/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| base | x | — |' '| urgent | y | base |' '| infra | z | base |' '' 'Build order: base → urgent → infra' > "$paused/spec/CAPABILITY-MAP.md"
+touch "$paused/spec/base.md" "$paused/spec/infra.md"
+printf '# Plan\n' > "$paused/tasks/base/plan.md"
+printf '# Plan\n' > "$paused/tasks/infra/plan.md"
+printf '%s\n' '- [x] done' > "$paused/tasks/base/todo.md"
+printf '%s\n' '- [x] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
+printf '{"tracker":"none","modules":{},"activeModule":"urgent"}\n' > "$paused/.agent/state.json"
+injects "插队缺 Spec 时报告 NEEDS_SPEC" "$paused" "当前阶段: **NEEDS_SPEC**"
+injects "NEEDS_SPEC 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
+touch "$paused/spec/urgent.md"
+injects "插队缺 Plan 时显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
+printf '# Plan\n' > "$paused/tasks/urgent/plan.md"
+printf '%s\n' '- [ ] u1' > "$paused/tasks/urgent/todo.md"
+injects "插队 BUILDING 时报告阶段" "$paused" "当前阶段: **BUILDING**"
+injects "BUILDING 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
+printf '%s\n' '- [x] u1' > "$paused/tasks/urgent/todo.md"
+injects "插队完成后报告 MODULE_DONE" "$paused" "当前阶段: **MODULE_DONE**"
+injects "MODULE_DONE 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
+injects "MODULE_DONE 点名被暂停的模块" "$paused" 'resume paused module `infra` (BUILDING). Set activeModule to it.'
+printf '%s\n' '- [x] a' '- [x] b' > "$paused/tasks/infra/todo.md"
+lacks "没有被暂停模块时不出现 Paused" "$paused" "Paused"
+printf '%s\n' '- [ ] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
+lacks "只有未勾选项的模块不算被暂停" "$paused" "Paused"
+printf '%s\n' '- [x] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
+printf '{"tracker":"none","modules":{},"activeModule":"infra"}\n' > "$paused/.agent/state.json"
+lacks "当前模块自己做到一半时不算被暂停" "$paused" "Paused"
+
 legacy_project="$WORK/legacy"
 mkdir -p "$legacy_project/.agent"
 printf '%s\n' '{"tracker":"github","modules":{"alpha":{"issue":1}}}' > "$legacy_project/.agent/state.json"

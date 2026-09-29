@@ -16,13 +16,16 @@ import sys
 from capability_map import MapError, parse_map
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
+CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 
 
 def module_state(root: Path, module_id: str) -> dict:
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
     has_plan = (root / "tasks" / module_id / "plan.md").is_file()
     todo = root / "tasks" / module_id / "todo.md"
-    open_items = len(UNCHECKED.findall(todo.read_text(encoding="utf-8"))) if todo.is_file() else 0
+    text = todo.read_text(encoding="utf-8") if todo.is_file() else ""
+    open_items = len(UNCHECKED.findall(text))
+    half = bool(open_items) and bool(CHECKED.search(text))
     if not has_spec:
         stage = "NEEDS_SPEC"
     elif not has_plan:
@@ -31,7 +34,8 @@ def module_state(root: Path, module_id: str) -> dict:
         stage = "BUILDING"
     else:
         stage = "DONE"
-    return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items}
+    return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
+            "half": half}
 
 
 def active_module(root: Path) -> str | None:
@@ -62,6 +66,11 @@ def project_stage(states: list, active: str | None) -> tuple:
     return ("MODULE_DONE" if current["stage"] == "DONE" else current["stage"]), current, source, pending
 
 
+def paused_modules(states: list, current: dict | None) -> list:
+    """Modules other than `current` whose todo is half done, in Build order."""
+    return [state for state in states if state["half"] and state is not current]
+
+
 def describe(root: Path) -> str:
     root = Path(root)
     try:
@@ -80,6 +89,7 @@ def describe(root: Path) -> str:
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
+    paused = paused_modules(states, current) if stage != "DONE" else []
     if stage == "DONE":
         if current is not None:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
@@ -89,12 +99,20 @@ def describe(root: Path) -> str:
                 "(Codex: spec-guard-ops add-module) at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
+    counts += "".join("\n- Paused: `%s` (%d unchecked item(s)); resume it after `%s`." % (p["id"], p["open"], module)
+                      for p in paused)
+    if stage == "MODULE_DONE" and paused:
+        resume = paused[0]
+        module_done = ("`%s` is done; resume paused module `%s` (%s). Set activeModule to it."
+                       % (module, resume["id"], resume["stage"]))
+    else:
+        module_done = ("`%s` is done; next unfinished module in Build order is `%s` (%s). "
+                       "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
         "BUILDING": "continue `/build` on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (module, current["open"], module),
-        "MODULE_DONE": "`%s` is done; next unfinished module in Build order is `%s` (%s). "
-                       "Set activeModule to it before building." % (module, pending["id"], pending["stage"]),
+        "MODULE_DONE": module_done,
     }[stage]
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,

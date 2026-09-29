@@ -20,7 +20,7 @@ import tempfile
 from pathlib import Path
 
 from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
-from module_stage import UNCHECKED, active_module, module_state, project_stage
+from module_stage import active_module, module_state, paused_modules, project_stage
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -30,7 +30,6 @@ _digest_spec.loader.exec_module(_digest_module)
 compute = _digest_module.compute
 
 
-CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 ANCHOR_AFTER = re.compile(r"^after:(.+)$")
 
 
@@ -57,16 +56,6 @@ def _current_module(project, order):
     if active and active in by_id:
         return by_id[active], active
     return next((state for state in states if state["stage"] != "DONE"), None), active
-
-
-def _half_done(project, current):
-    if current is None:
-        return False
-    todo_path = project / "tasks" / current["id"] / "todo.md"
-    if not todo_path.is_file():
-        return False
-    text = todo_path.read_text(encoding="utf-8")
-    return bool(UNCHECKED.search(text)) and bool(CHECKED.search(text))
 
 
 def _module_table_rows(lines):
@@ -145,7 +134,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor):
 
     order = list(parsed.order)
     current, active = _current_module(project, order)
-    if _half_done(project, current):
+    if current is not None and current["half"]:
         raise InsertError("当前模块 `%s` 做到一半（既有已勾选项又有未勾选项）；请先完成它。" % current["id"])
 
     if not MODULE_ID.match(module_id):
@@ -297,16 +286,22 @@ def write(project, module_id, responsibility, depends_on_raw, anchor):
     final_order = list(final_parsed.order)
     states = [module_state(project, module_id) for module_id in final_order]
     stage, final_current, _, pending = project_stage(states, active_module(project))
+    paused = paused_modules(states, final_current)
 
     return {
         "map_path": str(map_path),
         "stage_module": final_current["id"] if final_current else None,
         "stage_hint": stage,
         "stage_pending": (pending["id"], pending["stage"]) if pending else None,
+        "stage_paused": (paused[0]["id"], paused[0]["stage"]) if paused else None,
     }
 
 
 def format_stage_hint(outcome):
+    if outcome["stage_hint"] == "MODULE_DONE" and outcome.get("stage_paused"):
+        paused_id, paused_stage = outcome["stage_paused"]
+        return ("当前阶段提示: `%s` 处于 MODULE_DONE；被暂停的模块 `%s`（%s）应先恢复"
+                % (outcome["stage_module"], paused_id, paused_stage))
     if outcome["stage_hint"] == "MODULE_DONE" and outcome["stage_pending"]:
         pending_id, pending_stage = outcome["stage_pending"]
         return ("当前阶段提示: `%s` 处于 MODULE_DONE；Build order 中下一个未完成模块是 `%s`（%s）"
