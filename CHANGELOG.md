@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-09-30
+
 ### 新增
 
 - **阶段提示在 `DONE`／`MODULE_DONE` 时指出未合并的分支提交。** 当前分支有提交不在本地已知的远端默认分支（`refs/remotes/origin/HEAD`，缺省时依次回退 `origin/main`、`origin/master`）里时，追加一行 `This branch has N commit(s) not yet in \`origin/main\` (as last fetched).`，并把建议改为先推送、合并这些提交，再按原建议插入新模块（`MODULE_DONE` 时在原建议前加同一句）。只读且不联网：不执行 `git fetch`，比较的是本地跟踪引用，可能过时；没有远端、没有默认分支引用、分离 HEAD 或 `git` 调用失败时不提示。其余阶段与没有未合并提交时的输出逐字不变，`module_state`／`project_stage` 与 `verify-artifacts` 的判据不变。
