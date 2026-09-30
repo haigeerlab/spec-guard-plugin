@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 from capability_map import MapError, parse_map
@@ -80,6 +81,32 @@ def paused_modules(states: list, current: dict | None) -> list:
     return [state for state in states if state["half"] and state is not current]
 
 
+def _git(root: Path, *args: str) -> str | None:
+    try:
+        done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def unmerged_commits(root: Path) -> tuple | None:
+    """(count, ref short name) of HEAD commits not in the locally known origin default branch, else None.
+
+    Read-only and offline: only compares local remote-tracking refs, never fetches.
+    """
+    ref = _git(root, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+    if not ref:
+        ref = next((c for c in ("refs/remotes/origin/main", "refs/remotes/origin/master")
+                    if _git(root, "rev-parse", "--verify", "--quiet", c)), None)
+    if not ref:
+        return None
+    count = _git(root, "rev-list", "--count", ref + "..HEAD")
+    if count is None or not count.isdigit():
+        return None
+    prefix = "refs/remotes/"
+    return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
+
+
 def describe(root: Path) -> str:
     root = Path(root)
     try:
@@ -105,11 +132,26 @@ def describe(root: Path) -> str:
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
     paused = paused_modules(states, current) if stage != "DONE" else []
+    unmerged = unmerged_commits(root) if stage in ("DONE", "MODULE_DONE") else None
+    push_first = ""
+    if unmerged and unmerged[0] > 0:
+        hint = ("- This branch has %d commit(s) not yet in `%s` (as last fetched)." % unmerged)
+        push_first = "push this branch and merge its %d commit(s) into `%s` first; then " % unmerged
+    else:
+        hint = ""
     if stage == "DONE":
         if no_todo_note:
             notes.append(no_todo_note)
         if current is not None:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
+        if hint:
+            notes.append(hint)
+        if push_first:
+            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+                    "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
+                    "for new work, insert a module with /spec-guard:add-module "
+                    "(Codex: spec-guard-ops add-module); "
+                    "use a Proposal when the addition needs a recorded, reviewed decision.")
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
                 "For new work, insert a module with /spec-guard:add-module "
@@ -118,6 +160,8 @@ def describe(root: Path) -> str:
     module = current["id"]
     if no_todo_note:
         counts += "\n" + no_todo_note
+    if hint:
+        counts += "\n" + hint
     counts += "".join("\n- Paused: `%s` (%d unchecked item(s)); resume it after `%s`." % (p["id"], p["open"], module)
                       for p in paused)
     if stage == "MODULE_DONE" and paused:
@@ -131,7 +175,7 @@ def describe(root: Path) -> str:
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
         "BUILDING": "continue `/build` on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (module, current["open"], module),
-        "MODULE_DONE": module_done,
+        "MODULE_DONE": push_first + module_done,
     }[stage]
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,

@@ -4,6 +4,7 @@
 
 ### 新增
 
+- **阶段提示在 `DONE`／`MODULE_DONE` 时指出未合并的分支提交。** 当前分支有提交不在本地已知的远端默认分支（`refs/remotes/origin/HEAD`，缺省时依次回退 `origin/main`、`origin/master`）里时，追加一行 `This branch has N commit(s) not yet in \`origin/main\` (as last fetched).`，并把建议改为先推送、合并这些提交，再按原建议插入新模块（`MODULE_DONE` 时在原建议前加同一句）。只读且不联网：不执行 `git fetch`，比较的是本地跟踪引用，可能过时；没有远端、没有默认分支引用、分离 HEAD 或 `git` 调用失败时不提示。其余阶段与没有未合并提交时的输出逐字不变，`module_state`／`project_stage` 与 `verify-artifacts` 的判据不变。
 - **本地事项账本 `status` 报告状态 worktree 被另一个仓库占用。** Epiq 把状态 worktree 固定在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/worktrees/<projectId>`，两个仓库共用 `projectId`（如仓库副本）时，后到的仓库每次调用都以 `already exists` 失败。项目已初始化时，`status` 现在带 `project.stateWorktree`（`absent`／`owned`／`foreign`／`unknown`）；`foreign` 时顶层 `state` 为 `conflict`、`diagnostic` 为 `ledger-state-worktree-foreign`、退出码 1，并给出占用仓库路径。其余情况的顶层状态与退出码不变；只读，不移动或删除任何 worktree。处理办法见运行时参考文档与仓库副本迁移记录。
 
 ## [0.35.0] - 2026-09-30
