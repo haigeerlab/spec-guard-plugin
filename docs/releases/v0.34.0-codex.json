@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.34.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.34.0;test:marketplace-ref-upgrade-20260930"
+      },
+      "observedAt": "2026-09-30T05:19:13Z",
+      "evidence": [
+        "change:only marketplaces.spec-guard-marketplace ref in the user Codex config was changed from v0.33.0 to v0.34.0, then codex plugin marketplace upgrade spec-guard-marketplace",
+        "result:spec-guard@spec-guard-marketplace version 0.34.0 is installed and enabled; the marketplace checkout is at 883a01a and plugins/spec-guard is file-for-file identical to git archive v0.34.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.34.0;test:user-prompt-submit-smoke-20260930"
+      },
+      "observedAt": "2026-09-30T05:19:24Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and the user Codex config was byte-identical before and after the run",
+        "result:test_proposal_submit.py, test_proposal_publication.py, test_module_insert.py and test_proposal_promotion_proof.py from the installed marketplace copy passed under the macOS system python3 3.9.6 (PATH=/usr/bin:/bin)",
+        "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
+      ]
+    }
+  ]
+}
