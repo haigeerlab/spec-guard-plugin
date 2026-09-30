@@ -1,14 +1,18 @@
 """Isolated tests for portable Local ticket inventory."""
 import hashlib
+import io
 import json
 import os
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from local_ticket_portability import InventoryError, inventory_project
+import local_ticket_archive
+from local_ticket_archive import archive_project, verify_archive
+from local_ticket_portability import InventoryError, inventory_project, main
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -46,10 +50,16 @@ class SourceInventoryTests(unittest.TestCase):
             "stateBranch": "__epiq_state__",
             "createdAt": "2026-10-01T00:00:00.000Z",
         }), encoding="utf-8")
-        git(self.root, "add", ".epiq/project.json")
+        (self.root / "README.md").write_text("fixture source\n", encoding="utf-8")
+        git(self.root, "add", ".epiq/project.json", "README.md")
         git(self.root, "commit", "-qm", "initialize fixture")
-        git(self.root, "worktree", "add", "-q", "-b", "__epiq_state__",
-            str(self.state_root), "HEAD")
+        git(self.root, "worktree", "add", "-q", "--orphan", "-b", "__epiq_state__",
+            str(self.state_root))
+        state_config = self.state_root / ".epiq" / "project.json"
+        state_config.parent.mkdir()
+        state_config.write_bytes(config.read_bytes())
+        git(self.state_root, "add", ".epiq/project.json")
+        git(self.state_root, "commit", "-qm", "state genesis")
         self.events = self.state_root / ".epiq" / "events"
         self.media = self.state_root / ".epiq" / "media"
         self.events.mkdir(parents=True)
@@ -143,6 +153,119 @@ class SourceInventoryTests(unittest.TestCase):
         }))
         with self.assertRaisesRegex(InventoryError, "invalid-media"):
             inventory_project(self.root)
+
+    def test_archive_preserves_bundle_and_raw_pending_bytes(self):
+        tracked = self.write_events("actor.jsonl", event("EV1"))
+        pending = self.write_events("actor~pending.jsonl", event("EV2"))
+        archive = self.root.parent / "archive"
+
+        created = archive_project(self.root, archive)
+        verified = verify_archive(archive)
+
+        self.assertEqual(created["state"], "archived")
+        self.assertEqual(verified["state"], "verified")
+        self.assertEqual((archive / ".epiq/events" / tracked.name).read_bytes(), tracked.read_bytes())
+        self.assertEqual((archive / ".epiq/events" / pending.name).read_bytes(), pending.read_bytes())
+        self.assertTrue((archive / "state.bundle").is_file())
+        self.assertEqual(git(self.root, "status", "--porcelain", "--untracked-files=all"), "")
+
+    def test_archive_verification_rejects_tampered_event_and_missing_bundle(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        event_copy = archive / ".epiq/events/actor.jsonl"
+        event_copy.write_bytes(event_copy.read_bytes() + b"tampered")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+        event_copy.write_bytes(self.events.joinpath("actor.jsonl").read_bytes())
+        (archive / "state.bundle").unlink()
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
+    def test_archive_refuses_output_inside_source_or_an_existing_directory(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        inside = self.root / "backup"
+        with self.assertRaisesRegex(InventoryError, "archive-output-unsafe"):
+            archive_project(self.root, inside)
+        self.assertFalse(inside.exists())
+        existing = self.root.parent / "existing"
+        existing.mkdir()
+        with self.assertRaisesRegex(InventoryError, "archive-output-exists"):
+            archive_project(self.root, existing)
+
+    def test_archive_rejects_state_branch_with_source_history(self):
+        git(self.root, "worktree", "remove", str(self.state_root))
+        git(self.root, "branch", "-D", "__epiq_state__")
+        git(self.root, "worktree", "add", "-q", "-b", "__epiq_state__",
+            str(self.state_root), "HEAD")
+        self.events.mkdir(parents=True)
+        self.media.mkdir(parents=True)
+        self.write_events("actor.jsonl", event("EV1"))
+        with self.assertRaisesRegex(InventoryError, "archive-source-history"):
+            archive_project(self.root, self.root.parent / "unsafe-archive")
+
+    def test_archive_verification_rejects_unlisted_symlink(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        (archive / "unexpected").symlink_to(self.root)
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
+    def test_archive_and_verify_cli_return_json_outcomes(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(["archive", "--project", str(self.root),
+                                   "--output", str(archive)]), 0)
+        self.assertEqual(json.loads(output.getvalue())["state"], "archived")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(["verify", "--archive", str(archive)]), 0)
+        self.assertEqual(json.loads(output.getvalue())["state"], "verified")
+
+    def test_archive_verification_rejects_mismatched_project_identity(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        manifest = archive / "manifest.json"
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        payload["projectId"] = "DIFFERENT"
+        manifest.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
+    def test_archive_verification_rejects_traversal_manifest(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        manifest = archive / "manifest.json"
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+        payload["files"][0]["path"] = "../outside"
+        manifest.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
+    def test_archive_rejects_source_change_after_initial_inventory(self):
+        source = self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        original = local_ticket_archive.inventory_project
+        calls = 0
+
+        def inventory_then_change(project):
+            nonlocal calls
+            result = original(project)
+            calls += 1
+            if calls == 1:
+                with source.open("ab") as handle:
+                    handle.write((json.dumps(event("EV2")) + "\n").encode("utf-8"))
+            return result
+
+        with patch("local_ticket_archive.inventory_project", side_effect=inventory_then_change):
+            with self.assertRaisesRegex(InventoryError, "source-changed"):
+                archive_project(self.root, archive)
+        self.assertFalse(archive.exists())
 
 
 if __name__ == "__main__":

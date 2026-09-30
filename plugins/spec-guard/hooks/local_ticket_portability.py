@@ -172,17 +172,35 @@ def inventory_project(project: Path) -> dict[str, Any]:
         "epiqVersion": PACKAGE_VERSION, "stateBranch": STATE_BRANCH,
         "stateHead": branch_head, "eventFileCount": len(event_files),
         "eventIds": sorted(by_id), "mediaCount": len(media_sizes), "files": files,
+        "projectConfigSha256": hashlib.sha256(
+            _read_file(project / ".epiq" / "project.json")
+        ).hexdigest(),
     }
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory",))
-    parser.add_argument("--project", type=Path, required=True)
+    parser.add_argument("command", choices=("inventory", "archive", "verify"))
+    parser.add_argument("--project", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--archive", type=Path)
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
+    if args.command in ("inventory", "archive") and args.project is None:
+        parser.error("--project is required")
+    if args.command == "archive" and args.output is None:
+        parser.error("--output is required")
+    if args.command == "verify" and args.archive is None:
+        parser.error("--archive is required")
     try:
-        payload = inventory_project(args.project)
+        if args.command == "inventory":
+            payload = inventory_project(args.project)
+        elif args.command == "archive":
+            from local_ticket_archive import archive_project
+            payload = archive_project(args.project, args.output)
+        else:
+            from local_ticket_archive import verify_archive
+            payload = verify_archive(args.archive)
         code = 0
     except (InventoryError, OSError) as error:
         payload = {"state": "invalid", "diagnostic": str(error)}
