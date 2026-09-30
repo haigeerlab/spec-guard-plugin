@@ -26,6 +26,12 @@ Epiq 1.11.0 把本地账本的状态 worktree 固定放在 `<EPIQ_GLOBAL_DIR 或
    （属于另一个仓库，附 `owner` 为占用仓库路径）、`unknown`（读不到或无法判断，附短码诊断，不当作故障）。
 4. `foreign` 时顶层 `state` 为新值 `conflict`，退出码 1，`diagnostic` 为 `ledger-state-worktree-foreign`；其余情况顶层
    状态与退出码保持现状（`absent`／`owned`／`unknown` 不改变原来的 `initialized` 结果）。
+
+2026-10-01 安全补充：受管路径不存在时，还须只读检查本仓状态分支是否已在其他 worktree
+检出；若是，`project.stateWorktree=unknown`、`diagnostic=ledger-state-worktree-away`，
+附 `checkedOutAt`。如果状态分支也不存在，报告 `ledger-state-branch-missing` 而不创建空账本。
+两种情况顶层仍为 `initialized`。路径为符号链接或配置中的 project ID 不是
+安全的单一路径分量时，不得把它当作可创建的空状态。日常入口遇到 `unknown` 不写入。
 5. 文档给出处理办法：先备份占用的 worktree；若占用仓库已停用，在**占用仓库**执行 `git worktree move <路径> <别处>`
    （保留其中未同步的事件）；若两个仓库都要用账本，则为其中一个的账本进程设置不同的 `EPIQ_GLOBAL_DIR`，并说明账本 MCP
    是用户级配置、改全局目录会影响所有项目。不推荐换 `projectId`（需删除本地与远端状态分支，不可逆）。
@@ -34,8 +40,8 @@ Epiq 1.11.0 把本地账本的状态 worktree 固定放在 `<EPIQ_GLOBAL_DIR 或
 
 ## Contract
 
-- `local_ledger_runtime.py`：新增 `state_worktree_status(project_dir, project_id)`（只读：读文件与一次
-  `git rev-parse --git-common-dir`），`status()` 在项目 `initialized` 时调用并按第 3、4 条合并结果。
+- `local_ledger_runtime.py`：新增 `state_worktree_status(project_dir, project_id)`（只读检查文件、
+  Git worktree、状态分支与 common dir），`status()` 在项目 `initialized` 时调用并按第 3、4 条合并结果。
 - 路径比较使用 realpath；`.git` 为目录（非 worktree）、内容无法解析、gitdir 指向不存在的位置时为 `unknown`。
 - 不改 `contract`、`preflight`、`install`、`initialize` 的行为与输出。
 
