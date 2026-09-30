@@ -33,7 +33,6 @@ for plugin in plugins:
 fi
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-guard 插件未安装或未启用" >&2; exit 2; }
 PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 python3 -B "$ROOT/hooks/proposal_submit.py" --project "$PROJECT" \
   --draft "spec/proposals/<id>.md" --platform "<github|gitlab>"
 ```
