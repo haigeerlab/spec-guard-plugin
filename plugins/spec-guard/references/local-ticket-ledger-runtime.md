@@ -55,6 +55,7 @@ Epiq 1.11.0 把状态 worktree 放在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/work
 - `absent`：该目录不存在，Epiq 下次会创建。
 - `owned`：属于本仓库。
 - `foreign`：属于另一个仓库，`owner` 为占用仓库路径；顶层 `state` 变为 `conflict`。
+  `--format text` 时除状态行外还打印 `状态 worktree：<路径>`、`占用仓库：<owner>` 与指向本节处理办法的一行。
 - `unknown`：读不到或无法判断（`diagnostic: ledger-state-worktree-unreadable`）；不当作冲突，顶层状态不变。
 
 处理办法（插件不自动执行，也不得在未经用户明确同意时移动或删除任何 worktree）：
