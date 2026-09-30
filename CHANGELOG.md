@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-30
+
 ### 新增
 
 - **`/spec-guard:proposal-submit --draft spec/proposals/<id>.md --platform <github|gitlab>`：补全并校验 Proposal 草稿。** agent 按模板写好草稿（基线一节可省略、revision 可为 64 个 `0`），命令从远端默认分支的固定快照生成基线一节并重算 revision，用 `parse_proposal` 与 `validate_proposal` 校验；草稿修改后重跑即重算 revision。草稿路径必须是 `spec/proposals/<id>.md`；远端另一个文件声明同一 id 时拒绝，同一路径已发布则视为修订并提示。先预览，加 `--confirm` 才写回，且只写这一份草稿。最后打印开 Issue 的现成命令（标签 `proposal`、`proposal-stage:published`），命令本身不执行任何远端操作。Codex 的 `spec-guard-ops` 同步提供该入口。
