@@ -118,7 +118,10 @@ def fixed_snapshot(project, remote, prefix):
         if not _run(["git", "init", "--bare", str(repo)]):
             yield Snapshot("temporary Git snapshot failed")
             return
-        fetched = _run(["git", "-C", str(repo), "fetch", "--no-tags", url,
+        # No auto-maintenance: fetch would detach a background `git maintenance`
+        # that can still write into the snapshot while the temp dir is removed.
+        fetched = _run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                        "-C", str(repo), "fetch", "--no-tags", url,
                         "refs/heads/%s" % branch])
         tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
         if not fetched or not tip or tip.stdout.strip() != commit:
