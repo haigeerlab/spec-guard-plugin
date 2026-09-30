@@ -44,8 +44,9 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | promotion-proof-diagnostics | 晋级证明因晋级行与声明不符或改动了其他模块行被拒时，给出对应诊断码、晋级提交与不一致的字段；其余结果与输出不变。 | proposal-add-module-promotion |
 | insert-existing-spec | add-module 在 spec/<id>.md 已存在时不再拒绝插入，改为在预览中提示插入后阶段为 NEEDS_PLAN、未评审的 Spec 须先评审；其余校验与写入范围不变。 | module-insert, proposal-add-module-promotion |
 | ledger-worktree-owner | 本地账本 status 检出 Epiq 状态 worktree 被同一 projectId 的另一个仓库占用时，报告占用者与处理办法，而不是让账本调用以 git worktree 报错失败；状态检查仍只读。 | local-ticket-ledger, ledger-dependency-lock |
+| done-unmerged-hint | 阶段为 DONE 或 MODULE_DONE 且当前分支有提交尚未进入本地已知的远端默认分支时，阶段提示追加未合并提交数并建议先推送合并；只读、不联网，探测失败时不提示。 | phase-and-verification, done-stage-split |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit → promotion-proof-diagnostics → insert-existing-spec → ledger-worktree-owner
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit → promotion-proof-diagnostics → insert-existing-spec → ledger-worktree-owner → done-unmerged-hint
 
 ---
 
