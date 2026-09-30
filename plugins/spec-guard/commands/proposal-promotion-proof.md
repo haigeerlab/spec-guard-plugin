@@ -37,6 +37,16 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 没有任何提交把该 module 纳入远端默认分支的能力图——下一步是合并晋级分支，再重新运行本命令；
 `unknown` 表示远端无法安全读取。
 
+`invalid` 且 `diagnostic` 为下列两个码时，结果附带 `promotionCommit`（找到的晋级提交），按码处理：
+
+- `promotion-row-mismatch`：晋级行与 Proposal 声明不符，`mismatchedFields` 列出不符项
+  （`responsibility`、`dependsOn`、`position` 的子集，按此顺序）。让能力图里该行与 Proposal 声明一致，
+  或修订 Proposal 使其与已合并的行一致，再重新晋级／重跑。
+- `promotion-other-rows-changed`：该行相符，但晋级提交还改动了其他模块的行或它们的顺序。
+  把与晋级无关的能力图改动从晋级中拆出去，再重新晋级／重跑。
+
+其他 `invalid` 仍是 `promotion-invalid`（或下层具体原因）。
+
 `not-accepted`、`invalid`、`stale`、`unknown` 附带的 `diagnostic` 会尽量透传下层已给出的具体原因（例如
 `proposal-baseline-drifted`、`proposal-pool-unknown`），只有没有更具体原因时才是折叠后的
 `promotion-<state>`；`not-promoted` 固定是 `promotion-not-found`。详见

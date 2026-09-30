@@ -16,7 +16,7 @@ from proposal_publication import (
     Publication, PublicationPool, read_published, skipped_as_json)
 import proposal_promotion_proof
 from proposal_promotion_proof import (
-    Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, promotion_base, prove)
+    Preflight, Proof, _matches, _mismatched_fields, as_json, main, preflight, preflight_as_json, promotion_base, prove)
 from proposal_tracker_read import TrackerRead
 
 
@@ -341,7 +341,41 @@ class OtherRowPromotionTests(PromotionFixture):
                                           "| alpha | Rewritten capability | — |")
 
     def test_promotion_that_also_edits_another_module_row_is_invalid(self):
-        self.assertEqual(self.prove().state, "invalid")
+        result = self.prove()
+        self.assertEqual((result.state, result.diagnostic, result.promotion_commit),
+                         ("invalid", "promotion-other-rows-changed", self.promotion_commit))
+        data = as_json(result)
+        self.assertEqual(data["diagnostic"], "promotion-other-rows-changed")
+        self.assertEqual(data["promotionCommit"], self.promotion_commit)
+        self.assertNotIn("mismatchedFields", data)
+
+
+class RowMismatchPromotionTests(PromotionFixture):
+    promotion_map = PROMOTION_MAP.replace("| gamma | Gamma. | alpha |",
+                                          "| gamma | Different responsibility | — |")
+
+    def test_responsibility_and_dependency_mismatch_are_named_in_order(self):
+        result = self.prove()
+        self.assertEqual((result.state, result.diagnostic, result.promotion_commit),
+                         ("invalid", "promotion-row-mismatch", self.promotion_commit))
+        self.assertEqual(list(result.mismatched_fields), ["responsibility", "dependsOn"])
+        data = as_json(result)
+        self.assertEqual(data["diagnostic"], "promotion-row-mismatch")
+        self.assertEqual(data["promotionCommit"], self.promotion_commit)
+        self.assertEqual(data["mismatchedFields"], ["responsibility", "dependsOn"])
+
+
+class PositionMismatchPromotionTests(PromotionFixture):
+    # delta lands between alpha and gamma, so gamma is not immediately after its anchor.
+    promotion_map = PROMOTION_MAP.replace(
+        "| gamma | Gamma. | alpha |", "| delta | Extra. | — |\n| gamma | Gamma. | alpha |").replace(
+            "Build order: alpha → gamma", "Build order: alpha → delta → gamma")
+
+    def test_only_position_is_named(self):
+        result = self.prove()
+        self.assertEqual((result.state, result.diagnostic, result.promotion_commit),
+                         ("invalid", "promotion-row-mismatch", self.promotion_commit))
+        self.assertEqual(as_json(result)["mismatchedFields"], ["position"])
 
 
 class DriftedBaselinePromotionTests(PromotionFixture):
@@ -410,6 +444,16 @@ class MatchesAnchorMutantTests(unittest.TestCase):
     def test_after_anchor_requires_the_module_to_immediately_follow_it(self):
         capability_map = self._map("alpha → delta → gamma")
         self.assertFalse(_matches(self._proposal("after:alpha"), capability_map))
+
+    def test_mismatched_fields_is_empty_exactly_when_matches_is_true(self):
+        for anchor, order in (("end", "alpha → gamma → delta"), ("end", "alpha → delta → gamma"),
+                              ("after:alpha", "alpha → delta → gamma"),
+                              ("after:alpha", "alpha → gamma → delta")):
+            proposal, capability_map = self._proposal(anchor), self._map(order)
+            self.assertEqual(not _mismatched_fields(proposal, capability_map),
+                             _matches(proposal, capability_map), (anchor, order))
+        self.assertEqual(_mismatched_fields(self._proposal("end"),
+                                            self._map("alpha → gamma → delta")), ["position"])
 
 
 class PromotionPreflightTests(PromotionFixture):
