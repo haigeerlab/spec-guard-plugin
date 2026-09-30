@@ -38,8 +38,8 @@
   - 验收：显式项目分页查重、排除系统 notes、历史事件发布与读回；uploads 权限／哈希不明时保持 `partial`。
   - 验证：假 `glab api` 全链路创建、评论、关闭和重复调用读回通过；系统 notes 排除，内部 marker 冲突拒绝，分页与响应丢失边界通过。附件访问权限与原字节哈希未实测，因此保持 `partial`，未写真实项目。
   - 文件：GitLab 适配模块、CLI、聚焦测试（约 3 个）。依赖：6。
-- [ ] Task 9：使用入口、参考文档与总验收
+- [x] Task 9：使用入口、参考文档与总验收
   - 验收：CLI、Claude/Codex 入口和参考文档说明精确目标授权、`partial`／`conflict` 及线上未验证边界；不调用退役 bridge。
-  - 验证：命令一致性、聚焦合成验收、`scripts/validate.sh`、阶段／产物检查、`git diff --check`；完成证据回写 Local 事项。
+  - 验证：28 个来源／归档测试、9 个对账测试、5 个提供方测试和真实 Epiq 临时仓库验收通过；正式仓库现有 Local 事项只读快照为 7 个事件、0 个媒体，前后源清单相同。`scripts/validate.sh`、产物检查、技能格式与 `git diff --check` 通过；完成证据记录在本地事项，未写真实远端。
   - 文件：command、skill、reference、`CHANGELOG.md`（约 4 个）。依赖：3–8。
-- [ ] Checkpoint D：逐条对照 Spec 成功标准；有未证明的附件或真实远端行为时保留其 `partial`／“线上未验证”状态，不把模块报告为完整交付。
+- [ ] Checkpoint D：代码与同机隔离验收已对照 Spec；独立介质恢复及真实 GitHub/GitLab 往返未执行，附件也尚无远端原字节／可见性读回证据。保持 `partial`／“线上未验证”，模块暂不报告为完整交付。

@@ -76,6 +76,8 @@ class GitLabHandoff:
                 raise InventoryError("provider-unavailable: GitLab note response is incomplete")
             if item["system"]:
                 continue
+            if not isinstance(item.get("internal"), bool):
+                raise InventoryError("provider-unavailable: GitLab note visibility is unknown")
             if item.get("internal") is True:
                 if ISSUE_MARKER in body or EVENT_MARKER in body:
                     raise InventoryError("conflict: Local marker is in an internal GitLab note")

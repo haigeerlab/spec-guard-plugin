@@ -212,7 +212,8 @@ def restore_archive(archive: Path, project: Path, global_dir: Path,
         ).stdout.strip():
             raise InventoryError("target-identity-missing: configure Git author before restore")
         state_root = global_dir / "worktrees" / manifest["projectId"]
-        state_root.parent.mkdir(parents=True)
+        os.chmod(global_dir, 0o700)
+        state_root.parent.mkdir(parents=True, mode=0o700)
         try:
             _populate_archive(archive, manifest, project, state_root)
             _git(project, "add", ".epiq/project.json")

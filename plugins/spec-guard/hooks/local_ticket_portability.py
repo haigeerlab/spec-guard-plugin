@@ -183,10 +183,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=(
         "inventory", "archive", "verify", "restore", "handoff-preview",
+        "handoff-publish",
     ))
     parser.add_argument("--project", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--preview", type=Path)
     parser.add_argument("--epiq-global-dir", type=Path)
     parser.add_argument("--issue-id")
     parser.add_argument("--platform", choices=("github", "gitlab"))
@@ -198,7 +200,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
-    if args.command in ("inventory", "archive", "restore", "handoff-preview") and args.project is None:
+    if args.command in ("inventory", "archive", "restore", "handoff-preview",
+                        "handoff-publish") and args.project is None:
         parser.error("--project is required")
     if args.command in ("archive", "handoff-preview") and args.output is None:
         parser.error("--output is required")
@@ -206,8 +209,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--archive is required")
     if args.command == "restore" and args.epiq_global_dir is None:
         parser.error("--epiq-global-dir is required")
-    if args.confirm and args.command != "restore":
-        parser.error("--confirm is only available with restore")
+    if args.confirm and args.command not in ("restore", "handoff-publish"):
+        parser.error("--confirm is only available with restore or handoff-publish")
+    if args.command == "handoff-publish" and args.preview is None:
+        parser.error("--preview is required")
     if args.command == "handoff-preview" and any(value is None for value in (
             args.issue_id, args.platform, args.host, args.target, args.visibility)):
         parser.error("--issue-id, --platform, --host, --target and --visibility are required")
@@ -231,6 +236,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.project, args.issue_id, args.runtime_dir, args.platform,
                 args.host, args.target, args.visibility, args.output,
             )
+        elif args.command == "handoff-publish":
+            from local_ticket_github import GitHubHandoff
+            from local_ticket_gitlab import GitLabHandoff
+            from local_ticket_publish import publish_preview
+            if args.preview.is_symlink() or not args.preview.is_file():
+                raise InventoryError("preview-invalid: preview file is absent or unsafe")
+            preview = json.loads(args.preview.read_text(encoding="utf-8"))
+            if not isinstance(preview, dict) or not isinstance(preview.get("destination"), dict):
+                raise InventoryError("preview-invalid: destination is missing")
+            destination = preview.get("destination", {})
+            if destination.get("platform") == "github":
+                provider = GitHubHandoff(destination["host"], destination["target"])
+            elif destination.get("platform") == "gitlab":
+                provider = GitLabHandoff(destination["host"], destination["target"])
+            else:
+                raise InventoryError("preview-invalid: destination platform is unsupported")
+            payload = publish_preview(
+                preview, args.project, args.runtime_dir, provider, confirm=args.confirm,
+            )
         else:
             if args.prove:
                 from local_ticket_restore import prove_restore
@@ -239,7 +263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 from local_ticket_archive import verify_archive
                 payload = verify_archive(args.archive)
         code = 0
-    except (InventoryError, OSError) as error:
+    except (InventoryError, OSError, ValueError, KeyError, TypeError) as error:
         payload = {"state": "invalid", "diagnostic": str(error)}
         code = 1
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True))

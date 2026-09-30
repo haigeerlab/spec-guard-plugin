@@ -100,6 +100,11 @@ def write_entry(path: Path, key: str, entry: dict[str, Any]) -> None:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, path)
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
         finally:
             Path(temporary).unlink(missing_ok=True)
     finally:

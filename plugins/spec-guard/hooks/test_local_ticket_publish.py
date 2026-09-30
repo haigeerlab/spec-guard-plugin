@@ -1,12 +1,16 @@
 """Failure-injection tests for explicit Local ticket handoff reconciliation."""
+import io
+import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 from local_ticket_journal import entry_key, journal_path, read_journal
 from local_ticket_publish import publish_preview
 from local_ticket_preview import EVENT_MARKER, render_body
+from local_ticket_portability import main
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -157,6 +161,24 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.publish()["state"], "publication-uncertain")
         self.assertEqual(len(self.provider.issues), 1)
         self.assertEqual(self.provider.comments.get(1, []), [])
+
+    def test_cli_needs_confirm_before_hosted_write(self):
+        preview_file = self.base / "preview.json"
+        preview_file.write_text(json.dumps(self.preview), encoding="utf-8")
+        output = io.StringIO()
+        with (patch("local_ticket_github.GitHubHandoff", return_value=self.provider),
+              patch("local_ticket_publish.snapshot_issue", return_value=self.source),
+              patch("local_ticket_journal.default_journal_root",
+                    return_value=self.journal_root),
+              redirect_stdout(output)):
+            self.assertEqual(main(["handoff-publish", "--project", str(self.project),
+                                   "--preview", str(preview_file)]), 1)
+            self.assertEqual(self.provider.issues, [])
+            output.seek(0)
+            output.truncate(0)
+            self.assertEqual(main(["handoff-publish", "--project", str(self.project),
+                                   "--preview", str(preview_file), "--confirm"]), 0)
+        self.assertEqual(json.loads(output.getvalue())["state"], "verified")
 
 
 if __name__ == "__main__":

@@ -139,6 +139,7 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         final = provider.get_issue(remote_id)
         comments = _items(provider.list_comments(remote_id), "comments")
         if (final.get("body") != preview["body"] or final.get("title") != preview["title"]
+                or not isinstance(final.get("url"), str) or not final["url"]
                 or bool(final.get("closed")) != desired_closed or any(
                     sum(item.get("body") == body for item in comments) != 1
                     for body in expected_comments.values())):

@@ -1,0 +1,58 @@
+# Local ticket archive and explicit handoff
+
+Run from a Git repository with an initialized Local Epiq 1.11.0 ledger. Set `ROOT` to the
+installed Spec Guard plugin directory; replace angle-bracket placeholders with user-selected
+paths and identities.
+
+```bash
+python3 -B "$ROOT/hooks/local_ticket_portability.py" inventory --project <repo>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" archive --project <repo> --output <new-private-directory>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory> --prove
+```
+
+The archive contains `manifest.json`, a single-state-branch Git bundle, the Epiq project
+identity, raw event/media files, and a private mapping journal snapshot if one exists. It
+does not contain project source or other Git branches. `verify --prove` compares all source
+events with Epiq's materialized view and checks a disposable write. Copy the archive to
+independent storage and verify that copy before relying on it for disaster recovery.
+
+```bash
+python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \
+  --archive <archive-directory> --project <empty-git-repo> \
+  --epiq-global-dir <empty-epiq-directory> --confirm
+```
+
+The target repo must have no files or refs and cannot be a linked worktree sharing another
+Git common directory; prepare an independent empty repository. Configure its Git author first. The Epiq directory
+must exist and be empty, and must not share the original project ID's active global worktree.
+Restore first proves the archive in isolation, then commits `.epiq/project.json` on the new
+repo's default branch and creates `__epiq_state__` with its worktree. It does not push. If a
+write is interrupted, it preserves partial target data for inspection; do not rerun into that
+nonempty target. The mapping journal is exported in the archive but not imported into a new
+project's user-level partition automatically.
+
+```bash
+python3 -B "$ROOT/hooks/local_ticket_portability.py" handoff-preview \
+  --project <repo> --issue-id <full-epiq-id> --platform <github-or-gitlab> \
+  --host <host> --target <owner/repo-or-group/project> \
+  --visibility <public-or-internal-or-private> --output <new-private-preview.json>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" handoff-publish \
+  --project <repo> --preview <private-preview.json> --confirm
+```
+
+`handoff-preview` reads source files and target metadata; it does not write to either. It
+rejects unknown metadata rights or visibility mismatch. The preview file is mode 0600 and
+contains the full Local history, so keep it private. `handoff-publish` can create an Issue,
+post historical comments, and set closed/open state on the exact target. Show the complete
+preview and obtain target-specific authorization before running it. The command rechecks the
+source digest and remote metadata, records intent privately, then reads back every managed
+marker. GitHub PRs and GitLab system notes are excluded from issue/comment matching.
+
+If attachment bytes cannot be uploaded and read back under the target's visibility, the result
+remains `partial` and the original Local media stays in the archive. Code references on the
+target, short or indirect code references, and API token write scope are not proven by the
+read-only preview. A failed or lost response can produce `publication-uncertain`; inspect
+remote markers and the private journal before any retry. Two matching Issues or an edited
+managed Issue/comment are `conflict`. The module does not automatically switch later daily
+work to GitHub/GitLab, and it does not close the Local ticket.
