@@ -10,10 +10,43 @@ from local_ledger_adapters import GATED_TOOLS
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SKILL = PLUGIN_ROOT / "skills" / "ticket" / "SKILL.md"
 COMMAND = PLUGIN_ROOT / "commands" / "ticket.md"
+LOCAL_TEMPLATES = (
+    PLUGIN_ROOT / "templates" / "claude-block-local.md",
+    PLUGIN_ROOT / "templates" / "codex-block-local.md",
+)
 VALIDATE = PLUGIN_ROOT.parents[1] / "scripts" / "validate.sh"
 
 
 class TicketEntryContractTest(unittest.TestCase):
+    def test_accepted_work_has_an_early_identity_and_unknown_does_not_create(self) -> None:
+        text = SKILL.read_text(encoding="utf-8")
+        self.assertIn("`includeClosed: true`", text)
+        self.assertIn("`found`／`absent`／`unknown`", text)
+        self.assertIn("动代码前", text)
+        self.assertIn("读取失败或列表是否完整无法确定时不创建", text)
+        self.assertIn("两个 Agent 同时查重仍可能重复", text)
+
+    def test_material_change_and_closure_have_readback_rules(self) -> None:
+        text = SKILL.read_text(encoding="utf-8")
+        self.assertIn("先追加决定评论", text)
+        self.assertIn("决定待应用", text)
+        self.assertIn("验证未通过时保持开放", text)
+        self.assertIn("读回关闭状态", text)
+
+    def test_ticket_write_requires_safe_state_worktree(self) -> None:
+        text = SKILL.read_text(encoding="utf-8")
+        self.assertIn("`project.stateWorktree`", text)
+        self.assertIn("`foreign`／`unknown`", text)
+        self.assertIn("不调用 Epiq 写工具", text)
+
+    def test_local_convention_mentions_early_ticket_only_when_ledger_is_enabled(self) -> None:
+        for path in LOCAL_TEMPLATES:
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("若项目已启用 Local 事项账本", text)
+                self.assertIn("在动代码前先用 `spec-guard:ticket`", text)
+                self.assertIn("探索和无需追踪的小操作例外", text)
+
     def test_short_ref_is_resolved_to_full_id_before_writing(self) -> None:
         text = SKILL.read_text(encoding="utf-8")
 

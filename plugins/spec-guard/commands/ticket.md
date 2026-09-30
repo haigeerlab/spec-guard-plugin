@@ -1,5 +1,5 @@
 ---
-description: 用自然语言查看、创建、讨论或关闭当前项目的本地事项
+description: 用自然语言受理开发需求或修复问题，并查看、讨论或关闭当前项目的本地事项
 ---
 
 把用户在命令后的内容当作日常本地事项请求，加载本插件的 `ticket` skill 并执行。用户只说
@@ -21,6 +21,7 @@ description: 用自然语言查看、创建、讨论或关闭当前项目的本�
 例如：
 
 - `/spec-guard:ticket 记个 bug：测试环境的接口响应异常`
+- `/spec-guard:ticket 实现本地导出；先查重并在动代码前绑定事项`
 - `/spec-guard:ticket 查看 <事项短编号> 并补充我的排查结果`
 - `/spec-guard:ticket 创建事项并告诉另一位 Agent 帮忙复查`
 
