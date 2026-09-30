@@ -5,6 +5,7 @@
 ### 变更
 
 - **晋级证明被拒时给出具体原因。** `/spec-guard:proposal-promotion-proof` 在晋级提交里的行与 Proposal 声明不符时返回 `promotion-row-mismatch`，并带 `promotionCommit` 与 `mismatchedFields`（`responsibility`、`dependsOn`、`position` 的子集，按此顺序）；行相符但晋级提交还改动了其他模块行或顺序时返回 `promotion-other-rows-changed` 与 `promotionCommit`。`state` 仍为 `invalid`，其余 `invalid` 分支与成功路径的输出不变；`_matches` 改为基于同一个不符字段函数，判断不会分叉。
+- **`add-module` 允许在 `spec/<id>.md` 已存在时插入能力图。** 先写 Spec 再插入不再被“已存在，拒绝覆盖”卡住（命令本来就从不写 Spec 文件）。预览与 `--confirm` 的输出会追加一行提示：该模块插入后阶段为 `NEEDS_PLAN`（视为已评审），Spec 尚未评审时应先评审再确认；`--proposal` 路径同样适用。其余校验与写入范围（只写 `spec/CAPABILITY-MAP.md`）不变，Spec 不存在时输出逐字不变。
 
 ## [0.34.0] - 2026-09-30
 

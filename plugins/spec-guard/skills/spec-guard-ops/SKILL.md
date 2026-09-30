@@ -114,8 +114,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 原样转述输出（Proposal id、revision、baseCommit 与新行、Build order、diff）。命令内嵌同一预检；预检非 `ready`、
 本地能力图与 baseCommit 上的不一致（提示 `git switch -c <晋级分支> <baseCommit>`）、锚点在 Build order 并行段中致使
-写入结果无法被 proposal-promotion-proof 证明、当前模块做到一半（`--interrupt` 规则同上）、`spec/<id>.md` 已存在，
-均原样说明并停下。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
+写入结果无法被 proposal-promotion-proof 证明、当前模块做到一半（`--interrupt` 规则同上），
+均原样说明并停下。`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审），
+未评审先评审再 `--confirm`。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
 不改 Issue 标签。合并后运行 proposal 一节的 `--prove`，`proved` 后由人工把标签改为 `proposal-stage:promoted`。
 
 ## documentation

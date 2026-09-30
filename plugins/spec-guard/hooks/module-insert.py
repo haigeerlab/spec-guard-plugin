@@ -166,8 +166,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
         if anchor_id not in existing_ids:
             raise InsertError("anchor 指向的模块不存在于能力图: %s" % anchor_id)
 
-    if (project / "spec" / ("%s.md" % module_id)).exists():
-        raise InsertError("spec/%s.md 已存在，拒绝覆盖" % module_id)
+    existing_spec = (project / "spec" / ("%s.md" % module_id)).exists()
 
     old_text = map_path.read_text(encoding="utf-8")
     ends_with_newline = old_text.endswith("\n")
@@ -258,6 +257,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
         "new_current": new_current["id"] if new_current else None,
         "proposal_conflict": proposal_path.is_file(),
         "module_id": module_id,
+        "existing_spec": existing_spec,
         "interrupted": interrupted,
         "responsibility": responsibility,
         "new_text": new_text,
@@ -298,6 +298,8 @@ def write(project, module_id, responsibility, depends_on_raw, anchor, interrupt=
 
     return {
         "map_path": str(map_path),
+        "existing_spec": result["existing_spec"],
+        "module_id": module_id,
         "stage_module": final_current["id"] if final_current else None,
         "stage_hint": stage,
         "stage_pending": (pending["id"], pending["stage"]) if pending else None,
@@ -317,6 +319,11 @@ def format_stage_hint(outcome):
     if outcome["stage_module"] and outcome["stage_hint"] != "DONE":
         return "当前阶段提示: `%s` 处于 %s" % (outcome["stage_module"], outcome["stage_hint"])
     return "当前阶段提示: DONE"
+
+
+def format_existing_spec_hint(outcome):
+    return ("提示: spec/%s.md 已存在：该模块阶段为 NEEDS_PLAN（视为已评审）；若尚未评审，请先评审"
+            % outcome["module_id"])
 
 
 def prepare_proposal(project, proposal_id, platform, target, interrupt=False,
@@ -398,6 +405,10 @@ def format_report(result):
         if result["new_current"] == interrupted["id"]:
             lines.append("插入后当前模块仍是 `%s`；请把 .agent/state.json 的 activeModule 改为 `%s` 再开始构建"
                          % (interrupted["id"], result["module_id"]))
+    if result["existing_spec"]:
+        lines.append("")
+        lines.append("提示: spec/%s.md 已存在——插入后该模块阶段为 NEEDS_PLAN（视为已评审）；"
+                     "若这份 Spec 尚未评审，先评审再 --confirm。" % result["module_id"])
     if result["proposal_conflict"]:
         lines.append("")
         lines.append("警告: 本地存在 spec/proposals/%s.md；若该 Proposal 之后发布，"
@@ -446,6 +457,8 @@ def _main_fields(args):
             return 1
         print("已写入: %s" % outcome["map_path"])
         print(format_stage_hint(outcome))
+        if outcome["existing_spec"]:
+            print(format_existing_spec_hint(outcome))
         return 0
 
     try:
@@ -483,6 +496,8 @@ def _main_proposal(args, tracker_reader):
         return 1
     print("已写入: %s" % outcome["map_path"])
     print(format_stage_hint(outcome))
+    if outcome["existing_spec"]:
+        print(format_existing_spec_hint(outcome))
     return 0
 
 
