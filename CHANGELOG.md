@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 变更
+
+- **上游兼容基线更新至 agent-skills 0.6.11（`2686b62`）。** 按 [上游分析](docs/upstream-analysis.md) 的核对清单逐条复核：spec 查找路径、Task List Target、tracker 激活条件均未变，五个缺口仍成立；上游新增的 `/constraints` 与 `constraint-driven-development`、「不覆盖未完成 plan」止损、外部 spec 约定条款均与 spec-guard 不冲突。上游 0.6.10 起不再注册 SessionStart hook，spec-guard 不依赖它。最低上游版本仍为 `5a5ea45`，无需迁移。
+
 ## [0.33.0] - 2026-09-30
 
 ### 新增
