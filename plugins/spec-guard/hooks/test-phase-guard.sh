@@ -258,4 +258,80 @@ assert "当前阶段: **IDLE**" in json.loads(sys.stdin.read())["hookSpecificOut
 ' <<<"$(run_from "$plain")" || fail "非 git 目录应退回当前目录判断"
 echo "  ✅ 非 git 目录退回当前目录"; PASS=$((PASS + 1))
 
+# DONE／MODULE_DONE 时提示当前分支尚未进入本地已知远端默认分支的提交（只读、不联网）。
+g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+unmerged_fixture() {  # $1=克隆目录 $2=alpha 的 todo 内容；创建 bare 远端并推送基线，origin/HEAD 指向 main
+  local dir="$1"
+  git init -q --bare -b main "$dir.git"
+  git init -q -b main "$dir"
+  mkdir -p "$dir/spec" "$dir/tasks/alpha" "$dir/tasks/beta" "$dir/.agent"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$dir/CLAUDE.md"
+  printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+    '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$dir/spec/CAPABILITY-MAP.md"
+  touch "$dir/spec/alpha.md" "$dir/spec/beta.md"
+  printf '# Plan\n' > "$dir/tasks/alpha/plan.md"
+  printf '%s\n' "$2" > "$dir/tasks/alpha/todo.md"
+  printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$dir/.agent/state.json"
+  g -C "$dir" add -A
+  g -C "$dir" commit -q -m base
+  git -C "$dir" remote add origin "$dir.git"
+  git -C "$dir" push -q origin main 2>/dev/null
+  git -C "$dir" fetch -q origin
+  git -C "$dir" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+}
+two_commits() {  # $1=克隆目录
+  echo "1$RANDOM" > "$1/f1"; g -C "$1" add -A; g -C "$1" commit -q -m c1
+  echo "2$RANDOM" > "$1/f2"; g -C "$1" add -A; g -C "$1" commit -q -m c2
+}
+HINT='- This branch has 2 commit(s) not yet in `origin/main` (as last fetched).'
+PUSHFIRST='push this branch and merge its 2 commit(s) into `origin/main` first'
+
+um_done="$WORK/um-done"
+unmerged_fixture "$um_done" '- [x] done'
+printf '# Plan\n' > "$um_done/tasks/beta/plan.md"; printf '%s\n' '- [x] b' > "$um_done/tasks/beta/todo.md"
+g -C "$um_done" add -A; g -C "$um_done" commit -q -m beta; git -C "$um_done" push -q origin main 2>/dev/null
+git -C "$um_done" fetch -q origin
+two_commits "$um_done"
+injects "DONE 且领先远端默认分支时报告未合并提交" "$um_done" "$HINT"
+injects "DONE 且领先时建议先推送合并" "$um_done" "$PUSHFIRST"
+injects "DONE 且领先时仍保留 add-module 与 Proposal 指引" "$um_done" "use a Proposal when the addition needs a recorded, reviewed decision"
+injects "DONE 且领先时仍报告 DONE" "$um_done" "当前阶段: **DONE**"
+# 只读：运行 hook 前后引用与工作区状态不变。
+refs_before="$(git -C "$um_done" for-each-ref)"; status_before="$(git -C "$um_done" status --porcelain)"
+run "$um_done" >/dev/null
+[ "$refs_before" = "$(git -C "$um_done" for-each-ref)" ] && [ "$status_before" = "$(git -C "$um_done" status --porcelain)" ] \
+  || fail "未合并提交检查必须只读"
+echo "  ✅ 未合并提交检查只读"; PASS=$((PASS + 1))
+# 没有 origin/HEAD 时回退到 origin/main。
+git -C "$um_done" symbolic-ref --delete refs/remotes/origin/HEAD
+injects "没有 origin/HEAD 时回退到 origin/main" "$um_done" "$HINT"
+git -C "$um_done" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+# 推送后：与没有远端的同一棵树逐字相同。
+git -C "$um_done" push -q origin main 2>/dev/null
+git -C "$um_done" fetch -q origin
+lacks "推送后 DONE 不再报告未合并提交" "$um_done" "not yet in"
+lacks "推送后 DONE 不再建议先推送" "$um_done" "push this branch"
+um_plain="$WORK/um-plain"
+cp -R "$um_done" "$um_plain"; git -C "$um_plain" remote remove origin
+[ "$(run "$um_done")" = "$(run "$um_plain")" ] || fail "推送后的输出应与无远端时逐字相同"
+echo "  ✅ 推送后输出与无远端时逐字相同"; PASS=$((PASS + 1))
+# 没有远端：无提示。
+two_commits "$um_plain"
+lacks "没有远端时不提示未合并提交" "$um_plain" "not yet in"
+injects "没有远端时仍指向 add-module" "$um_plain" "/spec-guard:add-module"
+
+um_mod="$WORK/um-mod"
+unmerged_fixture "$um_mod" '- [x] done'
+two_commits "$um_mod"
+injects "MODULE_DONE 且领先时报告未合并提交" "$um_mod" "$HINT"
+injects "MODULE_DONE 且领先时在原建议前加先推送合并" "$um_mod" "Suggested next step: $PUSHFIRST; then \`alpha\` is done; next unfinished module"
+injects "MODULE_DONE 且领先时仍报告 MODULE_DONE" "$um_mod" "当前阶段: **MODULE_DONE**"
+
+um_build="$WORK/um-build"
+unmerged_fixture "$um_build" '- [ ] open'
+two_commits "$um_build"
+injects "BUILDING 仍报告 BUILDING" "$um_build" "当前阶段: **BUILDING**"
+lacks "BUILDING 且领先时不提示未合并提交" "$um_build" "not yet in"
+lacks "BUILDING 且领先时不建议先推送" "$um_build" "push this branch"
+
 echo "phase-guard regression passed (${PASS} cases)"
