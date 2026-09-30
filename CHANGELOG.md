@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-30
+
 ### 新增
 
 - **`add-module --proposal <id> --platform <github|gitlab> --target <target>`：从已接受的 Proposal 晋级。** id、职责、依赖与锚点全部取自远端已发布的 Proposal，与 `--id`／`--responsibility`／`--depends-on`／`--anchor` 同用即报错；命令内嵌晋级预检（非 `ready` 时原样报告 state 与 diagnostic 并停下），要求本地 `spec/CAPABILITY-MAP.md` 与 `baseCommit` 上的能力图逐字相同（否则提示 `git switch -c <晋级分支> <baseCommit>`），并用证明所用的匹配器自检写入结果，例如锚点位于 Build order 并行段中、写入后无法被证明时直接拒绝。先预览，再加 `--confirm` 写入，只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、不改标签。不带 `--proposal` 时行为与输出不变；`/spec-guard:proposal-promotion-preflight` 保留为只读预览，Codex 的 `spec-guard-ops` 同步提供该入口。
