@@ -656,5 +656,111 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["runtime"]["lock"], "unlocked")
 
 
+class StateWorktreeOwnerTests(unittest.TestCase):
+    PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="sg-state-worktree-")
+        self.addCleanup(self.tmp.cleanup)
+        root = Path(self.tmp.name).resolve()
+        self.repo_a = root / "repo-a"
+        self.repo_b = root / "repo-b"
+        self.global_dir = root / "global"
+        self.runtime_dir = root / "runtime"
+        for repo in (self.repo_a, self.repo_b):
+            self.git(root, "init", "-q", str(repo))
+            self.git(repo, "-c", "user.name=t", "-c", "user.email=t@example.test",
+                     "commit", "-q", "--allow-empty", "-m", "init")
+        (self.repo_a / ".epiq").mkdir()
+        (self.repo_a / ".epiq" / "project.json").write_text(json.dumps({
+            "projectId": self.PROJECT_ID, "stateBranch": "__epiq_state__",
+            "createdAt": "2026-09-24T00:00:00.000Z",
+        }), encoding="utf-8")
+        package_dir = self.runtime_dir / "node_modules" / local_ledger_runtime.PACKAGE_NAME
+        (package_dir / "dist").mkdir(parents=True)
+        (package_dir / "package.json").write_text(json.dumps({
+            "name": local_ledger_runtime.PACKAGE_NAME,
+            "version": local_ledger_runtime.PACKAGE_VERSION,
+        }), encoding="utf-8")
+        (package_dir / "dist" / "mcp.js").write_text("export {};\n", encoding="utf-8")
+        self.worktree = self.global_dir / "worktrees" / self.PROJECT_ID
+        env = patch.dict("os.environ", {"EPIQ_GLOBAL_DIR": str(self.global_dir)})
+        env.start()
+        self.addCleanup(env.stop)
+
+    @staticmethod
+    def git(cwd, *arguments):
+        subprocess.run(["git", "-C", str(cwd), *arguments], check=True, capture_output=True)
+
+    def add_worktree(self, repo):
+        self.worktree.parent.mkdir(parents=True)
+        self.git(repo, "worktree", "add", "-q", str(self.worktree), "-b", "__epiq_state__")
+
+    def run_status(self):
+        with patch("local_ledger_runtime.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }):
+            return local_ledger_runtime.status(self.runtime_dir, self.repo_a)
+
+    def test_worktree_owned_by_another_repository_is_a_conflict(self):
+        self.add_worktree(self.repo_b)
+        code, payload = self.run_status()
+        self.assertEqual(code, 1)
+        self.assertEqual(payload["state"], "conflict")
+        self.assertEqual(payload["diagnostic"], "ledger-state-worktree-foreign")
+        state = payload["project"]["stateWorktree"]
+        self.assertEqual(state["state"], "foreign")
+        self.assertEqual(state["owner"], str(self.repo_b))
+        self.assertEqual(Path(state["path"]).resolve(), self.worktree.resolve())
+
+    def test_worktree_owned_by_this_repository_keeps_the_initialized_result(self):
+        self.add_worktree(self.repo_a)
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertNotIn("diagnostic", payload)
+        self.assertEqual(payload["project"]["stateWorktree"]["state"], "owned")
+
+    def test_missing_worktree_directory_is_absent(self):
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertEqual(payload["project"]["stateWorktree"]["state"], "absent")
+
+    def test_unparsable_git_file_is_unknown_not_a_conflict(self):
+        self.worktree.mkdir(parents=True)
+        (self.worktree / ".git").write_text("garbage\n", encoding="utf-8")
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        state = payload["project"]["stateWorktree"]
+        self.assertEqual(state["state"], "unknown")
+        self.assertEqual(state["diagnostic"], "ledger-state-worktree-unreadable")
+
+    def test_git_directory_instead_of_file_is_unknown(self):
+        (self.worktree / ".git").mkdir(parents=True)
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertEqual(payload["project"]["stateWorktree"]["state"], "unknown")
+
+    def test_uninitialized_project_has_no_state_worktree_field(self):
+        (self.repo_a / ".epiq" / "project.json").unlink()
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "ready"))
+        self.assertNotIn("stateWorktree", payload["project"])
+
+    def test_status_is_read_only_for_worktrees_and_global_dir(self):
+        self.add_worktree(self.repo_b)
+
+        def snapshot():
+            tree = sorted(str(p.relative_to(self.global_dir)) for p in self.global_dir.rglob("*"))
+            listing = [
+                subprocess.run(["git", "-C", str(r), "worktree", "list", "--porcelain"],
+                               check=True, capture_output=True, text=True).stdout
+                for r in (self.repo_a, self.repo_b)
+            ]
+            return tree, listing
+        before = snapshot()
+        self.run_status()
+        self.assertEqual(before, snapshot())
+
+
 if __name__ == "__main__":
     unittest.main()

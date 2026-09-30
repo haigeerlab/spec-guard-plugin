@@ -24,7 +24,10 @@ Resolve the installed plugin root and run only the side-effect-free status opera
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 ```
 
-Explain `absent`, `ready`, `initialized`, and `invalid` accurately. Never install Epiq, initialize a
+Explain `absent`, `ready`, `initialized`, `conflict`, and `invalid` accurately. `conflict` means the Epiq state
+worktree (`project.stateWorktree`, state `foreign`) is owned by another repository: relay its `owner` and `path`
+and the remedies in `references/local-ticket-ledger-runtime.md`, and never move or delete a worktree without the
+user's explicit approval. Never install Epiq, initialize a
 repository, change Claude/Codex configuration, or start a service merely because a status check is
 successful.
 
