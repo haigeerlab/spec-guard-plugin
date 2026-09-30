@@ -14,7 +14,7 @@ import local_ticket_archive
 from local_ledger_runtime import RuntimeContractError
 from local_ticket_archive import archive_project, verify_archive
 from local_ticket_portability import InventoryError, inventory_project, main
-from local_ticket_restore import prove_restore
+from local_ticket_restore import prove_restore, restore_archive
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -281,6 +281,81 @@ class SourceInventoryTests(unittest.TestCase):
                     side_effect=RuntimeContractError("unreadable fixture"))):
             with self.assertRaisesRegex(InventoryError, "restore-proof-failed"):
                 prove_restore(archive, self.root.parent / "fake-runtime")
+
+    def test_restore_requires_confirmation_and_empty_target(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        target = self.root.parent / "target"
+        target.mkdir()
+        git(target, "init", "-q")
+        global_dir = self.root.parent / "target-global"
+        global_dir.mkdir()
+        with self.assertRaisesRegex(InventoryError, "confirmation-required"):
+            restore_archive(archive, target, global_dir, self.root.parent / "runtime",
+                            confirm=False)
+        (target / "README.md").write_text("existing work\n", encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "target-not-empty"):
+            restore_archive(archive, target, global_dir, self.root.parent / "runtime",
+                            confirm=True)
+        self.assertFalse((target / ".epiq").exists())
+
+    def test_restore_refuses_existing_global_state(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        target = self.root.parent / "target"
+        target.mkdir()
+        git(target, "init", "-q")
+        global_dir = self.root.parent / "target-global"
+        global_dir.mkdir()
+        (global_dir / "config.json").write_text("existing", encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "target-not-empty"):
+            restore_archive(archive, target, global_dir, self.root.parent / "runtime",
+                            confirm=True)
+        self.assertFalse((target / ".epiq").exists())
+
+    def test_restore_refuses_existing_branch_even_without_project_files(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        target = self.root.parent / "target"
+        target.mkdir()
+        git(target, "init", "-q")
+        git(target, "fetch", "-q", str(archive / "state.bundle"),
+            "refs/heads/__epiq_state__:refs/heads/__epiq_state__")
+        global_dir = self.root.parent / "target-global"
+        global_dir.mkdir()
+        with self.assertRaisesRegex(InventoryError, "target-not-empty"):
+            restore_archive(archive, target, global_dir, self.root.parent / "runtime",
+                            confirm=True)
+        self.assertFalse((target / ".epiq").exists())
+
+    def test_restore_preserves_partial_target_for_diagnosis(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        target = self.root.parent / "target"
+        target.mkdir()
+        git(target, "init", "-q")
+        git(target, "config", "user.email", "test@example.invalid")
+        git(target, "config", "user.name", "Test")
+        global_dir = self.root.parent / "target-global"
+        global_dir.mkdir()
+        proof = {"state": "proved", "eventDigest": "fixture"}
+
+        def interrupted(*arguments):
+            (target / ".epiq").mkdir()
+            (target / ".epiq" / "partial").write_text("preserve", encoding="utf-8")
+            raise OSError("injected failure")
+
+        with (patch("local_ticket_restore.prove_restore", return_value=proof),
+              patch("local_ticket_restore._populate_archive", side_effect=interrupted)):
+            with self.assertRaisesRegex(InventoryError, "restore-incomplete"):
+                restore_archive(archive, target, global_dir, self.root.parent / "runtime",
+                                confirm=True)
+        self.assertEqual((target / ".epiq" / "partial").read_text(), "preserve")
+        self.assertFalse((target / ".git" / "spec-guard-local-restore.lock").exists())
 
 
 if __name__ == "__main__":

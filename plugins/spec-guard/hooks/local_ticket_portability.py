@@ -181,20 +181,26 @@ def inventory_project(project: Path) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory", "archive", "verify"))
+    parser.add_argument("command", choices=("inventory", "archive", "verify", "restore"))
     parser.add_argument("--project", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--epiq-global-dir", type=Path)
+    parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--prove", action="store_true")
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
-    if args.command in ("inventory", "archive") and args.project is None:
+    if args.command in ("inventory", "archive", "restore") and args.project is None:
         parser.error("--project is required")
     if args.command == "archive" and args.output is None:
         parser.error("--output is required")
-    if args.command == "verify" and args.archive is None:
+    if args.command in ("verify", "restore") and args.archive is None:
         parser.error("--archive is required")
+    if args.command == "restore" and args.epiq_global_dir is None:
+        parser.error("--epiq-global-dir is required")
+    if args.confirm and args.command != "restore":
+        parser.error("--confirm is only available with restore")
     if args.prove and args.command != "verify":
         parser.error("--prove is only available with verify")
     try:
@@ -203,6 +209,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "archive":
             from local_ticket_archive import archive_project
             payload = archive_project(args.project, args.output)
+        elif args.command == "restore":
+            from local_ticket_restore import restore_archive
+            payload = restore_archive(
+                args.archive, args.project, args.epiq_global_dir,
+                args.runtime_dir, confirm=args.confirm,
+            )
         else:
             if args.prove:
                 from local_ticket_restore import prove_restore

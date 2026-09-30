@@ -108,6 +108,41 @@ class RealEpiqRestoreProof(unittest.TestCase):
             self.assertEqual(json.loads((archive / "manifest.json").read_text())["eventIds"],
                              before["eventIds"])
 
+            target = base / "restored-project"
+            target.mkdir()
+            git(target, "init", "-q")
+            git(target, "config", "user.name", "Restore Fixture")
+            git(target, "config", "user.email", "restore@example.invalid")
+            target_global = base / "restored-global"
+            target_global.mkdir()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([
+                    "restore", "--archive", str(archive), "--project", str(target),
+                    "--epiq-global-dir", str(target_global),
+                    "--runtime-dir", str(runtime), "--confirm",
+                ]), 0)
+            restored = json.loads(output.getvalue())
+            self.assertEqual(restored["state"], "restored")
+            self.assertEqual(restored["eventCount"], result["eventCount"])
+            self.assertEqual((target / ".epiq/project.json").read_bytes(),
+                             (archive / ".epiq/project.json").read_bytes())
+            git(target, "ls-files", "--error-unmatch", ".epiq/project.json")
+            target_environment = dict(os.environ, EPIQ_GLOBAL_DIR=str(target_global))
+            (target_global / "config.json").write_text(json.dumps({
+                "logLevel": "error", "userId": "01M3SRSVX16EAHRM78KQ1K7J02",
+                "userName": "Restore Fixture", "autoSync": False,
+            }), encoding="utf-8")
+            mcp_tool_call(command, "epiq_issue_comment_add", {
+                "repoRoot": str(target), "issueId": issue["id"],
+                "body": "Continued after restore",
+            }, environment=target_environment)
+            resumed = mcp_tool_call(command, "epiq_issue_get", {
+                "repoRoot": str(target), "idOrRef": issue["id"],
+            }, environment=target_environment)["value"]
+            self.assertIn("Continued after restore",
+                          [comment["body"] for comment in resumed["comments"]])
+
 
 if __name__ == "__main__":
     if not os.environ.get("SPEC_GUARD_EPIQ_RUNTIME"):

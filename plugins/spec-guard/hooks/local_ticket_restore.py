@@ -51,6 +51,25 @@ def _call(command: list[str], environment: dict[str, str], name: str,
     return response["value"]
 
 
+def _populate_archive(archive: Path, manifest: dict[str, Any],
+                      root: Path, state_root: Path) -> None:
+    config = root / ".epiq" / "project.json"
+    config.parent.mkdir()
+    config.write_bytes((archive / ".epiq" / "project.json").read_bytes())
+    _git(root, "fetch", "-q", str(archive / "state.bundle"),
+         "refs/heads/__epiq_state__:refs/heads/__epiq_state__")
+    _git(root, "worktree", "add", "-q", str(state_root), "__epiq_state__")
+    for entry in manifest["files"]:
+        name = entry["path"]
+        if not name.startswith((".epiq/events/", ".epiq/media/")):
+            continue
+        target = state_root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((archive / name).read_bytes())
+        if hashlib.sha256(target.read_bytes()).hexdigest() != entry["sha256"]:
+            raise InventoryError("restore-proof-failed: restored file hash differs")
+
+
 def prove_restore(archive: Path, runtime_dir: Path) -> dict[str, Any]:
     """Use disposable Git/Epiq state; never mutate the archive or caller's ledger."""
     archive = Path(archive).resolve()
@@ -75,21 +94,7 @@ def prove_restore(archive: Path, runtime_dir: Path) -> dict[str, Any]:
         _git(root, "init", "-q")
         _git(root, "config", "user.name", "Spec Guard restore proof")
         _git(root, "config", "user.email", "restore-proof@example.invalid")
-        config = root / ".epiq" / "project.json"
-        config.parent.mkdir()
-        config.write_bytes((archive / ".epiq" / "project.json").read_bytes())
-        _git(root, "fetch", "-q", str(archive / "state.bundle"),
-             "refs/heads/__epiq_state__:refs/heads/__epiq_state__")
-        _git(root, "worktree", "add", "-q", str(state_root), "__epiq_state__")
-        for entry in manifest["files"]:
-            name = entry["path"]
-            if not name.startswith((".epiq/events/", ".epiq/media/")):
-                continue
-            target = state_root / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes((archive / name).read_bytes())
-            if hashlib.sha256(target.read_bytes()).hexdigest() != entry["sha256"]:
-                raise InventoryError("restore-proof-failed: restored file hash differs")
+        _populate_archive(archive, manifest, root, state_root)
 
         global_dir.mkdir(exist_ok=True)
         (global_dir / "config.json").write_text(json.dumps({
@@ -149,3 +154,86 @@ def prove_restore(archive: Path, runtime_dir: Path) -> dict[str, Any]:
             "issueCount": len(issues), "issueDigest": issue_digest,
             "mediaCount": len(media_hashes), "mediaHashes": media_hashes,
             "writable": True}
+
+
+def _preflight_target(archive: Path, project: Path, global_dir: Path) -> None:
+    if (project.is_symlink() or not project.is_dir() or
+            set(path.name for path in project.iterdir()) != {".git"} or
+            (project / ".git").is_symlink() or not (project / ".git").is_dir()):
+        raise InventoryError("target-not-empty: target must be an empty Git repository")
+    if (global_dir.is_symlink() or not global_dir.is_dir() or
+            any(global_dir.iterdir())):
+        raise InventoryError("target-not-empty: Epiq global directory must be empty")
+    resolved = (archive.resolve(), project.resolve(), global_dir.resolve())
+    for index, first in enumerate(resolved):
+        for second in resolved[index + 1:]:
+            if first == second or first in second.parents or second in first.parents:
+                raise InventoryError("target-not-empty: archive and target paths overlap")
+    top = subprocess.run(
+        ["git", "-C", str(project), "rev-parse", "--show-toplevel"],
+        capture_output=True, text=True, check=False,
+    )
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != project.resolve():
+        raise InventoryError("target-not-empty: target is not a Git worktree root")
+    for arguments in (("show-ref",), ("rev-parse", "--verify", "HEAD")):
+        result = subprocess.run(
+            ["git", "-C", str(project), *arguments],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode == 0:
+            raise InventoryError("target-not-empty: Git repository already has history")
+
+
+def restore_archive(archive: Path, project: Path, global_dir: Path,
+                    runtime_dir: Path, confirm: bool = False) -> dict[str, Any]:
+    """Restore only into a caller-named empty repository and empty Epiq home."""
+    if not confirm:
+        raise InventoryError("confirmation-required: restore needs explicit confirmation")
+    archive, project, global_dir = Path(archive), Path(project), Path(global_dir)
+    verify_archive(archive)
+    _preflight_target(archive, project, global_dir)
+    proof = prove_restore(archive, runtime_dir)
+    manifest = json.loads((archive / "manifest.json").read_text(encoding="utf-8"))
+    lock = project / ".git" / "spec-guard-local-restore.lock"
+    try:
+        descriptor = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as error:
+        raise InventoryError("target-busy: another restore owns this repository") from error
+    os.close(descriptor)
+    try:
+        _preflight_target(archive, project, global_dir)
+        verify_archive(archive)
+        if not subprocess.run(
+            ["git", "-C", str(project), "config", "user.name"],
+            capture_output=True, check=False,
+        ).stdout.strip() or not subprocess.run(
+            ["git", "-C", str(project), "config", "user.email"],
+            capture_output=True, check=False,
+        ).stdout.strip():
+            raise InventoryError("target-identity-missing: configure Git author before restore")
+        state_root = global_dir / "worktrees" / manifest["projectId"]
+        state_root.parent.mkdir(parents=True)
+        try:
+            _populate_archive(archive, manifest, project, state_root)
+            _git(project, "add", ".epiq/project.json")
+            _git(project, "commit", "-qm", "Restore Epiq project identity")
+            environment = dict(os.environ)
+            environment["EPIQ_GLOBAL_DIR"] = str(global_dir)
+            node = node_status()
+            command = [node["path"], str(Path(runtime_dir) / MCP_RELATIVE_PATH)]
+            state = _call(command, environment, "epiq_state_get", project)
+            digest = hashlib.sha256(json.dumps(
+                state["eventLog"], sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")).hexdigest()
+            if digest != proof["eventDigest"]:
+                raise InventoryError("restore-incomplete: restored Epiq state differs")
+        except (InventoryError, OSError, KeyError, TypeError, ValueError) as error:
+            raise InventoryError(
+                "restore-incomplete: inspect the target; partial data was preserved"
+            ) from error
+    finally:
+        lock.unlink(missing_ok=True)
+    return {"state": "restored", "projectId": proof["projectId"],
+            "eventCount": proof["eventCount"], "mediaCount": proof["mediaCount"],
+            "stateBranch": "__epiq_state__", "gitIdentityCommitted": True}
