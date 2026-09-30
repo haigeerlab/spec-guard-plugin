@@ -16,7 +16,7 @@ from proposal_publication import (
     Publication, PublicationPool, read_published, skipped_as_json)
 import proposal_promotion_proof
 from proposal_promotion_proof import (
-    Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, prove)
+    Preflight, Proof, _matches, as_json, main, preflight, preflight_as_json, promotion_base, prove)
 from proposal_tracker_read import TrackerRead
 
 
@@ -460,6 +460,52 @@ class PromotionPreflightTests(PromotionFixture):
         result = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
                            tracker_reader=lambda *ignored: TrackerRead("absent"))
         self.assertEqual((result.state, result.diagnostic), ("absent", "tracker-absent"))
+
+
+class PromotionBaseTests(PromotionFixture):
+    skip_promotion = True
+
+    def base(self, proposal_id="gamma", stage="proposal-stage:accepted"):
+        return promotion_base(self.consumer, proposal_id, "github", "octo/spec-guard",
+                              tracker_reader=lambda *ignored: self.tracker(stage))
+
+    def test_ready_returns_the_map_at_base_commit_and_the_proposal(self):
+        result, base_map, proposal = self.base()
+        self.assertEqual(result.state, "ready")
+        expected = self.git(self.seed, "show", "%s:spec/CAPABILITY-MAP.md" % result.base_commit)
+        self.assertEqual(base_map, expected)
+        self.assertEqual((proposal.proposal_id, proposal.change.module_id), ("gamma", "gamma"))
+        plain = preflight(self.consumer, "gamma", "github", "octo/spec-guard",
+                          tracker_reader=lambda *ignored: self.tracker())
+        self.assertEqual((result.state, result.base_commit, result.revision),
+                         (plain.state, plain.base_commit, plain.revision))
+
+    def test_non_ready_results_carry_no_map_or_proposal(self):
+        cases = (("gamma", "proposal-stage:in-review"), ("missing", "proposal-stage:accepted"))
+        for proposal_id, stage in cases:
+            with self.subTest(proposal_id=proposal_id, stage=stage):
+                result, base_map, proposal = self.base(proposal_id, stage)
+                self.assertNotEqual(result.state, "ready")
+                self.assertIsNone(base_map)
+                self.assertIsNone(proposal)
+                plain = preflight(self.consumer, proposal_id, "github", "octo/spec-guard",
+                                  tracker_reader=lambda *ignored: self.tracker(stage))
+                self.assertEqual((result.state, result.diagnostic),
+                                 (plain.state, plain.diagnostic))
+
+
+class DriftedPromotionBaseTests(PromotionFixture):
+    skip_promotion = True
+    drift_map = DRIFT_MAP
+
+    def test_baseline_drift_returns_no_map_or_proposal(self):
+        result, base_map, proposal = promotion_base(
+            self.consumer, "gamma", "github", "octo/spec-guard",
+            tracker_reader=lambda *ignored: self.tracker())
+        self.assertEqual((result.state, result.diagnostic),
+                         ("stale", "proposal-baseline-drifted"))
+        self.assertIsNone(base_map)
+        self.assertIsNone(proposal)
 
 
 class LegacyFilesPreflightTests(PromotionPreflightTests):

@@ -58,5 +58,32 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 不执行任何 Git 或远端操作。成功后原样转述写入结果与阶段提示；如果新模块因此成为当前模块，阶段会是
 `NEEDS_SPEC`——下一步是写并评审 `spec/<id>.md`（例如用 `/spec`），不是本命令的职责。
 
-如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 八步流程（见 `docs/workflow.md`），
-而不是本命令。
+## 从已接受的 Proposal 晋级（`--proposal`）
+
+前提：Proposal 已发布，Issue 带 `proposal-stage:accepted` 标签且评审新鲜。此时**不要自己提出**
+id、responsibility、depends-on、anchor——它们全部取自远端已发布的 Proposal，同时传 `--id`、`--responsibility`、
+`--depends-on`、`--anchor` 任一项都会报错。必须给 `--platform <github|gitlab>` 与 `--target <target>`。
+
+先跑预览（只读；ROOT 解析片段与上文相同）：
+
+```bash
+python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
+  --proposal "<id>" --platform "<github|gitlab>" --target "<target>"
+```
+
+原样转述预览输出（Proposal id、revision、baseCommit，新行、新 Build order、diff、当前模块会不会变）。命令内嵌同一预检并
+重读新鲜的远端事实，被拒绝时原样说明原因并停下，不要自行改动后重试：
+
+- 预检不是 `ready`：转述报告的 state 与 diagnostic，停下；
+- 本地 `spec/CAPABILITY-MAP.md` 与 baseCommit 上的能力图不一致：让用户先按提示从基线开晋级分支
+  （`git switch -c <晋级分支> <baseCommit>`），在该分支上重跑；
+- 锚点在 Build order 的并行段中，按声明插入后无法被 `proposal-promotion-proof` 证明：不能按该声明晋级，停下；
+- 当前模块做到一半：按上文 `--interrupt` 规则处理；
+- `spec/<id>.md` 已存在：拒绝，停下。
+
+等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次。命令只改 `spec/CAPABILITY-MAP.md`，
+不创建分支、不提交、不改 Issue 标签。写入后由用户提交并合并；合并后运行 `/spec-guard:proposal-promotion-proof`，
+证明为 `proved` 后，由人工把 Issue 标签改为 `proposal-stage:promoted`。不带 `--proposal` 时行为不变。
+
+如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
+已接受的 Proposal 用上面的 `--proposal` 晋级。
