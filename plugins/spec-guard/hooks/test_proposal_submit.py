@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -104,13 +105,40 @@ def outside_baseline(text):
 
 
 class ProposalSubmitTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """Build the git fixture once; each test copies it (see setUp)."""
+        super().setUpClass()
+        cls._template = Path(tempfile.mkdtemp(prefix="sg-proposal-submit-template-"))
+        try:
+            builder = cls("setUp")
+            builder.root = cls._template
+            builder.seed = builder.root / "seed"
+            builder.remote = builder.root / "remote.git"
+            builder.consumer = builder.root / "consumer"
+            builder.build()
+        except BaseException:
+            shutil.rmtree(cls._template, ignore_errors=True)
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._template, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-submit-")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+        shutil.copytree(self._template, self.root, symlinks=True, dirs_exist_ok=True)
         self.seed = self.root / "seed"
         self.remote = self.root / "remote.git"
         self.consumer = self.root / "consumer"
+        self.git(self.seed, "remote", "set-url", "origin", str(self.remote))
+        self.git(self.consumer, "remote", "set-url", "origin", str(self.remote))
+        self.map_path = self.seed / "spec/CAPABILITY-MAP.md"
+
+    def build(self):
         self.git(self.root, "init", "--bare", "-b", "trunk", str(self.remote))
         self.git(self.root, "init", "-b", "trunk", str(self.seed))
         self.git(self.seed, "config", "user.email", "test@example.invalid")
@@ -124,7 +152,6 @@ class ProposalSubmitTests(unittest.TestCase):
         self.git(self.root, "clone", str(self.remote), str(self.consumer))
         self.git(self.consumer, "config", "user.email", "test@example.invalid")
         self.git(self.consumer, "config", "user.name", "test")
-        self.map_path = self.seed / "spec/CAPABILITY-MAP.md"
 
     def git(self, cwd, *args):
         result = subprocess.run(["git", "-C", str(cwd)] + list(args), text=True,
