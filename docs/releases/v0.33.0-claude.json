@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.33.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.33.0;test:marketplace-update-20260930"
+      },
+      "observedAt": "2026-09-30T01:47:12Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.32.0 to 0.33.0 for scope user; the cached plugin is file-for-file identical to git archive v0.33.0 apart from the host's .in_use marker"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.33.0;test:system-python39-building-20260930"
+      },
+      "observedAt": "2026-09-30T01:49:00Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events --output-format stream-json ran with PATH=~/.local/bin:/usr/bin:/bin, so the hook could only use the macOS system python3 3.9.6",
+        "result:the session init loaded spec-guard 0.33.0 from the plugin cache and the spec-guard UserPromptSubmit hook exited 0",
+        "result:in a temporary local-mode consumer repository whose activeModule alpha had one unchecked todo item, the hook injected BUILDING for alpha",
+        "result:test_module_insert.py, test_proposal_promotion_proof.py and test_proposal_publication.py from the plugin cache passed under the system python3 3.9.6",
+        "limit:add-module --proposal was not exercised through a host prompt against a real tracker; its unit suite, including an end-to-end promotion proved on a temporary remote, covers it"
+      ]
+    }
+  ]
+}
