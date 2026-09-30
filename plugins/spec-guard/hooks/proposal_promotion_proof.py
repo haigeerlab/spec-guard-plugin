@@ -19,8 +19,10 @@ DIAGNOSTIC_CODE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 class Proof(object):
     def __init__(self, state, review_commit=None, proposal_id=None, module_id=None,
-                 promotion_commit=None, diagnostic=None, skipped_proposals=()):
+                 promotion_commit=None, diagnostic=None, skipped_proposals=(),
+                 mismatched_fields=()):
         self.skipped_proposals = tuple(skipped_proposals)
+        self.mismatched_fields = tuple(mismatched_fields)
         self.state = state
         self.review_commit = review_commit
         self.proposal_id = proposal_id
@@ -70,6 +72,8 @@ def as_json(result):
         code = result.diagnostic
         data["diagnostic"] = (code if isinstance(code, str) and DIAGNOSTIC_CODE.match(code)
                               else "promotion-%s" % result.state)
+    if result.mismatched_fields:
+        data["mismatchedFields"] = list(result.mismatched_fields)
     if result.skipped_proposals:
         data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     return data
@@ -111,18 +115,32 @@ def _map(repo, commit, temp):
         return "invalid"
 
 
-def _matches(proposal, capability_map):
+def _mismatched_fields(proposal, capability_map):
+    """Fields of the promoted row that differ from the declaration, in a fixed order."""
+    change = proposal.change
     rows = dict((row.module_id, row) for row in capability_map.rows)
-    row = rows.get(proposal.change.module_id)
-    if (row is None or row.responsibility != proposal.change.responsibility or
-            tuple(row.depends_on) != tuple(proposal.change.depends_on)):
-        return False
-    position = capability_map.order.index(proposal.change.module_id)
-    if proposal.change.anchor == "end":
-        return position == len(capability_map.order) - 1
-    anchor = proposal.change.anchor[len("after:"):]
-    return (anchor in capability_map.order and
-            position == capability_map.order.index(anchor) + 1)
+    row = rows.get(change.module_id)
+    if row is None or change.module_id not in capability_map.order:
+        return ["responsibility", "dependsOn", "position"]
+    fields = []
+    if row.responsibility != change.responsibility:
+        fields.append("responsibility")
+    if tuple(row.depends_on) != tuple(change.depends_on):
+        fields.append("dependsOn")
+    position = capability_map.order.index(change.module_id)
+    if change.anchor == "end":
+        placed = position == len(capability_map.order) - 1
+    else:
+        anchor = change.anchor[len("after:"):]
+        placed = (anchor in capability_map.order and
+                  position == capability_map.order.index(anchor) + 1)
+    if not placed:
+        fields.append("position")
+    return fields
+
+
+def _matches(proposal, capability_map):
+    return not _mismatched_fields(proposal, capability_map)
 
 
 def _first_parent(repo, commit):
@@ -241,10 +259,17 @@ def prove(project, publication, tracker, platform, target, remote="origin"):
             parent_text = _show(repo, parent, "spec/CAPABILITY-MAP.md")
             if parent_map == "invalid" or parent_text is None:
                 return _blocked("invalid")
-            if (module_id in parent_map.order or
-                    not _matches(proposal, capability_map) or
-                    not _only_adds(module_id, parent_map, capability_map)):
+            if module_id in parent_map.order:
                 return _blocked("invalid")
+            fields = _mismatched_fields(proposal, capability_map)
+            if fields:
+                return Proof("invalid", diagnostic="promotion-row-mismatch",
+                             promotion_commit=commit, proposal_id=proposal.proposal_id,
+                             module_id=module_id, mismatched_fields=fields)
+            if not _only_adds(module_id, parent_map, capability_map):
+                return Proof("invalid", diagnostic="promotion-other-rows-changed",
+                             promotion_commit=commit, proposal_id=proposal.proposal_id,
+                             module_id=module_id)
             # 晋级那一刻的新鲜度：在父提交的能力图上评审，accepted 与 promoted 阶段等价。
             at_parent = Publication(
                 "published", review_commit=parent, proposal=proposal,

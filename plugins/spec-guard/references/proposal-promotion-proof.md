@@ -67,8 +67,25 @@ string, so a missing tracker Issue, a missing Proposal and a stale review are di
 | No tracker Issue carries the Proposal's marker | `tracker-absent` |
 | The tracker Issue or its labels fail the tracker contract | `tracker-invalid` |
 
-A diagnostic that names neither a layer nor a specific cause (Git plumbing
-failures inside `prove`, for example) keeps the generic `promotion-<state>` /
+Two rejections of the promotion commit C carry their own code, both with `state`
+`invalid` and `promotionCommit` = C (checked in this order, after P is found not to
+contain the module):
+
+| Cause | Diagnostic | Extra field |
+| --- | --- | --- |
+| C's row differs from the Proposal declaration | `promotion-row-mismatch` | `mismatchedFields`: the differing subset of `responsibility`, `dependsOn`, `position`, always in that order |
+| The row matches, but C also changed another module's row or the order of the other modules | `promotion-other-rows-changed` | none |
+
+`responsibility` is a different responsibility text, `dependsOn` a different
+dependency list (order matters), `position` a build-order position that does not
+satisfy the anchor (`end` must be last, `after:<id>` must immediately follow `<id>`).
+The field list comes from the same function `add-module --proposal` uses for its
+self-check, so the two cannot disagree.
+
+Every other `invalid` case (P already contains the module, unreadable maps, baseline
+not an ancestor, and so on) and a diagnostic that names neither a layer nor a
+specific cause (Git plumbing failures inside `prove`, for example) keep the generic
+`promotion-<state>` /
 `promotion-preflight-<state>` form; only `not-promoted` keeps its own fixed
 `promotion-not-found`.
 

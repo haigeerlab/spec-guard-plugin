@@ -41,8 +41,9 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | proposal-label-acceptance | Proposal 的接受只看 Issue 标签 proposal-stage:accepted 与评审新鲜度；晋级证明以 Proposal 基线提交为起点并接受只改能力图的晋级提交；删除主链裁决命令、策略文件与验收记录要求，已有文件保持可读。 | proposal-pool-isolation |
 | proposal-add-module-promotion | add-module --proposal <id> 按已发布 Proposal 声明的 id、职责、依赖与锚点插入能力图，内嵌远端预检（已接受、新鲜、模块未在图中），预览后确认写入。 | proposal-label-acceptance |
 | proposal-submit | 生成 Proposal 文档并自动计算基线、模块摘要与 revision，输出开 Issue 的现成命令；把使用流程、README 与发版流程改写为提交、接受、晋级、收尾四步。 | proposal-add-module-promotion |
+| promotion-proof-diagnostics | 晋级证明因晋级行与声明不符或改动了其他模块行被拒时，给出对应诊断码、晋级提交与不一致的字段；其余结果与输出不变。 | proposal-add-module-promotion |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit → promotion-proof-diagnostics
 
 ---
 
