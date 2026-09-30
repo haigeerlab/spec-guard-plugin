@@ -450,12 +450,15 @@ def read_mcp_tool_result(stream: Any, request_id: int) -> dict[str, Any]:
     return payload
 
 
-def mcp_tool_call(command: list[str], tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+def mcp_tool_call(
+    command: list[str], tool_name: str, arguments: dict[str, Any],
+    environment: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Call one stdio MCP tool and terminate the private child process afterwards."""
     try:
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True,
+            text=True, env=environment,
         )
     except OSError as error:
         raise RuntimeContractError("unable to start the local-ledger MCP server") from error
@@ -483,6 +486,7 @@ def mcp_tool_call(command: list[str], tool_name: str, arguments: dict[str, Any])
         return read_mcp_tool_result(process.stdout, 2)
     finally:
         process.stdin.close()
+        process.stdout.close()
         if process.poll() is None:
             process.terminate()
         try:

@@ -32,14 +32,15 @@ Proposal #104。已有 Local 事项是本次工作的受理入口；模块任务
    `refs/heads/__epiq_state__` 可达对象的 `state.bundle`、`.epiq/project.json`、
    pending 原始文件、媒体文件和当时的映射日志快照。manifest 固定
    `formatVersion=1`、`epiqVersion=1.11.0`、`projectId`、`stateBranch`、
-   `stateHead`、`capturedAt`、`files[{path,size,sha256}]` 与事件／媒体摘要；
+   `stateHead`、`capturedAt`、`eventIds` 与 `files[{path,size,sha256}]`；
    所有路径为受限相对路径，不能存来源绝对路径或凭据。先写临时目录并复核来源，
    最后以排他方式发布；失败留下明确诊断，不把半成品当归档。检查状态分支
    每个历史提交的改动路径，只允许 `.epiq/`；否则 bundle 可能夹带源码。
    事件／媒体原始文件全部覆盖到归档，以包含已提交后又修改的文件。
 3. **恢复。** `verify` 只检查结构、所有字节和 Git bundle 完整性；恢复证明在
    临时 Git 仓库与独立 `EPIQ_GLOBAL_DIR` 完成，并调用锁定的 Epiq 运行时读回
-   事项、全部事件与附件，再写一条合成事项。真实 `restore` 只接受用户指定的
+   事项、全部事件与附件，输出物化事件和事项视图摘要，再写一条合成事项。
+   真实 `restore` 只接受用户指定的
    空 Git 仓库及空 Epiq 目录，先完成同样预检；如写入中断，报告剩余状态并停止，
    不删除或强制覆盖。恢复的是账本，不是项目源码与其他 Git 分支。
 4. **交接快照。** 每个源事项以 `projectId + issueId` 标识，源摘要覆盖有序原始

@@ -11,8 +11,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import local_ticket_archive
+from local_ledger_runtime import RuntimeContractError
 from local_ticket_archive import archive_project, verify_archive
 from local_ticket_portability import InventoryError, inventory_project, main
+from local_ticket_restore import prove_restore
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -266,6 +268,19 @@ class SourceInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(InventoryError, "source-changed"):
                 archive_project(self.root, archive)
         self.assertFalse(archive.exists())
+
+    def test_restore_proof_reports_epiq_readback_failure(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        with (patch("local_ticket_restore.runtime_status", return_value={"state": "ready"}),
+              patch("local_ticket_restore.node_status", return_value={
+                  "state": "ready", "path": "/usr/bin/node",
+              }),
+              patch("local_ticket_restore.mcp_tool_call",
+                    side_effect=RuntimeContractError("unreadable fixture"))):
+            with self.assertRaisesRegex(InventoryError, "restore-proof-failed"):
+                prove_restore(archive, self.root.parent / "fake-runtime")
 
 
 if __name__ == "__main__":

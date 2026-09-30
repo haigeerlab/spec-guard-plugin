@@ -35,8 +35,9 @@ GitHub 或 GitLab Issue，失败后可对账重试。Local 无需 PR/MR；迁移
 以及事件与媒体原始文件（包括未提交部分）。状态分支历史若含 `.epiq/` 以外的
 路径则拒绝归档，避免 bundle 夹带项目源码。输出目录必须位于来源仓库和状态 worktree 之外，
 不能经符号链接指回两者；创建目录前检查这一条件。manifest 记录格式版本、
-Epiq 版本、项目 ID、状态分支 HEAD、快照截止点、每个文件的相对路径／长度／
-哈希和物化事件摘要。目录默认仅当前
+Epiq 版本、项目 ID、状态分支 HEAD、快照截止点、原始事件 ID 清单以及每个文件的
+相对路径／长度／哈希。`verify --prove` 在隔离环境计算物化事件与事项视图摘要。
+目录默认仅当前
 用户可读。绝对工作路径不参与恢复；不自动 `epiq_sync`、Git push、Git add 或上传。
 
 恢复先在新临时 Git 仓库与独立 Epiq 全局目录做证明：验证 manifest 和所有字节，
@@ -88,6 +89,7 @@ Epiq 版本、项目 ID、状态分支 HEAD、快照截止点、每个文件的�
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py inventory --project <repo> --format json
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py archive --project <repo> --output <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory>
+python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory> --prove --runtime-dir <pinned-runtime>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py restore --archive <directory> --project <empty-repo> --epiq-global-dir <empty-directory> --confirm
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-preview --project <repo> --platform <github|gitlab> --target <project> --issue-id <id> --output <preview.json>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-publish --project <repo> --preview <preview.json> --confirm

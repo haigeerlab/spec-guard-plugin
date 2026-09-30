@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from local_ledger_runtime import (
-    PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
+    PACKAGE_VERSION, STATE_BRANCH, default_runtime_dir,
+    project_status, state_worktree_status,
 )
 
 
@@ -184,6 +185,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--project", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--archive", type=Path)
+    parser.add_argument("--prove", action="store_true")
+    parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
     if args.command in ("inventory", "archive") and args.project is None:
@@ -192,6 +195,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--output is required")
     if args.command == "verify" and args.archive is None:
         parser.error("--archive is required")
+    if args.prove and args.command != "verify":
+        parser.error("--prove is only available with verify")
     try:
         if args.command == "inventory":
             payload = inventory_project(args.project)
@@ -199,8 +204,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             from local_ticket_archive import archive_project
             payload = archive_project(args.project, args.output)
         else:
-            from local_ticket_archive import verify_archive
-            payload = verify_archive(args.archive)
+            if args.prove:
+                from local_ticket_restore import prove_restore
+                payload = prove_restore(args.archive, args.runtime_dir)
+            else:
+                from local_ticket_archive import verify_archive
+                payload = verify_archive(args.archive)
         code = 0
     except (InventoryError, OSError) as error:
         payload = {"state": "invalid", "diagnostic": str(error)}
