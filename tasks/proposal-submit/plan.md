@@ -49,6 +49,7 @@
 
 - 两种 Python 下三条最小验证、`test_proposal_submit.py`、`test_proposal_publication.py`、command parity 与 Codex
   命令根测试全部通过；逐条核对 Spec 的成功标准。
-- 用本仓库自己的一份已发布 Proposal 做一次只读演示：复制到临时目录、把基线一节删掉、revision 置零，预览应补回与
-  远端一致的基线（不写本仓库任何文件）。
+- 只读演示：在本仓库的临时克隆里对真实远端默认分支写一份假设的新草稿，只跑预览，基线 Commit、Goal digest 与各模块
+  行摘要应与远端能力图一致（不写本仓库任何文件）。原计划用已发布的 Proposal 演示不可行：它的模块已在能力图中，
+  按当前远端补全必然被拒。
 - 检查点勾选随模块 PR 一起提交；阶段变为 DONE（Proposal 精简三个模块全部完成）。
