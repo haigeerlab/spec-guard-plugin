@@ -94,7 +94,7 @@ python3 -B plugins/spec-guard/hooks/local_ticket_portability.py archive --projec
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory> --prove --runtime-dir <pinned-runtime>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py restore --archive <directory> --project <empty-repo> --epiq-global-dir <empty-directory> --confirm
-python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-preview --project <repo> --platform <github|gitlab> --target <project> --issue-id <id> --output <preview.json>
+python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-preview --project <repo> --platform <github|gitlab> --host <host> --target <project> --visibility <public|internal|private> --issue-id <id> --output <preview.json>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-publish --project <repo> --preview <preview.json> --confirm
 python3 -B plugins/spec-guard/hooks/test_local_ticket_portability.py
 /bin/bash scripts/validate.sh

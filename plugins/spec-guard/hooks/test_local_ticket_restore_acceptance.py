@@ -15,6 +15,7 @@ from local_ledger_runtime import (
 )
 from local_ticket_archive import archive_project
 from local_ticket_portability import inventory_project, main
+from local_ticket_handoff import snapshot_issue
 
 
 def git(root, *args):
@@ -76,6 +77,12 @@ class RealEpiqRestoreProof(unittest.TestCase):
                 mcp_tool_call(command, "epiq_issue_close", {
                     "repoRoot": str(source), "issueId": issue["id"],
                 })
+                mcp_tool_call(command, "epiq_issue_reopen", {
+                    "repoRoot": str(source), "issueId": issue["id"],
+                })
+                mcp_tool_call(command, "epiq_issue_close", {
+                    "repoRoot": str(source), "issueId": issue["id"],
+                })
                 source_events = mcp_tool_call(command, "epiq_state_get", {
                     "repoRoot": str(source),
                 })["value"]["eventLog"]
@@ -83,6 +90,17 @@ class RealEpiqRestoreProof(unittest.TestCase):
                     "repoRoot": str(source), "idOrRef": issue["id"],
                 })["value"]
                 before = inventory_project(source)
+                snapshot = snapshot_issue(source, issue["id"], runtime)
+                self.assertEqual(snapshot["state"], "snapshot")
+                self.assertEqual(snapshot["issueId"], issue["id"])
+                self.assertEqual(snapshot["issue"]["description"], "Revised scope")
+                self.assertEqual(snapshot["events"][-1]["action"], "close.issue")
+                self.assertIn("reopen.issue",
+                              [item["action"] for item in snapshot["events"]])
+                self.assertEqual(sum(item["action"] == "edit.description"
+                                     for item in snapshot["events"]), 2)
+                self.assertEqual(len(snapshot["attachments"]), 1)
+                self.assertEqual(inventory_project(source), before)
                 archive = base / "archive"
                 archive_project(source, archive)
 

@@ -15,6 +15,8 @@ from local_ledger_runtime import RuntimeContractError
 from local_ticket_archive import archive_project, verify_archive
 from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
+from local_ticket_handoff import _issue_events
+from local_ticket_preview import create_preview, target_facts
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -356,6 +358,80 @@ class SourceInventoryTests(unittest.TestCase):
                                 confirm=True)
         self.assertEqual((target / ".epiq" / "partial").read_text(), "preserve")
         self.assertFalse((target / ".git" / "spec-guard-local-restore.lock").exists())
+
+    def test_handoff_includes_changes_to_related_comment(self):
+        events = [
+            {"id": "E1", "action": "add.issue", "payload": {"id": "I1"}},
+            {"id": "E2", "action": "add.issue.comment",
+             "payload": {"id": "C1", "issue": "I1", "md": "Original"}},
+            {"id": "E3", "action": "edit.comment",
+             "payload": {"id": "C1", "md": "Revised"}},
+            {"id": "E4", "action": "edit.description",
+             "payload": {"id": "I1", "md": "Current"}},
+            {"id": "E5", "action": "add.issue", "payload": {"id": "I2"}},
+        ]
+        self.assertEqual([item["id"] for item in _issue_events(events, "I1")],
+                         ["E1", "E2", "E3", "E4"])
+
+    def test_preview_is_private_and_contains_full_history_markers(self):
+        snapshot = {
+            "projectId": PROJECT_ID, "issueId": "I1", "sourceDigest": "a" * 64,
+            "issue": {"title": "Scope", "description": "New scope"},
+            "attachments": [],
+            "codeReferences": [],
+            "events": [
+                {"id": "01M3SX6JX0VMYEMES73BMEHQED", "action": "edit.description",
+                 "payload": {"id": "I1", "md": "Old scope"}, "userId": "A1",
+                 "actorName": "Ada"},
+                {"id": "01M3SX6KH9C5E0W8KVH9PG1KW2", "action": "edit.description",
+                 "payload": {"id": "I1", "md": "New scope"}, "userId": "A1",
+                 "actorName": "Ada"},
+            ],
+        }
+        output = self.root.parent / "preview.json"
+        metadata = {"full_name": "team/repo", "private": True, "has_issues": True,
+                    "permissions": {"push": True}, "id": 42}
+        runner = lambda arguments: json.dumps(metadata)
+        with patch("local_ticket_preview.snapshot_issue", return_value=snapshot):
+            result = create_preview(self.root, "I1", self.root.parent / "runtime",
+                                    "github", "github.com", "team/repo", "private",
+                                    output, runner=runner)
+        preview = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result["state"], "previewed")
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertIn("Old scope", preview["body"])
+        self.assertIn("New scope", preview["body"])
+        self.assertEqual(preview["body"].count("spec-guard-local-event:v1"), 2)
+        self.assertIn("spec-guard-local-ticket:v1", preview["body"])
+        self.assertNotIn(str(self.root), output.read_text(encoding="utf-8"))
+
+    def test_preview_rejects_unknown_permission_and_visibility_mismatch(self):
+        limited = {"full_name": "team/repo", "private": False, "has_issues": True,
+                   "permissions": {"pull": True}, "id": 42}
+        with self.assertRaisesRegex(InventoryError, "provider-unavailable"):
+            target_facts("github", "github.com", "team/repo",
+                         runner=lambda arguments: json.dumps(limited))
+        limited["permissions"] = {"push": True}
+        with self.assertRaisesRegex(InventoryError, "visibility"):
+            create_preview(self.root, "I1", self.root.parent / "runtime",
+                           "github", "github.com", "team/repo", "private",
+                           self.root.parent / "preview.json",
+                           runner=lambda arguments: json.dumps(limited))
+
+    def test_gitlab_preview_requires_issue_permission(self):
+        metadata = {"path_with_namespace": "group/project", "visibility": "internal",
+                    "issues_enabled": True, "permissions": {
+                        "project_access": {"access_level": 20},
+                        "group_access": None,
+                    }, "id": 19}
+        with self.assertRaisesRegex(InventoryError, "provider-unavailable"):
+            target_facts("gitlab", "gitlab.example.test", "group/project",
+                         runner=lambda arguments: json.dumps(metadata))
+        metadata["permissions"]["project_access"]["access_level"] = 30
+        facts = target_facts("gitlab", "gitlab.example.test", "group/project",
+                             runner=lambda arguments: json.dumps(metadata))
+        self.assertEqual(facts["visibility"], "internal")
+        self.assertEqual(facts["targetId"], 19)
 
 
 if __name__ == "__main__":

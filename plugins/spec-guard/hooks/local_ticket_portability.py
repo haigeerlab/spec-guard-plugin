@@ -181,19 +181,26 @@ def inventory_project(project: Path) -> dict[str, Any]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("inventory", "archive", "verify", "restore"))
+    parser.add_argument("command", choices=(
+        "inventory", "archive", "verify", "restore", "handoff-preview",
+    ))
     parser.add_argument("--project", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--archive", type=Path)
     parser.add_argument("--epiq-global-dir", type=Path)
+    parser.add_argument("--issue-id")
+    parser.add_argument("--platform", choices=("github", "gitlab"))
+    parser.add_argument("--host")
+    parser.add_argument("--target")
+    parser.add_argument("--visibility", choices=("public", "internal", "private"))
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--prove", action="store_true")
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
-    if args.command in ("inventory", "archive", "restore") and args.project is None:
+    if args.command in ("inventory", "archive", "restore", "handoff-preview") and args.project is None:
         parser.error("--project is required")
-    if args.command == "archive" and args.output is None:
+    if args.command in ("archive", "handoff-preview") and args.output is None:
         parser.error("--output is required")
     if args.command in ("verify", "restore") and args.archive is None:
         parser.error("--archive is required")
@@ -201,6 +208,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--epiq-global-dir is required")
     if args.confirm and args.command != "restore":
         parser.error("--confirm is only available with restore")
+    if args.command == "handoff-preview" and any(value is None for value in (
+            args.issue_id, args.platform, args.host, args.target, args.visibility)):
+        parser.error("--issue-id, --platform, --host, --target and --visibility are required")
     if args.prove and args.command != "verify":
         parser.error("--prove is only available with verify")
     try:
@@ -214,6 +224,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = restore_archive(
                 args.archive, args.project, args.epiq_global_dir,
                 args.runtime_dir, confirm=args.confirm,
+            )
+        elif args.command == "handoff-preview":
+            from local_ticket_preview import create_preview
+            payload = create_preview(
+                args.project, args.issue_id, args.runtime_dir, args.platform,
+                args.host, args.target, args.visibility, args.output,
             )
         else:
             if args.prove:
