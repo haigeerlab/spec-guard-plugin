@@ -593,6 +593,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本项目已初始化：" + payload["projectId"])
     else:
         print("本地事项账本状态：" + payload["state"])
+        if payload["state"] == "conflict":
+            worktree = payload["project"]["stateWorktree"]
+            print("状态 worktree：" + worktree["path"])
+            print("占用仓库：" + worktree["owner"])
+            print("处理办法见 references/local-ticket-ledger-runtime.md；不要在未经确认时移动或删除该 worktree。")
     return code
 
 

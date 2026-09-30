@@ -713,6 +713,33 @@ class StateWorktreeOwnerTests(unittest.TestCase):
         self.assertEqual(state["owner"], str(self.repo_b))
         self.assertEqual(Path(state["path"]).resolve(), self.worktree.resolve())
 
+    def run_text_status(self):
+        out = io.StringIO()
+        with patch("local_ledger_runtime.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(out):
+            code = local_ledger_runtime.main([
+                "status", "--runtime-dir", str(self.runtime_dir),
+                "--project-dir", str(self.repo_a), "--format", "text"])
+        return code, out.getvalue()
+
+    def test_text_status_names_the_owner_and_path_of_a_conflict(self):
+        self.add_worktree(self.repo_b)
+        code, text = self.run_text_status()
+        self.assertEqual(code, 1)
+        lines = text.splitlines()
+        self.assertEqual(lines[0], "本地事项账本状态：conflict")
+        self.assertIn("占用仓库：" + str(self.repo_b), lines)
+        self.assertTrue(any(line.startswith("状态 worktree：") and
+                            Path(line.split("：", 1)[1]).resolve() == self.worktree.resolve()
+                            for line in lines), lines)
+        self.assertTrue(any("local-ticket-ledger-runtime.md" in line for line in lines), lines)
+
+    def test_text_status_without_conflict_keeps_one_line(self):
+        self.add_worktree(self.repo_a)
+        code, text = self.run_text_status()
+        self.assertEqual((code, text), (0, "本地事项账本状态：initialized\n"))
+
     def test_worktree_owned_by_this_repository_keeps_the_initialized_result(self):
         self.add_worktree(self.repo_a)
         code, payload = self.run_status()
