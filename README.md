@@ -51,7 +51,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 **Codex：**
 
 ```bash
-codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.33.0
+codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.34.0
 codex plugin add spec-guard@spec-guard-marketplace
 ```
 
