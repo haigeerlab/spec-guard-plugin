@@ -19,7 +19,7 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 阶段提示 | agent 每轮都知道当前模块和下一步 | 自动；`/spec-guard:phase` 查看 | 运行 setup 后生效 |
 | 产物校验 | 能力图格式、模块与 Spec 的对应关系是否正确 | `/spec-guard:verify-artifacts` | 按需运行 |
 | 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
-| Proposal 流程 | 需要留痕时，新需求经评审、人工接受后再加进能力图 | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
+| Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
 | 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
 | 本地事项账本 | 没有 GitHub/GitLab Issue 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
