@@ -25,9 +25,6 @@ PROPOSALS_DIR = "spec/proposals/"
 BASELINE_HEADING = "Capability map baseline"
 ZERO_REVISION = "0" * 64
 ISSUE_LABELS = ("proposal", "proposal-stage:published")
-# The hook only prints the Issue command; the verb is kept out of a literal so the
-# retirement scan for real Issue-writing call sites stays meaningful.
-_CREATE = "create"
 
 
 class SubmitError(Exception):
@@ -77,6 +74,9 @@ def _headings(lines):
 
 def _baseline_section(remote, snapshot, map_path):
     digest = compute(str(map_path))
+    if digest["goalDigest"] is None:
+        raise SubmitError("remote %s has no `## 目标` (or `## Goal`) section; "
+                          "a Proposal baseline needs its goal digest" % MAP_PATH)
     rows = "\n".join("| %s | %s |" % (item["id"], item["rowDigest"]) for item in digest["rows"])
     return "\n".join((
         "## " + BASELINE_HEADING,
@@ -132,12 +132,12 @@ def _published_ids(snapshot):
 
 def _next_steps(platform, title, marker, summary, revision_of):
     if platform == "github":
-        create = "gh issue %s --title %s --label proposal --label %s --body %s" % (
-            _CREATE, shlex.quote(title), shlex.quote(ISSUE_LABELS[1]), shlex.quote(marker + "\n\n" + summary))
+        create = "gh issue create --title %s --label proposal --label %s --body %s" % (
+            shlex.quote(title), shlex.quote(ISSUE_LABELS[1]), shlex.quote(marker + "\n\n" + summary))
         labels = ["gh label create %s" % shlex.quote(label) for label in ISSUE_LABELS]
     else:
-        create = "glab issue %s --title %s --label %s --description %s" % (
-            _CREATE, shlex.quote(title), shlex.quote(",".join(ISSUE_LABELS)),
+        create = "glab issue create --title %s --label %s --description %s" % (
+            shlex.quote(title), shlex.quote(",".join(ISSUE_LABELS)),
             shlex.quote(marker + "\n\n" + summary))
         labels = ["glab label create --name %s" % shlex.quote(label) for label in ISSUE_LABELS]
     out = ["", "Next steps (nothing below has been run):",

@@ -97,12 +97,18 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
 # gets caught, since its text won't match any entry.
 ALLOWLIST_PATH=(
   "plugins/spec-guard/references/proposal-promotion-proof.md"
+  "plugins/spec-guard/hooks/proposal_submit.py"
+  "plugins/spec-guard/hooks/proposal_submit.py"
 )
 ALLOWLIST_TEXT=(
   '`.agent/state.json`. It does not invoke `spec-github-bridge` or `/sync-map`.'
+  'create = "gh issue create --title %s --label proposal --label %s --body %s" % ('
+  'create = "glab issue create --title %s --label %s --description %s" % ('
 )
 ALLOWLIST_REASON=(
   "negative statement — says the prove action does not invoke the retired bridge or /sync-map, not a real call site"
+  "printed next step — proposal-submit only prints this command for the user to run; it never executes it"
+  "printed next step — proposal-submit only prints this command for the user to run; it never executes it"
 )
 
 trim() {

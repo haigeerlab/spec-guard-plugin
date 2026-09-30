@@ -328,6 +328,14 @@ class ProposalSubmitTests(unittest.TestCase):
         self.assertIn("another remote file", err)
         self.assertIn("spec/proposals/duplicate.md", err)
 
+    def test_remote_map_without_a_goal_section_is_rejected_clearly(self):
+        (self.seed / "spec/CAPABILITY-MAP.md").write_text(
+            MAP.replace("## 目标\n\nTest remote facts.\n\n", ""), encoding="utf-8")
+        self.git(self.seed, "commit", "-am", "drop the goal section")
+        self.git(self.seed, "push", "origin", "trunk")
+        err = self.assert_rejected(draft_text(), confirm=True)
+        self.assertIn("## 目标", err)
+
     def test_unreachable_remote_is_rejected_without_writing(self):
         os.rename(str(self.remote), str(self.root / "gone.git"))
         err = self.assert_rejected(draft_text(), confirm=True)
