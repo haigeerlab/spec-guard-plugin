@@ -12,6 +12,7 @@ COMMANDS=(
   proposal-promotion-preflight
   proposal-promotion-proof
   proposal-review
+  proposal-submit
   verify-artifacts
 )
 

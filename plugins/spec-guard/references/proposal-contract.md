@@ -90,6 +90,51 @@ v1 Proposal 继续可读，不会被自动重写或删除；它不能进入新�
 同一 id 的旧 revision。阶段还允许 proposal-stage:needs-revision 和
 proposal-stage:deferred。
 
+## Draft template
+
+agent 直接按下面的模板写 `spec/proposals/<proposal-id>.md`，再运行 `/spec-guard:proposal-submit`。
+模板省略了 `## Capability map baseline` 一节：baseline 与标记里的 revision 由 `proposal-submit`
+从远端默认分支的固定快照补全并写回，不要手算；revision 先写 64 个 `0`。改了草稿后重跑即重算。
+`<...>` 处替换为实际内容，Integration intent 六项与 Change 五项的要求见上文。
+
+~~~markdown
+# Proposal: <简短标题>
+<!-- spec-guard-proposal:v2 id=<proposal-id> revision=sha256:0000000000000000000000000000000000000000000000000000000000000000 -->
+
+## Summary
+
+<要解决什么问题，为什么它是一个独立模块。>
+
+## Integration intent
+
+| Field | Value |
+| --- | --- |
+| Problem | <问题> |
+| In scope | <范围内> |
+| Out of scope | <范围外> |
+| Safety boundaries | <安全边界> |
+| Initial dependency assumptions | <依赖假设> |
+| Acceptance intent | <验收意图> |
+
+## Change
+
+| Field | Value |
+| --- | --- |
+| Type | new-module |
+| Module id | <new-module-id> |
+| Responsibility | <非空单行职责> |
+| Depends on | — |
+| Build-order anchor | end |
+
+## Tracker contract
+
+| Field | Value |
+| --- | --- |
+| Proposal id | <proposal-id> |
+| Identity label | proposal |
+| Stage label namespace | proposal-stage: |
+~~~
+
 ## Minimal example
 
 ```markdown

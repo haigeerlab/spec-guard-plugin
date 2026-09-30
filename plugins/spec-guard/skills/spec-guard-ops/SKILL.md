@@ -144,6 +144,16 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
 ```
 
+提交前先按 `references/proposal-contract.md` 写好草稿 `spec/proposals/<id>.md`，再补全基线与 revision 并校验（等价于 `/spec-guard:proposal-submit`）：
+
+```bash
+python3 -B "$ROOT/hooks/proposal_submit.py" --project "$PROJECT" \
+  --draft spec/proposals/<id>.md --platform <github|gitlab>
+```
+
+先预览并原样转述 diff、revision、baseline commit 与下一步；用户明确确认后才加 `--confirm`（只重写草稿），
+下一步只打印、不执行，本步骤不写 Issue、标签、分支或远端。
+
 原样报告 JSON；除 `ready`、`proved` 外的状态都要停下并说明
 `diagnostic`。`ready` 不创建分支，`proved` 不回写 Issue。
 

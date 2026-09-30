@@ -2,12 +2,17 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **`/spec-guard:proposal-submit --draft spec/proposals/<id>.md --platform <github|gitlab>`：补全并校验 Proposal 草稿。** agent 按模板写好草稿（基线一节可省略、revision 可为 64 个 `0`），命令从远端默认分支的固定快照生成基线一节并重算 revision，用 `parse_proposal` 与 `validate_proposal` 校验；草稿修改后重跑即重算 revision。草稿路径必须是 `spec/proposals/<id>.md`；远端另一个文件声明同一 id 时拒绝，同一路径已发布则视为修订并提示。先预览，加 `--confirm` 才写回，且只写这一份草稿。最后打印开 Issue 的现成命令（标签 `proposal`、`proposal-stage:published`），命令本身不执行任何远端操作。Codex 的 `spec-guard-ops` 同步提供该入口。
+
 ### 修复
 
 - **读取远端 Proposal 快照不再偶发“Directory not empty”。** 快照用的临时裸仓库在 `git fetch` 时关闭自动维护：此前 fetch 返回后会在后台拉起 `git maintenance run --auto --detach`，它可能在临时目录被删除时仍往里写文件，导致 Proposal 评审、预检、晋级与证明偶发 `写入失败: [Errno 39]`。
 
 ### 变更
 
+- **Proposal 文档改写为四步（提交、接受、晋级、收尾）。** `docs/workflow.md`、README 与概念文档同步；删除手工计算 revision 的片段，`references/proposal-contract.md` 增加可复制的草稿模板；发版流程不再快进 `integration/mainline`。
 - **上游兼容基线更新至 agent-skills 0.6.11（`2686b62`）。** 按 [上游分析](docs/upstream-analysis.md) 的核对清单逐条复核：spec 查找路径、Task List Target、tracker 激活条件均未变，五个缺口仍成立；上游新增的 `/constraints` 与 `constraint-driven-development`、「不覆盖未完成 plan」止损、外部 spec 约定条款均与 spec-guard 不冲突。上游 0.6.10 起不再注册 SessionStart hook，spec-guard 不依赖它。最低上游版本仍为 `5a5ea45`，无需迁移。
 
 ## [0.33.0] - 2026-09-30
