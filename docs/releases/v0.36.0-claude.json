@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.36.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.36.0;test:marketplace-update-20260930"
+      },
+      "observedAt": "2026-09-30T15:42:55Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard was updated from 0.35.0 to 0.36.0 for scope user; the cached plugin is file-for-file identical to git archive v0.36.0 apart from the host's .in_use marker"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.36.0;test:system-python39-done-unmerged-hint-20260930"
+      },
+      "observedAt": "2026-09-30T15:43:34Z",
+      "evidence": [
+        "host:claude -p --no-session-persistence --tools '' --include-hook-events --output-format stream-json ran with PATH=~/.local/bin:/usr/bin:/bin, so the hook could only use the macOS system python3 3.9.6",
+        "result:the session init loaded spec-guard 0.36.0 from the plugin cache and the spec-guard UserPromptSubmit hook exited 0",
+        "result:in a temporary local-mode consumer repository whose only module was done and whose branch was one commit ahead of origin/main, the hook injected DONE with the new line naming 1 commit not yet in origin/main and the push-first suggestion",
+        "result:test_local_ledger_runtime.py, test_module_insert.py and test-phase-guard.sh from the plugin cache passed under the system python3 3.9.6",
+        "limit:the ledger conflict report was not exercised through a host prompt; its unit suite and a read-only run against two real repositories sharing a projectId cover it"
+      ]
+    }
+  ]
+}
