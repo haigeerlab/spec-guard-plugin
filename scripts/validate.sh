@@ -95,6 +95,7 @@ python3 -B plugins/spec-guard/hooks/test_native_collaboration_rollback.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collaboration_retire.py || F=1
 python3 -B plugins/spec-guard/hooks/test_host_config_removal.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_publication.py || F=1
+python3 -B plugins/spec-guard/hooks/test_proposal_submit.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_promotion_proof.py || F=1
