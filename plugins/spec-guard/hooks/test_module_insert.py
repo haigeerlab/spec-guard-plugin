@@ -751,10 +751,6 @@ class ProposalPromotionFixture(fixtures.PromotionFixture):
     stage = "proposal-stage:accepted"
 
     def setUp(self):
-        if self.base_map is not None:
-            patcher = mock.patch.object(fixtures, "BASE_MAP", self.base_map)
-            patcher.start()
-            self.addCleanup(patcher.stop)
         super().setUp()
         self.map_file = self.consumer / "spec" / "CAPABILITY-MAP.md"
         self.git(self.consumer, "config", "user.email", "test@example.invalid")

@@ -1,6 +1,7 @@
 """Publication reads a local bare remote, never the consumer worktree."""
 import importlib.util
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -34,13 +35,40 @@ Build order: alpha
 
 
 class ProposalPublicationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """Build the git fixture once; each test copies it (see setUp)."""
+        super().setUpClass()
+        cls._template = Path(tempfile.mkdtemp(prefix="sg-proposal-publication-template-"))
+        try:
+            builder = cls("setUp")
+            builder.root = cls._template
+            builder.seed = builder.root / "seed"
+            builder.remote = builder.root / "remote.git"
+            builder.consumer = builder.root / "consumer"
+            builder.build()
+            cls.baseline = builder.baseline
+        except BaseException:
+            shutil.rmtree(cls._template, ignore_errors=True)
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._template, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-publication-")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+        shutil.copytree(self._template, self.root, symlinks=True, dirs_exist_ok=True)
         self.seed = self.root / "seed"
         self.remote = self.root / "remote.git"
         self.consumer = self.root / "consumer"
+        self.git(self.seed, "remote", "set-url", "origin", str(self.remote))
+        self.git(self.consumer, "remote", "set-url", "origin", str(self.remote))
+
+    def build(self):
         self.git(self.root, "init", "--bare", "-b", "trunk", str(self.remote))
         self.git(self.root, "init", "-b", "trunk", str(self.seed))
         self.git(self.seed, "config", "user.email", "test@example.invalid")

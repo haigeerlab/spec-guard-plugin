@@ -1,7 +1,9 @@
 """Promotion-proof fixtures begin with safe input-state precedence."""
+import copy
 import importlib.util
 import io
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -59,19 +61,54 @@ class PromotionFixture(unittest.TestCase):
     legacy_files = False
     drift_map = None
 
+    base_map = None
+    _recorded = ("baseline", "publish_commit", "drift_commit", "parent_commit",
+                 "feature_commit", "pre_merge_commit", "promotion_commit", "_publication")
+
+    @classmethod
+    def setUpClass(cls):
+        """Build the git fixture once; each test copies it (see setUp)."""
+        super().setUpClass()
+        cls._template = Path(tempfile.mkdtemp(prefix="sg-proposal-promotion-template-"))
+        try:
+            builder = cls("setUp")
+            builder.root = cls._template
+            builder.seed = builder.root / "seed"
+            builder.remote = builder.root / "remote.git"
+            builder.consumer = builder.root / "consumer"
+            builder.build()
+            for name in cls._recorded:
+                if hasattr(builder, name):
+                    setattr(cls, name, getattr(builder, name))
+        except BaseException:
+            shutil.rmtree(cls._template, ignore_errors=True)
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls._template, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-proposal-promotion-proof-")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+        shutil.copytree(self._template, self.root, symlinks=True, dirs_exist_ok=True)
         self.seed = self.root / "seed"
         self.remote = self.root / "remote.git"
         self.consumer = self.root / "consumer"
+        self.git(self.seed, "remote", "set-url", "origin", str(self.remote))
+        self.git(self.consumer, "remote", "set-url", "origin", str(self.remote))
+        self.publication = copy.deepcopy(self._publication)
+
+    def build(self):
         self.git(self.root, "init", "--bare", "-b", "trunk", str(self.remote))
         self.git(self.root, "init", "-b", "trunk", str(self.seed))
         self.git(self.seed, "config", "user.email", "test@example.invalid")
         self.git(self.seed, "config", "user.name", "test")
         (self.seed / "spec").mkdir()
-        (self.seed / "spec/CAPABILITY-MAP.md").write_text(BASE_MAP, encoding="utf-8")
+        (self.seed / "spec/CAPABILITY-MAP.md").write_text(
+            BASE_MAP if self.base_map is None else self.base_map, encoding="utf-8")
         self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
         self.git(self.seed, "commit", "-m", "baseline")
         self.baseline = self.git(self.seed, "rev-parse", "HEAD").strip()
@@ -84,7 +121,8 @@ class PromotionFixture(unittest.TestCase):
         self.git(self.seed, "remote", "add", "origin", str(self.remote))
         self.git(self.seed, "push", "origin", "trunk")
         self.git(self.root, "clone", str(self.remote), str(self.consumer))
-        self.publication = read_published(self.consumer, "gamma")
+        # Read at the publish state (before any drift or promotion is pushed), as before.
+        self._publication = read_published(self.consumer, "gamma")
         if self.drift_map is not None:
             (self.seed / "spec/CAPABILITY-MAP.md").write_text(self.drift_map, encoding="utf-8")
             self.git(self.seed, "add", "spec/CAPABILITY-MAP.md")
