@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-30
+
 ### 变更
 
 - **晋级证明被拒时给出具体原因。** `/spec-guard:proposal-promotion-proof` 在晋级提交里的行与 Proposal 声明不符时返回 `promotion-row-mismatch`，并带 `promotionCommit` 与 `mismatchedFields`（`responsibility`、`dependsOn`、`position` 的子集，按此顺序）；行相符但晋级提交还改动了其他模块行或顺序时返回 `promotion-other-rows-changed` 与 `promotionCommit`。`state` 仍为 `invalid`，其余 `invalid` 分支与成功路径的输出不变；`_matches` 改为基于同一个不符字段函数，判断不会分叉。
