@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| 末次核对 | **2026-08-26** |
-| 上游 commit | **`5a5ea45`**（2026-08-21） |
-| 扫描范围 | 187 个文件全量 |
+| 末次核对 | **2026-09-30** |
+| 上游 commit | **`2686b62`**（0.6.11，2026-09-25） |
+| 扫描范围 | 207 个文件全量 |
 
 > **最低上游版本：commit `5a5ea45`（2026-08-21）或更新。**
 > 本插件依赖的两处上游结构 —— `spec-driven-development` 的 **Phase 0** 和
@@ -29,10 +29,12 @@ AGENTS.md  CLAUDE.md  CONTRIBUTING.md  README.md  plugin.json
 agents/    commands/  docs/  evals/  hooks/  references/  scripts/  skills/
 ```
 
-- **skills/** —— 24 个（23 个生命周期 skill + `using-agent-skills` 元技能）
-- **commands/** —— 8 个 toml：`spec` `planning` `build` `test` `review` `ship`
-  `code-simplify` `webperf`
-- **hooks/** —— 只有一个 `SessionStart`，作用是注入 `using-agent-skills` 元技能
+- **skills/** —— 25 个（24 个生命周期 skill + `using-agent-skills` 元技能）；0.6.8 新增
+  `constraint-driven-development`
+- **commands/** —— 9 个 toml：`spec` `planning` `build` `test` `review` `ship`
+  `code-simplify` `webperf` `constraints`
+- **hooks/** —— 0.6.10 起**不注册任何 hook**（`hooks.json` 已删除，见第四节）；
+  目录里只剩需手动接入的脚本
 - **agents/** —— 4 个 persona：`code-reviewer` `test-engineer` `security-auditor`
   `web-performance-auditor`
 
@@ -127,7 +129,16 @@ Build order: identity → billing, notifications → reporting
 ⚠️ **上游的第二处不一致**：Phase 0 让 spec 放项目根并命名为 `SPEC-<module>.md`，
 但 3.1 的查找规则匹配不到这个模式。
 
-### 3.4 外部 tracker 扩展点 —— `skills/planning-and-task-breakdown/SKILL.md:150-157`
+**0.6.9 起上游明确允许外部约定接管存放位置**（`skills/spec-driven-development/SKILL.md:150`）：
+
+> If the project already uses OpenSpec or another specification system, keep that
+> system's artifact format and storage conventions instead of creating a duplicate
+> `SPEC.md`. This skill owns the clarification, content, and approval gates; the
+> external tool owns how the approved spec is represented.
+
+这正是 spec-guard 的分工：澄清与审批闸门归上游，`spec/` 布局归 spec-guard。
+
+### 3.4 外部 tracker 扩展点 —— `skills/planning-and-task-breakdown/SKILL.md:157-164`
 
 **这是 spec-guard 整个 GitHub 集成的立足点。**
 
@@ -197,6 +208,11 @@ grep -n -iE "module|capability map|per-module|SPEC-" \
 
 **确认缺口 B**：多模块递归时，各模块的 `/plan` 会互相覆盖 `tasks/plan.md`。
 
+0.6.8 起上游加了一道**止损**（`SKILL.md:150`，`/plan` 命令同步）：`tasks/plan.md` 或
+`tasks/todo.md` 仍有未勾选任务、而这次是另一件事时，停下来问，不覆盖。这把「静默覆盖」
+变成「停下来问」，但仍没有模块概念 —— 缺口 B 依旧成立，`tasks/<module-id>/` 隔离仍然需要。
+两者方向一致，不冲突。
+
 ### 3.9 全仓库无 gh 调用
 
 ```bash
@@ -220,8 +236,10 @@ grep -rn -iE "\bgh (issue|pr|api)\b|github issues|issue tracker" \
 
 ## 四、hook 机制参考
 
-`hooks/hooks.json` **只注册了一个 SessionStart**（这是 spec-guard 的 UserPromptSubmit
-不与上游冲突的依据）：
+**0.6.10 起（`a598aab`，上游 #569）`hooks/hooks.json` 已删除，上游不注册任何 hook。**
+理由是 Claude Code 与 Codex CLI 已按 skill 描述原生路由，再注入元技能等于叠第二个路由器；
+`session-start.sh` 保留，只供没有原生路由的宿主手动接入。spec-guard 的 UserPromptSubmit
+因此更不可能与上游冲突。以下为 0.6.9 及更早版本的注册内容，留作参考：
 
 ```json
 {
@@ -269,10 +287,25 @@ other shapes.* —— **输出格式错了会被宿主拒绝，且失败是静�
 ```bash
 M=~/.claude/plugins/marketplaces/addy-agent-skills
 git -C "$M" log -1 --format='%h %ad' --date=short
-find "$M" -type f -not -path '*/.git/*' | wc -l    # 应为 187 上下
+find "$M" -type f -not -path '*/.git/*' | wc -l    # 应为 207 上下（0.6.11）
 ```
 
-### 末次核对结果（2026-08-26 · commit `5a5ea45`）
+### 末次核对结果（2026-09-30 · commit `2686b62` · 0.6.11）
+
+| # | 核对项 | 结果 | 结论 |
+|---|---|---|---|
+| 1 | `build.toml:30` 仍是那三条路径 | ✅ 逐字未变（clean baseline 在 :31，也未变） | 缺口 A 成立 |
+| 2 | `Task List Target` 章节还在 | ✅ 在（行号 150→**157**） | GitHub 集成的地基存在 |
+| 3 | 激活条件仍是「CLAUDE.md/AGENTS.md 或用户指定 tracker」 | ✅ 原文未变 | 声明块确为「接上游接口」 |
+| 4 | planning skill 有了 module 概念？ | ❌ 仍 0 命中（新增「不覆盖未完成 plan」止损，见 3.8） | **缺口 B 仍成立** |
+| 5 | 新增了 gh 调用？ | ❌ 无 | **缺口 E 仍成立** |
+| 6 | 能力图有了固定文件名？ | ❌ 仍只说 "at the project root"（上游新增外部约定条款，见 3.3） | **已知限制 3 仍成立** |
+| 7 | 命令与 skill 的名字有没有变？ | ✅ 只增不改：新增命令 `constraints`、skill `constraint-driven-development` | `check-command-names.py` 快照已同步 |
+| 8 | 新增了自动推进机制？ | ❌ 反而更少：`hooks.json` 已删除，零注册 | **缺口 F 仍成立**，且不冲突 |
+
+**五个缺口仍无一被上游补掉，插件整体成立。**
+
+### 上一次核对结果（2026-08-26 · commit `5a5ea45`）
 
 | # | 核对项 | 结果 | 结论 |
 |---|---|---|---|
@@ -316,8 +349,8 @@ grep -n "Save the approved map" "$M/skills/spec-driven-development/SKILL.md"
 ls "$M/.claude/commands" | sed 's/\.md$//'
 ls "$M/skills"
 
-# 8. 注册了哪些 hook 事件（不是数 hooks/ 目录里的文件）
-python3 -c "import json;print(list(json.load(open('$M/hooks/hooks.json'))['hooks']))"
+# 8. 注册了哪些 hook 事件（不是数 hooks/ 目录里的文件；0.6.10 起文件不存在 = 零注册）
+python3 -c "import json,os;f='$M/hooks/hooks.json';print(list(json.load(open(f))['hooks']) if os.path.exists(f) else [])"
 ```
 
 有任何一条翻转，对应功能就该撤掉或改为跟随上游 —— 见 [design.md 三、五个缺口与对策](design.md)。

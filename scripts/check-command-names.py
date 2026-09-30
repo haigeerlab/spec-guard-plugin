@@ -28,13 +28,14 @@ import sys
 #    能读到就以**上游本人**为准（见 upstream_live()）—— 冻结清单在上游改名时
 #    不会自己跟上，而那正是 0.4.1 那个 bug 的成因：文档写着一个已经不存在的
 #    命令，检查器照样放行。
-#    末次核对：2026-08-28，上游 0.6.7（commit 7829ffd）—— 与实际一致。
+#    末次核对：2026-09-30，上游 0.6.11（commit 2686b62）—— 与实际一致。
 
 # 上游 addy-agent-skills 的命令。取自 `.claude/commands/*.md` 的**文件名** ——
 # 不是 `commands/*.toml`：两套目录内容等价但文件名不同（`plan.md` vs
 # `planning.toml`），**Claude Code 读的是前者**。搞错这个正是 0.5.2 那个 bug。
 UPSTREAM = {
-    "build", "code-simplify", "plan", "review", "ship", "spec", "test", "webperf",
+    "build", "code-simplify", "constraints", "plan", "review", "ship", "spec", "test",
+    "webperf",
 }
 
 # Claude Code 自带的命令（不属于任何插件）。模板/命令文里写安装步骤会用到。
@@ -47,7 +48,8 @@ BUILTIN = {
 # `planning-and-task-breakdown` 是 skill，二者都存在且不可互换。
 UPSTREAM_SKILLS = {
     "api-and-interface-design", "browser-testing-with-devtools", "ci-cd-and-automation",
-    "code-review-and-quality", "code-simplification", "context-engineering",
+    "code-review-and-quality", "code-simplification", "constraint-driven-development",
+    "context-engineering",
     "debugging-and-error-recovery", "deprecation-and-migration", "documentation-and-adrs",
     "doubt-driven-development", "frontend-ui-engineering", "git-workflow-and-versioning",
     "idea-refine", "incremental-implementation", "interview-me",
