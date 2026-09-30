@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **本地事项账本 `status` 报告状态 worktree 被另一个仓库占用。** Epiq 把状态 worktree 固定在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/worktrees/<projectId>`，两个仓库共用 `projectId`（如仓库副本）时，后到的仓库每次调用都以 `already exists` 失败。项目已初始化时，`status` 现在带 `project.stateWorktree`（`absent`／`owned`／`foreign`／`unknown`）；`foreign` 时顶层 `state` 为 `conflict`、`diagnostic` 为 `ledger-state-worktree-foreign`、退出码 1，并给出占用仓库路径。其余情况的顶层状态与退出码不变；只读，不移动或删除任何 worktree。处理办法见运行时参考文档与仓库副本迁移记录。
+
 ## [0.35.0] - 2026-09-30
 
 ### 变更

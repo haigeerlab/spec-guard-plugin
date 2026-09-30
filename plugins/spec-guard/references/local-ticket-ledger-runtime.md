@@ -36,10 +36,34 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 - `absent`：受管 Epiq 运行时尚未安装；这不是错误，也不会创建目录。
 - `ready`：固定版本运行时与 Node 前置条件可用，但当前项目未初始化账本。
 - `initialized`：运行时可用，当前项目的已提交 `.epiq/project.json` 合法。
+- `conflict`：项目已初始化，但 Epiq 的状态 worktree 被另一个仓库占用（见下节）；退出码 1，`diagnostic` 为
+  `ledger-state-worktree-foreign`。
 - `invalid`：已存在的运行时、Node 或项目配置不符合合同；诊断说明原因，调用方不得删除、覆盖或放宽校验。
 
 输出将 `node`、`runtime` 和 `project` 分开报告，避免把“Node 缺失”“未安装运行时”和“项目尚未初始化”
 混成一个原因。诊断只读取文件与 `node --version`；它不读取 token，因为本事项账本没有项目级 secret。
+
+### 状态 worktree 被另一个仓库占用
+
+Epiq 1.11.0 把状态 worktree 放在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/worktrees/<projectId>`，路径里只有
+`projectId`。同一台 Mac 上两个仓库共用一个 `projectId`（仓库副本，或同一仓库的两份克隆）时，先建立 worktree 的
+仓库占用该路径，另一个仓库的每次账本调用都会以 `Failed to create state branch worktree … already exists` 失败。
+
+项目为 `initialized` 时，`status` 在 `project.stateWorktree` 里报告，只读文件与一次
+`git rev-parse --git-common-dir`：
+
+- `absent`：该目录不存在，Epiq 下次会创建。
+- `owned`：属于本仓库。
+- `foreign`：属于另一个仓库，`owner` 为占用仓库路径；顶层 `state` 变为 `conflict`。
+- `unknown`：读不到或无法判断（`diagnostic: ledger-state-worktree-unreadable`）；不当作冲突，顶层状态不变。
+
+处理办法（插件不自动执行，也不得在未经用户明确同意时移动或删除任何 worktree）：
+
+1. 先备份占用路径下的 worktree，其中可能有尚未同步的事件。
+2. 占用仓库已停用：在**占用仓库**中执行 `git worktree move <路径> <别处>`，保留其中未同步的事件，本仓库下次调用即可重建。
+3. 两个仓库都要用账本：为其中一个的账本进程设置不同的 `EPIQ_GLOBAL_DIR`。账本 MCP 是用户级配置，改全局目录会影响
+   所有项目，并可能让其他项目未同步的事件看起来消失。
+4. 不推荐换新的 `projectId`：需要删除本地与远端的 `__epiq_state__` 分支，不可逆。
 
 可单独查看固定合同：
 

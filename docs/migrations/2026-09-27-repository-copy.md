@@ -31,3 +31,12 @@ redirect links from the old location; this was a copy, not a transfer.
 - The copied `v0.20.0` tag still points to the pre-migration release commit.
   A Release draft in the new repository is unpublished. Review the tag,
   package metadata, and installation evidence before publishing a new Release.
+
+## Local ticket ledger
+
+A copied repository keeps the Epiq `projectId` in `.epiq/project.json`, so a
+copy and its original on the same Mac share one Epiq state worktree path. The
+repository that created it owns the path, and the other repository's ledger
+calls fail. Run the ledger `status` command: it reports `conflict` with the
+owning repository. See `plugins/spec-guard/references/local-ticket-ledger-runtime.md`
+for the cause and the remedies.

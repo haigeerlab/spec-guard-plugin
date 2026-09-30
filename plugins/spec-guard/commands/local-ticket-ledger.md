@@ -20,6 +20,10 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 - `absent`：Epiq 运行时尚未安装。这是正常的未启用状态；不得自动下载。
 - `ready`：受管运行时可用，但当前仓库还没有本地账本。
 - `initialized`：当前仓库已有可用的 `.epiq/project.json`，可继续检查 MCP 接入。
+- `conflict`：项目已初始化，但 Epiq 状态 worktree 被另一个仓库占用（`project.stateWorktree.state` 为 `foreign`）。
+  向用户转述 `owner` 与 `path` 和处理办法（先备份；占用仓库已停用则在**占用仓库**执行 `git worktree move`；
+  两边都要用则给其中一个设置不同的 `EPIQ_GLOBAL_DIR`，注意账本 MCP 为用户级配置、会影响所有项目），细则见
+  `references/local-ticket-ledger-runtime.md`。未经用户明确同意，不得移动或删除任何 worktree。
 - `runtime.lock`（运行时为 `ready` 时出现）：`locked` 表示运行时按插件自带的 lockfile 安装；`unlocked` 表示
   旧方式安装，或插件升级了 lockfile。`unlocked` 的运行时照常可用，不要自动替换。
 - `invalid`：原样说明诊断，不能删除、覆盖或尝试修复现有目录。若诊断为 `Epiq package directory is absent`

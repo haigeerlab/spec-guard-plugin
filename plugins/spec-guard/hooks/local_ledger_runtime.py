@@ -2,6 +2,7 @@
 from __future__ import annotations
 import argparse
 import json
+import os
 import re
 import shutil
 import stat
@@ -197,6 +198,37 @@ def _git(project_dir: Path, *arguments: str) -> subprocess.CompletedProcess[str]
         )
     except OSError:
         return None
+
+
+def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
+    """Report which repository owns Epiq's state worktree; read files and one git query only."""
+    global_dir = os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global")
+    path = os.path.join(global_dir, "worktrees", project_id)
+    if not os.path.isdir(path):
+        return {"state": "absent", "path": path}
+    unknown = {"state": "unknown", "path": path, "diagnostic": "ledger-state-worktree-unreadable"}
+    git_file = os.path.join(path, ".git")
+    try:
+        if not os.path.isfile(git_file) or os.path.islink(git_file):
+            return unknown
+        with open(git_file, encoding="utf-8") as handle:
+            content = handle.read(4096).strip()
+    except (OSError, UnicodeDecodeError):
+        return unknown
+    if not content.startswith("gitdir:") or "\n" in content:
+        return unknown
+    gitdir = os.path.realpath(os.path.join(path, content[len("gitdir:"):].strip()))
+    if os.path.basename(os.path.dirname(gitdir)) != "worktrees":
+        return unknown
+    owner_common = os.path.dirname(os.path.dirname(gitdir))
+    result = _git(project_dir, "rev-parse", "--git-common-dir")
+    if result is None or result.returncode != 0 or not result.stdout.strip():
+        return unknown
+    own_common = os.path.realpath(os.path.join(str(project_dir), result.stdout.strip()))
+    if owner_common == own_common:
+        return {"state": "owned", "path": path}
+    owner = os.path.dirname(owner_common) if os.path.basename(owner_common) == ".git" else owner_common
+    return {"state": "foreign", "path": path, "owner": owner}
 
 
 def initialization_preflight(
@@ -471,7 +503,7 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     """Return side-effect-free status for the optional local ledger."""
     node = node_status()
     runtime = runtime_status(runtime_dir)
-    project = project_status(project_dir)
+    project: dict[str, Any] = project_status(project_dir)
     payload: dict[str, Any] = {"node": node, "runtime": runtime, "project": project}
     if runtime["state"] == "invalid" or project["state"] == "invalid":
         payload["state"] = "invalid"
@@ -485,6 +517,12 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     if project["state"] == "uninitialized":
         payload["state"] = "ready"
         return 0, payload
+    worktree = state_worktree_status(project_dir, project["projectId"])
+    project["stateWorktree"] = worktree
+    if worktree["state"] == "foreign":
+        payload["state"] = "conflict"
+        payload["diagnostic"] = "ledger-state-worktree-foreign"
+        return 1, payload
     payload["state"] = "initialized"
     return 0, payload
 
