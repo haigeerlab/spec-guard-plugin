@@ -17,6 +17,7 @@ from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
 from local_ticket_handoff import _issue_events
 from local_ticket_preview import create_preview, target_facts
+from local_ticket_journal import entry_key, journal_path, read_journal, write_entry
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -432,6 +433,53 @@ class SourceInventoryTests(unittest.TestCase):
                              runner=lambda arguments: json.dumps(metadata))
         self.assertEqual(facts["visibility"], "internal")
         self.assertEqual(facts["targetId"], 19)
+
+    def test_private_mapping_journal_is_versioned_and_clone_scoped(self):
+        base = self.root.parent / "private-journals"
+        destination = {"platform": "github", "host": "github.com", "targetId": 42}
+        path = journal_path(self.root, PROJECT_ID, base)
+        key = entry_key(PROJECT_ID, "I1", destination)
+        write_entry(path, key, {"state": "planned", "sourceDigest": "a" * 64,
+                                "destination": destination})
+        self.assertEqual(read_journal(path)["entries"][key]["state"], "planned")
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+        clone = self.root.parent / "clone"
+        clone.mkdir()
+        git(clone, "init", "-q")
+        self.assertNotEqual(journal_path(clone, PROJECT_ID, base), path)
+
+    def test_journal_rejects_symlink_and_broad_root(self):
+        destination = {"platform": "github", "host": "github.com", "targetId": 42}
+        key = entry_key(PROJECT_ID, "I1", destination)
+        entry = {"state": "partial"}
+        broad = self.root.parent / "broad"
+        broad.mkdir(mode=0o755)
+        broad.chmod(0o755)
+        with self.assertRaisesRegex(InventoryError, "journal-unsafe"):
+            write_entry(journal_path(self.root, PROJECT_ID, broad), key, entry)
+        self.assertEqual(broad.stat().st_mode & 0o777, 0o755)
+        pointer = self.root.parent / "pointer"
+        pointer.symlink_to(broad, target_is_directory=True)
+        with self.assertRaisesRegex(InventoryError, "journal-unsafe"):
+            write_entry(journal_path(self.root, PROJECT_ID, pointer), key, entry)
+
+    def test_next_archive_exports_private_mapping_snapshot(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        journal_root = self.root.parent / "private-journals"
+        destination = {"platform": "github", "host": "github.com", "targetId": 42}
+        key = entry_key(PROJECT_ID, "I1", destination)
+        with patch("local_ticket_journal.default_journal_root", return_value=journal_root):
+            path = journal_path(self.root, PROJECT_ID)
+            write_entry(path, key, {"state": "partial", "sourceDigest": "a" * 64})
+            archive = self.root.parent / "archive"
+            archive_project(self.root, archive)
+            self.assertEqual(verify_archive(archive)["state"], "verified")
+        exported = archive / ".spec-guard" / "mapping.json"
+        self.assertEqual(read_journal(exported)["entries"][key]["state"], "partial")
+        exported.write_text("{}", encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
 
 
 if __name__ == "__main__":

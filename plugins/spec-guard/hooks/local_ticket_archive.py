@@ -16,6 +16,7 @@ from local_ledger_runtime import (
     PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
 )
 from local_ticket_portability import InventoryError, inventory_project
+from local_ticket_journal import journal_path, read_journal
 
 
 def _within(candidate: Path, parent: Path) -> bool:
@@ -49,6 +50,8 @@ def _safe_name(name: str) -> bool:
             or relative.as_posix() != name):
         return False
     if name in ("state.bundle", ".epiq/project.json"):
+        return True
+    if name == ".spec-guard/mapping.json":
         return True
     return (len(relative.parts) == 3 and relative.parts[:2] in
             ((".epiq", "events"), (".epiq", "media")))
@@ -107,7 +110,7 @@ def verify_archive(archive: Path) -> dict[str, Any]:
             if directory.is_symlink():
                 raise InventoryError("archive-invalid: unlisted symbolic link")
             if directory.relative_to(archive).as_posix() not in (
-                    ".epiq", ".epiq/events", ".epiq/media"):
+                    ".epiq", ".epiq/events", ".epiq/media", ".spec-guard"):
                 raise InventoryError("archive-invalid: unlisted directory")
         for name in file_names:
             path = parent / name
@@ -116,6 +119,8 @@ def verify_archive(archive: Path) -> dict[str, Any]:
             actual.add(path.relative_to(archive).as_posix())
     if actual != expected:
         raise InventoryError("archive-invalid: unlisted or missing file")
+    if ".spec-guard/mapping.json" in expected:
+        read_journal(archive / ".spec-guard/mapping.json")
     with tempfile.TemporaryDirectory(prefix="sg-archive-verify-") as temporary:
         _git(Path(temporary), "init", "-q")
         _git(Path(temporary), "bundle", "verify", str(archive / "state.bundle"))
@@ -155,6 +160,14 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
         config.parent.mkdir(mode=0o700)
         config.write_bytes(config_source.read_bytes())
         records = [_record(bundle, temporary), _record(config, temporary)]
+        mapping_source = journal_path(project, before["projectId"])
+        mapping_present = mapping_source.exists() or mapping_source.is_symlink()
+        if mapping_present:
+            read_journal(mapping_source)
+            mapping = temporary / ".spec-guard" / "mapping.json"
+            mapping.parent.mkdir(mode=0o700)
+            mapping.write_bytes(mapping_source.read_bytes())
+            records.append(_record(mapping, temporary))
         for entry in before["files"]:
             source = state_root / entry["path"]
             if source.is_symlink() or not source.is_file():
@@ -169,6 +182,9 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
         after = inventory_project(project)
         if before != after or config_source.read_bytes() != config.read_bytes():
             raise InventoryError("source-changed: Local source changed during archive")
+        if (mapping_source.exists() or mapping_source.is_symlink()) != mapping_present or (
+                mapping_present and mapping_source.read_bytes() != mapping.read_bytes()):
+            raise InventoryError("source-changed: mapping journal changed during archive")
         manifest = {
             "formatVersion": 1, "epiqVersion": before["epiqVersion"],
             "projectId": before["projectId"], "stateBranch": STATE_BRANCH,
@@ -185,8 +201,9 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
         except FileExistsError as error:
             raise InventoryError("archive-output-exists: output must be new") from error
         # Claim the directory before publishing; the manifest is moved last.
-        for name in ("state.bundle", ".epiq", "manifest.json"):
-            (temporary / name).rename(output / name)
+        for name in ("state.bundle", ".epiq", ".spec-guard", "manifest.json"):
+            if (temporary / name).exists():
+                (temporary / name).rename(output / name)
         return {"state": "archived", "projectId": before["projectId"],
                 "eventCount": len(before["eventIds"]), "fileCount": len(records)}
     finally:
