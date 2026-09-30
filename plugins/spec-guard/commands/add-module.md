@@ -51,6 +51,8 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒）。**被拒绝时**，原样说明
 是哪一条校验失败，然后停下——不要自行改字段重试，除非那正是用户接下来要做的事。
 
+`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审）；若这份 Spec 尚未评审，先评审再 `--confirm`。
+
 等用户对预览结果给出明确确认后，才在同一条命令后加 `--confirm` 重新运行一次（不要跳过预览直接确认）。用户
 改动了 id、responsibility、depends-on 或 anchor 中的任何一项，都要先重新跑预览，不能直接对着旧预览确认。
 
@@ -79,7 +81,7 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
   （`git switch -c <晋级分支> <baseCommit>`），在该分支上重跑；
 - 锚点在 Build order 的并行段中，按声明插入后无法被 `proposal-promotion-proof` 证明：不能按该声明晋级，停下；
 - 当前模块做到一半：按上文 `--interrupt` 规则处理；
-- `spec/<id>.md` 已存在：拒绝，停下。
+- `spec/<id>.md` 已存在：允许，预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审）；若这份 Spec 尚未评审，先评审再 `--confirm`。
 
 等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次。命令只改 `spec/CAPABILITY-MAP.md`，
 不创建分支、不提交、不改 Issue 标签。写入后由用户提交并合并；合并后运行 `/spec-guard:proposal-promotion-proof`，

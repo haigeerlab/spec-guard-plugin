@@ -3,6 +3,7 @@ import importlib.util
 import io
 import os
 import stat
+import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -319,7 +320,6 @@ class ModuleInsertTests(unittest.TestCase):
             dict(name="anchor_not_in_map", anchor="after:ghost"),
             dict(name="empty_responsibility", responsibility="   "),
             dict(name="multiline_responsibility", responsibility="line one\nline two"),
-            dict(name="existing_spec_file", files={"spec/delta.md": "# Spec: delta\n"}),
             dict(name="duplicate_depends_on", depends_on="alpha,alpha"),
         ]
         for scenario in scenarios:
@@ -519,9 +519,61 @@ class ModuleInsertTests(unittest.TestCase):
     def test_multiline_responsibility_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "delta", "line one\nline two", "—", "end"))
 
-    def test_existing_spec_file_is_refused(self):
+    def run_cli(self, *extra):
+        args = ["--project", str(self.root), "--id", "delta", "--responsibility", "Fourth",
+                "--depends-on", "—", "--anchor", "end"] + list(extra)
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            code = main(args)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_existing_spec_file_is_allowed_and_previewed_with_a_stage_hint(self):
         self.write("spec/delta.md", "# Spec: delta\n")
-        self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "—", "end"))
+        self.assertTrue(preview(self.root, "delta", "Fourth", "—", "end")["existing_spec"])
+        before = self.snapshot()
+        code, out, err = self.run_cli()
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("提示: spec/delta.md 已存在", out)
+        self.assertIn("NEEDS_PLAN", out)
+        self.assertEqual(before, self.snapshot())
+
+    def test_no_existing_spec_has_no_hint_and_flag_is_false(self):
+        self.assertFalse(preview(self.root, "delta", "Fourth", "—", "end")["existing_spec"])
+        code, out, err = self.run_cli()
+        self.assertNotIn("已存在", out)
+        code, out, err = self.run_cli("--confirm")
+        self.assertNotIn("已存在", out)
+
+    def test_confirm_over_existing_spec_changes_only_the_map_and_reaches_needs_plan(self):
+        self.make_done("alpha", "beta", "gamma")
+        spec_text = "# Spec: delta\n\nReviewed elsewhere.\n"
+        self.write("spec/delta.md", spec_text)
+        before = self.snapshot()
+        code, out, err = self.run_cli("--confirm")
+        self.assertEqual((code, err), (0, ""))
+        after = self.snapshot()
+        changed = set(path for path in set(before) | set(after) if before.get(path) != after.get(path))
+        self.assertEqual(changed, {str(self.map_path)})
+        self.assertEqual((self.root / "spec" / "delta.md").read_text(encoding="utf-8"), spec_text)
+        self.assertIn("当前阶段提示: `delta` 处于 NEEDS_PLAN", out)
+        self.assertIn("提示: spec/delta.md 已存在", out)
+        self.assertIn("NEEDS_PLAN", out.splitlines()[-1])
+
+    def test_verify_artifacts_accepts_the_module_after_insertion_over_an_existing_spec(self):
+        hook = Path(__file__).with_name("verify-artifacts.sh")
+        self.write("spec/delta.md", "# Spec: delta\n")
+
+        def verify():
+            done = subprocess.run(
+                ["/bin/bash", str(hook)], env=dict(os.environ, CLAUDE_PROJECT_DIR=str(self.root)),
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                universal_newlines=True)
+            return done.stdout
+
+        self.assertIn("能力图上没有的模块 spec: delta", verify())
+        code, out, err = self.run_cli("--confirm")
+        self.assertEqual(code, 0, err)
+        self.assertNotIn("能力图上没有的模块 spec", verify())
 
     def test_duplicate_depends_on_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "alpha,alpha", "end"))
@@ -818,9 +870,18 @@ class ProposalPromotionTests(ProposalPromotionFixture):
         code, out, err = self.run_main("--interrupt")
         self.assertEqual((code, err), (0, ""))
 
-    def test_existing_module_spec_is_rejected(self):
-        (self.consumer / "spec/gamma.md").write_text("# Spec: gamma\n", encoding="utf-8")
-        self.assert_rejected(message="spec/gamma.md")
+    def test_existing_module_spec_is_allowed_and_previewed_with_a_stage_hint(self):
+        spec = self.consumer / "spec/gamma.md"
+        spec.write_text("# Spec: gamma\n", encoding="utf-8")
+        before = self.snapshot()
+        code, out, err = self.run_main()
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("提示: spec/gamma.md 已存在", out)
+        self.assertEqual(before, self.snapshot())
+        code, out, err = self.run_main("--confirm")
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("spec/gamma.md 已存在", out)
+        self.assertEqual(spec.read_text(encoding="utf-8"), "# Spec: gamma\n")
 
     def test_local_map_differing_from_base_commit_is_rejected_with_the_commit(self):
         self.map_file.write_text(self.map_file.read_text(encoding="utf-8") + "\nExtra.\n",
