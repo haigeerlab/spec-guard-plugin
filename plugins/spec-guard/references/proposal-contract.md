@@ -95,7 +95,7 @@ proposal-stage:deferred。
 agent 直接按下面的模板写 `spec/proposals/<proposal-id>.md`，再运行 `/spec-guard:proposal-submit`。
 模板省略了 `## Capability map baseline` 一节：baseline 与标记里的 revision 由 `proposal-submit`
 从远端默认分支的固定快照补全并写回，不要手算；revision 先写 64 个 `0`。改了草稿后重跑即重算。
-`<...>` 处替换为实际内容，Change 表的六个字段要求见上文。
+`<...>` 处替换为实际内容，Integration intent 六项与 Change 五项的要求见上文。
 
 ~~~markdown
 # Proposal: <简短标题>
