@@ -31,7 +31,8 @@ real directory as part of this check. `storage-protect --format json` is a read-
 for an exposed root. Run it with `--confirm-protect` only after showing the exact path and
 0700 target to the user and obtaining authorization for that actual directory change. The
 flag alone is not authorization; the operation changes only the root mode and never creates
-or recursively rewrites ledger data.
+or recursively rewrites ledger data. New adapter fragments start Epiq with umask 077,
+but existing host MCP entries remain unchanged until separately reviewed and migrated.
 
 Explain `absent`, `ready`, `initialized`, `conflict`, and `invalid` accurately. `conflict` means the Epiq state
 worktree (`project.stateWorktree`, state `foreign`) is owned by another repository: relay its `owner` and `path`

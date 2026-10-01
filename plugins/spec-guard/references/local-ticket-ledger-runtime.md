@@ -61,7 +61,7 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-check --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-protect --format json
 ```
 
-`protectable` 给出当前 `mode` 与拟变更的 `targetMode: 0700`，不写入。只有用户审查路径和预览并明确授权这次操作后，才可添加 `--confirm-protect` 执行；该标记本身不代表用户授权。命令重新检查所有者、目录类型、父目录与路径身份，拒绝符号链接、错误归属或可由其他用户改写的父目录；只对根目录做一次 chmod，不递归修改事件、媒体或 Git worktree，不创建缺失目录。`already-private` 表示无需修改。`protected` 之后再运行 `storage-check` 核对。此操作不会替换已有的直接 Node MCP 宿主条目；若未来目录被移走或重建，必须另行保证新进程以私有权限创建。
+`protectable` 给出当前 `mode` 与拟变更的 `targetMode: 0700`，不写入。只有用户审查路径和预览并明确授权这次操作后，才可添加 `--confirm-protect` 执行；该标记本身不代表用户授权。命令重新检查所有者、目录类型、父目录与路径身份，拒绝符号链接、错误归属或可由其他用户改写的父目录；只对根目录做一次 chmod，不递归修改事件、媒体或 Git worktree，不创建缺失目录。`already-private` 表示无需修改。`protected` 之后再运行 `storage-check` 核对。此操作不会替换已有的直接 Node MCP 宿主条目。新版由插件启动的初始化进程以 umask 077 运行；新版 Claude/Codex 适配器片段通过固定的 `/bin/sh` 包装先设置 umask 077，再 `exec` 已验证的 Node 与 Epiq MCP 入口。因此首次创建的数据根及事件文件分别以当前用户私有的默认权限创建。已经安装的旧 MCP 配置仍按原来的直接 Node 命令运行，必须在用户明确要求后预览并迁移其精确条目；同名拒绝覆盖规则不变，也不会因为本次源码更新而自动重连宿主。
 
 ### 状态 worktree 被另一个仓库占用
 
@@ -201,7 +201,7 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 python3 -B "$ROOT/hooks/local_ledger_adapters.py" claude
 ```
 
-它们都指向已验证的受管 `node` 和固定 `epiq` MCP 入口，不包含 token、HTTP 地址、账本内容或项目 secret。
+新片段经 `/bin/sh` 设置私有 umask 后 `exec` 已验证的受管 `node` 与固定 `epiq` MCP 入口，不包含 token、HTTP 地址、账本内容或项目 secret。静态 shell 片段只引用位置参数，Node 与入口路径均作为独立参数传入。已有直接 Node 条目不会自动更新。
 只有用户明确要求写入某一个宿主的用户级配置时，才可运行相应安装命令，而且仍必须带第二层
 `--confirm-install`：
 

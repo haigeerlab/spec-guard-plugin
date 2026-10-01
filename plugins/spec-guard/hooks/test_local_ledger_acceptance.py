@@ -83,6 +83,9 @@ def run(runtime_dir: Path) -> dict[str, str]:
             _git(root, "show-ref", "--verify", "refs/heads/" + STATE_BRANCH)
             if (root / "node_modules").exists():
                 raise RuntimeContractError("project-local node_modules was unexpectedly created")
+            code, initial_mode = storage_check(global_dir)
+            if code != 0 or initial_mode["state"] != "private-posix":
+                raise RuntimeContractError("new temporary Epiq data root was not private")
             code, protected = storage_protect(global_dir, confirm=True)
             if code != 0 or protected["state"] not in ("protected", "already-private"):
                 raise RuntimeContractError("temporary Epiq data root could not be protected")

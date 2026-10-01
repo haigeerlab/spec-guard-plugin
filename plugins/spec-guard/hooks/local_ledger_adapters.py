@@ -44,7 +44,8 @@ def mcp_command(runtime_dir: Path, node_executable: str) -> list[str]:
     node_path = Path(node_executable)
     if not node_path.is_absolute():
         raise ValueError("local-ledger Node executable must be an absolute path")
-    return [str(node_path), str(Path(runtime_dir) / MCP_RELATIVE_PATH)]
+    return ["/bin/sh", "-c", 'umask 077; exec "$1" "$2"',
+            MCP_SERVER_NAME, str(node_path), str(Path(runtime_dir) / MCP_RELATIVE_PATH)]
 
 
 def codex_toml_fragment(runtime_dir: Path, node_executable: str) -> str:

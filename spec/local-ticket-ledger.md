@@ -38,6 +38,10 @@ process.
   perform it, after rechecking owner, type, parent and path identity with a no-follow
   directory handle. It never creates a missing root, recurses into children or changes
   host MCP configuration; the CLI flag does not replace user authorization.
+- New plugin-started Epiq processes use umask 077; new Claude/Codex adapter fragments
+  launch the pinned Node entry through a fixed `/bin/sh` umask wrapper. Existing installed
+  host entries are not overwritten or migrated automatically. A previously exposed root
+  still needs explicit review and protection.
 
 ## Host and interaction contract
 

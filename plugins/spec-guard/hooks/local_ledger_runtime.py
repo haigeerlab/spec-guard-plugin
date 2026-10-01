@@ -458,7 +458,7 @@ def mcp_tool_call(
     try:
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, env=environment,
+            text=True, env=environment, umask=0o077,
         )
     except OSError as error:
         raise RuntimeContractError("unable to start the local-ledger MCP server") from error
