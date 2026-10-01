@@ -47,6 +47,15 @@ process.
 - The daily entry (`/spec-guard:ticket`, Codex `ticket` skill) resolves short references to full
   IDs before writing, reports a write only after the tool confirms it, and diagnoses read-only when
   the ledger is unavailable.
+- When a user has chosen Local for an actionable implementation, the daily entry checks the
+  initialized ledger and its state-worktree ownership, searches open and closed tickets, then
+  creates or reuses a stable ticket ID before coding. Exploration and small untracked actions
+  do not require a ticket. An incomplete lookup is unknown, never proof of absence. This is
+  agent guidance, not an atomic cross-agent duplicate prevention mechanism.
+- For a material requirement change, the entry records the superseded rule and reason in a
+  comment before editing the effective description. If only the comment succeeds, it reports
+  the new decision as pending. Completion records code and verification evidence before an
+  explicitly authorized close, then reads back the ticket state.
 - The collaboration mailbox is optional. A message may carry a ticket reference; mailbox delivery
   and ledger writes are always separate actions, and neither module requires the other.
 
@@ -104,6 +113,9 @@ plugins/spec-guard/references/local-ticket-ledger-runtime.md -> runtime and safe
 
 - In one repository with two linked worktrees on the same Mac, Claude Code and Codex sessions see
   the same ticket and its discussion, and still read it after either MCP process restarts.
+- An accepted Local work item can be found or created before implementation; a material
+  revision has a readable decision trail; a verified close is read back. Concurrent semantic
+  deduplication, portable backup and remote publication require separate implementation.
 - A failed installation leaves the runtime `absent` and can be retried.
 - No gated tool runs without a per-call user confirmation on a supported host.
 

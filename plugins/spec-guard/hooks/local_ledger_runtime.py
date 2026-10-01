@@ -179,6 +179,8 @@ def project_status(project_dir: Path) -> dict[str, str]:
             raise RuntimeContractError("Epiq project configuration fields are invalid")
         if not all(isinstance(config[key], str) and config[key] for key in expected):
             raise RuntimeContractError("Epiq project configuration values are invalid")
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", config["projectId"]):
+            raise RuntimeContractError("Epiq project ID is not a safe path component")
         if config["stateBranch"] != STATE_BRANCH:
             raise RuntimeContractError("Epiq state branch does not match the audited contract")
     except RuntimeContractError as error:
@@ -201,12 +203,34 @@ def _git(project_dir: Path, *arguments: str) -> subprocess.CompletedProcess[str]
 
 
 def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
-    """Report which repository owns Epiq's state worktree; read files and one git query only."""
+    """Report the state worktree's repository and detect missing or displaced state."""
     global_dir = os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global")
     path = os.path.join(global_dir, "worktrees", project_id)
-    if not os.path.isdir(path):
-        return {"state": "absent", "path": path}
     unknown = {"state": "unknown", "path": path, "diagnostic": "ledger-state-worktree-unreadable"}
+    if not os.path.lexists(path):
+        listing = _git(project_dir, "worktree", "list", "--porcelain")
+        if listing is None or listing.returncode != 0:
+            return unknown
+        for record in listing.stdout.split("\n\n"):
+            lines = record.splitlines()
+            if "branch refs/heads/" + STATE_BRANCH in lines:
+                location = next((line[len("worktree "):] for line in lines
+                                 if line.startswith("worktree ")), "")
+                return {
+                    "state": "unknown", "path": path,
+                    "diagnostic": "ledger-state-worktree-away",
+                    "checkedOutAt": location,
+                }
+        branch = _git(project_dir, "show-ref", "--verify", "--quiet", "refs/heads/" + STATE_BRANCH)
+        if branch is None or branch.returncode != 0:
+            return {
+                "state": "unknown", "path": path,
+                "diagnostic": ("ledger-state-branch-missing" if branch is not None and
+                               branch.returncode == 1 else "ledger-state-worktree-unreadable"),
+            }
+        return {"state": "absent", "path": path}
+    if os.path.islink(path) or not os.path.isdir(path):
+        return unknown
     git_file = os.path.join(path, ".git")
     try:
         if not os.path.isfile(git_file) or os.path.islink(git_file):
@@ -426,12 +450,15 @@ def read_mcp_tool_result(stream: Any, request_id: int) -> dict[str, Any]:
     return payload
 
 
-def mcp_tool_call(command: list[str], tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+def mcp_tool_call(
+    command: list[str], tool_name: str, arguments: dict[str, Any],
+    environment: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Call one stdio MCP tool and terminate the private child process afterwards."""
     try:
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True,
+            text=True, env=environment,
         )
     except OSError as error:
         raise RuntimeContractError("unable to start the local-ledger MCP server") from error
@@ -459,6 +486,7 @@ def mcp_tool_call(command: list[str], tool_name: str, arguments: dict[str, Any])
         return read_mcp_tool_result(process.stdout, 2)
     finally:
         process.stdin.close()
+        process.stdout.close()
         if process.poll() is None:
             process.terminate()
         try:
@@ -598,6 +626,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("状态 worktree：" + worktree["path"])
             print("占用仓库：" + worktree["owner"])
             print("处理办法见 references/local-ticket-ledger-runtime.md；不要在未经确认时移动或删除该 worktree。")
+        elif payload["state"] == "initialized":
+            worktree = payload["project"].get("stateWorktree", {})
+            if worktree.get("state") == "unknown":
+                print("状态 worktree 未确认：" + worktree["diagnostic"])
+                if worktree.get("checkedOutAt"):
+                    print("状态分支检出于：" + worktree["checkedOutAt"])
+                print("写入前先核查；处理办法见 references/local-ticket-ledger-runtime.md。")
     return code
 
 

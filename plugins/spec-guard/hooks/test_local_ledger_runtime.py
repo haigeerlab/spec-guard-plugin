@@ -109,6 +109,17 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["runtime"]["state"], "invalid")
         self.assertIn("version", payload["runtime"]["diagnostic"])
 
+    def test_project_id_cannot_escape_the_managed_worktree_directory(self):
+        self.write_project_config()
+        path = self.project_dir / ".epiq" / "project.json"
+        config = json.loads(path.read_text(encoding="utf-8"))
+        for project_id in ("../other", "/tmp/other", "nested/id", ".."):
+            with self.subTest(project_id=project_id):
+                config["projectId"] = project_id
+                path.write_text(json.dumps(config), encoding="utf-8")
+                result = local_ledger_runtime.project_status(self.project_dir)
+                self.assertEqual(result["state"], "invalid")
+
     def test_missing_or_unsupported_node_has_an_explicit_diagnostic(self):
         self.write_runtime()
         for node in (
@@ -748,9 +759,44 @@ class StateWorktreeOwnerTests(unittest.TestCase):
         self.assertEqual(payload["project"]["stateWorktree"]["state"], "owned")
 
     def test_missing_worktree_directory_is_absent(self):
+        self.git(self.repo_a, "branch", "__epiq_state__")
         code, payload = self.run_status()
         self.assertEqual((code, payload["state"]), (0, "initialized"))
         self.assertEqual(payload["project"]["stateWorktree"]["state"], "absent")
+
+    def test_missing_state_branch_is_unknown_not_empty_ledger(self):
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        state = payload["project"]["stateWorktree"]
+        self.assertEqual(state["state"], "unknown")
+        self.assertEqual(state["diagnostic"], "ledger-state-branch-missing")
+
+    def test_state_branch_checked_out_elsewhere_is_not_absent(self):
+        detached = Path(self.tmp.name) / "detached-state"
+        self.git(self.repo_a, "worktree", "add", "-q", "-b", "__epiq_state__", str(detached))
+        pending = detached / ".epiq" / "events" / "fixture~pending.jsonl"
+        pending.parent.mkdir(parents=True)
+        pending.write_text('{"synthetic":true}\n', encoding="utf-8")
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        state = payload["project"]["stateWorktree"]
+        self.assertEqual(state["state"], "unknown")
+        self.assertEqual(state["diagnostic"], "ledger-state-worktree-away")
+        self.assertEqual(Path(state["checkedOutAt"]).resolve(), detached.resolve())
+        self.assertEqual(pending.read_text(encoding="utf-8"), '{"synthetic":true}\n')
+        text_code, text = self.run_text_status()
+        self.assertEqual(text_code, 0)
+        self.assertIn("状态 worktree 未确认：ledger-state-worktree-away", text)
+        self.assertIn("状态分支检出于：", text)
+
+    def test_symlink_at_managed_path_is_not_absent_or_owned(self):
+        target = Path(self.tmp.name) / "target"
+        target.mkdir()
+        self.worktree.parent.mkdir(parents=True)
+        self.worktree.symlink_to(target, target_is_directory=True)
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertEqual(payload["project"]["stateWorktree"]["state"], "unknown")
 
     def test_unparsable_git_file_is_unknown_not_a_conflict(self):
         self.worktree.mkdir(parents=True)

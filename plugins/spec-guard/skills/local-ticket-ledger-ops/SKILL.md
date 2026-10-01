@@ -27,7 +27,9 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 Explain `absent`, `ready`, `initialized`, `conflict`, and `invalid` accurately. `conflict` means the Epiq state
 worktree (`project.stateWorktree`, state `foreign`) is owned by another repository: relay its `owner` and `path`
 and the remedies in `references/local-ticket-ledger-runtime.md`, and never move or delete a worktree without the
-user's explicit approval. Never install Epiq, initialize a
+user's explicit approval. Also inspect `project.stateWorktree` when the top level says `initialized`:
+`unknown` means ownership or location has not been proved, so explain its diagnostic and do not treat
+the ledger as safe for writes. Never install Epiq, initialize a
 repository, change Claude/Codex configuration, or start a service merely because a status check is
 successful.
 

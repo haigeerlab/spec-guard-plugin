@@ -20,6 +20,8 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 - `absent`：Epiq 运行时尚未安装。这是正常的未启用状态；不得自动下载。
 - `ready`：受管运行时可用，但当前仓库还没有本地账本。
 - `initialized`：当前仓库已有可用的 `.epiq/project.json`，可继续检查 MCP 接入。
+- 若 `project.stateWorktree.state` 是 `unknown`，先查明状态分支位置并保全 pending 事件，
+  不把顶层 `initialized` 解释成已可安全写入。
 - `conflict`：项目已初始化，但 Epiq 状态 worktree 被另一个仓库占用（`project.stateWorktree.state` 为 `foreign`）。
   向用户转述 `owner` 与 `path` 和处理办法（先备份；占用仓库已停用则在**占用仓库**执行 `git worktree move`；
   两边都要用则给其中一个设置不同的 `EPIQ_GLOBAL_DIR`，注意账本 MCP 为用户级配置、会影响所有项目），细则见
@@ -83,8 +85,9 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-insta
 也可用，消息可以携带事项短编号，例如“`R85YPWB` 已处理，请拉取后验证”；消息投递和事项改动仍是两个
 独立、明确的动作。
 
-GitHub/GitLab 恢复后，本功能不会自动创建、导入或同步远端 Issue；保留本地事项编号作为引用，是否迁移须由
-后续独立设计决定。详细安全边界见 `references/local-ticket-ledger-runtime.md`。
+GitHub/GitLab 恢复后，本功能不会自动创建、导入或持续同步远端 Issue。保留本地事项编号并按需迁移时，
+使用独立的 `local-ticket-portability` 流程，先预览，再针对目标与内容授权。详细安全边界见
+`references/local-ticket-ledger-runtime.md`。
 
 本阶段没有“删除账本”命令。不得为了停用而删除 `.epiq/`、`__epiq_state__`、受管运行时或 MCP 条目；这些
 动作会影响持久记录或其他项目，必须由单独的、可审查的移除设计处理。

@@ -9,7 +9,8 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | agent 不知道现在该做哪个模块、做到哪一步 | 每轮对话开头自动注入当前阶段，例如「`NEEDS_PLAN`：去给 `billing` 写 plan」 |
 | 做到一半冒出新需求，不知道插在哪，手改能力图容易改坏 | 快速插入：在检查点（或显式插队）提出新模块，校验、预览后经你确认插进能力图；需要留痕时改走 Proposal |
 
-它只报告事实、给出建议，**不替你改 Issue、分支或能力图**，决定和写入都留给人。设计原因见[设计理念与术语](docs/concepts.md)。
+阶段 hook 只报告事实、给出建议；Local 事项写入需要明确使用 `ticket` 入口，
+能力图插入也须预览确认。设计原因见[设计理念与术语](docs/concepts.md)。
 
 ## 功能一览
 
@@ -106,6 +107,8 @@ setup 会往 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入下面这段约定，�
 - `/build` 取任务：读 `.agent/state.json` 的 `activeModule`，从该模块的 `todo.md`
   取第一个未勾选项，**不跨模块取**
 - 切换 `activeModule` 前当前模块不能有进行中的 task；切换后重读该模块的 spec 和 plan
+- 若项目已启用 Local 事项账本，确认要实现的需求或修复在动代码前先用 `spec-guard:ticket`
+  查重并取得事项 ID；探索和无需追踪的小操作例外
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
 <!-- END:agent-skills-convention -->
 ````

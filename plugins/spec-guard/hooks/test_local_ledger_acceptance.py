@@ -92,11 +92,28 @@ def run(runtime_dir: Path) -> dict[str, str]:
                 "description": "Created from worker A.",
             })["value"]
             issue_id = issue["id"]
+            decision = "Decision: replace the initial scope after review."
+            effective = "Revised scope after the recorded decision."
+            mcp_tool_call(command, "epiq_issue_comment_add", {
+                "repoRoot": str(worker_a), "issueId": issue_id, "body": decision,
+            })
+            mcp_tool_call(command, "epiq_issue_description_edit", {
+                "repoRoot": str(worker_a), "issueId": issue_id, "description": effective,
+            })
             before_comments = mcp_tool_call(command, "epiq_issue_get", {
                 "repoRoot": str(worker_b), "idOrRef": issue["ref"],
             })["value"]
-            if before_comments["id"] != issue_id:
-                raise RuntimeContractError("worker B could not read worker A's ticket")
+            if before_comments["id"] != issue_id or before_comments["description"] != effective:
+                raise RuntimeContractError("worker B could not read the current ticket requirement")
+            if decision not in {comment["body"] for comment in before_comments["comments"]}:
+                raise RuntimeContractError("worker B could not read the supersession decision")
+            state = mcp_tool_call(command, "epiq_state_get", {"repoRoot": str(worker_b)})["value"]
+            descriptions = [
+                event["payload"]["md"] for event in state["eventLog"]
+                if event["action"] == "edit.description" and event["payload"]["id"] == issue_id
+            ]
+            if descriptions != [issue["description"], effective]:
+                raise RuntimeContractError("Epiq event history lost a requirement version")
 
             def add_comment(worker: Path, body: str) -> None:
                 mcp_tool_call(command, "epiq_issue_comment_add", {
@@ -117,6 +134,29 @@ def run(runtime_dir: Path) -> dict[str, str]:
             expected = {"concurrent comment from worker A", "concurrent comment from worker B"}
             if not expected.issubset(bodies):
                 raise RuntimeContractError("concurrent comments did not survive a fresh MCP process")
+            evidence = "Delivery: synthetic commit; verification: fixture checks passed."
+            add_comment(worker_a, evidence)
+            mcp_tool_call(command, "epiq_issue_close", {
+                "repoRoot": str(worker_a), "issueId": issue_id,
+            })
+            closed = mcp_tool_call(command, "epiq_issue_get", {
+                "repoRoot": str(worker_b), "idOrRef": issue_id,
+            })["value"]
+            if not closed["isClosed"] or evidence not in {c["body"] for c in closed["comments"]}:
+                raise RuntimeContractError("verified closure or delivery evidence was not readable")
+            listed = mcp_tool_call(command, "epiq_issue_list", {
+                "repoRoot": str(worker_b), "includeClosed": True, "brief": True,
+            })["value"]
+            if not any(ticket["id"] == issue_id for ticket in listed):
+                raise RuntimeContractError("closed ticket was missing from intake lookup")
+            mcp_tool_call(command, "epiq_issue_reopen", {
+                "repoRoot": str(worker_a), "issueId": issue_id,
+            })
+            reopened = mcp_tool_call(command, "epiq_issue_get", {
+                "repoRoot": str(worker_b), "idOrRef": issue_id,
+            })["value"]
+            if reopened["isClosed"]:
+                raise RuntimeContractError("reopened ticket still appeared closed")
         finally:
             if previous_global is None:
                 os.environ.pop("EPIQ_GLOBAL_DIR", None)

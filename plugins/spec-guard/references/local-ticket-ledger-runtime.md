@@ -49,14 +49,20 @@ Epiq 1.11.0 把状态 worktree 放在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/work
 `projectId`。同一台 Mac 上两个仓库共用一个 `projectId`（仓库副本，或同一仓库的两份克隆）时，先建立 worktree 的
 仓库占用该路径，另一个仓库的每次账本调用都会以 `Failed to create state branch worktree … already exists` 失败。
 
-项目为 `initialized` 时，`status` 在 `project.stateWorktree` 里报告，只读文件与一次
-`git rev-parse --git-common-dir`：
+项目为 `initialized` 时，`status` 在 `project.stateWorktree` 里报告；它只读受管目录与
+Git worktree、状态分支及 common dir：
 
-- `absent`：该目录不存在，Epiq 下次会创建。
+- `absent`：该目录不存在，当前仓库仍有状态分支，且它未在其他 worktree 检出；Epiq 下次会创建受管 worktree。
 - `owned`：属于本仓库。
 - `foreign`：属于另一个仓库，`owner` 为占用仓库路径；顶层 `state` 变为 `conflict`。
   `--format text` 时除状态行外还打印 `状态 worktree：<路径>`、`占用仓库：<owner>` 与指向本节处理办法的一行。
-- `unknown`：读不到或无法判断（`diagnostic: ledger-state-worktree-unreadable`）；不当作冲突，顶层状态不变。
+- `unknown`：读不到或无法判断（`diagnostic: ledger-state-worktree-unreadable`）；或者受管路径不存在、
+  状态分支却在其他位置检出（`ledger-state-worktree-away`，附 `checkedOutAt`）。
+  受管路径与本地状态分支都不存在时为 `ledger-state-branch-missing`；先核对来源，不能建空分支代替原账本。
+  不当作另一个仓库占用，顶层状态不变；写入前仍需查清来源，保全可能存在的 pending 事件。
+
+项目 ID 必须是单个安全路径分量；包含斜杠、点路径或绝对路径的配置为 `invalid`，
+不得据此拼接 Epiq 全局工作树路径。受管路径是符号链接时同样返回 `unknown`。
 
 处理办法（插件不自动执行，也不得在未经用户明确同意时移动或删除任何 worktree）：
 
@@ -240,4 +246,4 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 - 同一个 macOS 用户下，已初始化的同一 Git 仓库 linked worktree 能共享 Epiq 项目身份；独立机器不在本层范围。
 - Epiq 事项可自由记录 bug、需求、排查和完成结果；Spec Guard 不据此建立项目组、角色、指派锁或排期。
 - 若协作邮箱可用，Agent 可以在自由消息中附 Epiq 短编号；邮箱投递和事项写入仍是两次独立动作。
-- GitHub/GitLab 恢复后，不会自动创建、导入或同步远端 Issue。保留本地编号并按需显式关联／迁移是后续能力。
+- GitHub/GitLab 恢复后，不会自动创建、导入或持续同步远端 Issue。需要保留本地编号并逐项迁移时，使用独立的 [Local 事项归档与交接](local-ticket-portability.md) 流程；远端写入须针对精确目标与内容授权。
