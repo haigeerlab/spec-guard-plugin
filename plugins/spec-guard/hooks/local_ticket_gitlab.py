@@ -23,7 +23,8 @@ class GitLabHandoff:
         arguments = ["glab", "api", "--hostname", self.host, "--method", method,
                      endpoint]
         if body is not None:
-            arguments.extend(["--input", "-"])
+            arguments.extend(["--header", "Content-Type: application/json",
+                              "--input", "-"])
         return self.runner(arguments, body)
 
     def target_facts(self) -> dict[str, Any]:
@@ -46,8 +47,11 @@ class GitLabHandoff:
         if (address.scheme != self.web_scheme or address.netloc != self.host or
                 address.path != "/" + self.target + "/-/issues/" + str(raw["iid"])):
             raise InventoryError("provider-unavailable: GitLab issue URL differs from target")
+        description = raw["description"] or ""
+        if description and not description.endswith("\n"):
+            description += "\n"
         return {"id": raw["iid"], "title": raw["title"],
-                "body": raw["description"] or "", "closed": raw["state"] == "closed",
+                "body": description, "closed": raw["state"] == "closed",
                 "url": raw["web_url"]}
 
     def list_issues(self) -> dict[str, Any]:

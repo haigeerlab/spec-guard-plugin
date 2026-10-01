@@ -83,7 +83,7 @@ class ApiFixture:
             return {"number": number, "title": title, "body": body, "state": "open",
                     "html_url": "https://github.com/team/repo/issues/" + str(number)}
         return {"iid": number, "project_id": 43, "title": title,
-                "description": body, "state": "opened",
+                "description": body.rstrip("\n"), "state": "opened",
                 "web_url": self.scheme + "://gitlab.example.test/group/project/-/issues/" + str(number)}
 
 
@@ -127,6 +127,9 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(fixture.issues[0]["state"],
                          "closed" if platform == "github" else "closed")
         self.assertTrue(any("page=1" in part for args, _ in fixture.calls for part in args))
+        if platform == "gitlab":
+            self.assertTrue(all("Content-Type: application/json" in args
+                                for args, body in fixture.calls if body is not None))
         return fixture, provider
 
     def test_github_roundtrip_excludes_pull_request(self):
