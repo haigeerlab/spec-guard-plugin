@@ -45,7 +45,7 @@
 | `DONE` | 全部模块都已完成 | 新需求用 `/spec-guard:add-module` 插入；`activeModule` 还指着已完成模块时可以清掉 |
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
-有 Plan 但没有 `todo.md` 的模块按已完成计（历史上已交付的模块常是这种写法，所以判据不变）。插队或新加的模块如果只有 Plan、没有 `todo.md`，会被读成已完成；把 `activeModule` 指向它时阶段提示会多一行提醒，补上 `tasks/<模块>/todo.md` 列出剩余任务即可。
+有 Plan 但没有 `todo.md` 的模块按已完成计（历史上已交付的模块常是这种写法，所以判据不变）。DONE 汇总会显示这类模块的数量，可用 `/spec-guard:verify-artifacts` 查看具体模块。插队或新加的模块如果只有 Plan、没有 `todo.md`，会被读成已完成；把 `activeModule` 指向它时阶段提示会多一行提醒，补上 `tasks/<模块>/todo.md` 列出剩余任务即可。
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 随时想看完整状态，用 `/spec-guard:phase`。
@@ -79,8 +79,9 @@
 
 - 当前模块做到一半（todo 里既有已勾、又有未勾的项）——唯一的例外是显式加 `--interrupt` 插队，见下一节；
 - 依赖不存在、依赖排在插入位置之后、出现循环依赖，或 id 重复、不是 kebab-case；
-- 插入会改动 `## 目标`、已有模块行，或已有模块在 Build order 中的先后；
-- `spec/<id>.md` 已经存在。
+- 插入会改动 `## 目标`、已有模块行，或已有模块在 Build order 中的先后。
+
+若 `spec/<id>.md` 已存在，预览会提示插入后为 `NEEDS_PLAN`；先确认这份 Spec 已评审，再确认写入。
 
 ### 插队
 
