@@ -14,6 +14,7 @@ from unittest.mock import patch
 import local_ticket_archive
 from local_ledger_runtime import RuntimeContractError
 from local_ticket_archive import archive_project, verify_archive
+from local_ticket_bind import preview_binding
 from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
 from local_ticket_handoff import _first_contributor_names, _issue_events, _source_digest
@@ -188,6 +189,139 @@ class SourceInventoryTests(unittest.TestCase):
             "conflict": 0, "partial": 1, "planned": 1, "verified": 1,
         })
         self.assertEqual(len(read_journal(old_mapping)["entries"]), 3)
+
+    def test_bind_preview_reviews_moved_mapping_without_writing_source(self):
+        issue_id = "ISSUE1"
+        self.write_events("actor.jsonl", event("EV1", "add.issue", {"id": issue_id}))
+        journal_root = self.root.parent / "private-journal"
+        destination = {"platform": "github", "host": "github.com",
+                       "target": "team/repo", "targetId": 42}
+        snapshot_events = [{"id": "EV1", "action": "add.issue",
+                            "payload": {"id": issue_id}}]
+        digest = _source_digest(snapshot_events)
+        old_mapping = journal_path(self.root, PROJECT_ID, journal_root)
+        key = entry_key(PROJECT_ID, issue_id, destination)
+        write_entry(old_mapping, key, {"state": "partial", "digestVersion": 2,
+                                       "sourceDigest": digest, "destination": destination})
+        old_common = Path(git(self.root, "rev-parse", "--path-format=absolute",
+                              "--git-common-dir"))
+        archive = self.root.parent / "archive"
+        with patch("local_ticket_archive.journal_path",
+                   side_effect=lambda project, identity: journal_path(
+                       project, identity, journal_root)):
+            archive_project(self.root, archive)
+        moved = self.root.parent / "moved-repo"
+        self.root.rename(moved)
+        git(moved, "worktree", "repair", str(self.state_root))
+        mapping_before = old_mapping.read_bytes()
+        inventory_before = inventory_project(moved)
+        fake_snapshot = {"sourceDigest": digest, "events": snapshot_events}
+        output = self.root.parent / "bind-preview.json"
+
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            result = preview_binding(moved, old_mapping.parent.parent.name, output,
+                                     self.root.parent / "runtime", old_common_dir=old_common,
+                                     journal_root=journal_root)
+        preview = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(result["state"], "journal-bind-previewed")
+        self.assertEqual(preview["entries"][0]["issueId"], issue_id)
+        self.assertEqual(preview["entries"][0]["sourceMatch"], "current")
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(old_mapping.read_bytes(), mapping_before)
+        self.assertEqual(inventory_project(moved), inventory_before)
+        self.assertFalse(journal_path(moved, PROJECT_ID, journal_root).exists())
+
+        archive_preview = self.root.parent / "archive-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            preview_binding(moved, old_mapping.parent.parent.name, archive_preview,
+                            self.root.parent / "runtime", archive=archive,
+                            journal_root=journal_root)
+        self.assertEqual(json.loads(archive_preview.read_text())["evidence"]["kind"],
+                         "archive")
+        inside_archive = archive / "bind-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            with self.assertRaisesRegex(InventoryError, "output must be a new file"):
+                preview_binding(moved, old_mapping.parent.parent.name, inside_archive,
+                                self.root.parent / "runtime", archive=archive,
+                                journal_root=journal_root)
+        self.assertFalse(inside_archive.exists())
+
+        prefix = self.root.parent / "prefix-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value={
+                "sourceDigest": "b" * 64,
+                "events": snapshot_events + [{"id": "EV2", "action": "update.issue",
+                                            "payload": {"issue": issue_id}}]}):
+            preview_binding(moved, old_mapping.parent.parent.name, prefix,
+                            self.root.parent / "runtime", old_common_dir=old_common,
+                            journal_root=journal_root)
+        self.assertEqual(json.loads(prefix.read_text())["entries"][0]["sourceMatch"],
+                         "prefix")
+
+        wrong = self.root.parent / "wrong-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value={
+                "sourceDigest": "b" * 64,
+                "events": [{"id": "OTHER", "action": "add.issue",
+                            "payload": {"id": issue_id}}]}):
+            with self.assertRaisesRegex(InventoryError, "source digest cannot be proven"):
+                preview_binding(moved, old_mapping.parent.parent.name, wrong,
+                                self.root.parent / "runtime", old_common_dir=old_common,
+                                journal_root=journal_root)
+        self.assertFalse(wrong.exists())
+
+        old_common.mkdir(parents=True)
+        occupied = self.root.parent / "occupied-preview.json"
+        with self.assertRaisesRegex(InventoryError, "still occupied"):
+            preview_binding(moved, old_mapping.parent.parent.name, occupied,
+                            self.root.parent / "runtime", old_common_dir=old_common,
+                            journal_root=journal_root)
+        self.assertFalse(occupied.exists())
+        old_common.rmdir()
+
+        write_entry(old_mapping, key, {"state": "partial", "digestVersion": 1,
+                                       "sourceDigest": "c" * 64,
+                                       "destination": destination})
+        legacy = self.root.parent / "legacy-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            with self.assertRaisesRegex(InventoryError, "source digest cannot be proven"):
+                preview_binding(moved, old_mapping.parent.parent.name, legacy,
+                                self.root.parent / "runtime", old_common_dir=old_common,
+                                journal_root=journal_root)
+        self.assertFalse(legacy.exists())
+
+    def test_bind_preview_refuses_multiple_candidates_and_missing_mapping(self):
+        self.write_events("actor.jsonl", event("EV1", "add.issue", {"id": "ISSUE1"}))
+        journal_root = self.root.parent / "private-journal"
+        old_mapping = journal_path(self.root, PROJECT_ID, journal_root)
+        write_entry(old_mapping, "a" * 64, {"state": "partial"})
+        old_common = Path(git(self.root, "rev-parse", "--path-format=absolute",
+                              "--git-common-dir"))
+        moved = self.root.parent / "moved-repo"
+        self.root.rename(moved)
+        git(moved, "worktree", "repair", str(self.state_root))
+        clone = self.root.parent / "same-id-clone"
+        clone.mkdir()
+        git(clone, "init", "-q")
+        other_mapping = journal_path(clone, PROJECT_ID, journal_root)
+        write_entry(other_mapping, "b" * 64, {"state": "planned"})
+        output = self.root.parent / "bind-preview.json"
+        with patch("local_ticket_bind.snapshot_issue",
+                   side_effect=AssertionError("must stop before source snapshot")):
+            with self.assertRaisesRegex(InventoryError, "one complete candidate"):
+                preview_binding(moved, old_mapping.parent.parent.name, output,
+                                self.root.parent / "runtime", old_common_dir=old_common,
+                                journal_root=journal_root)
+        self.assertFalse(output.exists())
+
+        for path in other_mapping.parent.iterdir():
+            path.unlink()
+        other_mapping.parent.rmdir()
+        other_mapping.parent.parent.rmdir()
+        old_mapping.unlink()
+        with self.assertRaisesRegex(InventoryError, "one complete candidate"):
+            preview_binding(moved, old_mapping.parent.parent.name, output,
+                            self.root.parent / "runtime", old_common_dir=old_common,
+                            journal_root=journal_root)
+        self.assertFalse(output.exists())
 
     def test_empty_event_directory_is_not_a_complete_initialized_ledger(self):
         with self.assertRaisesRegex(InventoryError, "invalid-event-log"):
