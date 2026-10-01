@@ -248,11 +248,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "inventory":
             payload = inventory_project(args.project)
         elif args.command == "journal-candidates":
-            from local_ticket_journal import discover_journal_candidates
+            from local_ticket_journal import journal_candidate_status
             identity = project_status(args.project)
             if identity["state"] != "initialized":
                 raise InventoryError("journal-source-unknown: Epiq project identity is unavailable")
-            payload = discover_journal_candidates(args.project, identity["projectId"])
+            payload = journal_candidate_status(args.project, identity["projectId"])
         elif args.command == "journal-bind-preview":
             from local_ticket_bind import preview_binding
             payload = preview_binding(

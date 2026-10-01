@@ -48,7 +48,7 @@
   - 模块实现验收完成，公开 PR 的双平台 CI 均通过。真实 Local 账本的同盘归档已再次通过隔离恢复证明，并与当前源的项目、状态分支、事件 ID 和文件摘要一致；同盘副本不提供离机容灾。
   - 真实项目启用仍有独立的操作前置：真实账本需复制到独立介质并读回；mGit API 当前仅证实 HTTP 可用于合成数据，HTTPS 443 从本机连接超时，敏感历史的保密传输未证明；附件远端原字节与可见性未验证，相关事项继续保持 `partial`。这些条件不作为插件代码和合成验收完成的前置，也不能被完成标记代替。
 
-## 扩展：移动后的映射日志重绑定（执行中）
+## 扩展：移动后的映射日志重绑定（合成验收完成）
 
 - [x] Task 10：固定绑定契约与临时移动夹具。依赖：已完成的任务 9。
   - 验收：Spec 明确指针与归档兼容边界；临时项目可模拟移动前后 Git common dir、同 ID clone、旧 `planned`／`partial`／`verified` 映射和状态 worktree；不读取真实用户映射。
@@ -60,27 +60,31 @@
   - 验证：正反合成测试检查预览文件内容、权限和来源／目标零写入；运行 `test_local_ticket_portability.py`。
   - 文件：新绑定模块、CLI、`test_local_ticket_portability.py`（约 3 个）。
   - 完成证据：唯一旧候选、旧 common-dir 哈希或已核验归档、映射键和来源摘要均核对后才写 0600 预览；新版摘要可匹配历史前缀，旧版不匹配则停止。多候选、缺映射、旧路径仍占用、摘要分叉和输出落入归档均不产出预览。49 项 portability 与 32 项 publish 回归通过；本阶段无真实用户目录或远端写入。
-- [ ] Checkpoint E：人工审查预览报告能区分“候选存在”和“已证明可绑定”；不泄露绝对旧路径到归档或远端。
+- [x] Checkpoint E：用户已审阅并接受合成预览首版契约。样例展示当前、候选及 canonical 分区、逐项来源匹配和旧路径线索，明确说明现有历史不能独立证明仓库身份；真实候选仍须单独审阅。绝对旧路径只在 0600 私有预览，不进入绑定指针、归档或远端。
 - [x] Task 12：原子安装私有绑定指针。依赖：11。
   - 验收：`--confirm` 在目标分区锁内重验并排他创建 0600 指针；预览／映射变化、目标已有日志或指针、并发安装失败；旧日志字节保持不变，远端调用计数为零。
   - 验证：过期预览、并发和故障注入测试通过；运行 `test_local_ticket_portability.py`。
   - 文件：绑定模块、CLI、`test_local_ticket_portability.py`（约 3 个）。
   - 完成证据：执行前和安装锁内都重建预览并逐字节核对；通过临时文件、fsync 和排他硬链接发布 0600 指针。篡改预览、宽权限、源日志变化、锁占用及发布中断均未留下有效指针；旧日志字节未改，未调用提供方。50 项 portability、32 项 publish 测试及 `git diff --check` 通过，全部在临时夹具完成。
-- [ ] Task 13：发布解析到 canonical 日志。依赖：12。
+- [x] Task 13：发布解析到 canonical 日志。依赖：12。
   - 验收：绑定前保守阻断；绑定后预锁和锁内都解析同一 canonical 路径，继续使用原 per-key 锁；额外候选、指针篡改、原日志丢失均失败关闭；`planned`／`partial` 不会因绑定自动变为 `verified`。
   - 验证：假提供方重复发布与响应丢失测试不创建重复 Issue／评论；运行 `test_local_ticket_publish.py`。
   - 文件：日志模块、发布模块、`test_local_ticket_publish.py`（约 3 个）。
-- [ ] Checkpoint F：检查 canonical 路径与锁的一致性及双路径并发；映射原子替换可改变 inode，不能以 inode 等同作为证明。
-- [ ] Task 14：再次移动时沿有效指针链解析。依赖：13。
+  - 完成证据：发布前和进入 canonical per-key 锁后两次解析相同路径和指针摘要；旧锁被占用时新路径发布拒绝。重复发布保持 1 条 Issue／评论，不确定创建不重建；额外候选、指针校验失败和新分区映射并存均失败关闭。34 项 publish、50 项 portability 测试及 `git diff --check` 通过。
+- [x] Checkpoint F：canonical 路径与锁一致性、双路径并发拒绝由隔离测试证明；映射原子替换可能改变 inode，未以 inode 相等为证据。
+- [x] Task 14：再次移动时沿有效指针链解析。依赖：13。
   - 验收：新位置经第二次显式预览和绑定后仍抵达首份 canonical 日志；循环、断链、不同 canonical 和可识别的独立 clone 均拒绝自动接管；完全相同的历史不被误报成已证明同仓库。
   - 验证：隔离 Git/worktree 夹具和指针链篡改测试通过；运行两个聚焦测试文件。
   - 文件：绑定模块、日志模块、两个聚焦测试文件（约 4 个）。
-- [ ] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
+  - 完成证据：临时 Git/Epiq 项目经两次路径移动及显式 worktree repair 后，第二次预览显示完整链并绑定至首份 canonical 映射；再次发布仍为同一 Issue／评论。循环、断链、不同 canonical 和链外同 ID clone 均停止或待人工对账。51 项 portability、35 项 publish 测试及 `git diff --check` 通过；无法从旧格式区分历史完全相同的复制仓库，仍需人确认归属。
+- [x] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
   - 验收：新归档的 mapping 与绑定证明都受 manifest 哈希保护并相互核对；旧 v1 归档仍可验证和恢复；恢复不会写用户级指针。
   - 验证：新旧归档、篡改／缺失证明、隔离恢复测试通过；运行 `test_local_ticket_portability.py`。
   - 文件：归档模块、绑定模块、`test_local_ticket_portability.py`（约 3 个）。
-- [ ] Task 16：CLI 说明与总验收。依赖：11–15。
+  - 完成证据：绑定链归档为 v2，导出首份 canonical 映射及无绝对路径的指针链；manifest 逐字节覆盖两者，`verify` 再核对映射摘要与每段指针校验和。隔离的 v2 恢复在模拟 Epiq 读回后成功，未在目标安装用户级绑定；篡改链并重算 manifest 哈希仍被拒绝。旧 v1 验证回归通过；51 项 portability、35 项 publish 回归和 `git diff --check` 通过。
+- [x] Task 16：CLI 说明与总验收。依赖：11–15。
   - 验收：命令与参考文档写明移动修复边界、显式审阅和人工对账状态；不恢复退役 hosted Tracker bridge，不在真实用户目录安装指针或写远端。
   - 验证：两个聚焦测试、`scripts/validate.sh`、`verify-artifacts.sh`、`git diff --check` 通过；记录未实测的真实移动与在线行为。
   - 文件：command／skill／reference／`CHANGELOG.md` 中实际受影响的文件（每次提交不超过约 5 个）。
-- [ ] Checkpoint G：复核全部停止边界、归档证据和无远端写入；确认可审查后再考虑实际用户账本操作。
+  - 完成证据：command、skill、reference 与 changelog 均说明显式预览、候选归属限制、worktree 修复边界、两种归档格式和无自动远端写入。`scripts/validate.sh` 最终退出码 0；52 项 portability、35 项 publish 回归通过；`verify-artifacts.sh` 为 3 通过、0 失败（1 条既有警告）；`git diff --check` 通过。无真实用户级绑定或远端写入。
+- [x] Checkpoint G：代码审查覆盖来源权限、预览过期、并发锁、循环／断链、未知创建和 v1/v2 归档；合成验收与预览契约人工审阅通过。真实用户日志仍需针对具体候选单独预览与授权。

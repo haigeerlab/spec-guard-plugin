@@ -16,7 +16,8 @@ from local_ledger_runtime import state_worktree_status
 from local_ticket_archive import verify_archive
 from local_ticket_handoff import _raw_events, _source_digest, snapshot_issue
 from local_ticket_journal import (PARTITION_NAME, default_journal_root,
-                                  discover_journal_candidates, entry_key, journal_path,
+                                  binding_checksum, candidate_journal_chain,
+                                  entry_key, journal_path,
                                   read_journal, _prepare_parent)
 from local_ticket_lock import acquire_lock
 from local_ticket_portability import InventoryError, inventory_project, worktree_roots
@@ -123,15 +124,10 @@ def preview_binding(project: Path, candidate: str, output: Path, runtime_dir: Pa
     project_id = before["projectId"]
     root = default_journal_root() if journal_root is None else Path(journal_root)
     current = journal_path(project, project_id, root)
-    discovery = discover_journal_candidates(project, project_id, root)
-    candidates = discovery["candidates"]
-    if (len(candidates) != 1 or candidates[0]["partition"] != candidate or
-            candidates[0]["journalState"] != "present"):
-        raise InventoryError("journal-bind-evidence: one complete candidate is required")
+    mapping, chain = candidate_journal_chain(project, project_id, candidate, root)
     if current.parent.exists() and (not current.parent.is_dir() or
                                     any(current.parent.iterdir())):
         raise InventoryError("journal-bind-evidence: current partition is already active")
-    mapping = Path(candidates[0]["path"])
     mapping_bytes = mapping.read_bytes()
     entries = read_journal(mapping)["entries"]
     proof = (_old_path_evidence(old_common_dir, candidate) if old_common_dir is not None
@@ -152,6 +148,7 @@ def preview_binding(project: Path, candidate: str, output: Path, runtime_dir: Pa
     preview = {
         "formatVersion": 1, "state": "journal-bind-preview", "projectId": project_id,
         "currentPartition": current.parent.parent.name, "candidatePartition": candidate,
+        "canonicalPartition": mapping.parent.parent.name, "bindingChain": chain,
         "mappingSha256": _sha(mapping_bytes), "sourceInventorySha256": _sha(json.dumps(
             before, sort_keys=True, separators=(",", ":")).encode("utf-8")),
         "evidence": proof, "entries": resolved,
@@ -230,11 +227,12 @@ def bind_journal(project: Path, preview_path: Path, runtime_dir: Path,
             "formatVersion": 1, "projectId": project_id,
             "currentPartition": preview["currentPartition"],
             "candidatePartition": preview["candidatePartition"],
-            "canonicalPartition": preview["candidatePartition"],
+            "canonicalPartition": preview["canonicalPartition"],
             "initialMappingSha256": preview["mappingSha256"],
             "previewSha256": _sha(preview_bytes),
             "boundAt": datetime.now(timezone.utc).isoformat(),
         }
+        value["bindingSha256"] = binding_checksum(value)
         file_descriptor, temporary_name = tempfile.mkstemp(prefix=".binding-",
                                                            dir=pointer.parent)
         temporary = Path(temporary_name)
@@ -256,4 +254,4 @@ def bind_journal(project: Path, preview_path: Path, runtime_dir: Path,
     finally:
         os.close(descriptor)
     return {"state": "journal-bound", "projectId": project_id,
-            "canonicalPartition": preview["candidatePartition"]}
+            "canonicalPartition": preview["canonicalPartition"]}
