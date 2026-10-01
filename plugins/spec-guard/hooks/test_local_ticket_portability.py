@@ -246,6 +246,34 @@ class SourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(InventoryError, "archive-invalid"):
             verify_archive(archive)
 
+    def test_archive_verification_rejects_bundle_tree_symlink(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        crafted = self.root.parent / "crafted-bundle"
+        crafted.mkdir()
+        git(crafted, "init", "-q")
+        git(crafted, "config", "user.email", "test@example.invalid")
+        git(crafted, "config", "user.name", "Test")
+        git(crafted, "checkout", "-q", "--orphan", "__epiq_state__")
+        (crafted / ".epiq").mkdir()
+        (crafted / ".epiq" / "events").symlink_to(self.root.parent / "outside")
+        git(crafted, "add", ".epiq")
+        git(crafted, "commit", "-qm", "unsafe tree")
+        bundle = archive / "state.bundle"
+        bundle.unlink()
+        git(crafted, "bundle", "create", str(bundle), "refs/heads/__epiq_state__")
+        manifest_path = archive / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["stateHead"] = git(crafted, "rev-parse", "HEAD")
+        bundle_record = next(item for item in manifest["files"]
+                             if item["path"] == "state.bundle")
+        bundle_record["size"] = bundle.stat().st_size
+        bundle_record["sha256"] = hashlib.sha256(bundle.read_bytes()).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
     def test_archive_and_verify_cli_return_json_outcomes(self):
         self.write_events("actor.jsonl", event("EV1"))
         archive = self.root.parent / "archive"
@@ -267,6 +295,17 @@ class SourceInventoryTests(unittest.TestCase):
         payload = json.loads(manifest.read_text(encoding="utf-8"))
         payload["projectId"] = "DIFFERENT"
         manifest.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
+
+    def test_archive_verification_rejects_mismatched_event_ids(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        archive_project(self.root, archive)
+        manifest_path = archive / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["eventIds"] = ["MISSING"]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         with self.assertRaisesRegex(InventoryError, "archive-invalid"):
             verify_archive(archive)
 

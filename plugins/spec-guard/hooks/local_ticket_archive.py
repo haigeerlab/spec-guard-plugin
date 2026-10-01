@@ -15,7 +15,7 @@ from typing import Any
 from local_ledger_runtime import (
     PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
 )
-from local_ticket_portability import InventoryError, inventory_project, worktree_roots
+from local_ticket_portability import InventoryError, _event_lines, inventory_project, worktree_roots
 from local_ticket_journal import journal_path, read_journal
 
 
@@ -89,6 +89,7 @@ def verify_archive(archive: Path) -> dict[str, Any]:
             identity["projectId"] != manifest["projectId"]):
         raise InventoryError("archive-invalid: project identity differs from manifest")
     expected = {"manifest.json"}
+    event_payloads: dict[str, str] = {}
     for record in manifest["files"]:
         if (not isinstance(record, dict) or set(record) != {"path", "size", "sha256"}
                 or not isinstance(record["path"], str) or not _safe_name(record["path"])
@@ -107,6 +108,19 @@ def verify_archive(archive: Path) -> dict[str, Any]:
         data = file_path.read_bytes()
         if len(data) != record["size"] or hashlib.sha256(data).hexdigest() != record["sha256"]:
             raise InventoryError("archive-invalid: file hash differs")
+        if record["path"].startswith(".epiq/events/"):
+            try:
+                events = _event_lines(data, record["path"])
+            except InventoryError as error:
+                raise InventoryError("archive-invalid: event file is invalid") from error
+            for event in events:
+                event_id = event["id"][0]
+                canonical = json.dumps(event, sort_keys=True, separators=(",", ":"))
+                if event_id in event_payloads and event_payloads[event_id] != canonical:
+                    raise InventoryError("archive-invalid: duplicate event differs")
+                event_payloads[event_id] = canonical
+    if manifest.get("eventIds") != sorted(event_payloads):
+        raise InventoryError("archive-invalid: event IDs differ from archived files")
     if not {"state.bundle", ".epiq/project.json"}.issubset(expected):
         raise InventoryError("archive-invalid: required file is missing")
     actual = set()
@@ -129,11 +143,30 @@ def verify_archive(archive: Path) -> dict[str, Any]:
     if ".spec-guard/mapping.json" in expected:
         read_journal(archive / ".spec-guard/mapping.json")
     with tempfile.TemporaryDirectory(prefix="sg-archive-verify-") as temporary:
-        _git(Path(temporary), "init", "-q")
-        _git(Path(temporary), "bundle", "verify", str(archive / "state.bundle"))
-        heads = _git(Path(temporary), "bundle", "list-heads", str(archive / "state.bundle"))
-    if heads.splitlines() != [manifest["stateHead"] + " refs/heads/" + STATE_BRANCH]:
-        raise InventoryError("archive-invalid: bundle does not match state branch HEAD")
+        checkout = Path(temporary)
+        bundle = str(archive / "state.bundle")
+        _git(checkout, "init", "-q")
+        _git(checkout, "bundle", "verify", bundle)
+        heads = _git(checkout, "bundle", "list-heads", bundle)
+        if heads.splitlines() != [manifest["stateHead"] + " refs/heads/" + STATE_BRANCH]:
+            raise InventoryError("archive-invalid: bundle does not match state branch HEAD")
+        _git(checkout, "fetch", "-q", bundle,
+             "refs/heads/" + STATE_BRANCH + ":refs/heads/" + STATE_BRANCH)
+        history = _git(checkout, "log", "--name-only", "--no-renames", "-z",
+                       "--pretty=format:", "refs/heads/" + STATE_BRANCH)
+        if any(name and not name.startswith(".epiq/") for name in history.split("\0")):
+            raise InventoryError("archive-invalid: bundle history contains non-ledger files")
+        tree = _git(checkout, "ls-tree", "-rz", "--full-tree",
+                    "refs/heads/" + STATE_BRANCH)
+        for record in tree.split("\0"):
+            if not record:
+                continue
+            metadata, separator, name = record.partition("\t")
+            fields = metadata.split()
+            if (separator != "\t" or len(fields) != 3 or
+                    fields[0] not in ("100644", "100755") or fields[1] != "blob" or
+                    not name.startswith(".epiq/")):
+                raise InventoryError("archive-invalid: bundle tree contains unsafe file")
     return {"state": "verified", "projectId": manifest.get("projectId"),
             "eventCount": len(manifest.get("eventIds", [])), "fileCount": len(expected) - 1}
 
