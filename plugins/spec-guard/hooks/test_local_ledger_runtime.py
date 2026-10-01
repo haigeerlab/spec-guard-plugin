@@ -904,6 +904,7 @@ class EpiqStorageCheckTests(unittest.TestCase):
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
         code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
         self.assertEqual((code, result["state"]), (0, "protected"))
+        self.assertEqual((result["previousMode"], result["mode"]), ("0755", "0700"))
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
         self.assertEqual((event.stat().st_mode, event.read_bytes()), event_before)
         code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)

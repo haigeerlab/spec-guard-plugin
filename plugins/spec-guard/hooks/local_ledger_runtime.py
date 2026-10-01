@@ -595,7 +595,7 @@ def storage_protect(global_dir: Path, confirm: bool = False) -> tuple[int, dict[
             os.close(descriptor)
     except OSError:
         return 1, {**check, "state": "unknown", "diagnostic": "epiq-global-protect-failed"}
-    return 0, {**preview, "state": "protected"}
+    return 0, {**preview, "state": "protected", "previousMode": check["mode"], "mode": "0700"}
 
 
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
