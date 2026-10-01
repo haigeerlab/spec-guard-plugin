@@ -15,7 +15,8 @@ The archive contains `manifest.json`, a single-state-branch Git bundle, the Epiq
 identity, raw event/media files, and a private mapping journal snapshot if one exists. It
 does not contain project source or other Git branches. `verify --prove` compares all source
 events with Epiq's materialized view and checks a disposable write. Copy the archive to
-independent storage and verify that copy before relying on it for disaster recovery.
+independent storage and verify that copy before relying on it for disaster recovery. Archive
+creation stops if the destination directory does not retain private POSIX mode (0700).
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \

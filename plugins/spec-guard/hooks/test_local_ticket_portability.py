@@ -198,6 +198,26 @@ class SourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(InventoryError, "archive-output-exists"):
             archive_project(self.root, existing)
 
+    def test_archive_refuses_filesystem_without_private_directory_permissions(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        archive = self.root.parent / "archive"
+        original = local_ticket_archive._require_private_directory
+
+        def reject_output(path):
+            if path == archive:
+                raise InventoryError("archive-output-unsafe: destination is not private")
+            original(path)
+
+        with patch("local_ticket_archive._require_private_directory", side_effect=reject_output):
+            with self.assertRaisesRegex(InventoryError, "archive-output-unsafe"):
+                archive_project(self.root, archive)
+        self.assertFalse(archive.exists())
+        world_readable = self.root.parent / "world-readable"
+        world_readable.mkdir(mode=0o755)
+        world_readable.chmod(0o755)
+        with self.assertRaisesRegex(InventoryError, "archive-output-unsafe"):
+            original(world_readable)
+
     def test_archive_rejects_state_branch_with_source_history(self):
         git(self.root, "worktree", "remove", str(self.state_root))
         git(self.root, "branch", "-D", "__epiq_state__")

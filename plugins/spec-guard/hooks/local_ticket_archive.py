@@ -44,6 +44,13 @@ def _record(path: Path, base: Path) -> dict[str, Any]:
     }
 
 
+def _require_private_directory(path: Path) -> None:
+    if path.stat().st_mode & 0o077:
+        raise InventoryError(
+            "archive-output-unsafe: destination does not retain private POSIX mode"
+        )
+
+
 def _safe_name(name: str) -> bool:
     relative = PurePosixPath(name)
     if (relative.is_absolute() or not relative.parts or ".." in relative.parts
@@ -153,6 +160,7 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
     temporary = Path(tempfile.mkdtemp(prefix=".sg-archive-", dir=output.parent))
     try:
         os.chmod(temporary, 0o700)
+        _require_private_directory(temporary)
         bundle = temporary / "state.bundle"
         _git(project, "bundle", "create", str(bundle), "refs/heads/" + STATE_BRANCH)
         config_source = project / ".epiq" / "project.json"
@@ -200,6 +208,11 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
             output.mkdir(mode=0o700)
         except FileExistsError as error:
             raise InventoryError("archive-output-exists: output must be new") from error
+        try:
+            _require_private_directory(output)
+        except InventoryError:
+            output.rmdir()
+            raise
         # Claim the directory before publishing; the manifest is moved last.
         for name in ("state.bundle", ".epiq", ".spec-guard", "manifest.json"):
             if (temporary / name).exists():
