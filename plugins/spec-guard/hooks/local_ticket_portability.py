@@ -32,6 +32,21 @@ def _git(project: Path, *arguments: str) -> str:
     return result.stdout.strip()
 
 
+def worktree_roots(project: Path) -> list[Path]:
+    """Return every registered checkout sharing this project's Git common dir."""
+    listing = _git(project, "worktree", "list", "--porcelain", "-z")
+    roots = []
+    for record in listing.split("\0"):
+        if record.startswith("worktree "):
+            path = Path(record[len("worktree "):])
+            if not path.is_absolute():
+                raise InventoryError("source-unknown: Git worktree path is invalid")
+            roots.append(path.resolve())
+    if not roots or Path(project).resolve() not in roots:
+        raise InventoryError("source-unknown: Git worktree list is incomplete")
+    return roots
+
+
 def _directory(path: Path) -> None:
     if path.is_symlink() or not path.is_dir():
         raise InventoryError("source-unknown: required Epiq directory is unsafe or absent")

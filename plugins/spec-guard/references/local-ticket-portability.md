@@ -17,6 +17,8 @@ does not contain project source or other Git branches. `verify --prove` compares
 events with Epiq's materialized view and checks a disposable write. Copy the archive to
 independent storage and verify that copy before relying on it for disaster recovery. Archive
 creation stops if the destination directory does not retain private POSIX mode (0700).
+Archive and private preview outputs cannot be placed inside any linked worktree of the
+source repository.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \

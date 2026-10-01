@@ -15,7 +15,7 @@ from typing import Any
 from local_ledger_runtime import (
     PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
 )
-from local_ticket_portability import InventoryError, inventory_project
+from local_ticket_portability import InventoryError, inventory_project, worktree_roots
 from local_ticket_journal import journal_path, read_journal
 
 
@@ -150,7 +150,8 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
            for name in history.split("\0")):
         raise InventoryError("archive-source-history: state branch includes non-ledger files")
     destination = output.resolve(strict=False)
-    if _within(destination, project) or _within(destination, state_root):
+    if _within(destination, state_root) or any(
+            _within(destination, root) for root in worktree_roots(project)):
         raise InventoryError("archive-output-unsafe: output overlaps Local source")
     if output.exists() or output.is_symlink():
         raise InventoryError("archive-output-exists: output must be new")

@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 from local_ledger_runtime import state_worktree_status
 from local_ticket_handoff import snapshot_issue
-from local_ticket_portability import InventoryError
+from local_ticket_portability import InventoryError, worktree_roots
 
 
 ISSUE_MARKER = "spec-guard-local-ticket:v1"
@@ -139,7 +139,8 @@ def create_preview(project: Path, issue_id: str, runtime_dir: Path, platform: st
     snapshot = snapshot_issue(project, issue_id, runtime_dir)
     state_root = Path(state_worktree_status(project, snapshot["projectId"])["path"])
     destination = output.resolve(strict=False)
-    if (project == destination or project in destination.parents or
+    if (any(root == destination or root in destination.parents
+            for root in worktree_roots(project)) or
             state_root == destination or state_root in destination.parents or
             not output.parent.is_dir() or output.exists() or output.is_symlink()):
         raise InventoryError("preview-output-unsafe: output must be a new file outside Local source")

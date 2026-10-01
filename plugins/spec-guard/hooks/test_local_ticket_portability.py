@@ -198,6 +198,15 @@ class SourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(InventoryError, "archive-output-exists"):
             archive_project(self.root, existing)
 
+    def test_archive_refuses_output_in_sibling_worktree(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        sibling = self.root.parent / "sibling"
+        git(self.root, "worktree", "add", "-q", "-b", "sibling", str(sibling), "HEAD")
+        output = sibling / "private-archive"
+        with self.assertRaisesRegex(InventoryError, "archive-output-unsafe"):
+            archive_project(self.root, output)
+        self.assertFalse(output.exists())
+
     def test_archive_refuses_filesystem_without_private_directory_permissions(self):
         self.write_events("actor.jsonl", event("EV1"))
         archive = self.root.parent / "archive"
@@ -425,6 +434,19 @@ class SourceInventoryTests(unittest.TestCase):
         self.assertEqual(preview["body"].count("spec-guard-local-event:v1"), 2)
         self.assertIn("spec-guard-local-ticket:v1", preview["body"])
         self.assertNotIn(str(self.root), output.read_text(encoding="utf-8"))
+
+    def test_preview_refuses_output_in_sibling_worktree(self):
+        sibling = self.root.parent / "sibling"
+        git(self.root, "worktree", "add", "-q", "-b", "sibling", str(sibling), "HEAD")
+        metadata = {"full_name": "team/repo", "private": True, "has_issues": True,
+                    "permissions": {"push": True}, "id": 42}
+        with patch("local_ticket_preview.snapshot_issue",
+                   return_value={"projectId": PROJECT_ID}):
+            with self.assertRaisesRegex(InventoryError, "preview-output-unsafe"):
+                create_preview(self.root, "I1", self.root.parent / "runtime",
+                               "github", "github.com", "team/repo", "private",
+                               sibling / "private-preview.json",
+                               runner=lambda arguments: json.dumps(metadata))
 
     def test_preview_rejects_unknown_permission_and_visibility_mismatch(self):
         limited = {"full_name": "team/repo", "private": False, "has_issues": True,
