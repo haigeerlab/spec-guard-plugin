@@ -598,6 +598,21 @@ class SourceInventoryTests(unittest.TestCase):
         with publication_lock(path, key):
             self.assertTrue(path.with_name("mapping." + key + ".publish.lock").exists())
 
+    def test_new_lock_file_is_fully_initialized_before_publication(self):
+        lock = self.root.parent / "atomic.lock"
+        original_link = os.link
+
+        def inspect_link(source, destination):
+            self.assertEqual(Path(source).read_bytes(), MAGIC)
+            self.assertFalse(Path(destination).exists())
+            return original_link(source, destination)
+
+        with patch("local_ticket_lock.os.link", side_effect=inspect_link) as linked:
+            descriptor = acquire_lock(lock, "journal-busy")
+        self.assertEqual(linked.call_count, 1)
+        os.close(descriptor)
+        self.assertEqual(lock.read_bytes(), MAGIC)
+
     def test_legacy_empty_lock_is_not_silently_stolen(self):
         path = journal_path(self.root, PROJECT_ID, self.root.parent / "private-journals")
         key = entry_key(PROJECT_ID, "ISSUE1", {"platform": "github", "host": "github.com",

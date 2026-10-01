@@ -79,7 +79,14 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         if earlier and earlier.get("digestVersion", 1) != version:
             return {"state": "preview-incompatible",
                     "diagnostic": "existing handoff uses another format; regenerate with --legacy-format if version 1"}
-        if earlier and earlier.get("sourceDigest") != source["sourceDigest"]:
+        rejected_before_write = bool(
+            earlier and earlier.get("state") == "planned" and
+            earlier.get("createAttempted") is False and
+            earlier.get("remoteId") is None and
+            type(earlier.get("rejectionStatus")) is int
+        )
+        if (earlier and earlier.get("sourceDigest") != source["sourceDigest"] and
+                not rejected_before_write):
             write_entry(path, key, {**earlier, "state": "conflict"})
             return {"state": "conflict", "diagnostic": "source history diverged"}
         issues = _items(provider.list_issues(), "issues")
@@ -106,6 +113,9 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
             if earlier and earlier.get("createAttempted"):
                 return {"state": "publication-uncertain",
                         "diagnostic": "prior create attempt is not visible; manual reconciliation required"}
+            if version == 1:
+                return {"state": "preview-incompatible",
+                        "diagnostic": "legacy format requires an existing remote handoff"}
             entry = {"state": "planned", "digestVersion": version,
                      "sourceDigest": source["sourceDigest"],
                      "destination": destination, "createAttempted": True,

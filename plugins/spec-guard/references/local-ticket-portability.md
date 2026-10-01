@@ -67,18 +67,21 @@ comment, publication reports an ambiguous marker conflict. This preserves the no
 boundary even when the private journal is missing and someone moved the marker.
 
 An API response with a recognized, definite 4xx rejection returns `provider-rejected` with
-its status code. No Issue or comment attempt is treated as successful, so correct the
-permission or content, create a fresh preview if the source changes, and retry. A timeout,
+its status code. A rejected Issue creation with no remote write may use a fresh source
+preview after a content correction; once an Issue or comment exists, changed source
+history remains a conflict. Correct the permission or content and retry. A timeout,
 server failure, or response without a reliable status remains `publication-uncertain`.
 Large histories can exceed provider limits; the CLI does not split them automatically and
 must not truncate the Local context to force publication.
 
-Current handoff and restore locks use private retained files with OS advisory locks; a
-process crash releases the OS lock. If a lock is reported as legacy or damaged, first prove
+Current handoff and restore locks publish a fully initialized private lock file
+atomically and use OS advisory locks; a process crash releases the OS lock. If a lock
+is reported as legacy or damaged, first prove
 no older publisher or restore is still running, preserve the lock and journal for diagnosis,
 then remove only that stale lock file before retrying. Never delete a mapping journal or a
 partial restore target to bypass a conflict. Handoffs started before the stable source
 digest change use version 1. Regenerate their preview with `handoff-preview --legacy-format`
-and review it before continuation; a default version 2 preview returns
+and review it before continuation. Legacy format requires an existing remote handoff
+marker; new handoffs use version 2. A default version 2 preview returns
 `preview-incompatible` without changing the journal. An actual old source digest mismatch
 remains `conflict` rather than silently rewriting the already published remote body.

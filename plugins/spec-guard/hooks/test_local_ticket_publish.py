@@ -79,7 +79,8 @@ class HandoffTests(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.project), "init", "-q"], check=True)
         self.journal_root = self.base / "private-journal"
         self.source = {
-            "projectId": PROJECT_ID, "issueId": ISSUE_ID, "sourceDigest": "a" * 64,
+            "projectId": PROJECT_ID, "issueId": ISSUE_ID, "formatVersion": 2,
+            "sourceDigest": "a" * 64,
             "issue": {"title": "Scope", "description": "Current scope",
                       "isClosed": True}, "attachments": [], "codeReferences": [],
             "events": [
@@ -88,7 +89,7 @@ class HandoffTests(unittest.TestCase):
                  "payload": {"id": "C1", "issue": ISSUE_ID, "md": "Decision"}},
             ],
         }
-        self.preview = {"formatVersion": 1, "state": "preview",
+        self.preview = {"formatVersion": 2, "state": "preview",
                         "source": self.source, "destination": DESTINATION,
                         "title": "Scope", "body": render_body(self.source)}
         self.provider = FakeProvider()
@@ -113,6 +114,12 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(read_journal(path)["entries"][key]["state"], "verified")
 
     def test_legacy_journal_requires_matching_preview_format(self):
+        self.provider.issues = [{"id": 1, "title": "Scope", "body": "",
+                                 "closed": True, "url": "https://example.invalid/issues/1"}]
+        self.source["formatVersion"] = 1
+        self.preview["formatVersion"] = 1
+        self.preview["body"] = render_body(self.source)
+        self.provider.issues[0]["body"] = self.preview["body"]
         self.assertEqual(self.publish()["state"], "verified")
         self.preview["formatVersion"] = 2
         self.source["formatVersion"] = 2
@@ -125,6 +132,13 @@ class HandoffTests(unittest.TestCase):
         self.source["formatVersion"] = 1
         self.preview["body"] = render_body(self.source)
         self.assertEqual(self.publish()["state"], "verified")
+
+    def test_new_legacy_handoff_without_remote_evidence_is_rejected(self):
+        self.source["formatVersion"] = 1
+        self.preview["formatVersion"] = 1
+        self.preview["body"] = render_body(self.source)
+        self.assertEqual(self.publish()["state"], "preview-incompatible")
+        self.assertEqual(self.provider.issues, [])
 
     def test_new_format_handoff_records_version(self):
         self.preview["formatVersion"] = 2
@@ -156,6 +170,19 @@ class HandoffTests(unittest.TestCase):
         self.provider.reject_create = False
         self.assertEqual(self.publish()["state"], "verified")
         self.assertEqual(len(self.provider.issues), 1)
+
+    def test_content_rejection_allows_new_source_preview_before_any_remote_write(self):
+        self.provider.reject_create = True
+        self.assertEqual(self.publish()["state"], "provider-rejected")
+        self.source["sourceDigest"] = "b" * 64
+        self.source["issue"]["description"] = "Revised scope"
+        self.preview["body"] = render_body(self.source)
+        self.provider.reject_create = False
+        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+        path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        self.assertEqual(read_journal(path)["entries"][key]["sourceDigest"], "b" * 64)
 
     def test_lost_comment_response_and_manual_edit(self):
         self.provider.lose_comment = "after"
