@@ -5,7 +5,10 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
+import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +17,8 @@ from local_ticket_archive import verify_archive
 from local_ticket_handoff import _raw_events, _source_digest, snapshot_issue
 from local_ticket_journal import (PARTITION_NAME, default_journal_root,
                                   discover_journal_candidates, entry_key, journal_path,
-                                  read_journal)
+                                  read_journal, _prepare_parent)
+from local_ticket_lock import acquire_lock
 from local_ticket_portability import InventoryError, inventory_project, worktree_roots
 
 
@@ -165,3 +169,91 @@ def preview_binding(project: Path, candidate: str, output: Path, runtime_dir: Pa
     return {"state": "journal-bind-previewed", "projectId": project_id,
             "candidatePartition": candidate, "entryCount": len(resolved),
             "output": str(output)}
+
+
+def _recheck_preview(project: Path, preview: dict[str, Any], preview_bytes: bytes,
+                     runtime_dir: Path, journal_root: Path | None) -> None:
+    proof = preview.get("evidence")
+    if (preview.get("state") != "journal-bind-preview" or
+            preview.get("formatVersion") != 1 or not isinstance(proof, dict)):
+        raise InventoryError("journal-bind-preview-invalid: review artifact is incomplete")
+    path = proof.get("path")
+    if not isinstance(path, str) or not path:
+        raise InventoryError("journal-bind-preview-invalid: source proof path is missing")
+    if proof.get("kind") == "old-common-dir":
+        evidence = {"old_common_dir": Path(path)}
+    elif proof.get("kind") == "archive":
+        evidence = {"archive": Path(path)}
+    else:
+        raise InventoryError("journal-bind-preview-invalid: source proof is unknown")
+    with tempfile.TemporaryDirectory(prefix="sg-bind-review-") as temporary:
+        output = Path(temporary) / "review.json"
+        preview_binding(project, preview["candidatePartition"], output, runtime_dir,
+                        journal_root=journal_root, **evidence)
+        if output.read_bytes() != preview_bytes:
+            raise InventoryError("journal-bind-preview-stale: source or candidate changed")
+
+
+def bind_journal(project: Path, preview_path: Path, runtime_dir: Path,
+                 journal_root: Path | None = None, confirm: bool = False) -> dict[str, Any]:
+    """Install a private pointer only after fresh local evidence and exclusive review."""
+    if not confirm:
+        raise InventoryError("confirmation-required: journal binding needs review")
+    preview_path = Path(preview_path)
+    descriptor = os.open(preview_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    with os.fdopen(descriptor, "rb") as handle:
+        info = os.fstat(handle.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or
+                stat.S_IMODE(info.st_mode) != 0o600):
+            raise InventoryError("journal-bind-preview-invalid: review artifact is not private")
+        preview_bytes = handle.read()
+    try:
+        preview = json.loads(preview_bytes)
+        project_id = preview["projectId"]
+    except (KeyError, TypeError, ValueError) as error:
+        raise InventoryError("journal-bind-preview-invalid: review artifact is unreadable") from error
+    if not isinstance(project_id, str) or not project_id.isalnum():
+        raise InventoryError("journal-bind-preview-invalid: project identity is invalid")
+    project = Path(project).resolve()
+    root = default_journal_root() if journal_root is None else Path(journal_root)
+    current = journal_path(project, project_id, root)
+    if preview.get("currentPartition") != current.parent.parent.name:
+        raise InventoryError("journal-bind-preview-stale: current Git partition differs")
+    _recheck_preview(project, preview, preview_bytes, runtime_dir, root)
+    _prepare_parent(current)
+    install_lock = current.parent.parent / ("binding." + project_id + ".install.lock")
+    descriptor = acquire_lock(install_lock, "journal-bind-busy")
+    try:
+        _recheck_preview(project, preview, preview_bytes, runtime_dir, root)
+        pointer = current.parent / "binding.json"
+        value = {
+            "formatVersion": 1, "projectId": project_id,
+            "currentPartition": preview["currentPartition"],
+            "candidatePartition": preview["candidatePartition"],
+            "canonicalPartition": preview["candidatePartition"],
+            "initialMappingSha256": preview["mappingSha256"],
+            "previewSha256": _sha(preview_bytes),
+            "boundAt": datetime.now(timezone.utc).isoformat(),
+        }
+        file_descriptor, temporary_name = tempfile.mkstemp(prefix=".binding-",
+                                                           dir=pointer.parent)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
+                os.fchmod(handle.fileno(), 0o600)
+                json.dump(value, handle, sort_keys=True)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.link(temporary, pointer)
+            directory_fd = os.open(pointer.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temporary.unlink(missing_ok=True)
+    finally:
+        os.close(descriptor)
+    return {"state": "journal-bound", "projectId": project_id,
+            "canonicalPartition": preview["candidatePartition"]}

@@ -198,7 +198,7 @@ def inventory_project(project: Path) -> dict[str, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=(
-        "inventory", "journal-candidates", "journal-bind-preview", "archive", "verify", "restore", "handoff-preview",
+        "inventory", "journal-candidates", "journal-bind-preview", "journal-bind", "archive", "verify", "restore", "handoff-preview",
         "handoff-publish",
     ))
     parser.add_argument("--project", type=Path)
@@ -219,7 +219,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
-    if args.command in ("inventory", "journal-candidates", "journal-bind-preview", "archive", "restore", "handoff-preview",
+    if args.command in ("inventory", "journal-candidates", "journal-bind-preview", "journal-bind", "archive", "restore", "handoff-preview",
                         "handoff-publish") and args.project is None:
         parser.error("--project is required")
     if args.command in ("archive", "handoff-preview", "journal-bind-preview") and args.output is None:
@@ -228,9 +228,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--archive is required")
     if args.command == "restore" and args.epiq_global_dir is None:
         parser.error("--epiq-global-dir is required")
-    if args.confirm and args.command not in ("restore", "handoff-publish"):
-        parser.error("--confirm is only available with restore or handoff-publish")
+    if args.confirm and args.command not in ("restore", "handoff-publish", "journal-bind"):
+        parser.error("--confirm is only available with restore, handoff-publish or journal-bind")
     if args.command == "handoff-publish" and args.preview is None:
+        parser.error("--preview is required")
+    if args.command == "journal-bind" and args.preview is None:
         parser.error("--preview is required")
     if args.command == "handoff-preview" and any(value is None for value in (
             args.issue_id, args.platform, args.host, args.target, args.visibility)):
@@ -257,6 +259,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.project, args.candidate, args.output, args.runtime_dir,
                 old_common_dir=args.old_common_dir, archive=args.archive,
             )
+        elif args.command == "journal-bind":
+            from local_ticket_bind import bind_journal
+            payload = bind_journal(args.project, args.preview, args.runtime_dir,
+                                   confirm=args.confirm)
         elif args.command == "archive":
             from local_ticket_archive import archive_project
             payload = archive_project(args.project, args.output)
