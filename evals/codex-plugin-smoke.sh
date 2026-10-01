@@ -100,40 +100,66 @@ print_plugin_repair() {
   echo "     codex plugin add spec-guard@spec-guard-marketplace"
 }
 
-grade() { # $1=transcript 或明确 hook 记录
-  local record="$1"
-  if [ ! -s "$record" ]; then
-    echo "  ⏭  没有 transcript/hook 输出：环境未就绪"
-    return 2
-  fi
-  if grep -q 'HOOK_UNTRUSTED\|HOOK_NOT_RUN' "$record"; then
-    echo "  ⏭  hook 未信任或未执行：在新会话用 /hooks 审核并信任"
-    return 2
-  fi
-  # 模型复述时可能把半角冒号写成全角（实测 Codex 回复“当前阶段：IDLE”），两种都算。
-  if grep -Eq '当前阶段[:：]' "$record"; then
-    echo "  ✅ 收到 spec-guard hook 注入的当前阶段"
-    return 0
-  fi
-  if grep -q 'HOOK_EXECUTED' "$record"; then
-    echo "  ❌ hook 已执行，但输出未包含有效的当前阶段事实"
-    return 1
-  fi
-  echo "  ⏭  无法证明 hook 是否执行：不把空输出判为产品失败"
-  return 2
+grade() { # $1=codex exec --json 的机器事件；模型回复不算 hook 证据
+  python3 - "$1" <<'PY'
+import json
+import re
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        events = [json.loads(line) for line in handle if line.strip()]
+except (OSError, UnicodeError, ValueError):
+    print("  ⏭  无法读取 Codex 机器事件；没有宿主 hook 结论")
+    raise SystemExit(2)
+
+observed = False
+for event in events:
+    if not isinstance(event, dict):
+        continue
+    output = event.get("hookSpecificOutput")
+    if output is None and str(event.get("type", "")).startswith("hook."):
+        nested = event.get("output")
+        if isinstance(nested, dict):
+            output = nested.get("hookSpecificOutput")
+    if not isinstance(output, dict) or output.get("hookEventName") != "UserPromptSubmit":
+        continue
+    observed = True
+    context = output.get("additionalContext")
+    if (isinstance(context, str) and "## spec-guard local workflow" in context
+            and re.search(r"当前阶段:\s*\*\*(?:IDLE|MAP_ONLY|NEEDS_SPEC|NEEDS_PLAN|BUILDING|MODULE_DONE|DONE)\*\*", context)):
+        print("  ✅ Codex 机器事件包含有效的 spec-guard 阶段注入")
+        raise SystemExit(0)
+
+if observed:
+    print("  ❌ hook 已执行，但没有有效的 spec-guard 阶段注入")
+    raise SystemExit(1)
+print("  ⏭  未观察到宿主 hook 事件；模型复述不能证明 hook 执行")
+types = sorted({event.get("type", "<missing>") for event in events
+                if isinstance(event, dict) and isinstance(event.get("type"), str)})
+if types:
+    print("  观察到的机器事件类型: " + ", ".join(types))
+raise SystemExit(2)
+PY
 }
 
 selftest() {
   local rc
   SMOKE_TMP="$(mktemp -d)"; trap 'rm -rf "$SMOKE_TMP"' EXIT
-  printf '%s\n' 'HOOK_EXECUTED 当前阶段: PLANNED' > "$SMOKE_TMP/valid"
+  printf '%s\n' '{"type":"hook.completed","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"## spec-guard local workflow\n当前阶段: **NEEDS_PLAN**"}}' > "$SMOKE_TMP/valid"
   grade "$SMOKE_TMP/valid"; rc=$?
   [ "$rc" -eq 0 ] || return 1
-  printf '%s\n' '当前阶段：IDLE' > "$SMOKE_TMP/fullwidth"
-  grade "$SMOKE_TMP/fullwidth" >/dev/null; rc=$?
-  [ "$rc" -eq 0 ] || return 1
-  printf '%s\n' 'HOOK_NOT_RUN' > "$SMOKE_TMP/untrusted"
-  grade "$SMOKE_TMP/untrusted"; rc=$?
+  printf '%s\n' '{"type":"item.completed","item":{"type":"agent_message","text":"当前阶段：IDLE"}}' > "$SMOKE_TMP/model-echo"
+  grade "$SMOKE_TMP/model-echo"; rc=$?
+  [ "$rc" -eq 2 ] || return 1
+  python3 - "$SMOKE_TMP/model-json" <<'PY'
+import json
+import sys
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"type": "item.completed", "item": {"type": "agent_message",
+              "text": '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit"}}'}}, handle)
+PY
+  grade "$SMOKE_TMP/model-json"; rc=$?
   [ "$rc" -eq 2 ] || return 1
   printf '%s\n' '{"installed":[]}' > "$SMOKE_TMP/missing-plugin.json"
   [ "$(plugin_state "$SMOKE_TMP/missing-plugin.json")" = missing ] || return 1
@@ -145,7 +171,7 @@ selftest() {
   [ "$(plugin_state "$SMOKE_TMP/ambiguous-plugin.json")" = ambiguous ] || return 1
   [ "$(plugin_state "$SMOKE_TMP/ambiguous-plugin.json" spec-guard@candidate /tmp/candidate)" = ready ] || return 1
   [ "$(plugin_state "$SMOKE_TMP/ambiguous-plugin.json" spec-guard@candidate /tmp/other)" = source-mismatch ] || return 1
-  printf '%s\n' 'HOOK_EXECUTED {not-json}' > "$SMOKE_TMP/invalid"
+  printf '%s\n' '{"type":"hook.completed","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: phase-guard.sh 执行失败"}}' > "$SMOKE_TMP/invalid"
   grade "$SMOKE_TMP/invalid"; rc=$?
   [ "$rc" -eq 1 ] || return 1
   printf '%s\n' 'model = "x"' '' '[projects."/keep"]' 'trust_level = "trusted"' '' \
@@ -160,7 +186,7 @@ selftest() {
   # fallbacks are not portable; read the mode through python3, which the smoke already requires.
   [ "$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' \
     "$SMOKE_TMP/config.toml")" = 640 ] || return 1
-  echo "  ✅ selftest: 0=通过、1=行为失败、2=环境未就绪；只清理 smoke 自己留下的信任记录"
+  echo "  ✅ selftest: 只接受机器 hook 事件；0=通过、1=行为失败、2=未观察到执行"
 }
 
 [ "$MODE" = "--selftest" ] && { selftest; exit $?; }
@@ -217,7 +243,7 @@ printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$WORK/AGENTS.md"
 printf '%s\n' '<!-- END:spec-guard-codex-convention -->' >> "$WORK/AGENTS.md"
 OUT="$WORK/transcript" ERR="$WORK/transcript.err"
 PROMPT='请只复述你收到的 spec-guard 当前阶段事实；若没有收到，输出 HOOK_NOT_RUN。'
-if ! ( cd "$WORK" && codex exec "$PROMPT" ) > "$OUT" 2> "$ERR"; then
+if ! ( cd "$WORK" && codex exec --json "$PROMPT" ) > "$OUT" 2> "$ERR"; then
   if grep -qi 'trust\|untrusted\|login\|auth' "$ERR"; then
     echo "  ⏭  Codex、登录或 hook trust 未就绪；用 /hooks 审核并信任后重试"
   else
