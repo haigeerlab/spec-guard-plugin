@@ -1,5 +1,6 @@
 """Failure-injection tests for explicit Local ticket handoff reconciliation."""
 import io
+from copy import deepcopy
 import json
 import tempfile
 import unittest
@@ -7,10 +8,11 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from local_ticket_handoff import _digest
 from local_ticket_journal import entry_key, journal_path, read_journal, write_entry
 from local_ticket_publish import publish_preview
 from local_ticket_preview import EVENT_MARKER, render_body
-from local_ticket_portability import main
+from local_ticket_portability import InventoryError, main
 from local_ticket_provider import ProviderRejected
 
 
@@ -132,6 +134,49 @@ class HandoffTests(unittest.TestCase):
         self.source["formatVersion"] = 1
         self.preview["body"] = render_body(self.source)
         self.assertEqual(self.publish()["state"], "verified")
+
+    def test_saved_legacy_preview_survives_only_reachability_change(self):
+        self.source["state"] = "snapshot"
+        self.source["formatVersion"] = 1
+        self.source["codeReferences"] = [{"sha": "a" * 40,
+                                          "sourceCommitReachable": True,
+                                          "targetCommitReachable": None}]
+        self.source["sourceDigest"] = _digest({
+            key: self.source[key] for key in
+            ("events", "issue", "attachments", "codeReferences")})
+        self.preview["formatVersion"] = 1
+        self.preview["body"] = render_body(self.source)
+        self.provider.issues = [{"id": 1, "title": "Scope", "body": self.preview["body"],
+                                 "closed": True, "url": "https://example.invalid/issues/1"}]
+        path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(path, key, {"state": "partial", "digestVersion": 1,
+                                "sourceDigest": self.source["sourceDigest"],
+                                "destination": DESTINATION, "remoteId": 1,
+                                "createAttempted": True, "commentAttempts": [],
+                                "verifiedEventIds": [], "stateVerified": False})
+        fresh = deepcopy(self.source)
+        fresh["codeReferences"][0]["sourceCommitReachable"] = False
+        fresh["stateHead"] = "unrelated-head-change"
+        fresh["sourceDigest"] = _digest({
+            key: fresh[key] for key in
+            ("events", "issue", "attachments", "codeReferences")})
+        with patch("local_ticket_publish.snapshot_issue", return_value=fresh):
+            result = publish_preview(self.preview, self.project, self.base / "runtime",
+                                     self.provider, self.journal_root, confirm=True)
+        self.assertEqual(result["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+
+    def test_saved_legacy_preview_rejects_changed_issue_events(self):
+        self.source["formatVersion"] = 1
+        self.preview["formatVersion"] = 1
+        self.preview["body"] = render_body(self.source)
+        fresh = deepcopy(self.source)
+        fresh["events"][1]["payload"]["md"] = "Different decision"
+        with patch("local_ticket_publish.snapshot_issue", return_value=fresh):
+            with self.assertRaisesRegex(InventoryError, "preview-stale"):
+                publish_preview(self.preview, self.project, self.base / "runtime",
+                                self.provider, self.journal_root, confirm=True)
 
     def test_new_legacy_handoff_without_remote_evidence_is_rejected(self):
         self.source["formatVersion"] = 1
@@ -273,6 +318,27 @@ class HandoffTests(unittest.TestCase):
         self.provider.issues[0]["body"] = "Edited by user\n" + marker
         self.assertEqual(self.publish()["state"], "conflict")
         self.assertEqual(len(self.provider.issues), 1)
+
+    def test_remote_edit_conflict_preserves_uncertain_comment_attempt(self):
+        self.provider.lose_comment = "before"
+        self.assertEqual(self.publish()["state"], "publication-uncertain")
+        original_body = self.provider.issues[0]["body"]
+        self.provider.issues[0]["body"] = original_body + "\nmanual edit"
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.provider.issues[0]["body"] = original_body
+        self.provider.lose_comment = None
+        self.assertEqual(self.publish()["state"], "publication-uncertain")
+        self.assertEqual(self.provider.comments.get(1, []), [])
+
+    def test_duplicate_marker_conflict_preserves_uncertain_comment_attempt(self):
+        self.provider.lose_comment = "before"
+        self.assertEqual(self.publish()["state"], "publication-uncertain")
+        self.provider.issues.append({**self.provider.issues[0], "id": 2})
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.provider.issues.pop()
+        self.provider.lose_comment = None
+        self.assertEqual(self.publish()["state"], "publication-uncertain")
+        self.assertEqual(self.provider.comments.get(1, []), [])
 
     def test_attachment_remains_partial_without_duplicate_on_retry(self):
         self.source["attachments"] = [{"hash": "a" * 64, "ext": "gif", "bytes": 10}]

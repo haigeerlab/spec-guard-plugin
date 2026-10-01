@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from local_ticket_handoff import snapshot_issue
+from local_ticket_handoff import _digest, snapshot_issue
 from local_ticket_journal import (
     entry_key, journal_path, publication_lock, read_journal, write_entry,
 )
@@ -46,6 +46,26 @@ def _contains_marker(body: Any, marker: str) -> bool:
     return marker in str(body or "")
 
 
+def _legacy_same_facts(saved: dict[str, Any], fresh: dict[str, Any]) -> bool:
+    """Allow an old preview only when its authoritative Local facts are unchanged."""
+    digest = _digest({key: saved[key] for key in
+                      ("events", "issue", "attachments", "codeReferences")})
+    if saved.get("sourceDigest") != digest:
+        return False
+
+    def facts(value: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "state": value["state"], "formatVersion": value["formatVersion"],
+            "projectId": value["projectId"], "issueId": value["issueId"],
+            "issue": value["issue"], "attachments": value["attachments"],
+            "events": [{key: item for key, item in event.items() if key != "actorName"}
+                       for event in value["events"]],
+            "codeShas": [item["sha"] for item in value["codeReferences"]],
+        }
+
+    return facts(saved) == facts(fresh)
+
+
 def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                     provider: Any, journal_root: Path | None = None,
                     confirm: bool = False) -> dict[str, Any]:
@@ -61,8 +81,9 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     destination = preview["destination"]
     version = preview["formatVersion"]
     fresh = snapshot_issue(project, source["issueId"], runtime_dir, legacy=version == 1)
-    if (fresh != source or preview["body"] != render_body(fresh) or
-            preview.get("title") != fresh["issue"]["title"]):
+    if (preview["body"] != render_body(source) or
+            preview.get("title") != source["issue"]["title"] or
+            (fresh != source and (version != 1 or not _legacy_same_facts(source, fresh)))):
         raise InventoryError("preview-stale: Local source changed")
     if provider.target_facts() != destination:
         raise InventoryError("preview-stale: remote target facts changed")
@@ -103,7 +124,8 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         matches = [issue for issue in issues if not issue.get("isPullRequest") and
                    _has_issue_marker(issue.get("body"), marker)]
         if len(matches) > 1:
-            write_entry(path, key, {"state": "conflict", "digestVersion": version,
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
                                     "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "reason": "multiple markers"})
             return {"state": "conflict", "diagnostic": "multiple destination issues"}
@@ -158,7 +180,8 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         current = provider.get_issue(remote_id)
         if (current.get("body") != preview["body"] or
                 current.get("title") != preview["title"]):
-            write_entry(path, key, {"state": "conflict", "digestVersion": version,
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
                                     "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "remoteId": remote_id,
                                     "reason": "remote issue edited"})
