@@ -7,7 +7,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from local_ticket_journal import entry_key, journal_path, read_journal
+from local_ticket_journal import entry_key, journal_path, read_journal, write_entry
 from local_ticket_publish import publish_preview
 from local_ticket_preview import EVENT_MARKER, render_body
 from local_ticket_portability import main
@@ -183,6 +183,30 @@ class HandoffTests(unittest.TestCase):
         path = journal_path(self.project, PROJECT_ID, self.journal_root)
         key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
         self.assertEqual(read_journal(path)["entries"][key]["sourceDigest"], "b" * 64)
+
+    def test_rejected_legacy_create_can_restart_with_version_two(self):
+        path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(path, key, {"state": "planned", "digestVersion": 1,
+                                "sourceDigest": "a" * 64, "destination": DESTINATION,
+                                "createAttempted": False, "remoteId": None,
+                                "verifiedEventIds": [], "rejectionStatus": 422})
+        self.source["sourceDigest"] = "b" * 64
+        self.preview["body"] = render_body(self.source)
+        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+
+    def test_changed_source_after_rejection_conflicts_if_remote_marker_appears(self):
+        self.provider.reject_create = True
+        self.assertEqual(self.publish()["state"], "provider-rejected")
+        self.source["sourceDigest"] = "b" * 64
+        self.source["issue"]["description"] = "Revised scope"
+        self.preview["body"] = render_body(self.source)
+        self.provider.reject_create = False
+        self.provider.issues = [{"id": 1, "title": "Scope", "body": self.preview["body"],
+                                 "closed": True, "url": "https://example.invalid/issues/1"}]
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertEqual(len(self.provider.issues), 1)
 
     def test_lost_comment_response_and_manual_edit(self):
         self.provider.lose_comment = "after"

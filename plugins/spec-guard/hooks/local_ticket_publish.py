@@ -76,17 +76,18 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
 
     with publication_lock(path, key):
         earlier = read_journal(path)["entries"].get(key)
-        if earlier and earlier.get("digestVersion", 1) != version:
-            return {"state": "preview-incompatible",
-                    "diagnostic": "existing handoff uses another format; regenerate with --legacy-format if version 1"}
         rejected_before_write = bool(
             earlier and earlier.get("state") == "planned" and
             earlier.get("createAttempted") is False and
             earlier.get("remoteId") is None and
             type(earlier.get("rejectionStatus")) is int
         )
-        if (earlier and earlier.get("sourceDigest") != source["sourceDigest"] and
-                not rejected_before_write):
+        format_changed = bool(earlier and earlier.get("digestVersion", 1) != version)
+        source_changed = bool(earlier and earlier.get("sourceDigest") != source["sourceDigest"])
+        if format_changed and not rejected_before_write:
+            return {"state": "preview-incompatible",
+                    "diagnostic": "existing handoff uses another format; regenerate with --legacy-format if version 1"}
+        if source_changed and not rejected_before_write:
             write_entry(path, key, {**earlier, "state": "conflict"})
             return {"state": "conflict", "diagnostic": "source history diverged"}
         issues = _items(provider.list_issues(), "issues")
@@ -106,6 +107,10 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                                     "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "reason": "multiple markers"})
             return {"state": "conflict", "diagnostic": "multiple destination issues"}
+        if matches and rejected_before_write and (format_changed or source_changed):
+            write_entry(path, key, {**earlier, "state": "conflict",
+                                    "reason": "remote marker appeared after rejection"})
+            return {"state": "conflict", "diagnostic": "source history diverged with remote marker"}
         found_existing = bool(matches)
         if matches:
             issue = matches[0]

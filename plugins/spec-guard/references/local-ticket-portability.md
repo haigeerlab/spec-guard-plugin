@@ -68,8 +68,10 @@ boundary even when the private journal is missing and someone moved the marker.
 
 An API response with a recognized, definite 4xx rejection returns `provider-rejected` with
 its status code. A rejected Issue creation with no remote write may use a fresh source
-preview after a content correction; once an Issue or comment exists, changed source
-history remains a conflict. Correct the permission or content and retry. A timeout,
+preview after a content correction; if a matching remote marker appears after that
+rejection while the source or format changed, publication stops as a conflict. Once an
+Issue or comment exists, changed source history remains a conflict. Correct the
+permission or content and retry. A timeout,
 server failure, or response without a reliable status remains `publication-uncertain`.
 Large histories can exceed provider limits; the CLI does not split them automatically and
 must not truncate the Local context to force publication.
@@ -82,6 +84,7 @@ then remove only that stale lock file before retrying. Never delete a mapping jo
 partial restore target to bypass a conflict. Handoffs started before the stable source
 digest change use version 1. Regenerate their preview with `handoff-preview --legacy-format`
 and review it before continuation. Legacy format requires an existing remote handoff
-marker; new handoffs use version 2. A default version 2 preview returns
+marker; new handoffs use version 2. A version 1 attempt definitely rejected before
+any remote write can restart with a version 2 preview. A default version 2 preview returns
 `preview-incompatible` without changing the journal. An actual old source digest mismatch
 remains `conflict` rather than silently rewriting the already published remote body.
