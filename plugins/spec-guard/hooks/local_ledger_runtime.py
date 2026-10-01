@@ -547,11 +547,55 @@ def storage_check(global_dir: Path) -> tuple[int, dict[str, Any]]:
         return 1, {**result, "state": "unsafe", "diagnostic": "epiq-global-foreign-owner"}
     mode = stat.S_IMODE(metadata.st_mode)
     result["mode"] = format(mode, "04o")
-    if mode & 0o077:
-        return 1, {**result, "state": "exposed", "diagnostic": "epiq-global-accessible-to-others"}
     if mode & 0o700 != 0o700:
         return 1, {**result, "state": "unusable", "diagnostic": "epiq-global-owner-access-incomplete"}
+    if mode & 0o077:
+        return 1, {**result, "state": "exposed", "diagnostic": "epiq-global-accessible-to-others"}
     return 0, {**result, "state": "private-posix"}
+
+
+def storage_protect(global_dir: Path, confirm: bool = False) -> tuple[int, dict[str, Any]]:
+    """Preview or narrow only an owned Epiq data root, without touching its children."""
+    path = Path(global_dir)
+    _, check = storage_check(path)
+    if check["state"] == "private-posix":
+        return 0, {**check, "state": "already-private"}
+    if check["state"] != "exposed":
+        return 1, check
+    try:
+        parent = path.parent.lstat()
+    except OSError:
+        return 1, {**check, "state": "unknown", "diagnostic": "epiq-global-parent-unreadable"}
+    if (not stat.S_ISDIR(parent.st_mode) or parent.st_uid != os.getuid()
+            or stat.S_IMODE(parent.st_mode) & 0o022):
+        return 1, {**check, "state": "unsafe", "diagnostic": "epiq-global-parent-unsafe"}
+    preview = {**check, "state": "protectable", "targetMode": "0700"}
+    preview.pop("diagnostic", None)
+    if not confirm:
+        return 0, preview
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        return 1, {**check, "state": "unknown", "diagnostic": "epiq-global-safe-open-unsupported"}
+    flags |= os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            opened = os.fstat(descriptor)
+            current = path.lstat()
+            if (not stat.S_ISDIR(opened.st_mode) or opened.st_uid != os.getuid()
+                    or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)
+                    or parent != path.parent.lstat()):
+                return 1, {**check, "state": "unsafe", "diagnostic": "epiq-global-changed"}
+            os.fchmod(descriptor, 0o700)
+            after = path.lstat()
+            if ((after.st_dev, after.st_ino) != (opened.st_dev, opened.st_ino)
+                    or stat.S_IMODE(after.st_mode) != 0o700):
+                return 1, {**check, "state": "unknown", "diagnostic": "epiq-global-change-unverified"}
+        finally:
+            os.close(descriptor)
+    except OSError:
+        return 1, {**check, "state": "unknown", "diagnostic": "epiq-global-protect-failed"}
+    return 0, {**preview, "state": "protected"}
 
 
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
@@ -585,12 +629,13 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=(
-        "contract", "status", "storage-check", "preflight", "install", "initialize",
+        "contract", "status", "storage-check", "storage-protect", "preflight", "install", "initialize",
     ))
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
     parser.add_argument("--confirm-install", action="store_true")
+    parser.add_argument("--confirm-protect", action="store_true")
     parser.add_argument("--replace-unlocked", action="store_true")
     parser.add_argument("--confirm-initialize", action="store_true")
     parser.add_argument("--user-name", default=None)
@@ -606,6 +651,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.command == "storage-check":
         global_dir = os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global")
         code, payload = storage_check(Path(global_dir))
+    elif args.command == "storage-protect":
+        global_dir = os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global")
+        code, payload = storage_protect(Path(global_dir), confirm=args.confirm_protect)
     elif args.command == "preflight":
         code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push)
     elif args.command == "install" and not args.confirm_install:
@@ -649,6 +697,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本初始化预检：" + payload["state"])
     elif args.command == "storage-check":
         print("Epiq 数据目录 POSIX 权限：" + payload["state"] + "（" + payload["path"] + "）")
+    elif args.command == "storage-protect":
+        print("Epiq 数据目录保护：" + payload["state"] + "（" + payload["path"] + "）")
     elif args.command == "install" and payload["state"] == "installed":
         print("本地事项账本运行时已安装：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     elif args.command == "initialize" and payload["state"] == "initialized":

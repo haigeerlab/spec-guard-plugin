@@ -860,7 +860,7 @@ class EpiqStorageCheckTests(unittest.TestCase):
     def test_exposed_and_unusable_modes_do_not_report_private(self):
         self.root.mkdir(mode=0o700)
         for mode, expected in ((0o755, "exposed"), (0o711, "exposed"),
-                               (0o500, "unusable")):
+                               (0o500, "unusable"), (0o111, "unusable")):
             with self.subTest(mode=mode):
                 self.root.chmod(mode)
                 code, result = local_ledger_runtime.storage_check(self.root)
@@ -891,6 +891,82 @@ class EpiqStorageCheckTests(unittest.TestCase):
         with patch.object(Path, "lstat", side_effect=PermissionError):
             code, result = local_ledger_runtime.storage_check(self.root)
         self.assertEqual((code, result["state"]), (1, "unknown"))
+
+    def test_protect_preview_is_read_only_and_confirm_changes_only_root_mode(self):
+        self.root.mkdir(mode=0o700)
+        self.root.chmod(0o755)
+        event = self.root / "event.jsonl"
+        event.write_text("private history\n", encoding="utf-8")
+        event_before = (event.stat().st_mode, event.read_bytes())
+        code, preview = local_ledger_runtime.storage_protect(self.root)
+        self.assertEqual((code, preview["state"]), (0, "protectable"))
+        self.assertEqual((preview["mode"], preview["targetMode"]), ("0755", "0700"))
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
+        code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertEqual((code, result["state"]), (0, "protected"))
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((event.stat().st_mode, event.read_bytes()), event_before)
+        code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertEqual((code, result["state"]), (0, "already-private"))
+
+    def test_protect_rejects_absent_symlink_foreign_owner_and_writable_parent(self):
+        code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertEqual((code, result["state"]), (1, "absent"))
+        target = self.root.parent / "target"
+        target.mkdir(mode=0o700)
+        self.root.symlink_to(target, target_is_directory=True)
+        code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertEqual((code, result["state"]), (1, "unsafe"))
+        self.root.unlink()
+        self.root.mkdir(mode=0o700)
+        self.root.chmod(0o755)
+        with patch("local_ledger_runtime.os.getuid", return_value=os.getuid() + 1):
+            code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertEqual((code, result["state"]), (1, "unsafe"))
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
+        self.root.parent.chmod(0o777)
+        try:
+            code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+            self.assertEqual((code, result["state"]), (1, "unsafe"))
+            self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
+        finally:
+            self.root.parent.chmod(0o700)
+
+    def test_protect_does_not_follow_path_swapped_to_symlink(self):
+        self.root.mkdir(mode=0o700)
+        self.root.chmod(0o755)
+        target = self.root.parent / "target"
+        target.mkdir(mode=0o700)
+        original_open = os.open
+
+        def swap_then_open(path, flags):
+            self.root.rename(self.root.parent / "original")
+            self.root.symlink_to(target, target_is_directory=True)
+            return original_open(path, flags)
+
+        with patch("local_ledger_runtime.os.open", side_effect=swap_then_open):
+            code, result = local_ledger_runtime.storage_protect(self.root, confirm=True)
+        self.assertNotEqual(code, 0)
+        self.assertIn(result["state"], ("unsafe", "unknown"))
+        self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((self.root.parent / "original").stat().st_mode & 0o777, 0o755)
+
+    def test_cli_protect_requires_confirm(self):
+        self.root.mkdir(mode=0o700)
+        self.root.chmod(0o755)
+        with patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.root)}):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = local_ledger_runtime.main(["storage-protect", "--format", "json"])
+            self.assertEqual((code, json.loads(output.getvalue())["state"]), (0, "protectable"))
+            self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = local_ledger_runtime.main([
+                    "storage-protect", "--confirm-protect", "--format", "json",
+                ])
+            self.assertEqual((code, json.loads(output.getvalue())["state"]), (0, "protected"))
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o700)
 
     def test_cli_checks_selected_epiq_global_dir_without_contents(self):
         self.root.mkdir(mode=0o700)

@@ -53,7 +53,15 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-check --format json
 
 该命令只读取目录自身的类型、所有者和 POSIX 权限位，不读取事项或日志、不创建目录、不修改权限。`absent` 表示尚未创建；`private-posix` 表示由当前用户拥有且权限位仅允许该用户读写进入；`exposed` 表示组或其他用户具有 POSIX 访问位；`unusable` 表示当前所有者缺少读／写／进入权限；`unsafe` 表示符号链接、普通文件或归属其他用户；`unknown` 表示路径相对或元数据不可读。前两种状态退出码 0，其余退出码 1。返回的 `scope: posix-mode-only` 明确说明这不是 ACL 的完整安全证明。
 
-如果 MCP 宿主单独设置了 `EPIQ_GLOBAL_DIR`，应在相同环境下运行该检查；它不会读取宿主配置推断目录。此命令不修复已存在的宽权限，也不改变 `status`／`preflight` 的判据。修复真实目录或更改宿主启动方式需另行预览。
+如果 MCP 宿主单独设置了 `EPIQ_GLOBAL_DIR`，应在相同环境下运行该检查；它不会读取宿主配置推断目录。此命令不修复已存在的宽权限，也不改变 `status`／`preflight` 的判据。
+
+对宽权限根目录，可先只读预览精确变更：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-protect --format json
+```
+
+`protectable` 给出当前 `mode` 与拟变更的 `targetMode: 0700`，不写入。只有用户审查路径和预览并明确授权这次操作后，才可添加 `--confirm-protect` 执行；该标记本身不代表用户授权。命令重新检查所有者、目录类型、父目录与路径身份，拒绝符号链接、错误归属或可由其他用户改写的父目录；只对根目录做一次 chmod，不递归修改事件、媒体或 Git worktree，不创建缺失目录。`already-private` 表示无需修改。`protected` 之后再运行 `storage-check` 核对。此操作不会替换已有的直接 Node MCP 宿主条目；若未来目录被移走或重建，必须另行保证新进程以私有权限创建。
 
 ### 状态 worktree 被另一个仓库占用
 

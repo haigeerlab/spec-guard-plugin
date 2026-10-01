@@ -27,7 +27,11 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 For a requested local data access check, run `storage-check --format json` through the same
 script. It reads only the effective `EPIQ_GLOBAL_DIR` directory metadata, never ticket content;
 `private-posix` is limited to POSIX owner and mode, not a complete ACL audit. Do not chmod the
-real directory as part of this check.
+real directory as part of this check. `storage-protect --format json` is a read-only preview
+for an exposed root. Run it with `--confirm-protect` only after showing the exact path and
+0700 target to the user and obtaining authorization for that actual directory change. The
+flag alone is not authorization; the operation changes only the root mode and never creates
+or recursively rewrites ledger data.
 
 Explain `absent`, `ready`, `initialized`, `conflict`, and `invalid` accurately. `conflict` means the Epiq state
 worktree (`project.stateWorktree`, state `foreign`) is owned by another repository: relay its `owner` and `path`
