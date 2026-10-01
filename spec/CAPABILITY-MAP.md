@@ -19,9 +19,7 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | proposal-publication | 只从远端默认分支的固定快照读取一个已发布 Proposal 或候选池，拒绝把其他 worktree 的本地文件当作共享事实。 | proposal-contract |
 | proposal-tracker-read | 用最小的 GitHub/GitLab 只读适配器核验普通 Proposal Issue 的唯一 revision marker 与唯一阶段，不使用旧 bridge。 | proposal-contract |
 | proposal-review | 汇总发布、tracker 与当前能力图事实，给出与人工授权分离的 freshness/stale/blocked/unknown 结果。 | proposal-publication, proposal-tracker-read |
-| proposal-mainline-review | 验证唯一主链上下文和远端 acceptance attestation，接收受限本地观察并输出人工主链裁决。 | proposal-review |
-| proposal-promotion-proof | 对已接受、已预检的 new-module Proposal 核验严格 promotion diff、首次纳入和必要 Spec/Plan。 | proposal-mainline-review |
-| proposal-boundary-guidance | 提供 intake/review/主链评审/晋级核验入口，并仅在模块交付或推进边界给出非阻断提醒。 | proposal-mainline-review, proposal-promotion-proof |
+| proposal-promotion-proof | 对 Proposal 晋级核验 Issue 阶段、新鲜度、首次纳入提交及声明行与位置，并给出证明或诊断。 | proposal-review |
 | collaboration-messaging | Provide a private same-Mac mailbox and host adapters for direct Claude Code and Codex session communication. | — |
 | collaboration-safe-defaults | 协作信箱默认不绑定唤醒、Claude 启动器不把 token 放进会话环境，并用测试防止回退。 | collaboration-messaging |
 | local-ticket-ledger | Provide an optional local-first, worktree-shared ticket ledger and narrow Claude Code/Codex access without imposing workflow ownership or project topology. | — |
@@ -33,9 +31,9 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | documentation-baseline | 定义显式启用的项目级文档基线协议、解析事实和初始化入口 | — |
 | documentation-impact | 在模块 Spec、Plan 与交付前表达并收口对文档基线的遵循、补全、变更或不适用结论 | documentation-baseline |
 | documentation-verification | 提供只读核验、保守提醒和跨宿主回归，确保缺失或未知不被伪装为文档完成 | documentation-baseline, documentation-impact |
-| audit-remediation | 修复项目审计中已核实、不改变设计的缺陷：假成功、诊断丢失、Codex 路由与校验缺口、文档漂移。 | proposal-mainline-review, proposal-promotion-proof, collaboration-messaging, local-convention, module-insert, capability-history, documentation-verification |
+| audit-remediation | 修复项目审计中已核实、不改变设计的缺陷：假成功、诊断丢失、Codex 路由与校验缺口、文档漂移。 | proposal-promotion-proof, collaboration-messaging, local-convention, module-insert, capability-history, documentation-verification |
 | done-stage-split | 把阶段提示里的 DONE 拆成两种：当前模块已完成但还有别的模块未完成、全部模块已完成，各给出正确的下一步。 | phase-and-verification, module-insert |
-| module-interrupt | 支持显式插队：当前模块做到一半时，经预览确认把新模块插到它前面，阶段提示持续显示被暂停的模块，插队模块完成后回到它。 | module-insert, done-stage-split, proposal-mainline-review |
+| module-interrupt | 支持显式插队：当前模块做到一半时，经预览确认把新模块插到它前面，阶段提示持续显示被暂停的模块，插队模块完成后回到它。 | module-insert, done-stage-split |
 | plan-without-todo | 有 Plan 却没有 todo.md 的模块会被判为已完成：阶段提示与 verify-artifacts 对此给出警告，完成判据保持不变，避免新插入的模块被误当成已完成。 | phase-and-verification, module-interrupt |
 | proposal-pool-isolation | Proposal 池中已晋级（模块已在能力图中）的 Proposal 不再参与基线校验，使一个基线失效的历史 Proposal 不会让整个池失效；验收记录指纹与 policy 摘要不变。 | proposal-publication, proposal-promotion-proof |
 | proposal-label-acceptance | Proposal 的接受只看 Issue 标签 proposal-stage:accepted 与评审新鲜度；晋级证明以 Proposal 基线提交为起点并接受只改能力图的晋级提交；删除主链裁决命令、策略文件与验收记录要求，已有文件保持可读。 | proposal-pool-isolation |
@@ -47,8 +45,9 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | done-unmerged-hint | 阶段为 DONE 或 MODULE_DONE 且当前分支有提交尚未进入本地已知的远端默认分支时，阶段提示追加未合并提交数并建议先推送合并；只读、不联网，探测失败时不提示。 | phase-and-verification, done-stage-split |
 | git-fixture-template | Proposal 与晋级相关测试的临时 git 夹具每个测试类只构建一次模板、每个测试复制一份并修正远端地址，缩短 validate.sh 耗时；测试的断言、隔离与覆盖不变，产品代码不改。 | proposal-promotion-proof, proposal-submit |
 | local-ticket-portability | Verify and restore complete Local ticket context, then explicitly hand off selected tickets to a chosen GitHub or GitLab Issue with resumable per-ticket reconciliation. | local-ticket-ledger, ledger-worktree-owner |
+| retired-module-separation | 把已退役 Proposal 模块从当前能力图移出，保留可核验的历史 Spec、Plan 与快照，并让现行依赖和阶段提示只引用活跃模块。 | capability-history, proposal-label-acceptance, phase-and-verification |
 
-Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-mainline-review → proposal-promotion-proof → proposal-boundary-guidance → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit → promotion-proof-diagnostics → insert-existing-spec → ledger-worktree-owner → done-unmerged-hint → git-fixture-template → local-ticket-portability
+Build order: proposal-contract → proposal-publication → proposal-tracker-read → proposal-review → proposal-promotion-proof → collaboration-messaging → collaboration-safe-defaults → local-ticket-ledger → ledger-dependency-lock → local-convention → phase-and-verification → module-insert → capability-history → documentation-baseline → documentation-impact → documentation-verification → audit-remediation → done-stage-split → module-interrupt → plan-without-todo → proposal-pool-isolation → proposal-label-acceptance → proposal-add-module-promotion → proposal-submit → promotion-proof-diagnostics → insert-existing-spec → ledger-worktree-owner → done-unmerged-hint → git-fixture-template → local-ticket-portability → retired-module-separation
 
 ---
 
