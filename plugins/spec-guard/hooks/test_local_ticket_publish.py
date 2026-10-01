@@ -4,12 +4,13 @@ from copy import deepcopy
 import json
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
 from local_ticket_handoff import _digest
-from local_ticket_journal import entry_key, journal_path, read_journal, write_entry
+from local_ticket_journal import (binding_checksum, entry_key, journal_path, publication_lock,
+                                  read_journal, write_entry)
 from local_ticket_publish import publish_preview
 from local_ticket_preview import EVENT_MARKER, render_body
 from local_ticket_portability import InventoryError, main
@@ -101,6 +102,28 @@ class HandoffTests(unittest.TestCase):
             return publish_preview(self.preview, self.project, self.base / "runtime",
                                    self.provider, self.journal_root, confirm=True)
 
+    def bind_moved_journal(self):
+        old = journal_path(self.project, PROJECT_ID, self.journal_root)
+        moved = self.base / "moved-project"
+        self.project.rename(moved)
+        self.project = moved
+        current = journal_path(moved, PROJECT_ID, self.journal_root)
+        current.parent.mkdir(parents=True, mode=0o700)
+        current.parent.parent.chmod(0o700)
+        pointer = current.with_name("binding.json")
+        binding = {
+            "formatVersion": 1, "projectId": PROJECT_ID,
+            "currentPartition": current.parent.parent.name,
+            "candidatePartition": old.parent.parent.name,
+            "canonicalPartition": old.parent.parent.name,
+            "initialMappingSha256": "a" * 64, "previewSha256": "b" * 64,
+            "boundAt": "2026-10-01T00:00:00+00:00",
+        }
+        binding["bindingSha256"] = binding_checksum(binding)
+        pointer.write_text(json.dumps(binding))
+        pointer.chmod(0o600)
+        return old, current, pointer
+
     def test_verified_handoff_and_repeat_do_not_duplicate(self):
         result = self.publish()
         self.assertEqual(result["state"], "verified")
@@ -114,6 +137,138 @@ class HandoffTests(unittest.TestCase):
         path = journal_path(self.project, PROJECT_ID, self.journal_root)
         key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
         self.assertEqual(read_journal(path)["entries"][key]["state"], "verified")
+
+    def test_moved_project_stops_before_remote_or_new_journal_write(self):
+        old_path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(old_path, key, {"state": "partial", "sourceDigest": "a" * 64})
+        moved = self.base / "moved-project"
+        self.project.rename(moved)
+        self.project = moved
+        current_path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        with patch("local_ticket_publish.snapshot_issue",
+                   side_effect=AssertionError("source must not be read before candidate review")):
+            result = publish_preview(self.preview, self.project, self.base / "runtime",
+                                     self.provider, self.journal_root, confirm=True)
+        self.assertEqual(result["state"], "manual-reconciliation-required")
+        self.assertEqual(result["candidates"][0]["stateCounts"]["partial"], 1)
+        self.assertEqual(self.provider.issues, [])
+        self.assertFalse(current_path.exists())
+
+    def test_bound_project_reuses_old_journal_and_never_duplicates(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        old, current, pointer = self.bind_moved_journal()
+        old_before = old.read_bytes()
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        with publication_lock(old, key):
+            with self.assertRaisesRegex(InventoryError, "journal-busy"):
+                self.publish()
+        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+
+        original_lock = publication_lock
+
+        @contextmanager
+        def changed_binding(path, issue_key):
+            with original_lock(path, issue_key):
+                value = json.loads(pointer.read_text())
+                value["previewSha256"] = "c" * 64
+                value["bindingSha256"] = binding_checksum(value)
+                pointer.write_text(json.dumps(value))
+                yield
+
+        with patch("local_ticket_publish.publication_lock", changed_binding):
+            with self.assertRaisesRegex(InventoryError, "journal-bind-stale"):
+                self.publish()
+        self.assertEqual(len(self.provider.issues), 1)
+        self.assertEqual(len(self.provider.comments[1]), 1)
+        self.assertEqual(old.read_bytes(), old_before)
+        self.assertFalse(current.exists())
+
+        clone = self.base / "independent-clone"
+        clone.mkdir()
+        import subprocess
+        subprocess.run(["git", "-C", str(clone), "init", "-q"], check=True)
+        duplicate = journal_path(clone, PROJECT_ID, self.journal_root)
+        write_entry(duplicate, "c" * 64, {"state": "partial"})
+        self.assertEqual(self.publish()["state"], "manual-reconciliation-required")
+        self.assertEqual(len(self.provider.issues), 1)
+
+    def test_bound_uncertain_create_and_invalid_pointer_stop_before_remote_write(self):
+        old = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(old, key, {"state": "planned", "digestVersion": 2,
+                               "sourceDigest": self.source["sourceDigest"],
+                               "destination": DESTINATION, "createAttempted": True,
+                               "remoteId": None, "verifiedEventIds": []})
+        _, current, pointer = self.bind_moved_journal()
+        self.assertEqual(self.publish()["state"], "publication-uncertain")
+        self.assertEqual(self.provider.issues, [])
+        self.assertFalse(current.exists())
+        valid_pointer = pointer.read_text()
+        tampered = json.loads(valid_pointer)
+        tampered["previewSha256"] = "c" * 64
+        pointer.write_text(json.dumps(tampered))
+        with self.assertRaisesRegex(InventoryError, "journal-bind-invalid"):
+            self.publish()
+        self.assertEqual(self.provider.issues, [])
+        pointer.write_text(valid_pointer)
+        write_entry(current, key, {"state": "planned"})
+        with self.assertRaisesRegex(InventoryError, "another mapping"):
+            self.publish()
+        self.assertEqual(self.provider.issues, [])
+
+    def test_second_move_publishes_through_original_canonical_journal(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        old, second_mapping, _ = self.bind_moved_journal()
+        third = self.base / "third-project"
+        self.project.rename(third)
+        self.project = third
+        current = journal_path(third, PROJECT_ID, self.journal_root)
+        current.parent.mkdir(parents=True, mode=0o700)
+        current.parent.parent.chmod(0o700)
+        pointer = current.with_name("binding.json")
+        value = {
+            "formatVersion": 1, "projectId": PROJECT_ID,
+            "currentPartition": current.parent.parent.name,
+            "candidatePartition": second_mapping.parent.parent.name,
+            "canonicalPartition": old.parent.parent.name,
+            "initialMappingSha256": "a" * 64, "previewSha256": "b" * 64,
+            "boundAt": "2026-10-01T00:00:00+00:00",
+        }
+        value["bindingSha256"] = binding_checksum(value)
+        pointer.write_text(json.dumps(value))
+        pointer.chmod(0o600)
+        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+        self.assertEqual(len(self.provider.comments[1]), 1)
+        self.assertFalse(current.exists())
+
+    def test_same_id_clone_candidate_blocks_even_when_source_digest_matches(self):
+        clone = self.base / "independent-clone"
+        clone.mkdir()
+        import subprocess
+        subprocess.run(["git", "-C", str(clone), "init", "-q"], check=True)
+        path = journal_path(clone, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(path, key, {"state": "verified", "sourceDigest": self.source["sourceDigest"]})
+        self.assertEqual(self.publish()["state"], "manual-reconciliation-required")
+        self.assertEqual(self.provider.issues, [])
+
+    def test_old_partition_without_mapping_still_blocks_create(self):
+        old_project = self.base / "old-project"
+        old_project.mkdir()
+        import subprocess
+        subprocess.run(["git", "-C", str(old_project), "init", "-q"], check=True)
+        old_path = journal_path(old_project, PROJECT_ID, self.journal_root)
+        old_path.parent.mkdir(parents=True, mode=0o700)
+        old_path.parent.parent.chmod(0o700)
+        old_path.parent.chmod(0o700)
+        self.journal_root.chmod(0o700)
+        result = self.publish()
+        self.assertEqual(result["state"], "manual-reconciliation-required")
+        self.assertEqual(result["candidates"][0]["journalState"], "absent")
+        self.assertEqual(self.provider.issues, [])
 
     def test_legacy_journal_requires_matching_preview_format(self):
         self.provider.issues = [{"id": 1, "title": "Scope", "body": "",

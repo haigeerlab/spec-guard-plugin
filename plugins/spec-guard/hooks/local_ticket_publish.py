@@ -6,7 +6,8 @@ from typing import Any
 
 from local_ticket_handoff import _digest, snapshot_issue
 from local_ticket_journal import (
-    entry_key, journal_path, publication_lock, read_journal, write_entry,
+    active_journal, entry_key, publication_lock,
+    read_journal, write_entry,
 )
 from local_ticket_portability import InventoryError
 from local_ticket_preview import EVENT_MARKER, ISSUE_MARKER, render_body
@@ -80,6 +81,10 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     source = preview["source"]
     destination = preview["destination"]
     version = preview["formatVersion"]
+    path, binding_token, unresolved = active_journal(
+        project, source["projectId"], journal_root)
+    if unresolved is not None:
+        return unresolved
     fresh = snapshot_issue(project, source["issueId"], runtime_dir, legacy=version == 1)
     if (preview["body"] != render_body(source) or
             preview.get("title") != source["issue"]["title"] or
@@ -87,7 +92,6 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         raise InventoryError("preview-stale: Local source changed")
     if provider.target_facts() != destination:
         raise InventoryError("preview-stale: remote target facts changed")
-    path = journal_path(project, source["projectId"], journal_root)
     key = entry_key(source["projectId"], source["issueId"], destination)
     marker = "<!-- " + ISSUE_MARKER + " " + source["projectId"] + "/" + source["issueId"] + " -->"
     expected_comments = {
@@ -96,6 +100,12 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     }
 
     with publication_lock(path, key):
+        locked_path, locked_token, unresolved = active_journal(
+            project, source["projectId"], journal_root)
+        if unresolved is not None:
+            return unresolved
+        if locked_path != path or locked_token != binding_token:
+            raise InventoryError("journal-bind-stale: active journal changed during publish")
         earlier = read_journal(path)["entries"].get(key)
         rejected_before_write = bool(
             earlier and earlier.get("state") == "planned" and

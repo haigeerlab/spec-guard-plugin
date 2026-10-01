@@ -13,6 +13,20 @@ Start with read-only `inventory`; `foreign` or `unknown` state worktree ownershi
 not an empty ledger. A valid archive preserves raw event and media bytes, including pending
 files. `verify --prove` uses disposable Git and Epiq state. It does not establish off-machine
 durability; a separate copy must be verified on independent storage for that claim.
+If a project path moved and `inventory` cannot read the state worktree, use read-only
+`journal-candidates` to locate same-ID mapping partitions. This command only reads the
+project identity and Git common dir; it does not prove that a candidate belongs to the
+current checkout. Any candidate requires manual reconciliation before hosted publication.
+Do not copy, merge, or delete a journal to get past the stop.
+After an explicit path move, first inspect Git worktree ownership and repair it separately
+when necessary. Use `journal-bind-preview` with the old absolute Git common-dir path or a
+verified archive. Review every mapped issue, the candidate and canonical partitions, and
+the warning that identical copied repositories cannot be distinguished from old journal
+facts alone. Only after the user confirms that exact candidate may `journal-bind --confirm`
+install a private pointer. It never rewrites the canonical mapping or calls a provider.
+If the preview is stale, the old path is still occupied, a mapping key is unresolved, or
+another candidate exists outside the binding chain, stop for manual reconciliation.
+Do not install a pointer in the user's real home while only testing the feature.
 
 Restore only to a user-selected empty Git repository and empty Epiq global directory after
 showing the exact archive and paths. A restore commits the project identity in that new repo

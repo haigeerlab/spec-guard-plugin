@@ -6,13 +6,15 @@ paths and identities.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" inventory --project <repo>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" journal-candidates --project <repo>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" archive --project <repo> --output <new-private-directory>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory> --prove
 ```
 
 The archive contains `manifest.json`, a single-state-branch Git bundle, the Epiq project
-identity, raw event/media files, and a private mapping journal snapshot if one exists. It
+identity, raw event/media files, and a private mapping journal snapshot if one exists. A
+bound project's v2 archive also records the verified binding chain. It
 does not contain project source or other Git branches. `verify --prove` compares all source
 events with Epiq's materialized view and checks a disposable write. Archive
 creation stops if the destination directory does not retain private POSIX mode (0700).
@@ -27,6 +29,63 @@ one project's state at that point in time; keep older archives until their repla
 has passed `verify --prove`. This location is a user-level record shared by the current
 user's worktrees, not a plugin installation or project checkout directory. It does not
 protect against loss of this host.
+
+`journal-candidates` reads other private project partitions with the same Epiq project ID.
+It creates no journal or lock and prints only partition paths and counts by state. If a
+project was moved, or an independent clone has the same ID, a candidate requires manual
+reconciliation; one candidate is not proof that it belongs to the current checkout.
+`clear` only means no other local partition was found; it does not prove that the current
+journal or remote target has no handoff.
+`handoff-publish` stops before creating a remote Issue when a candidate is unbound or
+unrelated to a validated binding chain.
+An unsafe or damaged partition also stops discovery rather than appearing absent.
+An old same-ID partition directory with no `mapping.json` is still a candidate because
+it may represent an interrupted publication attempt; its counts are unknown.
+Do not delete or copy a candidate journal into the current partition to bypass this stop.
+
+### Bind a journal after moving the Git repository
+
+First run `inventory` and inspect `git worktree list --porcelain`. A moved Epiq state
+worktree can still point at the old Git administration path. If ownership is not `owned`,
+review the Git relationship and explicitly repair it before retrying; the binding commands
+never run `git worktree repair`, move a worktree, or discard Epiq state.
+
+```bash
+python3 -B "$ROOT/hooks/local_ticket_portability.py" journal-bind-preview \
+  --project <moved-repo> --candidate <64-hex-old-partition> \
+  --old-common-dir <old-absolute-git-common-dir> \
+  --output <new-private-binding-preview.json>
+# Instead of --old-common-dir, a verified archive containing the same mapping may be used:
+# --archive <verified-archive-directory>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" journal-bind \
+  --project <moved-repo> --preview <private-binding-preview.json> --confirm
+```
+
+The old common-dir path must be absent; an occupied path may belong to another active
+repository. The preview is 0600 and belongs outside every source worktree, the state
+worktree, the journal root, and the evidence archive. A suitable private parent is
+`~/.spec-guard/local-ticket-bind-previews/<projectId>/` with mode 0700. The preview checks
+each old mapping key against a unique current Local issue and destination, and checks the
+old source digest against current history or a provable prefix. Version 1 digests require
+an exact current match. Missing or diverged evidence produces no executable preview.
+
+Review the preview's candidate, canonical partition, issue IDs, source matches and
+limitations before confirming. The old path hash and an archive are provenance clues;
+the old format has no independent repository ID, so identical copied histories cannot
+prove ownership. `journal-bind --confirm` rechecks the complete preview, then creates
+only a private pointer in the new partition. The old `mapping.json` remains the sole
+writable journal and lock location. Binding does not mark a handoff `verified` or justify
+recreating a remote Issue after an uncertain attempt. No GitHub or GitLab API is called.
+If any review fact changes, regenerate the preview; preserve old journals for manual
+reconciliation rather than resetting them.
+
+After binding, `journal-candidates` reports `bound` and marks candidates as `canonical`
+or `alias`; an extra `unrelated` candidate keeps the state at
+`manual-reconciliation-required` and blocks publication. A second move requires another
+reviewed preview and pointer; every valid alias still resolves to the first mapping.
+Bound archives use format v2 and include `binding-provenance.json` beside the canonical
+mapping. `verify` checks both; older v1 archives remain valid. Restore never installs a
+user-level binding pointer in the new repository.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \
