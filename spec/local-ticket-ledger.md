@@ -30,6 +30,10 @@ process.
 - Status, contract, and preflight commands are read-only. Installation, initialization, and host
   configuration are explicit operator actions gated by `--confirm-install` or the equivalent
   confirmation; plugin installation, hooks, and the daily entry perform none of them.
+- `storage-check` is a separate read-only POSIX ownership/mode diagnostic for the effective
+  `EPIQ_GLOBAL_DIR` (default `~/.epiq-global`). It reports absent, private-posix, exposed,
+  unusable, unsafe, or unknown without reading ticket contents or changing the existing
+  `status` result. POSIX mode alone does not prove the absence of ACL-based access.
 
 ## Host and interaction contract
 
@@ -63,6 +67,7 @@ process.
 
 ```text
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py status --format json
+python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py storage-check --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py install --confirm-install --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py preflight --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_adapters.py codex|claude

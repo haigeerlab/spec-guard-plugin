@@ -24,6 +24,11 @@ Resolve the installed plugin root and run only the side-effect-free status opera
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 ```
 
+For a requested local data access check, run `storage-check --format json` through the same
+script. It reads only the effective `EPIQ_GLOBAL_DIR` directory metadata, never ticket content;
+`private-posix` is limited to POSIX owner and mode, not a complete ACL audit. Do not chmod the
+real directory as part of this check.
+
 Explain `absent`, `ready`, `initialized`, `conflict`, and `invalid` accurately. `conflict` means the Epiq state
 worktree (`project.stateWorktree`, state `foreign`) is owned by another repository: relay its `owner` and `path`
 and the remedies in `references/local-ticket-ledger-runtime.md`, and never move or delete a worktree without the

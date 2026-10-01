@@ -1,6 +1,7 @@
 """Local-ledger runtime contract tests; no package installation or Git mutation."""
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -833,6 +834,76 @@ class StateWorktreeOwnerTests(unittest.TestCase):
         before = snapshot()
         self.run_status()
         self.assertEqual(before, snapshot())
+
+
+class EpiqStorageCheckTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sg-epiq-storage-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "epiq-global"
+
+    def test_absent_and_private_directories_are_read_only(self):
+        code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (0, "absent"))
+        self.assertFalse(self.root.exists())
+        self.root.mkdir(mode=0o700)
+        secret = self.root / "event.jsonl"
+        secret.write_text("private ticket content\n", encoding="utf-8")
+        before = (self.root.stat().st_mode, self.root.stat().st_mtime_ns, secret.read_bytes())
+        code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (0, "private-posix"))
+        self.assertEqual(result["mode"], "0700")
+        self.assertEqual((self.root.stat().st_mode, self.root.stat().st_mtime_ns,
+                          secret.read_bytes()), before)
+        self.assertNotIn("private ticket content", json.dumps(result))
+
+    def test_exposed_and_unusable_modes_do_not_report_private(self):
+        self.root.mkdir(mode=0o700)
+        for mode, expected in ((0o755, "exposed"), (0o711, "exposed"),
+                               (0o500, "unusable")):
+            with self.subTest(mode=mode):
+                self.root.chmod(mode)
+                code, result = local_ledger_runtime.storage_check(self.root)
+                self.assertEqual((code, result["state"]), (1, expected))
+                self.assertEqual(result["mode"], format(mode, "04o"))
+        self.root.chmod(0o700)
+
+    def test_symlink_file_and_foreign_owner_are_unsafe(self):
+        target = self.root.parent / "target"
+        target.mkdir(mode=0o700)
+        self.root.symlink_to(target, target_is_directory=True)
+        code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (1, "unsafe"))
+        self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+        self.root.unlink()
+        self.root.write_text("not a directory", encoding="utf-8")
+        code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (1, "unsafe"))
+        self.root.unlink()
+        self.root.mkdir(mode=0o700)
+        with patch("local_ledger_runtime.os.getuid", return_value=os.getuid() + 1):
+            code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (1, "unsafe"))
+
+    def test_relative_path_and_unreadable_metadata_are_unknown(self):
+        code, result = local_ledger_runtime.storage_check(Path("relative-epiq-global"))
+        self.assertEqual((code, result["state"]), (1, "unknown"))
+        with patch.object(Path, "lstat", side_effect=PermissionError):
+            code, result = local_ledger_runtime.storage_check(self.root)
+        self.assertEqual((code, result["state"]), (1, "unknown"))
+
+    def test_cli_checks_selected_epiq_global_dir_without_contents(self):
+        self.root.mkdir(mode=0o700)
+        self.root.chmod(0o755)
+        (self.root / "event.jsonl").write_text("sensitive history\n", encoding="utf-8")
+        output = io.StringIO()
+        with patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.root)}), redirect_stdout(output):
+            code = local_ledger_runtime.main(["storage-check", "--format", "json"])
+        result = json.loads(output.getvalue())
+        self.assertEqual((code, result["state"]), (1, "exposed"))
+        self.assertEqual(result["path"], str(self.root))
+        self.assertNotIn("sensitive history", output.getvalue())
+        self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
 
 
 if __name__ == "__main__":

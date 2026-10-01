@@ -43,6 +43,18 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 输出将 `node`、`runtime` 和 `project` 分开报告，避免把“Node 缺失”“未安装运行时”和“项目尚未初始化”
 混成一个原因。诊断只读取文件与 `node --version`；它不读取 token，因为本事项账本没有项目级 secret。
 
+### Epiq 用户级数据目录的权限检查
+
+同一入口可只读检查当前进程使用的 `EPIQ_GLOBAL_DIR`，未设置时检查 `~/.epiq-global`：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-check --format json
+```
+
+该命令只读取目录自身的类型、所有者和 POSIX 权限位，不读取事项或日志、不创建目录、不修改权限。`absent` 表示尚未创建；`private-posix` 表示由当前用户拥有且权限位仅允许该用户读写进入；`exposed` 表示组或其他用户具有 POSIX 访问位；`unusable` 表示当前所有者缺少读／写／进入权限；`unsafe` 表示符号链接、普通文件或归属其他用户；`unknown` 表示路径相对或元数据不可读。前两种状态退出码 0，其余退出码 1。返回的 `scope: posix-mode-only` 明确说明这不是 ACL 的完整安全证明。
+
+如果 MCP 宿主单独设置了 `EPIQ_GLOBAL_DIR`，应在相同环境下运行该检查；它不会读取宿主配置推断目录。此命令不修复已存在的宽权限，也不改变 `status`／`preflight` 的判据。修复真实目录或更改宿主启动方式需另行预览。
+
 ### 状态 worktree 被另一个仓库占用
 
 Epiq 1.11.0 把状态 worktree 放在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/worktrees/<projectId>`，路径里只有
