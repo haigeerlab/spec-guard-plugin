@@ -4,12 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from local_ticket_handoff import snapshot_issue
+from local_ticket_handoff import _digest, snapshot_issue
 from local_ticket_journal import (
     entry_key, journal_path, publication_lock, read_journal, write_entry,
 )
 from local_ticket_portability import InventoryError
 from local_ticket_preview import EVENT_MARKER, ISSUE_MARKER, render_body
+from local_ticket_provider import ProviderRejected
 
 
 def _items(page: Any, kind: str) -> list[dict[str, Any]]:
@@ -25,22 +26,64 @@ def _comment_text(event: dict[str, Any]) -> str:
             event["id"] + " -->")
 
 
+def _has_issue_marker(body: Any, marker: str) -> bool:
+    lines = str(body or "").splitlines()
+    return any(
+        line == marker and index >= 2 and index + 2 < len(lines) and
+        lines[index - 2].startswith("Snapshot SHA-256: ") and
+        lines[index - 1] == lines[index + 1] == "" and
+        lines[index + 2] == "## Local history (original order)"
+        for index, line in enumerate(lines)
+    )
+
+
+def _has_comment_marker(body: Any, marker: str) -> bool:
+    lines = str(body or "").splitlines()
+    return bool(lines) and lines[-1] == marker
+
+
+def _contains_marker(body: Any, marker: str) -> bool:
+    return marker in str(body or "")
+
+
+def _legacy_same_facts(saved: dict[str, Any], fresh: dict[str, Any]) -> bool:
+    """Allow an old preview only when its authoritative Local facts are unchanged."""
+    digest = _digest({key: saved[key] for key in
+                      ("events", "issue", "attachments", "codeReferences")})
+    if saved.get("sourceDigest") != digest:
+        return False
+
+    def facts(value: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "state": value["state"], "formatVersion": value["formatVersion"],
+            "projectId": value["projectId"], "issueId": value["issueId"],
+            "issue": value["issue"], "attachments": value["attachments"],
+            "events": [{key: item for key, item in event.items() if key != "actorName"}
+                       for event in value["events"]],
+            "codeShas": [item["sha"] for item in value["codeReferences"]],
+        }
+
+    return facts(saved) == facts(fresh)
+
+
 def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                     provider: Any, journal_root: Path | None = None,
                     confirm: bool = False) -> dict[str, Any]:
     """Recheck source/target, then create or reconcile exactly one remote issue."""
     if not confirm:
         raise InventoryError("confirmation-required: handoff needs explicit confirmation")
-    if (preview.get("formatVersion") != 1 or preview.get("state") != "preview" or
+    if (preview.get("formatVersion") not in (1, 2) or preview.get("state") != "preview" or
             not isinstance(preview.get("source"), dict) or
             not isinstance(preview.get("destination"), dict) or
             not isinstance(preview.get("body"), str)):
         raise InventoryError("preview-invalid: handoff preview is incomplete")
     source = preview["source"]
     destination = preview["destination"]
-    fresh = snapshot_issue(project, source["issueId"], runtime_dir)
-    if (fresh != source or preview["body"] != render_body(fresh) or
-            preview.get("title") != fresh["issue"]["title"]):
+    version = preview["formatVersion"]
+    fresh = snapshot_issue(project, source["issueId"], runtime_dir, legacy=version == 1)
+    if (preview["body"] != render_body(source) or
+            preview.get("title") != source["issue"]["title"] or
+            (fresh != source and (version != 1 or not _legacy_same_facts(source, fresh)))):
         raise InventoryError("preview-stale: Local source changed")
     if provider.target_facts() != destination:
         raise InventoryError("preview-stale: remote target facts changed")
@@ -54,16 +97,42 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
 
     with publication_lock(path, key):
         earlier = read_journal(path)["entries"].get(key)
-        if earlier and earlier.get("sourceDigest") != source["sourceDigest"]:
+        rejected_before_write = bool(
+            earlier and earlier.get("state") == "planned" and
+            earlier.get("createAttempted") is False and
+            earlier.get("remoteId") is None and
+            type(earlier.get("rejectionStatus")) is int
+        )
+        format_changed = bool(earlier and earlier.get("digestVersion", 1) != version)
+        source_changed = bool(earlier and earlier.get("sourceDigest") != source["sourceDigest"])
+        if format_changed and not rejected_before_write:
+            return {"state": "preview-incompatible",
+                    "diagnostic": "existing handoff uses another format; regenerate with --legacy-format if version 1"}
+        if source_changed and not rejected_before_write:
             write_entry(path, key, {**earlier, "state": "conflict"})
             return {"state": "conflict", "diagnostic": "source history diverged"}
         issues = _items(provider.list_issues(), "issues")
+        if any(_contains_marker(issue.get("body"), marker) and
+               not _has_issue_marker(issue.get("body"), marker)
+               for issue in issues if not issue.get("isPullRequest")):
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
+                                    "sourceDigest": source["sourceDigest"],
+                                    "destination": destination,
+                                    "reason": "marker outside managed section"})
+            return {"state": "conflict", "diagnostic": "destination marker is ambiguous"}
         matches = [issue for issue in issues if not issue.get("isPullRequest") and
-                   marker in str(issue.get("body", "")).splitlines()]
+                   _has_issue_marker(issue.get("body"), marker)]
         if len(matches) > 1:
-            write_entry(path, key, {"state": "conflict", "sourceDigest": source["sourceDigest"],
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
+                                    "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "reason": "multiple markers"})
             return {"state": "conflict", "diagnostic": "multiple destination issues"}
+        if matches and rejected_before_write and (format_changed or source_changed):
+            write_entry(path, key, {**earlier, "state": "conflict",
+                                    "reason": "remote marker appeared after rejection"})
+            return {"state": "conflict", "diagnostic": "source history diverged with remote marker"}
         found_existing = bool(matches)
         if matches:
             issue = matches[0]
@@ -71,16 +140,31 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
             if earlier and earlier.get("createAttempted"):
                 return {"state": "publication-uncertain",
                         "diagnostic": "prior create attempt is not visible; manual reconciliation required"}
-            entry = {"state": "planned", "sourceDigest": source["sourceDigest"],
+            if version == 1:
+                return {"state": "preview-incompatible",
+                        "diagnostic": "legacy format requires an existing remote handoff"}
+            entry = {"state": "planned", "digestVersion": version,
+                     "sourceDigest": source["sourceDigest"],
                      "destination": destination, "createAttempted": True,
                      "remoteId": None, "verifiedEventIds": []}
             write_entry(path, key, entry)
             try:
                 issue = provider.create_issue(preview["title"], preview["body"])
+            except ProviderRejected as error:
+                write_entry(path, key, {**entry, "createAttempted": False,
+                                        "rejectionStatus": error.status_code})
+                return {"state": "provider-rejected", "diagnostic": str(error)}
             except Exception:
                 issues = _items(provider.list_issues(), "issues")
+                if any(_contains_marker(item.get("body"), marker) and
+                       not _has_issue_marker(item.get("body"), marker)
+                       for item in issues if not item.get("isPullRequest")):
+                    write_entry(path, key, {**entry, "state": "conflict",
+                                            "reason": "marker outside managed section"})
+                    return {"state": "conflict",
+                            "diagnostic": "destination marker is ambiguous"}
                 matches = [item for item in issues if not item.get("isPullRequest") and
-                           marker in str(item.get("body", "")).splitlines()]
+                           _has_issue_marker(item.get("body"), marker)]
                 if len(matches) > 1:
                     write_entry(path, key, {**entry, "state": "conflict",
                                             "reason": "multiple markers"})
@@ -96,7 +180,9 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         current = provider.get_issue(remote_id)
         if (current.get("body") != preview["body"] or
                 current.get("title") != preview["title"]):
-            write_entry(path, key, {"state": "conflict", "sourceDigest": source["sourceDigest"],
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
+                                    "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "remoteId": remote_id,
                                     "reason": "remote issue edited"})
             return {"state": "conflict", "diagnostic": "remote issue was edited"}
@@ -106,11 +192,13 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                  current["closed"] != earlier.get("remoteClosed")) or
                 (not earlier and found_existing and current["closed"] != desired_closed)):
             write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
                                     "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "remoteId": remote_id,
                                     "reason": "remote state changed"})
             return {"state": "conflict", "diagnostic": "remote issue state changed"}
-        entry = {"state": "partial", "sourceDigest": source["sourceDigest"],
+        entry = {"state": "partial", "digestVersion": version,
+                 "sourceDigest": source["sourceDigest"],
                  "destination": destination, "remoteId": remote_id,
                  "remoteUrl": current.get("url"), "createAttempted": True,
                  "commentAttempts": (earlier or {}).get("commentAttempts", []),
@@ -121,8 +209,14 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         for event_id, body in expected_comments.items():
             comments = _items(provider.list_comments(remote_id), "comments")
             comment_marker = "<!-- " + EVENT_MARKER + " " + event_id + " -->"
-            matches = [item for item in comments if comment_marker in
-                       str(item.get("body", "")).splitlines()]
+            if any(_contains_marker(item.get("body"), comment_marker) and
+                   not _has_comment_marker(item.get("body"), comment_marker)
+                   for item in comments):
+                write_entry(path, key, {**entry, "state": "conflict",
+                                        "reason": "comment marker outside managed end"})
+                return {"state": "conflict", "diagnostic": "comment marker is ambiguous"}
+            matches = [item for item in comments if
+                       _has_comment_marker(item.get("body"), comment_marker)]
             if len(matches) > 1:
                 write_entry(path, key, {**entry, "state": "conflict", "reason": "duplicate comment"})
                 return {"state": "conflict", "diagnostic": "duplicate remote comment"}
@@ -137,6 +231,10 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                 write_entry(path, key, entry)
                 try:
                     provider.create_comment(remote_id, body)
+                except ProviderRejected as error:
+                    entry["commentAttempts"].remove(event_id)
+                    write_entry(path, key, {**entry, "rejectionStatus": error.status_code})
+                    return {"state": "provider-rejected", "diagnostic": str(error)}
                 except Exception:
                     comments = _items(provider.list_comments(remote_id), "comments")
                     if sum(item.get("body") == body for item in comments) != 1:

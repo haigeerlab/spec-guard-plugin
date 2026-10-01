@@ -22,6 +22,19 @@ def _digest(value: Any) -> str:
     ).encode("utf-8")).hexdigest()
 
 
+def _source_digest(events: list[dict[str, Any]]) -> str:
+    return _digest([{key: value for key, value in item.items() if key != "actorName"}
+                    for item in events])
+
+
+def _first_contributor_names(events: list[dict[str, Any]]) -> dict[str, Any]:
+    names: dict[str, Any] = {}
+    for item in events:
+        if item["action"] == "create.contributor":
+            names.setdefault(item["payload"].get("id"), item["payload"].get("name"))
+    return names
+
+
 def _raw_events(state_root: Path, files: list[dict[str, Any]]) -> dict[str, tuple[str, Any]]:
     result: dict[str, tuple[str, Any]] = {}
     for entry in files:
@@ -63,7 +76,8 @@ def _code_references(project: Path, issue: dict[str, Any],
     return references
 
 
-def snapshot_issue(project: Path, issue_id: str, runtime_dir: Path) -> dict[str, Any]:
+def snapshot_issue(project: Path, issue_id: str, runtime_dir: Path,
+                   legacy: bool = False) -> dict[str, Any]:
     """Read raw files and Epiq's view twice around a stable source inventory."""
     project = Path(project).resolve()
     if not issue_id or not isinstance(issue_id, str):
@@ -99,8 +113,9 @@ def snapshot_issue(project: Path, issue_id: str, runtime_dir: Path) -> dict[str,
         selected = _issue_events(events, issue_id)
         if not selected or not any(item["action"] == "add.issue" for item in selected):
             raise InventoryError("source-unknown: issue has no complete creation history")
-        contributors = {item["payload"].get("id"): item["payload"].get("name")
-                        for item in events if item["action"] == "create.contributor"}
+        contributors = ({item["payload"].get("id"): item["payload"].get("name")
+                         for item in events if item["action"] == "create.contributor"}
+                        if legacy else _first_contributor_names(events))
         selected = [{**item, "actorName": contributors.get(item.get("userId"))}
                     for item in selected]
         attachments = []
@@ -125,12 +140,12 @@ def snapshot_issue(project: Path, issue_id: str, runtime_dir: Path) -> dict[str,
             raise
         raise InventoryError("source-unknown: Epiq issue view is incomplete") from error
     references = _code_references(project, issue, selected)
-    source = {"events": selected, "issue": issue, "attachments": attachments,
-              "codeReferences": references}
+    digest = (_digest({"events": selected, "issue": issue, "attachments": attachments,
+                       "codeReferences": references}) if legacy else _source_digest(selected))
     return {
-        "state": "snapshot", "formatVersion": 1,
+        "state": "snapshot", "formatVersion": 1 if legacy else 2,
         "projectId": before["projectId"], "issueId": issue_id,
-        "stateHead": before["stateHead"], "sourceDigest": _digest(source),
+        "stateHead": before["stateHead"], "sourceDigest": digest,
         "issue": issue, "events": selected, "attachments": attachments,
         "codeReferences": references,
     }

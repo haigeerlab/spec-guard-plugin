@@ -4,6 +4,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
@@ -15,9 +16,10 @@ from local_ledger_runtime import RuntimeContractError
 from local_ticket_archive import archive_project, verify_archive
 from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
-from local_ticket_handoff import _issue_events
-from local_ticket_preview import create_preview, target_facts
-from local_ticket_journal import entry_key, journal_path, read_journal, write_entry
+from local_ticket_handoff import _first_contributor_names, _issue_events, _source_digest
+from local_ticket_preview import create_preview, render_body, target_facts
+from local_ticket_journal import entry_key, journal_path, publication_lock, read_journal, write_entry
+from local_ticket_lock import MAGIC, acquire_lock
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -34,6 +36,33 @@ def event(event_id, action="create.issue", payload=None):
 
 
 class SourceInventoryTests(unittest.TestCase):
+    def test_first_contributor_name_does_not_change_on_later_rename(self):
+        events = [{"action": "create.contributor", "payload": {"id": "U1", "name": "Ada"}},
+                  {"action": "create.contributor", "payload": {"id": "U1", "name": "Renamed"}}]
+        self.assertEqual(_first_contributor_names(events)["U1"], "Ada")
+
+    def test_source_digest_and_body_ignore_volatile_display_checks(self):
+        source = {"projectId": PROJECT_ID, "issueId": "I1",
+                  "formatVersion": 2,
+                  "sourceDigest": "a" * 64,
+                  "issue": {"description": "Current", "isClosed": False},
+                  "events": [{"id": "E1", "action": "add.issue", "userId": "U1",
+                              "payload": {"id": "I1"}, "actorName": "Ada"}],
+                  "attachments": [],
+                  "codeReferences": [{"sha": "a" * 40, "sourceCommitReachable": True,
+                                      "targetCommitReachable": None}]}
+        digest = _source_digest(source["events"])
+        body = render_body(source)
+        source["codeReferences"][0]["sourceCommitReachable"] = False
+        self.assertEqual(render_body(source), body)
+        source["formatVersion"] = 1
+        self.assertIn("source commit missing", render_body(source))
+        source["formatVersion"] = 2
+        source["events"][0]["actorName"] = "Renamed"
+        self.assertEqual(_source_digest(source["events"]), digest)
+        source["events"][0]["payload"]["id"] = "I2"
+        self.assertNotEqual(_source_digest(source["events"]), digest)
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="sg-portability-source-")
         self.addCleanup(temporary.cleanup)
@@ -434,7 +463,10 @@ class SourceInventoryTests(unittest.TestCase):
                 restore_archive(archive, target, global_dir, self.root.parent / "runtime",
                                 confirm=True)
         self.assertEqual((target / ".epiq" / "partial").read_text(), "preserve")
-        self.assertFalse((target / ".git" / "spec-guard-local-restore.lock").exists())
+        lock = target / ".git" / "spec-guard-local-restore.lock"
+        self.assertEqual(lock.read_bytes(), MAGIC)
+        descriptor = acquire_lock(lock, "target-busy")
+        os.close(descriptor)
 
     def test_handoff_includes_changes_to_related_comment(self):
         events = [
@@ -452,7 +484,8 @@ class SourceInventoryTests(unittest.TestCase):
 
     def test_preview_is_private_and_contains_full_history_markers(self):
         snapshot = {
-            "projectId": PROJECT_ID, "issueId": "I1", "sourceDigest": "a" * 64,
+            "projectId": PROJECT_ID, "issueId": "I1", "formatVersion": 2,
+            "sourceDigest": "a" * 64,
             "issue": {"title": "Scope", "description": "New scope"},
             "attachments": [],
             "codeReferences": [],
@@ -475,6 +508,7 @@ class SourceInventoryTests(unittest.TestCase):
                                     output, runner=runner)
         preview = json.loads(output.read_text(encoding="utf-8"))
         self.assertEqual(result["state"], "previewed")
+        self.assertEqual(preview["formatVersion"], 2)
         self.assertEqual(output.stat().st_mode & 0o777, 0o600)
         self.assertIn("Old scope", preview["body"])
         self.assertIn("New scope", preview["body"])
@@ -559,6 +593,70 @@ class SourceInventoryTests(unittest.TestCase):
         clone.mkdir()
         git(clone, "init", "-q")
         self.assertNotEqual(journal_path(clone, PROJECT_ID, base), path)
+
+    def test_publication_lock_can_reopen_retained_file_and_excludes_concurrent_writer(self):
+        path = journal_path(self.root, PROJECT_ID, self.root.parent / "private-journals")
+        key = entry_key(PROJECT_ID, "ISSUE1", {"platform": "github", "host": "github.com",
+                                               "targetId": 42})
+        with publication_lock(path, key):
+            with self.assertRaisesRegex(InventoryError, "journal-busy"):
+                with publication_lock(path, key):
+                    pass
+        self.assertTrue(path.with_name("mapping." + key + ".publish.lock").exists())
+        with publication_lock(path, key):
+            self.assertTrue(path.with_name("mapping." + key + ".publish.lock").exists())
+
+    def test_new_lock_file_is_fully_initialized_before_publication(self):
+        lock = self.root.parent / "atomic.lock"
+        original_link = os.link
+
+        def inspect_link(source, destination):
+            self.assertEqual(Path(source).read_bytes(), MAGIC)
+            self.assertFalse(Path(destination).exists())
+            return original_link(source, destination)
+
+        with patch("local_ticket_lock.os.link", side_effect=inspect_link) as linked:
+            descriptor = acquire_lock(lock, "journal-busy")
+        self.assertEqual(linked.call_count, 1)
+        os.close(descriptor)
+        self.assertEqual(lock.read_bytes(), MAGIC)
+
+    def test_legacy_empty_lock_is_not_silently_stolen(self):
+        path = journal_path(self.root, PROJECT_ID, self.root.parent / "private-journals")
+        key = entry_key(PROJECT_ID, "ISSUE1", {"platform": "github", "host": "github.com",
+                                               "targetId": 42})
+        with publication_lock(path, key):
+            pass
+        lock = path.with_name("mapping." + key + ".publish.lock")
+        lock.write_text("")
+        with self.assertRaisesRegex(InventoryError, "journal-busy"):
+            with publication_lock(path, key):
+                pass
+
+    def test_lock_owner_crash_releases_retained_file(self):
+        lock = self.root.parent / "crash.lock"
+        code = ("import sys; from local_ticket_lock import acquire_lock; "
+                "acquire_lock(sys.argv[1], 'journal-busy'); print('locked', flush=True); "
+                "sys.stdin.read()")
+        child = subprocess.Popen([sys.executable, "-B", "-c", code, str(lock)],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True,
+                                 cwd=Path(__file__).parent)
+        try:
+            self.assertEqual(child.stdout.readline().strip(), "locked")
+            with self.assertRaisesRegex(InventoryError, "journal-busy"):
+                acquire_lock(lock, "journal-busy")
+            child.kill()
+            child.wait(timeout=5)
+            descriptor = acquire_lock(lock, "journal-busy")
+            os.close(descriptor)
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait(timeout=5)
+            child.stdin.close()
+            child.stdout.close()
+            child.stderr.close()
 
     def test_journal_rejects_symlink_and_broad_root(self):
         destination = {"platform": "github", "host": "github.com", "targetId": 42}

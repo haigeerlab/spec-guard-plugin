@@ -62,3 +62,36 @@ read-only preview. A failed or lost response can produce `publication-uncertain`
 remote markers and the private journal before any retry. Two matching Issues or an edited
 managed Issue/comment are `conflict`. The module does not automatically switch later daily
 work to GitHub/GitLab, and it does not close the Local ticket.
+If a source marker appears outside the managed Issue section or the end of a managed
+comment, publication reports an ambiguous marker conflict. This preserves the no-duplicate
+boundary even when the private journal is missing and someone moved the marker. A conflict
+retains recorded create and comment attempts; correcting remote text cannot silently reset
+retry protection.
+
+An API response with a recognized, definite 4xx rejection returns `provider-rejected` with
+its status code. A rejected Issue creation with no remote write may use a fresh source
+preview after a content correction; if a matching remote marker appears after that
+rejection while the source or format changed, publication stops as a conflict. Once an
+Issue or comment exists, changed source history remains a conflict. Correct the
+permission or content and retry. A timeout,
+server failure, or response without a reliable status remains `publication-uncertain`.
+Large histories can exceed provider limits; the CLI does not split them automatically and
+must not truncate the Local context to force publication.
+
+Current handoff and restore locks publish a fully initialized private lock file
+atomically and use OS advisory locks; a process crash releases the OS lock. If a lock
+is reported as legacy or damaged, first prove
+no older publisher or restore is still running, preserve the lock and journal for diagnosis,
+then remove only that stale lock file before retrying. Never delete a mapping journal or a
+partial restore target to bypass a conflict. Handoffs started before the stable source
+digest change use version 1. Keep the originally authorized version 1 preview for
+continuation: publication rechecks its raw Local events, current Issue view, attachments,
+and referenced commit IDs, then verifies the old remote body. A Git reachability, actor
+display name, or unrelated ledger HEAD change alone does not invalidate that saved preview.
+A regenerated preview with `handoff-preview --legacy-format` works if its old digest is
+still unchanged. If the original preview is lost and the version 1 digest differs, stop
+for manual reconciliation; do not replace the journal or overwrite remote history.
+Legacy format requires an existing remote handoff marker; new handoffs use version 2.
+A version 1 attempt definitely rejected before any remote write can restart with a
+version 2 preview. A default version 2 preview returns `preview-incompatible` for an
+existing version 1 handoff without changing the journal.

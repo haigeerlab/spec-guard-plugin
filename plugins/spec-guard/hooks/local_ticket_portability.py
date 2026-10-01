@@ -213,6 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--visibility", choices=("public", "internal", "private"))
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--prove", action="store_true")
+    parser.add_argument("--legacy-format", action="store_true")
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
@@ -234,6 +235,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--issue-id, --platform, --host, --target and --visibility are required")
     if args.prove and args.command != "verify":
         parser.error("--prove is only available with verify")
+    if args.legacy_format and args.command != "handoff-preview":
+        parser.error("--legacy-format is only available with handoff-preview")
     try:
         if args.command == "inventory":
             payload = inventory_project(args.project)
@@ -251,6 +254,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = create_preview(
                 args.project, args.issue_id, args.runtime_dir, args.platform,
                 args.host, args.target, args.visibility, args.output,
+                legacy=args.legacy_format,
             )
         elif args.command == "handoff-publish":
             from local_ticket_github import GitHubHandoff

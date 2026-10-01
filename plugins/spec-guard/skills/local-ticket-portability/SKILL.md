@@ -25,6 +25,8 @@ attachment status, and code-reference limits. Obtain authorization for that exac
 content before invoking `handoff-publish --confirm`. Recheck source and target facts at publish
 time. A public target may expose Local history, so apply the session's external-communication
 sanitization rules before any hosted write. Never use `epiq_sync` as a substitute.
+For a handoff recorded by the older version 1 format, regenerate its preview with
+`--legacy-format`; never replace an existing mapping journal to force a new format.
 
 `verified` means the previewed snapshot was read back on the target; it does not make the
 hosted provider the new daily Tracker. `partial`, `conflict`, and `publication-uncertain` leave

@@ -14,6 +14,7 @@ from local_ledger_runtime import (
 )
 from local_ticket_archive import verify_archive
 from local_ticket_portability import InventoryError, _event_lines
+from local_ticket_lock import acquire_lock
 
 
 PROOF_ACTOR_ID = "01M3SRSVX16EAHRM78KQ1K7J01"
@@ -195,11 +196,7 @@ def restore_archive(archive: Path, project: Path, global_dir: Path,
     proof = prove_restore(archive, runtime_dir)
     manifest = json.loads((archive / "manifest.json").read_text(encoding="utf-8"))
     lock = project / ".git" / "spec-guard-local-restore.lock"
-    try:
-        descriptor = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError as error:
-        raise InventoryError("target-busy: another restore owns this repository") from error
-    os.close(descriptor)
+    lock_descriptor = acquire_lock(lock, "target-busy")
     try:
         _preflight_target(archive, project, global_dir)
         verify_archive(archive)
@@ -234,7 +231,7 @@ def restore_archive(archive: Path, project: Path, global_dir: Path,
                 "restore-incomplete: inspect the target; partial data was preserved"
             ) from error
     finally:
-        lock.unlink(missing_ok=True)
+        os.close(lock_descriptor)
     return {"state": "restored", "projectId": proof["projectId"],
             "eventCount": proof["eventCount"], "mediaCount": proof["mediaCount"],
             "stateBranch": "__epiq_state__", "gitIdentityCommitted": True,

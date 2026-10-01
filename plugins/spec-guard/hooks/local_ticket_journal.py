@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from local_ticket_portability import InventoryError
+from local_ticket_lock import acquire_lock
 
 
 SCHEMA_VERSION = 1
@@ -83,11 +84,7 @@ def write_entry(path: Path, key: str, entry: dict[str, Any]) -> None:
     path = Path(path)
     _prepare_parent(path)
     lock = path.with_name(path.name + ".lock")
-    try:
-        descriptor = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError as error:
-        raise InventoryError("journal-busy: handoff is already running") from error
-    os.close(descriptor)
+    lock_descriptor = acquire_lock(lock, "journal-busy")
     try:
         ledger = _read(path)
         ledger["entries"][key] = entry
@@ -108,7 +105,7 @@ def write_entry(path: Path, key: str, entry: dict[str, Any]) -> None:
         finally:
             Path(temporary).unlink(missing_ok=True)
     finally:
-        lock.unlink(missing_ok=True)
+        os.close(lock_descriptor)
 
 
 @contextmanager
@@ -117,12 +114,8 @@ def publication_lock(path: Path, key: str):
     path = Path(path)
     _prepare_parent(path)
     lock = path.with_name("mapping." + key + ".publish.lock")
-    try:
-        descriptor = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError as error:
-        raise InventoryError("journal-busy: handoff is already running") from error
-    os.close(descriptor)
+    descriptor = acquire_lock(lock, "journal-busy")
     try:
         yield
     finally:
-        lock.unlink(missing_ok=True)
+        os.close(descriptor)
