@@ -44,3 +44,4 @@ git diff --check
 - 迁移后严格解析通过，现行模块 31 个；退役 id 在模块行、依赖和 Build order 中均不存在。
 - 四份归档与迁移前 `HEAD` 的 Git blob 相同：`f3308cb73faf`、`1fa5a467c52f`、`85e71bf1e2b1`、`77e6240fc15a`。
 - `verify-artifacts.sh` 退出 0；产物回归 18 例、阶段回归 78 例、完整 `scripts/validate.sh` 均通过。13 个历史模块缺 todo 的既有警告仍可观察，不计作本次迁移失败。
+- 迁移已提交于本地分支，并将结果回填 Local Bug `SH62J51`；交付时复核远端分支与草稿 PR 状态。
