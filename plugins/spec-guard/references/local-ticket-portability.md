@@ -33,7 +33,9 @@ Restore first proves the archive in isolation, then commits `.epiq/project.json`
 repo's default branch and creates `__epiq_state__` with its worktree. It does not push. If a
 write is interrupted, it preserves partial target data for inspection; do not rerun into that
 nonempty target. The mapping journal is exported in the archive but not imported into a new
-project's user-level partition automatically.
+project's user-level partition automatically. The proof uses a disposable Epiq identity;
+after real restore, configure a local Epiq user identity through Epiq's setup flow before the
+first write. The restore result reports `localIdentitySetupRequired: true` for this boundary.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" handoff-preview \

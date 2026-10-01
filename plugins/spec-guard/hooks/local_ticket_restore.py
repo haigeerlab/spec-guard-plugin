@@ -237,4 +237,5 @@ def restore_archive(archive: Path, project: Path, global_dir: Path,
         lock.unlink(missing_ok=True)
     return {"state": "restored", "projectId": proof["projectId"],
             "eventCount": proof["eventCount"], "mediaCount": proof["mediaCount"],
-            "stateBranch": "__epiq_state__", "gitIdentityCommitted": True}
+            "stateBranch": "__epiq_state__", "gitIdentityCommitted": True,
+            "localIdentitySetupRequired": True}
