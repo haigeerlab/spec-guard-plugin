@@ -207,10 +207,7 @@ class SourceInventoryTests(unittest.TestCase):
         old_common = Path(git(self.root, "rev-parse", "--path-format=absolute",
                               "--git-common-dir"))
         archive = self.root.parent / "archive"
-        with patch("local_ticket_archive.journal_path",
-                   side_effect=lambda project, identity: journal_path(
-                       project, identity, journal_root)):
-            archive_project(self.root, archive)
+        archive_project(self.root, archive, journal_root=journal_root)
         moved = self.root.parent / "moved-repo"
         self.root.rename(moved)
         git(moved, "worktree", "repair", str(self.state_root))
@@ -464,6 +461,50 @@ class SourceInventoryTests(unittest.TestCase):
         self.assertIsNotNone(token)
         self.assertIsNone(unresolved)
         self.assertFalse(journal_path(third, PROJECT_ID, journal_root).exists())
+
+        archive = self.root.parent / "bound-archive"
+        archive_project(third, archive, journal_root=journal_root)
+        self.assertEqual(verify_archive(archive)["state"], "verified")
+        manifest = json.loads((archive / "manifest.json").read_text())
+        self.assertEqual(manifest["formatVersion"], 2)
+        self.assertEqual((archive / ".spec-guard/mapping.json").read_bytes(),
+                         old_mapping.read_bytes())
+        proof_file = archive / ".spec-guard/binding-provenance.json"
+        proof = json.loads(proof_file.read_text())
+        self.assertEqual(len(proof["bindings"]), 2)
+        self.assertNotIn(str(old_common), proof_file.read_text())
+        restored = self.root.parent / "restored"
+        restored.mkdir()
+        git(restored, "init", "-q")
+        git(restored, "config", "user.name", "Restore Fixture")
+        git(restored, "config", "user.email", "restore@example.invalid")
+        restored_global = self.root.parent / "restored-global"
+        restored_global.mkdir()
+        materialized = [{"id": "EV1", "action": "add.issue",
+                         "payload": {"id": issue_id}}]
+        event_digest = hashlib.sha256(json.dumps(
+            materialized, sort_keys=True, ensure_ascii=False,
+            separators=(",", ":")).encode()).hexdigest()
+        with patch("local_ticket_restore.prove_restore", return_value={
+                "projectId": PROJECT_ID, "eventCount": 1, "mediaCount": 0,
+                "eventDigest": event_digest}), \
+             patch("local_ticket_restore.node_status", return_value={"path": "/bin/false"}), \
+             patch("local_ticket_restore._call", return_value={"eventLog": materialized}):
+            self.assertEqual(restore_archive(
+                archive, restored, restored_global, self.root.parent / "runtime",
+                confirm=True)["state"], "restored")
+        self.assertFalse((restored / ".spec-guard").exists())
+        self.assertFalse(journal_path(restored, PROJECT_ID, journal_root).exists())
+
+        proof["bindings"][0]["canonicalPartition"] = "f" * 64
+        proof_file.write_text(json.dumps(proof))
+        for record in manifest["files"]:
+            if record["path"] == ".spec-guard/binding-provenance.json":
+                record["size"] = proof_file.stat().st_size
+                record["sha256"] = hashlib.sha256(proof_file.read_bytes()).hexdigest()
+        (archive / "manifest.json").write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(InventoryError, "archive-invalid"):
+            verify_archive(archive)
 
         original_pointer = second_pointer.read_text()
         value = json.loads(original_pointer)

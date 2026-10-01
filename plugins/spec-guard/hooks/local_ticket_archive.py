@@ -16,7 +16,8 @@ from local_ledger_runtime import (
     PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
 )
 from local_ticket_portability import InventoryError, _event_lines, inventory_project, worktree_roots
-from local_ticket_journal import journal_path, read_journal
+from local_ticket_journal import (binding_chain_evidence, binding_checksum,
+                                  read_journal)
 
 
 def _within(candidate: Path, parent: Path) -> bool:
@@ -58,7 +59,7 @@ def _safe_name(name: str) -> bool:
         return False
     if name in ("state.bundle", ".epiq/project.json"):
         return True
-    if name == ".spec-guard/mapping.json":
+    if name in (".spec-guard/mapping.json", ".spec-guard/binding-provenance.json"):
         return True
     return (len(relative.parts) == 3 and relative.parts[:2] in
             ((".epiq", "events"), (".epiq", "media")))
@@ -76,7 +77,7 @@ def verify_archive(archive: Path) -> dict[str, Any]:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError) as error:
         raise InventoryError("archive-invalid: manifest is unreadable") from error
-    if (not isinstance(manifest, dict) or manifest.get("formatVersion") != 1
+    if (not isinstance(manifest, dict) or manifest.get("formatVersion") not in (1, 2)
             or manifest.get("epiqVersion") != PACKAGE_VERSION
             or manifest.get("stateBranch") != STATE_BRANCH
             or not isinstance(manifest.get("stateHead"), str)
@@ -142,6 +143,49 @@ def verify_archive(archive: Path) -> dict[str, Any]:
         raise InventoryError("archive-invalid: unlisted or missing file")
     if ".spec-guard/mapping.json" in expected:
         read_journal(archive / ".spec-guard/mapping.json")
+    proof_name = ".spec-guard/binding-provenance.json"
+    if manifest["formatVersion"] == 1 and proof_name in expected:
+        raise InventoryError("archive-invalid: v1 archive has binding provenance")
+    if manifest["formatVersion"] == 2:
+        if proof_name not in expected or ".spec-guard/mapping.json" not in expected:
+            raise InventoryError("archive-invalid: bound mapping evidence is missing")
+        try:
+            proof = json.loads((archive / proof_name).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError) as error:
+            raise InventoryError("archive-invalid: binding provenance is unreadable") from error
+        bindings = proof.get("bindings") if isinstance(proof, dict) else None
+        canonical = proof.get("canonicalPartition") if isinstance(proof, dict) else None
+        mapping_bytes = (archive / ".spec-guard/mapping.json").read_bytes()
+        if (not isinstance(proof, dict) or set(proof) != {
+                "formatVersion", "projectId", "canonicalPartition", "mappingSha256",
+                "bindings"} or proof["formatVersion"] != 1 or
+                proof["projectId"] != manifest["projectId"] or
+                not isinstance(canonical, str) or re.fullmatch(r"[0-9a-f]{64}", canonical) is None or
+                proof["mappingSha256"] != hashlib.sha256(mapping_bytes).hexdigest() or
+                not isinstance(bindings, list) or not bindings):
+            raise InventoryError("archive-invalid: binding provenance differs")
+        seen: set[str] = set()
+        previous = None
+        for binding in bindings:
+            if (not isinstance(binding, dict) or set(binding) != {
+                    "formatVersion", "projectId", "currentPartition", "candidatePartition",
+                    "canonicalPartition", "initialMappingSha256", "previewSha256",
+                    "boundAt", "bindingSha256"} or
+                    binding["formatVersion"] != 1 or binding["projectId"] != proof["projectId"] or
+                    binding["canonicalPartition"] != canonical or
+                    not all(isinstance(binding[name], str) and
+                            re.fullmatch(r"[0-9a-f]{64}", binding[name])
+                            for name in ("currentPartition", "candidatePartition",
+                                         "initialMappingSha256", "previewSha256")) or
+                    not isinstance(binding["boundAt"], str) or
+                    binding["currentPartition"] in seen or
+                    (previous is not None and binding["currentPartition"] != previous) or
+                    binding["bindingSha256"] != binding_checksum(binding)):
+                raise InventoryError("archive-invalid: binding chain differs")
+            seen.add(binding["currentPartition"])
+            previous = binding["candidatePartition"]
+        if previous != canonical or canonical in seen:
+            raise InventoryError("archive-invalid: binding chain does not reach mapping")
     with tempfile.TemporaryDirectory(prefix="sg-archive-verify-") as temporary:
         checkout = Path(temporary)
         bundle = str(archive / "state.bundle")
@@ -171,7 +215,8 @@ def verify_archive(archive: Path) -> dict[str, Any]:
             "eventCount": len(manifest.get("eventIds", [])), "fileCount": len(expected) - 1}
 
 
-def archive_project(project: Path, output: Path) -> dict[str, Any]:
+def archive_project(project: Path, output: Path,
+                    journal_root: Path | None = None) -> dict[str, Any]:
     """Save committed state and raw live files without sync, add or push."""
     project = Path(project).resolve()
     output = Path(output)
@@ -202,7 +247,8 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
         config.parent.mkdir(mode=0o700)
         config.write_bytes(config_source.read_bytes())
         records = [_record(bundle, temporary), _record(config, temporary)]
-        mapping_source = journal_path(project, before["projectId"])
+        mapping_source, binding_token, bindings = binding_chain_evidence(
+            project, before["projectId"], journal_root)
         mapping_present = mapping_source.exists() or mapping_source.is_symlink()
         if mapping_present:
             read_journal(mapping_source)
@@ -210,6 +256,18 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
             mapping.parent.mkdir(mode=0o700)
             mapping.write_bytes(mapping_source.read_bytes())
             records.append(_record(mapping, temporary))
+        if binding_token is not None:
+            if not mapping_present:
+                raise InventoryError("archive-invalid: bound mapping is absent")
+            provenance = temporary / ".spec-guard" / "binding-provenance.json"
+            provenance.write_text(json.dumps({
+                "formatVersion": 1, "projectId": before["projectId"],
+                "canonicalPartition": mapping_source.parent.parent.name,
+                "mappingSha256": hashlib.sha256(mapping.read_bytes()).hexdigest(),
+                "bindings": bindings,
+            }, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+            provenance.chmod(0o600)
+            records.append(_record(provenance, temporary))
         for entry in before["files"]:
             source = state_root / entry["path"]
             if source.is_symlink() or not source.is_file():
@@ -227,8 +285,14 @@ def archive_project(project: Path, output: Path) -> dict[str, Any]:
         if (mapping_source.exists() or mapping_source.is_symlink()) != mapping_present or (
                 mapping_present and mapping_source.read_bytes() != mapping.read_bytes()):
             raise InventoryError("source-changed: mapping journal changed during archive")
+        after_mapping, after_token, after_bindings = binding_chain_evidence(
+            project, before["projectId"], journal_root)
+        if (after_mapping != mapping_source or after_token != binding_token or
+                after_bindings != bindings):
+            raise InventoryError("source-changed: binding chain changed during archive")
         manifest = {
-            "formatVersion": 1, "epiqVersion": before["epiqVersion"],
+            "formatVersion": 2 if binding_token is not None else 1,
+            "epiqVersion": before["epiqVersion"],
             "projectId": before["projectId"], "stateBranch": STATE_BRANCH,
             "stateHead": before["stateHead"],
             "capturedAt": datetime.now(timezone.utc).isoformat(),

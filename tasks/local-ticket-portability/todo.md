@@ -77,10 +77,11 @@
   - 验证：隔离 Git/worktree 夹具和指针链篡改测试通过；运行两个聚焦测试文件。
   - 文件：绑定模块、日志模块、两个聚焦测试文件（约 4 个）。
   - 完成证据：临时 Git/Epiq 项目经两次路径移动及显式 worktree repair 后，第二次预览显示完整链并绑定至首份 canonical 映射；再次发布仍为同一 Issue／评论。循环、断链、不同 canonical 和链外同 ID clone 均停止或待人工对账。51 项 portability、35 项 publish 测试及 `git diff --check` 通过；无法从旧格式区分历史完全相同的复制仓库，仍需人确认归属。
-- [ ] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
+- [x] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
   - 验收：新归档的 mapping 与绑定证明都受 manifest 哈希保护并相互核对；旧 v1 归档仍可验证和恢复；恢复不会写用户级指针。
   - 验证：新旧归档、篡改／缺失证明、隔离恢复测试通过；运行 `test_local_ticket_portability.py`。
   - 文件：归档模块、绑定模块、`test_local_ticket_portability.py`（约 3 个）。
+  - 完成证据：绑定链归档为 v2，导出首份 canonical 映射及无绝对路径的指针链；manifest 逐字节覆盖两者，`verify` 再核对映射摘要与每段指针校验和。隔离的 v2 恢复在模拟 Epiq 读回后成功，未在目标安装用户级绑定；篡改链并重算 manifest 哈希仍被拒绝。旧 v1 验证回归通过；51 项 portability、35 项 publish 回归和 `git diff --check` 通过。
 - [ ] Task 16：CLI 说明与总验收。依赖：11–15。
   - 验收：命令与参考文档写明移动修复边界、显式审阅和人工对账状态；不恢复退役 hosted Tracker bridge，不在真实用户目录安装指针或写远端。
   - 验证：两个聚焦测试、`scripts/validate.sh`、`verify-artifacts.sh`、`git diff --check` 通过；记录未实测的真实移动与在线行为。

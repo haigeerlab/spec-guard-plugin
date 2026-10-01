@@ -229,6 +229,32 @@ def active_journal(project: Path, project_id: str,
     return path, hashlib.sha256("|".join(tokens).encode("ascii")).hexdigest(), None
 
 
+def binding_chain_evidence(project: Path, project_id: str,
+                           root: Path | None = None) -> tuple[Path, str | None, list[dict[str, Any]]]:
+    """Return verified canonical path and path-free pointer records for an archive."""
+    path, token, unresolved = active_journal(project, project_id, root)
+    if unresolved is not None:
+        raise InventoryError("journal-bind-conflict: old journal candidates need review")
+    if token is None:
+        return path, None, []
+    base = default_journal_root() if root is None else Path(root)
+    partition = journal_path(project, project_id, root).parent.parent.name
+    chain: list[dict[str, Any]] = []
+    while partition != path.parent.parent.name:
+        link = _read_binding(base / partition / project_id / "binding.json",
+                             project_id, partition)
+        if link is None:
+            raise InventoryError("journal-bind-invalid: binding chain changed")
+        binding, _ = link
+        chain.append(binding)
+        partition = binding["candidatePartition"]
+        if len(chain) > 100:
+            raise InventoryError("journal-bind-invalid: binding chain is too long")
+    if active_journal(project, project_id, root)[:2] != (path, token):
+        raise InventoryError("journal-bind-invalid: binding chain changed")
+    return path, token, chain
+
+
 def _prepare_parent(path: Path) -> None:
     managed = (path.parent.parent.parent, path.parent.parent, path.parent)
     for directory in managed:
