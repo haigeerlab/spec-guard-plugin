@@ -44,7 +44,8 @@ def mcp_command(runtime_dir: Path, node_executable: str) -> list[str]:
     node_path = Path(node_executable)
     if not node_path.is_absolute():
         raise ValueError("local-ledger Node executable must be an absolute path")
-    return [str(node_path), str(Path(runtime_dir) / MCP_RELATIVE_PATH)]
+    return ["/bin/sh", "-c", 'umask 077; exec "$1" "$2"',
+            MCP_SERVER_NAME, str(node_path), str(Path(runtime_dir) / MCP_RELATIVE_PATH)]
 
 
 def codex_toml_fragment(runtime_dir: Path, node_executable: str) -> str:
@@ -154,7 +155,8 @@ def main(argv=None) -> int:
         if args.host == "codex":
             print(codex_toml_fragment(args.runtime_dir, node_path), end="")
         elif args.host == "claude":
-            print(json.dumps({"command": node_path, "args": [str(args.runtime_dir / MCP_RELATIVE_PATH)],
+            command = mcp_command(args.runtime_dir, node_path)
+            print(json.dumps({"command": command[0], "args": command[1:],
                               "permissions": {"ask": claude_ask_rules()}}, indent=2))
         elif not args.confirm_install:
             print("configuration-confirmation-required: rerun with --confirm-install to write host configuration")

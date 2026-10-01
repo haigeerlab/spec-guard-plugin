@@ -1,7 +1,9 @@
 """Local-ledger Claude/Codex adapter tests; never alter real host configuration."""
 import json
 import io
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -24,10 +26,40 @@ class LocalLedgerAdapterTests(unittest.TestCase):
     def test_codex_fragment_is_a_no_secret_stdio_entry(self):
         fragment = local_ledger_adapters.codex_toml_fragment(self.runtime_dir, "/opt/node")
         self.assertIn("[mcp_servers.spec_guard_local_ledger]", fragment)
-        self.assertIn('command = "/opt/node"', fragment)
+        self.assertIn('command = "/bin/sh"', fragment)
+        self.assertIn("umask 077", fragment)
+        self.assertIn('/opt/node', fragment)
         self.assertIn(str(self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"), fragment)
         self.assertNotIn("token", fragment.lower())
         self.assertNotIn("http", fragment.lower())
+
+    def test_claude_preview_matches_private_install_command(self):
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "claude", "--runtime-dir", str(self.runtime_dir),
+            ]), 0)
+        preview = json.loads(output.getvalue())
+        command = local_ledger_adapters.mcp_command(self.runtime_dir, "/opt/node")
+        self.assertEqual([preview["command"], *preview["args"]], command)
+        self.assertEqual(preview["command"], "/bin/sh")
+
+    def test_generated_mcp_command_creates_private_default_mode_files(self):
+        entrypoint = self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"
+        entrypoint.write_text(
+            "import os\nfrom pathlib import Path\n"
+            "root = Path(os.environ['SG_TEST_EPIQ_GLOBAL'])\n"
+            "root.mkdir()\n(root / 'event.jsonl').write_text('test')\n",
+            encoding="utf-8",
+        )
+        command = local_ledger_adapters.mcp_command(self.runtime_dir, sys.executable)
+        global_dir = Path(self.tmp.name) / "new-epiq-global"
+        env = {**os.environ, "SG_TEST_EPIQ_GLOBAL": str(global_dir)}
+        subprocess.run(command, env=env, check=True, capture_output=True, text=True)
+        self.assertEqual(global_dir.stat().st_mode & 0o777, 0o700)
+        self.assertEqual((global_dir / "event.jsonl").stat().st_mode & 0o777, 0o600)
 
     def test_codex_fragment_exposes_only_daily_tools(self):
         fragment = local_ledger_adapters.codex_toml_fragment(self.runtime_dir, "/opt/node")

@@ -17,6 +17,8 @@ ROOT="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}"
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 ```
 
+需要检查 Epiq 用户级事项数据目录的本机访问位时，再运行 `storage-check --format json`。它只读地检查当前进程的 `EPIQ_GLOBAL_DIR`（缺省 `~/.epiq-global`），不会修复权限；`private-posix` 只证明 POSIX 所有者和权限位，不能证明 ACL 无额外访问。检查结果与上面的运行时 `status` 是两个独立事实，细则见运行时参考文档。需要收紧宽权限时先运行只读 `storage-protect --format json` 展示路径和 0700 目标；只有用户审查并明确授权这次真实目录写入后，才能加 `--confirm-protect`。它只改根目录权限，不创建目录或递归改事项文件。新生成的宿主片段与插件自己的初始化进程使用私有 umask；已有宿主 MCP 条目不会自动替换，需单独预览迁移。
+
 - `absent`：Epiq 运行时尚未安装。这是正常的未启用状态；不得自动下载。
 - `ready`：受管运行时可用，但当前仓库还没有本地账本。
 - `initialized`：当前仓库已有可用的 `.epiq/project.json`，可继续检查 MCP 接入。

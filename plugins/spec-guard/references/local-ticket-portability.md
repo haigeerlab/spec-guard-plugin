@@ -14,11 +14,19 @@ python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-d
 The archive contains `manifest.json`, a single-state-branch Git bundle, the Epiq project
 identity, raw event/media files, and a private mapping journal snapshot if one exists. It
 does not contain project source or other Git branches. `verify --prove` compares all source
-events with Epiq's materialized view and checks a disposable write. Copy the archive to
-independent storage and verify that copy before relying on it for disaster recovery. Archive
+events with Epiq's materialized view and checks a disposable write. Archive
 creation stops if the destination directory does not retain private POSIX mode (0700).
 Archive and private preview outputs cannot be placed inside any linked worktree of the
 source repository.
+
+For the current same-host workflow, a practical archive destination is
+`~/.spec-guard/local-ticket-ledger/archives/<projectId>/<UTC>-<unique-id>/`.
+Use `inventory` to obtain the project ID, create the parent directories with private
+permissions (0700), and pass a new final directory as `--output`. The archive contains
+one project's state at that point in time; keep older archives until their replacement
+has passed `verify --prove`. This location is a user-level record shared by the current
+user's worktrees, not a plugin installation or project checkout directory. It does not
+protect against loss of this host.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \
@@ -54,6 +62,13 @@ post historical comments, and set closed/open state on the exact target. Show th
 preview and obtain target-specific authorization before running it. The command rechecks the
 source digest and remote metadata, records intent privately, then reads back every managed
 marker. GitHub PRs and GitLab system notes are excluded from issue/comment matching.
+
+A practical preview destination is
+`~/.spec-guard/local-ticket-portability/previews/<projectId>/<full-issue-id>/<UTC>-<unique-id>.json`.
+Create its parent directories privately (0700), then pass a new file path as `--output`.
+The preview records the exact target and full source history. Keep it while a handoff is
+`planned`, `partial`, `conflict`, or uncertain; never treat it as disposable scratch data.
+Neither archive nor preview gets an implicit default output path.
 
 If attachment bytes cannot be uploaded and read back under the target's visibility, the result
 remains `partial` and the original Local media stays in the archive. Code references on the

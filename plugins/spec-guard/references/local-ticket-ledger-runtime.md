@@ -43,6 +43,26 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
 输出将 `node`、`runtime` 和 `project` 分开报告，避免把“Node 缺失”“未安装运行时”和“项目尚未初始化”
 混成一个原因。诊断只读取文件与 `node --version`；它不读取 token，因为本事项账本没有项目级 secret。
 
+### Epiq 用户级数据目录的权限检查
+
+同一入口可只读检查当前进程使用的 `EPIQ_GLOBAL_DIR`，未设置时检查 `~/.epiq-global`：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-check --format json
+```
+
+该命令只读取目录自身的类型、所有者和 POSIX 权限位，不读取事项或日志、不创建目录、不修改权限。`absent` 表示尚未创建；`private-posix` 表示由当前用户拥有且权限位仅允许该用户读写进入；`exposed` 表示组或其他用户具有 POSIX 访问位；`unusable` 表示当前所有者缺少读／写／进入权限；`unsafe` 表示符号链接、普通文件或归属其他用户；`unknown` 表示路径相对或元数据不可读。前两种状态退出码 0，其余退出码 1。返回的 `scope: posix-mode-only` 明确说明这不是 ACL 的完整安全证明。
+
+如果 MCP 宿主单独设置了 `EPIQ_GLOBAL_DIR`，应在相同环境下运行该检查；它不会读取宿主配置推断目录。此命令不修复已存在的宽权限，也不改变 `status`／`preflight` 的判据。
+
+对宽权限根目录，可先只读预览精确变更：
+
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" storage-protect --format json
+```
+
+`protectable` 给出当前 `mode` 与拟变更的 `targetMode: 0700`，不写入。只有用户审查路径和预览并明确授权这次操作后，才可添加 `--confirm-protect` 执行；该标记本身不代表用户授权。命令重新检查所有者、目录类型、父目录与路径身份，拒绝符号链接、错误归属或可由其他用户改写的父目录；只对根目录做一次 chmod，不递归修改事件、媒体或 Git worktree，不创建缺失目录。`already-private` 表示无需修改。`protected` 之后再运行 `storage-check` 核对。此操作不会替换已有的直接 Node MCP 宿主条目。新版由插件启动的初始化进程以 umask 077 运行；新版 Claude/Codex 适配器片段通过固定的 `/bin/sh` 包装先设置 umask 077，再 `exec` 已验证的 Node 与 Epiq MCP 入口。因此首次创建的数据根及事件文件分别以当前用户私有的默认权限创建。已经安装的旧 MCP 配置仍按原来的直接 Node 命令运行，必须在用户明确要求后预览并迁移其精确条目；同名拒绝覆盖规则不变，也不会因为本次源码更新而自动重连宿主。
+
 ### 状态 worktree 被另一个仓库占用
 
 Epiq 1.11.0 把状态 worktree 放在 `<EPIQ_GLOBAL_DIR 或 ~/.epiq-global>/worktrees/<projectId>`，路径里只有
@@ -181,7 +201,7 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 python3 -B "$ROOT/hooks/local_ledger_adapters.py" claude
 ```
 
-它们都指向已验证的受管 `node` 和固定 `epiq` MCP 入口，不包含 token、HTTP 地址、账本内容或项目 secret。
+新片段经 `/bin/sh` 设置私有 umask 后 `exec` 已验证的受管 `node` 与固定 `epiq` MCP 入口，不包含 token、HTTP 地址、账本内容或项目 secret。静态 shell 片段只引用位置参数，Node 与入口路径均作为独立参数传入。已有直接 Node 条目不会自动更新。
 只有用户明确要求写入某一个宿主的用户级配置时，才可运行相应安装命令，而且仍必须带第二层
 `--confirm-install`：
 

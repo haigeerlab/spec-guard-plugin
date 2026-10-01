@@ -30,6 +30,18 @@ process.
 - Status, contract, and preflight commands are read-only. Installation, initialization, and host
   configuration are explicit operator actions gated by `--confirm-install` or the equivalent
   confirmation; plugin installation, hooks, and the daily entry perform none of them.
+- `storage-check` is a separate read-only POSIX ownership/mode diagnostic for the effective
+  `EPIQ_GLOBAL_DIR` (default `~/.epiq-global`). It reports absent, private-posix, exposed,
+  unusable, unsafe, or unknown without reading ticket contents or changing the existing
+  `status` result. POSIX mode alone does not prove the absence of ACL-based access.
+- `storage-protect` previews a root-only change to 0700. Only `--confirm-protect` may
+  perform it, after rechecking owner, type, parent and path identity with a no-follow
+  directory handle. It never creates a missing root, recurses into children or changes
+  host MCP configuration; the CLI flag does not replace user authorization.
+- New plugin-started Epiq processes use umask 077; new Claude/Codex adapter fragments
+  launch the pinned Node entry through a fixed `/bin/sh` umask wrapper. Existing installed
+  host entries are not overwritten or migrated automatically. A previously exposed root
+  still needs explicit review and protection.
 
 ## Host and interaction contract
 
@@ -63,6 +75,8 @@ process.
 
 ```text
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py status --format json
+python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py storage-check --format json
+python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py storage-protect --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py install --confirm-install --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_runtime.py preflight --format json
 python3 -B plugins/spec-guard/hooks/local_ledger_adapters.py codex|claude
