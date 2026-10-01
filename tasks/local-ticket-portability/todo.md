@@ -47,3 +47,38 @@
   - 合成归档上传到私有 GitHub 测试仓库后，从远端下载的 SHA-256 与原归档相同；下载副本的 `verify --prove` 通过（15 个事件、1 条评论、1 个图片附件，媒体哈希一致）。用下载副本恢复到新的空 Git 仓库和 Epiq 全局目录，原事项摘要、事件、评论和附件与来源一致；完成本机 Epiq 身份设置后新增事项并读回。这证明独立存储副本可恢复，未证明异机运行或用户真实账本已有离机备份。
   - 模块实现验收完成，公开 PR 的双平台 CI 均通过。真实 Local 账本的同盘归档已再次通过隔离恢复证明，并与当前源的项目、状态分支、事件 ID 和文件摘要一致；同盘副本不提供离机容灾。
   - 真实项目启用仍有独立的操作前置：真实账本需复制到独立介质并读回；mGit API 当前仅证实 HTTP 可用于合成数据，HTTPS 443 从本机连接超时，敏感历史的保密传输未证明；附件远端原字节与可见性未验证，相关事项继续保持 `partial`。这些条件不作为插件代码和合成验收完成的前置，也不能被完成标记代替。
+
+## 扩展：移动后的映射日志重绑定（执行中）
+
+- [x] Task 10：固定绑定契约与临时移动夹具。依赖：已完成的任务 9。
+  - 验收：Spec 明确指针与归档兼容边界；临时项目可模拟移动前后 Git common dir、同 ID clone、旧 `planned`／`partial`／`verified` 映射和状态 worktree；不读取真实用户映射。
+  - 验证：夹具能复现当前 `journal-candidates` 阻断，损坏／宽权限候选按现有规则失败；`git diff --check`。
+  - 文件：`spec/local-ticket-portability.md`、两个现有聚焦测试文件（约 3 个）。
+  - 完成证据：Spec 增加双步骤与失败边界；临时 Git/Epiq 夹具在移动并显式 `git worktree repair` 后保留旧分区的 `planned`／`partial`／`verified`，新分区无映射。既有同 ID clone 和旧目录无映射回归通过。47 项 portability、32 项 publish 测试通过，产物检查 0 失败，`git diff --check` 通过；未读取真实用户日志。
+- [ ] Task 11：只读绑定预览。依赖：10。
+  - 验收：仅一个可归属候选、完整键解析及来源摘要证据才产出 0600 预览；旧路径或已验证归档证据匹配；旧目录无映射、多候选、旧仓库仍活跃、来源分叉、旧版摘要无法证明均停止。历史完全相同的复制仓库无法单靠旧格式自动区分，预览须明确提示由人确认归属。
+  - 验证：正反合成测试检查预览文件内容、权限和来源／目标零写入；运行 `test_local_ticket_portability.py`。
+  - 文件：新绑定模块、CLI、`test_local_ticket_portability.py`（约 3 个）。
+- [ ] Checkpoint E：人工审查预览报告能区分“候选存在”和“已证明可绑定”；不泄露绝对旧路径到归档或远端。
+- [ ] Task 12：原子安装私有绑定指针。依赖：11。
+  - 验收：`--confirm` 在目标分区锁内重验并排他创建 0600 指针；预览／映射变化、目标已有日志或指针、并发安装失败；旧日志字节保持不变，远端调用计数为零。
+  - 验证：过期预览、并发和故障注入测试通过；运行 `test_local_ticket_portability.py`。
+  - 文件：绑定模块、CLI、`test_local_ticket_portability.py`（约 3 个）。
+- [ ] Task 13：发布解析到 canonical 日志。依赖：12。
+  - 验收：绑定前保守阻断；绑定后预锁和锁内都解析同一 canonical 路径，继续使用原 per-key 锁；额外候选、指针篡改、原日志丢失均失败关闭；`planned`／`partial` 不会因绑定自动变为 `verified`。
+  - 验证：假提供方重复发布与响应丢失测试不创建重复 Issue／评论；运行 `test_local_ticket_publish.py`。
+  - 文件：日志模块、发布模块、`test_local_ticket_publish.py`（约 3 个）。
+- [ ] Checkpoint F：检查 canonical 路径与锁的一致性及双路径并发；映射原子替换可改变 inode，不能以 inode 等同作为证明。
+- [ ] Task 14：再次移动时沿有效指针链解析。依赖：13。
+  - 验收：新位置经第二次显式预览和绑定后仍抵达首份 canonical 日志；循环、断链、不同 canonical 和可识别的独立 clone 均拒绝自动接管；完全相同的历史不被误报成已证明同仓库。
+  - 验证：隔离 Git/worktree 夹具和指针链篡改测试通过；运行两个聚焦测试文件。
+  - 文件：绑定模块、日志模块、两个聚焦测试文件（约 4 个）。
+- [ ] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
+  - 验收：新归档的 mapping 与绑定证明都受 manifest 哈希保护并相互核对；旧 v1 归档仍可验证和恢复；恢复不会写用户级指针。
+  - 验证：新旧归档、篡改／缺失证明、隔离恢复测试通过；运行 `test_local_ticket_portability.py`。
+  - 文件：归档模块、绑定模块、`test_local_ticket_portability.py`（约 3 个）。
+- [ ] Task 16：CLI 说明与总验收。依赖：11–15。
+  - 验收：命令与参考文档写明移动修复边界、显式审阅和人工对账状态；不恢复退役 hosted Tracker bridge，不在真实用户目录安装指针或写远端。
+  - 验证：两个聚焦测试、`scripts/validate.sh`、`verify-artifacts.sh`、`git diff --check` 通过；记录未实测的真实移动与在线行为。
+  - 文件：command／skill／reference／`CHANGELOG.md` 中实际受影响的文件（每次提交不超过约 5 个）。
+- [ ] Checkpoint G：复核全部停止边界、归档证据和无远端写入；确认可审查后再考虑实际用户账本操作。

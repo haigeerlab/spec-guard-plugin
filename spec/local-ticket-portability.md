@@ -107,7 +107,34 @@ worktree，不推送远端。写入中断保留部分目标数据供诊断，不
    自动创建远端事项。候选即使只有一份也不自动绑定到当前仓库；同 ID 的独立
    clone 可能造成保守阻断。旧目录即使没有 `mapping.json`，也可能是中断的
    发布准备，不能当作缺席；损坏或不安全的候选同样如此。发现命令不创建
-   分区、锁或远端内容；正式重绑定另行设计。
+   分区、锁或远端内容；显式重绑定契约见下节。
+
+## 路径移动后的映射日志重绑定
+
+Git common dir 的绝对路径变化会改变用户级日志分区。重绑定须先读取候选并
+生成私有预览，再由人确认候选归属后显式安装绑定指针。预览必须核对当前
+Epiq 项目身份、状态 worktree 所有权、候选目录和文件权限、映射 schema、
+每条不可逆键与当前事项及目标的唯一对应关系，以及可证明的来源摘要。
+旧路径字符串与分区哈希相符或归档中存在相同映射快照，只是来源线索，
+不能独立证明两个 Git 仓库相同。旧 common dir 仍指向另一活跃仓库、
+多份无关候选、只有旧目录而没有映射、来源分叉或旧版摘要无法重建时，
+停止并保留原日志供人工对账。历史完全相同的复制仓库在旧格式中可能
+无法区分；预览必须说明这一限制，不自动绑定。
+
+确认后只在新分区排他创建权限为 0600 的 `binding.json`；它指向旧分区，
+不复制、合并、删除或改写旧 `mapping.json`，也不调用远端。预览后来源、
+候选或目标分区变化使确认失效。指针只存格式版本、项目 ID、分区哈希、
+绑定时映射摘要和预览摘要等审计事实，不存来源绝对路径或事项正文。
+映射经原子替换更新，初始摘要不会永久不变；所有受管发布进程必须使用
+同一个 canonical 映射路径及其逐项锁，而不是依赖 inode 相等。
+
+发布和归档均解析有效绑定链；循环、断链、损坏指针、目标分区另有映射或
+额外候选均停止。再次移动仍须重新预览和确认，并沿原 canonical 日志继续；
+绑定本身不改变 `planned`、`partial`、`verified` 或 `conflict`，远端仍须逐项
+读回。新归档需同时包含 canonical 映射及可核验、无绝对路径的绑定来源证明；
+旧归档继续可验证，恢复不会自动安装用户级绑定。Git worktree 修复属于
+独立显式操作，绑定命令不得暗中执行。绑定无法证明既有远端写入失败，
+因此不能据一次远端空查询重新创建事项。
 
 ## 命令
 
@@ -116,6 +143,8 @@ worktree，不推送远端。写入中断保留部分目标数据供诊断，不
 ```text
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py inventory --project <repo> --format json
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py journal-candidates --project <repo> --format json
+python3 -B plugins/spec-guard/hooks/local_ticket_portability.py journal-bind-preview --project <repo> --candidate <partition> (--old-common-dir <old-path> | --archive <verified-archive>) --output <preview.json>
+python3 -B plugins/spec-guard/hooks/local_ticket_portability.py journal-bind --project <repo> --preview <preview.json> --confirm
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py archive --project <repo> --output <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory> --prove --runtime-dir <pinned-runtime>

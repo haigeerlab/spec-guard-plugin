@@ -163,6 +163,32 @@ class SourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(InventoryError, "source-unknown"):
             inventory_project(other)
 
+    def test_moved_project_retains_old_mapping_states_after_worktree_repair(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        journal_root = self.root.parent / "private-journal"
+        old_mapping = journal_path(self.root, PROJECT_ID, journal_root)
+        for state, issue_id in (("planned", "I1"), ("partial", "I2"),
+                                ("verified", "I3")):
+            key = entry_key(PROJECT_ID, issue_id, {
+                "platform": "github", "host": "github.com", "targetId": 42,
+            })
+            write_entry(old_mapping, key, {"state": state, "sourceDigest": "a" * 64})
+
+        moved = self.root.parent / "moved-repo"
+        self.root.rename(moved)
+        git(moved, "worktree", "repair", str(self.state_root))
+
+        self.assertEqual(inventory_project(moved)["state"], "ready")
+        current_mapping = journal_path(moved, PROJECT_ID, journal_root)
+        self.assertNotEqual(current_mapping, old_mapping)
+        self.assertFalse(current_mapping.exists())
+        candidates = discover_journal_candidates(moved, PROJECT_ID, journal_root)
+        self.assertEqual(candidates["state"], "manual-reconciliation-required")
+        self.assertEqual(candidates["candidates"][0]["stateCounts"], {
+            "conflict": 0, "partial": 1, "planned": 1, "verified": 1,
+        })
+        self.assertEqual(len(read_journal(old_mapping)["entries"]), 3)
+
     def test_empty_event_directory_is_not_a_complete_initialized_ledger(self):
         with self.assertRaisesRegex(InventoryError, "invalid-event-log"):
             inventory_project(self.root)
