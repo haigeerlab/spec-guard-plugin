@@ -46,7 +46,8 @@ python3 -B "$ROOT/hooks/local_ticket_portability.py" handoff-publish \
 
 `handoff-preview` reads source files and target metadata; it does not write to either. It
 rejects unknown metadata rights or visibility mismatch. The preview file is mode 0600 and
-contains the full Local history, so keep it private. `handoff-publish` can create an Issue,
+contains the full Local history, so keep it private. A GitLab target using HTTP and any
+unverified attachment transfer are called out in its limitations. `handoff-publish` can create an Issue,
 post historical comments, and set closed/open state on the exact target. Show the complete
 preview and obtain target-specific authorization before running it. The command rechecks the
 source digest and remote metadata, records intent privately, then reads back every managed

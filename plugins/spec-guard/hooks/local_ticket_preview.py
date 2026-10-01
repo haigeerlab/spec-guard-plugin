@@ -152,13 +152,18 @@ def create_preview(project: Path, issue_id: str, runtime_dir: Path, platform: st
             state_root == destination or state_root in destination.parents or
             not output.parent.is_dir() or output.exists() or output.is_symlink()):
         raise InventoryError("preview-output-unsafe: output must be a new file outside Local source")
+    limitations = ["target code references not verified",
+                   "short or indirect code references may require manual review",
+                   "issue-write API scope is not proven by read-only metadata"]
+    if facts.get("webScheme") == "http":
+        limitations.append("GitLab target uses HTTP; transport confidentiality is unavailable")
+    if snapshot["attachments"]:
+        limitations.append("attachment bytes are not transferred or verified; publication remains partial")
     preview = {
         "formatVersion": 1, "state": "preview", "source": snapshot,
         "destination": facts, "title": snapshot["issue"]["title"],
         "body": render_body(snapshot),
-        "limitations": ["target code references not verified",
-                        "short or indirect code references may require manual review",
-                        "issue-write API scope is not proven by read-only metadata"],
+        "limitations": limitations,
         "attachmentTransfer": "unverified" if snapshot["attachments"] else "none",
     }
     descriptor = os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

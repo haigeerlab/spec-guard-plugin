@@ -448,6 +448,27 @@ class SourceInventoryTests(unittest.TestCase):
                                sibling / "private-preview.json",
                                runner=lambda arguments: json.dumps(metadata))
 
+    def test_gitlab_http_attachment_preview_names_both_limits(self):
+        snapshot = {
+            "projectId": PROJECT_ID, "issueId": "I1", "sourceDigest": "a" * 64,
+            "issue": {"title": "Synthetic", "description": "Test"},
+            "attachments": [{"hash": "b" * 64, "ext": "png", "bytes": 1}],
+            "codeReferences": [], "events": [],
+        }
+        metadata = {"path_with_namespace": "group/project", "id": 19,
+                    "web_url": "http://gitlab.example.test/group/project",
+                    "visibility": "private", "issues_enabled": True,
+                    "permissions": {"project_access": {"access_level": 30}}}
+        output = self.root.parent / "http-preview.json"
+        with patch("local_ticket_preview.snapshot_issue", return_value=snapshot):
+            create_preview(self.root, "I1", self.root.parent / "runtime",
+                           "gitlab", "gitlab.example.test", "group/project",
+                           "private", output,
+                           runner=lambda arguments: json.dumps(metadata))
+        limitations = json.loads(output.read_text(encoding="utf-8"))["limitations"]
+        self.assertTrue(any("HTTP" in item for item in limitations))
+        self.assertTrue(any("attachment bytes" in item for item in limitations))
+
     def test_preview_rejects_unknown_permission_and_visibility_mismatch(self):
         limited = {"full_name": "team/repo", "private": False, "has_issues": True,
                    "permissions": {"pull": True}, "id": 42}
