@@ -82,8 +82,9 @@
   - 验证：新旧归档、篡改／缺失证明、隔离恢复测试通过；运行 `test_local_ticket_portability.py`。
   - 文件：归档模块、绑定模块、`test_local_ticket_portability.py`（约 3 个）。
   - 完成证据：绑定链归档为 v2，导出首份 canonical 映射及无绝对路径的指针链；manifest 逐字节覆盖两者，`verify` 再核对映射摘要与每段指针校验和。隔离的 v2 恢复在模拟 Epiq 读回后成功，未在目标安装用户级绑定；篡改链并重算 manifest 哈希仍被拒绝。旧 v1 验证回归通过；51 项 portability、35 项 publish 回归和 `git diff --check` 通过。
-- [ ] Task 16：CLI 说明与总验收。依赖：11–15。
+- [x] Task 16：CLI 说明与总验收。依赖：11–15。
   - 验收：命令与参考文档写明移动修复边界、显式审阅和人工对账状态；不恢复退役 hosted Tracker bridge，不在真实用户目录安装指针或写远端。
   - 验证：两个聚焦测试、`scripts/validate.sh`、`verify-artifacts.sh`、`git diff --check` 通过；记录未实测的真实移动与在线行为。
   - 文件：command／skill／reference／`CHANGELOG.md` 中实际受影响的文件（每次提交不超过约 5 个）。
-- [ ] Checkpoint G：复核全部停止边界、归档证据和无远端写入；确认可审查后再考虑实际用户账本操作。
+  - 完成证据：command、skill、reference 与 changelog 均说明显式预览、候选归属限制、worktree 修复边界、两种归档格式和无自动远端写入。`scripts/validate.sh` 最终退出码 0；52 项 portability、35 项 publish 回归通过；`verify-artifacts.sh` 为 3 通过、0 失败（1 条既有警告）；`git diff --check` 通过。无真实用户级绑定或远端写入。
+- [x] Checkpoint G：代码审查覆盖来源权限、预览过期、并发锁、循环／断链、未知创建和 v1/v2 归档；合成验收通过，真实用户日志仍需针对具体候选单独预览与授权。检查点 E 的预览契约人工审阅仍待确认。
