@@ -20,7 +20,8 @@ from local_ticket_restore import prove_restore, restore_archive
 from local_ticket_handoff import _first_contributor_names, _issue_events, _source_digest
 from local_ticket_preview import create_preview, render_body, target_facts
 from local_ticket_journal import (active_journal, binding_checksum,
-                                  discover_journal_candidates, entry_key, journal_path,
+                                  discover_journal_candidates, entry_key, journal_candidate_status,
+                                  journal_path,
                                   publication_lock, read_journal, write_entry)
 from local_ticket_lock import MAGIC, acquire_lock
 
@@ -461,6 +462,10 @@ class SourceInventoryTests(unittest.TestCase):
         self.assertIsNotNone(token)
         self.assertIsNone(unresolved)
         self.assertFalse(journal_path(third, PROJECT_ID, journal_root).exists())
+        status = journal_candidate_status(third, PROJECT_ID, journal_root)
+        self.assertEqual(status["state"], "bound")
+        self.assertEqual({item["bindingStatus"] for item in status["candidates"]},
+                         {"alias", "canonical"})
 
         archive = self.root.parent / "bound-archive"
         archive_project(third, archive, journal_root=journal_root)
@@ -533,6 +538,9 @@ class SourceInventoryTests(unittest.TestCase):
                     {"state": "partial"})
         self.assertEqual(active_journal(third, PROJECT_ID, journal_root)[2]["state"],
                          "manual-reconciliation-required")
+        self.assertEqual({item["bindingStatus"] for item in
+                          journal_candidate_status(third, PROJECT_ID, journal_root)["candidates"]},
+                         {"alias", "canonical", "unrelated"})
 
     def test_empty_event_directory_is_not_a_complete_initialized_ledger(self):
         with self.assertRaisesRegex(InventoryError, "invalid-event-log"):
@@ -1122,6 +1130,17 @@ class SourceInventoryTests(unittest.TestCase):
         exported.write_text("{}", encoding="utf-8")
         with self.assertRaisesRegex(InventoryError, "archive-invalid"):
             verify_archive(archive)
+
+    def test_archive_rejects_mapping_with_broad_permissions(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        journal_root = self.root.parent / "private-journals"
+        path = journal_path(self.root, PROJECT_ID, journal_root)
+        write_entry(path, "a" * 64, {"state": "partial"})
+        path.chmod(0o644)
+        archive = self.root.parent / "archive"
+        with self.assertRaisesRegex(InventoryError, "archive-source-unsafe"):
+            archive_project(self.root, archive, journal_root=journal_root)
+        self.assertFalse(archive.exists())
 
 
 if __name__ == "__main__":

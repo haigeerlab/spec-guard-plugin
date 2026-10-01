@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 from datetime import datetime, timezone
@@ -251,6 +252,10 @@ def archive_project(project: Path, output: Path,
             project, before["projectId"], journal_root)
         mapping_present = mapping_source.exists() or mapping_source.is_symlink()
         if mapping_present:
+            metadata = mapping_source.lstat()
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
+                    stat.S_IMODE(metadata.st_mode) & 0o077):
+                raise InventoryError("archive-source-unsafe: mapping journal is not private")
             read_journal(mapping_source)
             mapping = temporary / ".spec-guard" / "mapping.json"
             mapping.parent.mkdir(mode=0o700)

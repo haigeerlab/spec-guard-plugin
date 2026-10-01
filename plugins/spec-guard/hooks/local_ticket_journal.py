@@ -208,6 +208,31 @@ def candidate_journal_chain(project: Path, project_id: str, candidate: str,
     return path, chain
 
 
+def journal_candidate_status(project: Path, project_id: str,
+                             root: Path | None = None) -> dict[str, Any]:
+    """Annotate a reviewed chain while leaving unrelated candidates visible."""
+    discovery = discover_journal_candidates(project, project_id, root)
+    current = journal_path(project, project_id, root)
+    link = _read_binding(current.with_name("binding.json"), project_id,
+                         current.parent.parent.name)
+    if link is None:
+        return discovery
+    binding, _ = link
+    available = {item["partition"]: item for item in discovery["candidates"]}
+    path, chain, _ = _follow_chain(
+        project_id, binding["candidatePartition"], available,
+        seen={current.parent.parent.name}, canonical=binding["canonicalPartition"],
+    )
+    canonical = path.parent.parent.name
+    for item in discovery["candidates"]:
+        item["bindingStatus"] = ("canonical" if item["partition"] == canonical else
+                                 "alias" if item["partition"] in chain else "unrelated")
+    discovery["canonicalPartition"] = canonical
+    discovery["state"] = ("bound" if set(chain) == set(available)
+                          else "manual-reconciliation-required")
+    return discovery
+
+
 def active_journal(project: Path, project_id: str,
                    root: Path | None = None) -> tuple[Path, str | None, dict[str, Any] | None]:
     """Resolve one reviewed binding chain, or return unresolved old candidates."""
