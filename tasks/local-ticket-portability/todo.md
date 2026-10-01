@@ -66,11 +66,12 @@
   - 验证：过期预览、并发和故障注入测试通过；运行 `test_local_ticket_portability.py`。
   - 文件：绑定模块、CLI、`test_local_ticket_portability.py`（约 3 个）。
   - 完成证据：执行前和安装锁内都重建预览并逐字节核对；通过临时文件、fsync 和排他硬链接发布 0600 指针。篡改预览、宽权限、源日志变化、锁占用及发布中断均未留下有效指针；旧日志字节未改，未调用提供方。50 项 portability、32 项 publish 测试及 `git diff --check` 通过，全部在临时夹具完成。
-- [ ] Task 13：发布解析到 canonical 日志。依赖：12。
+- [x] Task 13：发布解析到 canonical 日志。依赖：12。
   - 验收：绑定前保守阻断；绑定后预锁和锁内都解析同一 canonical 路径，继续使用原 per-key 锁；额外候选、指针篡改、原日志丢失均失败关闭；`planned`／`partial` 不会因绑定自动变为 `verified`。
   - 验证：假提供方重复发布与响应丢失测试不创建重复 Issue／评论；运行 `test_local_ticket_publish.py`。
   - 文件：日志模块、发布模块、`test_local_ticket_publish.py`（约 3 个）。
-- [ ] Checkpoint F：检查 canonical 路径与锁的一致性及双路径并发；映射原子替换可改变 inode，不能以 inode 等同作为证明。
+  - 完成证据：发布前和进入 canonical per-key 锁后两次解析相同路径和指针摘要；旧锁被占用时新路径发布拒绝。重复发布保持 1 条 Issue／评论，不确定创建不重建；额外候选、指针校验失败和新分区映射并存均失败关闭。34 项 publish、50 项 portability 测试及 `git diff --check` 通过。
+- [x] Checkpoint F：canonical 路径与锁一致性、双路径并发拒绝由隔离测试证明；映射原子替换可能改变 inode，未以 inode 相等为证据。
 - [ ] Task 14：再次移动时沿有效指针链解析。依赖：13。
   - 验收：新位置经第二次显式预览和绑定后仍抵达首份 canonical 日志；循环、断链、不同 canonical 和可识别的独立 clone 均拒绝自动接管；完全相同的历史不被误报成已证明同仓库。
   - 验证：隔离 Git/worktree 夹具和指针链篡改测试通过；运行两个聚焦测试文件。

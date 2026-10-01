@@ -21,6 +21,12 @@ STATES = {"planned", "partial", "verified", "conflict"}
 PARTITION_NAME = re.compile(r"[0-9a-f]{64}\Z")
 
 
+def binding_checksum(value: dict[str, Any]) -> str:
+    payload = {key: item for key, item in value.items() if key != "bindingSha256"}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")
+                                     ).encode("utf-8")).hexdigest()
+
+
 def default_journal_root() -> Path:
     return Path.home() / ".spec-guard" / "local-ticket-portability"
 
@@ -108,6 +114,61 @@ def discover_journal_candidates(project: Path, project_id: str,
     return {"state": "manual-reconciliation-required" if candidates else "clear",
             "projectId": project_id, "currentPath": str(current),
             "candidates": candidates}
+
+
+def active_journal(project: Path, project_id: str,
+                   root: Path | None = None) -> tuple[Path, str | None, dict[str, Any] | None]:
+    """Resolve one reviewed binding, or return unresolved old candidates."""
+    current = journal_path(project, project_id, root)
+    discovery = discover_journal_candidates(project, project_id, root)
+    pointer = current.with_name("binding.json")
+    try:
+        descriptor = os.open(pointer, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except FileNotFoundError:
+        return current, None, discovery if discovery["candidates"] else None
+    except OSError as error:
+        raise InventoryError("journal-bind-invalid: binding pointer is unsafe") from error
+    with os.fdopen(descriptor, "rb") as handle:
+        metadata = os.fstat(handle.fileno())
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
+                stat.S_IMODE(metadata.st_mode) != 0o600):
+            raise InventoryError("journal-bind-invalid: binding pointer is not private")
+        raw = handle.read()
+    try:
+        binding = json.loads(raw)
+    except (UnicodeError, ValueError) as error:
+        raise InventoryError("journal-bind-invalid: binding pointer is unreadable") from error
+    if (not isinstance(binding, dict) or set(binding) != {
+            "formatVersion", "projectId", "currentPartition", "candidatePartition",
+            "canonicalPartition", "initialMappingSha256", "previewSha256", "boundAt",
+            "bindingSha256"}
+            or binding["formatVersion"] != 1 or binding["projectId"] != project_id or
+            binding["currentPartition"] != current.parent.parent.name or
+            not isinstance(binding["candidatePartition"], str) or
+            PARTITION_NAME.fullmatch(binding["candidatePartition"]) is None or
+            binding["canonicalPartition"] != binding["candidatePartition"] or
+            not all(isinstance(binding[name], str) and PARTITION_NAME.fullmatch(binding[name])
+                    for name in ("initialMappingSha256", "previewSha256")) or
+            not isinstance(binding["boundAt"], str) or
+            binding["bindingSha256"] != binding_checksum(binding)):
+        raise InventoryError("journal-bind-invalid: binding pointer schema differs")
+    if current.exists() or current.is_symlink():
+        raise InventoryError("journal-bind-invalid: current partition has another mapping")
+    if any(item.name != "binding.json" for item in current.parent.iterdir()):
+        raise InventoryError("journal-bind-invalid: current partition has another file")
+    candidate = next((item for item in discovery["candidates"]
+                      if item["partition"] == binding["candidatePartition"]), None)
+    if candidate is None or candidate["journalState"] != "present":
+        raise InventoryError("journal-bind-invalid: canonical mapping is unavailable")
+    if len(discovery["candidates"]) != 1:
+        return current, None, discovery
+    path = Path(candidate["path"])
+    metadata = path.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
+            stat.S_IMODE(metadata.st_mode) & 0o077):
+        raise InventoryError("journal-bind-invalid: canonical mapping is unsafe")
+    read_journal(path)
+    return path, hashlib.sha256(raw).hexdigest(), None
 
 
 def _prepare_parent(path: Path) -> None:

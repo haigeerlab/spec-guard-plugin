@@ -16,7 +16,8 @@ from local_ledger_runtime import state_worktree_status
 from local_ticket_archive import verify_archive
 from local_ticket_handoff import _raw_events, _source_digest, snapshot_issue
 from local_ticket_journal import (PARTITION_NAME, default_journal_root,
-                                  discover_journal_candidates, entry_key, journal_path,
+                                  binding_checksum, discover_journal_candidates,
+                                  entry_key, journal_path,
                                   read_journal, _prepare_parent)
 from local_ticket_lock import acquire_lock
 from local_ticket_portability import InventoryError, inventory_project, worktree_roots
@@ -235,6 +236,7 @@ def bind_journal(project: Path, preview_path: Path, runtime_dir: Path,
             "previewSha256": _sha(preview_bytes),
             "boundAt": datetime.now(timezone.utc).isoformat(),
         }
+        value["bindingSha256"] = binding_checksum(value)
         file_descriptor, temporary_name = tempfile.mkstemp(prefix=".binding-",
                                                            dir=pointer.parent)
         temporary = Path(temporary_name)

@@ -6,7 +6,7 @@ from typing import Any
 
 from local_ticket_handoff import _digest, snapshot_issue
 from local_ticket_journal import (
-    discover_journal_candidates, entry_key, journal_path, publication_lock,
+    active_journal, entry_key, publication_lock,
     read_journal, write_entry,
 )
 from local_ticket_portability import InventoryError
@@ -81,10 +81,10 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     source = preview["source"]
     destination = preview["destination"]
     version = preview["formatVersion"]
-    path = journal_path(project, source["projectId"], journal_root)
-    discovery = discover_journal_candidates(project, source["projectId"], journal_root)
-    if discovery["candidates"]:
-        return discovery
+    path, binding_token, unresolved = active_journal(
+        project, source["projectId"], journal_root)
+    if unresolved is not None:
+        return unresolved
     fresh = snapshot_issue(project, source["issueId"], runtime_dir, legacy=version == 1)
     if (preview["body"] != render_body(source) or
             preview.get("title") != source["issue"]["title"] or
@@ -100,9 +100,12 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     }
 
     with publication_lock(path, key):
-        discovery = discover_journal_candidates(project, source["projectId"], journal_root)
-        if discovery["candidates"]:
-            return discovery
+        locked_path, locked_token, unresolved = active_journal(
+            project, source["projectId"], journal_root)
+        if unresolved is not None:
+            return unresolved
+        if locked_path != path or locked_token != binding_token:
+            raise InventoryError("journal-bind-stale: active journal changed during publish")
         earlier = read_journal(path)["entries"].get(key)
         rejected_before_write = bool(
             earlier and earlier.get("state") == "planned" and
