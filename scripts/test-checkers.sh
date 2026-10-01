@@ -244,7 +244,7 @@ fi
 
 # ── 零文件不算通过 ────────────────────────────────────────
 # 「0 处违规」和「0 个文件」在退出码上长得一样（lenses A5）。
-# validate.sh 里这三个都靠 $(find …) 喂文件，find 表达式一旦失配就会全绿。
+# validate.sh 里这三个都靠仓库文件列表喂文件，列表一旦为空就会全绿。
 for c in check-bash32 check-grep-pipe check-gh-json-fields; do
   want fail "$c: 零个文件 → 不算通过" python3 "$ROOT/scripts/$c.py"
 done
