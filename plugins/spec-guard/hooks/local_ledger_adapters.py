@@ -155,7 +155,8 @@ def main(argv=None) -> int:
         if args.host == "codex":
             print(codex_toml_fragment(args.runtime_dir, node_path), end="")
         elif args.host == "claude":
-            print(json.dumps({"command": node_path, "args": [str(args.runtime_dir / MCP_RELATIVE_PATH)],
+            command = mcp_command(args.runtime_dir, node_path)
+            print(json.dumps({"command": command[0], "args": command[1:],
                               "permissions": {"ask": claude_ask_rules()}}, indent=2))
         elif not args.confirm_install:
             print("configuration-confirmation-required: rerun with --confirm-install to write host configuration")

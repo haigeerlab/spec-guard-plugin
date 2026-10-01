@@ -33,6 +33,19 @@ class LocalLedgerAdapterTests(unittest.TestCase):
         self.assertNotIn("token", fragment.lower())
         self.assertNotIn("http", fragment.lower())
 
+    def test_claude_preview_matches_private_install_command(self):
+        output = io.StringIO()
+        with patch("local_ledger_adapters.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }), redirect_stdout(output):
+            self.assertEqual(local_ledger_adapters.main([
+                "claude", "--runtime-dir", str(self.runtime_dir),
+            ]), 0)
+        preview = json.loads(output.getvalue())
+        command = local_ledger_adapters.mcp_command(self.runtime_dir, "/opt/node")
+        self.assertEqual([preview["command"], *preview["args"]], command)
+        self.assertEqual(preview["command"], "/bin/sh")
+
     def test_generated_mcp_command_creates_private_default_mode_files(self):
         entrypoint = self.runtime_dir / "node_modules" / "epiq" / "dist" / "mcp.js"
         entrypoint.write_text(
