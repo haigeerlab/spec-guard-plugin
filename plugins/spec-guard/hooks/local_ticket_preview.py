@@ -128,23 +128,28 @@ def render_body(snapshot: dict[str, Any]) -> str:
     if snapshot["codeReferences"]:
         lines.extend(["## Code references", ""])
         for reference in snapshot["codeReferences"]:
-            lines.append("- " + reference["sha"] + ": source commit " +
-                         ("reachable" if reference["sourceCommitReachable"] else "missing") +
-                         "; target commit unverified")
+            if snapshot.get("formatVersion", 1) == 1:
+                lines.append("- " + reference["sha"] + ": source commit " +
+                             ("reachable" if reference["sourceCommitReachable"] else "missing") +
+                             "; target commit unverified")
+            else:
+                lines.append("- " + reference["sha"] +
+                             ": source reachability checked in preview; target commit unverified")
         lines.append("")
     return "\n".join(lines)
 
 
 def create_preview(project: Path, issue_id: str, runtime_dir: Path, platform: str,
                    host: str, target: str, visibility: str, output: Path,
-                   runner: Callable[[list[str]], str | None] = _run) -> dict[str, Any]:
+                   runner: Callable[[list[str]], str | None] = _run,
+                   legacy: bool = False) -> dict[str, Any]:
     """Write one private preview only after source and target are readable."""
     project = Path(project).resolve()
     output = Path(output)
     facts = target_facts(platform, host, target, runner)
     if visibility != facts["visibility"]:
         raise InventoryError("provider-unavailable: target visibility differs from request")
-    snapshot = snapshot_issue(project, issue_id, runtime_dir)
+    snapshot = snapshot_issue(project, issue_id, runtime_dir, legacy=legacy)
     state_root = Path(state_worktree_status(project, snapshot["projectId"])["path"])
     destination = output.resolve(strict=False)
     if (any(root == destination or root in destination.parents
@@ -159,8 +164,10 @@ def create_preview(project: Path, issue_id: str, runtime_dir: Path, platform: st
         limitations.append("GitLab target uses HTTP; transport confidentiality is unavailable")
     if snapshot["attachments"]:
         limitations.append("attachment bytes are not transferred or verified; publication remains partial")
+    if legacy:
+        limitations.append("legacy format is for continuing an existing version 1 handoff only")
     preview = {
-        "formatVersion": 1, "state": "preview", "source": snapshot,
+        "formatVersion": snapshot.get("formatVersion", 1), "state": "preview", "source": snapshot,
         "destination": facts, "title": snapshot["issue"]["title"],
         "body": render_body(snapshot),
         "limitations": limitations,

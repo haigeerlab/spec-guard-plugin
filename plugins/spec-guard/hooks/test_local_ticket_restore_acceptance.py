@@ -16,6 +16,7 @@ from local_ledger_runtime import (
 from local_ticket_archive import archive_project
 from local_ticket_portability import inventory_project, main
 from local_ticket_handoff import snapshot_issue
+from local_ticket_preview import render_body
 
 
 def git(root, *args):
@@ -92,6 +93,7 @@ class RealEpiqRestoreProof(unittest.TestCase):
                 before = inventory_project(source)
                 snapshot = snapshot_issue(source, issue["id"], runtime)
                 self.assertEqual(snapshot["state"], "snapshot")
+                self.assertEqual(snapshot["formatVersion"], 2)
                 self.assertEqual(snapshot["issueId"], issue["id"])
                 self.assertEqual(snapshot["issue"]["description"], "Revised scope")
                 self.assertEqual(snapshot["events"][-1]["action"], "close.issue")
@@ -100,6 +102,19 @@ class RealEpiqRestoreProof(unittest.TestCase):
                 self.assertEqual(sum(item["action"] == "edit.description"
                                      for item in snapshot["events"]), 2)
                 self.assertEqual(len(snapshot["attachments"]), 1)
+                reference = {"sha": "a" * 40, "sourceCommitReachable": True,
+                             "targetCommitReachable": None}
+                with patch("local_ticket_handoff._code_references", return_value=[dict(reference)]):
+                    reachable = snapshot_issue(source, issue["id"], runtime)
+                    legacy = snapshot_issue(source, issue["id"], runtime, legacy=True)
+                reference["sourceCommitReachable"] = False
+                with patch("local_ticket_handoff._code_references", return_value=[dict(reference)]):
+                    missing = snapshot_issue(source, issue["id"], runtime)
+                self.assertEqual(reachable["sourceDigest"], missing["sourceDigest"])
+                self.assertEqual(render_body(reachable), render_body(missing))
+                self.assertEqual(legacy["formatVersion"], 1)
+                self.assertIn("source commit reachable", render_body(legacy))
+                self.assertNotEqual(legacy["sourceDigest"], reachable["sourceDigest"])
                 self.assertEqual(inventory_project(source), before)
                 archive = base / "archive"
                 archive_project(source, archive)

@@ -2,6 +2,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from subprocess import CompletedProcess
 from unittest.mock import patch
 
 from local_ticket_github import GitHubHandoff
@@ -9,7 +10,7 @@ from local_ticket_gitlab import GitLabHandoff
 from local_ticket_preview import render_body
 from local_ticket_publish import publish_preview
 from local_ticket_portability import InventoryError
-from local_ticket_provider import PAGE_SIZE, MAX_PAGES, pages
+from local_ticket_provider import PAGE_SIZE, MAX_PAGES, ProviderRejected, pages, run_json
 
 
 PROJECT_ID = "01M37F8MKQRSB562YCBQ004QGJ"
@@ -88,6 +89,28 @@ class ApiFixture:
 
 
 class ProviderTests(unittest.TestCase):
+    def test_cli_classifies_definite_rejection_without_exposing_body(self):
+        response = CompletedProcess([], 1, "HTTP/2.0 422 Unprocessable Entity\r\n\r\n{\"detail\":\"private\"}", "secret")
+        with patch("local_ticket_provider.subprocess.run", return_value=response) as run:
+            with self.assertRaises(ProviderRejected) as caught:
+                run_json(["gh", "api", "repos/team/repo/issues"], {"title": "bad"})
+        self.assertEqual(caught.exception.status_code, 422)
+        self.assertNotIn("private", str(caught.exception))
+        self.assertNotIn("secret", str(caught.exception))
+        self.assertIn("--include", run.call_args.args[0])
+
+    def test_cli_keeps_unknown_write_failure_uncertain(self):
+        response = CompletedProcess([], 1, "", "connection reset")
+        with patch("local_ticket_provider.subprocess.run", return_value=response):
+            with self.assertRaisesRegex(InventoryError, "provider-unavailable"):
+                run_json(["glab", "api", "projects/1/issues"], {"title": "x"})
+
+    def test_cli_reads_json_after_included_success_headers(self):
+        response = CompletedProcess([], 0, "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n\r\n{\"id\":1}", "")
+        with patch("local_ticket_provider.subprocess.run", return_value=response):
+            self.assertEqual(run_json(["glab", "api", "projects/1/issues"],
+                                      {"title": "x"}), {"id": 1})
+
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="sg-provider-fixture-")
         self.addCleanup(temporary.cleanup)
@@ -97,6 +120,7 @@ class ProviderTests(unittest.TestCase):
         import subprocess
         subprocess.run(["git", "-C", str(self.project), "init", "-q"], check=True)
         self.source = {"projectId": PROJECT_ID, "issueId": ISSUE_ID,
+                       "formatVersion": 2,
                        "sourceDigest": "a" * 64,
                        "issue": {"title": "Scope", "description": "Current", "isClosed": True},
                        "events": [
@@ -112,7 +136,7 @@ class ProviderTests(unittest.TestCase):
         else:
             provider = GitLabHandoff("gitlab.example.test", "group/project", fixture)
         destination = provider.target_facts()
-        preview = {"formatVersion": 1, "state": "preview", "source": self.source,
+        preview = {"formatVersion": 2, "state": "preview", "source": self.source,
                    "destination": destination, "title": "Scope",
                    "body": render_body(self.source)}
         with patch("local_ticket_publish.snapshot_issue", return_value=self.source):
@@ -161,7 +185,7 @@ class ProviderTests(unittest.TestCase):
                 provider = (GitHubHandoff("github.com", "team/repo", fixture)
                             if platform == "github" else
                             GitLabHandoff("gitlab.example.test", "group/project", fixture))
-                preview = {"formatVersion": 1, "state": "preview",
+                preview = {"formatVersion": 2, "state": "preview",
                            "source": self.source, "destination": provider.target_facts(),
                            "title": "Scope", "body": render_body(self.source)}
                 with patch("local_ticket_publish.snapshot_issue", return_value=self.source):

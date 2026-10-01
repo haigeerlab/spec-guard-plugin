@@ -62,3 +62,20 @@ read-only preview. A failed or lost response can produce `publication-uncertain`
 remote markers and the private journal before any retry. Two matching Issues or an edited
 managed Issue/comment are `conflict`. The module does not automatically switch later daily
 work to GitHub/GitLab, and it does not close the Local ticket.
+
+An API response with a recognized, definite 4xx rejection returns `provider-rejected` with
+its status code. No Issue or comment attempt is treated as successful, so correct the
+permission or content, create a fresh preview if the source changes, and retry. A timeout,
+server failure, or response without a reliable status remains `publication-uncertain`.
+Large histories can exceed provider limits; the CLI does not split them automatically and
+must not truncate the Local context to force publication.
+
+Current handoff and restore locks use private retained files with OS advisory locks; a
+process crash releases the OS lock. If a lock is reported as legacy or damaged, first prove
+no older publisher or restore is still running, preserve the lock and journal for diagnosis,
+then remove only that stale lock file before retrying. Never delete a mapping journal or a
+partial restore target to bypass a conflict. Handoffs started before the stable source
+digest change use version 1. Regenerate their preview with `handoff-preview --legacy-format`
+and review it before continuation; a default version 2 preview returns
+`preview-incompatible` without changing the journal. An actual old source digest mismatch
+remains `conflict` rather than silently rewriting the already published remote body.
