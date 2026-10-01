@@ -216,12 +216,14 @@ printf '{"tracker":"none","modules":{},"activeModule":"base"}\n' > "$notodo/.age
 lacks "activeModule 有全勾 todo 时无缺 todo 提醒" "$notodo" "has a plan but no"
 rm "$notodo/.agent/state.json"
 lacks "无 activeModule 时不因其他缺 todo 模块提醒" "$notodo" "has a plan but no"
+injects "无 activeModule 的 DONE 汇总仍显示缺 todo 数量" "$notodo" "Plan without todo: 1 module(s) counted as done"
 printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$notodo/.agent/state.json"
 lacks "activeModule 不在图中时无缺 todo 提醒" "$notodo" "has a plan but no"
 
 # 已退役的远端 tracker 模式（state.json 仍是 github／gitlab）：任务不在 todo.md，不给缺 todo 提醒。
 printf '{"tracker":"github","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 lacks "退役 tracker github 不给缺 todo 提醒" "$notodo" "has a plan but no"
+lacks "退役 tracker github 不给缺 todo 汇总" "$notodo" "Plan without todo:"
 printf '{"tracker":"gitlab","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 lacks "退役 tracker gitlab 不给缺 todo 提醒" "$notodo" "has a plan but no"
 printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"

@@ -99,6 +99,7 @@ printf '# Mine\n\nkeep me\n' > "$P/CLAUDE.md"
 cp "$P/CLAUDE.md" "$WORK/original"
 run setup-convention.sh local
 touch "$P/spec/alpha.md"; mkdir -p "$P/tasks/alpha"; printf 'plan\n' > "$P/tasks/alpha/plan.md"
+printf '%s\n' '{"tracker":"none","modules":{"alpha":{}},"activeModule":"alpha"}' > "$P/.agent/state.json"
 before="$(snapshot)"
 run teardown-convention.sh --dry-run
 [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] || fail "teardown --dry-run 不应改动任何文件
@@ -118,6 +119,25 @@ ok "teardown 逐字节还原声明块外内容，保留用户产物，hook 静�
 run teardown-convention.sh
 [ "$RC" -eq 2 ] || fail "未启用的项目 teardown 应退出 2（实际 ${RC}）"
 ok "未启用的项目 teardown 什么都不做"
+
+before="$(snapshot)"
+run setup-convention.sh local --dry-run
+[ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] && grep -F 'state.json.disabled' >/dev/null <<<"$OUT" || fail "停用状态存在时 dry-run 应明确拒绝且不写入\n$OUT"
+run setup-convention.sh local
+[ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] || fail "重新 setup 不得新建空 state 覆盖停用上下文\n$OUT"
+mv "$P/.agent/state.json.disabled" "$P/.agent/state.json"
+run setup-convention.sh local
+[ "$RC" -eq 0 ] && grep -F '"activeModule":"alpha"' "$P/.agent/state.json" >/dev/null && [ ! -e "$P/.agent/state.json.disabled" ] || fail "显式恢复后 setup 应保留原活动模块\n$OUT"
+ok "停用状态阻止静默重建，显式恢复后上下文不变"
+
+project state-conflict
+mkdir -p "$P/.agent"
+printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$P/.agent/state.json"
+printf '%s\n' '{"tracker":"none","modules":{"alpha":{}},"activeModule":"alpha"}' > "$P/.agent/state.json.disabled"
+before="$(snapshot)"
+run setup-convention.sh local
+[ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] || fail "活动和停用状态并存时应拒绝且不写入\n$OUT"
+ok "并存状态要求人工处理，不选择任一副本"
 
 project keep
 run setup-convention.sh local

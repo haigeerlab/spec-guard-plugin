@@ -131,6 +131,11 @@ def describe(root: Path) -> str:
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
+    if stage == "DONE" and not retired_tracker(root):
+        missing_todo = sum(s["plan"] and not s["todo"] for s in states)
+        if missing_todo:
+            counts += ("\n- Plan without todo: %d module(s) counted as done; "
+                       "run /spec-guard:verify-artifacts to review." % missing_todo)
     paused = paused_modules(states, current) if stage != "DONE" else []
     unmerged = unmerged_commits(root) if stage in ("DONE", "MODULE_DONE") else None
     push_first = ""

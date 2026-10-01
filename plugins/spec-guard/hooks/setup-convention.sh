@@ -54,6 +54,16 @@ if [ "$(marker_lines)" -gt 0 ]; then
   HAS_BLOCK=true
 fi
 
+# teardown 保留的状态不能被新的空 state 静默遮住；由用户先决定是否恢复。
+if [ -e .agent/state.json.disabled ] || [ -L .agent/state.json.disabled ]; then
+  if [ -e .agent/state.json ] || [ -L .agent/state.json ]; then
+    echo '  ❌ .agent/state.json 与 .agent/state.json.disabled 并存；请先人工核对，未改动任何文件' >&2
+  else
+    echo '  ❌ 发现 .agent/state.json.disabled；确认要恢复后先改回 .agent/state.json，未改动任何文件' >&2
+  fi
+  exit 1
+fi
+
 install_block() {
   if [ "$HAS_BLOCK" = true ]; then
     if [ "$REPLACE" != true ]; then

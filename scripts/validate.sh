@@ -4,6 +4,8 @@ set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 F=0
 say(){ printf "  %s %s\n" "$1" "$2"; }
+# 仅扫描本 checkout 的跟踪文件及未忽略的新文件，不穿透嵌套 Git checkout。
+repo_files(){ git ls-files --cached --others --exclude-standard -- "$1"; }
 
 echo "═══ 结构 ═══"
 for p in .claude-plugin/marketplace.json \
@@ -17,7 +19,7 @@ echo ""
 echo "═══ JSON 语法 ═══"
 while IFS= read -r j; do
   python3 -m json.tool "$j" >/dev/null 2>&1 && say "✅" "$j" || { say "❌" "$j 解析失败"; F=1; }
-done < <(find . -name "*.json" -not -path "./.git/*")
+done < <(repo_files '*.json')
 
 echo ""
 echo "═══ marketplace ↔ Claude / Codex plugin 一致性 ═══"
@@ -31,18 +33,18 @@ echo ""
 echo "═══ Shell 语法 ═══"
 while IFS= read -r s; do
   bash -n "$s" 2>/dev/null && say "✅" "$s" || { say "❌" "$s 语法错误"; F=1; }
-done < <(find . -name "*.sh" -not -path "./.git/*")
+done < <(repo_files '*.sh')
 
 echo ""
 echo "═══ 可执行位 ═══"
 while IFS= read -r s; do
   [ -x "$s" ] && say "✅" "$s" || { say "❌" "$s 缺执行位（git update-index --chmod=+x ${s}）"; F=1; }
-done < <(find . -name "*.sh" -not -path "./.git/*")
+done < <(repo_files '*.sh')
 
 echo ""
 echo "═══ bash 3.2 兼容（macOS 自带 bash）═══"
 # shellcheck disable=SC2046
-python3 scripts/check-bash32.py $(find . -name "*.sh" -not -path "./.git/*") || F=1
+python3 scripts/check-bash32.py $(repo_files '*.sh') || F=1
 
 echo ""
 echo "═══ gh --json 字段是否真实存在 ═══"
@@ -53,7 +55,7 @@ python3 scripts/check-gh-json-fields.py \
 echo ""
 echo "═══ 管道 + grep -q（SIGPIPE 陷阱）═══"
 # shellcheck disable=SC2046
-python3 scripts/check-grep-pipe.py $(find . -name "*.sh" -not -path "./.git/*") || F=1
+python3 scripts/check-grep-pipe.py $(repo_files '*.sh') || F=1
 
 echo ""
 echo "═══ 用户可见输出里的命令名 ═══"
