@@ -198,7 +198,7 @@ def inventory_project(project: Path) -> dict[str, Any]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=(
-        "inventory", "archive", "verify", "restore", "handoff-preview",
+        "inventory", "journal-candidates", "archive", "verify", "restore", "handoff-preview",
         "handoff-publish",
     ))
     parser.add_argument("--project", type=Path)
@@ -217,7 +217,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--format", choices=("json",), default="json")
     args = parser.parse_args(argv)
-    if args.command in ("inventory", "archive", "restore", "handoff-preview",
+    if args.command in ("inventory", "journal-candidates", "archive", "restore", "handoff-preview",
                         "handoff-publish") and args.project is None:
         parser.error("--project is required")
     if args.command in ("archive", "handoff-preview") and args.output is None:
@@ -240,6 +240,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "inventory":
             payload = inventory_project(args.project)
+        elif args.command == "journal-candidates":
+            from local_ticket_journal import discover_journal_candidates
+            identity = project_status(args.project)
+            if identity["state"] != "initialized":
+                raise InventoryError("journal-source-unknown: Epiq project identity is unavailable")
+            payload = discover_journal_candidates(args.project, identity["projectId"])
         elif args.command == "archive":
             from local_ticket_archive import archive_project
             payload = archive_project(args.project, args.output)

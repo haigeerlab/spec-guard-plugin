@@ -6,6 +6,7 @@ paths and identities.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" inventory --project <repo>
+python3 -B "$ROOT/hooks/local_ticket_portability.py" journal-candidates --project <repo>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" archive --project <repo> --output <new-private-directory>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory>
 python3 -B "$ROOT/hooks/local_ticket_portability.py" verify --archive <archive-directory> --prove
@@ -27,6 +28,18 @@ one project's state at that point in time; keep older archives until their repla
 has passed `verify --prove`. This location is a user-level record shared by the current
 user's worktrees, not a plugin installation or project checkout directory. It does not
 protect against loss of this host.
+
+`journal-candidates` reads other private project partitions with the same Epiq project ID.
+It creates no journal or lock and prints only partition paths and counts by state. If a
+project was moved, or an independent clone has the same ID, a candidate requires manual
+reconciliation; one candidate is not proof that it belongs to the current checkout.
+`clear` only means no other local partition was found; it does not prove that the current
+journal or remote target has no handoff.
+`handoff-publish` stops before creating a remote Issue when such a candidate exists.
+An unsafe or damaged partition also stops discovery rather than appearing absent.
+An old same-ID partition directory with no `mapping.json` is still a candidate because
+it may represent an interrupted publication attempt; its counts are unknown.
+Do not delete or copy a candidate journal into the current partition to bypass this stop.
 
 ```bash
 python3 -B "$ROOT/hooks/local_ticket_portability.py" restore \

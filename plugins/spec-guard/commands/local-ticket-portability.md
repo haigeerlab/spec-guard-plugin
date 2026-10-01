@@ -2,7 +2,7 @@
 description: 只读核验或离线归档 Local 事项，明确指定目标后恢复或逐项交接到 GitHub/GitLab
 ---
 
-加载本插件的 `local-ticket-portability` skill，按用户请求执行 `inventory`、`archive`、
+加载本插件的 `local-ticket-portability` skill，按用户请求执行 `inventory`、`journal-candidates`、`archive`、
 `verify`、`restore`、`handoff-preview` 或 `handoff-publish`。普通事项创建、讨论和关闭
 仍用 `/spec-guard:ticket`；不要因查看账本而自动归档、同步或迁移。
 

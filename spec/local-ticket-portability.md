@@ -102,6 +102,12 @@ worktree，不推送远端。写入中断保留部分目标数据供诊断，不
    可读，后续托管事项操作不属于本模块。
    归档中的映射日志是可核验的导出副本；恢复到账本目标时不自动写入另一项目的
    用户级映射分区，避免把旧环境的目标身份误当作新环境的已验证状态。
+   交接前只读发现同一 `projectId` 在当前 Git common dir 分区之外的旧项目目录和映射日志；
+   任一旧分区候选都要求人工对账，发布不得把当前分区的空日志当作“未交接”而
+   自动创建远端事项。候选即使只有一份也不自动绑定到当前仓库；同 ID 的独立
+   clone 可能造成保守阻断。旧目录即使没有 `mapping.json`，也可能是中断的
+   发布准备，不能当作缺席；损坏或不安全的候选同样如此。发现命令不创建
+   分区、锁或远端内容；正式重绑定另行设计。
 
 ## 命令
 
@@ -109,6 +115,7 @@ worktree，不推送远端。写入中断保留部分目标数据供诊断，不
 
 ```text
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py inventory --project <repo> --format json
+python3 -B plugins/spec-guard/hooks/local_ticket_portability.py journal-candidates --project <repo> --format json
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py archive --project <repo> --output <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py verify --archive <directory> --prove --runtime-dir <pinned-runtime>
@@ -116,6 +123,7 @@ python3 -B plugins/spec-guard/hooks/local_ticket_portability.py restore --archiv
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-preview --project <repo> --platform <github|gitlab> --host <host> --target <project> --visibility <public|internal|private> --issue-id <id> --output <preview.json>
 python3 -B plugins/spec-guard/hooks/local_ticket_portability.py handoff-publish --project <repo> --preview <preview.json> --confirm
 python3 -B plugins/spec-guard/hooks/test_local_ticket_portability.py
+python3 -B plugins/spec-guard/hooks/test_local_ticket_publish.py
 /bin/bash scripts/validate.sh
 ```
 

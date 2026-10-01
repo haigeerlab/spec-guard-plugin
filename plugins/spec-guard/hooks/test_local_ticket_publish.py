@@ -115,6 +115,49 @@ class HandoffTests(unittest.TestCase):
         key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
         self.assertEqual(read_journal(path)["entries"][key]["state"], "verified")
 
+    def test_moved_project_stops_before_remote_or_new_journal_write(self):
+        old_path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(old_path, key, {"state": "partial", "sourceDigest": "a" * 64})
+        moved = self.base / "moved-project"
+        self.project.rename(moved)
+        self.project = moved
+        current_path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        with patch("local_ticket_publish.snapshot_issue",
+                   side_effect=AssertionError("source must not be read before candidate review")):
+            result = publish_preview(self.preview, self.project, self.base / "runtime",
+                                     self.provider, self.journal_root, confirm=True)
+        self.assertEqual(result["state"], "manual-reconciliation-required")
+        self.assertEqual(result["candidates"][0]["stateCounts"]["partial"], 1)
+        self.assertEqual(self.provider.issues, [])
+        self.assertFalse(current_path.exists())
+
+    def test_same_id_clone_candidate_blocks_even_when_source_digest_matches(self):
+        clone = self.base / "independent-clone"
+        clone.mkdir()
+        import subprocess
+        subprocess.run(["git", "-C", str(clone), "init", "-q"], check=True)
+        path = journal_path(clone, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        write_entry(path, key, {"state": "verified", "sourceDigest": self.source["sourceDigest"]})
+        self.assertEqual(self.publish()["state"], "manual-reconciliation-required")
+        self.assertEqual(self.provider.issues, [])
+
+    def test_old_partition_without_mapping_still_blocks_create(self):
+        old_project = self.base / "old-project"
+        old_project.mkdir()
+        import subprocess
+        subprocess.run(["git", "-C", str(old_project), "init", "-q"], check=True)
+        old_path = journal_path(old_project, PROJECT_ID, self.journal_root)
+        old_path.parent.mkdir(parents=True, mode=0o700)
+        old_path.parent.parent.chmod(0o700)
+        old_path.parent.chmod(0o700)
+        self.journal_root.chmod(0o700)
+        result = self.publish()
+        self.assertEqual(result["state"], "manual-reconciliation-required")
+        self.assertEqual(result["candidates"][0]["journalState"], "absent")
+        self.assertEqual(self.provider.issues, [])
+
     def test_legacy_journal_requires_matching_preview_format(self):
         self.provider.issues = [{"id": 1, "title": "Scope", "body": "",
                                  "closed": True, "url": "https://example.invalid/issues/1"}]

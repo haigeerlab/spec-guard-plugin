@@ -18,7 +18,8 @@ from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
 from local_ticket_handoff import _first_contributor_names, _issue_events, _source_digest
 from local_ticket_preview import create_preview, render_body, target_facts
-from local_ticket_journal import entry_key, journal_path, publication_lock, read_journal, write_entry
+from local_ticket_journal import (discover_journal_candidates, entry_key, journal_path,
+                                  publication_lock, read_journal, write_entry)
 from local_ticket_lock import MAGIC, acquire_lock
 
 
@@ -593,6 +594,67 @@ class SourceInventoryTests(unittest.TestCase):
         clone.mkdir()
         git(clone, "init", "-q")
         self.assertNotEqual(journal_path(clone, PROJECT_ID, base), path)
+
+    def test_candidate_discovery_is_read_only_when_root_is_absent(self):
+        base = self.root.parent / "missing-journals"
+        result = discover_journal_candidates(self.root, PROJECT_ID, base)
+        self.assertEqual(result["state"], "clear")
+        self.assertEqual(result["candidates"], [])
+        self.assertFalse(base.exists())
+
+    def test_candidate_cli_is_read_only(self):
+        base = self.root.parent / "missing-journals"
+        output = io.StringIO()
+        with patch("local_ticket_journal.default_journal_root", return_value=base), \
+                redirect_stdout(output):
+            code = main(["journal-candidates", "--project", str(self.root)])
+        self.assertEqual(code, 0, output.getvalue())
+        self.assertEqual(json.loads(output.getvalue())["state"], "clear")
+        self.assertFalse(base.exists())
+
+    def test_candidate_cli_finds_old_partition_after_project_move(self):
+        base = self.root.parent / "private-journals"
+        old = journal_path(self.root, PROJECT_ID, base)
+        write_entry(old, "a" * 64, {"state": "partial"})
+        moved = self.root.parent / "moved-repo"
+        self.root.rename(moved)
+        output = io.StringIO()
+        with patch("local_ticket_journal.default_journal_root", return_value=base), \
+                redirect_stdout(output):
+            code = main(["journal-candidates", "--project", str(moved)])
+        self.assertEqual(code, 0, output.getvalue())
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["state"], "manual-reconciliation-required")
+        self.assertEqual(result["candidates"][0]["stateCounts"]["partial"], 1)
+        self.assertFalse(Path(result["currentPath"]).exists())
+
+    def test_linked_worktree_shares_current_partition_without_false_candidate(self):
+        base = self.root.parent / "private-journals"
+        current = journal_path(self.root, PROJECT_ID, base)
+        write_entry(current, "a" * 64, {"state": "planned"})
+        linked = self.root.parent / "linked"
+        git(self.root, "worktree", "add", "-q", "-b", "candidate-test", str(linked))
+        result = discover_journal_candidates(linked, PROJECT_ID, base)
+        self.assertEqual(result["state"], "clear")
+        self.assertEqual(result["candidates"], [])
+        self.assertEqual(Path(result["currentPath"]), current)
+
+    def test_candidate_discovery_fails_closed_for_unsafe_or_damaged_partition(self):
+        base = self.root.parent / "private-journals"
+        current = journal_path(self.root, PROJECT_ID, base)
+        other = base / ("a" * 64) / PROJECT_ID
+        other.mkdir(parents=True, mode=0o700)
+        base.chmod(0o700)
+        other.parent.chmod(0o700)
+        other.chmod(0o700)
+        other.joinpath("mapping.json").symlink_to(current)
+        with self.assertRaisesRegex(InventoryError, "journal-discovery-unsafe"):
+            discover_journal_candidates(self.root, PROJECT_ID, base)
+        other.joinpath("mapping.json").unlink()
+        other.joinpath("mapping.json").write_text("not json", encoding="utf-8")
+        other.joinpath("mapping.json").chmod(0o600)
+        with self.assertRaisesRegex(InventoryError, "journal-discovery-invalid"):
+            discover_journal_candidates(self.root, PROJECT_ID, base)
 
     def test_publication_lock_can_reopen_retained_file_and_excludes_concurrent_writer(self):
         path = journal_path(self.root, PROJECT_ID, self.root.parent / "private-journals")

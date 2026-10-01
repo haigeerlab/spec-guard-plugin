@@ -6,7 +6,8 @@ from typing import Any
 
 from local_ticket_handoff import _digest, snapshot_issue
 from local_ticket_journal import (
-    entry_key, journal_path, publication_lock, read_journal, write_entry,
+    discover_journal_candidates, entry_key, journal_path, publication_lock,
+    read_journal, write_entry,
 )
 from local_ticket_portability import InventoryError
 from local_ticket_preview import EVENT_MARKER, ISSUE_MARKER, render_body
@@ -80,6 +81,10 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     source = preview["source"]
     destination = preview["destination"]
     version = preview["formatVersion"]
+    path = journal_path(project, source["projectId"], journal_root)
+    discovery = discover_journal_candidates(project, source["projectId"], journal_root)
+    if discovery["candidates"]:
+        return discovery
     fresh = snapshot_issue(project, source["issueId"], runtime_dir, legacy=version == 1)
     if (preview["body"] != render_body(source) or
             preview.get("title") != source["issue"]["title"] or
@@ -87,7 +92,6 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         raise InventoryError("preview-stale: Local source changed")
     if provider.target_facts() != destination:
         raise InventoryError("preview-stale: remote target facts changed")
-    path = journal_path(project, source["projectId"], journal_root)
     key = entry_key(source["projectId"], source["issueId"], destination)
     marker = "<!-- " + ISSUE_MARKER + " " + source["projectId"] + "/" + source["issueId"] + " -->"
     expected_comments = {
@@ -96,6 +100,9 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
     }
 
     with publication_lock(path, key):
+        discovery = discover_journal_candidates(project, source["projectId"], journal_root)
+        if discovery["candidates"]:
+            return discovery
         earlier = read_journal(path)["entries"].get(key)
         rejected_before_write = bool(
             earlier and earlier.get("state") == "planned" and
