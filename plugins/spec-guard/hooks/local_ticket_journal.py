@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
+import stat
 import subprocess
 import tempfile
 from contextlib import contextmanager
@@ -16,6 +18,7 @@ from local_ticket_lock import acquire_lock
 
 SCHEMA_VERSION = 1
 STATES = {"planned", "partial", "verified", "conflict"}
+PARTITION_NAME = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def default_journal_root() -> Path:
@@ -38,6 +41,73 @@ def journal_path(project: Path, project_id: str, root: Path | None = None) -> Pa
     common = _common_dir(Path(project))
     partition = hashlib.sha256(str(common).encode("utf-8")).hexdigest()
     return (default_journal_root() if root is None else Path(root)) / partition / project_id / "mapping.json"
+
+
+def discover_journal_candidates(project: Path, project_id: str,
+                                root: Path | None = None) -> dict[str, Any]:
+    """Read same-project journals in other path partitions without claiming ownership."""
+    current = journal_path(project, project_id, root)
+    base = default_journal_root() if root is None else Path(root)
+
+    def directory(path: Path, optional: bool = False) -> bool:
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            if optional:
+                return False
+            raise InventoryError("journal-discovery-unsafe: directory disappeared")
+        except OSError as error:
+            raise InventoryError("journal-discovery-unsafe: directory is unreadable") from error
+        if (not stat.S_ISDIR(metadata.st_mode) or metadata.st_uid != os.getuid() or
+                stat.S_IMODE(metadata.st_mode) & 0o077):
+            raise InventoryError("journal-discovery-unsafe: directory is not private")
+        return True
+
+    if not directory(base, optional=True):
+        return {"state": "clear", "projectId": project_id,
+                "currentPath": str(current), "candidates": []}
+    candidates = []
+    try:
+        partitions = sorted(base.iterdir())
+    except OSError as error:
+        raise InventoryError("journal-discovery-unsafe: partitions are unreadable") from error
+    for partition in partitions:
+        if not PARTITION_NAME.fullmatch(partition.name):
+            continue
+        directory(partition)
+        candidate_dir = partition / project_id
+        if not directory(candidate_dir, optional=True):
+            continue
+        mapping = candidate_dir / "mapping.json"
+        if mapping == current:
+            continue
+        try:
+            metadata = mapping.lstat()
+        except FileNotFoundError:
+            candidates.append({"partition": partition.name, "path": str(mapping),
+                               "journalState": "absent", "entryCount": None,
+                               "stateCounts": None})
+            continue
+        except OSError as error:
+            raise InventoryError("journal-discovery-unsafe: mapping is unreadable") from error
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
+                stat.S_IMODE(metadata.st_mode) & 0o077):
+            raise InventoryError("journal-discovery-unsafe: mapping is not private")
+        try:
+            entries = read_journal(mapping)["entries"]
+        except InventoryError as error:
+            raise InventoryError("journal-discovery-invalid: mapping cannot be read") from error
+        counts = {state: 0 for state in sorted(STATES)}
+        for entry in entries.values():
+            if not isinstance(entry, dict) or entry.get("state") not in STATES:
+                raise InventoryError("journal-discovery-invalid: mapping state is unknown")
+            counts[entry["state"]] += 1
+        candidates.append({"partition": partition.name, "path": str(mapping),
+                           "journalState": "present",
+                           "entryCount": len(entries), "stateCounts": counts})
+    return {"state": "manual-reconciliation-required" if candidates else "clear",
+            "projectId": project_id, "currentPath": str(current),
+            "candidates": candidates}
 
 
 def _prepare_parent(path: Path) -> None:
