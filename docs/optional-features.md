@@ -45,7 +45,9 @@
 
 事项的短编号可以写进协作消息里。但另一个仓库里的 agent 看不到你的账本，发消息时要附上来源项目和问题摘要。
 
-**不做什么：** 不同步远端 Issue。推送到 Git 远端这类高风险操作需要单独授权。
+**不做什么：** 不持续同步远端 Issue。需要备份、恢复或逐项迁移时，使用独立的
+[Local 事项归档与交接](../plugins/spec-guard/references/local-ticket-portability.md)流程；
+远端写入须先预览并针对目标和内容单独授权。推送到 Git 远端也需要单独授权。
 
 **详细说明：** [本地事项账本说明](../plugins/spec-guard/references/local-ticket-ledger-runtime.md)
 

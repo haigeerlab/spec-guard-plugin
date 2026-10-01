@@ -85,8 +85,9 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-insta
 也可用，消息可以携带事项短编号，例如“`R85YPWB` 已处理，请拉取后验证”；消息投递和事项改动仍是两个
 独立、明确的动作。
 
-GitHub/GitLab 恢复后，本功能不会自动创建、导入或同步远端 Issue；保留本地事项编号作为引用，是否迁移须由
-后续独立设计决定。详细安全边界见 `references/local-ticket-ledger-runtime.md`。
+GitHub/GitLab 恢复后，本功能不会自动创建、导入或持续同步远端 Issue。保留本地事项编号并按需迁移时，
+使用独立的 `local-ticket-portability` 流程，先预览，再针对目标与内容授权。详细安全边界见
+`references/local-ticket-ledger-runtime.md`。
 
 本阶段没有“删除账本”命令。不得为了停用而删除 `.epiq/`、`__epiq_state__`、受管运行时或 MCP 条目；这些
 动作会影响持久记录或其他项目，必须由单独的、可审查的移除设计处理。

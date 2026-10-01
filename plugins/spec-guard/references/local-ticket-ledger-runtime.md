@@ -246,4 +246,4 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 - 同一个 macOS 用户下，已初始化的同一 Git 仓库 linked worktree 能共享 Epiq 项目身份；独立机器不在本层范围。
 - Epiq 事项可自由记录 bug、需求、排查和完成结果；Spec Guard 不据此建立项目组、角色、指派锁或排期。
 - 若协作邮箱可用，Agent 可以在自由消息中附 Epiq 短编号；邮箱投递和事项写入仍是两次独立动作。
-- GitHub/GitLab 恢复后，不会自动创建、导入或同步远端 Issue。保留本地编号并按需显式关联／迁移是后续能力。
+- GitHub/GitLab 恢复后，不会自动创建、导入或持续同步远端 Issue。需要保留本地编号并逐项迁移时，使用独立的 [Local 事项归档与交接](local-ticket-portability.md) 流程；远端写入须针对精确目标与内容授权。
