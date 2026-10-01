@@ -136,6 +136,7 @@ echo ""
 
 echo "═══ Codex 真实宿主 smoke 判决器自检（不调用 Codex）═══"
 /bin/bash evals/codex-plugin-smoke.sh --selftest || F=1
+/bin/bash evals/module-namespace.sh --selftest || F=1
 echo ""
 
 echo "═══ 发布证据记录回归 ═══"
