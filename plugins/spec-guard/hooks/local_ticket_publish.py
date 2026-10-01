@@ -42,6 +42,10 @@ def _has_comment_marker(body: Any, marker: str) -> bool:
     return bool(lines) and lines[-1] == marker
 
 
+def _contains_marker(body: Any, marker: str) -> bool:
+    return marker in str(body or "")
+
+
 def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                     provider: Any, journal_root: Path | None = None,
                     confirm: bool = False) -> dict[str, Any]:
@@ -79,6 +83,15 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
             write_entry(path, key, {**earlier, "state": "conflict"})
             return {"state": "conflict", "diagnostic": "source history diverged"}
         issues = _items(provider.list_issues(), "issues")
+        if any(_contains_marker(issue.get("body"), marker) and
+               not _has_issue_marker(issue.get("body"), marker)
+               for issue in issues if not issue.get("isPullRequest")):
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "digestVersion": version,
+                                    "sourceDigest": source["sourceDigest"],
+                                    "destination": destination,
+                                    "reason": "marker outside managed section"})
+            return {"state": "conflict", "diagnostic": "destination marker is ambiguous"}
         matches = [issue for issue in issues if not issue.get("isPullRequest") and
                    _has_issue_marker(issue.get("body"), marker)]
         if len(matches) > 1:
@@ -106,6 +119,13 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                 return {"state": "provider-rejected", "diagnostic": str(error)}
             except Exception:
                 issues = _items(provider.list_issues(), "issues")
+                if any(_contains_marker(item.get("body"), marker) and
+                       not _has_issue_marker(item.get("body"), marker)
+                       for item in issues if not item.get("isPullRequest")):
+                    write_entry(path, key, {**entry, "state": "conflict",
+                                            "reason": "marker outside managed section"})
+                    return {"state": "conflict",
+                            "diagnostic": "destination marker is ambiguous"}
                 matches = [item for item in issues if not item.get("isPullRequest") and
                            _has_issue_marker(item.get("body"), marker)]
                 if len(matches) > 1:
@@ -151,6 +171,12 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
         for event_id, body in expected_comments.items():
             comments = _items(provider.list_comments(remote_id), "comments")
             comment_marker = "<!-- " + EVENT_MARKER + " " + event_id + " -->"
+            if any(_contains_marker(item.get("body"), comment_marker) and
+                   not _has_comment_marker(item.get("body"), comment_marker)
+                   for item in comments):
+                write_entry(path, key, {**entry, "state": "conflict",
+                                        "reason": "comment marker outside managed end"})
+                return {"state": "conflict", "diagnostic": "comment marker is ambiguous"}
             matches = [item for item in comments if
                        _has_comment_marker(item.get("body"), comment_marker)]
             if len(matches) > 1:

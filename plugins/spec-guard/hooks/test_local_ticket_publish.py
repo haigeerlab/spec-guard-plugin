@@ -184,21 +184,44 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(self.publish()["state"], "conflict")
         self.assertEqual(len(self.provider.issues), 2)
 
-    def test_marker_quoted_in_unrelated_issue_is_not_taken_as_handoff(self):
+    def test_marker_quoted_in_unrelated_issue_stops_without_duplicate(self):
         marker = "<!-- spec-guard-local-ticket:v1 " + PROJECT_ID + "/" + ISSUE_ID + " -->"
         self.provider.issues = [{"id": 9, "title": "Unrelated", "body": "Quote:\n" + marker,
                                  "closed": False, "url": "https://example.invalid/issues/9"}]
         self.provider.next_id = 10
-        self.assertEqual(self.publish()["state"], "verified")
-        self.assertEqual(len(self.provider.issues), 2)
-        self.assertEqual(self.provider.issues[-1]["id"], 10)
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertEqual(len(self.provider.issues), 1)
 
-    def test_marker_quoted_inside_unrelated_comment_is_ignored(self):
+    def test_inline_marker_without_journal_is_ambiguous(self):
+        marker = "<!-- spec-guard-local-ticket:v1 " + PROJECT_ID + "/" + ISSUE_ID + " -->"
+        self.provider.issues = [{"id": 9, "title": "Unrelated",
+                                 "body": "Copied " + marker + " in a discussion",
+                                 "closed": False, "url": "https://example.invalid/issues/9"}]
+        self.provider.next_id = 10
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertEqual(len(self.provider.issues), 1)
+
+    def test_marker_quoted_inside_unrelated_comment_stops(self):
         self.assertEqual(self.publish()["state"], "verified")
         marker = "<!-- spec-guard-local-event:v1 E2 -->"
         self.provider.comments[1].append({"body": marker + "\nquoted for discussion"})
-        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(self.publish()["state"], "conflict")
         self.assertEqual(len(self.provider.comments[1]), 2)
+
+    def test_moved_comment_marker_with_lost_journal_does_not_duplicate(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        journal_path(self.project, PROJECT_ID, self.journal_root).unlink()
+        self.provider.comments[1][0]["body"] += "\nmanual suffix"
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertEqual(len(self.provider.comments[1]), 1)
+
+    def test_moved_issue_marker_with_lost_journal_does_not_duplicate(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        journal_path(self.project, PROJECT_ID, self.journal_root).unlink()
+        marker = "<!-- spec-guard-local-ticket:v1 " + PROJECT_ID + "/" + ISSUE_ID + " -->"
+        self.provider.issues[0]["body"] = "Edited by user\n" + marker
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertEqual(len(self.provider.issues), 1)
 
     def test_attachment_remains_partial_without_duplicate_on_retry(self):
         self.source["attachments"] = [{"hash": "a" * 64, "ext": "gif", "bytes": 10}]

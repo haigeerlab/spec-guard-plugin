@@ -62,6 +62,9 @@ read-only preview. A failed or lost response can produce `publication-uncertain`
 remote markers and the private journal before any retry. Two matching Issues or an edited
 managed Issue/comment are `conflict`. The module does not automatically switch later daily
 work to GitHub/GitLab, and it does not close the Local ticket.
+If a source marker appears outside the managed Issue section or the end of a managed
+comment, publication reports an ambiguous marker conflict. This preserves the no-duplicate
+boundary even when the private journal is missing and someone moved the marker.
 
 An API response with a recognized, definite 4xx rejection returns `provider-rejected` with
 its status code. No Issue or comment attempt is treated as successful, so correct the
