@@ -8,7 +8,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from local_ledger_runtime import state_worktree_status
 from local_ticket_handoff import snapshot_issue
@@ -62,19 +62,27 @@ def target_facts(platform: str, host: str, target: str,
         rights = data.get("permissions")
         if not isinstance(rights, dict):
             raise InventoryError("provider-unavailable: GitLab permission is unknown")
+        web_url = data.get("web_url")
+        address = urlparse(web_url) if isinstance(web_url, str) else None
         levels = [entry.get("access_level") for entry in rights.values()
                   if isinstance(entry, dict)]
         if (data.get("path_with_namespace") != target or
                 data.get("visibility") not in ("private", "internal", "public") or
                 data.get("issues_enabled") is not True or
+                address is None or address.scheme not in ("http", "https") or
+                address.netloc != host or address.path != "/" + target or
+                address.query or address.fragment or
                 not any(isinstance(level, int) and level >= 30 for level in levels)):
             raise InventoryError("provider-unavailable: GitLab target or write permission is unknown")
         visibility = data["visibility"]
         identity = data.get("id")
     if not isinstance(identity, int) or identity <= 0:
         raise InventoryError("provider-unavailable: target identity is unknown")
-    return {"platform": platform, "host": host, "target": target,
-            "targetId": identity, "visibility": visibility}
+    facts = {"platform": platform, "host": host, "target": target,
+             "targetId": identity, "visibility": visibility}
+    if platform == "gitlab":
+        facts["webScheme"] = address.scheme
+    return facts
 
 
 def _event_time(event_id: str) -> str | None:

@@ -17,8 +17,9 @@ ISSUE_ID = "01M3SX6JWYGM5120R5VDA15T35"
 
 
 class ApiFixture:
-    def __init__(self, platform):
+    def __init__(self, platform, scheme="https"):
         self.platform = platform
+        self.scheme = scheme
         self.issues = []
         self.comments = {}
         self.calls = []
@@ -34,6 +35,7 @@ class ApiFixture:
                 return {"full_name": "team/repo", "id": 42, "private": True,
                         "has_issues": True, "permissions": {"push": True}}
             return {"path_with_namespace": "group/project", "id": 43,
+                    "web_url": self.scheme + "://gitlab.example.test/group/project",
                     "visibility": "private", "issues_enabled": True,
                     "permissions": {"project_access": {"access_level": 30}}}
         if "?" in endpoint:
@@ -82,7 +84,7 @@ class ApiFixture:
                     "html_url": "https://github.com/team/repo/issues/" + str(number)}
         return {"iid": number, "project_id": 43, "title": title,
                 "description": body, "state": "opened",
-                "web_url": "https://gitlab.example.test/group/project/-/issues/" + str(number)}
+                "web_url": self.scheme + "://gitlab.example.test/group/project/-/issues/" + str(number)}
 
 
 class ProviderTests(unittest.TestCase):
@@ -103,8 +105,8 @@ class ProviderTests(unittest.TestCase):
                             "payload": {"id": "C1", "issue": ISSUE_ID, "md": "Decision"}},
                        ], "attachments": [], "codeReferences": []}
 
-    def roundtrip(self, platform):
-        fixture = ApiFixture(platform)
+    def roundtrip(self, platform, scheme="https"):
+        fixture = ApiFixture(platform, scheme)
         if platform == "github":
             provider = GitHubHandoff("github.com", "team/repo", fixture)
         else:
@@ -134,6 +136,9 @@ class ProviderTests(unittest.TestCase):
         fixture, provider = self.roundtrip("gitlab")
         fixture.comments[1].append({"body": "system change", "system": True})
         self.assertEqual(len(provider.list_comments(1)["comments"]), 1)
+
+    def test_gitlab_http_project_roundtrip_uses_project_web_scheme(self):
+        self.roundtrip("gitlab", scheme="http")
 
     def test_gitlab_internal_marker_is_conflict(self):
         fixture = ApiFixture("gitlab")

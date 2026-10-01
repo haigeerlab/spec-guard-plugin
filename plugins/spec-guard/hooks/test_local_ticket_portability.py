@@ -463,6 +463,7 @@ class SourceInventoryTests(unittest.TestCase):
 
     def test_gitlab_preview_requires_issue_permission(self):
         metadata = {"path_with_namespace": "group/project", "visibility": "internal",
+                    "web_url": "https://gitlab.example.test/group/project",
                     "issues_enabled": True, "permissions": {
                         "project_access": {"access_level": 20},
                         "group_access": None,

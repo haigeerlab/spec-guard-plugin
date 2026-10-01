@@ -16,6 +16,7 @@ class GitLabHandoff:
         self.host, self.target, self.runner = host, target, runner
         self.base = "projects/" + quote(target, safe="") + "/issues"
         self.target_id: int | None = None
+        self.web_scheme: str | None = None
 
     def _request(self, endpoint: str, method: str = "GET",
                  body: dict[str, Any] | None = None) -> Any:
@@ -29,6 +30,7 @@ class GitLabHandoff:
         facts = target_facts("gitlab", self.host, self.target,
                              runner=lambda args: json.dumps(self.runner(args, None)))
         self.target_id = facts["targetId"]
+        self.web_scheme = facts["webScheme"]
         return facts
 
     def _issue(self, raw: Any) -> dict[str, Any]:
@@ -41,7 +43,7 @@ class GitLabHandoff:
                 or not isinstance(raw.get("web_url"), str)):
             raise InventoryError("provider-unavailable: GitLab issue response is incomplete")
         address = urlparse(raw["web_url"])
-        if (address.scheme != "https" or address.hostname != self.host or
+        if (address.scheme != self.web_scheme or address.netloc != self.host or
                 address.path != "/" + self.target + "/-/issues/" + str(raw["iid"])):
             raise InventoryError("provider-unavailable: GitLab issue URL differs from target")
         return {"id": raw["iid"], "title": raw["title"],
