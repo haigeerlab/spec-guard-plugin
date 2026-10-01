@@ -159,6 +159,14 @@ class SourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(InventoryError, "invalid-media"):
             inventory_project(self.root)
 
+    def test_inventory_rejects_project_identity_directory_symlink(self):
+        self.write_events("actor.jsonl", event("EV1"))
+        external = self.root.parent / "external-identity"
+        (self.root / ".epiq").rename(external)
+        (self.root / ".epiq").symlink_to(external, target_is_directory=True)
+        with self.assertRaisesRegex(InventoryError, "source-unknown"):
+            inventory_project(self.root)
+
     def test_archive_preserves_bundle_and_raw_pending_bytes(self):
         tracked = self.write_events("actor.jsonl", event("EV1"))
         pending = self.write_events("actor~pending.jsonl", event("EV2"))
