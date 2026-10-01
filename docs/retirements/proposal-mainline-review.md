@@ -26,7 +26,12 @@ Proposal 流程里"主链裁决 → 人工写验收记录"这一层：主链策�
   `acceptance-attestation-invalid` 这两类诊断
 - 晋级证明对"晋级提交必须同时带 Spec 与 Plan"的要求
 
-历史发布记录、`docs/acceptance/` 与 `tasks/` 下的历史材料保持原样，只作为历史证据。
+历史发布记录、`docs/acceptance/` 与其他 `tasks/` 历史材料保持原样，只作为历史证据。两份已退役模块的原始 Spec 与 Plan 已逐字节移至：
+
+- 主链裁决：[Spec](proposal-mainline-review/spec.md)、[Plan](proposal-mainline-review/plan.md)
+- 边界提醒：[Spec](proposal-boundary-guidance/spec.md)、[Plan](proposal-boundary-guidance/plan.md)
+
+这四份文件不属于当前能力图的模块产物；旧路径和旧设计见 Git 历史。
 
 ## 保留的内容
 
