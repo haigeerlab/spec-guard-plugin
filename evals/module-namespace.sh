@@ -27,7 +27,12 @@
 set -uo pipefail
 
 MODE=run
-[ "${1:-}" = "--scaffold-only" ] && MODE=scaffold
+case "${1:-}" in
+  --scaffold-only) MODE=scaffold ;;
+  --selftest) MODE=selftest ;;
+  "") ;;
+  *) echo "用法: $0 [--scaffold-only|--selftest]" >&2; exit 2 ;;
+esac
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUG="$(cd "$HERE/.." && pwd)/plugins/spec-guard"
@@ -50,7 +55,7 @@ mk() {  # $1=目录 $2=with|without
     mkdir -p "$1/.agent"
     echo '{"tracker":"none","modules":{"identity":{}},"activeModule":"identity"}' > "$1/.agent/state.json"
   fi
-  printf '# 能力图\n\n| Module id | 职责 | Depends on |\n|---|---|---|\n| identity | 认证 | — |\n| billing | 计费 | identity |\n\n- [x] 已评审\n' > "$1/spec/CAPABILITY-MAP.md"
+  printf '# 能力图\n\n## 目标\n\n让用户管理身份与账单。\n\n## 模块\n\n| Module id | Responsibility | Depends on |\n|---|---|---|\n| identity | 认证 | — |\n| billing | 计费 | identity |\n\nBuild order: identity → billing\n\n- [x] 已评审\n' > "$1/spec/CAPABILITY-MAP.md"
   printf '# identity\n\n验收：用户能注册、登录、登出。会话 30 天过期。\n' > "$1/spec/identity.md"
   ( cd "$1" && git add -A >/dev/null && git -c user.email=t@t -c user.name=t commit -qm init )
 }
@@ -67,13 +72,33 @@ judge() {  # $1=目录 $2=组名 ; 0=落进命名空间 1=落错位置 2=什么�
   # （或没写文件），把它读成「命名空间不成立」就是拿工具故障去指控产品 ——
   # 这个仓库对假警报的态度写在三条不可违反的性质里。
   if [ "${ns}" -eq 0 ] && [ "${flat}" -eq 0 ]; then
+    if [ -n "$(find "$1/tasks" -type f -print -quit 2>/dev/null)" ]; then
+      echo "  [$2] ❌ 发现任务文件，但不在约定的 plan/todo 路径"
+      return 1
+    fi
     echo "  [$2] ⏭  tasks/ 下什么都没有 —— 模型没产出任何任务文件，**这一组没有结论**"
     return 2
   fi
-  [ "$ns" -ge 1 ] && [ "$flat" -eq 0 ]
+  [ "$ns" -eq 2 ] && [ "$flat" -eq 0 ]
 }
 
-if [ "$MODE" != scaffold ]; then
+check_scaffold() {
+  local output
+  output="$(CLAUDE_PROJECT_DIR="$WORK/withblk" CLAUDE_PLUGIN_ROOT="$PLUG" bash "$PLUG/hooks/phase-guard.sh")"
+  if ! python3 -c '
+import json, sys
+context = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+assert "当前阶段: **NEEDS_PLAN**" in context
+' <<< "$output"; then
+    echo "  ❌ 有块脚手架未得到有效的 NEEDS_PLAN 阶段；评测无意义"
+    return 1
+  fi
+  echo "  ✅ 有块脚手架得到有效的 NEEDS_PLAN 阶段"
+}
+
+if [ "$MODE" = selftest ]; then
+  trap 'rm -rf "$WORK"' EXIT
+elif [ "$MODE" != scaffold ]; then
   preflight_installed_matches_repo "$REPO" || exit 1
 fi
 
@@ -82,10 +107,31 @@ mk "$WORK/withblk" with
 mk "$WORK/noblk" without
 echo "  脚手架: $WORK"
 echo "  有块 CLAUDE.md $(wc -l < "$WORK/withblk/CLAUDE.md" | tr -d ' ') 行 · 无块 $(wc -l < "$WORK/noblk/CLAUDE.md" | tr -d ' ') 行"
-if [ -z "$(CLAUDE_PROJECT_DIR="$WORK/withblk" CLAUDE_PLUGIN_ROOT="$PLUG" bash "$PLUG/hooks/phase-guard.sh" 2>/dev/null)" ]; then
-  echo "  ❌ 有块那组 hook 静默 —— 脚手架没激活约定，评测无意义"; exit 1
+check_scaffold || exit 1
+
+if [ "$MODE" = selftest ]; then
+  judge "$WORK/withblk" "零产物" >/dev/null; [ "$?" -eq 2 ] || exit 1
+  mkdir -p "$WORK/withblk/tasks/other"
+  touch "$WORK/withblk/tasks/other/plan.md"
+  judge "$WORK/withblk" "错误路径" >/dev/null; [ "$?" -eq 1 ] || exit 1
+  rm -rf "$WORK/withblk/tasks/other"
+  mkdir -p "$WORK/withblk/tasks/identity"
+  touch "$WORK/withblk/tasks/identity/plan.md"
+  judge "$WORK/withblk" "仅 plan" >/dev/null; [ "$?" -eq 1 ] || exit 1
+  rm "$WORK/withblk/tasks/identity/plan.md"
+  touch "$WORK/withblk/tasks/identity/todo.md"
+  judge "$WORK/withblk" "仅 todo" >/dev/null; [ "$?" -eq 1 ] || exit 1
+  touch "$WORK/withblk/tasks/identity/plan.md"
+  judge "$WORK/withblk" "两份产物" >/dev/null; [ "$?" -eq 0 ] || exit 1
+  touch "$WORK/withblk/tasks/plan.md"
+  judge "$WORK/withblk" "根下单例" >/dev/null; [ "$?" -eq 1 ] || exit 1
+  sed 's/Responsibility/职责/' "$WORK/withblk/spec/CAPABILITY-MAP.md" > "$WORK/withblk/spec/invalid-map.md"
+  mv "$WORK/withblk/spec/CAPABILITY-MAP.md" "$WORK/withblk/spec/valid-map.md"
+  mv "$WORK/withblk/spec/invalid-map.md" "$WORK/withblk/spec/CAPABILITY-MAP.md"
+  check_scaffold >/dev/null 2>&1; [ "$?" -eq 1 ] || exit 1
+  echo "  ✅ selftest: 有效脚手架、零产物、错误路径、缺一文件、两文件和根下单例判据"
+  exit 0
 fi
-echo "  ✅ 有块那组 hook 已激活"
 
 [ "$MODE" = scaffold ] && { echo "  --scaffold-only：到此为止，未调用模型"; exit 0; }
 
