@@ -42,4 +42,4 @@
   - 验收：CLI、Claude/Codex 入口和参考文档说明精确目标授权、`partial`／`conflict` 及线上未验证边界；不调用退役 bridge。
   - 验证：31 个来源／归档测试、9 个对账测试、5 个提供方测试和真实 Epiq 临时仓库验收通过；私有 POSIX 模式及 sibling worktree 输出拒绝用例已加入主质量门。正式仓库现有 Local 事项只读快照为 7 个事件、0 个媒体，前后源清单相同。`scripts/validate.sh`、产物检查、技能格式与 `git diff --check` 通过；完成证据记录在本地事项，未写真实远端。
   - 文件：command、skill、reference、`CHANGELOG.md`（约 4 个）。依赖：3–8。
-- [ ] Checkpoint D：代码与同机隔离验收已对照 Spec；独立介质恢复及真实 GitHub/GitLab 往返未执行，附件也尚无远端原字节／可见性读回证据。保持 `partial`／“线上未验证”，模块暂不报告为完整交付。
+- [ ] Checkpoint D：代码与同机隔离验收已对照 Spec；2026-10-01 私有 GitHub 测试仓库的合成事项真实往返已读回为 `verified`（7 个事件、1 条评论、关闭状态），全量质量门通过。独立介质恢复与真实 GitLab 往返仍未完成；附件也尚无远端原字节／可见性读回证据。保持这些边界的 `partial`／“未验证”，模块暂不报告为完整交付。
