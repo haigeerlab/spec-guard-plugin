@@ -64,6 +64,7 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
             write_entry(path, key, {"state": "conflict", "sourceDigest": source["sourceDigest"],
                                     "destination": destination, "reason": "multiple markers"})
             return {"state": "conflict", "diagnostic": "multiple destination issues"}
+        found_existing = bool(matches)
         if matches:
             issue = matches[0]
         else:
@@ -99,11 +100,23 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                                     "destination": destination, "remoteId": remote_id,
                                     "reason": "remote issue edited"})
             return {"state": "conflict", "diagnostic": "remote issue was edited"}
+        desired_closed = bool(source["issue"].get("isClosed"))
+        if (not isinstance(current.get("closed"), bool) or
+                (earlier and earlier.get("stateVerified") and
+                 current["closed"] != earlier.get("remoteClosed")) or
+                (not earlier and found_existing and current["closed"] != desired_closed)):
+            write_entry(path, key, {**(earlier or {}), "state": "conflict",
+                                    "sourceDigest": source["sourceDigest"],
+                                    "destination": destination, "remoteId": remote_id,
+                                    "reason": "remote state changed"})
+            return {"state": "conflict", "diagnostic": "remote issue state changed"}
         entry = {"state": "partial", "sourceDigest": source["sourceDigest"],
                  "destination": destination, "remoteId": remote_id,
                  "remoteUrl": current.get("url"), "createAttempted": True,
                  "commentAttempts": (earlier or {}).get("commentAttempts", []),
-                 "verifiedEventIds": [event["id"] for event in source["events"]]}
+                 "verifiedEventIds": [event["id"] for event in source["events"]],
+                 "stateVerified": bool((earlier or {}).get("stateVerified")),
+                 "remoteClosed": (earlier or {}).get("remoteClosed")}
         write_entry(path, key, entry)
         for event_id, body in expected_comments.items():
             comments = _items(provider.list_comments(remote_id), "comments")
@@ -133,8 +146,13 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
             if sum(item.get("body") == body for item in comments) != 1:
                 return {"state": "publication-uncertain",
                         "diagnostic": "comment readback differs"}
-        desired_closed = bool(source["issue"].get("isClosed"))
-        if bool(provider.get_issue(remote_id).get("closed")) != desired_closed:
+        current_state = provider.get_issue(remote_id).get("closed")
+        if not isinstance(current_state, bool) or (earlier and earlier.get("stateVerified") and
+                                                   current_state != earlier.get("remoteClosed")):
+            write_entry(path, key, {**entry, "state": "conflict",
+                                    "reason": "remote state changed"})
+            return {"state": "conflict", "diagnostic": "remote issue state changed"}
+        if current_state != desired_closed:
             provider.set_closed(remote_id, desired_closed)
         final = provider.get_issue(remote_id)
         comments = _items(provider.list_comments(remote_id), "comments")
@@ -144,6 +162,9 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                     sum(item.get("body") == body for item in comments) != 1
                     for body in expected_comments.values())):
             return {"state": "publication-uncertain", "diagnostic": "final readback differs"}
+        entry["stateVerified"] = True
+        entry["remoteClosed"] = desired_closed
+        write_entry(path, key, entry)
         if source["attachments"]:
             return {"state": "partial", "remoteId": remote_id,
                     "diagnostic": "attachments are not verified on destination"}

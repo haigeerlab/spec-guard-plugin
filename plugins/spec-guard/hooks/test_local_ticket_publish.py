@@ -143,6 +143,23 @@ class HandoffTests(unittest.TestCase):
         self.assertEqual(len(self.provider.comments[1]), 1)
         self.assertNotIn("proposal-stage:", self.preview["body"])
 
+    def test_manual_remote_state_change_after_verification_is_conflict(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        self.provider.issues[0]["closed"] = False
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertFalse(self.provider.issues[0]["closed"])
+        path = journal_path(self.project, PROJECT_ID, self.journal_root)
+        key = entry_key(PROJECT_ID, ISSUE_ID, DESTINATION)
+        self.assertEqual(read_journal(path)["entries"][key]["state"], "conflict")
+
+    def test_manual_remote_state_change_after_partial_is_conflict(self):
+        self.source["attachments"] = [{"hash": "a" * 64, "ext": "gif", "bytes": 10}]
+        self.preview["body"] = render_body(self.source)
+        self.assertEqual(self.publish()["state"], "partial")
+        self.provider.issues[0]["closed"] = False
+        self.assertEqual(self.publish()["state"], "conflict")
+        self.assertFalse(self.provider.issues[0]["closed"])
+
     def test_stale_source_and_incomplete_listing_stop_before_write(self):
         self.preview["body"] = "edited preview"
         from local_ticket_portability import InventoryError
