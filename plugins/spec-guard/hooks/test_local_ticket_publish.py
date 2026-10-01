@@ -218,6 +218,32 @@ class HandoffTests(unittest.TestCase):
             self.publish()
         self.assertEqual(self.provider.issues, [])
 
+    def test_second_move_publishes_through_original_canonical_journal(self):
+        self.assertEqual(self.publish()["state"], "verified")
+        old, second_mapping, _ = self.bind_moved_journal()
+        third = self.base / "third-project"
+        self.project.rename(third)
+        self.project = third
+        current = journal_path(third, PROJECT_ID, self.journal_root)
+        current.parent.mkdir(parents=True, mode=0o700)
+        current.parent.parent.chmod(0o700)
+        pointer = current.with_name("binding.json")
+        value = {
+            "formatVersion": 1, "projectId": PROJECT_ID,
+            "currentPartition": current.parent.parent.name,
+            "candidatePartition": second_mapping.parent.parent.name,
+            "canonicalPartition": old.parent.parent.name,
+            "initialMappingSha256": "a" * 64, "previewSha256": "b" * 64,
+            "boundAt": "2026-10-01T00:00:00+00:00",
+        }
+        value["bindingSha256"] = binding_checksum(value)
+        pointer.write_text(json.dumps(value))
+        pointer.chmod(0o600)
+        self.assertEqual(self.publish()["state"], "verified")
+        self.assertEqual(len(self.provider.issues), 1)
+        self.assertEqual(len(self.provider.comments[1]), 1)
+        self.assertFalse(current.exists())
+
     def test_same_id_clone_candidate_blocks_even_when_source_digest_matches(self):
         clone = self.base / "independent-clone"
         clone.mkdir()

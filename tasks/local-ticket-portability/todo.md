@@ -72,10 +72,11 @@
   - 文件：日志模块、发布模块、`test_local_ticket_publish.py`（约 3 个）。
   - 完成证据：发布前和进入 canonical per-key 锁后两次解析相同路径和指针摘要；旧锁被占用时新路径发布拒绝。重复发布保持 1 条 Issue／评论，不确定创建不重建；额外候选、指针校验失败和新分区映射并存均失败关闭。34 项 publish、50 项 portability 测试及 `git diff --check` 通过。
 - [x] Checkpoint F：canonical 路径与锁一致性、双路径并发拒绝由隔离测试证明；映射原子替换可能改变 inode，未以 inode 相等为证据。
-- [ ] Task 14：再次移动时沿有效指针链解析。依赖：13。
+- [x] Task 14：再次移动时沿有效指针链解析。依赖：13。
   - 验收：新位置经第二次显式预览和绑定后仍抵达首份 canonical 日志；循环、断链、不同 canonical 和可识别的独立 clone 均拒绝自动接管；完全相同的历史不被误报成已证明同仓库。
   - 验证：隔离 Git/worktree 夹具和指针链篡改测试通过；运行两个聚焦测试文件。
   - 文件：绑定模块、日志模块、两个聚焦测试文件（约 4 个）。
+  - 完成证据：临时 Git/Epiq 项目经两次路径移动及显式 worktree repair 后，第二次预览显示完整链并绑定至首份 canonical 映射；再次发布仍为同一 Issue／评论。循环、断链、不同 canonical 和链外同 ID clone 均停止或待人工对账。51 项 portability、35 项 publish 测试及 `git diff --check` 通过；无法从旧格式区分历史完全相同的复制仓库，仍需人确认归属。
 - [ ] Task 15：归档 canonical 映射及来源证明。依赖：13、14。
   - 验收：新归档的 mapping 与绑定证明都受 manifest 哈希保护并相互核对；旧 v1 归档仍可验证和恢复；恢复不会写用户级指针。
   - 验证：新旧归档、篡改／缺失证明、隔离恢复测试通过；运行 `test_local_ticket_portability.py`。

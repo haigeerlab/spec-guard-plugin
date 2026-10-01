@@ -19,7 +19,8 @@ from local_ticket_portability import InventoryError, inventory_project, main
 from local_ticket_restore import prove_restore, restore_archive
 from local_ticket_handoff import _first_contributor_names, _issue_events, _source_digest
 from local_ticket_preview import create_preview, render_body, target_facts
-from local_ticket_journal import (discover_journal_candidates, entry_key, journal_path,
+from local_ticket_journal import (active_journal, binding_checksum,
+                                  discover_journal_candidates, entry_key, journal_path,
                                   publication_lock, read_journal, write_entry)
 from local_ticket_lock import MAGIC, acquire_lock
 
@@ -306,7 +307,7 @@ class SourceInventoryTests(unittest.TestCase):
         output = self.root.parent / "bind-preview.json"
         with patch("local_ticket_bind.snapshot_issue",
                    side_effect=AssertionError("must stop before source snapshot")):
-            with self.assertRaisesRegex(InventoryError, "one complete candidate"):
+            with self.assertRaisesRegex(InventoryError, "unrelated candidates"):
                 preview_binding(moved, old_mapping.parent.parent.name, output,
                                 self.root.parent / "runtime", old_common_dir=old_common,
                                 journal_root=journal_root)
@@ -317,7 +318,7 @@ class SourceInventoryTests(unittest.TestCase):
         other_mapping.parent.rmdir()
         other_mapping.parent.parent.rmdir()
         old_mapping.unlink()
-        with self.assertRaisesRegex(InventoryError, "one complete candidate"):
+        with self.assertRaisesRegex(InventoryError, "canonical mapping is unavailable"):
             preview_binding(moved, old_mapping.parent.parent.name, output,
                             self.root.parent / "runtime", old_common_dir=old_common,
                             journal_root=journal_root)
@@ -412,6 +413,85 @@ class SourceInventoryTests(unittest.TestCase):
             with self.assertRaisesRegex(InventoryError, "already active"):
                 bind_journal(moved, preview_file, self.root.parent / "runtime",
                              journal_root=journal_root, confirm=True)
+
+    def test_second_move_follows_original_mapping_and_rejects_broken_chain(self):
+        issue_id = "ISSUE1"
+        self.write_events("actor.jsonl", event("EV1", "add.issue", {"id": issue_id}))
+        journal_root = self.root.parent / "private-journal"
+        destination = {"platform": "github", "host": "github.com",
+                       "target": "team/repo", "targetId": 42}
+        events = [{"id": "EV1", "action": "add.issue", "payload": {"id": issue_id}}]
+        digest = _source_digest(events)
+        old_mapping = journal_path(self.root, PROJECT_ID, journal_root)
+        write_entry(old_mapping, entry_key(PROJECT_ID, issue_id, destination), {
+            "state": "partial", "digestVersion": 2,
+            "sourceDigest": digest, "destination": destination,
+        })
+        old_common = Path(git(self.root, "rev-parse", "--path-format=absolute",
+                              "--git-common-dir"))
+        second = self.root.parent / "second"
+        self.root.rename(second)
+        git(second, "worktree", "repair", str(self.state_root))
+        fake_snapshot = {"sourceDigest": digest, "events": events}
+        first_preview = self.root.parent / "first-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            preview_binding(second, old_mapping.parent.parent.name, first_preview,
+                            self.root.parent / "runtime", old_common_dir=old_common,
+                            journal_root=journal_root)
+            bind_journal(second, first_preview, self.root.parent / "runtime",
+                         journal_root=journal_root, confirm=True)
+
+        second_mapping = journal_path(second, PROJECT_ID, journal_root)
+        second_pointer = second_mapping.with_name("binding.json")
+        second_common = Path(git(second, "rev-parse", "--path-format=absolute",
+                                 "--git-common-dir"))
+        third = self.root.parent / "third"
+        second.rename(third)
+        git(third, "worktree", "repair", str(self.state_root))
+        third_preview = self.root.parent / "third-preview.json"
+        with patch("local_ticket_bind.snapshot_issue", return_value=fake_snapshot):
+            preview_binding(third, second_mapping.parent.parent.name, third_preview,
+                            self.root.parent / "runtime", old_common_dir=second_common,
+                            journal_root=journal_root)
+            data = json.loads(third_preview.read_text())
+            self.assertEqual(data["bindingChain"], [second_mapping.parent.parent.name,
+                                                     old_mapping.parent.parent.name])
+            self.assertEqual(data["canonicalPartition"], old_mapping.parent.parent.name)
+            bind_journal(third, third_preview, self.root.parent / "runtime",
+                         journal_root=journal_root, confirm=True)
+        path, token, unresolved = active_journal(third, PROJECT_ID, journal_root)
+        self.assertEqual(path, old_mapping)
+        self.assertIsNotNone(token)
+        self.assertIsNone(unresolved)
+        self.assertFalse(journal_path(third, PROJECT_ID, journal_root).exists())
+
+        original_pointer = second_pointer.read_text()
+        value = json.loads(original_pointer)
+        value["candidatePartition"] = journal_path(third, PROJECT_ID, journal_root).parent.parent.name
+        value["bindingSha256"] = binding_checksum(value)
+        second_pointer.write_text(json.dumps(value))
+        with self.assertRaisesRegex(InventoryError, "cycle"):
+            active_journal(third, PROJECT_ID, journal_root)
+        second_pointer.write_text(original_pointer)
+        value = json.loads(original_pointer)
+        value["canonicalPartition"] = "d" * 64
+        value["bindingSha256"] = binding_checksum(value)
+        second_pointer.write_text(json.dumps(value))
+        with self.assertRaisesRegex(InventoryError, "canonical partition differs"):
+            active_journal(third, PROJECT_ID, journal_root)
+        second_pointer.write_text(original_pointer)
+        second_pointer.unlink()
+        with self.assertRaisesRegex(InventoryError, "canonical mapping is unavailable"):
+            active_journal(third, PROJECT_ID, journal_root)
+        second_pointer.write_text(original_pointer)
+        second_pointer.chmod(0o600)
+        clone = self.root.parent / "independent-clone"
+        clone.mkdir()
+        git(clone, "init", "-q")
+        write_entry(journal_path(clone, PROJECT_ID, journal_root), "e" * 64,
+                    {"state": "partial"})
+        self.assertEqual(active_journal(third, PROJECT_ID, journal_root)[2]["state"],
+                         "manual-reconciliation-required")
 
     def test_empty_event_directory_is_not_a_complete_initialized_ledger(self):
         with self.assertRaisesRegex(InventoryError, "invalid-event-log"):

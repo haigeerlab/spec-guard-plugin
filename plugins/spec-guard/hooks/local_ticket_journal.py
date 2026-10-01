@@ -116,16 +116,12 @@ def discover_journal_candidates(project: Path, project_id: str,
             "candidates": candidates}
 
 
-def active_journal(project: Path, project_id: str,
-                   root: Path | None = None) -> tuple[Path, str | None, dict[str, Any] | None]:
-    """Resolve one reviewed binding, or return unresolved old candidates."""
-    current = journal_path(project, project_id, root)
-    discovery = discover_journal_candidates(project, project_id, root)
-    pointer = current.with_name("binding.json")
+def _read_binding(pointer: Path, project_id: str, partition: str
+                  ) -> tuple[dict[str, Any], bytes] | None:
     try:
         descriptor = os.open(pointer, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
     except FileNotFoundError:
-        return current, None, discovery if discovery["candidates"] else None
+        return None
     except OSError as error:
         raise InventoryError("journal-bind-invalid: binding pointer is unsafe") from error
     with os.fdopen(descriptor, "rb") as handle:
@@ -143,32 +139,94 @@ def active_journal(project: Path, project_id: str,
             "canonicalPartition", "initialMappingSha256", "previewSha256", "boundAt",
             "bindingSha256"}
             or binding["formatVersion"] != 1 or binding["projectId"] != project_id or
-            binding["currentPartition"] != current.parent.parent.name or
+            binding["currentPartition"] != partition or
             not isinstance(binding["candidatePartition"], str) or
             PARTITION_NAME.fullmatch(binding["candidatePartition"]) is None or
-            binding["canonicalPartition"] != binding["candidatePartition"] or
+            not isinstance(binding["canonicalPartition"], str) or
+            PARTITION_NAME.fullmatch(binding["canonicalPartition"]) is None or
             not all(isinstance(binding[name], str) and PARTITION_NAME.fullmatch(binding[name])
                     for name in ("initialMappingSha256", "previewSha256")) or
             not isinstance(binding["boundAt"], str) or
             binding["bindingSha256"] != binding_checksum(binding)):
         raise InventoryError("journal-bind-invalid: binding pointer schema differs")
+    current = pointer.with_name("mapping.json")
     if current.exists() or current.is_symlink():
         raise InventoryError("journal-bind-invalid: current partition has another mapping")
-    if any(item.name != "binding.json" for item in current.parent.iterdir()):
+    if any(item.name != "binding.json" for item in pointer.parent.iterdir()):
         raise InventoryError("journal-bind-invalid: current partition has another file")
-    candidate = next((item for item in discovery["candidates"]
-                      if item["partition"] == binding["candidatePartition"]), None)
-    if candidate is None or candidate["journalState"] != "present":
-        raise InventoryError("journal-bind-invalid: canonical mapping is unavailable")
-    if len(discovery["candidates"]) != 1:
+    return binding, raw
+
+
+def _follow_chain(project_id: str, start: str,
+                  available: dict[str, dict[str, Any]], seen: set[str] | None = None,
+                  canonical: str | None = None
+                  ) -> tuple[Path, list[str], list[str]]:
+    visited = set() if seen is None else set(seen)
+    chain: list[str] = []
+    fingerprints: list[str] = []
+    partition = start
+    while True:
+        if partition in visited:
+            raise InventoryError("journal-bind-invalid: binding cycle detected")
+        visited.add(partition)
+        candidate = available.get(partition)
+        if candidate is None:
+            raise InventoryError("journal-bind-invalid: binding chain is broken")
+        chain.append(partition)
+        path = Path(candidate["path"])
+        pointer = path.with_name("binding.json")
+        link = _read_binding(pointer, project_id, partition)
+        if link is None:
+            if candidate["journalState"] != "present" or (
+                    canonical is not None and partition != canonical):
+                raise InventoryError("journal-bind-invalid: canonical mapping is unavailable")
+            metadata = path.lstat()
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
+                    stat.S_IMODE(metadata.st_mode) & 0o077):
+                raise InventoryError("journal-bind-invalid: canonical mapping is unsafe")
+            read_journal(path)
+            return path, chain, fingerprints
+        binding, raw = link
+        if canonical is not None and binding["canonicalPartition"] != canonical:
+            raise InventoryError("journal-bind-invalid: canonical partition differs")
+        canonical = binding["canonicalPartition"]
+        fingerprints.append(hashlib.sha256(raw).hexdigest())
+        partition = binding["candidatePartition"]
+
+
+def candidate_journal_chain(project: Path, project_id: str, candidate: str,
+                            root: Path | None = None) -> tuple[Path, list[str]]:
+    """Resolve a reviewed old candidate; all discovered partitions must join its chain."""
+    discovery = discover_journal_candidates(project, project_id, root)
+    available = {item["partition"]: item for item in discovery["candidates"]}
+    path, chain, _ = _follow_chain(
+        project_id, candidate, available,
+        seen={journal_path(project, project_id, root).parent.parent.name},
+    )
+    if set(chain) != set(available):
+        raise InventoryError("journal-bind-evidence: unrelated candidates remain")
+    return path, chain
+
+
+def active_journal(project: Path, project_id: str,
+                   root: Path | None = None) -> tuple[Path, str | None, dict[str, Any] | None]:
+    """Resolve one reviewed binding chain, or return unresolved old candidates."""
+    current = journal_path(project, project_id, root)
+    discovery = discover_journal_candidates(project, project_id, root)
+    link = _read_binding(current.with_name("binding.json"), project_id,
+                         current.parent.parent.name)
+    if link is None:
+        return current, None, discovery if discovery["candidates"] else None
+    binding, raw = link
+    available = {item["partition"]: item for item in discovery["candidates"]}
+    path, chain, fingerprints = _follow_chain(
+        project_id, binding["candidatePartition"], available,
+        seen={current.parent.parent.name}, canonical=binding["canonicalPartition"],
+    )
+    if set(chain) != set(available):
         return current, None, discovery
-    path = Path(candidate["path"])
-    metadata = path.lstat()
-    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid() or
-            stat.S_IMODE(metadata.st_mode) & 0o077):
-        raise InventoryError("journal-bind-invalid: canonical mapping is unsafe")
-    read_journal(path)
-    return path, hashlib.sha256(raw).hexdigest(), None
+    tokens = [hashlib.sha256(raw).hexdigest(), *fingerprints]
+    return path, hashlib.sha256("|".join(tokens).encode("ascii")).hexdigest(), None
 
 
 def _prepare_parent(path: Path) -> None:
