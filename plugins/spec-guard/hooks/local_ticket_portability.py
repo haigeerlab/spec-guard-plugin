@@ -116,6 +116,7 @@ def inventory_project(project: Path) -> dict[str, Any]:
     project = Path(project).resolve()
     if _git(project, "rev-parse", "--show-toplevel") != str(project):
         raise InventoryError("source-unknown: project must be a Git worktree root")
+    _directory(project / ".epiq")
     identity = project_status(project)
     if identity["state"] != "initialized":
         raise InventoryError("source-unknown: Epiq project identity is unavailable")
