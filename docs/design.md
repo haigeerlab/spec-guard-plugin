@@ -19,6 +19,11 @@ synchronizes remote Issues during daily work. The separate Local ticket
 portability workflow can archive the ledger and explicitly hand off selected
 items to GitHub/GitLab Issues after a target-specific preview and authorization.
 
+A project-audit handoff convention bounds a review batch, records its findings,
+and moves confirmed bugs into the existing ticket and agent-skills repair flows.
+It does not add an audit state to the phase hook or revive mutable remote
+tracker adapters.
+
 ## Proposal boundary
 
 `spec/CAPABILITY-MAP.md` is the single capability map for the whole plugin: an
