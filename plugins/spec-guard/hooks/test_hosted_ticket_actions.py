@@ -66,6 +66,15 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(second["state"], "found")
         self.assertEqual(self.provider.comment_attempts, 1)
 
+    def test_auto_closed_issue_can_record_validation_without_reopening(self):
+        self.provider.issue["closed"] = True
+        preview = make_comment_preview(self.provider, 7, "delivery-12", "Merged and CI passed")
+        self.assertEqual(preview["state"], "preview")
+        self.assertEqual(publish_comment(preview, self.provider, self.root,
+                                         confirm=True)["state"], "verified")
+        self.assertTrue(self.provider.issue["closed"])
+        self.assertEqual(self.provider.comment_attempts, 1)
+
     def test_lost_comment_response_recovers_or_stays_unknown_without_retry(self):
         preview = make_comment_preview(self.provider, 7, "decision-1", "Fix scope A")
         self.provider.lose_comment_response = True

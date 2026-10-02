@@ -48,7 +48,8 @@ description: 在明确选用 GitHub 或 GitLab 普通 Issue 时，逐项查重�
 - PR/MR 创建后，记录它覆盖哪些 Issue；合并后**逐项**核对平台的 merged 状态、
   合并提交、CI／验收结果、事项剩余范围和当前 Issue 状态。仅合并不等于完成；
   部分覆盖、待部署、验收失败或结果未知均保持开放。先把修复与验证记录写回
-  Issue，并按上一步读回。
+  Issue，并按上一步读回。平台已自动关闭时仍可记录核对结果，但不能把关闭状态
+  当成验收通过。
 - 全部范围已交付且验证通过时，使用
   `python3 -B "$ROOT/hooks/hosted_ticket_action.py" close-preview --platform …
   --host … --target … --visibility … --issue-id <id> --delivery-id <pr-or-mr-iid>

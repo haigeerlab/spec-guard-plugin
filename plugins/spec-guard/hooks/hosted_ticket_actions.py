@@ -43,8 +43,6 @@ def make_comment_preview(provider: Any, issue_id: int, event_id: str,
     try:
         target = provider.target_facts()
         issue = provider.get_issue(issue_id)
-        if issue.get("closed") is True:
-            return {"state": "incomplete", "diagnostic": "issue-already-closed"}
         marker = "<!-- " + COMMENT_MARKER + " " + event_id + " -->"
         existing = _comment_matches(provider, issue_id, marker)
         if existing["state"] != "absent":
@@ -92,7 +90,7 @@ def publish_comment(preview: dict[str, Any], provider: Any, intent_root: Path,
             if provider.target_facts() != target:
                 return {"state": "unknown", "diagnostic": "target-changed"}
             issue = provider.get_issue(preview["issueId"])
-            if issue.get("url") != preview["issueUrl"] or issue.get("closed") is True:
+            if issue.get("url") != preview["issueUrl"]:
                 return {"state": "unknown", "diagnostic": "issue-changed"}
             existing = _comment_matches(provider, preview["issueId"], marker)
             if existing["state"] == "found":

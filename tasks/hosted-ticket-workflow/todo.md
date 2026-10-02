@@ -6,6 +6,7 @@
 - [x] Claude/Codex 入口、审查批次目标与剩余数量、使用文档。
 - [ ] 假提供方和受控真实目标验证、Local/Proposal/退役 bridge 回归。
 
-验证进度：假提供方、真实 GitHub 只读目标、完整 `scripts/validate.sh` 及退役 bridge
-回归已通过。真实 GitHub/GitLab 写入、评论和关闭需指定受控目标与精确内容，尚未执行；
-宿主实际加载新 skill 的行为也尚未观察到，不以源码测试冒充该证据。
+验证进度：假提供方、真实 GitHub 只读目标、完整 `scripts/validate.sh`、阶段与产物
+回归及退役 bridge 回归已通过；Claude 插件源码校验通过。真实 GitHub/GitLab 写入、
+评论和关闭需指定受控目标与精确内容，尚未执行；宿主会话实际加载新 skill 的行为
+也尚未观察到，不以源码或清单校验冒充该证据。
