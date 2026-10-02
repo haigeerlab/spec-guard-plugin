@@ -1,8 +1,14 @@
 ---
-description: 用自然语言受理开发需求或修复问题，并查看、讨论或关闭当前项目的本地事项
+description: 用自然语言受理开发需求或修复问题；按明确选择的 Local 或 GitHub/GitLab 日常事项目标处理
 ---
 
-把用户在命令后的内容当作日常本地事项请求，加载本插件的 `ticket` skill 并执行。用户只说
+用户或审查批次明确选择 GitHub/GitLab 普通 Issue 时，加载
+`hosted-ticket-workflow` skill：先完整查重和根因复核，再按精确目标与内容逐次授权。
+不能因仓库 Git remote 是 GitHub/GitLab 而改变已选 Local 事项归属；Proposal Issue
+也不是普通缺陷事项。未明确目标时先补目标，不从旧 tracker state 猜测。
+
+以下仅是 **Local** 路径。把用户在命令后的内容当作日常本地事项请求，加载本插件的
+`ticket` skill 并执行。用户只说
 `/spec-guard:ticket` 时，列出当前仓库的未关闭事项，简要显示标题、短编号和当前状态；若账本尚未
 启用，仅做只读诊断并给出一条启用步骤。
 其他面向用户的回复也以已读取的标题为主：首次提到具体事项写成 `《标题》（短编号）`，

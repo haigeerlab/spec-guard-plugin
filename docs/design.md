@@ -14,8 +14,10 @@ spec-guard adds two independent safeguards around agent-skills:
 
 It also ships two optional same-Mac capabilities that need explicit setup: a
 collaboration mailbox for Claude Code and Codex sessions, and a local ticket
-ledger for repositories without GitHub/GitLab Issues. Neither replaces or
-synchronizes remote Issues during daily work. The separate Local ticket
+ledger for work explicitly tracked locally. The Local ledger does not
+synchronize remote Issues. An on-demand hosted ticket workflow handles ordinary
+GitHub/GitLab Issues after an explicit target choice; it does not project tasks
+or bind worktrees. The separate Local ticket
 portability workflow can archive the ledger and explicitly hand off selected
 items to GitHub/GitLab Issues after a target-specific preview and authorization.
 
