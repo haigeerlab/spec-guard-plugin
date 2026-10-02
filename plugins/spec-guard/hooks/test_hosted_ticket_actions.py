@@ -113,6 +113,14 @@ class ActionTests(unittest.TestCase):
                          "verified")
         self.assertEqual(self.provider.close_attempts, 1)
 
+    def test_close_stops_when_issue_scope_changes_after_preview(self):
+        preview = make_close_preview(self.provider, 7, 12, True, "CI passed")
+        self.provider.issue["body"] = "Evidence and new scope"
+        result = close_issue(preview, self.provider, confirm=True)
+        self.assertEqual(result["state"], "incomplete")
+        self.assertEqual(result["diagnostic"], "issue-content-changed")
+        self.assertEqual(self.provider.close_attempts, 0)
+
 
 class AdapterActionTests(unittest.TestCase):
     def test_github_delivery_comment_and_close_transport(self):

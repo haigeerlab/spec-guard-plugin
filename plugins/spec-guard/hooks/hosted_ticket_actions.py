@@ -141,10 +141,14 @@ def make_close_preview(provider: Any, issue_id: int, delivery_id: int,
         delivery = provider.get_delivery(delivery_id)
         if delivery.get("merged") is not True or not delivery.get("mergeCommit"):
             return {"state": "incomplete", "diagnostic": "delivery-not-merged"}
+        if issue.get("closed") is True:
+            return {"state": "already-closed", "issue": issue}
         preview = {"state": "preview", "target": target, "issueId": issue_id,
                    "issueUrl": issue["url"], "deliveryId": delivery_id,
                    "deliveryUrl": delivery["url"],
                    "mergeCommit": delivery["mergeCommit"],
+                   "issueContentDigest": _digest({"title": issue["title"],
+                                                  "body": issue["body"]}),
                    "validationEvidence": validation_evidence.strip(),
                    "coverageComplete": True}
         return {**preview, "digest": _digest(preview)}
@@ -174,6 +178,9 @@ def close_issue(preview: dict[str, Any], provider: Any,
         issue = provider.get_issue(preview["issueId"])
         if issue.get("url") != preview["issueUrl"]:
             return {"state": "unknown", "diagnostic": "issue-changed"}
+        if _digest({"title": issue["title"], "body": issue["body"]}) != \
+                preview.get("issueContentDigest"):
+            return {"state": "incomplete", "diagnostic": "issue-content-changed"}
         if issue.get("closed") is True:
             return {"state": "already-closed", "issue": issue}
         try:
