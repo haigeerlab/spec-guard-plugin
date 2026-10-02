@@ -85,7 +85,10 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次。命令只改 `spec/CAPABILITY-MAP.md`，
 不创建分支、不提交、不改 Issue 标签。写入后由用户提交并合并；合并后运行 `/spec-guard:proposal-promotion-proof`，
-证明为 `proved` 后，由人工把 Issue 标签改为 `proposal-stage:promoted`。不带 `--proposal` 时行为不变。
+证明为 `proved` 后，由人工把 Issue 标签改为 `proposal-stage:promoted`。正式 Spec 与 Plan 若已可评审，
+可在同一个晋级 PR 中补齐；本命令仍只写能力图，Spec、Plan 必须分别按其阶段审阅，
+不因同 PR 而跳过。预检已内嵌于本命令，通常无需另跑独立 preflight。
+不带 `--proposal` 时行为不变。
 
 如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
 已接受的 Proposal 用上面的 `--proposal` 晋级。

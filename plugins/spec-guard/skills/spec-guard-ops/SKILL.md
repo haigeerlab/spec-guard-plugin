@@ -117,7 +117,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 写入结果无法被 proposal-promotion-proof 证明、当前模块做到一半（`--interrupt` 规则同上），
 均原样说明并停下。`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审），
 未评审先评审再 `--confirm`。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
-不改 Issue 标签。合并后运行 proposal 一节的 `--prove`，`proved` 后由人工把标签改为 `proposal-stage:promoted`。
+不改 Issue 标签。正式 Spec 与 Plan 若已可评审，可与能力图放在同一个晋级 PR；
+本命令仍只写能力图，且内嵌预检通常无需再单独运行。Spec 与 Plan 分别按阶段审阅，
+不能因同 PR 跳过。合并后运行 proposal 一节的 `--prove`，`proved` 后由人工把标签改为 `proposal-stage:promoted`。
 
 ## documentation
 
