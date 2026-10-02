@@ -98,6 +98,26 @@ class ActionTests(unittest.TestCase):
         self.assertEqual(make_comment_preview(self.provider, 7, "decision-1", "Fix")
                          ["state"], "conflict")
 
+    def test_comment_stops_when_issue_scope_changes_after_preview(self):
+        preview = make_comment_preview(self.provider, 7, "decision-1", "Fix scope A")
+        self.provider.issue["body"] = "Evidence and new scope"
+        result = publish_comment(preview, self.provider, self.root, confirm=True)
+        self.assertEqual(result["state"], "incomplete")
+        self.assertEqual(result["diagnostic"], "issue-content-changed")
+        self.assertEqual(self.provider.comment_attempts, 0)
+
+    def test_changed_scope_still_recovers_an_already_posted_comment(self):
+        preview = make_comment_preview(self.provider, 7, "decision-1", "Fix scope A")
+        self.provider.hide_comment = True
+        self.provider.lose_comment_response = True
+        self.assertEqual(publish_comment(preview, self.provider, self.root,
+                                         confirm=True)["state"], "unknown")
+        self.provider.hide_comment = False
+        self.provider.issue["body"] = "Evidence and new scope"
+        result = publish_comment(preview, self.provider, self.root, confirm=True)
+        self.assertEqual(result["state"], "found")
+        self.assertEqual(self.provider.comment_attempts, 1)
+
     def test_close_requires_merged_delivery_complete_coverage_and_validation(self):
         self.provider.delivery["merged"] = False
         self.assertEqual(make_close_preview(self.provider, 7, 12, True, "CI passed")
@@ -110,7 +130,9 @@ class ActionTests(unittest.TestCase):
 
     def test_close_reads_back_and_does_not_reclose(self):
         preview = make_close_preview(self.provider, 7, 12, True, "CI passed")
-        self.assertEqual(close_issue(preview, self.provider, confirm=True)["state"], "verified")
+        first = close_issue(preview, self.provider, confirm=True)
+        self.assertEqual(first["state"], "verified")
+        self.assertEqual(first["verifiedFact"], "remote-issue-closed")
         self.assertEqual(close_issue(preview, self.provider, confirm=True)["state"],
                          "already-closed")
         self.assertEqual(self.provider.close_attempts, 1)

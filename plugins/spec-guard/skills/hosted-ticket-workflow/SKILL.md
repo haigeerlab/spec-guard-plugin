@@ -44,7 +44,9 @@ description: 在明确选用 GitHub 或 GitLab 普通 Issue 时，逐项查重�
   --host … --target … --visibility … --issue-id <id> --event-id <stable-id>
   --body-file <file>`；展示内容并取得该次授权后，运行同参数的
   `comment-publish --expected-digest <digest> --confirm`。评论按标记读回；结果未知
-  时不自动发第二条。无关的错字修正可以使用平台原生编辑，但不能抹掉实质决定。
+  时不自动发第二条。若评论尚未写入且预览后 Issue 标题或正文变化，停止并重新
+  核对、预览；已写入的评论仍按标记读回对账。无关的错字修正可以使用平台原生编辑，
+  但不能抹掉实质决定。
 - PR/MR 创建后，记录它覆盖哪些 Issue；合并后**逐项**核对平台的 merged 状态、
   合并提交、CI／验收结果、事项剩余范围和当前 Issue 状态。GitLab 的 fast-forward
   或 squash 回退提交须能从目标分支追溯，不能把源分支 SHA 直接当交付证明。
@@ -59,7 +61,8 @@ description: 在明确选用 GitHub 或 GitLab 普通 Issue 时，逐项查重�
   提交；`validation-file` 必须来自刚核对的真实 CI／验收事实，布尔参数本身不是
   证据。展示精确 Issue、交付和验证信息，取得关闭授权后再以同参数运行
   `close-publish --expected-digest <digest> --confirm`，读回关闭状态。平台自动关闭
-  报 `already-closed`，仍需核对实际剩余条件；不可把它写成自动验收通过。
+  报 `already-closed`，仍需核对实际剩余条件；`verified` 只证明远端 Issue 已关闭并
+  读回，不证明 CI／验收证据真实或通过，后者必须在关闭前由执行者核对。
 
 每个检查点按[共享检查点规则](../../references/workflow-checkpoints.md)报告已处理和
 剩余数量、真实验证与未验证项、下一停点。修复代码复用 agent-skills 的诊断、TDD、
