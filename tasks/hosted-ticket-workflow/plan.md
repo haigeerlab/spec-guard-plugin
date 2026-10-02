@@ -58,3 +58,10 @@
 本 PR 只纳入能力图、Spec、Plan 和任务清单；不把计划中的用例说成已通过。
 运行 `verify-artifacts.sh`、`phase-guard.sh` 与 `git diff --check`，并在合并后
 用 `proposal_promotion_proof.py --prove` 证明首次纳入的模块行符合 Proposal。
+
+## 实施记录
+
+- 2026-10-02：任务 1 的独立只读入口与 10 个聚焦用例通过。对
+  `haigeerlab/spec-guard-plugin` 做了一次真实 GitHub 只读扫描，目标可见性为
+  public、普通 Issue 共 2 条，合成请求编号得到 `absent` 且明确要求根因人工复核。
+  没有执行远端写入；GitLab 真实目标仍未验证。
