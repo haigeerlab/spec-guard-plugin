@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:c3842b92293244df8f3b6365f757ebeb9c6061a7"
+      },
+      "observedAt": "2026-10-02T19:10:57Z",
+      "evidence": [
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "result:all source checks passed on release pull request head db5244bfd965bca1fdeb06d8dc0ede5ceb590cfb; pull request #135 validate (ubuntu-latest) passed",
+        "result:release pull request head db5244bfd965bca1fdeb06d8dc0ede5ceb590cfb and tagged merge commit c3842b92293244df8f3b6365f757ebeb9c6061a7 have identical Git trees 40c2bfd513ee52fc6295fdd6ced129bf6a6fddd5"
+      ]
+    }
+  ]
+}

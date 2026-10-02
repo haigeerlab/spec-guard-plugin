@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.38.2;test:marketplace-update-20261003"
+      },
+      "observedAt": "2026-10-02T19:10:57Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user",
+        "result:the user-scope plugin was updated from 0.38.1 to 0.38.2 and enabled; a new session is required to apply it",
+        "result:all 144 distributed files in the installed cache and marketplace are byte-for-byte identical to git archive v0.38.2"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.38.2;test:synthetic-map-only-20261003"
+      },
+      "observedAt": "2026-10-02T19:10:57Z",
+      "evidence": [
+        "host:claude -p --verbose --output-format stream-json --include-hook-events --no-session-persistence --plugin-dir <installed-v0.38.2> ran from an isolated synthetic Git project",
+        "result:a UserPromptSubmit hook_response system machine event contained the spec-guard local workflow heading and MAP_ONLY stage; Claude exited 0",
+        "limit:the synthetic project contained no real repository content; this proves installed Claude Code hook injection, not title-display behavior, hosted Issue writes, or Claude Desktop behavior"
+      ]
+    }
+  ]
+}
