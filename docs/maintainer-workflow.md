@@ -75,8 +75,9 @@ codex plugin add spec-guard@spec-guard-marketplace
   --expected-source /absolute/path/to/spec-guard-plugin/plugins/spec-guard
 ```
 
-退出码：`0` 为真实 hook 通过，`1` 为已执行的行为失败，`2` 为安装、登录、信任或来源不匹配，
-即环境未就绪。
+退出码：`0` 为本次临时消费者项目的宿主机器记录含有效阶段注入，`1` 为已执行但输出无效，
+`2` 为未观察到执行或安装、登录、信任、来源不匹配。`codex exec --json` 未公开 hook 事件时，
+smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；该宿主内部格式不可用或变化时保守返回 `2`。
 
 ## 提交前
 
