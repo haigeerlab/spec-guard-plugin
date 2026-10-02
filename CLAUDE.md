@@ -22,6 +22,7 @@ spec-guard 为 `addyosmani/agent-skills` 提供：
 2. Proposal 生命周期：只读地评审 GitHub / GitLab Proposal Issue，把新需求按锚点插入能力图；
 3. UserPromptSubmit 阶段注入：报告当前模块缺 Spec、缺 Plan、在构建中还是已完成；
 4. 可选的本机能力：agent 协作信箱与本地事项账本。
+5. 按需托管日常事项：明确目标后处理 GitHub/GitLab 普通 Issue，不恢复旧 bridge。
 
 改动前先阅读 [docs/design.md](docs/design.md)；已有故障模式和审查方法在
 [docs/lenses.md](docs/lenses.md)。

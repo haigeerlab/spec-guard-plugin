@@ -73,7 +73,7 @@ class CheckpointContractTests(unittest.TestCase):
         checkpoint = self.target.read_text(encoding="utf-8")
         ticket = (self.plugin / "skills" / "ticket" / "SKILL.md").read_text(encoding="utf-8")
         workflow = (self.plugin.parents[1] / "docs" / "workflow.md").read_text(encoding="utf-8")
-        for phrase in ("审查完成", "事项已入账", "Local", "GitHub/GitLab", "待外部交接"):
+        for phrase in ("审查完成", "事项已入账", "Local", "GitHub/GitLab", "待入账"):
             self.assertIn(phrase, checkpoint)
         for phrase in ("审查批次", "查重", "待调查"):
             self.assertIn(phrase, ticket)

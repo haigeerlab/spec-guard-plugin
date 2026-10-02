@@ -23,7 +23,8 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 项目审查交接 | 限定审查批次，整理发现并转入事项和修复 | 项目约定与共享检查点 | 安装约定后按需使用 |
 | Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
 | 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
-| 本地事项账本 | 没有 GitHub/GitLab Issue 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
+| 本地事项账本 | 明确选择 Local 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
+| 托管日常事项 | 明确选择 GitHub/GitLab 后逐项查重、授权创建并在交付后对账 | `/spec-guard:ticket`、`hosted-ticket-workflow` skill | 需登录对应 CLI；外部写入逐次授权 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
 | 能力历史 | 核验旧版本归档下来的能力图没被改动 | `/spec-guard:history-integrity` | 只对有归档的项目有用 |
 
@@ -40,7 +41,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 
 - 已安装 agent-skills；
 - `bash`、`git`、`python3`（3.9 及以上，macOS 自带的即可）；
-- 用 Proposal 流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
+- 用 Proposal 或托管日常事项流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
 - 用协作信箱或本地事项账本时，需要 macOS 和 Node.js。
 
 **Claude Code：**
@@ -112,6 +113,8 @@ setup 会往 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入下面这段约定，�
   查重并取得事项 ID；探索和无需追踪的小操作例外
 - 项目级审查按 `spec-guard:spec-guard-ops` 的共享检查点规则限定批次、收束发现并交接缺陷；
   审查完成后的“继续”推进已预告的问题处理步骤，不重新泛扫
+- 明确选用 GitHub/GitLab 普通 Issue 时，用 `spec-guard:hosted-ticket-workflow` 逐项查重、授权写入与交付对账；
+  Local 事项仍走 `spec-guard:ticket`，不凭 Git remote 改目标
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
 <!-- END:agent-skills-convention -->
 ````

@@ -272,6 +272,9 @@ class GitLabIssues:
         raw = self._get(endpoint)
         address = urlparse(raw.get("web_url", "")) if isinstance(raw, dict) else None
         commit = raw.get("merge_commit_sha") if isinstance(raw, dict) else None
+        if isinstance(raw, dict) and raw.get("state") == "merged" and not commit:
+            # Fast-forward merges have no merge commit; squash merges may have one.
+            commit = raw.get("squash_commit_sha") or raw.get("sha")
         if (not isinstance(raw, dict) or raw.get("iid") != number or
                 raw.get("project_id") != self.project_id or address is None or
                 address.scheme != self.web_scheme or address.netloc != self.host or

@@ -9,4 +9,6 @@
   查重并取得事项 ID；探索和无需追踪的小操作例外
 - 项目级审查按 `spec-guard:spec-guard-ops` 的共享检查点规则限定批次、收束发现并交接缺陷；
   审查完成后的“继续”推进已预告的问题处理步骤，不重新泛扫
+- 明确选用 GitHub/GitLab 普通 Issue 时，用 `spec-guard:hosted-ticket-workflow` 逐项查重、授权写入与交付对账；
+  Local 事项仍走 `spec-guard:ticket`，不凭 Git remote 改目标
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。

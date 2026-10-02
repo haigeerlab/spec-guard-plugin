@@ -51,14 +51,20 @@ PR 合并后核对合并提交与验证结果并写回；只有事项全部范�
 
 已选用且可用的 Local 账本走 `ticket` 查重和读回；GitHub 上托管代码不改变 Local 事项目标。
 未启用 Local、账本归属未知或结果未知时，报告“待入账”而不重复创建。明确选用 GitHub/GitLab
-日常 Issue 时，当前插件只提供可审阅的交接清单；远端写入与读回交给另行授权的外部 Tracker
-工作流，未完成时标为“待外部交接”。Proposal Issue 不能充当缺陷事项，旧远端 bridge 不恢复。
+普通 Issue 时，按 `hosted-ticket-workflow` 用完整分页和稳定标记查询；`absent` 的
+`rootCauseReviewRequired` 仍须人工核对同根因异名事项。展示精确目标、可见性和脱敏内容，
+取得该次授权后才创建，读回 ID/URL 才算入账；结果未知不自动重发。Proposal Issue
+不能充当缺陷事项，旧远端 bridge 不恢复。
 仅要求审查的用户收到报告，不自动建单或修改代码。
 
 修复现有行为时，简单 bug 用 agent-skills 的 `debugging-and-error-recovery` 与 TDD 先复现再修复、验证和复审；
 多步骤修复才在相关模块 plan 与 `todo.md` 中切片，不覆盖进行中的任务，也不为每个 bug 新建能力模块。
 发现的是独立新能力时才按本页的快速插入或 Proposal 流程处理。通过 GitHub PR 交付 Local 事项时，
 仍按上一节的 PR 创建、合并和关闭对账条件收尾。
+
+托管日常事项在 Issue 中记录修复和验证；PR/MR 合并后按事项逐项读回合并提交、
+CI／验收与剩余范围。只有全部交付并验证通过且获关闭授权才关闭并读回；平台
+自动关闭、部分合并或待部署均不能当作已完成。后续批次改选目标不迁移已有事项。
 
 ### 阶段提示
 

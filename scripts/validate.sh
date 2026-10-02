@@ -86,6 +86,7 @@ python3 -B plugins/spec-guard/hooks/test_collab_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collab_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_collaboration_backend.py || F=1
 python3 -B plugins/spec-guard/hooks/test_ticket_entry.py || F=1
+python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ledger_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ticket_portability.py || F=1

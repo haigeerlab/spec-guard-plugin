@@ -22,7 +22,7 @@
 
 审查冻结后，普通“继续”只推进最近预告的查重、入账、计划或下一项修复，并显示已覆盖/总范围、待调查、待入账、待修复的数量；不能默默重新开启泛扫。可执行的缺陷先按根因查重：选用且已启用 Local 账本时走 `ticket` skill 的 `found`／`absent`／`unknown` 与读回规则。Local 未启用、归属不明或读取失败时标为待入账。GitHub 仓库仍可选 Local；Git remote、旧 tracker state、Proposal Issue 和本地 `DONE` 均不能推断日常事项目标。
 
-明确选用 GitHub/GitLab 日常 Issue 时，本插件只整理经查重的可审阅交接清单；发布与读回由另行授权的外部 Tracker 工作流负责。当前 Spec Guard 不创建 GitHub/GitLab 缺陷 Issue，也不恢复旧 bridge；没有可用外部流程时标为“待外部交接”，不称事项已入账。写入结果未知时先读回精确对象，不盲目重试。已确认 bug 的简单修复可接 agent-skills 的 `debugging-and-error-recovery`、TDD 和代码复审；多步骤修复按现有模块的 plan/todo 切片，不覆盖进行中的任务；独立新能力才走 add-module 或 Proposal。Local 事项经 GitHub PR 交付时继续按下方 PR 检查点对账。
+明确选用 GitHub/GitLab 普通 Issue 时，按本批目标使用 `hosted-ticket-workflow` skill：完整分页查重后复核同根因候选，`rootCauseReviewRequired` 未解决前不发布；对精确目标、可见性和脱敏内容逐项授权，写入后读回 ID/URL 才算“事项已入账”。查询不完整、目标未知、标记冲突或写入结果未知均保留“待入账”，不自动重发。后续批次改选目标不迁移旧事项，不恢复旧 bridge。已确认 bug 的简单修复可接 agent-skills 的 `debugging-and-error-recovery`、TDD 和代码复审；多步骤修复按现有模块的 plan/todo 切片，不覆盖进行中的任务；独立新能力才走 add-module 或 Proposal。Local 事项经 GitHub PR 交付时继续按下方 PR 检查点对账。
 
 ## 阶段交接
 
@@ -33,6 +33,7 @@
 - **交付前**：展示目标仓库、分支、Issue/PR/MR、具体写入内容和验证结果。对未授权远端步骤取得针对性确认；已获授权则不重复询问。首步按实际路径是只读核对、推送还是创建 PR，必须准确写明；结果核实或未知时停止扩展操作。
 - **PR 创建后**：若本次工作已绑定 Local 事项，读回 PR 地址和状态，把 PR 地址及本 PR 覆盖范围逐条写回关联事项；私有事项的标题与编号不因关联而写入公开 PR。写入失败时报告关联未完成，不把 PR 当成事项关闭证据。PR 未合并时保持事项开放。
 - **PR 合并后**：一旦获知合并，核对精确 PR 的 merged 状态、合并提交和 CI／验收结果，并逐条写回关联的 Local 事项。只有某事项的全部范围都已交付、验证通过且已有关闭授权时才关闭，并读回关闭状态；多个 PR 中只合并了一部分、仍待部署／验收、结果未知或写回失败时保持开放，说明剩余条件。不能仅凭 PR 合并或本地 `DONE` 推断事项已关闭。没有可用的本机执行会话时，下次交付检查点须补做这项对账，不声称 GitHub 事件已自动修改本地账本。
+- **托管 Issue 的 PR/MR 合并后**：按 `hosted-ticket-workflow` 对每个 Issue 读回合并提交，核对本项的覆盖范围和真实 CI／验收证据；先记录并读回处理结论，再按关闭授权逐项关闭并读回。平台自动关闭只是一条当前状态事实，不能替代验证。未合并、仅部分覆盖或证据未知时保持未完成结论。
 
 ## 模块交付或推进时的 Proposal
 
