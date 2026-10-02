@@ -98,3 +98,6 @@ smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；�
 改动已完成且本地验证通过时，默认创建普通 PR，等待 CI 与评审；不把草稿当成运行 CI 的前置步骤。
 只有工作尚未完成或用户明确要求时才创建草稿 PR。草稿不会因 CI 通过而自动解除合并阻挡；
 工作完成后须显式转为 Ready for review。
+若本次开发绑定了 Local 事项，创建 PR 后记录其地址与覆盖范围；合并后按
+`plugins/spec-guard/references/workflow-checkpoints.md` 核对合并提交、验证结果与事项剩余范围，
+满足关闭条件才关闭并读回。PR 合并本身不代表 Local 事项已关闭。
