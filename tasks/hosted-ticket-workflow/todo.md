@@ -18,5 +18,7 @@ Issue 和已合并 MR：当前工作区源码只读找回 Issue 并识别为已�
 配置和临时消费者项目中，从当前工作区本地 marketplace 安装候选插件；安装副本的
 `hosted-ticket-workflow/SKILL.md` 与工作区逐字一致。真实 `codex exec` 的机器事件
 显示宿主读取了该完整 skill，并正确识别第一个只读脚本及 Local/Proposal 边界。
-Claude Code 以工作区 `--plugin-dir` 尝试真实加载时返回 `Not logged in`，故其
-真实宿主行为为环境原因未验证，不以 Codex 结果或 Claude 源码校验代替。
+Claude Code 在默认沙箱内尝试工作区 `--plugin-dir` 时返回 `Not logged in`；后续
+在沙箱外确认 CLI 已登录，并从同一候选源码读取了完整 Skill。发布 v0.38.1 后，
+已安装 Claude 插件在合成临时项目的 `UserPromptSubmit` 机器事件中注入 `MAP_ONLY`。
+这证明安装版阶段 hook 执行，不等于真实事项回复或 GitLab 写入路径已验证。
