@@ -7,13 +7,12 @@ on:
 
 jobs:
   validate:
-    # macOS 自带 bash 3.2，Linux 是 bash 5。两者对多字节字符的解析不同，
-    # 只跑一个平台会漏掉「$VAR 后紧跟全角括号」这类静默致命 bug。
-    # main 的 push 已由合并前 PR 覆盖双平台；合并后只重跑 Ubuntu，避免重复占用 macOS runner。
+    # Bash 3.2 的已知语法陷阱由 scripts/validate.sh 的静态检查器覆盖；
+    # GitHub CI 统一跑 Ubuntu，避免 PR 因 macOS runner 排队而阻塞。
+    # 保留单元素矩阵，使现有 required check 名称保持为 validate (ubuntu-latest)。
     strategy:
-      fail-fast: false
       matrix:
-        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest"]') }}
+        os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
     steps:
@@ -39,6 +38,5 @@ jobs:
       #    **v0.11.0**（`npx shellcheck@4.1.0 -V` 自己会说）。两个号不一样 ——
       #    写 `shellcheck@0.11.0` 会 ETARGET，那个版本在 npm 上根本不存在。
       - name: ShellCheck（阻塞；npm 4.1.0 = 二进制 v0.11.0）
-        if: matrix.os == 'ubuntu-latest'
         # evals/*.sh 此前不在范围里 —— 它们是会真的调模型的脚本，更该被检查
         run: npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh evals/*.sh
