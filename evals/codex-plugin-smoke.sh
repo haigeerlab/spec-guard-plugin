@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Codex 插件真实宿主 smoke。--selftest 只验证判决器，绝不调用 Codex。
-# 退出码：0=hook 已执行且输出有效；1=行为失败；2=环境未就绪。
+# 退出码：0=宿主机器记录含有效阶段注入；1=行为失败；2=未观察到执行或环境未就绪。
 set -uo pipefail
 
 MODE=run
@@ -100,9 +100,11 @@ print_plugin_repair() {
   echo "     codex plugin add spec-guard@spec-guard-marketplace"
 }
 
-grade() { # $1=codex exec --json 的机器事件；模型回复不算 hook 证据
-  python3 - "$1" <<'PY'
+grade() { # $1=exec 机器事件；$2=消费者目录、$3=会话目录（真实运行时）；模型回复不算证据
+  python3 - "$1" "${2:-}" "${3:-}" <<'PY'
 import json
+import os
+from pathlib import Path
 import re
 import sys
 
@@ -114,6 +116,7 @@ except (OSError, UnicodeError, ValueError):
     raise SystemExit(2)
 
 observed = False
+stage = re.compile(r"当前阶段:\s*\*\*(?:IDLE|MAP_ONLY|NEEDS_SPEC|NEEDS_PLAN|BUILDING|MODULE_DONE|DONE)\*\*")
 for event in events:
     if not isinstance(event, dict):
         continue
@@ -126,15 +129,57 @@ for event in events:
         continue
     observed = True
     context = output.get("additionalContext")
-    if (isinstance(context, str) and "## spec-guard local workflow" in context
-            and re.search(r"当前阶段:\s*\*\*(?:IDLE|MAP_ONLY|NEEDS_SPEC|NEEDS_PLAN|BUILDING|MODULE_DONE|DONE)\*\*", context)):
+    if isinstance(context, str) and "## spec-guard local workflow" in context and stage.search(context):
         print("  ✅ Codex 机器事件包含有效的 spec-guard 阶段注入")
         raise SystemExit(0)
 
 if observed:
     print("  ❌ hook 已执行，但没有有效的 spec-guard 阶段注入")
     raise SystemExit(1)
-print("  ⏭  未观察到宿主 hook 事件；模型复述不能证明 hook 执行")
+
+# exec --json 不一定公开 hook 事件；只读取本次 thread id 对应的宿主会话记录。
+project, sessions = sys.argv[2:]
+ids = [event.get("thread_id") for event in events
+       if isinstance(event, dict) and event.get("type") == "thread.started"]
+if project and sessions and len(ids) == 1 and isinstance(ids[0], str) \
+        and re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", ids[0]):
+    matches = list(Path(sessions).glob(f"**/*-{ids[0]}.jsonl"))
+    if len(matches) == 1 and matches[0].is_file() and not matches[0].is_symlink():
+        try:
+            with matches[0].open(encoding="utf-8") as handle:
+                records = [json.loads(line) for line in handle if line.strip()]
+        except (OSError, UnicodeError, ValueError):
+            records = []
+        metadata = [record["payload"] for record in records
+                    if isinstance(record, dict) and record.get("type") == "session_meta"
+                    and isinstance(record.get("payload"), dict)]
+        if len(metadata) == 1 and metadata[0].get("id") == ids[0] \
+                and metadata[0].get("source") == "exec" \
+                and isinstance(metadata[0].get("cwd"), str) \
+                and os.path.realpath(metadata[0]["cwd"]) == os.path.realpath(project):
+            contexts = []
+            for record in records:
+                if not isinstance(record, dict) or record.get("type") != "response_item":
+                    continue
+                item = record.get("payload", {})
+                if not isinstance(item, dict) or item.get("type") != "message" or item.get("role") != "developer":
+                    continue
+                content = item.get("content")
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "input_text" \
+                            and isinstance(part.get("text"), str) \
+                            and "## spec-guard local workflow" in part["text"]:
+                        contexts.append(part["text"])
+            if contexts:
+                if all(stage.search(context) for context in contexts):
+                    print("  ✅ Codex 会话机器记录包含有效的 spec-guard 阶段注入")
+                    raise SystemExit(0)
+                print("  ❌ 宿主已注入 spec-guard 上下文，但阶段事实无效")
+                raise SystemExit(1)
+
+print("  ⏭  未观察到宿主 hook 事件或匹配的会话注入；模型复述不能证明 hook 执行")
 types = sorted({event.get("type", "<missing>") for event in events
                 if isinstance(event, dict) and isinstance(event.get("type"), str)})
 if types:
@@ -161,6 +206,48 @@ with open(sys.argv[1], "w", encoding="utf-8") as handle:
 PY
   grade "$SMOKE_TMP/model-json"; rc=$?
   [ "$rc" -eq 2 ] || return 1
+  mkdir -p "$SMOKE_TMP/consumer" "$SMOKE_TMP/sessions/2026/10/02"
+  python3 - "$SMOKE_TMP" <<'PY'
+import json
+import os
+import sys
+
+root = sys.argv[1]
+thread_id = "01a0fa36-50b0-7be1-af18-f533b846423c"
+with open(os.path.join(root, "rollout-events"), "w", encoding="utf-8") as handle:
+    handle.write(json.dumps({"type": "thread.started", "thread_id": thread_id}) + "\n")
+rollout = os.path.join(root, "sessions", "2026", "10", "02", f"rollout-selftest-{thread_id}.jsonl")
+records = [
+    {"type": "session_meta", "payload": {"id": thread_id, "cwd": os.path.join(root, "consumer"), "source": "exec"}},
+    {"type": "response_item", "payload": {"type": "message", "role": "developer", "content": [
+        {"type": "input_text", "text": "## spec-guard local workflow\n当前阶段: **NEEDS_PLAN**"}
+    ]}},
+]
+with open(rollout, "w", encoding="utf-8") as handle:
+    for record in records:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+with open(os.path.join(root, "rollout-invalid"), "w", encoding="utf-8") as handle:
+    for record in [records[0], {**records[1], "payload": {**records[1]["payload"], "content": [
+        {"type": "input_text", "text": "## spec-guard local workflow\n当前阶段: **BROKEN**"}
+    ]}}]:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+with open(os.path.join(root, "rollout-model-echo"), "w", encoding="utf-8") as handle:
+    for record in [records[0], {**records[1], "payload": {**records[1]["payload"], "role": "assistant"}}]:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+PY
+  grade "$SMOKE_TMP/rollout-events" "$SMOKE_TMP/consumer" "$SMOKE_TMP/sessions"; rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  grade "$SMOKE_TMP/rollout-events" "$SMOKE_TMP/other" "$SMOKE_TMP/sessions"; rc=$?
+  [ "$rc" -eq 2 ] || return 1
+  mv "$SMOKE_TMP/sessions/2026/10/02/rollout-selftest-01a0fa36-50b0-7be1-af18-f533b846423c.jsonl" "$SMOKE_TMP/sessions/held.jsonl"
+  grade "$SMOKE_TMP/rollout-events" "$SMOKE_TMP/consumer" "$SMOKE_TMP/sessions"; rc=$?
+  [ "$rc" -eq 2 ] || return 1
+  mv "$SMOKE_TMP/rollout-invalid" "$SMOKE_TMP/sessions/2026/10/02/rollout-selftest-01a0fa36-50b0-7be1-af18-f533b846423c.jsonl"
+  grade "$SMOKE_TMP/rollout-events" "$SMOKE_TMP/consumer" "$SMOKE_TMP/sessions"; rc=$?
+  [ "$rc" -eq 1 ] || return 1
+  mv "$SMOKE_TMP/rollout-model-echo" "$SMOKE_TMP/sessions/2026/10/02/rollout-selftest-01a0fa36-50b0-7be1-af18-f533b846423c.jsonl"
+  grade "$SMOKE_TMP/rollout-events" "$SMOKE_TMP/consumer" "$SMOKE_TMP/sessions"; rc=$?
+  [ "$rc" -eq 2 ] || return 1
   printf '%s\n' '{"installed":[]}' > "$SMOKE_TMP/missing-plugin.json"
   [ "$(plugin_state "$SMOKE_TMP/missing-plugin.json")" = missing ] || return 1
   printf '%s\n' '{"installed":[{"name":"spec-guard","installed":true,"enabled":false}]}' > "$SMOKE_TMP/disabled-plugin.json"
@@ -186,7 +273,7 @@ PY
   # fallbacks are not portable; read the mode through python3, which the smoke already requires.
   [ "$(python3 -c 'import os, stat, sys; print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "o"))' \
     "$SMOKE_TMP/config.toml")" = 640 ] || return 1
-  echo "  ✅ selftest: 只接受机器 hook 事件；0=通过、1=行为失败、2=未观察到执行"
+  echo "  ✅ selftest: 只接受机器事件或匹配本次会话的宿主注入；0=通过、1=行为失败、2=未观察到执行"
 }
 
 [ "$MODE" = "--selftest" ] && { selftest; exit $?; }
@@ -252,4 +339,4 @@ if ! ( cd "$WORK" && codex exec --json "$PROMPT" ) > "$OUT" 2> "$ERR"; then
   fi
   exit 2
 fi
-grade "$OUT"
+grade "$OUT" "$WORK" "${CODEX_HOME:-$HOME/.codex}/sessions"
