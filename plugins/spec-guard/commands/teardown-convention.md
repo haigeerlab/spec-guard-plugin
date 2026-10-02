@@ -4,18 +4,26 @@ argument-hint: "[--dry-run] [--keep-state]"
 allowed-tools: Bash
 ---
 
-移除本项目的 spec-guard 约定。**先确认用户真的要移除**，说明会发生什么。
+移除本项目的 spec-guard 约定。先预览将改动的内容，说明会发生什么；
+**只有用户看过预览并明确确认，才能实际拆除**。
 
 ## 执行
 
-直接跑脚本，**不要自己解释执行步骤**——这是插件里唯一的破坏性操作
-（删用户 `CLAUDE.md` 里的内容），必须确定性执行：
+**每次都先运行 `--dry-run`，原样展示预览**。这是插件里唯一会删除用户
+`CLAUDE.md` 受管内容的操作；不要自行模拟脚本行为。若用户已带 `--dry-run`，
+直接用原参数运行脚本，只展示预览并停止，不重复追加该选项。否则用原参数加
+`--dry-run` 预览。以下命令仅用于**原参数未含 `--dry-run`**的情况：
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS --dry-run
+```
+
+预览失败时停止，不执行拆除。用户看过具体预览并明确确认后，才用相同的原参数
+去掉 `--dry-run` 执行一次，再原样转述脚本输出：
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 ```
-
-用户说「先看看会删什么」就加 `--dry-run`。
 
 ## 它做什么
 

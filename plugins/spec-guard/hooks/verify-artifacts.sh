@@ -67,7 +67,7 @@ for module in value.get("modules", []):
         fi
       done
       # 有 Plan 无 todo.md 的模块按已完成计（判据来自 module_stage.py）；这里只汇总，不判失败。
-      NOTODO="$(python3 -c '
+      if ! NOTODO="$(python3 -c '
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
@@ -80,7 +80,10 @@ ids = [s["id"] for s in (module_state(root, m) for m in order) if s["plan"] and 
 if ids and not retired_tracker(root):
     listed = ", ".join(ids[:10]) + (" 等 %d 个" % len(ids) if len(ids) > 10 else "")
     print("%d 个模块有 Plan 但没有 todo.md，按已完成计：%s" % (len(ids), listed))
-' "$HOOKDIR" 2>/dev/null </dev/null)" || NOTODO=""
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+        warn '未验证：有 Plan 无 todo.md 汇总脚本没有正常运行'
+        NOTODO=""
+      fi
       [ -z "$NOTODO" ] || warn "$NOTODO"
     fi
   fi
