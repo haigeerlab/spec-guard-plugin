@@ -60,6 +60,14 @@ class TicketEntryContractTest(unittest.TestCase):
         self.assertIn("不得把短编号直接传给写工具", text)
         self.assertIn("写工具确认成功后才能报告成功", text)
 
+    def test_user_facing_ticket_reference_includes_title(self) -> None:
+        for path in (SKILL, COMMAND):
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertIn("`《标题》（短编号）`", text)
+                self.assertIn("不要只显示短编号", text)
+                self.assertIn("写工具只返回 ID 时", text)
+
     def test_daily_entries_name_every_gated_tool_as_confirmation_only(self) -> None:
         for path in (SKILL, COMMAND):
             text = path.read_text(encoding="utf-8")
