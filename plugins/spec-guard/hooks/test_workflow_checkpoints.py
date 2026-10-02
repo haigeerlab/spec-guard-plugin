@@ -46,6 +46,19 @@ class CheckpointContractTests(unittest.TestCase):
         for rule in ("不重复", "最近一次", "失效", "无需确认"):
             self.assertIn(rule, text)
 
+    def test_local_ticket_is_reconciled_after_pr_merge(self):
+        template = (self.plugin.parents[1] / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+        checkpoint = self.target.read_text(encoding="utf-8")
+        ticket = (self.plugin / "skills" / "ticket" / "SKILL.md").read_text(encoding="utf-8")
+        workflow = (self.plugin.parents[1] / "docs" / "workflow.md").read_text(encoding="utf-8")
+        for phrase in ("Local 事项", "本 PR 覆盖范围", "私有 Local 事项不在公开 PR"):
+            self.assertIn(phrase, template)
+        for phrase in ("PR 创建后", "PR 合并后", "合并提交", "保持开放", "读回关闭状态"):
+            self.assertIn(phrase, checkpoint)
+        for phrase in ("PR 地址", "合并提交", "全部范围", "保持开放"):
+            self.assertIn(phrase, ticket)
+        self.assertIn("PR 合并后", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
