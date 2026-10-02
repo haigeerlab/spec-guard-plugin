@@ -133,6 +133,42 @@ class GitHubIssues:
         arguments = ["gh", "api", "--hostname", self.host, "--method", "POST", self.base]
         return self._issue(self.writer(arguments, {"title": title, "body": body}))
 
+    def list_comments(self, issue_id: int) -> dict[str, Any]:
+        endpoint = self.base + "/" + str(issue_id) + "/comments"
+        raw = pages(lambda page: self._get(endpoint + "?per_page=100&page=" + str(page)))
+        if any(not isinstance(item.get("body"), str) for item in raw):
+            raise HostedTicketError("provider-unavailable: invalid GitHub comment")
+        return {"complete": True, "comments": [{"body": item["body"]} for item in raw]}
+
+    def create_comment(self, issue_id: int, body: str) -> None:
+        arguments = ["gh", "api", "--hostname", self.host, "--method", "POST",
+                     self.base + "/" + str(issue_id) + "/comments"]
+        self.writer(arguments, {"body": body})
+
+    def set_closed(self, issue_id: int) -> None:
+        arguments = ["gh", "api", "--hostname", self.host, "--method", "PATCH",
+                     self.base + "/" + str(issue_id)]
+        self.writer(arguments, {"state": "closed"})
+
+    def get_delivery(self, number: int) -> dict[str, Any]:
+        raw = self._get("repos/" + self.target + "/pulls/" + str(number))
+        address = urlparse(raw.get("html_url", "")) if isinstance(raw, dict) else None
+        base = raw.get("base") if isinstance(raw, dict) else None
+        base_repo = base.get("repo") if isinstance(base, dict) else None
+        commit = raw.get("merge_commit_sha") if isinstance(raw, dict) else None
+        if (not isinstance(raw, dict) or raw.get("number") != number or
+                address is None or address.scheme != "https" or
+                address.netloc != self.host or
+                address.path != "/" + self.target + "/pull/" + str(number) or
+                not isinstance(base_repo, dict) or
+                base_repo.get("full_name") != self.target or
+                not isinstance(raw.get("merged"), bool) or
+                (raw["merged"] and (not isinstance(commit, str) or
+                                    not re.fullmatch(r"[0-9a-fA-F]{40}", commit)))):
+            raise HostedTicketError("provider-unavailable: invalid GitHub PR")
+        return {"merged": raw["merged"], "mergeCommit": commit if raw["merged"] else None,
+                "url": raw["html_url"]}
+
 
 class GitLabIssues:
     def __init__(self, host: str, target: str,
@@ -197,3 +233,54 @@ class GitLabIssues:
         arguments = ["glab", "api", "--hostname", self.host, "--method", "POST",
                      self.base, "--header", "Content-Type: application/json"]
         return self._issue(self.writer(arguments, {"title": title, "description": body}))
+
+    def list_comments(self, issue_id: int) -> dict[str, Any]:
+        endpoint = self.base + "/" + str(issue_id) + "/notes"
+        raw = pages(lambda page: self._get(endpoint + "?per_page=100&page=" + str(page)))
+        comments = []
+        for item in raw:
+            if (not isinstance(item.get("body"), str) or
+                    not isinstance(item.get("system"), bool)):
+                raise HostedTicketError("provider-unavailable: invalid GitLab note")
+            if item["system"]:
+                continue
+            if not isinstance(item.get("internal"), bool):
+                raise HostedTicketError("provider-unavailable: GitLab note visibility unknown")
+            if item["internal"]:
+                if "spec-guard-hosted-comment:v1" in item["body"]:
+                    raise HostedTicketError("comment-marker-ambiguous: marker is in private note")
+                continue
+            comments.append({"body": item["body"]})
+        return {"complete": True, "comments": comments}
+
+    def create_comment(self, issue_id: int, body: str) -> None:
+        arguments = ["glab", "api", "--hostname", self.host, "--method", "POST",
+                     self.base + "/" + str(issue_id) + "/notes",
+                     "--header", "Content-Type: application/json"]
+        self.writer(arguments, {"body": body})
+
+    def set_closed(self, issue_id: int) -> None:
+        arguments = ["glab", "api", "--hostname", self.host, "--method", "PUT",
+                     self.base + "/" + str(issue_id),
+                     "--header", "Content-Type: application/json"]
+        self.writer(arguments, {"state_event": "close"})
+
+    def get_delivery(self, number: int) -> dict[str, Any]:
+        if self.project_id is None or self.web_scheme is None:
+            raise HostedTicketError("target-unknown: GitLab target has not been checked")
+        endpoint = "projects/" + quote(self.target, safe="") + "/merge_requests/" + str(number)
+        raw = self._get(endpoint)
+        address = urlparse(raw.get("web_url", "")) if isinstance(raw, dict) else None
+        commit = raw.get("merge_commit_sha") if isinstance(raw, dict) else None
+        if (not isinstance(raw, dict) or raw.get("iid") != number or
+                raw.get("project_id") != self.project_id or address is None or
+                address.scheme != self.web_scheme or address.netloc != self.host or
+                address.path != "/" + self.target + "/-/merge_requests/" + str(number) or
+                raw.get("state") not in ("opened", "closed", "merged") or
+                (raw["state"] == "merged" and
+                 (not isinstance(commit, str) or
+                  not re.fullmatch(r"[0-9a-fA-F]{40}", commit)))):
+            raise HostedTicketError("provider-unavailable: invalid GitLab MR")
+        return {"merged": raw["state"] == "merged",
+                "mergeCommit": commit if raw["state"] == "merged" else None,
+                "url": raw["web_url"]}

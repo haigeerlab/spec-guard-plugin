@@ -93,6 +93,7 @@ python3 -B plugins/spec-guard/hooks/test_local_ticket_publish.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ticket_providers.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_read.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_write.py || F=1
+python3 -B plugins/spec-guard/hooks/test_hosted_ticket_actions.py || F=1
 python3 -B plugins/spec-guard/hooks/test_collaboration_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collaboration_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_native_collaboration_adapters.py || F=1

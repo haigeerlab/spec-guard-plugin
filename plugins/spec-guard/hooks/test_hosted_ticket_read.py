@@ -106,6 +106,25 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaises(HostedTicketError):
             provider.list_issues()
 
+    def test_gitlab_system_note_is_ignored_but_private_marker_is_conflict(self):
+        notes = [{"body": "system change", "system": True}]
+        def runner(args):
+            endpoint = next(x for x in args if x.startswith("projects/"))
+            if endpoint == "projects/group%2Frepo":
+                return {"path_with_namespace": "group/repo", "id": 43,
+                        "web_url": "https://gitlab.example.test/group/repo",
+                        "visibility": "private", "issues_enabled": True}
+            if "/notes?" in endpoint:
+                return notes
+            return []
+        provider = GitLabIssues("gitlab.example.test", "group/repo", runner)
+        provider.target_facts()
+        self.assertEqual(provider.list_comments(3)["comments"], [])
+        notes[:] = [{"body": "<!-- spec-guard-hosted-comment:v1 decision-1 -->",
+                    "system": False, "internal": True}]
+        with self.assertRaises(HostedTicketError):
+            provider.list_comments(3)
+
     def test_malformed_github_issue_url_has_a_safe_error(self):
         def runner(args):
             endpoint = next(x for x in args if x.startswith("repos/"))
