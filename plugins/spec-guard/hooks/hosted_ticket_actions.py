@@ -49,6 +49,8 @@ def make_comment_preview(provider: Any, issue_id: int, event_id: str,
             return existing
         preview = {"state": "preview", "target": target, "issueId": issue_id,
                    "issueUrl": issue["url"], "eventId": event_id,
+                   "issueContentDigest": _digest({"title": issue["title"],
+                                                  "body": issue["body"]}),
                    "body": message.rstrip("\n") + "\n\n" + marker}
         return {**preview, "digest": _digest(preview)}
     except Exception:
@@ -101,6 +103,9 @@ def publish_comment(preview: dict[str, Any], provider: Any, intent_root: Path,
                 return {"state": "found", "issue": issue}
             if existing["state"] != "absent":
                 return existing
+            if _digest({"title": issue["title"], "body": issue["body"]}) != \
+                    preview.get("issueContentDigest"):
+                return {"state": "incomplete", "diagnostic": "issue-content-changed"}
             if earlier and earlier["attempted"]:
                 return {"state": "unknown", "diagnostic": "prior-comment-not-visible"}
             record = {"version": 1, "digest": preview["digest"],
@@ -187,7 +192,8 @@ def close_issue(preview: dict[str, Any], provider: Any,
             pass
         current = provider.get_issue(preview["issueId"])
         if current.get("closed") is True:
-            return {"state": "verified", "issue": current,
+            return {"state": "verified", "verifiedFact": "remote-issue-closed",
+                    "issue": current,
                     "mergeCommit": preview["mergeCommit"]}
         return {"state": "unknown", "diagnostic": "close-result-uncertain"}
     except Exception:
