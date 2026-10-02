@@ -69,6 +69,30 @@ printf '%s\n' '#!/bin/sh' 'echo broken; exit 1' > "$WORK/brokenpy/python3"
 chmod +x "$WORK/brokenpy/python3"
 RUN_PATH="$WORK/brokenpy:$PATH" check "解析器异常时报未验证而非失败" 0 "未验证：能力图解析器没有正常运行"
 
+# 主解析器成功、仅 Plan/todo 二次汇总失败时不能把零结果冒充为零警告。
+project summary-helper-fails
+mkdir -p "$PROJECT/tasks/alpha"
+touch "$PROJECT/tasks/alpha/plan.md"
+mkdir -p "$WORK/summary-fails"
+cat > "$WORK/summary-fails/python3" <<'SH'
+#!/bin/sh
+if [ "$1" = -c ]; then
+  case "$2" in
+    *'from module_stage import module_state'*)
+      printf 'called\n' > "$SPEC_GUARD_TEST_SENTINEL"
+      exit 29
+      ;;
+  esac
+fi
+exec "$SPEC_GUARD_TEST_REAL_PYTHON" "$@"
+SH
+chmod +x "$WORK/summary-fails/python3"
+SPEC_GUARD_TEST_REAL_PYTHON="$(command -v python3)" \
+SPEC_GUARD_TEST_SENTINEL="$WORK/summary-helper-called" \
+RUN_PATH="$WORK/summary-fails:$PATH" \
+  check "二次汇总失败时明确报未验证" 0 "未验证：有 Plan 无 todo.md 汇总脚本没有正常运行"
+[ -f "$WORK/summary-helper-called" ] || fail "二次汇总失败用例没有运行目标 helper"
+
 # 有 Plan 无 todo.md 的模块按已完成计：汇总成一条警告，不改退出码。
 # $1=目录 $2=模块数；每个模块都有 spec，m01..mNN 全部在 Build order 内。
 many_modules() {
