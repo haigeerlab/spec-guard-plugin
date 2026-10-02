@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.38.2;test:marketplace-ref-upgrade-20261003"
+      },
+      "observedAt": "2026-10-02T19:10:57Z",
+      "evidence": [
+        "command:codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.38.2 --json",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "result:spec-guard@spec-guard-marketplace version 0.38.2 is installed and enabled; the marketplace checkout resolves to tagged commit c3842b92293244df8f3b6365f757ebeb9c6061a7",
+        "result:all 144 distributed files in the marketplace and installed cache are byte-for-byte identical to git archive v0.38.2; generated migrated-command-skills were excluded from the comparison"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.38.2;test:user-prompt-submit-smoke-20261003"
+      },
+      "reason": "The real smoke exited 2 before its hook criterion because Codex non-interactive execution did not complete. The CLI printed an unknown configured model warning and 'Reading additional input from stdin...'; the precise failure cause was not established. No product pass or failure is inferred. Native Codex Desktop hook acceptance was not tested."
+    }
+  ]
+}

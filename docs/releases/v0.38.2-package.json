@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.38.2;asset:spec-guard-v0.38.2.tar.gz;sha256:f1d52ff34efc801ccbb6a91e03d8c36be75a4b2244d2a56c37ef1cfce15c829f"
+      },
+      "observedAt": "2026-10-02T19:10:57Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.38.2",
+        "asset:spec-guard-v0.38.2.tar.gz;size:336872",
+        "source-tag:v0.38.2@c3842b92293244df8f3b6365f757ebeb9c6061a7",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.38.2",
+        "result:the package was built from git archive c3842b92293244df8f3b6365f757ebeb9c6061a7 of .claude-plugin and plugins/spec-guard plus ARTIFACT-MANIFEST.json",
+        "result:release-package.py validated the artifact directory before archiving and after extracting the archive; no AppleDouble, symbolic-link, or hard-link entries were found",
+        "result:the locally built archive, published GitHub asset digest, and independently downloaded asset all have SHA-256 f1d52ff34efc801ccbb6a91e03d8c36be75a4b2244d2a56c37ef1cfce15c829f"
+      ]
+    }
+  ]
+}
