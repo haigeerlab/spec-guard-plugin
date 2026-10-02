@@ -106,6 +106,41 @@ class ProviderTests(unittest.TestCase):
         with self.assertRaises(HostedTicketError):
             provider.list_issues()
 
+    def test_gitlab_public_work_item_url_and_limited_project_metadata(self):
+        def runner(args):
+            endpoint = next(x for x in args if x.startswith("projects/"))
+            if endpoint == "projects/group%2Frepo":
+                return {"path_with_namespace": "group/repo", "id": 43,
+                        "web_url": "https://gitlab.example.test/group/repo",
+                        "visibility": "public"}
+            return [{"iid": 3, "project_id": 43, "title": "Other",
+                     "description": "", "state": "opened", "issue_type": "issue",
+                     "web_url": "https://gitlab.example.test/group/repo/-/work_items/3"}]
+        provider = GitLabIssues("gitlab.example.test", "group/repo", runner)
+        self.assertEqual(provider.target_facts()["visibility"], "public")
+        self.assertEqual(provider.list_issues()["issues"][0]["id"], 3)
+
+    def test_gitlab_explicitly_disabled_issues_and_other_types_are_rejected(self):
+        def disabled(args):
+            return {"path_with_namespace": "group/repo", "id": 43,
+                    "web_url": "https://gitlab.example.test/group/repo",
+                    "visibility": "public", "issues_access_level": "disabled"}
+        with self.assertRaises(HostedTicketError):
+            GitLabIssues("gitlab.example.test", "group/repo", disabled).target_facts()
+        def incident(args):
+            endpoint = next(x for x in args if x.startswith("projects/"))
+            if endpoint == "projects/group%2Frepo":
+                return {"path_with_namespace": "group/repo", "id": 43,
+                        "web_url": "https://gitlab.example.test/group/repo",
+                        "visibility": "public", "issues_enabled": True}
+            return [{"iid": 4, "project_id": 43, "title": "Incident",
+                     "description": "", "state": "opened", "issue_type": "incident",
+                     "web_url": "https://gitlab.example.test/group/repo/-/work_items/4"}]
+        provider = GitLabIssues("gitlab.example.test", "group/repo", incident)
+        provider.target_facts()
+        with self.assertRaises(HostedTicketError):
+            provider.list_issues()
+
     def test_gitlab_system_note_is_ignored_but_private_marker_is_conflict(self):
         notes = [{"body": "system change", "system": True}]
         def runner(args):

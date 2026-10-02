@@ -189,7 +189,8 @@ class GitLabIssues:
         if (not isinstance(raw, dict) or raw.get("path_with_namespace") != self.target or
                 not isinstance(raw.get("id"), int) or raw["id"] <= 0 or
                 raw.get("visibility") not in ("public", "internal", "private") or
-                raw.get("issues_enabled") is not True or address is None or
+                raw.get("issues_enabled") is False or
+                raw.get("issues_access_level") == "disabled" or address is None or
                 address.scheme not in ("http", "https") or address.netloc != self.host or
                 address.path != "/" + self.target or address.query or address.fragment):
             raise HostedTicketError("target-unknown: GitLab target is unavailable")
@@ -202,7 +203,7 @@ class GitLabIssues:
         if self.project_id is None or self.web_scheme is None:
             raise HostedTicketError("target-unknown: GitLab target has not been checked")
         raw = pages(lambda page: self._get(
-            self.base + "?state=all&scope=all&per_page=100&page=" + str(page)))
+            self.base + "?state=all&scope=all&issue_type=issue&per_page=100&page=" + str(page)))
         return {"complete": True, "issues": [self._issue(item) for item in raw]}
 
     def _issue(self, item: Any) -> dict[str, Any]:
@@ -215,8 +216,12 @@ class GitLabIssues:
                 not isinstance(item.get("title"), str) or
                 not isinstance(item.get("description"), (str, type(None))) or
                 item.get("state") not in ("opened", "closed") or
+                item.get("issue_type", "issue") != "issue" or
+                item.get("type", "ISSUE") != "ISSUE" or
                 address.scheme != self.web_scheme or address.netloc != self.host or
-                address.path != "/" + self.target + "/-/issues/" + str(number) or
+                address.path not in (
+                    "/" + self.target + "/-/issues/" + str(number),
+                    "/" + self.target + "/-/work_items/" + str(number)) or
                 address.query or address.fragment):
             raise HostedTicketError("provider-unavailable: invalid GitLab issue")
         return {"id": number, "title": item["title"],
