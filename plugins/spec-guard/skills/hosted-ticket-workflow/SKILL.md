@@ -46,7 +46,9 @@ description: 在明确选用 GitHub 或 GitLab 普通 Issue 时，逐项查重�
   `comment-publish --expected-digest <digest> --confirm`。评论按标记读回；结果未知
   时不自动发第二条。无关的错字修正可以使用平台原生编辑，但不能抹掉实质决定。
 - PR/MR 创建后，记录它覆盖哪些 Issue；合并后**逐项**核对平台的 merged 状态、
-  合并提交、CI／验收结果、事项剩余范围和当前 Issue 状态。仅合并不等于完成；
+  合并提交、CI／验收结果、事项剩余范围和当前 Issue 状态。GitLab 的 fast-forward
+  或 squash 回退提交须能从目标分支追溯，不能把源分支 SHA 直接当交付证明。
+  仅合并不等于完成；
   部分覆盖、待部署、验收失败或结果未知均保持开放。先把修复与验证记录写回
   Issue，并按上一步读回。平台已自动关闭时仍可记录核对结果，但不能把关闭状态
   当成验收通过。

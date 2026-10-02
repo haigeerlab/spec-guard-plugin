@@ -193,17 +193,25 @@ class AdapterActionTests(unittest.TestCase):
     def test_gitlab_fast_forward_and_squash_delivery_commit(self):
         delivery = {"iid": 12, "project_id": 43, "state": "merged",
                     "merge_commit_sha": None, "sha": "c" * 40,
+                    "target_branch": "main",
                     "web_url": "https://gitlab.example.test/team/repo/-/merge_requests/12"}
+        refs = [{"type": "branch", "name": "main"}]
         def read(args):
             endpoint = next(part for part in args if part.startswith("projects/"))
             if endpoint == "projects/team%2Frepo":
                 return {"path_with_namespace": "team/repo", "id": 43,
                         "web_url": "https://gitlab.example.test/team/repo",
                         "visibility": "private", "issues_enabled": True}
+            if "/refs?" in endpoint:
+                return refs
             return delivery
         provider = GitLabIssues("gitlab.example.test", "team/repo", read)
         provider.target_facts()
         self.assertEqual(provider.get_delivery(12)["mergeCommit"], "c" * 40)
+        refs[:] = [{"type": "branch", "name": "other"}]
+        with self.assertRaises(HostedTicketError):
+            provider.get_delivery(12)
+        refs[:] = [{"type": "branch", "name": "main"}]
         delivery["squash_commit_sha"] = "d" * 40
         self.assertEqual(provider.get_delivery(12)["mergeCommit"], "d" * 40)
 

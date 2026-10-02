@@ -9,5 +9,6 @@
 验证进度：假提供方、真实 GitHub 与 GitLab 只读目标、完整 `scripts/validate.sh`、
 阶段与产物回归及退役 bridge 回归已通过；Claude 插件源码校验通过。GitLab 只读
 核对覆盖公开项目的有限元数据、现行 `work_items` Issue URL 和小型项目的完整扫描。
+GitLab 交付提交回退的引用接口也已用公开项目的 main 当前及历史提交只读核对。
 真实 GitHub/GitLab 写入、评论和关闭需指定受控目标与精确内容，尚未执行；宿主
 会话实际加载新 skill 的行为也尚未观察到，不以源码或清单校验冒充该证据。

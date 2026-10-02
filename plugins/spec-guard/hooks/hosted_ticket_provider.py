@@ -289,6 +289,17 @@ class GitLabIssues:
                  (not isinstance(commit, str) or
                   not re.fullmatch(r"[0-9a-fA-F]{40}", commit)))):
             raise HostedTicketError("provider-unavailable: invalid GitLab MR")
+        if raw["state"] == "merged" and not raw.get("merge_commit_sha"):
+            branch = raw.get("target_branch")
+            if not isinstance(branch, str) or not branch:
+                raise HostedTicketError("provider-unavailable: GitLab target branch unknown")
+            endpoint = ("projects/" + quote(self.target, safe="") +
+                        "/repository/commits/" + commit + "/refs?type=branch&per_page=100&page=")
+            refs = pages(lambda page: self._get(endpoint + str(page)))
+            if (any(ref.get("type") != "branch" or
+                    not isinstance(ref.get("name"), str) for ref in refs) or
+                    not any(ref["name"] == branch for ref in refs)):
+                raise HostedTicketError("provider-unavailable: GitLab delivery commit not on target")
         return {"merged": raw["state"] == "merged",
                 "mergeCommit": commit if raw["state"] == "merged" else None,
                 "url": raw["web_url"]}
