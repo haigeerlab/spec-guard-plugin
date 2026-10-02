@@ -59,6 +59,27 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, ticket)
         self.assertIn("PR 合并后", workflow)
 
+    def test_project_audit_handoff_is_discoverable_on_both_hosts(self):
+        checkpoint = self.target.read_text(encoding="utf-8")
+        for name in ("claude-block-local.md", "codex-block-local.md"):
+            template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                self.assertIn("项目级审查", template)
+                self.assertIn("共享检查点规则", template)
+        for phrase in ("项目级审查", "审查批次", "审查完成", "待调查", "P0", "继续"):
+            self.assertIn(phrase, checkpoint)
+
+    def test_audit_handoff_reuses_ticket_without_reviving_remote_bridge(self):
+        checkpoint = self.target.read_text(encoding="utf-8")
+        ticket = (self.plugin / "skills" / "ticket" / "SKILL.md").read_text(encoding="utf-8")
+        workflow = (self.plugin.parents[1] / "docs" / "workflow.md").read_text(encoding="utf-8")
+        for phrase in ("审查完成", "事项已入账", "Local", "GitHub/GitLab", "待外部交接"):
+            self.assertIn(phrase, checkpoint)
+        for phrase in ("审查批次", "查重", "待调查"):
+            self.assertIn(phrase, ticket)
+        for phrase in ("审查完成", "debugging-and-error-recovery", "todo.md"):
+            self.assertIn(phrase, workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

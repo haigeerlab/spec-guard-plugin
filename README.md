@@ -20,6 +20,7 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 阶段提示 | agent 每轮都知道当前模块和下一步 | 自动；`/spec-guard:phase` 查看 | 运行 setup 后生效 |
 | 产物校验 | 能力图格式、模块与 Spec 的对应关系是否正确 | `/spec-guard:verify-artifacts` | 按需运行 |
 | 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
+| 项目审查交接 | 限定审查批次，整理发现并转入事项和修复 | 项目约定与共享检查点 | 安装约定后按需使用 |
 | Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
 | 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
 | 本地事项账本 | 没有 GitHub/GitLab Issue 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
@@ -109,6 +110,8 @@ setup 会往 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入下面这段约定，�
 - 切换 `activeModule` 前当前模块不能有进行中的 task；切换后重读该模块的 spec 和 plan
 - 若项目已启用 Local 事项账本，确认要实现的需求或修复在动代码前先用 `spec-guard:ticket`
   查重并取得事项 ID；探索和无需追踪的小操作例外
+- 项目级审查按 `spec-guard:spec-guard-ops` 的共享检查点规则限定批次、收束发现并交接缺陷；
+  审查完成后的“继续”推进已预告的问题处理步骤，不重新泛扫
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
 <!-- END:agent-skills-convention -->
 ````
