@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.38.0;test:marketplace-ref-upgrade-20261002"
+      },
+      "observedAt": "2026-10-02T15:12:35Z",
+      "evidence": [
+        "change:only marketplaces.spec-guard-marketplace ref in the user Codex config was changed from v0.37.0 to v0.38.0",
+        "diagnostic:codex plugin marketplace upgrade timed out twice while cloning; the existing clean marketplace checkout then fetched only tag v0.38.0 and switched to its detached commit before codex plugin add",
+        "result:spec-guard@spec-guard-marketplace version 0.38.0 is installed and enabled; the marketplace checkout is at 904d8fca931f46eac2acad205604ecd81105a049",
+        "result:all 144 distributed files in the installed 0.38.0 cache are byte-for-byte identical to git archive v0.38.0 after excluding only host-generated metadata"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.38.0;test:user-prompt-submit-smoke-20261002"
+      },
+      "observedAt": "2026-10-02T15:12:35Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source <configured-marketplace-source-path>",
+        "result:the smoke exited 0 and a matching fresh Codex session machine record contained valid spec-guard stage injection",
+        "result:a separate fresh Codex session discovered spec-guard:hosted-ticket-workflow, read SKILL.md from the installed 0.38.0 cache, and returned LOADED 托管日常事项",
+        "limit:this verifies the Codex CLI hook and skill loading paths; it does not claim native Codex Desktop hook acceptance or unrelated MCP server health"
+      ]
+    }
+  ]
+}

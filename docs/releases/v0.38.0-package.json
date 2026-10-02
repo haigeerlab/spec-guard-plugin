@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.38.0;asset:spec-guard-v0.38.0.tar.gz;sha256:34541362dbec64a6b4fe75b81742d7beeca237a0c55f3730b916c4c00e75c5f4"
+      },
+      "observedAt": "2026-10-02T15:12:35Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.38.0",
+        "asset:spec-guard-v0.38.0.tar.gz;size:336195",
+        "source-tag:v0.38.0@904d8fca931f46eac2acad205604ecd81105a049",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.38.0",
+        "result:the package was built from the v0.38.0 tag with git archive of .claude-plugin and plugins/spec-guard plus ARTIFACT-MANIFEST.json",
+        "result:release-package.py validated the artifact directory before archiving and again after extracting the archive; the archive contains no AppleDouble, symbolic-link, or hard-link entries",
+        "result:the locally built archive and the published GitHub asset both have SHA-256 34541362dbec64a6b4fe75b81742d7beeca237a0c55f3730b916c4c00e75c5f4 and size 336195",
+        "content:the package contains skills/hosted-ticket-workflow/SKILL.md and the GitHub/GitLab hosted ticket scripts"
+      ]
+    }
+  ]
+}
