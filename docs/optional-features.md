@@ -46,6 +46,9 @@ Spec Guard 会读取并复用这些规则，但不会自动修改项目或全局
 background 时，若没有可靠的原生 wake，Spec Guard 会先精确停止该 background 并确认，再用完整 session ID
 恢复同一会话；停止结果不确定时不会继续 resume 或新建副本。
 
+预配规则必须和当前传输方式匹配：native 的工具名以 `bridge_` 开头，XATS 使用 `register_agent`、
+`send_message`、`get_inbox` 等自己的工具名。Spec Guard 只建议当前后端的最小清单，不会把两套权限一起放开。
+
 创建新会话不会改变 A10 的 transport 选择：它只复用当前已经选择的 XATS 或 native，不会自动切换后端、
 删除 XATS 或把 native 宣布为正式默认。普通信箱消息仍不构成开发授权。
 
