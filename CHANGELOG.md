@@ -5,10 +5,12 @@
 ### 修复
 
 - **Claude background 委派能收到首轮 prompt，并可继续真实的 `blocked/idle` 会话。** 创建命令在可变长 `--tools` 后加入参数终止符，避免 prompt 被解析成工具名；第二轮把 Claude Code 2.1.288 的 `blocked/idle` 作为可精确 stop 后恢复的空闲状态，停止后的 `done/null/null` 条目可读回为 `done`。真实 Codex→Claude 双轮、safe-review 写入拒绝与精确停止已通过。
+- **授权会话委派把目标结果精确回传给发起会话。** 控制器只接受当前 origin session 唯一绑定的 mailbox 身份，为每轮生成独立 route，并只核对发件人、收件人和 thread/subject 元数据；同步最终回复经路径和内部 ID 脱敏后显示。Claude Code 与 Codex 两个方向的最小真实回传均已通过。
+- **同名委派会话可按公开短编号精确操作。** `continue`、`status`、`cancel` 接受列表返回的 6 位 `--disambiguator`；省略短编号时仍拒绝猜测。两个真实同名 Codex 会话已分别按短编号停止。
 
 ### 已知限制
 
-- **授权会话委派仍是未完成候选。** 2026-10-04 的双向真实宿主测试已证明创建、自注册、两轮继续和取消，但控制器公开结果仍不包含目标回复，任务信封也没有受控的 origin mailbox recipient；因此“一句话委派后自动收到结果”尚未验收，不宣称发布完成，也不推进 A10 native 转正或删除 XATS。
+- **授权会话委派仍是未发布候选，且不改变 A10。** 2026-10-04 的本机 native 验收已覆盖双向创建、自注册、两轮继续、结果回传、同名消歧和取消，但没有覆盖 XATS 或跨机器；不据此宣称发布完成、推进 A10 native 转正或删除 XATS。
 
 ## [0.38.3] - 2026-10-03
 
