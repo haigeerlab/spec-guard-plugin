@@ -49,12 +49,18 @@
     },
     {
       "subject": "spec-guard-real-local-ticket-reply",
-      "status": "not-verified",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
         "id": "claude-code-cli:v0.38.3;test:real-local-ticket-reply-20261003"
       },
-      "reason": "Automatic approval review rejected sending the real Local ledger contents to an external Claude model because disclosure of those specific records was not authorized. No real ticket was read by that host test; the synthetic test above is the available evidence."
+      "observedAt": "2026-10-03T10:55:22Z",
+      "evidence": [
+        "host:a fresh Claude Code CLI session used installed v0.38.3 in the user's real Local ledger, querying only one newly created synthetic acceptance issue by short reference",
+        "result:epiq_issue_get actually ran and returned the synthetic issue; the final reply included its read title and short reference and omitted the full internal ID",
+        "boundary:no existing private issue was listed or read, and the host invoked no ticket write or sync tool; the synthetic issue remains open",
+        "limit:this proves the targeted real-ledger reply path, not a broad listing of existing tickets or a remote sync"
+      ]
     },
     {
       "subject": "spec-guard-claude-code-desktop-hook",
