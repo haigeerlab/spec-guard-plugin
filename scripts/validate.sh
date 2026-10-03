@@ -98,6 +98,7 @@ python3 -B plugins/spec-guard/hooks/test_hosted_ticket_write.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_actions.py || F=1
 python3 -B plugins/spec-guard/hooks/test_collaboration_runtime.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_routing.py || F=1
+python3 -B plugins/spec-guard/hooks/test_session_routing_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_delegation.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_delegation_codex.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_delegation_claude.py || F=1
