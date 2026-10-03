@@ -31,7 +31,7 @@
 | A08 | 有意保留或条件未触发 | `spec/capability-history.md:53-59` 将 `history-migration.py import --confirm` 限定为维护者内部工具，日常入口只有只读 preview；`docs/maintainer-workflow.md:38-40` 要求逐次确认。 | 不增加日常导入入口；真实导入仍需新鲜预览和单独确认。 |
 | A09 | 已修且已验证 | `spec/module-insert.md:3-6` 和 `spec/proposal-promotion-proof.md:3-4` 均给出现行修订指针并保留原始决策文字；完整校验通过。 | 后续修订继续用指针说明现行契约，不改写历史正文。 |
 | A10 | 有意保留或条件未触发 | `docs/decisions/2026-09-28-xats-sunset.md:20-30` 的三个门槛均未全部满足：发布 JSON 中没有连续两个版本、每版至少两主机的 native 收发/空闲唤醒/回退记录；`plugins/spec-guard/hooks/native_collaboration_runtime.py:20-22` 仍是最初固定的 `8f12c880…`，没有一次上游 revision 升级后的唤醒验收；公开 GitHub 当前虽无带 P1/P2 标签或标题/正文含 native 的开放 Issue，但在“不扫描真实 Local 账本”的边界下不能把第三项升级为全局证明。native 聚焦测试 45 项通过，只证明源码契约。 | 保持 XATS 默认和 native 实验性传输，不提出转正 Proposal，不删除传输层。至少前两项门槛补齐且第三项有明确缺陷账本证据后才重新评估。 |
-| A11 | 已修且已验证；仍缺限定补证 | `spec/audit-handoff.md:18-43` 与 `workflow-checkpoints.md:15-25,48-56` 已定义有限批次、冻结、权限与“继续”边界；双宿主合成两轮验收已证明限定场景，静态测试 6 项本轮通过。测试数量少不能推断功能失败。 | 值得补的最小宿主证据有两项：Claude 在“唯一、已授权的下一步”下收到“继续”时只推进该步；用户明确带来新证据或扩展范围时能开启新批次。它们是 P2 验证增强，不是已确认 bug，不要求新 Spec/Plan。规则未变时不阻塞本次收尾。 |
+| A11 | 已修且已验证；限定补证完成 | `spec/audit-handoff.md:18-43` 与 `workflow-checkpoints.md:15-25,48-56` 已定义有限批次、冻结、权限与“继续”边界；静态测试 6 项通过。2026-10-03 又在 Claude Code 2.1.288 和 Codex CLI 0.160.0 的隔离三轮会话中补验：冻结批次收到普通“继续”时，两端都只执行最近预告的 `checked-gate`，保持 2/2 且不重扫、不扩批、不写入；随后明确给出新证据与范围扩展时，两端都保留原冻结批次并新开只含新增范围的批次。 | 当前无待补 A11 场景；这是合成宿主证据，不扩大为生产环境保证。规则或相关宿主行为变化后再按同一场景回归。测试数量少不能推断功能失败，也无需新 Spec/Plan。 |
 | A12 | 已修且已验证 | `ticket` 入口要求用户回复采用 `《标题》（短编号）` 且不展示完整 ID（`plugins/spec-guard/commands/ticket.md:12-18`、`skills/ticket/SKILL.md:17-24`），契约测试见 `test_ticket_entry.py:63-70`。PR #144 已合并为 `dd68698`；`docs/releases/v0.38.3-claude.json:51-62` 记录安装版对真实 Local 账本中单一合成事项的定向 `epiq_issue_get`，回复包含标题和短编号、没有完整内部 ID，且无写入或同步调用。本轮未重读该事项。 | 发布后真实定向回复缺口已经关闭。该合成事项保持开放；记录结论或关闭仍须对这一具体事项取得明确授权并在写入后读回。 |
 | A13 | 已修且已验证 | 本轮用已验证 Epiq 1.11.0 运行时重跑隔离临时项目：`test_local_ledger_acceptance.py` 返回 `state: passed`，`test_local_ticket_restore_acceptance.py` 1 项通过；两命令均退出 0。测试分别用临时目录和隔离 `EPIQ_GLOBAL_DIR`（`test_local_ledger_acceptance.py:59-73`、`test_local_ticket_restore_acceptance.py:35-46`）。 | 仍只证明合成临时项目；不自动迁移、扫描或修改真实用户数据。 |
 
@@ -50,6 +50,23 @@ Spec/Plan，也不应据此开发 `--model` 参数。
 除 D01 外，本批次没有发现新的产品缺陷；A10/A11 的项目分别是门槛未触发和验证增强，
 不得转写成当前功能失败。
 
+## A11 补充宿主验收
+
+验收使用全新隔离 Git 仓库，只注入与 `workflow-checkpoints.md:17-23,54-56` 对应的
+有限批次规则和合成事实；仓库在验收前后均为 clean，没有读取事项、访问远端或写文件。
+
+- Claude Code 2.1.288：首轮用 `claude -p --output-format json --tools= <scenario>`
+  冻结 2/2 批次；同一 session 第二轮只发送“继续”，返回 `checked-gate`、
+  `rescanned=false`、`scope_expanded=false`、`writes=false`；第三轮明确提供新增证据并扩展
+  范围，返回新批次、仅覆盖新增范围、保留原冻结批次。
+- Codex CLI 0.160.0：从首轮开始统一用
+  `codex exec --ignore-user-config --json -s read-only -C <isolated-fixture> <scenario>`，后两轮
+  用同一 session 的 `codex exec resume --ignore-user-config --json`；结果与 Claude 一致。
+  未传 `--model`，也未修改全局配置。一次启动方式不一致的诊断会话不计入验收结论。
+
+这两项补证填补的是先前报告列出的最小正向续接与反向扩批场景；不会把提示词规则冒充
+硬闸，也不会替代 A10 的发布／多主机事实。
+
 ## 本轮验证状态
 
 | 验证 | 状态 | 结果与边界 |
@@ -66,7 +83,7 @@ Spec/Plan，也不应据此开发 `--model` 参数。
 | 源码 `phase-guard.sh` / `verify-artifacts.sh` 对本仓 | 通过 | 阶段 DONE；33/33 Spec、33/33 Plan；13 个旧模块无 Todo 只记 1 条警告，0 失败。 |
 | 隔离 Epiq 本地账本与恢复验收 | 通过 | `state: passed`；恢复 1 项通过；未读取真实事项。 |
 | A10 两版本/两主机、上游升级后唤醒 | 未运行 | 所需发布版本和 revision 升级事实尚不存在，不能通过重复当前版本测试补出。 |
-| A11 最小正向续接与明确扩批宿主场景 | 未运行 | 当前规则与限定双宿主验收没有失败；列为非阻塞验证增强。 |
+| A11 最小正向续接与明确扩批宿主场景 | 通过 | Claude Code 2.1.288 与 Codex CLI 0.160.0 各自同一三轮隔离会话均通过；无重扫、无越界扩批、无写入。只证明所述合成场景。 |
 | 已知真实 Local 合成事项的再次读取、记录或关闭 | 未运行 | 本轮无授权且无必要；保持开放，公开报告不记录其标识。 |
 
 本轮没有“失败”或“环境不可用”的验证项；配置的私有 GitLab 主机认证与只读 API 均可用。
@@ -76,8 +93,9 @@ Spec/Plan，也不应据此开发 `--model` 参数。
 1. **P2，条件性：** 若未来要推动 native 转正，先累积连续两版、每版至少两主机的
    收发/空闲唤醒/回退发布记录，再升级一次固定上游 revision 并重做唤醒验收；最后用
    明确缺陷账本证明没有开放 P1/P2。条件未齐前不建 Proposal、不删除 XATS。
-2. **P2，非阻塞验证增强：** 在规则或宿主版本发生相关变化时，为 A11 补一次 Claude
-   “唯一已授权下一步 + 继续”场景；若要证明反向出口，再补“明确新证据/扩展范围 → 新批次”。
+2. **已完成，无当前行动：** A11 的“唯一已授权下一步 + 继续”和
+   “明确新证据/扩展范围 → 新批次”已在 Claude 与 Codex 补验通过。仅在规则或相关宿主
+   行为变化后重跑，不为提高验证评级重复执行。
 3. **需用户授权才可做：** 若要给已知的单一真实 Local 合成验收事项记录本报告或关闭它，只操作该事项，
    先展示拟写内容并取得明确授权，写后读回；不得同步远端。
 
