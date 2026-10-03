@@ -477,13 +477,22 @@ class CollaborationRuntimeTests(unittest.TestCase):
             seen["env"] = env
             return subprocess.CompletedProcess(command, 0)
 
-        parent = {"PATH": "/usr/bin", "SPEC_GUARD_COLLABORATION_TOKEN": "leaked-parent-token"}
+        parent = {
+            "PATH": "/usr/bin",
+            "SPEC_GUARD_COLLABORATION_TOKEN": "leaked-parent-token",
+            "CODEX_THREAD_ID": "unrelated-origin-thread",
+            "CODEX_SESSION_ID": "unrelated-origin-session",
+            "CLAUDE_CODE_SESSION_ID": "unrelated-claude-session",
+        }
         for parent_env in ({"PATH": "/usr/bin"}, parent):
             with patch.dict("collaboration_claude.os.environ", parent_env, clear=True), \
                     patch("collaboration_claude.shutil.which", return_value="/bin/echo"), \
                     patch("collaboration_claude.subprocess.run", side_effect=fake_run):
                 self.assertEqual(claude_launcher.launch_claude(self.config_dir, "claude", []), 0)
             self.assertNotIn("SPEC_GUARD_COLLABORATION_TOKEN", seen["env"])
+            self.assertNotIn("CODEX_THREAD_ID", seen["env"])
+            self.assertNotIn("CODEX_SESSION_ID", seen["env"])
+            self.assertNotIn("CLAUDE_CODE_SESSION_ID", seen["env"])
             self.assertNotIn("test-only-token", json.dumps(seen["env"]))
             self.assertEqual(seen["env"]["PATH"], "/usr/bin")
 
