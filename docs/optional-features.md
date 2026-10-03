@@ -30,6 +30,20 @@
 
 **不做什么：** 不改 Git 和 Issue，不分派任务，不跨机器通信。
 
+### 跨宿主会话委派
+
+在已启用协作信箱后，可以用一句话要求当前 Claude Code 创建 Codex 审查会话，或由 Codex 创建 Claude Code
+开发会话。默认是一个任务、一个新会话的有限授权；也可明确选择逐次确认、固定数量 batch 或绑定一个会话的
+session 范围。第一版只支持同一台 Mac，不提供跨机器发现或唤醒。
+
+为了不中途反复弹权限，Claude Code 可以提前在目标项目的 `.claude/settings.json` 中配置该消息后端的
+项目级 allow。安全审查只需预批准通信 MCP；需要改代码时才额外允许编辑、写入和限定 Bash 命令。
+Spec Guard 会读取并复用这些规则，但不会自动修改项目或全局权限，也不会代替你接受项目 trust 或 MCP
+首次批准。缺少前置条件时会显示 held 和最小下一步，不会静默使用 bypass。
+
+创建新会话不会改变 A10 的 transport 选择：它只复用当前已经选择的 XATS 或 native，不会自动切换后端、
+删除 XATS 或把 native 宣布为正式默认。普通信箱消息仍不构成开发授权。
+
 **详细说明：** [协作运行时说明](../plugins/spec-guard/references/collaboration-runtime.md)
 
 ## 本地事项账本
