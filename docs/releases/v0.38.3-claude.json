@@ -57,13 +57,27 @@
       "reason": "Automatic approval review rejected sending the real Local ledger contents to an external Claude model because disclosure of those specific records was not authorized. No real ticket was read by that host test; the synthetic test above is the available evidence."
     },
     {
-      "subject": "spec-guard-claude-desktop",
-      "status": "not-verified",
+      "subject": "spec-guard-claude-code-desktop-hook",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
-        "id": "claude-desktop:v0.38.3;test:host-path-20261003"
+        "id": "claude-code-desktop:v0.38.3;test:synthetic-map-only-20261003"
       },
-      "reason": "Claude Desktop is a separate delivery surface and was not exercised by the Claude Code CLI tests."
+      "observedAt": "2026-10-03T10:25:36Z",
+      "evidence": [
+        "host:a new Claude desktop Code-mode session used an isolated synthetic Git project with a capability map and no module specs",
+        "result:the session transcript contains a UserPromptSubmit hook_additional_context attachment with the valid MAP_ONLY stage; the app reply reported the same stage",
+        "limit:this verifies Claude Code in the desktop app, not the retired Claude Desktop MCPB or the user's real Local ticket ledger"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-desktop-mcpb",
+      "status": "unsupported",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-desktop-mcpb:v0.38.3;retired"
+      },
+      "reason": "The ordinary Claude Desktop MCPB surface was retired on 2026-09-28; its manifest, server, and package path are absent from v0.38.3. See docs/retirements/claude-desktop-mcpb.md."
     }
   ]
 }

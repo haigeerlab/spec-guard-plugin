@@ -16,13 +16,13 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.20.1）：官方 marketplace 安装副本的新 CLI 会话收到 UserPromptSubmit 阶段注入，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 显式确认；模块严格串行推进 |
-| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.19.0）：原生桌面任务在无远端临时账本中创建、评论、读取并关闭事项，见 [v0.19.0-codex.json](v0.19.0-codex.json)；v0.18.0 联调双向收发另见 [v0.18.0-codex.json](v0.18.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.20.1）：官方 marketplace 安装副本的新 CLI 会话在隔离消费者项目收到 MAP_ONLY 阶段注入，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.38.3）：已安装版在指定可用模型的新 CLI 会话收到 MAP_ONLY 阶段注入；默认模型 smoke 仍为 `not-verified`，见 [v0.38.3-codex.json](v0.38.3-codex.json) | 显式确认；模块严格串行推进 |
+| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.38.3）：新原生任务在合成项目收到 MAP_ONLY 阶段注入，见 [v0.38.3-codex.json](v0.38.3-codex.json)；v0.19.0 的隔离事项验收见 [v0.19.0-codex.json](v0.19.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.38.3）：已安装版的新 CLI 会话在隔离消费者项目收到 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 显式确认；模块严格串行推进 |
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
 | Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
-| Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `installed-verified` / `host-verified`（v0.13.0）：重启后的桌面会话收到 UserPromptSubmit 阶段注入，见 [v0.13.0-claude.json](v0.13.0-claude.json) | 不因其他宿主而获得写入结论 |
-| Claude Desktop MCPB | 已于 2026-09-28 退役，见 [退役记录](../retirements/claude-desktop-mcpb.md) | `not-verified`：退役前从未记录已安装 MCPB 会话 | 不再提供 |
+| Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `host-verified`（v0.38.3）：新 Code 模式会话在合成项目收到 UserPromptSubmit 的 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 不因其他宿主而获得写入结论 |
+| Claude Desktop MCPB | 已于 2026-09-28 退役，见 [退役记录](../retirements/claude-desktop-mcpb.md) | `unsupported`：v0.38.3 不交付 MCPB；退役前从未记录已安装 MCPB 会话 | 不再提供 |
 
 以上行不等同于 GitHub/GitLab 项目验收；项目验收必须另行记录目标仓库、操作范围和
 观察结果。插件不提供并行执行；真实项目、新安装及降级环境的
