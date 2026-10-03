@@ -1,5 +1,10 @@
 # Spec: module-insert
 
+> 现行修订：做到一半时的显式插队由 [module-interrupt](module-interrupt.md) 定义；
+> `spec/<id>.md` 已存在时的拒绝条件由 [insert-existing-spec](insert-existing-spec.md)
+> 改为预览提示；Proposal 的现行四步流程见 [proposal-submit](proposal-submit.md)。
+> 本文件保留原始决策与验收记录。
+
 ## Objective
 
 项目做到一半冒出新需求时，最常见的做法是在一个模块做完的检查点，把理顺的需求上下文交给 agent，问它插在哪、
