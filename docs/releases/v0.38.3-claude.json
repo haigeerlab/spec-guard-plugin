@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.38.3;test:marketplace-update-20261003"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace --json",
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user --json",
+        "result:user-scope plugin updated from 0.38.2 to 0.38.3 and is enabled; a new session is required to apply it",
+        "result:all 144 distributed files in the installed cache are byte-for-byte identical to git archive v0.38.3"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.38.3;test:synthetic-map-only-20261003"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "host:a new Claude Code CLI session loaded the installed v0.38.3 plugin from its cache and ran in an isolated synthetic Git project",
+        "result:one UserPromptSubmit hook response machine event carried the valid MAP_ONLY stage and Claude exited 0",
+        "limit:the synthetic project contained no real repository content; this proves installed Claude Code hook injection, not Claude Desktop behavior"
+      ]
+    },
+    {
+      "subject": "spec-guard-local-ticket-reply",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.38.3;test:synthetic-local-ticket-reply-20261003"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "host:a fresh Claude Code CLI session used the installed v0.38.3 ticket command and skill against one synthetic Epiq issue in an isolated repository and isolated EPIQ_GLOBAL_DIR",
+        "result:epiq_issue_list actually ran; the user reply contained the read title and short reference, omitted the full internal ID, and no ticket write tool was called",
+        "limit:this proves the installed-version synthetic reply path, not a response over the user's real Local ledger"
+      ]
+    },
+    {
+      "subject": "spec-guard-real-local-ticket-reply",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-cli:v0.38.3;test:real-local-ticket-reply-20261003"
+      },
+      "reason": "Automatic approval review rejected sending the real Local ledger contents to an external Claude model because disclosure of those specific records was not authorized. No real ticket was read by that host test; the synthetic test above is the available evidence."
+    },
+    {
+      "subject": "spec-guard-claude-desktop",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-desktop:v0.38.3;test:host-path-20261003"
+      },
+      "reason": "Claude Desktop is a separate delivery surface and was not exercised by the Claude Code CLI tests."
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6c93031cc5a38a6a1f99b2cd9ce994e6dd6b41c1"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "result:v0.38.3 annotated tag and release resolve to final main commit 6c93031cc5a38a6a1f99b2cd9ce994e6dd6b41c1; pull request #141 validate (ubuntu-latest) passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "result:all four checks exited 0 on macOS system Bash at the tagged final main commit; phase guard passed 80 cases and verify-artifacts passed 19 cases",
+        "limit:Codex smoke selftest validates its grader, not a live Codex host session"
+      ]
+    }
+  ]
+}
