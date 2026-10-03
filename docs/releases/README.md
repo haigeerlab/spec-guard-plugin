@@ -16,7 +16,7 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.38.3）：已安装版在指定可用模型的新 CLI 会话收到 MAP_ONLY 阶段注入；默认模型 smoke 仍为 `not-verified`，见 [v0.38.3-codex.json](v0.38.3-codex.json) | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.38.3）：Codex CLI v0.160.0 使用默认 `gpt-6-sol` 在隔离消费者项目完成 smoke，退出 0，匹配的机器记录含有效阶段注入；此前 v0.154.0 的 HTTP 400 不能外推为账户不支持该模型，见 [v0.38.3-codex.json](v0.38.3-codex.json) | 显式确认；模块严格串行推进 |
 | Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.38.3）：新原生任务在合成项目收到 MAP_ONLY 阶段注入，见 [v0.38.3-codex.json](v0.38.3-codex.json)；v0.19.0 的隔离事项验收见 [v0.19.0-codex.json](v0.19.0-codex.json) | 遵从桌面批准；模块严格串行推进 |
 | Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.38.3）：已安装版的新 CLI 会话在隔离消费者项目收到 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 显式确认；模块严格串行推进 |
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
