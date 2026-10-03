@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.38.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex-cli:v0.38.3;test:marketplace-ref-upgrade-20261003"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "result:the configured spec-guard marketplace was changed from the v0.38.2 ref to v0.38.3 using the plugin marketplace CLI; other marketplaces were not changed",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "result:spec-guard@spec-guard-marketplace is installed and enabled at version 0.38.3; its marketplace checkout resolves to tagged commit 6c93031cc5a38a6a1f99b2cd9ce994e6dd6b41c1",
+        "result:all 144 distributed files in the marketplace and installed cache are byte-for-byte identical to git archive v0.38.3; 11 host-generated migrated command skills are additional cache files"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.38.3;test:synthetic-map-only-model-override-20261003"
+      },
+      "observedAt": "2026-10-03T10:05:08Z",
+      "evidence": [
+        "host:codex exec --json -m gpt-5.5 -s read-only ran from an isolated synthetic Git project with the installed plugin enabled",
+        "result:the CLI exited 0; the sole matching session machine record had matching thread id and project path and exactly one developer context with a valid MAP_ONLY stage",
+        "limit:this proves the Codex CLI hook on a synthetic project; native Codex Desktop hook behavior and Local ticket replies were not tested by this run"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-default-smoke",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.38.3;test:default-model-smoke-20261003"
+      },
+      "reason": "The repository smoke exited 2 before grading the hook and reported an unknown configured model. A separate explicit model probe received an account-model HTTP 400, but the exact cause of the default run was not established. A manual session with an accepted model verified the hook separately; the default-model run is not counted as a product failure or pass."
+    },
+    {
+      "subject": "spec-guard-codex-desktop-hook",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-desktop:v0.38.3;test:user-prompt-submit-20261003"
+      },
+      "reason": "No new native Codex Desktop session was started after installation; the current app session may retain its previous plugin snapshot."
+    }
+  ]
+}
