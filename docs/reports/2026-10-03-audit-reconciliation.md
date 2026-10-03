@@ -12,10 +12,10 @@
 | 编号 | 原发现与优先级 | 当前裁决及证据 | 尚需动作 |
 | --- | --- | --- | --- |
 | A01 | 有 Plan 无 `todo.md` 被计为 `DONE`，原审查 P1 | **按明确设计保留。** [plan-without-todo Spec](../../spec/plan-without-todo.md)记录用户决定：旧远端 tracker 项目不能因缺本地 Todo 被改判未完成；本地模式对 active module 提醒，产物校验汇总警告。[阶段判据](../../plugins/spec-guard/hooks/module_stage.py)仍按此实现。原审查把 13 个历史模块直接当作新模式缺陷，范围过宽。 | 新模块规划仍必须生成本地 Todo；若将来改变完成判据，须单独评审兼容规则和 Spec。 |
-| A02 | 托管普通 Issue 缺真实双平台往返，原审查 P1 | **部分验收。** GitHub 私有合成目标已完成创建、评论、PR 合并、关闭和读回。[模块记录](../../tasks/hosted-ticket-workflow/todo.md)明确：私有 GitLab 目标只读找回已关闭的既有事项，没有重新执行当前源码的写入链路。2026-10-03 再查重得到 `unknown`；mGit CLI API 返回 401 token expired，故本次是**环境不允许验证**。 | 凭据恢复后，先完整查重和根因核对；仅在有独立范围、精确内容及逐次授权时做 GitLab 合成往返。不得从 401 推断产品失败。 |
+| A02 | 托管普通 Issue 缺真实双平台往返，原审查 P1 | **部分验收，GitLab 评论路径已补测。** GitHub 私有合成目标已完成创建、评论、PR 合并、关闭和读回。GitLab 凭据恢复后，当前源码对指定私有测试项目完成查重及根因核对，复用已关闭的合成事项；经逐条授权发布一条评论，发布读回为 `verified`，重试预览为 `found`，独立读取 notes 确认该标记恰好出现一次。关闭预览为 `already-closed`。[模块记录](../../tasks/hosted-ticket-workflow/todo.md)中的较早只读结论是此前时点的证据，不覆盖本次结果。 | 本轮没有用当前源码重新执行创建或关闭写入，不能把评论验收扩展为完整 GitLab 往返；不为重复验收新建同根因事项。 |
 | A03 | Claude 拆除入口未默认预览，原审查 P2 | **已修源码。** [PR #134](https://github.com/haigeerlab/spec-guard-plugin/pull/134) 要求先运行 `--dry-run`、展示预览，预览失败即停；[现行入口](../../plugins/spec-guard/commands/teardown-convention.md)与回归已更新。 | 真正删除消费者受管块仍须看过预览后的单次确认；命令文字回归不能单独证明所有宿主回复。 |
 | A04 | 产物校验二次汇总失败可能显示零警告，原审查 P2 | **已修源码。** [PR #134](https://github.com/haigeerlab/spec-guard-plugin/pull/134) 使辅助脚本失败时输出“未验证”；[失败注入回归](../../plugins/spec-guard/hooks/test-verify-artifacts.sh)覆盖目标分支。 | 发布前沿完整校验再运行一次。 |
-| A05 | 托管评论预览可过期、关闭的 `verified` 易被误读为 CI 通过，原审查 P2 | **已修源码。** [PR #131](https://github.com/haigeerlab/spec-guard-plugin/pull/131) 将评论预览绑定 Issue 范围并把关闭事实限定为远端已关闭；[现行 skill](../../plugins/spec-guard/skills/hosted-ticket-workflow/SKILL.md)要求人工核对交付和验证事实。 | 真实 GitLab 写入仍按 A02 单列。 |
+| A05 | 托管评论预览可过期、关闭的 `verified` 易被误读为 CI 通过，原审查 P2 | **已修源码。** [PR #131](https://github.com/haigeerlab/spec-guard-plugin/pull/131) 将评论预览绑定 Issue 范围并把关闭事实限定为远端已关闭；[现行 skill](../../plugins/spec-guard/skills/hosted-ticket-workflow/SKILL.md)要求人工核对交付和验证事实。当前源码的 GitLab 评论发布与重试查重已按 A02 实测。 | 评论读回不代表 CI 或代码交付通过；创建、关闭验收边界仍按 A02 单列。 |
 | A06 | Ubuntu CI 不能代表每次 macOS Bash 3.2 验收，原审查 P2 | **验证边界保留。** [CI](../../.github/workflows/ci.yml)明确只持续运行 Ubuntu；[维护流程](../maintainer-workflow.md)要求 macOS `/bin/bash`。本轮工作区三条 macOS 校验已通过，见下节。 | 统一发布前仍须对最终待发布提交复核并记录；不能把 Ubuntu CI 说成 macOS CI。 |
 | A07 | 一次性维护工作进入能力图，增加模块状态与解释成本，原审查 P2 | **设计债已设准入边界。** [工作流](../workflow.md)规定局部 bug 不必新建能力模块；已发布图和历史保留，避免破坏 Proposal 基线。 | 新增模块时执行“独立用户能力”评审；不为清理统计数字批量删除旧模块。 |
 | A08 | 历史导入底层命令无日常入口，原审查 P3 | **按用户决定保留内部。** [能力历史 Spec](../../spec/capability-history.md)与[维护流程](../maintainer-workflow.md)说明 `import --confirm` 只供维护者处理已退役证据；用户入口只给只读预览。 | 实际导入旧证据仍需逐次确认，不因工具存在自动执行。 |
@@ -31,6 +31,13 @@ PR #138 已合并，两个 Manifest 在 `main` 上为 `0.38.3`，但没有 `v0.3
 
 ## 本轮验证
 
+GitLab 补充验收（2026-10-03，限已授权的私有合成事项）：
+
+- 凭据恢复后，当前源码的 Issue 查重返回 `absent` 和 `rootCauseReviewRequired: true`；根因核对发现已有同用途的已关闭合成事项，因此没有新建重复 Issue。
+- 当前源码的 `comment-preview` 生成预览；在用户对确切正文单独授权后，`comment-publish --confirm` 对同一预览返回 `verified`。随后 `comment-preview` 返回 `found`；独立 API 读回确认该评论标记恰好出现一次，事项仍为 `closed`。这证明本次评论的作用域和重试查重路径执行过，不证明创建或关闭写入路径已由当前源码重跑。
+- 已有合成 MR 的 `merged` 状态、合并提交及对应 pipeline 的 `success` 曾独立读回；当前源码的 `close-preview` 返回 `already-closed`。本轮没有新建 Issue、分支或 MR，没有再次合并或关闭，也没有删除项目内容。2026-10-03 更新本记录前的即时远端重查遇到 DNS 超时，该次请求不计为通过或失败。
+- 当前源码的四组托管事项本地测试共 39 项通过，覆盖读、写、动作与入口；它们不能替代真实创建和关闭的当前源码验收。
+
 在 macOS 系统 `/bin/bash` 下，对本轮工作区运行：
 
 - `scripts/validate.sh`：退出 0；其内部的 Codex smoke 判决器是 self-test，不代表真实 Codex 宿主已运行。
@@ -38,4 +45,4 @@ PR #138 已合并，两个 Manifest 在 `main` 上为 `0.38.3`，但没有 `v0.3
 - `plugins/spec-guard/hooks/test-verify-artifacts.sh`：退出 0，19 个用例。
 - `evals/codex-plugin-smoke.sh --selftest`：退出 0，只验证判决器对机器事件和未执行路径的区分。
 
-这几项不能代替 A02 的 GitLab 写入往返、A11 的双宿主多轮交接或 A12 的发布后真实账本回复。
+这些检查和本次 GitLab 评论验收不能代替 A02 尚未重跑的创建／关闭写入、A11 的双宿主多轮交接或 A12 的发布后真实账本回复。
