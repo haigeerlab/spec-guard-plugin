@@ -35,6 +35,10 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 
 macOS 上必须用 `/bin/bash`，以覆盖系统自带 bash 3.2；不要让 Homebrew bash 掩盖兼容问题。
 
+已退役 initiative 的 `history-migration.py import --confirm` 只供维护者处理旧证据，
+不作为 Claude 命令或 Codex skill 的日常用户入口。先运行只读 `preview` 并核对目标与冲突；
+实际导入须取得针对本次写入的明确确认。现行用户入口只提供迁移预览。
+
 ## 可选但高价值的检查
 
 ```bash

@@ -1,5 +1,8 @@
 # Spec: proposal-promotion-proof
 
+> 现行修订：接受条件、晋级证明的基线与提交内容约束由
+> [proposal-label-acceptance](proposal-label-acceptance.md) 取代；本文件保留原始决策与验收记录。
+
 ## Objective
 
 为一个已 `accepted` 且新鲜的 Proposal 提供只读晋级证明：证明某个远端默认分支 commit 首次包含 Proposal 声明的新增 module，并且该 commit 中的 capability map 满足声明的职责、依赖与 anchor。它不创建提交、PR、Issue、标签、分支、任务、能力图或 `.agent/state.json`。

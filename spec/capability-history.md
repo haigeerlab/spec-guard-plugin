@@ -54,7 +54,9 @@ plugins/spec-guard/commands/history-integrity.md, skills/spec-guard-ops/SKILL.md
   任一断言失败即退出。
 - `ensure`、`append`、`checkpoint`、`active`、`verify-checkpoint` 与 `artifact_history.py` 只服务于已退役的
   initiative 轮换，已于 2026-09-28 移除；测试断言这些动词被拒绝且不改动账本。
-- 已知缺口：`history-migration.py import --confirm` 没有命令或 skill 入口。
+- `history-migration.py import --confirm` 是维护者处理已退役 initiative 证据的内部工具，
+  不提供 Claude 命令或 Codex skill 用户入口；日常用户入口只提供只读迁移预览。
+  需要实际导入时，维护者先核对预览、目标与冲突，再单独取得本次写入确认。
 
 ## Boundaries
 

@@ -11,6 +11,10 @@
    [migration-strict-serial.md](migration-strict-serial.md)。
 4. 运行 `/bin/bash scripts/validate.sh` 与受改动面影响的聚焦测试。
 5. 若修改 Codex manifest、hook 或技能，运行 `/bin/bash evals/codex-plugin-smoke.sh --selftest`。
+6. 最终待发布提交还须在 macOS 用系统 `/bin/bash` 跑上述完整校验，以及
+   `plugins/spec-guard/hooks/test-phase-guard.sh` 和
+   `plugins/spec-guard/hooks/test-verify-artifacts.sh`。记录运行主机与结果；
+   Ubuntu CI 不能替代 macOS Bash 3.2 验证，无法运行时标为未验证。
 
 ## 发布
 
