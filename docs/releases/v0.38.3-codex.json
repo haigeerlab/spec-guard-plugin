@@ -40,7 +40,7 @@
         "kind": "host-session",
         "id": "codex-cli:v0.38.3;test:default-model-smoke-20261003"
       },
-      "reason": "The repository smoke exited 2 before grading the hook and reported an unknown configured model. A separate explicit model probe received an account-model HTTP 400, but the exact cause of the default run was not established. A manual session with an accepted model verified the hook separately; the default-model run is not counted as a product failure or pass."
+      "reason": "The repository smoke exited 2 before grading the hook. A read-only codex exec without a model override reproduced the default gpt-6-sol request and returned HTTP 400: this model is not supported when using Codex with the current ChatGPT account. A separate manual session with an accepted model verified the hook; the default-model run remains unverified and is not counted as a product failure or pass."
     },
     {
       "subject": "spec-guard-codex-desktop-hook",
