@@ -52,6 +52,10 @@ background 时，若没有可靠的原生 wake，Spec Guard 会先精确停止�
 创建新会话不会改变 A10 的 transport 选择：它只复用当前已经选择的 XATS 或 native，不会自动切换后端、
 删除 XATS 或把 native 宣布为正式默认。普通信箱消息仍不构成开发授权。
 
+截至 2026-10-04，该能力仍是源码候选：双向创建、同会话第二轮、只读权限负例和停止已在真实宿主
+通过，但控制器还不会把目标回复自动回传给发起方。`completed` 只表示宿主轮次完成，不能替代结果
+正文或 mailbox 投递证据；在结果回传契约完成前，不应把这项能力当作已发布的端到端委派功能。
+
 **详细说明：** [协作运行时说明](../plugins/spec-guard/references/collaboration-runtime.md)
 
 ## 本地事项账本

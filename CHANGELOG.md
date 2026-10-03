@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 修复
+
+- **Claude background 委派能收到首轮 prompt，并可继续真实的 `blocked/idle` 会话。** 创建命令在可变长 `--tools` 后加入参数终止符，避免 prompt 被解析成工具名；第二轮把 Claude Code 2.1.288 的 `blocked/idle` 作为可精确 stop 后恢复的空闲状态，停止后的 `done/null/null` 条目可读回为 `done`。真实 Codex→Claude 双轮、safe-review 写入拒绝与精确停止已通过。
+
+### 已知限制
+
+- **授权会话委派仍是未完成候选。** 2026-10-04 的双向真实宿主测试已证明创建、自注册、两轮继续和取消，但控制器公开结果仍不包含目标回复，任务信封也没有受控的 origin mailbox recipient；因此“一句话委派后自动收到结果”尚未验收，不宣称发布完成，也不推进 A10 native 转正或删除 XATS。
+
 ## [0.38.3] - 2026-10-03
 
 ### 修复
