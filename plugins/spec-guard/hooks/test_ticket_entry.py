@@ -66,6 +66,7 @@ class TicketEntryContractTest(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
                 self.assertIn("`《标题》（短编号）`", text)
                 self.assertIn("不要只显示短编号", text)
+                self.assertIn("不要展示完整内部 ID", text)
                 self.assertIn("写工具只返回 ID 时", text)
 
     def test_daily_entries_name_every_gated_tool_as_confirmation_only(self) -> None:
