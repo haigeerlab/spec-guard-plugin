@@ -44,12 +44,17 @@
     },
     {
       "subject": "spec-guard-codex-desktop-hook",
-      "status": "not-verified",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
         "id": "codex-desktop:v0.38.3;test:user-prompt-submit-20261003"
       },
-      "reason": "No new native Codex Desktop session was started after installation; the current app session may retain its previous plugin snapshot."
+      "observedAt": "2026-10-03T10:24:09Z",
+      "evidence": [
+        "host:a newly created native Codex Desktop task received a human user prompt in an isolated synthetic Git project with a capability map and no module specs",
+        "result:the matching Desktop session machine record contains a developer context with the valid MAP_ONLY stage; the task reply reported the same stage",
+        "limit:the preceding task-to-task delegation message did not trigger UserPromptSubmit and is not counted; this test does not access the real Local ticket ledger"
+      ]
     }
   ]
 }
