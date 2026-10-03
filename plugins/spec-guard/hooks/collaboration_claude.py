@@ -17,6 +17,19 @@ from collaboration_auth_header import read_private_token
 from collaboration_runtime import RuntimeContractError, default_config_dir, read_runtime_config
 
 
+def sanitized_environment(environment: dict[str, str] | None = None) -> dict[str, str]:
+    """Remove ambient credentials and unrelated host-session identity before launch."""
+    result = dict(os.environ if environment is None else environment)
+    for name in (
+        "SPEC_GUARD_COLLABORATION_TOKEN",
+        "CODEX_THREAD_ID",
+        "CODEX_SESSION_ID",
+        "CLAUDE_CODE_SESSION_ID",
+    ):
+        result.pop(name, None)
+    return result
+
+
 def write_ephemeral_mcp_config(config_dir: Path) -> Path:
     """Create a private stdio config; the proxy reads the token file itself."""
     # Validate the token file before launching; the value is discarded, never passed on.
@@ -56,8 +69,7 @@ def build_claude_command(
 def launch_claude(config_dir: Path, claude_bin: str, extra_args: Sequence[str]) -> int:
     """Run Claude without the bearer token in its environment; remove the temporary config after."""
     temporary_config = write_ephemeral_mcp_config(config_dir)
-    environment = os.environ.copy()
-    environment.pop("SPEC_GUARD_COLLABORATION_TOKEN", None)
+    environment = sanitized_environment()
     try:
         command = build_claude_command(claude_bin, temporary_config, extra_args)
         return subprocess.run(command, env=environment, check=False).returncode
