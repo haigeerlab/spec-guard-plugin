@@ -21,7 +21,7 @@
 | A08 | 历史导入底层命令无日常入口，原审查 P3 | **按用户决定保留内部。** [能力历史 Spec](../../spec/capability-history.md)与[维护流程](../maintainer-workflow.md)说明 `import --confirm` 只供维护者处理已退役证据；用户入口只给只读预览。 | 实际导入旧证据仍需逐次确认，不因工具存在自动执行。 |
 | A09 | 早期模块 Spec 单读时可能误导，原审查 P3 | **文档修订完成。** [module-insert](../../spec/module-insert.md)与[proposal-promotion-proof](../../spec/proposal-promotion-proof.md) 顶部新增现行修订指针，保留原始决策文字；四个目标文件已逐一确认存在。 | 本轮仓库完整校验已通过；后续若修订这些契约，继续保留历史与现行边界。 |
 | A10 | XATS/native 双传输及 XATS 依赖成本，原审查 P2 | **有意过渡，非本轮删除项。** [日落决定](../decisions/2026-09-28-xats-sunset.md)规定 native 转正门槛、一个 minor 的 XATS 退出节奏与反向出口；[协作 Spec](../../spec/collaboration-messaging.md)明示 XATS 依赖未锁定的剩余风险。 | 门槛达到后走独立 Proposal；不能凭一次宿主验收提前退役默认传输。 |
-| A11 | 项目审查交接主要靠静态指令测试，原审查 P2 | **宿主效果证据有限。** [共享检查点](../../plugins/spec-guard/references/workflow-checkpoints.md)要求有限批次和明确停点；本次对话在“继续”后已进入预告修复，但不能把这一观察单独归因于插件。 | 最终版在隔离消费者项目分别执行 Claude/Codex 多轮试验；不能用静态文字断言替代。 |
+| A11 | 项目审查交接主要靠静态指令测试，原审查 P2 | **双宿主合成多轮验收，验证强度 MODERATE。** Claude Code 与 Codex 均实际读取[共享检查点](../../plugins/spec-guard/references/workflow-checkpoints.md)，首轮覆盖预定 2/2 模块并冻结发现；第二轮仅发送“继续”后均未重扫或写入。Codex 沿预告只读核对 Local 账本；Claude 因首轮留下多个待选步骤且原授权仅限只读，停在范围选择。具体运行证据见下节。 | 本次只覆盖合成项目的审查收束和下一步边界；不声称所有交接场景或尚未安装的 v0.38.3 整包通过。规则与入口后续变动时须复测。 |
 | A12 | Local 事项回复可回显完整内部 ID，后续宿主验收发现 | **已修源码、未发布。** [PR #137](https://github.com/haigeerlab/spec-guard-plugin/pull/137) 收紧 Claude 命令和共用 skill；隔离合成 Claude Code MCP 试验中目标读取工具实际执行，候选回复含标题与短编号、未回显完整 ID。 | 统一发布并更新安装副本后，再核对真实账本上的 Claude 回复；事项保持开放。 |
 | A13 | Local 账本与归档恢复的可选真实运行时验收未在常规 `validate.sh` 中执行 | **本轮已实测。** 用固定 Epiq 1.11.0 运行时，在隔离临时仓库执行 `test_local_ledger_acceptance.py`（`state: passed`）和 `test_local_ticket_restore_acceptance.py`（1 项通过），均退出 0；工作仓库状态未被测试改动。 | 此证据仅覆盖临时合成项目，真实用户数据迁移仍需目标与授权。 |
 
@@ -38,6 +38,13 @@ GitLab 补充验收（2026-10-03，限已授权的私有合成事项）：
 - 已有合成 MR 的 `merged` 状态、合并提交及对应 pipeline 的 `success` 曾独立读回；当前源码的 `close-preview` 返回 `already-closed`。本轮没有新建 Issue、分支或 MR，没有再次合并或关闭，也没有删除项目内容。2026-10-03 更新本记录前的即时远端重查遇到 DNS 超时，该次请求不计为通过或失败。
 - 当前源码的四组托管事项本地测试共 39 项通过，覆盖读、写、动作与入口；它们不能替代真实创建和关闭的当前源码验收。
 
+A11 双宿主合成多轮验收（2026-10-03）：
+
+- 在隔离临时 Git 项目中建立两模块夹具：README 与模块 Spec 要求 `used < limit`，实现却为 `used <= limit`，现有测试仅覆盖低于限额；另一模块为正常标签格式。两宿主的首轮提示均限定只读审查这两个模块，第二轮仅发送“继续”。两次运行前后夹具 Git 状态均干净。
+- Claude Code 2.1.288 在实际会话中读取 `spec-guard-ops/SKILL.md` 与 `workflow-checkpoints.md`，首轮报告覆盖 2/2、稳定发现、未验证项及下一检查点；第二轮没有重扫、建单或改文件，因首轮给出多个后续选项且用户只授权只读审查，保留待选范围。正常模式试验明确允许只读访问插件规则目录；一次因权限无法读取规则的尝试不计入验收。
+- Codex CLI 0.154.0 在实际会话中读取相同 skill 与规则，首轮报告覆盖 2/2；直接边界断言失败、原有两个测试函数直接运行通过，`pytest` 未安装，故未声称 pytest 套件通过。第二轮实际调用 `local_ledger_runtime.py status --format json`，得到 `uninitialized`，仅针对已发现问题推进，不重新扫描、建单或改文件。
+- A11 所依赖的四份文件（共享规则、操作 skill、Claude/Codex 约定模板）在两宿主的安装目录均与本工作区源码逐字一致，但安装版标识仍为 0.38.2。此证据证明限定场景的宿主行为，不能外推到所有输入、完整 0.38.3 安装包或真实事项交付；Claude 与 Codex 对合成缺陷的优先级也不一致，仍须人工复核分级。
+
 在 macOS 系统 `/bin/bash` 下，对本轮工作区运行：
 
 - `scripts/validate.sh`：退出 0；其内部的 Codex smoke 判决器是 self-test，不代表真实 Codex 宿主已运行。
@@ -45,4 +52,4 @@ GitLab 补充验收（2026-10-03，限已授权的私有合成事项）：
 - `plugins/spec-guard/hooks/test-verify-artifacts.sh`：退出 0，19 个用例。
 - `evals/codex-plugin-smoke.sh --selftest`：退出 0，只验证判决器对机器事件和未执行路径的区分。
 
-这些检查和本次 GitLab 评论验收不能代替 A02 尚未重跑的创建／关闭写入、A11 的双宿主多轮交接或 A12 的发布后真实账本回复。
+这些检查和本次 GitLab 评论验收不能代替 A02 尚未重跑的创建／关闭写入或 A12 的发布后真实账本回复；A11 的合成双宿主证据仅覆盖上列场景。
