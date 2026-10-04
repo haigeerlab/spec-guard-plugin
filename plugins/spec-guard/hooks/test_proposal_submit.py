@@ -214,6 +214,46 @@ class ProposalSubmitTests(unittest.TestCase):
                       self.run_submit()[1])
         self.assertTrue(final.endswith("\n"))
 
+    def test_local_completes_the_draft_byte_for_byte_like_a_hosted_platform(self):
+        """Baseline and revision are pure Git facts. Choosing Local must change the
+        printed next step and nothing else -- if the completed document differed, the
+        backend would be deciding a shared fact, which is exactly the boundary the
+        two-axis split exists to hold."""
+        draft = self.write_draft(draft_text())
+        code, _, err = self.run_submit(platform="github", confirm=True)
+        self.assertEqual(code, 0, err)
+        from_github = draft.read_bytes()
+
+        self.write_draft(draft_text())
+        code, _, err = self.run_submit(platform="local", confirm=True)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(draft.read_bytes(), from_github)
+
+    def test_local_next_steps_name_the_ledger_rather_than_a_cli(self):
+        self.write_draft(draft_text())
+        code, out, err = self.run_submit(platform="local")
+        self.assertEqual(code, 0, err)
+        self.assertIn("Revision: sha256:", out)
+        self.assertIn("proposal-stage:published", out)
+        self.assertIn("/spec-guard:proposal-review", out)
+        # No hosted CLI may be suggested for a Local ledger.
+        self.assertNotIn("gh issue create", out)
+        self.assertNotIn("glab issue create", out)
+        self.assertNotIn("gh label create", out)
+        self.assertNotIn("glab label create", out)
+        # The body to paste must be shown, with the marker as its first line -- not
+        # merely mentioned somewhere else in the output. Take the marker from the body
+        # itself: the diff above it also contains markers, including the zeroed one.
+        step = out.split("Next steps (nothing below has been run):", 1)[1]
+        self.assertIn("with this body:", step)
+        body = step.split("with this body:", 1)[1].lstrip("\n")
+        first = body.splitlines()[0]
+        self.assertRegex(first,
+                         r"\A<!-- spec-guard-proposal:v2 id=gamma revision=sha256:[0-9a-f]{64} -->\Z")
+        revision = re.search(r"Revision: (sha256:[0-9a-f]{64})", out).group(1)
+        self.assertIn(revision, first)
+        self.assertIn("Proposal: Add gamma", step)
+
     def test_preview_prints_revision_diff_and_issue_command_per_platform(self):
         self.write_draft(draft_text())
         code, out, err = self.run_submit(platform="github")
