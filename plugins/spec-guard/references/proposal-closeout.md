@@ -24,14 +24,23 @@ tracker backend   ∈ {local, github, gitlab}     ← 本模块唯一引入的�
 
 ## 纯状态机
 
-判断顺序固定：**closed → proof → stage**。
+判断顺序固定：**closed → proof 读不到 → proof 不成立 → stage**。
 
 | 条件 | 结果 |
 | --- | --- |
 | 事项已关闭 | `already-closed`（压过其他一切，重跑只读回、不写） |
-| proof 不是 `proved` | `not-eligible`，透传 proof 的诊断 |
+| proof 是 `unknown`（**探测读不到**） | `unknown`，透传 proof 的诊断；proof 没给诊断时 `promotion-unknown` |
+| proof 是其他非 `proved`（读到了，**不成立**） | `not-eligible`，透传 proof 的诊断 |
 | 阶段不在 `accepted` / `promoted` | `not-eligible` + `stage-not-closeable` |
 | 其余 | `eligible`，`targetStage=proposal-stage:promoted` |
+
+**读不到和不成立必须分开报。** 两者都不写任何东西，差别只在告诉读者该做什么：`not-eligible` 读起来是
+对这条 Proposal 的判决，于是有人去查一份从没动过的文档，而真正该做的是重试。`prove()` 的四条
+`unknown` 路径（快照取不到、`rev-list` 空、读不到第一父提交、publication 非 published）**根本不带
+诊断**，此时 state 就是读者手上的全部信息。2026-10-04 收尾真实事项时踩到：八次 `close --confirm`
+里有三次报 `not-eligible`，实际原因是偶发的 `remote default branch moved or fetch failed`。
+这是本仓库「探测失败必须降级，不能把环境故障说成链路断裂」的不变量，与 `build_preview` 对
+publication 探测失败的处理同形。
 
 `closeout_decision(stage, closed, proof_state, proof_diagnostic)` 的签名**不含 `project`／`root`／
 `provider`**，有断言锁死。这不是洁癖：有 Plan 而没有 `tasks/<id>/todo.md` 的模块按已完成计
@@ -114,7 +123,7 @@ Spec、Plan、todo、实现与验收由模块自己的任务清单或普通事�
 | 正文与标签的 digest 未变 | `conflict` + `issue-content-changed` |
 | 仍 open | `already-closed` |
 | 阶段仍可关闭 | `not-eligible` |
-| **重跑 proof 仍 `proved` 且 `promotionCommit` 相同** | `not-eligible` + `proof-changed` |
+| **重跑 proof 仍 `proved` 且 `promotionCommit` 相同** | 读到了但不成立：`not-eligible` + `proof-changed`；探测读不到：`unknown` + proof 的诊断 |
 | journal 中已记录的绑定与本次一致 | `conflict` + `binding-target-changed` |
 
 ## 写入、幂等与 journal
@@ -144,9 +153,9 @@ journal 位于 `~/.local/state/spec-guard/proposal-closeout/`，文件 0600、�
 | `already-closed` | 事项已关闭，**不写任何内容** |
 | `partial` | 部分成功；journal 保留，不自动重试 |
 | `conflict` | marker 多条 / 正文被改 / 绑定目标不同 |
-| `not-eligible` | proof 非 proved、阶段不可关闭、proof 变化 |
+| `not-eligible` | proof 读到了但不成立（`not-promoted` / `stale` / `invalid` / `not-accepted`）、阶段不可关闭、proof 变化 |
 | `preview-stale` / `preview-invalid` | 预览失效 |
-| `unknown` + 探测原因 | 读不到，不是失效：重试；原来这会被误报成 `proposal-revision-changed` |
+| `unknown` + 探测原因 | 读不到，不是失效：重试。Proposal 快照探测、tracker 探测与 **promotion proof 探测**都走这里；前者原来会被误报成 `proposal-revision-changed`，后者原来会被误报成 `not-eligible` |
 | `unknown` | 传输不可用、读回不完整、Epiq runtime 不可用 |
 | `rejected` + `statusCode` | 平台明确 4xx 拒绝（权限不足走这里） |
 | `target-unselected` | 未给出精确目标且无可用项目默认值 |

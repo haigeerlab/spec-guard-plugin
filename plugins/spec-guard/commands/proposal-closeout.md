@@ -76,9 +76,9 @@ open、阶段是否仍可关闭、proof 是否仍 `proved` 且 commit 相同、j
 | `already-closed` | 事项已关闭，**什么都没写**。这是正常的重跑结果，不是失败 |
 | `partial` | 部分成功，尝试已记进 journal。**只做只读对账，不要重跑指望它补齐** |
 | `conflict` | marker 多条、正文被改、或绑定目标不同。**需要人来判断**，不要自行选一条 |
-| `not-eligible` | proof 不是 proved、阶段不可关闭、或 proof 已变。照实报告 `diagnostic` |
+| `not-eligible` | proof **读到了但不成立**、阶段不可关闭、或 proof 已变。照实报告 `diagnostic`。proof 只是读不到时走下面的 `unknown`，**不是这一行** |
 | `preview-stale` / `preview-invalid` | 预览失效，重新预览并重新取得授权 |
-| `unknown` + 探测原因 | **读不到，不是失效**：git 探测或 tracker 探测失败，重试即可，不要去改 Proposal |
+| `unknown` + 探测原因 | **读不到，不是失效**：git 探测、tracker 探测或 promotion proof 探测失败，重试即可，不要去改 Proposal |
 | `unknown` | 读写完整性无法证明。**不等于失败，更不等于没写入** —— 先按 marker 对账 |
 | `rejected` + `statusCode` | 平台明确拒绝（403 多半是权限） |
 | `target-unselected` | 补齐 backend 与精确目标，或配好项目默认值 |

@@ -22,7 +22,12 @@ ACCEPTED = "proposal-stage:accepted"
 OTHER_STAGES = ("proposal-stage:draft", "proposal-stage:published",
                 "proposal-stage:in-review", "proposal-stage:needs-revision",
                 "proposal-stage:deferred", "proposal-stage:rejected")
-UNPROVED = ("not-promoted", "stale", "invalid", "unknown", "not-accepted")
+# A proof that read the facts and found the promotion does not hold, versus a proof
+# that could not read at all.  The first is a verdict about the Proposal; the second
+# is a retry, and conflating them is what sent a reader to diff an unchanged
+# Proposal on 2026-10-04.
+REFUSED = ("not-promoted", "stale", "invalid", "not-accepted")
+UNPROVED = REFUSED + ("unknown",)
 
 
 class DecisionTests(unittest.TestCase):
@@ -46,17 +51,39 @@ class DecisionTests(unittest.TestCase):
                 decision = closeout_decision(stage, True, proof)
                 self.assertEqual(decision.state, "already-closed", (stage, proof))
 
-    def test_every_unproved_state_blocks_and_passes_its_diagnostic_through(self):
-        for proof in UNPROVED:
+    def test_every_refused_state_blocks_and_passes_its_diagnostic_through(self):
+        for proof in REFUSED:
             decision = closeout_decision(ACCEPTED, False, proof,
                                          proof_diagnostic="promotion-" + proof)
             self.assertEqual(decision.state, "not-eligible", proof)
             self.assertEqual(decision.diagnostic, "promotion-" + proof, proof)
 
-    def test_an_unproved_state_without_a_diagnostic_still_blocks(self):
+    def test_a_refused_state_without_a_diagnostic_still_blocks(self):
         decision = closeout_decision(ACCEPTED, False, "not-promoted")
         self.assertEqual(decision.state, "not-eligible")
         self.assertEqual(decision.diagnostic, "promotion-not-proved")
+
+    def test_a_proof_that_could_not_read_is_unknown_not_not_eligible(self):
+        """A probe failure is a retry, not a verdict about the Proposal.
+
+        `prove()` returns `unknown` both when the remote snapshot could not be taken
+        and when the Proposal pool was unreadable.  Reported as `not-eligible`, the
+        reader goes and investigates a Proposal that is perfectly fine -- which is what
+        happened on 2026-10-04, three times in one closeout.  `unknown` already means
+        "could not read, retry" everywhere else in this module.
+        """
+        decision = closeout_decision(ACCEPTED, False, "unknown",
+                                     proof_diagnostic="proposal-pool-unknown")
+        self.assertEqual(decision.state, "unknown")
+        self.assertNotEqual(decision.state, "not-eligible")
+        self.assertEqual(decision.diagnostic, "proposal-pool-unknown")
+
+    def test_a_probe_failure_without_a_diagnostic_still_says_unknown(self):
+        """Four of `prove()`'s `unknown` paths carry no diagnostic at all, so the
+        fallback must not claim the promotion was examined and found wanting."""
+        decision = closeout_decision(ACCEPTED, False, "unknown")
+        self.assertEqual(decision.state, "unknown")
+        self.assertEqual(decision.diagnostic, "promotion-unknown")
 
     def test_stages_outside_accepted_and_promoted_are_not_closeable(self):
         for stage in OTHER_STAGES:
@@ -207,17 +234,23 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(result["state"], "already-closed")
         self.assertNotIn("digest", result)
 
-    def test_an_unproved_promotion_blocks_and_keeps_the_proof_diagnostic(self):
+    def test_a_refused_promotion_blocks_and_keeps_the_proof_diagnostic(self):
         for state, diagnostic in (("not-promoted", "promotion-not-found"),
                                   ("stale", "proposal-baseline-drifted"),
                                   ("invalid", "promotion-row-mismatch"),
-                                  ("unknown", "promotion-unknown"),
                                   ("not-accepted", "tracker-absent")):
             result = preview(proof=Proof(state, proposal_id=PROPOSAL_ID,
                                          diagnostic=diagnostic))
             self.assertEqual(result["state"], "not-eligible", state)
             self.assertEqual(result["diagnostic"], diagnostic, state)
             self.assertNotIn("digest", result)
+
+    def test_a_proof_that_could_not_read_previews_unknown_not_not_eligible(self):
+        result = preview(proof=Proof("unknown", proposal_id=PROPOSAL_ID,
+                                    diagnostic="promotion-unknown"))
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["diagnostic"], "promotion-unknown")
+        self.assertNotIn("digest", result)
 
     def test_publication_states_other_than_published_pass_straight_through(self):
         for state in ("absent", "invalid", "unknown"):
@@ -455,6 +488,17 @@ class CloseTests(unittest.TestCase):
             result = closing(adapter, self.journal, proof=proof)
             self.assertIn(result["state"], ("not-eligible",))
             self.assertEqual(adapter.writes, [])
+
+    def test_a_reproof_that_could_not_read_is_unknown_and_still_writes_nothing(self):
+        """The confirm-side re-proof fails the same way the preview-side one does, and
+        must give the same answer: retry, not "this Proposal cannot be closed"."""
+        adapter = WritingAdapter()
+        result = closing(adapter, self.journal,
+                         proof=Proof("unknown", proposal_id=PROPOSAL_ID,
+                                     diagnostic="proposal-pool-unknown"))
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["diagnostic"], "proposal-pool-unknown")
+        self.assertEqual(adapter.writes, [])
 
     def test_a_target_that_moved_after_the_preview_stops_before_writing(self):
         adapter = WritingAdapter()
