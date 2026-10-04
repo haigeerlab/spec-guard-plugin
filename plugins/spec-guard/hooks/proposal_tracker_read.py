@@ -14,6 +14,7 @@ MAX_PAGES = 10
 # in local_ledger_runtime, so the two cannot drift apart.
 LOCAL_PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 # Open/closed is read per platform.  GitLab says "opened", not "open".
+# Keyed on the REST spelling; `_closed` lowercases GitHub's `gh` answer first.
 CLOSED_STATES = {"github": {"open": False, "closed": True},
                  "gitlab": {"opened": False, "closed": True}}
 # `invalid` covers three different problems and a caller must react differently to
@@ -72,7 +73,16 @@ def _closed(platform, issue):
     if platform == "local":
         value = issue.get("isClosed")
         return value if isinstance(value, bool) else None
-    return CLOSED_STATES[platform].get(issue.get("state"))
+    state = issue.get("state")
+    if platform == "github" and isinstance(state, str):
+        # `_github_page` reads through `gh issue list --json state`, which answers
+        # OPEN/CLOSED; the REST API answers open/closed. Uppercase is therefore the
+        # shape this adapter actually receives -- measured against github.com on
+        # 2026-10-04, where the lowercase-only table made every real read malformed.
+        # Not applied to gitlab: `glab api` returns the REST spelling, and loosening a
+        # case this has not been measured against would be guessing.
+        state = state.lower()
+    return CLOSED_STATES[platform].get(state)
 
 
 def _labels(platform, issue):
@@ -216,6 +226,11 @@ def _json(raw):
 
 
 def _github_page(target, runner):
+    # The only GitHub reader in this plugin that goes through the `gh` CLI rather than
+    # `gh api`. That matters for one field: `--json state` answers OPEN/CLOSED, while
+    # every `gh api` reader here (hosted_ticket_provider, local_ticket_github,
+    # proposal_closeout_github) gets the REST spelling. `_closed` lowercases for this
+    # reason; do not "simplify" that away.
     response = _json(runner([
         "gh", "issue", "list", "--repo", target, "--state", "all",
         "--limit", str(PAGE_SIZE * MAX_PAGES), "--json", "number,body,labels,state",
