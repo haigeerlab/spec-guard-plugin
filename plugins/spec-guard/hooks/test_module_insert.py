@@ -502,6 +502,16 @@ class ModuleInsertTests(unittest.TestCase):
     def test_invalid_non_kebab_id_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "Not_Kebab", "Fourth", "—", "end"))
 
+    def test_trailing_newline_id_is_refused_by_the_id_gate(self):
+        # `$` matches before a final newline, so the kebab-case gate must use
+        # fullmatch; otherwise the id slips through and the downstream strict
+        # re-validation blames the capability map instead of the id.
+        before = self.snapshot()
+        with self.assertRaises(InsertError) as caught:
+            preview(self.root, "zeta\n", "Fourth", "—", "end")
+        self.assertIn("id 不是合法的 kebab-case", str(caught.exception))
+        self.assertEqual(before, self.snapshot())
+
     def test_unknown_dependency_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "ghost", "end"))
 
