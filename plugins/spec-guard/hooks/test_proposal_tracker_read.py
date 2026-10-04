@@ -16,9 +16,10 @@ def proposal():
 
 
 def github_issue(number=42, body=None, labels=None, repository=None,
-                 title="Proposal: gamma"):
+                 title="Proposal: gamma", state="open"):
     return {
         "number": number,
+        "state": state,
         "repository": {"full_name": "octo/spec-guard"} if repository is None else repository,
         "title": title,
         "body": MARKER if body is None else body,
@@ -37,6 +38,118 @@ def gitlab_issue(iid=9, body=None, labels=None, project_id=17, title="Proposal: 
         "description": MARKER if body is None else body,
         "labels": ["proposal", "proposal-stage:published"] if labels is None else labels,
     }
+
+
+def local_issue(issue_id="01JQRS4V7XK0000000000E7V48", body=None, labels=None,
+                project_id="01M38JFCSPPKPQ3CJ2VY0ZP1XM", is_closed=False,
+                title="Proposal: gamma"):
+    """The shape the Local adapter normalizes an Epiq issue into."""
+    return {
+        "id": issue_id,
+        "projectId": project_id,
+        "title": title,
+        "isClosed": is_closed,
+        "description": MARKER if body is None else body,
+        "labels": ["proposal", "proposal-stage:accepted"] if labels is None else labels,
+    }
+
+
+class ProposalTrackerLocalTests(unittest.TestCase):
+    """The Local ledger is a third backend for the same identity rules: one pure
+    function, one stage namespace, only the transport differs."""
+
+    PROJECT = "01M38JFCSPPKPQ3CJ2VY0ZP1XM"
+
+    DEFAULT = object()
+
+    def recover(self, issues, target=DEFAULT, complete=True):
+        return recover_tracker_issue(
+            proposal(), "local", self.PROJECT if target is self.DEFAULT else target,
+            {"complete": complete, "issues": issues})
+
+    def test_recovers_one_verified_local_issue_with_a_string_id(self):
+        result = self.recover([local_issue()])
+        self.assertEqual(result.state, "verified")
+        self.assertEqual(result.issue_id, "01JQRS4V7XK0000000000E7V48")
+        self.assertEqual(result.stage, "proposal-stage:accepted")
+        self.assertEqual(result.target, self.PROJECT)
+        self.assertFalse(result.closed)
+
+    def test_a_closed_local_issue_reports_closed(self):
+        self.assertTrue(self.recover([local_issue(is_closed=True)]).closed)
+
+    def test_a_local_target_must_be_a_well_formed_project_id(self):
+        for target in (17, "", None, "has space", "x" * 65):
+            self.assertEqual(self.recover([local_issue()], target=target).state,
+                             "unknown", target)
+
+    def test_a_local_marker_outside_the_named_project_is_invalid(self):
+        result = self.recover([local_issue(project_id="01OTHERPROJECT")])
+        self.assertEqual(result.state, "invalid")
+
+    def test_a_local_issue_without_a_closed_flag_is_unknown(self):
+        issue = local_issue()
+        del issue["isClosed"]
+        self.assertEqual(self.recover([issue]).state, "unknown")
+        self.assertEqual(self.recover([dict(local_issue(), isClosed="no")]).state,
+                         "unknown")
+
+    def test_local_shares_the_absent_and_duplicate_rules(self):
+        self.assertEqual(self.recover([local_issue(body="no marker here")]).state,
+                         "absent")
+        self.assertEqual(self.recover([local_issue(issue_id="a"), local_issue(issue_id="b")]
+                                      ).state, "invalid")
+        self.assertEqual(self.recover([local_issue()], complete=False).state, "unknown")
+
+    def test_local_rejects_the_legacy_bridge_marker_and_label_contract_breaks(self):
+        legacy = MARKER + "\n<!-- spec-guard-sync:v2 id=gamma -->"
+        self.assertEqual(self.recover([local_issue(body=legacy)]).state, "invalid")
+        self.assertEqual(self.recover([local_issue(labels=["proposal"])]).state, "invalid")
+
+
+class ProposalTrackerClosedStateTests(unittest.TestCase):
+    """Without the open/closed fact a caller cannot report `already-closed`, so a
+    response that does not carry it is `unknown` rather than assumed open."""
+
+    def test_github_open_and_closed_states_are_read(self):
+        read = lambda state: recover_tracker_issue(
+            proposal(), "github", "octo/spec-guard",
+            {"complete": True, "issues": [github_issue(state=state)]})
+        self.assertFalse(read("open").closed)
+        self.assertTrue(read("closed").closed)
+
+    def test_a_github_issue_without_a_state_is_unknown(self):
+        issue = github_issue()
+        del issue["state"]
+        self.assertEqual(recover_tracker_issue(
+            proposal(), "github", "octo/spec-guard",
+            {"complete": True, "issues": [issue]}).state, "unknown")
+
+    def test_gitlab_uses_opened_rather_than_open(self):
+        read = lambda state: recover_tracker_issue(
+            proposal(), "gitlab", 17,
+            {"complete": True, "issues": [gitlab_issue(state=state)]})
+        self.assertFalse(read("opened").closed)
+        self.assertTrue(read("closed").closed)
+        self.assertEqual(read("open").state, "unknown")
+
+    def test_a_gitlab_issue_without_a_state_is_unknown(self):
+        issue = gitlab_issue()
+        del issue["state"]
+        self.assertEqual(recover_tracker_issue(
+            proposal(), "gitlab", 17, {"complete": True, "issues": [issue]}).state,
+            "unknown")
+
+    def test_safe_json_carries_the_closed_fact(self):
+        result = recover_tracker_issue(
+            proposal(), "local", "01M38JFCSPPKPQ3CJ2VY0ZP1XM",
+            {"complete": True, "issues": [local_issue(is_closed=True)]})
+        payload = as_json(result, "local", "01M38JFCSPPKPQ3CJ2VY0ZP1XM")
+        self.assertTrue(payload["closed"])
+        self.assertEqual(payload["issueId"], "01JQRS4V7XK0000000000E7V48")
+        serialized = json.dumps(payload)
+        self.assertNotIn(MARKER, serialized)
+        self.assertNotIn("Proposal: gamma", serialized)
 
 
 class ProposalTrackerReadFixtures(unittest.TestCase):
@@ -132,7 +245,7 @@ class ProposalTrackerTransportTests(unittest.TestCase):
         self.assertEqual((result.state, result.issue_id), ("verified", 101))
         self.assertEqual(calls, [[
             "gh", "issue", "list", "--repo", "octo/spec-guard", "--state", "all",
-            "--limit", "1000", "--json", "number,body,labels",
+            "--limit", "1000", "--json", "number,body,labels,state",
         ]])
 
     def test_github_result_at_the_read_limit_is_unknown(self):
@@ -192,11 +305,12 @@ class ProposalTrackerTransportTests(unittest.TestCase):
 
 class ProposalTrackerOutputTests(unittest.TestCase):
     def test_json_exposes_only_safe_verified_facts(self):
-        result = TrackerRead("verified", issue_id=42, stage="proposal-stage:in-review")
+        result = TrackerRead("verified", issue_id=42, stage="proposal-stage:in-review",
+                             closed=False)
         data = as_json(result, "github", "octo/spec-guard")
         self.assertEqual(data, {
             "state": "verified", "platform": "github", "target": "octo/spec-guard",
-            "issueId": 42, "stage": "proposal-stage:in-review",
+            "issueId": 42, "stage": "proposal-stage:in-review", "closed": False,
         })
         self.assertNotIn(MARKER, json.dumps(data))
 
