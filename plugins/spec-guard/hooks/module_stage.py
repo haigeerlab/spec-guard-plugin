@@ -149,8 +149,12 @@ def describe(root: Path) -> str:
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
     except MapError as error:
+        # The message carries the offending cell, which is the whole diagnostic value --
+        # without it nobody knows which row is broken. It is also repository content, so
+        # it goes through the sanitiser rather than being dropped or trusted.
         return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid (%s)\n\n"
-                "Suggested next step: run `/spec-guard:verify-artifacts` and fix the capability map." % error)
+                "Suggested next step: run `/spec-guard:verify-artifacts` and fix the capability map."
+                % safe_fragment(str(error)))
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
@@ -183,8 +187,10 @@ def describe(root: Path) -> str:
     unmerged = unmerged_commits(root) if stage in ("DONE", "MODULE_DONE") else None
     push_first = ""
     if unmerged and unmerged[0] > 0:
-        hint = ("- This branch has %d commit(s) not yet in `%s` (as last fetched)." % unmerged)
-        push_first = "push this branch and merge its %d commit(s) into `%s` first; then " % unmerged
+        count, ref = unmerged[0], safe_fragment(unmerged[1])
+        hint = "- This branch has %d commit(s) not yet in `%s` (as last fetched)." % (count, ref)
+        push_first = ("push this branch and merge its %d commit(s) into `%s` first; then "
+                      % (count, ref))
     else:
         hint = ""
     if stage == "DONE":
