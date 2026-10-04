@@ -144,7 +144,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
         checked = len(CHECKED.findall(todo.read_text(encoding="utf-8")))
         interrupted = {"id": current["id"], "checked": checked, "total": checked + current["open"]}
 
-    if not MODULE_ID.match(module_id):
+    if not MODULE_ID.fullmatch(module_id):
         raise InsertError("id 不是合法的 kebab-case: %s" % module_id)
 
     responsibility = responsibility.strip()
