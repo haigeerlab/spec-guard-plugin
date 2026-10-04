@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### 新增
+
+- **同机 Claude Code／Codex 会话使用统一的双向路由。** 用户按宿主、会话名称和项目描述即可发现并联系目标；Claude 同宿主复用 `ListAgents`／`SendMessage` 和 reply address，Codex 同宿主复用 App task/thread、turn 与 wait/read，跨宿主继续走当前唯一选择的持久 bridge。目录标明 `[Claude Code]`／`[Codex]` 与 `native-visible`／`bridge-joined`；同宿主原生能力不可用时，只有授权有效、bridge ready 且两端唯一加入才显式 fallback，不双写正文。
+- **会话通信授权可在流畅度和范围之间明确选择。** 联系既有会话复用当前 task 授权；新建会话默认一次 task，也可由用户选择固定数量 batch 或当前 session。扩项目、扩权、超额、过期和有后果的外部操作仍停止；消息和回复不授予开发权限。
+
 ### 修复
 
 - **Claude background 委派能收到首轮 prompt，并可继续真实的 `blocked/idle` 会话。** 创建命令在可变长 `--tools` 后加入参数终止符，避免 prompt 被解析成工具名；第二轮把 Claude Code 2.1.288 的 `blocked/idle` 作为可精确 stop 后恢复的空闲状态，停止后的 `done/null/null` 条目可读回为 `done`。真实 Codex→Claude 双轮、safe-review 写入拒绝与精确停止已通过。
@@ -11,6 +16,7 @@
 ### 已知限制
 
 - **授权会话委派仍是未发布候选，且不改变 A10。** 2026-10-04 的本机 native 验收已覆盖双向创建、自注册、两轮继续、结果回传、同名消歧和取消，但没有覆盖 XATS 或跨机器；不据此宣称发布完成、推进 A10 native 转正或删除 XATS。
+- **统一会话路由只声明已证明的同机语义。** Claude Code 2.1.288 的原生 peer 双向两轮和 Codex App 0.160.0 的同一 task 两轮 wait/read 已通过；Codex 目标 task 主动跨 task 发送仍需该发送 task 的直接人类授权。受控 bridge fallback 的前台双向两轮已通过，但一次 Claude `--background` 临时 MCP 探针因工具未挂载记为环境不可用；XATS 未重复实机验收。
 
 ## [0.38.3] - 2026-10-03
 

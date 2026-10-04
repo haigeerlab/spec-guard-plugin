@@ -30,6 +30,28 @@
 
 **不做什么：** 不改 Git 和 Issue，不分派任务，不跨机器通信。
 
+### 统一会话路由（源码候选）
+
+同一台 Mac 上可以直接按「宿主＋会话名称＋项目」联系另一会话。统一入口会显示 `[Claude Code]`／
+`[Codex]` 和 `native-visible`／`bridge-joined`，同名时要求最小消歧，不要求用户填写内部 ID：
+
+- Claude Code ↔ Claude Code 直接复用 Claude Code 的 `ListAgents`／`SendMessage`、reply address 和
+  原生 wake，不把正文再写进协作信箱；
+- Codex ↔ Codex 直接复用 Codex App 的 task/thread、turn 和 wait/read；目标在当前 turn 内回复。
+  如果要让目标 task 主动联系第三个 task，仍需人在那个发送 task 里直接授权；
+- Claude Code ↔ Codex 继续使用当前唯一选中的协作信箱后端，不同时写 XATS 与 native；
+- 同宿主原生能力不可用时，只有当前授权仍有效、bridge 已 ready、两端都已唯一加入，才自动回退，
+  并显示 `fallbackFrom` 和原因。初始化、改配置、加入新身份或扩权仍只问这一个变化。
+
+直接联系一个既有会话沿用本次任务授权，不逐条重复询问。创建新的复审／开发会话时默认使用一次
+task 授权；需要连续工作时可以明确授权固定数量的 batch 或当前 session，到期、超额、换项目、扩权和
+有后果的外部操作仍会停下。会话列表里的 registered 不等于 online，消息入箱也不等于已读或已完成。
+
+2026-10-04 的源码候选已在 Claude Code 2.1.288 和 Codex App 0.160.0 上完成同机双轮验收；
+Claude 的原生路径没有 bridge 正文副本，Codex 同一隔离 task 可被第二次启动 turn。受控 bridge
+fallback 的双向两轮与精确 acknowledgement 已通过，但一次 Claude `--background` 临时 MCP 探针因
+未挂载该 MCP 记为环境不可用。这个范围不包含跨机器，也不改变 A10 的转正门槛。
+
 ### 跨宿主会话委派
 
 在已启用协作信箱后，可以用一句话要求当前 Claude Code 创建 Codex 审查会话，或由 Codex 创建 Claude Code
