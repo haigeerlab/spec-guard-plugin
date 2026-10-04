@@ -312,6 +312,52 @@ printf -- '---\nname: ops\n---\n什么都没有。\n' > "$TMP/parityempty/plugin
 want fail "command-parity: 零个命令文件 → 不算通过" \
   python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityempty"
 
+# ── check-acceptance-wired.py ──
+# 2026-10-05 审计 P1-1：验收测试需要固定外部运行时，不该进 CI —— 但也不能没有任何
+# 地方告诉维护者跑它。最关键的是第二条反例：只被 docs/reports/ 提到**不算**运行指引，
+# 否则这条判据会被历史证据喂饱而永远绿（docs/lenses.md A3「太宽」）。
+mkacc() {  # $1=目录 $2=验收测试文件名
+  rm -rf "$1"
+  mkdir -p "$1/plugins/spec-guard/hooks" "$1/docs" "$1/scripts"
+  printf '# acceptance\n' > "$1/plugins/spec-guard/hooks/$2"
+  printf '# 维护者工作流\n' > "$1/docs/maintainer-workflow.md"
+  printf '#!/usr/bin/env bash\necho validate\n' > "$1/scripts/validate.sh"
+}
+
+mkacc "$TMP/accgood" test_demo_acceptance.py
+printf '跑 `plugins/spec-guard/hooks/test_demo_acceptance.py`，需 SPEC_GUARD_EPIQ_RUNTIME。\n' \
+  >> "$TMP/accgood/docs/maintainer-workflow.md"
+want pass "acceptance-wired: 维护者文档里有运行指引 → 放行" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accgood"
+
+mkacc "$TMP/accrunner" test_demo_acceptance.py
+printf 'python3 -B plugins/spec-guard/hooks/test_demo_acceptance.py\n' \
+  >> "$TMP/accrunner/scripts/validate.sh"
+want pass "acceptance-wired: 接进运行器 → 放行" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accrunner"
+
+mkacc "$TMP/accreport" test_demo_acceptance.py
+mkdir -p "$TMP/accreport/docs/reports"
+printf '本轮已实测 `test_demo_acceptance.py`，退出 0。\n' \
+  > "$TMP/accreport/docs/reports/2026-10-03-audit.md"
+want fail "acceptance-wired: 只被 docs/reports/ 当历史证据提到 → 报错" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accreport"
+
+mkacc "$TMP/accorphan" test_demo_acceptance.py
+want fail "acceptance-wired: 全仓库零引用 → 报错" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accorphan"
+
+rm -rf "$TMP/accnone"; mkdir -p "$TMP/accnone/plugins/spec-guard/hooks" "$TMP/accnone/docs"
+printf '# 维护者工作流\n' > "$TMP/accnone/docs/maintainer-workflow.md"
+printf '# 普通测试\n' > "$TMP/accnone/plugins/spec-guard/hooks/test_demo.py"
+want fail "acceptance-wired: 零个验收测试文件 → 不算通过" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accnone"
+
+rm -rf "$TMP/accnosrc"; mkdir -p "$TMP/accnosrc/plugins/spec-guard/hooks"
+printf '# acceptance\n' > "$TMP/accnosrc/plugins/spec-guard/hooks/test_demo_acceptance.py"
+want fail "acceptance-wired: 读不到任何运行器或维护者文档 → 不算通过" \
+  python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accnosrc"
+
 # ── test-retire-legacy-tracker-bridge.sh（广度扫描，R6）──
 # 扩大后的扫描要能对着一棵干净夹具树全绿，对反例喂 gh issue create 和
 # 残留在 hook 脚本里的 /sync-map 各报一次，而带理由的允许清单不受影响。
