@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.39.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.39.0;test:marketplace-update-20261004"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace --json",
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user --json",
+        "result:user-scope spec-guard plugin is enabled at version 0.39.0; its marketplace checkout resolves to the tagged commit",
+        "result:the installed cache matches the tagged plugin content except for host-owned marker metadata",
+        "host:Claude Code 2.1.289"
+      ]
+    },
+    {
+      "subject": "spec-guard-native-claude-wake",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.39.0;test:synthetic-native-repeat-wake-20261004"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "host:a fresh read-only Claude Code background session used the installed v0.39.0 native collaboration control surface on one Mac",
+        "result:the same idle Claude conversation was woken twice by the same exact Codex identity in separate turns; both PING/PONG pairs were read and acknowledged",
+        "result:the Claude identity also sent a direct message to a fresh idle Codex Desktop task, received its reply, and acknowledged it",
+        "cleanup:all temporary Claude identities were stopped and retired only after their unread counts reached zero; message history was retained",
+        "boundary:no project file, Git state, global host configuration, Local ticket, remote ticket, or non-test mailbox message was changed"
+      ]
+    }
+  ]
+}

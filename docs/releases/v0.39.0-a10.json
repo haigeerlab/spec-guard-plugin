@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.39.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-a10-native-same-mac-host",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.39.0;host:single-mac;test:synthetic-bidirectional-wake-20261004"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "backend:native;runtime-state:ready;pinned-revision:8f12c880cfdba73812b6ab7bc0f373fc467e0343",
+        "result:Codex to Claude completed two separate idle wake cycles on the same identities; every direct PING and PONG was acknowledged",
+        "result:Claude to a real idle Codex Desktop task completed wake, read, acknowledgement, reply, and reply acknowledgement",
+        "cleanup:four exact temporary identities, including one discarded orchestration attempt, were retired with zero test unread; the two Codex test tasks were archived",
+        "result:the global native preflight returned to the pre-test 21 registered identities and 9 unacknowledged direct deliveries"
+      ]
+    },
+    {
+      "subject": "spec-guard-a10-native-rollback-rehearsal",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.39.0;test:rollback-rehearsal"
+      },
+      "reason": "Fresh preflight found 21 pre-existing registered native identities, 9 pre-existing unacknowledged direct deliveries, and active-session state unverified. The authorized batch covered only new synthetic identities and messages, so rollback correctly stopped before changing the selector, starting XATS, or altering existing mailbox state."
+    },
+    {
+      "subject": "spec-guard-a10-native-promotion-r1",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.39.0;gate:r1"
+      },
+      "reason": "The released and installed version passed same-Mac native send, receive, repeat Claude idle wake, and real Codex Desktop idle wake, but A10 R1 also requires a safe rollback rehearsal. Because that rehearsal was blocked by pre-existing state, v0.39.0 is supporting host evidence and does not count as R1; the consecutive-release count remains 0/2."
+    }
+  ]
+}
