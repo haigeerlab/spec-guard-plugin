@@ -1,5 +1,9 @@
 # Plan: proposal-review
 
+> 登记说明：转为单一能力图时，本模块的 initiative 时期计划被原样恢复
+> （见 [`docs/decisions/2026-09-28-single-capability-map.md`](../../docs/decisions/2026-09-28-single-capability-map.md) 的「本次改动」第一条）。登记时模块已交付，因此没有
+> `tasks/<module-id>/todo.md`；`plan-without-todo` 判据据此按已完成计，这不是漏建。
+
 Spec: `spec/proposal-review.md`
 
 ## Overview
