@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.40.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.40.0;test:marketplace-ref-upgrade-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "result:spec-guard@spec-guard-marketplace is installed and enabled at version 0.40.0; its marketplace checkout resolves to the tagged commit",
+        "result:the installed plugin content matches the release content except for host-generated migrated command skills",
+        "host:the app-managed Codex package is codex-cli 0.160.0; the unrelated PATH CLI remains 0.154.0 and was not used for host acceptance"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.40.0;test:installed-plugin-smoke-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "command:PATH=<app-managed-codex-directory>:$PATH /bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source <marketplace-plugin-source>",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "host:codex-cli 0.160.0; no model override was passed",
+        "boundary:the PATH-selected 0.154.0 CLI and its historical HTTP 400 were not used or interpreted as an account model restriction"
+      ]
+    },
+    {
+      "subject": "spec-guard-native-codex-routing",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-desktop:v0.40.0;test:installed-native-bidirectional-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "host:a fresh user-authorized Codex Desktop task registered one exact synthetic identity against the installed v0.40.0 native runtime",
+        "result:Codex received and acknowledged two independent Claude result routes, including a second wake of the same Claude session",
+        "result:Codex sent one direct reverse message, observed target acknowledgement, received the same-thread reply, and acknowledged it",
+        "cleanup:the exact synthetic Codex identity was retired with unread zero and both acceptance tasks were archived; message history was retained",
+        "limit:the first acceptance harness used an unsuffixed recipient selector and an exact-body assertion; the product message still arrived, but that attempt is recorded as a harness failure rather than host proof"
+      ]
+    }
+  ]
+}

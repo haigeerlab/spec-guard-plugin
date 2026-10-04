@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.40.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-a10-native-only-same-mac",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.40.0;host:single-mac;test:installed-bidirectional-repeat-wake-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "backend:native;runtime-state:ready;pinned-revision:8f12c880cfdba73812b6ab7bc0f373fc467e0343",
+        "result:the installed host exposed exactly the ten reviewed bridge mailbox tools and no worker, orchestration, or lifecycle tools",
+        "result:one exact Claude session completed two Claude-to-Codex result routes across an idle continuation; Codex then completed one direct Codex-to-Claude request and same-thread reply",
+        "result:every processed delivery was acknowledged by its receiver and visible as acknowledged to its sender; the reverse wake record reached read",
+        "cleanup:the exact synthetic session was cancelled, both identities were retired at unread zero, history was retained, and acceptance tasks were archived",
+        "result:the public repository had three open Proposal issues and no open issue labelled P1 or P2 at the observation time"
+      ]
+    },
+    {
+      "subject": "spec-guard-a10-compatibility-rollback",
+      "status": "unsupported",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.40.0;test:compatibility-rollback"
+      },
+      "reason": "v0.40.0 is native-only by the accepted 2026-10-04 sunset decision. The compatibility runtime and fallback are intentionally absent, so rollback is not a current product acceptance path."
+    },
+    {
+      "subject": "spec-guard-a10-cross-machine",
+      "status": "unsupported",
+      "target": {
+        "kind": "host-session",
+        "id": "a10-native:v0.40.0;host:cross-machine"
+      },
+      "reason": "The supported collaboration scope is one Mac. No cross-machine discovery, connection, or wake guarantee is claimed."
+    }
+  ]
+}
