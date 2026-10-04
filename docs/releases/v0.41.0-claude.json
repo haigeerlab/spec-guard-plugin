@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.41.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "not-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.41.0"
+      },
+      "reason": "No Claude Code installed-session acceptance was run for this release. The v0.40.0 record is not carried forward: v0.41.0 changes the injected phase text, so the earlier observation does not describe this version."
+    },
+    {
+      "subject": "spec-guard-native-claude-repeat-wake",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.41.0"
+      },
+      "reason": "No native bridge host acceptance was run for this release. collaboration-messaging is unchanged in v0.41.0, but an unchanged surface is not an observation and is not recorded as one."
+    }
+  ]
+}
