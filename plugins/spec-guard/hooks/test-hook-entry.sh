@@ -29,7 +29,7 @@ $OUT"
 P="$WORK/active"
 mkdir -p "$P/.agent"
 git -C "$P" init -q
-printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$P/.agent/state.json"
+printf '%s\n' '{"activeModule":""}' > "$P/.agent/state.json"
 # 项目里放一个同名脚本：任何情况下都不能被执行。
 mkdir -p "$P/.claude/hooks"
 printf '#!/bin/sh\ntouch "%s/project-script-ran"\n' "$WORK" > "$P/.claude/hooks/phase-guard.sh"

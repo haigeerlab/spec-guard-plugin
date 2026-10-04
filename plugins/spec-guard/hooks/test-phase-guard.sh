@@ -63,8 +63,26 @@ printf '%s\n' '本项目不用 `<!-- BEGIN:agent-skills-convention -->` 这个�
 silent "正文里提到标记不激活" "$WORK/prose"
 
 mkdir -p "$WORK/idle/.agent"
-printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$WORK/idle/.agent/state.json"
+printf '%s\n' '{"activeModule":""}' > "$WORK/idle/.agent/state.json"
 injects "setup 写下的 state.json 激活并报告 IDLE" "$WORK/idle" "IDLE"
+
+# activeModule 是这个文件存在的唯一理由，因此它才是激活证据；已退役的 tracker 字段不是。
+mkdir -p "$WORK/legacy-state/.agent"
+printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$WORK/legacy-state/.agent/state.json"
+injects "旧版 state.json 仍靠 activeModule 激活" "$WORK/legacy-state" "IDLE"
+
+mkdir -p "$WORK/tracker-only/.agent"
+printf '%s\n' '{"tracker":"none"}' > "$WORK/tracker-only/.agent/state.json"
+silent "只有已退役的 tracker 字段不激活" "$WORK/tracker-only"
+
+mkdir -p "$WORK/tracker-github/.agent"
+printf '%s\n' '{"tracker":"github","modules":{}}' > "$WORK/tracker-github/.agent/state.json"
+silent "只有 tracker github 不激活" "$WORK/tracker-github"
+
+mkdir -p "$WORK/active-pointer/.agent"
+printf '%s\n' '{"activeModule":"alpha"}' > "$WORK/active-pointer/.agent/state.json"
+map "$WORK/active-pointer"
+injects "有值的 activeModule 同样激活" "$WORK/active-pointer" "MAP_ONLY"
 
 mkdir -p "$WORK/crlf"
 printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
@@ -97,12 +115,12 @@ injects "BUILDING 给出剩余项数" "$stages" "2 unchecked item(s) in \`tasks/
 injects "进行中时的全局计数" "$stages" "Modules 2 · Specs 2 · Plans 1 · In progress 1 · Done 0"
 printf '%s\n' '- [x] done' '- [X] one' > "$stages/tasks/alpha/todo.md"
 injects "当前模块完成后推进到下一个模块" "$stages" 'Current module: `beta` (next in Build order)'
-printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 优先于 Build order" "$stages" 'Current module: `alpha` (activeModule)'
-printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "activeModule 不在图中时提示并回退" "$stages" 'activeModule `ghost` is not in the capability map'
 # 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
-printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 已完成但项目未完成时报告 MODULE_DONE" "$stages" "当前阶段: **MODULE_DONE**"
 injects "MODULE_DONE 仍指出当前模块" "$stages" 'Current module: `alpha` (activeModule)'
 injects "MODULE_DONE 指向 Build order 中第一个未完成模块" "$stages" '`beta`'
@@ -110,19 +128,19 @@ injects "MODULE_DONE 报告该模块自己的阶段" "$stages" 'NEEDS_PLAN'
 lacks "MODULE_DONE 不再冒充项目 DONE" "$stages" "当前阶段: **DONE**"
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 # 全部完成且 activeModule 不在图中：回退后仍是项目 DONE（与拆分前同一场景）。
-printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
 # 全部完成但 activeModule 仍指向已完成模块：仍是项目 DONE，并提示可清除。
-printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "全部完成且 activeModule 未清除时仍报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "全部完成且 activeModule 未清除时指向 add-module" "$stages" "/spec-guard:add-module"
 injects "全部完成且 activeModule 未清除时提示可清除" "$stages" 'activeModule `alpha` is already done and can be cleared'
 lacks "全部完成时不出现模块级提示" "$stages" "before building it"
 # 全部完成且没有 activeModule：输出不带清除提示。
-printf '{"tracker":"none","modules":{},"activeModule":""}\n' > "$stages/.agent/state.json"
+printf '{"activeModule":""}\n' > "$stages/.agent/state.json"
 injects "全部完成且无 activeModule 时报告 DONE" "$stages" "当前阶段: **DONE**"
 lacks "全部完成且无 activeModule 时无清除提示" "$stages" "can be cleared"
 rm "$stages/spec/beta.md"
@@ -145,7 +163,7 @@ printf '# Plan\n' > "$paused/tasks/base/plan.md"
 printf '# Plan\n' > "$paused/tasks/infra/plan.md"
 printf '%s\n' '- [x] done' > "$paused/tasks/base/todo.md"
 printf '%s\n' '- [x] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
-printf '{"tracker":"none","modules":{},"activeModule":"urgent"}\n' > "$paused/.agent/state.json"
+printf '{"activeModule":"urgent"}\n' > "$paused/.agent/state.json"
 injects "插队缺 Spec 时报告 NEEDS_SPEC" "$paused" "当前阶段: **NEEDS_SPEC**"
 injects "NEEDS_SPEC 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
 touch "$paused/spec/urgent.md"
@@ -163,13 +181,16 @@ lacks "没有被暂停模块时不出现 Paused" "$paused" "Paused"
 printf '%s\n' '- [ ] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
 lacks "只有未勾选项的模块不算被暂停" "$paused" "Paused"
 printf '%s\n' '- [x] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
-printf '{"tracker":"none","modules":{},"activeModule":"infra"}\n' > "$paused/.agent/state.json"
+printf '{"activeModule":"infra"}\n' > "$paused/.agent/state.json"
 lacks "当前模块自己做到一半时不算被暂停" "$paused" "Paused"
 
+# 退役的远端映射既不激活也不被读取：带 activeModule 时按本地约定报阶段，映射本身始终被忽略。
 legacy_project="$WORK/legacy"
 mkdir -p "$legacy_project/.agent"
-printf '%s\n' '{"tracker":"github","modules":{"alpha":{"issue":1}}}' > "$legacy_project/.agent/state.json"
-injects "旧 tracker state 按本地约定报告阶段" "$legacy_project" "当前阶段: **IDLE**"
+printf '%s\n' '{"tracker":"github","modules":{"alpha":{"issue":1}},"activeModule":""}' \
+  > "$legacy_project/.agent/state.json"
+injects "旧 tracker state 仍按本地约定报告阶段" "$legacy_project" "当前阶段: **IDLE**"
+lacks "旧 tracker state 的 Issue 映射不被读取" "$legacy_project" "issue"
 if grep -Eqi 'LEGACY|migration notice|sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$legacy_project")"; then
   fail "旧 tracker state 不应再注入迁移提示或已退役的调用路径"
 fi
@@ -190,7 +211,7 @@ touch "$notodo/spec/base.md" "$notodo/spec/alpha.md" "$notodo/spec/beta.md"
 printf '# Plan\n' | tee "$notodo/tasks/base/plan.md" "$notodo/tasks/alpha/plan.md" "$notodo/tasks/beta/plan.md" > /dev/null
 printf '%s\n' '- [x] done' > "$notodo/tasks/base/todo.md"
 printf '%s\n' '- [x] a' '- [ ] b' > "$notodo/tasks/beta/todo.md"
-printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
+printf '{"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 NOTODO_NOTE='activeModule `alpha` has a plan but no `tasks/alpha/todo.md`, so it counts as done; add the todo if work remains.'
 injects "无 todo 的 activeModule 且项目未完成时报告 MODULE_DONE" "$notodo" "当前阶段: **MODULE_DONE**"
 injects "MODULE_DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
@@ -212,12 +233,12 @@ text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
 assert text.index(sys.argv[1]) < text.index("already done and can be cleared"), text
 ' "$NOTODO_NOTE" <<<"$(run "$notodo")" || fail "DONE 中缺 todo 提醒应在可清除提示之前"
 echo "  ✅ DONE 中缺 todo 提醒先于可清除提示"; PASS=$((PASS + 1))
-printf '{"tracker":"none","modules":{},"activeModule":"base"}\n' > "$notodo/.agent/state.json"
+printf '{"activeModule":"base"}\n' > "$notodo/.agent/state.json"
 lacks "activeModule 有全勾 todo 时无缺 todo 提醒" "$notodo" "has a plan but no"
 rm "$notodo/.agent/state.json"
 lacks "无 activeModule 时不因其他缺 todo 模块提醒" "$notodo" "has a plan but no"
 injects "无 activeModule 的 DONE 汇总仍显示缺 todo 数量" "$notodo" "Plan without todo: 1 module(s) counted as done"
-printf '{"tracker":"none","modules":{},"activeModule":"ghost"}\n' > "$notodo/.agent/state.json"
+printf '{"activeModule":"ghost"}\n' > "$notodo/.agent/state.json"
 lacks "activeModule 不在图中时无缺 todo 提醒" "$notodo" "has a plan but no"
 
 # 已退役的远端 tracker 模式（state.json 仍是 github／gitlab）：任务不在 todo.md，不给缺 todo 提醒。
@@ -226,7 +247,7 @@ lacks "退役 tracker github 不给缺 todo 提醒" "$notodo" "has a plan but no
 lacks "退役 tracker github 不给缺 todo 汇总" "$notodo" "Plan without todo:"
 printf '{"tracker":"gitlab","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 lacks "退役 tracker gitlab 不给缺 todo 提醒" "$notodo" "has a plan but no"
-printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
+printf '{"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 injects "tracker none 仍给缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
 
 # Codex 不提供 CLAUDE_PROJECT_DIR，hook 在会话目录里运行（2026-09-28 真实 Codex 核实）。
@@ -273,7 +294,7 @@ unmerged_fixture() {  # $1=克隆目录 $2=alpha 的 todo 内容；创建 bare �
   touch "$dir/spec/alpha.md" "$dir/spec/beta.md"
   printf '# Plan\n' > "$dir/tasks/alpha/plan.md"
   printf '%s\n' "$2" > "$dir/tasks/alpha/todo.md"
-  printf '{"tracker":"none","modules":{},"activeModule":"alpha"}\n' > "$dir/.agent/state.json"
+  printf '{"activeModule":"alpha"}\n' > "$dir/.agent/state.json"
   g -C "$dir" add -A
   g -C "$dir" commit -q -m base
   git -C "$dir" remote add origin "$dir.git"

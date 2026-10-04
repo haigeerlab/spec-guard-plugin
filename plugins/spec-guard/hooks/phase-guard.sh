@@ -15,8 +15,10 @@ else
 fi
 cd "$ROOT" 2>/dev/null || exit 0
 
-# 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或带已知
-# tracker 值的 state.json。正文里提到标记、或别的工具的 .agent/state.json 都不算。
+# 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或含
+# activeModule 的 state.json。正文里提到标记、或别的工具的 .agent/state.json 都不算。
+# activeModule 是本插件写这个文件的唯一理由，所以它是准确的激活证据；此前判据用的
+# `tracker` 字段已随远端 tracker 模式退役（docs/retirements/state-tracker-field.md）。
 has_block() {
   if grep -Eq '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' CLAUDE.md 2>/dev/null; then
     return 0
@@ -25,7 +27,7 @@ has_block() {
 }
 
 has_state() {
-  grep -Eq '"tracker"[[:space:]]*:[[:space:]]*"(none|github|gitlab)"' .agent/state.json 2>/dev/null
+  grep -Eq '"activeModule"[[:space:]]*:' .agent/state.json 2>/dev/null
 }
 
 has_block || has_state || exit 0
