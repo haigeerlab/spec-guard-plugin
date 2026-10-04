@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.39.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.39.0;asset:spec-guard-v0.39.0.tar.gz;sha256:b9a9b87d3170d61be7306752c88aaa0f28266ab8f8a912d04ff7e0adb5e79f78"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.39.0",
+        "asset:spec-guard-v0.39.0.tar.gz;size:435309",
+        "source-tag:v0.39.0@585aec236eba6c2f305997472a2daf2864a92b23",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.39.0",
+        "result:the artifact validated before archiving and after extraction; 184 archive entries contained no AppleDouble or symbolic-link entries",
+        "result:local artifact and published GitHub asset report the same SHA-256 b9a9b87d3170d61be7306752c88aaa0f28266ab8f8a912d04ff7e0adb5e79f78"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.39.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:585aec236eba6c2f305997472a2daf2864a92b23"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "result:v0.39.0 annotated tag and origin/main resolve to final main commit 585aec236eba6c2f305997472a2daf2864a92b23; pull request #154 validation passed before merge",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "result:all four checks exited 0 on macOS at the tagged final main commit",
+        "limit:the smoke selftest validates the grader and does not replace the real host evidence in the v0.39.0 host records"
+      ]
+    }
+  ]
+}

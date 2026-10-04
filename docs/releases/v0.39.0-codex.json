@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.39.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.39.0;test:marketplace-ref-upgrade-20261004"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "result:only the spec-guard marketplace was removed and re-added to change its pinned ref from v0.38.3 to v0.39.0 after the CLI refused an in-place source change",
+        "command:codex plugin add spec-guard@spec-guard-marketplace --json",
+        "result:spec-guard@spec-guard-marketplace is installed and enabled at version 0.39.0; its marketplace checkout resolves to the tagged commit",
+        "result:the installed cache matches the tagged plugin content except for host-generated migrated command skills",
+        "host:the app-managed Codex package is codex-cli 0.160.0; the unrelated PATH CLI remains 0.154.0 and was not used as the host-version conclusion"
+      ]
+    },
+    {
+      "subject": "spec-guard-native-codex-desktop-wake",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-desktop:v0.39.0;test:synthetic-native-idle-wake-20261004"
+      },
+      "observedAt": "2026-10-04T03:47:56Z",
+      "evidence": [
+        "host:a fresh user-authorized Codex Desktop task registered one exact temporary native identity, completed its initial turn, and became idle",
+        "result:a direct Claude message changed the wake receipt to read and created a new Codex turn without a human message in the target task",
+        "result:the Codex task read and acknowledged the message, replied to the exact Claude sender, and returned to idle; Claude read and acknowledged the reply",
+        "cleanup:the exact temporary Codex task was archived and its native identity retired after unread reached zero",
+        "limit:a separate app-server delegation task was not a valid idle-host proof: once notLoaded, its wake remained pending/offline until handled explicitly; this probe is excluded from the passing Desktop result"
+      ]
+    }
+  ]
+}
