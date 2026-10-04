@@ -7,4 +7,4 @@
 - [x] Task 5：复核、写入、journal 与幂等——八项复核全部重做、每步先查重后写、读回三项、两次 confirm 第二次 already-closed、响应丢失只对账不重发
 - [x] Task 6：补 Local 链路——`proposal_submit` 与 `add-module --proposal` 的 `--platform local`；baseline/revision 与 github 路径逐字相同
 - [x] Task 7：入口与文档——命令、Codex skill、parity、`references/proposal-closeout.md`、四步表第 4 步扩写、CHANGELOG；自查文档不描述未实现的行为
-- [ ] Checkpoint：两种 Python 下全部回归 + 隔离账本端到端 + 本仓库零差异 + 无 todo 模块不影响收尾判据 + 代码与安全审查（先复现再修）+ 开 PR 等 CI，不自行合并
+- [x] Checkpoint：两种 Python 下全部回归 + 隔离账本端到端 + 本仓库零差异 + 无 todo 模块不影响收尾判据 + 代码与安全审查（先复现再修）+ 开 PR 等 CI，不自行合并
