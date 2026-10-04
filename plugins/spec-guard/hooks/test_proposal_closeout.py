@@ -4,11 +4,12 @@ write. No I/O, no network, no ledger -- publication, proof and transport are inj
 import inspect
 import json
 import pathlib
+import tempfile
 import unittest
 
 from proposal_closeout import (
-    CLOSEABLE_STAGES, PROMOTED_STAGE, build_preview, closeout_record, closeout_decision,
-    preview_digest,
+    CLOSEABLE_STAGES, PROMOTED_STAGE, build_preview, close_preview, closeout_record,
+    closeout_decision, preview_digest,
 )
 from proposal_contract import Baseline, Change, Proposal
 from proposal_publication import Publication
@@ -108,6 +109,11 @@ class FakeAdapter:
 
     def target_facts(self):
         return dict(self.facts)
+
+    def get_issue(self, issue_id):
+        return {"number": issue_id, "state": "open", "body": "body",
+                "labels": [{"name": ACCEPTED}, {"name": "proposal"}],
+                "url": "u", "repository": {"full_name": "octo/repo"}}
 
     def list_issues(self):
         return {"complete": self.page["complete"],
@@ -281,6 +287,245 @@ class RecordTests(unittest.TestCase):
         self.assertNotEqual(closeout_record(PROPOSAL_ID, REVISION, PROMOTION,
                                             REVIEW).splitlines()[-1],
                             other.splitlines()[-1])
+
+
+class WritingAdapter(FakeAdapter):
+    """Records writes and can be told to fail or to lose a response."""
+
+    def __init__(self, issue=None, lose=(), fail=(), **kwargs):
+        super().__init__(**kwargs)
+        self.issue = issue or {"number": 149, "state": "open", "body": "body",
+                               "labels": [{"name": ACCEPTED}, {"name": "proposal"}],
+                               "url": "u", "repository": {"full_name": "octo/repo"}}
+        self.lose, self.fail = set(lose), set(fail)
+        self.calls = []
+
+    def get_issue(self, issue_id):
+        return dict(self.issue)
+
+    def _record(self, name):
+        self.calls.append(name)
+        self.writes.append(name)
+        if name in self.fail:
+            raise RuntimeError("provider exploded")
+
+    def create_comment(self, issue_id, body):
+        self._record("comment")
+        if "comment" not in self.lose:
+            self.comments.append(body)
+
+    def set_stage(self, issue_id, from_stage, to_stage):
+        self._record("stage")
+        if "stage" not in self.lose:
+            self.issue["labels"] = [{"name": to_stage}, {"name": "proposal"}]
+
+    def set_closed(self, issue_id):
+        self._record("close")
+        if "close" not in self.lose:
+            self.issue["state"] = "closed"
+
+
+OPEN_TRACKER = dict(issue_id=149, stage=ACCEPTED, proposal_id=PROPOSAL_ID,
+                    platform="github", target="octo/repo", closed=False)
+
+
+def tracker_read(**overrides):
+    return TrackerRead("verified", **dict(OPEN_TRACKER, **overrides))
+
+
+def good_proof():
+    return Proof("proved", review_commit=REVIEW, proposal_id=PROPOSAL_ID,
+                 module_id=PROPOSAL_ID, promotion_commit=PROMOTION)
+
+
+def published():
+    return Publication("published", review_commit=REVIEW, proposal=proposal())
+
+
+def closing(adapter, journal, confirm=True, tracker=None, proof=None,
+            publication=None, mutate=None, before_close=None):
+    """Preview against healthy facts, then close against possibly different ones.
+
+    The two phases take separate readers on purpose: every interesting case here is
+    something that changed *between* showing the preview and writing, which a single
+    set of readers could never express.
+    """
+    view = build_preview(
+        ".", PROPOSAL_ID, "github", "octo/repo", adapter,
+        publication_reader=lambda *a, **k: published(),
+        tracker_reader=lambda *a, **k: tracker_read(),
+        prover=lambda *a, **k: good_proof())
+    if mutate:
+        view = mutate(dict(view))
+    if before_close:
+        before_close(adapter)
+    return close_preview(
+        view, ".", adapter, confirm=confirm, journal_root=journal,
+        publication_reader=lambda *a, **k: publication or published(),
+        tracker_reader=lambda *a, **k: tracker or tracker_read(),
+        prover=lambda *a, **k: proof or good_proof())
+
+
+class CloseTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.journal = pathlib.Path(self.tmp.name) / "journal"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_without_confirmation_nothing_is_written(self):
+        adapter = WritingAdapter()
+        result = closing(adapter, self.journal, confirm=False)
+        self.assertEqual(result["state"], "confirmation-required")
+        self.assertEqual(adapter.writes, [])
+
+    def test_a_full_closeout_comments_stages_closes_and_reads_back(self):
+        adapter = WritingAdapter()
+        result = closing(adapter, self.journal)
+        self.assertEqual(result["state"], "verified")
+        self.assertEqual(adapter.writes, ["comment", "stage", "close"])
+        self.assertEqual(result["promotionCommit"], PROMOTION)
+        self.assertEqual(result["stage"], PROMOTED_STAGE)
+        self.assertTrue(result["closed"])
+
+    def test_a_rerun_writes_nothing_and_reports_already_closed(self):
+        adapter = WritingAdapter()
+        closing(adapter, self.journal)
+        adapter.writes = []
+        again = closing(adapter, self.journal,
+                        tracker=tracker_read(stage=PROMOTED_STAGE, closed=True))
+        self.assertEqual(again["state"], "already-closed")
+        self.assertEqual(adapter.writes, [])
+
+    def test_each_step_is_skipped_when_it_already_landed(self):
+        adapter = WritingAdapter()
+        adapter.comments = [closeout_record(PROPOSAL_ID, REVISION, PROMOTION, REVIEW)]
+        adapter.issue["labels"] = [{"name": PROMOTED_STAGE}, {"name": "proposal"}]
+        result = closing(adapter, self.journal,
+                         tracker=tracker_read(stage=PROMOTED_STAGE))
+        self.assertEqual(result["state"], "verified")
+        self.assertEqual(adapter.writes, ["close"])
+
+    def test_a_tampered_preview_is_refused(self):
+        adapter = WritingAdapter()
+        for change in ({"promotionCommit": "0" * 40}, {"issueId": 999},
+                       {"record": "something else"}, {"digest": "0" * 64}):
+            result = closing(adapter, self.journal,
+                             mutate=lambda view, c=change: dict(view, **c))
+            self.assertEqual(result["state"], "preview-invalid", change)
+            self.assertEqual(adapter.writes, [])
+
+    def test_a_revision_that_moved_between_preview_and_write_is_stale(self):
+        adapter = WritingAdapter()
+        moved = Publication("published", review_commit=REVIEW,
+                            proposal=proposal(revision="sha256:" + "cd" * 32))
+        view = build_preview(".", PROPOSAL_ID, "github", "octo/repo", adapter,
+                             publication_reader=lambda *a, **k: Publication(
+                                 "published", review_commit=REVIEW, proposal=proposal()),
+                             tracker_reader=lambda *a, **k: TrackerRead(
+                                 "verified", issue_id=149, stage=ACCEPTED,
+                                 proposal_id=PROPOSAL_ID, platform="github",
+                                 target="octo/repo", closed=False),
+                             prover=lambda *a, **k: Proof(
+                                 "proved", review_commit=REVIEW,
+                                 proposal_id=PROPOSAL_ID, module_id=PROPOSAL_ID,
+                                 promotion_commit=PROMOTION))
+        result = close_preview(view, ".", adapter, confirm=True,
+                               journal_root=self.journal,
+                               publication_reader=lambda *a, **k: moved,
+                               tracker_reader=lambda *a, **k: TrackerRead(
+                                   "verified", issue_id=149, stage=ACCEPTED,
+                                   proposal_id=PROPOSAL_ID, platform="github",
+                                   target="octo/repo", closed=False),
+                               prover=lambda *a, **k: Proof(
+                                   "proved", review_commit=REVIEW,
+                                   proposal_id=PROPOSAL_ID, module_id=PROPOSAL_ID,
+                                   promotion_commit=PROMOTION))
+        self.assertEqual(result["state"], "preview-stale")
+        self.assertEqual(adapter.writes, [])
+
+    def test_a_proof_that_no_longer_holds_blocks_the_write(self):
+        adapter = WritingAdapter()
+        for proof in (Proof("not-promoted", proposal_id=PROPOSAL_ID),
+                      Proof("proved", review_commit=REVIEW, proposal_id=PROPOSAL_ID,
+                            module_id=PROPOSAL_ID, promotion_commit="0" * 40)):
+            result = closing(adapter, self.journal, proof=proof)
+            self.assertIn(result["state"], ("not-eligible",))
+            self.assertEqual(adapter.writes, [])
+
+    def test_a_target_that_moved_after_the_preview_stops_before_writing(self):
+        adapter = WritingAdapter()
+        def move(target):
+            target.facts = dict(target.facts, target="octo/other")
+        result = closing(adapter, self.journal, before_close=move)
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["diagnostic"], "target-changed")
+        self.assertEqual(adapter.writes, [])
+
+    def test_an_item_edited_after_the_preview_is_a_conflict(self):
+        adapter = WritingAdapter()
+        def edit(target):
+            target.issue["body"] = "somebody rewrote this"
+        result = closing(adapter, self.journal, before_close=edit)
+        self.assertEqual(result["state"], "conflict")
+        self.assertEqual(result["diagnostic"], "issue-content-changed")
+        self.assertEqual(adapter.writes, [])
+
+    def test_a_lost_close_response_that_actually_closed_reconciles_to_verified(self):
+        class Flaky(WritingAdapter):
+            def set_closed(self, issue_id):
+                self.calls.append("close")
+                self.writes.append("close")
+                self.issue["state"] = "closed"
+                raise RuntimeError("response lost")
+        adapter = Flaky()
+        result = closing(adapter, self.journal)
+        self.assertEqual(result["state"], "verified")
+
+    def test_a_lost_close_response_that_did_not_close_is_partial_and_never_retried(self):
+        adapter = WritingAdapter(lose=("close",), fail=("close",))
+        result = closing(adapter, self.journal)
+        self.assertEqual(result["state"], "partial")
+        first = list(adapter.writes)
+        adapter.writes = []
+        repeat = closing(adapter, self.journal)
+        self.assertEqual(repeat["state"], "partial")
+        # The comment already carries its marker, so a retry must not add a second one.
+        self.assertNotIn("comment", adapter.writes)
+        self.assertEqual(first.count("comment"), 1)
+
+    def test_a_binding_recorded_for_another_target_is_a_conflict(self):
+        adapter = WritingAdapter(lose=("close",), fail=("close",))
+        closing(adapter, self.journal)
+        other = WritingAdapter()
+        other.facts = dict(other.facts, target="octo/elsewhere")
+        tracker = TrackerRead("verified", issue_id=149, stage=ACCEPTED,
+                              proposal_id=PROPOSAL_ID, platform="github",
+                              target="octo/elsewhere", closed=False)
+        result = closing(other, self.journal, tracker=tracker)
+        self.assertEqual(result["state"], "conflict")
+        self.assertEqual(result["diagnostic"], "binding-target-changed")
+        self.assertEqual(other.writes, [])
+
+    def test_an_unfinished_attempt_is_journalled_privately(self):
+        adapter = WritingAdapter(lose=("close",), fail=("close",))
+        self.assertEqual(closing(adapter, self.journal)["state"], "partial")
+        entries = [item for item in self.journal.iterdir()
+                   if item.suffix == ".json"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0].stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.journal.stat().st_mode & 0o777, 0o700)
+
+    def test_a_finished_closeout_leaves_no_journal_entry_or_lock(self):
+        adapter = WritingAdapter()
+        self.assertEqual(closing(adapter, self.journal)["state"], "verified")
+        self.assertEqual(list(self.journal.iterdir()), [])
+
+    def test_the_result_leaks_no_body_or_raw_error(self):
+        adapter = WritingAdapter(fail=("comment",))
+        result = closing(adapter, self.journal)
+        self.assertNotIn("provider exploded", json.dumps(result))
 
 
 class ProofRemainsReadOnlyTests(unittest.TestCase):

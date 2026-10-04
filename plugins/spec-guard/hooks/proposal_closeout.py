@@ -12,14 +12,19 @@ cannot make that mistake even by accident.
 """
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import os
+from pathlib import Path
 
 from proposal_promotion_proof import prove_from_remote
 from proposal_publication import read_published
 from proposal_tracker_read import (
-    CONTRACT_INVALID, MARKER_AMBIGUOUS, recover_tracker_issue,
+    CONTRACT_INVALID, MARKER_AMBIGUOUS, issue_identity, recover_tracker_issue,
 )
+
+JOURNAL_ROOT = Path.home() / ".local" / "state" / "spec-guard" / "proposal-closeout"
 
 PROMOTED_STAGE = "proposal-stage:promoted"
 ACCEPTED_STAGE = "proposal-stage:accepted"
@@ -169,6 +174,7 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
 
     try:
         facts = adapter.target_facts()
+        content = content_digest(backend, adapter.get_issue(tracker.issue_id))
     except Exception:
         return _blocked("unknown", "target-unreadable")
 
@@ -177,6 +183,7 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
         "state": "preview", "backend": backend, "exactTarget": facts,
         "proposalId": proposal_id, "revision": proposal.revision,
         "issueId": tracker.issue_id, "currentStage": tracker.stage,
+        "issueContentDigest": content,
         "targetStage": decision.target_stage,
         "promotionCommit": proof.promotion_commit,
         "reviewCommit": proof.review_commit,
@@ -186,3 +193,203 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
     }
     preview["digest"] = preview_digest(preview)
     return preview
+
+
+def content_digest(backend, raw_issue):
+    """Digest the body and label set, so an item edited after the preview is refused.
+
+    Platform shapes differ, so the fields come from the same extraction the identity
+    rules use rather than from a second, drifting copy of that knowledge.
+    """
+    fields = issue_identity(backend, raw_issue)
+    if fields is None:
+        raise ValueError("issue shape is unreadable")
+    _issue_id, _container, body, labels, _closed = fields
+    return preview_digest({"body": body, "labels": sorted(labels)})
+
+
+def _journal_path(root, proposal_id, revision):
+    key = hashlib.sha256(("%s/%s" % (proposal_id, revision)).encode("utf-8")).hexdigest()
+    return Path(root) / (key + ".json")
+
+
+def _private_root(root):
+    root = Path(root)
+    root.mkdir(parents=True, exist_ok=True)
+    os.chmod(root, 0o700)
+    return root
+
+
+def _read_journal(path):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            value = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _write_journal(path, record):
+    descriptor = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(record, handle, ensure_ascii=False, sort_keys=True)
+    os.chmod(path, 0o600)
+
+
+def _valid_preview(preview):
+    if not isinstance(preview, dict) or preview.get("state") != "preview":
+        return False
+    expected = {key: value for key, value in preview.items() if key != "digest"}
+    required = ("backend", "exactTarget", "proposalId", "revision", "issueId",
+                "currentStage", "targetStage", "promotionCommit", "reviewCommit",
+                "record", "actions", "issueContentDigest")
+    if any(preview.get(key) is None for key in required):
+        return False
+    marker = closeout_marker(preview["proposalId"], preview["revision"])
+    if preview["record"].splitlines()[-1] != marker:
+        return False
+    return preview.get("digest") == preview_digest(expected)
+
+
+def close_preview(preview, project, adapter, confirm=False, journal_root=None,
+                  remote="origin", publication_reader=None, tracker_reader=None,
+                  prover=None):
+    """Re-check everything the preview asserted, then write, then read back.
+
+    Nothing here trusts the preview: between showing it and this call the Proposal may
+    have been revised, the item edited, closed or relabelled, and the promotion may no
+    longer be provable.  Each step is skipped when its result is already present, so a
+    rerun after a lost response reconciles instead of writing a second time.
+    """
+    if not confirm:
+        return {"state": "confirmation-required"}
+    if not _valid_preview(preview):
+        return _blocked("preview-invalid")
+
+    publication_reader = publication_reader or read_published
+    prover = prover or prove_from_remote
+    reader = tracker_reader or adapter_tracker_reader(adapter)
+    backend, target = preview["backend"], preview["exactTarget"]["target"]
+    root = _private_root(journal_root or JOURNAL_ROOT)
+    path = _journal_path(root, preview["proposalId"], preview["revision"])
+
+    lock = os.open(str(path) + ".lock",
+                   os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        with os.fdopen(lock, "r+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            earlier = _read_journal(path)
+            if earlier and earlier.get("exactTarget") != preview["exactTarget"]:
+                return _blocked("conflict", "binding-target-changed")
+            return _close_locked(preview, project, adapter, path, backend, target,
+                                 remote, publication_reader, reader, prover)
+    except OSError:
+        return _blocked("unknown", "journal-unavailable")
+    finally:
+        try:
+            os.unlink(str(path) + ".lock")
+        except OSError:
+            pass
+
+
+def _close_locked(preview, project, adapter, path, backend, target, remote,
+                  publication_reader, reader, prover):
+    publication = publication_reader(project, preview["proposalId"], remote)
+    proposal = getattr(publication, "proposal", None)
+    if (getattr(publication, "state", None) != "published" or
+            getattr(proposal, "revision", None) != preview["revision"] or
+            getattr(proposal, "marker", None) is None):
+        return _blocked("preview-stale", "proposal-revision-changed")
+
+    try:
+        if adapter.target_facts() != preview["exactTarget"]:
+            return _blocked("unknown", "target-changed")
+    except Exception:
+        return _blocked("unknown", "target-unreadable")
+
+    tracker = reader(proposal, backend, target)
+    if getattr(tracker, "state", None) != "verified":
+        state = getattr(tracker, "state", None)
+        if state == "invalid":
+            code = getattr(tracker, "code", None) or CONTRACT_INVALID
+            return _blocked("conflict" if code == MARKER_AMBIGUOUS else "invalid", code)
+        return _blocked(state if state in TRACKER_CODES else "unknown",
+                        TRACKER_CODES.get(state, "tracker-unknown"))
+    if tracker.issue_id != preview["issueId"]:
+        return _blocked("conflict", "issue-changed")
+
+    try:
+        current = adapter.get_issue(tracker.issue_id)
+        if content_digest(backend, current) != preview["issueContentDigest"]:
+            return _blocked("conflict", "issue-content-changed")
+    except Exception:
+        return _blocked("unknown", "issue-unreadable")
+
+    proof = prover(project, preview["proposalId"], backend, target, remote,
+                   tracker_reader=reader)
+    decision = closeout_decision(tracker.stage, tracker.closed,
+                                 getattr(proof, "state", None),
+                                 getattr(proof, "diagnostic", None))
+    if decision.state == "already-closed":
+        return _blocked("already-closed")
+    if decision.state != "eligible":
+        return _blocked(decision.state, decision.diagnostic)
+    if getattr(proof, "promotion_commit", None) != preview["promotionCommit"]:
+        return _blocked("not-eligible", "proof-changed")
+
+    return _apply(preview, adapter, tracker, decision, path, backend)
+
+
+def _apply(preview, adapter, tracker, decision, path, backend):
+    """Write each step only when its result is not already present, then read back."""
+    issue_id, marker = tracker.issue_id, closeout_marker(preview["proposalId"],
+                                                         preview["revision"])
+    record = {"version": 1, "backend": preview["backend"],
+              "exactTarget": preview["exactTarget"],
+              "proposalId": preview["proposalId"], "revision": preview["revision"],
+              "digest": preview["digest"], "issueId": issue_id, "attempted": True}
+    _write_journal(path, record)
+
+    try:
+        comments = adapter.list_comments(issue_id)
+        if comments.get("complete") is not True:
+            return _blocked("unknown", "comments-incomplete")
+        if not any(str(item.get("body", "")).splitlines()[-1:] == [marker]
+                   for item in comments["comments"]):
+            adapter.create_comment(issue_id, preview["record"])
+    except Exception:
+        return _partial(path, record, "comment-result-uncertain")
+
+    try:
+        if decision.needs_stage_change:
+            adapter.set_stage(issue_id, tracker.stage, decision.target_stage)
+    except Exception:
+        return _partial(path, record, "stage-result-uncertain")
+
+    try:
+        adapter.set_closed(issue_id)
+    except Exception:
+        pass
+
+    try:
+        fields = issue_identity(backend, adapter.get_issue(issue_id))
+    except Exception:
+        fields = None
+    if fields is None:
+        return _partial(path, record, "close-result-uncertain")
+    _issue_id, _container, _body, labels, closed = fields
+    if not closed or decision.target_stage not in labels:
+        return _partial(path, record, "close-result-uncertain")
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+    return {"state": "verified", "issueId": issue_id,
+            "stage": decision.target_stage, "closed": True,
+            "promotionCommit": preview["promotionCommit"]}
+
+
+def _partial(path, record, diagnostic):
+    """Keep the attempt on record and stop: the next run reconciles, never resends."""
+    _write_journal(path, dict(record, attempted=True))
+    return {"state": "partial", "diagnostic": diagnostic}

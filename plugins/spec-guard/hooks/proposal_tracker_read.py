@@ -128,6 +128,15 @@ def _issue_fields(platform, issue):
     return issue_id, container, body, labels, closed
 
 
+def issue_identity(platform, issue):
+    """Public alias: the per-platform extraction callers need for a content digest.
+
+    Exposed so no second copy of "where does the body live on this platform" can drift
+    away from the one the identity rules use.
+    """
+    return _issue_fields(platform, issue)
+
+
 def _has_marker(body, marker):
     return any(line.strip() == marker for line in _visible_lines(body.splitlines()))
 
