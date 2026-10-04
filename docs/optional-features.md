@@ -26,7 +26,7 @@ Codex Desktop 会话；唤醒失败时，消息仍留在信箱里等待读取。
 
 **不做什么：** 不改 Git 和 Issue，不分派任务，不跨机器通信。
 
-### 统一会话路由（源码候选）
+### 统一会话路由
 
 同一台 Mac 上可以直接按「宿主＋会话名称＋项目」联系另一会话。统一入口会显示 `[Claude Code]`／
 `[Codex]` 和 `native-visible`／`bridge-joined`，同名时要求最小消歧，不要求用户填写内部 ID：
@@ -43,10 +43,10 @@ Codex Desktop 会话；唤醒失败时，消息仍留在信箱里等待读取。
 task 授权；需要连续工作时可以明确授权固定数量的 batch 或当前 session，到期、超额、换项目、扩权和
 有后果的外部操作仍会停下。会话列表里的 registered 不等于 online，消息入箱也不等于已读或已完成。
 
-2026-10-04 的源码候选已在 Claude Code 2.1.288 和 Codex App 0.160.0 上完成同机双轮验收；
-Claude 的原生路径没有 bridge 正文副本，Codex 同一隔离 task 可被第二次启动 turn。受控 bridge
-fallback 的双向两轮与精确 acknowledgement 已通过，但一次 Claude `--background` 临时 MCP 探针因
-未挂载该 MCP 记为环境不可用。这个范围不包含跨机器，也不改变 A10 的转正门槛。
+v0.39.0 已在 Claude Code 2.1.288 和 Codex App 0.160.0 上完成同机双轮验收；Claude 的原生路径没有
+bridge 正文副本，Codex 同一隔离 task 可被第二次启动 turn，受控 bridge fallback 的双向两轮与精确
+acknowledgement 已通过。2026-10-04 的后续 native-only 源码验收又证明了 Claude Code ↔ Codex 的直接双向
+回复和同一 Claude 空闲会话重复唤醒；兼容传输产品路径已经退役，等待下一版本发布。这个范围不包含跨机器。
 
 ### 跨宿主会话委派
 
@@ -67,7 +67,7 @@ background 时，若没有可靠的原生 wake，Spec Guard 会先精确停止�
 预配规则只允许 native 的 `bridge_` 工具最小清单。创建新会话不会扩大 transport 权限，普通信箱消息仍不
 构成开发授权。
 
-截至 2026-10-04，该能力仍是未发布的源码候选。双向创建、同会话第二轮、只读权限负例、停止、精确
+该能力已随 v0.39.0 发布。双向创建、同会话第二轮、只读权限负例、停止、精确
 mailbox 结果回传和真实同名短编号消歧已在本机真实宿主通过。同步结果可由控制器返回脱敏 `result`；
 异步结果仍由发起会话的正常 inbox 读取并确认。`resultDelivery=enqueued` 只证明精确消息已入队，不等于
 发起方已读或验证内容。当前验收只覆盖一台 Mac，不构成跨机器能力。

@@ -21,7 +21,7 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | proposal-review | 汇总发布、tracker 与当前能力图事实，给出与人工授权分离的 freshness/stale/blocked/unknown 结果。 | proposal-publication, proposal-tracker-read |
 | proposal-promotion-proof | 对 Proposal 晋级核验 Issue 阶段、新鲜度、首次纳入提交及声明行与位置，并给出证明或诊断。 | proposal-review |
 | collaboration-messaging | Provide a private same-Mac mailbox and host adapters for direct Claude Code and Codex session communication. | — |
-| collaboration-safe-defaults | 协作信箱默认不绑定唤醒、Claude 启动器不把 token 放进会话环境，并用测试防止回退。 | collaboration-messaging |
+| collaboration-safe-defaults | 协作会话默认不绑定唤醒、自动批准会话禁止绑定，并用回归锁定 native-only 安全边界。 | collaboration-messaging |
 | local-ticket-ledger | Provide an optional local-first, worktree-shared ticket ledger and narrow Claude Code/Codex access without imposing workflow ownership or project topology. | — |
 | ledger-dependency-lock | 用插件附带的 lockfile 与 npm ci 安装本地事项账本运行时，并校验全部依赖的完整性。 | local-ticket-ledger |
 | local-convention | Install and remove the local multi-module directory convention and its managed declaration block, without touching user specs or plans. | — |
