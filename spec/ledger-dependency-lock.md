@@ -7,11 +7,10 @@
 插件既不附带 lockfile，也不校验任何安装包的完整性。两次安装可能装上不同的代码；某个依赖一旦被投毒，
 导入时就会以用户权限执行（`--ignore-scripts` 只能挡住安装脚本）。
 
-本模块让账本运行时按插件附带的 lockfile 安装，由 `npm ci` 逐个校验每个依赖的 sha512 完整性；并在文档中写明
-XATS 协作传输的两个 npm 包仍未锁定这一剩余风险。
+本模块让账本运行时按插件附带的 lockfile 安装，由 `npm ci` 逐个校验每个依赖的 sha512 完整性。
 
-登记：2026-09-29 按用户决定经 `/spec-guard:add-module` 快速插入能力图。范围经用户选择只包含 epiq；XATS
-（`cross-agent-teams-mcp`、`mcp-remote`）不在本模块内，随 XATS 日落处理。
+登记：2026-09-29 按用户决定经 `/spec-guard:add-module` 快速插入能力图。范围只包含 epiq。旧协作传输的
+依赖风险已随 2026-10-04 native-only 退役完成而从当前产品面消失；原时点事实保留在历史决策中。
 
 ## Assumptions
 
@@ -25,7 +24,7 @@ XATS 协作传输的两个 npm 包仍未锁定这一剩余风险。
 3. 已经用旧方式安装的运行时照常可用，不自动重装；`status` 报告它未锁定，并给出重新安装的方法。
 4. epiq 版本保持 1.11.0；升级时由维护者重新生成 lockfile。
 5. 仍需联网从注册表下载，沿用用户的 npm 配置与镜像，但内容必须与 lockfile 中的哈希一致；离线安装不在范围内。
-6. XATS 的两个包不改，只在文档中写明剩余风险。
+6. 本模块不管理协作运行时依赖。
 
 ## Contract
 
@@ -60,9 +59,8 @@ XATS 协作传输的两个 npm 包仍未锁定这一剩余风险。
 ### L4 文档
 
 - `references/local-ticket-ledger-runtime.md`：安装方式、`lock` 状态含义、维护者重新生成 lockfile 的步骤。
-- `spec/collaboration-messaging.md` 与 `references/collaboration-runtime.md`：写明 XATS 的
-  `cross-agent-teams-mcp@0.8.6` 与 `mcp-remote@0.1.38` 仍在启动时用 `npx` 拉取、传递依赖未锁定，这一剩余风险随
-  XATS 日落（`docs/decisions/2026-09-28-xats-sunset.md`）消失。
+- `spec/collaboration-messaging.md` 与 `references/collaboration-runtime.md`：说明协作运行时由其自身的固定
+  revision 管理，不属于本模块的 npm lockfile 范围。
 - `CHANGELOG.md` Unreleased：用户可见的变更与升级方法。
 
 ## Commands
@@ -86,7 +84,7 @@ plugins/spec-guard/hooks/test_local_ledger_runtime.py                       -> L
 plugins/spec-guard/skills/local-ticket-ledger-ops/SKILL.md,
   commands/local-ticket-ledger.md                                           -> L3：展示与确认
 plugins/spec-guard/references/local-ticket-ledger-runtime.md                -> L4
-spec/collaboration-messaging.md, references/collaboration-runtime.md         -> L4：XATS 剩余风险
+spec/collaboration-messaging.md, references/collaboration-runtime.md         -> L4：协作依赖边界
 CHANGELOG.md                                                                 -> L4
 ```
 
@@ -106,7 +104,7 @@ CHANGELOG.md                                                                 -> 
 ## Boundaries
 
 - Always：先红后绿；只按插件附带的 lockfile 安装；失败不换上目录；替换只动运行时目录。
-- Ask first：升级 epiq 版本；修改 XATS 的安装方式；在用户机器上替换已有运行时（必须经用户明确确认）。
+- Ask first：升级 epiq 版本；在用户机器上替换已有运行时（必须经用户明确确认）。
 - Never：执行依赖的安装脚本；绕过完整性校验；自动重装或替换用户已有的运行时；触碰账本数据（`.epiq/`、`__epiq_state__`）。
 
 ## Success criteria
@@ -115,5 +113,5 @@ CHANGELOG.md                                                                 -> 
   且不留下半装的目录。
 - 旧方式安装的运行时 `status` 为 `ready` 加 `unlocked`，仍可使用；经用户确认可以原子替换为锁定安装，失败时旧运行时不变。
 - 防漂移测试守住版本常量、`package.json` 与 lockfile 的一致性。
-- 文档写明锁定安装、升级方法，以及 XATS 的剩余风险。
+- 文档写明锁定安装、升级方法，以及与协作运行时的依赖边界。
 - 三条最小验证在默认 `python3` 与 `/usr/bin/python3` 下都通过。

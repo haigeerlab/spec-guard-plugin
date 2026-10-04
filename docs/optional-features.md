@@ -19,12 +19,8 @@
 
 **使用：** 用自然语言即可，比如「加入本机联调」「查看联调消息」「告诉 reviewer 这个 PR 可以看了」。
 
-**两种传输方式：**
-
-- **XATS**：默认方式，只在本机回环地址监听，令牌放在 `~/.spec-guard/collaboration/`。消息会保存在信箱里，
-  但不会主动唤醒空闲的会话。
-- **native**：实验性方式，要经过单独审批的切换才能启用。它可以唤醒空闲的 Claude Code 和 Codex Desktop 会话；
-  唤醒失败时，消息仍留在信箱里等待读取。
+**传输方式：** native 是唯一协作传输。它只在本机使用私有邮箱，可唤醒已明确绑定的 Claude Code 和
+Codex Desktop 会话；唤醒失败时，消息仍留在信箱里等待读取。
 
 **注意：** 加入协作默认不绑定唤醒（`wake: null`），只有你在对话里明确要求才会绑定；开着自动批准的会话永远不要绑定。被唤醒的会话会不经人工确认就执行消息里的请求。
 
@@ -39,7 +35,7 @@
   原生 wake，不把正文再写进协作信箱；
 - Codex ↔ Codex 直接复用 Codex App 的 task/thread、turn 和 wait/read；目标在当前 turn 内回复。
   如果要让目标 task 主动联系第三个 task，仍需人在那个发送 task 里直接授权；
-- Claude Code ↔ Codex 继续使用当前唯一选中的协作信箱后端，不同时写 XATS 与 native；
+- Claude Code ↔ Codex 使用 native 协作信箱；
 - 同宿主原生能力不可用时，只有当前授权仍有效、bridge 已 ready、两端都已唯一加入，才自动回退，
   并显示 `fallbackFrom` 和原因。初始化、改配置、加入新身份或扩权仍只问这一个变化。
 
@@ -68,17 +64,13 @@ Spec Guard 会读取并复用这些规则，但不会自动修改项目或全局
 background 时，若没有可靠的原生 wake，Spec Guard 会先精确停止该 background 并确认，再用完整 session ID
 恢复同一会话；停止结果不确定时不会继续 resume 或新建副本。
 
-预配规则必须和当前传输方式匹配：native 的工具名以 `bridge_` 开头，XATS 使用 `register_agent`、
-`send_message`、`get_inbox` 等自己的工具名。Spec Guard 只建议当前后端的最小清单，不会把两套权限一起放开。
-
-创建新会话不会改变 A10 的 transport 选择：它只复用当前已经选择的 XATS 或 native，不会自动切换后端、
-删除 XATS 或把 native 宣布为正式默认。普通信箱消息仍不构成开发授权。
+预配规则只允许 native 的 `bridge_` 工具最小清单。创建新会话不会扩大 transport 权限，普通信箱消息仍不
+构成开发授权。
 
 截至 2026-10-04，该能力仍是未发布的源码候选。双向创建、同会话第二轮、只读权限负例、停止、精确
 mailbox 结果回传和真实同名短编号消歧已在本机真实宿主通过。同步结果可由控制器返回脱敏 `result`；
 异步结果仍由发起会话的正常 inbox 读取并确认。`resultDelivery=enqueued` 只证明精确消息已入队，不等于
-发起方已读或验证内容。当前验收只覆盖已选择的 native 后端和一台 Mac，不构成发布、跨机器能力或 A10
-native 转正；XATS 仍是默认并继续保留。
+发起方已读或验证内容。当前验收只覆盖一台 Mac，不构成跨机器能力。
 
 **详细说明：** [协作运行时说明](../plugins/spec-guard/references/collaboration-runtime.md)
 
