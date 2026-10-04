@@ -63,6 +63,10 @@ class SafeFragmentTests(unittest.TestCase):
             cleaned = safe_fragment(payload)
             left = [c for c in cleaned if unicodedata.category(c) in ("Cc", "Cf")]
             self.assertEqual(left, [], "%s: %r" % (name, cleaned))
+            # Both directions: asserting only the absence would pass if the function
+            # returned "" for everything.
+            self.assertIn("a", cleaned, name)
+            self.assertIn("b", cleaned, name)
 
     def test_a_long_value_is_truncated_with_an_ellipsis(self):
         cleaned = safe_fragment("x" * 500)
@@ -105,7 +109,9 @@ class SafeFragmentTests(unittest.TestCase):
         for value in ("module id 不符合 kebab-case: evil*id",
                       "module id 不符合 kebab-case: #evil",
                       "module id 不符合 kebab-case: a|b",
-                      "module id 不符合 kebab-case: <evil>"):
+                      "module id 不符合 kebab-case: <evil>",
+                      "module id 不符合 kebab-case: ~~~evil",
+                      "module id 不符合 kebab-case: > evil"):
             self.assertEqual(safe_fragment(value), value)
 
     def test_the_truncation_limit_counts_characters_not_bytes(self):
@@ -133,8 +139,10 @@ class MapInvalidLineTests(unittest.TestCase):
         leaving `present but invalid ()` -- a stage with no reason attached."""
         with mock.patch.object(module_stage, "safe_fragment", lambda value, limit=None: ""):
             line = self._invalid_line(self._render("not a capability map"))
-        self.assertNotIn("指令: )", line)
-        self.assertFalse(line.rstrip().endswith("()"), line)
+        # The label makes an `()` ending impossible, so assert on what can actually
+        # go wrong: an empty parenthetical, however the label around it is worded.
+        inside = line.split("(", 1)[1].rsplit(")", 1)[0]
+        self.assertTrue(inside.split(":")[-1].strip(), line)
         self.assertIn("诊断为空", line)
 
     def test_the_quoted_span_is_labelled_as_data(self):
