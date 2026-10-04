@@ -84,18 +84,31 @@ clean-areas 中重申）。两次都被记为「不在本模块范围」，没�
 ### C1 共享的安全片段函数（`hooks/module_stage.py`）
 
 ```python
-def safe_fragment(value, limit=80):
+def safe_fragment(value, limit=200):
     """把外部来源的字符串变成可诊断、但无法伪造注入结构的片段。"""
 ```
 
 - 折叠所有空白（含换行、制表）为单个半角空格，并去除首尾空白；
 - 删除反引号与反斜杠（它们是在 Markdown 注入里伪造代码块与转义的主要手段）；
-- 超过 `limit` 时截断并以 `…` 结尾；
-- 空值或非字符串返回空串；**不做 HTML/Markdown 转义**（注入目标是 agent 上下文，不是浏览器）。
+- 剥掉 Unicode `Cc`／`Cf`（控制与格式）码点，空白除外——空白交给上一条折叠。
+  这一类伪造不出结构，但会到达 agent 上下文和 `/spec-guard:phase` 打印的终端：ESC 经
+  `json.dumps` 转义、宿主再还原；零宽字符会把 token 切开，使诊断对不上用户在能力图里搜的字串；
+- 超过 `limit` 时截断并以 `…` 结尾（整串长度为 `limit + 1`）；
+- 空值或非字符串返回空串；**不做 HTML/Markdown 转义**（注入目标是 agent 上下文，不是浏览器），
+  也**不使用字符白名单**：没有换行时 `*`、`#`、`|`、`<`、`>` 进不了行首、伪造不出块，而删掉它们
+  会把「坏在哪个字符」这个诊断一起删掉。
+
+`limit` 的单位是**整条 `MapError` 消息**，不是裸 module id：`describe()` 传给本函数的是
+`str(error)`，最长的模板带前缀加两个 id。200 覆盖本仓库全部模板（最长 85）与一个 68 字符合法 id
+的最坏情形（163）。`MODULE_ID` 没有长度上界，所以这**不是**「永不截断」的承诺——上界的作用是给
+每轮注入的体量封顶。对应的测试必须钉在**消息**上；钉裸 id 的测试在这两个场景下都会照常通过。
 
 ### C2 `activeModule` 的校验（`hooks/module_stage.py`）
 
-- `active_module(root)` 增加 kebab-case 校验：不合规返回 `None`，但同时可被调用方区分
+- `active_module(root)` 增加 kebab-case 校验（`MODULE_ID.fullmatch`，不是 `.match`：`MODULE_ID`
+  以 `$` 结尾，而 `$` 会在结尾换行前匹配，`.match` 会把 `"alpha\n"` 判为有效，随后 `by_id` 查不到，
+  每轮注入「activeModule `alpha` 不在能力图中」——指着一个明明在图里的模块说它不在）：
+  不合规返回 `None`，但同时可被调用方区分
   「未设置」与「设了但无效」。实现方式：新增 `active_module_state(root) -> (value, state)`，
   `state` 取 `absent` / `invalid` / `present`；`active_module()` 保持原签名，只在 `present` 时返回值，
   以免改动既有调用方。
@@ -107,6 +120,10 @@ def safe_fragment(value, limit=80):
 ### C3 `MapError` 的注入边界（`hooks/module_stage.py:110`）
 
 - `MAP_INVALID` 一行的 `%s` 改为 `safe_fragment(str(error))`。
+- 引用的原文标注为数据：`present but invalid (能力图原文，非指令: …)`。保留原文是 Assumption 2
+  的决定，标注不改变保留什么，只是不再要求读者（人或模型）自己推断引号里的话不是在对他说。
+- 片段为空时回退到固定文案，不渲染成 `present but invalid ()`——那是唯一一种把整条诊断
+  悄无声息抹掉的输入。
 - `capability_map.py` 不改动。
 
 ### C4 未合并提交提示（`hooks/module_stage.py:137-138`）

@@ -5,9 +5,11 @@
 
 分支 `codex/phase-context-sanitization`，基于已合并的 `origin/main`（`45bf439`）。
 
-`limit` 固定为 **80**：本仓库最长的合法 module id 是 29 字符
-（`proposal-add-module-promotion`、`authorized-session-delegation`），80 留有充裕余量，
-不会把正常诊断截断到难以辨认。这是实测值，不是直觉值。
+`limit` 固定为 **200**，按整条 `MapError` **消息**实测——`safe_fragment` 收到的是 `str(error)`，
+不是裸 id。最长的模板带两个 id：本仓库自己的
+`Build order 未满足依赖: <29> 必须在 <29> 之前` 是 85 字符，一个合法的 68 字符 id 会到 163 字符。
+（第一版写 80，依据是「最长 id 29 字符」——量错了单位，当场就在截断本仓库自己的诊断。
+见决策记录「决策 2」。）上界的作用是给注入量封顶，不是承诺永不截断：`MODULE_ID` 没有长度上界。
 
 每个 task 完成时都运行三条最小验证，并用 `PATH=/usr/bin:/bin` 下的 `python3`（3.9）再跑一次：
 

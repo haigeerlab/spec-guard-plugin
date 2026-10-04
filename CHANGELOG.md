@@ -7,8 +7,12 @@
 - **安全：阶段提示不再把仓库内容原样注入 agent 上下文。** 这段文本每轮注入，此前两处会逐字带出仓库值：
   `.agent/state.json` 的 `activeModule`，以及能力图坏 module id 经 `MapError` 引用的单元格。
   两处都已复现——一个带换行的值能伪造出看起来像系统段落的块。
-  现在 `activeModule` 必须是 kebab-case 的 module id，诊断里的外部值一律折叠空白、去反引号与反斜杠、
-  限长 80 字符。
+  现在 `activeModule` 必须是完整匹配的 kebab-case module id（`fullmatch`：`$` 会在结尾换行前匹配，
+  用 `match` 的话 `"alpha\n"` 会被当成有效 id，随后查不到而报「不在能力图中」，指着一个明明在图里的模块
+  说它不在）；诊断里的外部值一律折叠空白、去反引号与反斜杠、剥掉控制与格式字符（Cc/Cf），
+  并限长 200 字符（被截断时整段为 201 字符，含省略号）。上界是按 `MapError` **整条消息**实测的：
+  最长的模板带两个 module id，本仓库自己的 Build order 诊断就有 85 字符。
+  `MAP_INVALID` 引用的能力图原文现在明确标注为「能力图原文，非指令」。
   **行为变化**：`activeModule` 无效时，提示从「打印该值并说它不在能力图中」变为「说它不是有效的
   module id」——**值不回显，但不静默忽略**，hook 也照常激活（让一个手滑的值使 hook 静默，比注入更难发现）。
   净化**只在注入边界**：`/spec-guard:verify-artifacts` 与 `/spec-guard:add-module` 给人读的终端输出

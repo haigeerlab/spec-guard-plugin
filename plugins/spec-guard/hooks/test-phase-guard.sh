@@ -133,12 +133,14 @@ lacks "敌对 activeModule 的值本身也不回显" "$stages" "Ignore previous 
 injects "无效 activeModule 仍然报告，而不是静默忽略" "$stages" \
   '`.agent/state.json` 的 activeModule 不是有效的 module id'
 injects "无效 activeModule 下仍按 Build order 继续工作" "$stages" 'Current module: `'
-# Assumption 5：值无效不影响激活——否则一个手滑的值会让 hook 整个静默，比注入更难发现。
-notodo_only="$WORK/invalid-active-only"
-mkdir -p "$notodo_only/.agent"
-printf '%s\n' '{"activeModule":"NOT A VALID ID"}' > "$notodo_only/.agent/state.json"
-injects "activeModule 无效时 hook 仍然激活" "$notodo_only" "IDLE"
-printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
+# Assumption 5（值无效不影响激活）真正的覆盖是上面两条针对 $stages 的断言：那条路径有能力图，
+# 会一路走到 module_stage。下面这个夹具只有一份 state.json，phase-guard 在没有能力图时就返回
+# IDLE，根本不调 module_stage —— 它测的是**激活信号本身**（grep 只看 key、不看值），
+# 不要把它当成 active_module_state 的用例：把该函数改成对任何无效值抛异常，它照样会绿。
+activation_only="$WORK/invalid-active-only"
+mkdir -p "$activation_only/.agent"
+printf '%s\n' '{"activeModule":"NOT A VALID ID"}' > "$activation_only/.agent/state.json"
+injects "activeModule 值无效时激活信号仍然触发" "$activation_only" "IDLE"
 # 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 已完成但项目未完成时报告 MODULE_DONE" "$stages" "当前阶段: **MODULE_DONE**"
@@ -300,7 +302,14 @@ out = subprocess.run([sys.argv[1]], capture_output=True, text=True, stdin=subpro
                      env={"CLAUDE_PROJECT_DIR": sys.argv[2], "PATH": "/usr/bin:/bin:/usr/local/bin"})
 body = json.loads(out.stdout)["hookSpecificOutput"]["additionalContext"]
 line = [l for l in body.splitlines() if "MAP_INVALID" in l or "invalid (" in l]
-assert all(len(l) < 220 for l in line), line
+# all([]) is True: without this the assertion below passes while checking nothing, which
+# is exactly what happens if the fixture stops reaching MAP_INVALID.
+assert line, body
+# A literal, deliberately: the real line is 252 characters (51 of fixed prefix plus the
+# 201-character fragment). Binding it to FRAGMENT_LIMIT instead would make a doubled
+# limit pass, which is what the previous `< 220` did. Changing the limit should turn
+# this red and force a decision.
+assert all(len(l) <= 260 for l in line), [len(l) for l in line]
 ' "$HOOKDIR/phase-guard.sh" "$badmap" || fail "超长坏 id 的诊断行没有被限长"
 echo "  ✅ 超长坏 id 的诊断行有界"; PASS=$((PASS + 1))
 
