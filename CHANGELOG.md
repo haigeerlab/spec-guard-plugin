@@ -23,6 +23,22 @@
   `proposal_submit` 直接报给用户。`proposal_promotion_proof` 仍只报 `promotion-unknown`：它的
   `as_json` 只透传 kebab 码形态的诊断，散文原因在那里会被归一化掉，补码形态诊断超出本次范围。
 
+- **诊断：把「探测读不到」说成了「这条 Proposal 不能关闭」。** `closeout_decision` 把 proof 的
+  `unknown`（探测读不到）与 `not-promoted` / `stale` / `invalid` / `not-accepted`（读到了，不成立）
+  一起映射到 `not-eligible`。`not-eligible` 读起来是对 Proposal 的判决，于是读者去查一份从没动过的
+  文档，而真正该做的是重试。诊断本该区分两者，但 `prove()` 的四条 `unknown` 路径（快照取不到、
+  `rev-list` 空、读不到第一父提交、publication 非 published）**根本不带诊断**，closeout 于是补成
+  `promotion-not-proved`——state 和 diagnostic 两格都在指责 Proposal，探测失败完全不出现在输出里。
+  2026-10-04 收尾真实事项时踩到：八次 `close --confirm` 里三次报 `not-eligible`，实际原因是偶发的
+  `remote default branch moved or fetch failed`。现在 proof 的 `unknown` 映射到 state `unknown`
+  并透传 proof 自己的诊断（没有时用 `promotion-unknown`），`not-eligible` 只留给读到了而不成立的那几种
+  与 `stage-not-closeable`。这与同一次发布里 `build_preview` / `_close_locked` 对 publication 探测
+  失败的处理同形，也是本仓库「探测失败必须降级」的不变量。
+  **这是契约变更，不只是修 bug**：`unknown` 与 `not-eligible` 都写在
+  `references/proposal-closeout.md` 与命令文档的结果表里，两处都已更新；`closeout_decision` 的签名
+  不变（仍不含 project/root/provider）。写入行为一字未改——两种 state 都什么都不写。
+  正反两向都有测试锁死：探测失败不得报 `not-eligible`，真正不成立的 proof 仍须报。六个变异全红，
+  含「每个非 proved 都变成 unknown」这一过度修正。
 - **诊断：把探测失败说成了「Proposal 的 revision 变了」。** `proposal_closeout` 的 `_close_locked`
   把三件事塌缩成同一个 `preview-stale` + `proposal-revision-changed`：快照探测读不到、Proposal 不在或
   不合法、revision 真的变了。只有最后一种跟 revision 有关。一次偶发的 `git fetch` 失败因此会让人
