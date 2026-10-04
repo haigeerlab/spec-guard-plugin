@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.41.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.41.0;asset:spec-guard-v0.41.0.tar.gz;sha256:b8f211e3225cbfb29befd7e463735a0b685ee288459ad60ba48d7bcf2e6e04e8"
+      },
+      "observedAt": "2026-10-04T16:23:54Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.41.0",
+        "asset:spec-guard-v0.41.0.tar.gz;size:456876",
+        "source-tag:v0.41.0@a69acc41ae2f84f44515fb36ca6e15b616fb91d2",
+        "command:python3 scripts/release-package.py validate <artifact-dir> 0.41.0",
+        "result:the candidate artifact and the independently downloaded release asset both validated; the archive has 184 entries, no symbolic links and no AppleDouble entries",
+        "result:local artifact and published GitHub asset report the same SHA-256 b8f211e3225cbfb29befd7e463735a0b685ee288459ad60ba48d7bcf2e6e04e8",
+        "result:the artifact carries only .claude-plugin/marketplace.json, plugins/ and ARTIFACT-MANIFEST.json, matching the v0.40.0 artifact shape; the 14 added entries are the closeout and backend hooks with their tests"
+      ]
+    }
+  ]
+}
