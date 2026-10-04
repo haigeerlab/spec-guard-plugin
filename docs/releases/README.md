@@ -16,9 +16,9 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified`（v0.39.0），见 [v0.39.0-codex.json](v0.39.0-codex.json)；最新 hook smoke 仍是 v0.38.3 的 app-managed CLI 0.160.0 记录，未把 PATH 旧版 0.154.0 的历史失败解释成模型不可用 | 显式确认；模块严格串行推进 |
-| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.39.0）：真实空闲 Desktop task 被 Claude 消息唤醒、读回、确认并回复，见 [v0.39.0-codex.json](v0.39.0-codex.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.39.0）：同一空闲会话被同一 Codex 身份连续两次唤醒并完成确认／回复，见 [v0.39.0-claude.json](v0.39.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.40.0）：app-managed CLI 0.160.0 使用默认模型的仓库 smoke 退出 0，见 [v0.40.0-codex.json](v0.40.0-codex.json)；PATH 旧版 0.154.0 未用于本结论 | 显式确认；模块严格串行推进 |
+| Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.40.0）：安装版 native-only 会话完成两轮 Claude→Codex 回传及一次 Codex→Claude→Codex 同线程闭环，见 [v0.40.0-codex.json](v0.40.0-codex.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 遵从桌面批准；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.40.0）：同一 Claude 会话被连续两次唤醒，随后完成反向消息的读取、确认和回复，见 [v0.40.0-claude.json](v0.40.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
 | Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `host-verified`（v0.38.3）：新 Code 模式会话在合成项目收到 UserPromptSubmit 的 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 不因其他宿主而获得写入结论 |
@@ -81,3 +81,12 @@ v0.39.0 的源码、发布包与两端安装记录见
 [`v0.39.0-codex.json`](v0.39.0-codex.json)。A10 的分项对账见
 [`v0.39.0-a10.json`](v0.39.0-a10.json)：双向收发和空闲唤醒通过，但回退演练因既有邮箱状态安全阻断，
 所以该版本当前不计 R1，连续版本计数仍为 0/2。
+
+v0.40.0 的发布后证据见
+[`v0.40.0-source.json`](v0.40.0-source.json)、
+[`v0.40.0-package.json`](v0.40.0-package.json)、
+[`v0.40.0-claude.json`](v0.40.0-claude.json)、
+[`v0.40.0-codex.json`](v0.40.0-codex.json) 与
+[`v0.40.0-a10.json`](v0.40.0-a10.json)。该版本按 2026-10-04 的 native-only 决策验收：同一台 Mac
+上的安装版完成双向收发、确认回执和同一 Claude 会话的重复空闲唤醒；兼容回退和第二台 Mac 不再属于产品
+门槛。v0.39.0 的旧 R1 结论继续作为当时时点事实保留，不反向改写。

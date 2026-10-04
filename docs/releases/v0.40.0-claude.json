@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.40.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code-cli:v0.40.0;test:marketplace-update-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace --json",
+        "command:claude plugin update spec-guard@spec-guard-marketplace --scope user --json",
+        "result:user-scope spec-guard is installed and enabled at version 0.40.0; its marketplace checkout resolves to the tagged commit",
+        "result:the installed plugin content matches the release content except for host-owned in-use metadata",
+        "host:Claude Code 2.1.289"
+      ]
+    },
+    {
+      "subject": "spec-guard-native-claude-repeat-wake",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.40.0;test:installed-native-repeat-wake-20261004"
+      },
+      "observedAt": "2026-10-04T06:36:30Z",
+      "evidence": [
+        "host:one user-authorized safe-review Claude session used the installed v0.40.0 native collaboration surface on one Mac",
+        "result:the same exact Claude session delivered two independent result messages to Codex across its initial run and one idle continuation; both messages were read and acknowledged",
+        "result:Codex then sent one direct message with wake requested; Claude read and acknowledged it and replied on the same thread",
+        "cleanup:the Claude session was cancelled and its exact synthetic identity was retired only after unread reached zero; history was retained",
+        "boundary:no project file, Git state, host configuration, Local ticket, remote ticket, or unrelated mailbox message was changed"
+      ]
+    }
+  ]
+}
