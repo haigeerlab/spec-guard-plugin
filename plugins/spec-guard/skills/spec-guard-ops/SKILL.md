@@ -73,7 +73,10 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/phase-guard.sh"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 ```
 
-旧 remote-tracker state 按本地约定报告阶段；phase 不认证、不读取其中的映射，也不选择任务。
+激活信号是两个：`CLAUDE.md`／`AGENTS.md` 里独占一行的声明块，或含 `activeModule` 的
+`.agent/state.json`。旧 remote-tracker state 若带 `activeModule` 仍按本地约定报告阶段；phase 不认证、
+不读取其中的 Issue 映射，也不选择任务。那个文件里的 `tracker` 字段已退役，不再被读取，也不再抑制
+任何提醒（`docs/retirements/state-tracker-field.md`）。
 
 ## tracker default
 

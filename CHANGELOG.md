@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### 移除
+
+- **`.agent/state.json` 的 `tracker` 字段退役。** 远端 tracker 模式本身早在 v0.15 退役，留下的字段却同时
+  充当激活信号、被 `setup-convention` 持续写入、又在另一处抑制 plan-without-todo 提醒，而
+  `verify-artifacts` 还对插件自己刚装的文件告警。现在没有任何代码读它：新装项目的 state 文件是
+  `{"activeModule":""}`，激活信号改判 `activeModule`（**信号数量不变**），抑制逻辑与无人读取的 `modules`
+  空对象一并删除，退役扫描会拦下任何重新引入的写入或读取。
+  **完成判据不变**——有 Plan 且没有未勾选项仍算完成，缺 `todo.md` 的历史模块状态不受影响。
+  迁移见[退役说明](docs/retirements/state-tracker-field.md)：绝大多数项目无需动作；只有既没有声明块、
+  又只剩 `{"tracker":"none"}` 的项目需要补 `activeModule` 或重装声明块。
+- `verify-artifacts` 不再对 `.agent/state.json` 的存在告警，只在确实残留 `tracker` 字段时提示删除。
+
+### 新增
+
+- **项目级默认事项后端。** `/spec-guard:tracker-default`（Codex：`spec-guard-ops` 的 tracker default 一节）
+  查看或按明确确认设置 `.agent/tracker.json` 的 `defaultBackend`（`local`／`github`／`gitlab`）与精确目标，
+  省去为一个几个月不变的选择逐次手打参数。它**只预填预览**：预览仍完整显示后端、精确目标与来源，每次外部
+  写入仍逐次授权；它不改变已有事项的绑定（只影响此后新建的事项），不是激活信号，也不决定能力图、Proposal
+  基线或 Spec/Plan/todo 等共享事实。文档不可用时报 `invalid` 并带稳定诊断码，**绝不降级为「没配过」**。
+  设计与取舍见[决策记录](docs/decisions/2026-10-04-tracker-backend-default.md)，它修订了
+  `spec/hosted-ticket-workflow.md`「不新增项目级 Tracker 配置」一条。
+
 ## [0.40.0] - 2026-10-04
 
 ### 变更

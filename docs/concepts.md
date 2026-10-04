@@ -34,7 +34,11 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | Build order | 能力图里的一行 `Build order: a → b → c`，规定模块的推进顺序 |
 | 模块 Spec | `spec/<模块>.md`，这个模块的需求与验收标准 |
 | Plan / todo | `tasks/<模块>/plan.md` 与 `tasks/<模块>/todo.md`，每个模块各自一份，互不覆盖 |
-| activeModule | `.agent/state.json` 里记录的当前模块，`/build` 只从它的 todo 取任务 |
+| activeModule | `.agent/state.json` 里记录的当前模块，`/build` 只从它的 todo 取任务。它是**书签**，不是进度账本：阶段每轮从 `spec/` 与 `tasks/` 的文件现状实时算出，丢了只会退化为按 Build order 取第一个未完成模块 |
+| source authority | 共享事实从哪里读：能力图结构、Proposal 正文、baseline commit、晋级提交。**恒为远端默认分支的固定快照**，与事项后端无关 |
+| backend | 承载某一条事项的身份、讨论、阶段与开闭状态的系统：`local`、`github` 或 `gitlab`。**每条事项各自一个**，首次写入后固定在那条事项上；它不碰 plan、todo、能力图和阶段 |
+| 精确目标 | 足以无歧义定位一个事项容器的元组：github 是 `(主机, owner/name)`，gitlab 是 `(主机, 正整数 project id)`，local 是 `(Epiq projectId)`。**永不推断**，只来自显式参数或项目默认值 |
+| 项目默认后端 | `.agent/tracker.json` 里的 `defaultBackend` 与 `defaultTarget`，入口 `/spec-guard:tracker-default`。它**只预填预览**，不决定写入、不改变已有事项的绑定，也不是激活信号 |
 | 阶段 | 每轮对话开头注入的状态，如 `NEEDS_PLAN`、`BUILDING`。完整列表见[使用流程](workflow.md#阶段提示) |
 | 快速插入 | `/spec-guard:add-module`：在检查点（或显式插队）校验、预览、经确认后把一个新模块插进能力图，是新增模块的默认方式 |
 | Proposal | 需要留痕时，给已有能力图新增一个模块的提案，写在 `spec/proposals/<id>.md`，经 `/spec-guard:proposal-submit` 补全基线与 revision，合进远端 main 才算发布；流程是提交、接受、晋级、收尾四步 |
