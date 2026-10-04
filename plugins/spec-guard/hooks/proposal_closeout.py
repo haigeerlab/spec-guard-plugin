@@ -32,10 +32,13 @@ PROMOTED_STAGE = "proposal-stage:promoted"
 ACCEPTED_STAGE = "proposal-stage:accepted"
 CLOSEABLE_STAGES = (ACCEPTED_STAGE, PROMOTED_STAGE)
 PROVED = "proved"
+# A proof that could not read, as opposed to one that read and refused.  The distinction
+# has to survive into the state, because that is what callers branch on.
+PROOF_UNREADABLE = "unknown"
 
 
 class Decision(object):
-    """`eligible`, `already-closed` or `not-eligible`."""
+    """`eligible`, `already-closed`, `not-eligible` or `unknown`."""
 
     def __init__(self, state, target_stage=None, needs_stage_change=None,
                  diagnostic=None):
@@ -52,9 +55,20 @@ def closeout_decision(stage, closed, proof_state, proof_diagnostic=None):
     after a human closed the item -- reports the fact and writes nothing.  The proof is
     checked before the stage so a caller learns why the promotion is not provable rather
     than being told its stage is wrong.
+
+    A proof that could not read is `unknown`, not `not-eligible`.  Both write nothing,
+    so the two differ only in what they tell the reader to do -- and that is the whole
+    point: `not-eligible` reads as a verdict about the Proposal, so it sends someone to
+    investigate a document that never moved, when the fix is to retry.  Four of
+    `prove()`'s `unknown` paths carry no diagnostic at all, so the state is all the
+    reader has.  That is this repo's invariant: a failed probe degrades, it is not
+    reported as a broken link.
     """
     if closed is True:
         return Decision("already-closed")
+    if proof_state == PROOF_UNREADABLE:
+        return Decision("unknown",
+                        diagnostic=proof_diagnostic or "promotion-unknown")
     if proof_state != PROVED:
         return Decision("not-eligible",
                         diagnostic=proof_diagnostic or "promotion-not-proved")
