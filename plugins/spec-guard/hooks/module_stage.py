@@ -39,6 +39,31 @@ def module_state(root: Path, module_id: str) -> dict:
             "half": half, "todo": todo.is_file()}
 
 
+FRAGMENT_LIMIT = 80
+STRUCTURE_CHARS = str.maketrans("", "", "`\\")
+
+
+def safe_fragment(value, limit: int = FRAGMENT_LIMIT) -> str:
+    """Make a value from the repository safe to name in the injected phase context.
+
+    `describe()` output reaches an agent every turn, so a value carrying a newline can
+    forge a heading and one carrying a backtick can forge a code fence.  This keeps the
+    words -- the point is a usable diagnostic, not redaction -- while removing the
+    characters that let a value pretend to be structure, and bounds the length so a
+    long one cannot bury the real message.
+
+    80 is measured, not guessed: the longest module id in this repository's capability
+    map is 29 characters, so a legitimate diagnostic is never truncated.
+
+    No HTML or Markdown escaping: the destination is an agent's context, not a browser,
+    and escapes would only make the diagnostic harder to read.
+    """
+    if not isinstance(value, str) or not value:
+        return ""
+    cleaned = " ".join(value.translate(STRUCTURE_CHARS).split())
+    return cleaned if len(cleaned) <= limit else cleaned[:limit] + "\u2026"
+
+
 def _state(root: Path) -> dict:
     try:
         value = json.loads((root / ".agent" / "state.json").read_text(encoding="utf-8"))

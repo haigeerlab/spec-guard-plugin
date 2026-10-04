@@ -113,6 +113,7 @@ python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_promotion_proof.py || F=1
 python3 -B plugins/spec-guard/hooks/test_module_insert.py || F=1
+python3 -B plugins/spec-guard/hooks/test_module_stage_sanitization.py || F=1
 python3 -B plugins/spec-guard/hooks/test_tracker_default.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_closeout.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_closeout_providers.py || F=1
