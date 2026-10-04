@@ -61,7 +61,10 @@ string, so a missing tracker Issue, a missing Proposal and a stale review are di
 
 | Cause | Diagnostic |
 | --- | --- |
-| The remote Proposal pool snapshot could not be read or does not parse | `proposal-pool-unknown` / `proposal-pool-invalid` |
+| A remote snapshot probe could not read the default branch, after its own three attempts | `snapshot-head-unavailable` (`ls-remote`) / `snapshot-fetch-failed` (fetch) -- nothing was read and nothing changed, so running the same command again is the fix |
+| The remote default branch tip moved between being observed and being fetched | `snapshot-tip-moved` -- never retried in place, because pinning the observed tip is the guarantee; re-running pins the newer tip, so the facts may genuinely differ |
+| The temporary snapshot repository could not be created (local, not remote) | `snapshot-temp-repo-failed` |
+| The remote Proposal pool snapshot does not parse, or could not be read for any other reason | `proposal-pool-invalid` / `proposal-pool-unknown` |
 | The Proposal is not in the published pool | `publication-absent` |
 | The review finds the Proposal stale (baseline drifted, and so on) | the review's diagnostic, such as `proposal-baseline-drifted`; fallback `promotion-stale` |
 | No tracker Issue carries the Proposal's marker | `tracker-absent` |

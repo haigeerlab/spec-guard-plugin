@@ -9,7 +9,7 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from proposal_contract import COMMIT
 from proposal_publication import (
-    Publication, fixed_snapshot, read_published_pool, skipped_as_json)
+    Publication, fixed_snapshot, probe_code, read_published_pool, skipped_as_json)
 from proposal_review import STAGES, Review, review
 from proposal_tracker_read import read_tracker
 
@@ -190,7 +190,8 @@ def _preflight(pool, proposal_id, platform, target, tracker_reader):
     pool_state = getattr(pool, "state", None)
     if pool_state != "published":
         state = pool_state if pool_state in ("invalid", "unknown") else "unknown"
-        return Preflight(state, diagnostic="proposal-pool-%s" % state)
+        return Preflight(state, diagnostic=probe_code(getattr(pool, "diagnostic", None))
+                         or "proposal-pool-%s" % state)
     publication = next((item for item in pool.publications
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:
@@ -211,7 +212,8 @@ def prove(project, publication, tracker, platform, target, remote="origin"):
     """Prove the first matching module commit from a fresh remote-default snapshot."""
     publication_state = getattr(publication, "state", None)
     if publication_state in ("absent", "invalid", "unknown"):
-        return _blocked(publication_state, getattr(publication, "diagnostic", None))
+        diagnostic = getattr(publication, "diagnostic", None)
+        return _blocked(publication_state, probe_code(diagnostic) or diagnostic)
     if publication_state != "published":
         return _blocked("unknown")
     tracker_state = getattr(tracker, "state", None)
@@ -234,7 +236,9 @@ def prove(project, publication, tracker, platform, target, remote="origin"):
     module_id = proposal.change.module_id
     with fixed_snapshot(project, remote, "sg-proposal-promotion-proof-") as snapshot:
         if snapshot.failure:
-            return _blocked("unknown")
+            # A probe that could not read and a tip that moved are both `unknown`, but
+            # only one of them is worth running again; `promotion-unknown` said neither.
+            return _blocked("unknown", probe_code(snapshot.failure))
         repo, temp, observed_commit = snapshot.repo, snapshot.temp, snapshot.commit
         ancestor = _run(["git", "-C", str(repo), "merge-base", "--is-ancestor",
                          baseline_commit, observed_commit])
@@ -299,7 +303,8 @@ def prove_from_remote(project, proposal_id, platform, target, remote="origin",
     state = getattr(pool, "state", None)
     if state != "published":
         state = state if state in ("invalid", "unknown") else "unknown"
-        return _blocked(state, "proposal-pool-%s" % state)
+        return _blocked(state, probe_code(getattr(pool, "diagnostic", None))
+                        or "proposal-pool-%s" % state)
     publication = next((item for item in pool.publications
                         if item.proposal.proposal_id == proposal_id), None)
     if publication is None:

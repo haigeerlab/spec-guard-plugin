@@ -51,4 +51,9 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
 `proposal-baseline-drifted`、`proposal-pool-unknown`），只有没有更具体原因时才是折叠后的
 `promotion-<state>`；`not-promoted` 固定是 `promotion-not-found`。详见
 `references/proposal-promotion-proof.md`。
+
+`unknown` 且 `diagnostic` 以 `snapshot-` 开头时是**远端快照读不到，不是链路失效**：
+`snapshot-head-unavailable` / `snapshot-fetch-failed` 是探测失败（内部已重试三次），什么都没读到、
+什么都没变，重跑同一条命令即可；`snapshot-tip-moved` 是远端默认分支在读取中途真的前进了，重跑会钉住
+新的 tip，所以事实可能确实不同。两者都不要去改 Proposal 或能力图。
 本命令不会把结果写回 Issue，也不创建或修改分支、能力图、Spec、Plan、任务或 PR。
