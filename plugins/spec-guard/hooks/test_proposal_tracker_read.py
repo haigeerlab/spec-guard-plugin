@@ -303,6 +303,46 @@ class ProposalTrackerTransportTests(unittest.TestCase):
                                       runner=incomplete).state, "unknown")
 
 
+class ProposalTrackerInvalidCodeTests(unittest.TestCase):
+    """`invalid` covers three different problems. A caller that cannot tell them apart
+    cannot react differently -- several items carrying the marker is a conflict to
+    resolve, a legacy bridge marker is a migration, a foreign container is a wrong
+    argument -- and matching on the prose diagnostic would be guessing at a sentence."""
+
+    def recover(self, issues, target="octo/spec-guard"):
+        return recover_tracker_issue(proposal(), "github", target,
+                                     {"complete": True, "issues": issues})
+
+    def test_several_items_carrying_the_marker_are_marker_ambiguous(self):
+        result = self.recover([github_issue(number=1), github_issue(number=2)])
+        self.assertEqual(result.state, "invalid")
+        self.assertEqual(result.code, "tracker-marker-ambiguous")
+
+    def test_a_marker_outside_the_container_names_the_container(self):
+        result = self.recover([github_issue(repository={"full_name": "other/repo"})])
+        self.assertEqual(result.code, "tracker-marker-foreign-container")
+
+    def test_a_legacy_bridge_marker_is_named_as_such(self):
+        body = MARKER + "\n<!-- spec-guard-sync:v2 id=gamma -->"
+        self.assertEqual(self.recover([github_issue(body=body)]).code,
+                         "tracker-legacy-marker")
+
+    def test_a_contract_breach_keeps_the_generic_code(self):
+        result = self.recover([github_issue(labels=["proposal"])])
+        self.assertEqual(result.code, "tracker-contract-invalid")
+
+    def test_each_code_reaches_the_safe_json(self):
+        result = self.recover([github_issue(number=1), github_issue(number=2)])
+        payload = as_json(result, "github", "octo/spec-guard")
+        self.assertEqual(payload["diagnostic"], "tracker-marker-ambiguous")
+        self.assertNotIn("multiple", json.dumps(payload))
+
+    def test_a_result_without_a_code_still_reports_the_generic_one(self):
+        payload = as_json(TrackerRead("invalid", diagnostic="raw prose"),
+                          "github", "octo/spec-guard")
+        self.assertEqual(payload["diagnostic"], "tracker-contract-invalid")
+
+
 class ProposalTrackerOutputTests(unittest.TestCase):
     def test_json_exposes_only_safe_verified_facts(self):
         result = TrackerRead("verified", issue_id=42, stage="proposal-stage:in-review",

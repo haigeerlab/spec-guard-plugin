@@ -17,7 +17,9 @@ import json
 
 from proposal_promotion_proof import prove_from_remote
 from proposal_publication import read_published
-from proposal_tracker_read import recover_tracker_issue
+from proposal_tracker_read import (
+    CONTRACT_INVALID, MARKER_AMBIGUOUS, recover_tracker_issue,
+)
 
 PROMOTED_STAGE = "proposal-stage:promoted"
 ACCEPTED_STAGE = "proposal-stage:accepted"
@@ -59,8 +61,7 @@ MARKER_NAMESPACE = "spec-guard-proposal-closeout:v1"
 REVISION_DIGITS = 12
 # Stable codes for the two read layers, so a missing Proposal, a missing item and an
 # unreadable container stay distinguishable even where the state would coincide.
-TRACKER_CODES = {"absent": "tracker-absent", "invalid": "tracker-invalid",
-                 "unknown": "tracker-unknown"}
+TRACKER_CODES = {"absent": "tracker-absent", "unknown": "tracker-unknown"}
 RECORD = (
     "Proposal `%(id)s` is promoted.\n"
     "\n"
@@ -150,6 +151,11 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
     tracker = reader(proposal, backend, target)
     if getattr(tracker, "state", None) != "verified":
         state = getattr(tracker, "state", None)
+        if state == "invalid":
+            code = getattr(tracker, "code", None) or CONTRACT_INVALID
+            # Several items carrying the marker is not a malformed container: it is a
+            # choice only a human can make, so say conflict rather than invalid.
+            return _blocked("conflict" if code == MARKER_AMBIGUOUS else "invalid", code)
         state = state if state in TRACKER_CODES else "unknown"
         return _blocked(state, TRACKER_CODES[state])
 

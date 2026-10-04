@@ -16,11 +16,19 @@ LOCAL_PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
 # Open/closed is read per platform.  GitLab says "opened", not "open".
 CLOSED_STATES = {"github": {"open": False, "closed": True},
                  "gitlab": {"opened": False, "closed": True}}
+# `invalid` covers three different problems and a caller must react differently to
+# each: several items carrying the marker is a conflict for a human to resolve, a
+# legacy bridge marker is a migration, a foreign container is a wrong argument.  The
+# prose diagnostic stays for humans; these codes are what callers may branch on.
+CONTRACT_INVALID = "tracker-contract-invalid"
+MARKER_AMBIGUOUS = "tracker-marker-ambiguous"
+FOREIGN_CONTAINER = "tracker-marker-foreign-container"
+LEGACY_MARKER = "tracker-legacy-marker"
 
 
 class TrackerRead(object):
     def __init__(self, state, issue_id=None, stage=None, diagnostic=None, proposal_id=None,
-                 platform=None, target=None, closed=None):
+                 platform=None, target=None, closed=None, code=None):
         self.state = state
         self.issue_id = issue_id
         self.stage = stage
@@ -29,6 +37,7 @@ class TrackerRead(object):
         self.proposal_id = proposal_id
         self.platform = platform
         self.target = target
+        self.code = code
 
 
 def as_json(result, platform, target):
@@ -39,7 +48,7 @@ def as_json(result, platform, target):
         data["stage"] = result.stage
         data["closed"] = result.closed
     elif result.state == "invalid":
-        data["diagnostic"] = "tracker-contract-invalid"
+        data["diagnostic"] = getattr(result, "code", None) or CONTRACT_INVALID
     elif result.state == "unknown":
         data["diagnostic"] = "tracker-read-unavailable"
     return data
@@ -49,8 +58,8 @@ def _unknown(message):
     return TrackerRead("unknown", diagnostic=message)
 
 
-def _invalid(message):
-    return TrackerRead("invalid", diagnostic=message)
+def _invalid(message, code=CONTRACT_INVALID):
+    return TrackerRead("invalid", diagnostic=message, code=code)
 
 
 def _closed(platform, issue):
@@ -159,15 +168,18 @@ def recover_tracker_issue(proposal, platform, target, page):
         if not _has_marker(body, proposal.marker):
             continue
         if container != target:
-            return _invalid("Proposal marker appeared outside the target container")
+            return _invalid("Proposal marker appeared outside the target container",
+                            FOREIGN_CONTAINER)
         if _has_legacy_marker(body):
-            return _invalid("Proposal Issue contains a legacy bridge marker")
+            return _invalid("Proposal Issue contains a legacy bridge marker",
+                            LEGACY_MARKER)
         matches.append((issue_id, body, labels, closed))
 
     if not matches:
         return TrackerRead("absent")
     if len(matches) != 1:
-        return _invalid("multiple Proposal Issues contain the complete marker")
+        return _invalid("multiple Proposal Issues contain the complete marker",
+                        MARKER_AMBIGUOUS)
     issue_id, body, labels, closed = matches[0]
     try:
         validate_tracker(proposal, body, labels)

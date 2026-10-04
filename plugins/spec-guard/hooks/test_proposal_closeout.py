@@ -228,12 +228,27 @@ class PreviewTests(unittest.TestCase):
 
     def test_tracker_states_other_than_verified_pass_through_with_a_stable_code(self):
         for state, diagnostic in (("absent", "tracker-absent"),
-                                  ("invalid", "tracker-invalid"),
+                                  ("invalid", "tracker-contract-invalid"),
                                   ("unknown", "tracker-unknown")):
             result = preview(tracker=TrackerRead(state, diagnostic="raw detail"))
             self.assertEqual(result["state"], state)
             self.assertEqual(result["diagnostic"], diagnostic)
             self.assertNotIn("raw detail", json.dumps(result))
+
+    def test_several_items_carrying_the_marker_are_a_conflict_to_resolve(self):
+        """Not just `invalid`: a human has to pick, and the preview should say so."""
+        result = preview(tracker=TrackerRead("invalid", diagnostic="raw prose",
+                                             code="tracker-marker-ambiguous"))
+        self.assertEqual(result["state"], "conflict")
+        self.assertEqual(result["diagnostic"], "tracker-marker-ambiguous")
+        self.assertNotIn("raw prose", json.dumps(result))
+
+    def test_other_invalid_codes_stay_invalid_and_keep_their_own_code(self):
+        for code in ("tracker-marker-foreign-container", "tracker-legacy-marker",
+                     "tracker-contract-invalid"):
+            result = preview(tracker=TrackerRead("invalid", code=code))
+            self.assertEqual(result["state"], "invalid", code)
+            self.assertEqual(result["diagnostic"], code, code)
 
     def test_the_preview_never_writes(self):
         adapter = FakeAdapter()

@@ -88,6 +88,12 @@ closeout_decision(stage, closed, proof_state) -> Decision
   `state` 已在响应中；Local 取 `isClosed`。缺这个字段即 `unknown`，**不默认当作 open**。
 - `absent` / `invalid` / `unknown` / `verified` 四态、marker 唯一性、容器一致、legacy marker 拒绝、
   完整分页要求**全部不变**，三个平台共用同一个纯函数。
+- `invalid` 覆盖三类不同的问题，而调用方对它们的反应应当不同，因此各给一个稳定短码：
+  `tracker-marker-ambiguous`（多条事项含完整 marker，需人工选择）、
+  `tracker-marker-foreign-container`（marker 出现在目标容器之外，参数给错了）、
+  `tracker-legacy-marker`（正文含旧 bridge marker，属于迁移问题）；
+  `validate_tracker` 的契约违规沿用 `tracker-contract-invalid`，未带短码的结果也回落到它。
+  散文诊断只留给人看，调用方只允许依据短码分支——靠匹配句子来区分是假精度。
 - 安全 JSON 增加 `closed`，其余不变：仍不含正文、评论、marker、URL、token、原始错误。
 
 ### C3 provider 适配器协议
