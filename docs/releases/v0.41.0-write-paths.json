@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": { "version": "0.41.0" },
+  "records": [
+    {
+      "subject": "spec-guard-proposal-closeout",
+      "status": "not-verified",
+      "target": { "kind": "host-session", "id": "not-run" },
+      "capabilities": ["proposal-closeout"],
+      "reason": "v0.41.0 ships the write-capable fourth step of the Proposal flow (record, stage to promoted, close, read back) but no host session exercised it after the fixes in this same release. The regressions that do cover it inject publication, proof and transport (test_proposal_closeout.py, 67 cases) or use fake provider transports (test_proposal_closeout_providers.py, 21 cases), so they pin what the adapters send, not what a real tracker accepts. The real runs narrated in the v0.41.0 changelog were observed on 2026-10-04 against the pre-fix code and are what motivated this release's diagnostic changes; they are not evidence for the shipped behaviour. Recording this as not-verified rather than leaving the capability absent from the evidence set, per docs/releases/README.md."
+    },
+    {
+      "subject": "spec-guard-proposal-local-backend",
+      "status": "not-verified",
+      "target": { "kind": "host-session", "id": "not-run" },
+      "capabilities": ["proposal-closeout", "proposal-submit", "proposal-add-module-promotion"],
+      "reason": "v0.41.0 adds --platform local to proposal-submit and add-module --proposal, and a Local closeout adapter over the Epiq stdio MCP. No host session ran either against a real ledger for this release. test_proposal_closeout_local.py uses a faked Epiq and states its shapes were observed once from pinned epiq@1.11.0; the re-runnable proof of that claim is test_proposal_closeout_local_acceptance.py, which needs SPEC_GUARD_EPIQ_RUNTIME and was not run. Shared Proposal facts still come only from the remote default branch, so this gap is about the ledger transport, not about the source authority."
+    },
+    {
+      "subject": "spec-guard-tracker-backend-default",
+      "status": "not-verified",
+      "target": { "kind": "host-session", "id": "not-run" },
+      "capabilities": ["tracker-backend-default"],
+      "reason": "v0.41.0 adds /spec-guard:tracker-default and the .agent/tracker.json project default. Covered by test_tracker_default.py (471 lines) only; no host session set or read a project default for this release. The capability prefills previews and never decides a write, so the unverified surface is the preview and the resolution of an exact target, not an external write."
+    }
+  ]
+}
