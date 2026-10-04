@@ -24,6 +24,8 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
 | 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
 | 本地事项账本 | 明确选择 Local 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
+| 会话路由 | 按宿主与会话名称联系本机另一个会话，优先复用同宿主原生通道 | `session-routing` skill | 需先启用协作信箱 |
+| 跨宿主会话委派 | 在有限授权内创建本机 Codex 审查或 Claude Code 开发会话 | `session-delegation` skill | 需先启用协作信箱 |
 | 托管日常事项 | 明确选择 GitHub/GitLab 后逐项查重、授权创建并在交付后对账 | `/spec-guard:ticket`、`hosted-ticket-workflow` skill | 需登录对应 CLI；外部写入逐次授权 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
 | 能力历史 | 核验旧版本归档下来的能力图没被改动 | `/spec-guard:history-integrity` | 只对有归档的项目有用 |
