@@ -32,12 +32,37 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 | Proposal preflight 或 proof | `test_proposal_promotion_proof.py`、`test_proposal_publication.py` 与完整 Proposal focused suites |
 | `check-*.py` | `scripts/test-checkers.sh`，每条新判据都有一正一反用例 |
 | `spec-digest.py` | 其 self-test、phase 与 verify 两侧回归 |
+| Local 账本、归档恢复或 Proposal 收尾的 Local 适配器 | 下节的三个可选验收测试 |
 
 macOS 上必须用 `/bin/bash`，以覆盖系统自带 bash 3.2；不要让 Homebrew bash 掩盖兼容问题。
 
 已退役 initiative 的 `history-migration.py import --confirm` 只供维护者处理旧证据，
 不作为 Claude 命令或 Codex skill 的日常用户入口。先运行只读 `preview` 并核对目标与冲突；
 实际导入须取得针对本次写入的明确确认。现行用户入口只提供迁移预览。
+
+## 可选验收测试（需固定外部运行时）
+
+下面三个**刻意不在** `scripts/validate.sh` 与 CI 里：它们要调用已装好的固定 Epiq 运行时，
+CI 没有、也不该有。但它们是唯一能证明适配器发出的参数名**被真实运行时接受**的东西 ——
+其余测试用的是假传输，只锁住「我们发了什么」。运行时改名时假传输测试会全绿，而写入路径
+静默失效（v0.41.0 的 GitHub `state` 大小写事故就是同一形状的另一个后端）。
+
+```bash
+SPEC_GUARD_EPIQ_RUNTIME=/path/to/verified/epiq python3 -B \
+  plugins/spec-guard/hooks/test_local_ledger_acceptance.py
+SPEC_GUARD_EPIQ_RUNTIME=/path/to/verified/epiq python3 -B \
+  plugins/spec-guard/hooks/test_local_ticket_restore_acceptance.py
+SPEC_GUARD_EPIQ_RUNTIME=/path/to/verified/epiq python3 -B \
+  plugins/spec-guard/hooks/test_proposal_closeout_local_acceptance.py
+```
+
+改 `local_ledger_*`、`local_ticket_*`、`proposal_closeout_local.py` 或升级固定的 Epiq 版本时
+跑它们，并把运行主机、运行时版本与结果记进发布证据；没跑就标未验证，不要留空。
+未设 `SPEC_GUARD_EPIQ_RUNTIME` 时三者都报跳过并**退出 2**（2026-10-05 实测），
+与通过的 `0`、失败的 `1` 分开 —— 把它们接进任何运行器时按 `2` 判「没跑起来」，不要当成通过。
+
+`scripts/check-acceptance-wired.py` 只保证本节或某个运行器真的提到了每个验收测试；
+它不证明这些测试跑过。
 
 ## 可选但高价值的检查
 

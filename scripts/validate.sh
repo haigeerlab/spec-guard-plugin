@@ -63,6 +63,7 @@ python3 scripts/check-command-names.py || F=1
 python3 scripts/check-no-parallel-surface.py || F=1
 python3 scripts/check-acceptance-immutable.py || F=1
 python3 scripts/check-command-parity.py || F=1
+python3 scripts/check-acceptance-wired.py || F=1
 
 echo ""
 echo "═══ 校验器自身的回归 ═══"
