@@ -177,7 +177,12 @@ plugins/spec-guard/commands/phase.md, docs/, CHANGELOG.md     -> C5
 
 ### T5 牙齿检查
 
-把 `safe_fragment` 改回恒等函数，T2／T3 的先红用例必须重新变红。
+把 `safe_fragment` 改回恒等函数：**T3 的先红用例**与 `test_module_stage_sanitization.py` 必须变红。
+
+**T2 不会变红，这是对的**：注入点 1 的控制是 `MODULE_ID` 校验，不是净化——值一旦通过校验就是
+kebab-case，没有可净化的内容；那一处的 `safe_fragment` 是纵深防御，不是生效中的控制。
+对应地，注入点 1 的牙齿检查是把 `MODULE_ID.match` 改成恒真（T2 立刻变红），以及把
+「无效时报告」那一行删掉（T2 的另一条变红）。两者都已实测。
 
 ## Boundaries
 

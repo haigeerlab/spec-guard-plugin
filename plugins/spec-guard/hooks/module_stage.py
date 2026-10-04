@@ -14,7 +14,7 @@ import re
 import subprocess
 import sys
 
-from capability_map import MapError, parse_map
+from capability_map import MODULE_ID, MapError, parse_map
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
@@ -72,9 +72,26 @@ def _state(root: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def active_module(root: Path) -> str | None:
+def active_module_state(root: Path) -> tuple:
+    """(value, state) where state is `absent`, `invalid` or `present`.
+
+    `invalid` is kept distinct from `absent` on purpose: the user did set something, and
+    silently ignoring it would let them believe it took effect.  The value itself is a
+    repository-controlled string, so only this state -- never the string -- is safe to
+    report without passing through `safe_fragment`.
+    """
     active = _state(root).get("activeModule")
-    return active if isinstance(active, str) and active else None
+    if not isinstance(active, str) or not active:
+        return None, "absent"
+    if not MODULE_ID.match(active):
+        return active, "invalid"
+    return active, "present"
+
+
+def active_module(root: Path) -> str | None:
+    """The current module pointer, or None when unset or not a module id."""
+    value, state = active_module_state(root)
+    return value if state == "present" else None
 
 
 def project_stage(states: list, active: str | None) -> tuple:
@@ -137,11 +154,18 @@ def describe(root: Path) -> str:
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
-    active = active_module(root)
+    active, active_state = active_module_state(root)
+    active = active if active_state == "present" else None
     stage, current, source, pending = project_stage(states, active)
     notes = []
-    if active and active not in by_id:
-        notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
+    if active_state == "invalid":
+        # Report it, but never echo it: the value is repository content, and the note
+        # itself is enough for the user to find what they typed.
+        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；"
+                     "按 Build order 取当前模块。")
+    elif active and active not in by_id:
+        notes.append("- activeModule `%s` is not in the capability map; using Build order."
+                     % safe_fragment(active))
     active_state = by_id.get(active) if active else None
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
