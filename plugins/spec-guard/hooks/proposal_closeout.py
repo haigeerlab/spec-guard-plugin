@@ -164,7 +164,11 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
     publication = publication_reader(project, proposal_id, remote)
     if getattr(publication, "state", None) != "published":
         state = getattr(publication, "state", None)
-        return _blocked(state if state in ("absent", "invalid") else "unknown")
+        # Carry the reason: a bare {"state": "unknown"} cannot be told apart from a
+        # broken link, and this plugin's rule is that a failed probe degrades with
+        # something the reader can act on.
+        return _blocked(state if state in ("absent", "invalid") else "unknown",
+                        getattr(publication, "diagnostic", None))
     proposal = publication.proposal
     if not getattr(proposal, "revision", None):
         return _blocked("not-eligible", "legacy-revision-required")
@@ -315,10 +319,19 @@ def close_preview(preview, project, adapter, confirm=False, journal_root=None,
 def _close_locked(preview, project, adapter, path, backend, target, remote,
                   publication_reader, reader, prover):
     publication = publication_reader(project, preview["proposalId"], remote)
+    state = getattr(publication, "state", None)
+    # Three different things used to collapse into `proposal-revision-changed`, and
+    # only one of them is about a revision. A probe that could not read is a retry;
+    # saying the revision moved sends the reader to diff a document that never changed.
+    if state != "published":
+        if state in ("absent", "invalid"):
+            return _blocked("preview-stale", "proposal-%s" % state)
+        return _blocked("unknown",
+                        getattr(publication, "diagnostic", None) or "proposal-pool-unknown")
     proposal = getattr(publication, "proposal", None)
-    if (getattr(publication, "state", None) != "published" or
-            getattr(proposal, "revision", None) != preview["revision"] or
-            getattr(proposal, "marker", None) is None):
+    if getattr(proposal, "marker", None) is None:
+        return _blocked("preview-stale", "proposal-marker-missing")
+    if getattr(proposal, "revision", None) != preview["revision"]:
         return _blocked("preview-stale", "proposal-revision-changed")
 
     try:
