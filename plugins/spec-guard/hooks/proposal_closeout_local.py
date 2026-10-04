@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
 from local_ledger_runtime import (
-    MCP_RELATIVE_PATH, RuntimeContractError, mcp_tool_call, node_status, runtime_status,
+    MCP_RELATIVE_PATH, RuntimeContractError, mcp_tool_call, node_status, project_status,
+    runtime_status, state_worktree_status,
 )
 
 PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
@@ -63,6 +65,7 @@ class LocalCloseout:
         if not isinstance(project_id, str) or not PROJECT_ID.fullmatch(project_id):
             raise LocalCloseoutError("target-invalid: project id is invalid")
         self.project_id = project_id
+        self.project = None if project is None else Path(project)
         if caller is None:
             if project is None:
                 raise LocalCloseoutError("target-invalid: project root is required")
@@ -89,9 +92,49 @@ class LocalCloseout:
 
     # ── reads ─────────────────────────────────────────────────────────────
     def target_facts(self) -> dict[str, Any]:
-        """The Local container has no URL and no platform visibility to read."""
+        """The committed ledger identity, not an echo of the caller's own argument.
+
+        `exactTarget` is what the operator reads before authorizing, so it has to be a
+        fact about the destination.  The project actually written to is decided by
+        `.epiq/project.json` under the project root, while the id came from `--target`
+        or from `.agent/tracker.json`; a repository shipping two different values would
+        otherwise show one destination and write to another.  There is no URL and no
+        platform visibility to report for a Local ledger.
+        """
+        if self.project is None:
+            raise LocalCloseoutError("target-unknown: project root is required")
+        identity = project_status(self.project)
+        if identity.get("state") != "initialized":
+            raise LocalCloseoutError("target-unknown: the ledger is not initialized")
+        if identity.get("projectId") != self.project_id:
+            raise LocalCloseoutError(
+                "target-unknown: the ledger identity differs from the named target")
+        # Every other Local writer here gates on ownership: a second checkout of the
+        # same project can own the state worktree, and writing through one we do not
+        # own would land the record in someone else's copy.
+        owner = state_worktree_status(self.project, self.project_id)
+        if owner.get("state") != "owned":
+            raise LocalCloseoutError(
+                "target-unknown: the Epiq state worktree is not owned by this checkout")
         return {"platform": "local", "target": self.project_id,
-                "targetId": self.project_id}
+                "targetId": identity["projectId"],
+                "stateBranch": identity.get("stateBranch"),
+                "publishesTo": self._publish_remote()}
+
+    def _publish_remote(self):
+        """The Git remote a confirmed `epiq_sync` would publish the state branch to.
+
+        The operator authorizes the write from the preview, so whether the record can
+        become public belongs in it. This module never calls `epiq_sync`; it only
+        reports where one would go, or `None` when there is no remote.
+        """
+        try:
+            done = subprocess.run(
+                ["git", "-C", str(self.project), "remote", "get-url", "origin"],
+                capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return "origin" if done.returncode == 0 and done.stdout.strip() else None
 
     def list_issues(self) -> dict[str, Any]:
         raw = self.call("epiq_issue_list", includeClosed=True)

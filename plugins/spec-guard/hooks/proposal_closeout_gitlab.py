@@ -33,10 +33,14 @@ class GitLabCloseout:
 
     # ── reads ─────────────────────────────────────────────────────────────
     def _get(self, endpoint: str) -> Any:
-        return self.runner(["glab", "api", endpoint])
+        # Pin the host on every request. Validating `self.host`, publishing it in
+        # `exactTarget` and then letting glab's config decide where the call lands
+        # would make the authorized target a label rather than the destination.
+        return self.runner(["glab", "api", "--hostname", self.host, endpoint])
 
     def _write(self, method: str, endpoint: str, body: dict[str, Any]) -> Any:
-        return self.writer(["glab", "api", "--method", method, endpoint], body)
+        return self.writer(["glab", "api", "--hostname", self.host,
+                            "--method", method, endpoint], body)
 
     def target_facts(self) -> dict[str, Any]:
         raw = self._get("projects/" + str(self.target))

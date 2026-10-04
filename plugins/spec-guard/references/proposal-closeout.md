@@ -89,7 +89,10 @@ tracker 的读取经由收尾适配器，而**同一个 reader 也交给 `prove_
 <!-- spec-guard-proposal-closeout:v1 <proposalId>/<revision 前 12 位> -->
 ```
 
-只在**最后一行**认定有效；出现在别处即 `conflict` + `tracker-marker-ambiguous`。命名空间与
+只在**最后一行**认定有效。带这个 marker、但正文不是本次要写的那条记录的评论，判为
+`conflict` + `closeout-marker-not-ours`——marker 由公开信息推得出来（`<id>/<revision 前 12 位>`，
+两者都印在 Proposal 事项正文的 v2 marker 里），所以「末行是 marker」不构成"本工具写过"的证据；
+在公开仓库上任何能评论的人都伪造得出来。只有逐字相同的那条记录才算已写过。命名空间与
 `spec-guard-hosted-ticket:v1`、`spec-guard-local-ticket:v1` 都不冲突，记录里也**不得**回显 Proposal 自己的
 `spec-guard-proposal:v2` marker——同一容器里两个命名空间正是 marker 歧义的开端。
 
@@ -117,8 +120,8 @@ Spec、Plan、todo、实现与验收由模块自己的任务清单或普通事�
 ```
 1. 评论   → 已有末行为该 marker 的评论则跳过
 2. 阶段   → 已是 promoted 则跳过；否则先 tag/label add，再 remove 旧的
-3. 关闭   → 已关闭则跳过
-4. 读回   → 阶段 == promoted ∧ 已关闭 ∧ marker 恰好一条
+3. 关闭   → 调用 set_closed（事项已关闭的情形在上一层的复核里就已返回 already-closed）
+4. 读回   → 阶段 == promoted ∧ 已关闭 ∧ **本次记录恰好一条**（读不回即 partial）
 ```
 
 每步先查重后写，这正是**响应丢失后重跑能对账而不是重写**的原因。结果无法确认时是 `partial`：尝试留在

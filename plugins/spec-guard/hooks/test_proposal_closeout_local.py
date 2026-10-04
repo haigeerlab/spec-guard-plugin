@@ -3,6 +3,10 @@
 Every shape asserted here was observed from the pinned epiq@1.11.0 runtime in a fully
 isolated temporary ledger, not inferred from the minified bundle.
 """
+import json
+import pathlib
+import subprocess
+import tempfile
 import unittest
 
 from proposal_closeout_local import LocalCloseout, LocalCloseoutError
@@ -186,17 +190,99 @@ class LocalWriteTests(unittest.TestCase):
 
 
 class LocalTargetTests(unittest.TestCase):
+    def owned(self):
+        """Pretend this checkout owns the state worktree; ownership has its own case."""
+        import proposal_closeout_local as module
+        original = module.state_worktree_status
+        module.state_worktree_status = lambda *a, **k: {"state": "owned"}
+        self.addCleanup(setattr, module, "state_worktree_status", original)
+
+    def initialized(self, tmp, project_id=PROJECT_ID):
+        root = pathlib.Path(tmp)
+        (root / ".epiq").mkdir(exist_ok=True)
+        (root / ".epiq" / "project.json").write_text(json.dumps(
+            {"projectId": project_id, "stateBranch": "__epiq_state__",
+             "createdAt": "2026-01-01T00:00:00.000Z"}), encoding="utf-8")
+        return root
+
     def test_a_project_id_must_be_well_formed(self):
         for identifier in ("", "has space", "x" * 65, 17, None):
             with self.assertRaises(LocalCloseoutError, msg=repr(identifier)):
                 LocalCloseout(identifier, caller=lambda *a, **k: None)
 
-    def test_target_facts_name_the_project_without_a_url(self):
-        closeout, _ = provider({})
-        facts = closeout.target_facts()
-        self.assertEqual(facts["platform"], "local")
-        self.assertEqual(facts["target"], PROJECT_ID)
-        self.assertNotIn("url", facts)
+    def test_target_facts_come_from_the_ledger_not_from_our_own_argument(self):
+        """`exactTarget` is what the operator reads before authorizing, so echoing the
+        caller's own `--target` back makes it a restatement of the request rather than
+        a fact. The project actually written to is decided by `.epiq/project.json` in
+        the project root; a repo shipping one id in `.agent/tracker.json` and another
+        in `.epiq/project.json` would show one destination and write to the other."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / ".epiq").mkdir()
+            (root / ".epiq" / "project.json").write_text(json.dumps(
+                {"projectId": PROJECT_ID, "stateBranch": "__epiq_state__",
+                 "createdAt": "2026-01-01T00:00:00.000Z"}), encoding="utf-8")
+            self.owned()
+            closeout = LocalCloseout(PROJECT_ID, project=root,
+                                     caller=Ledger({}))
+            facts = closeout.target_facts()
+            self.assertEqual(facts["platform"], "local")
+            self.assertEqual(facts["target"], PROJECT_ID)
+            self.assertEqual(facts["stateBranch"], "__epiq_state__")
+            self.assertNotIn("url", facts)
+
+    def test_a_ledger_identity_that_differs_from_the_named_target_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / ".epiq").mkdir()
+            (root / ".epiq" / "project.json").write_text(json.dumps(
+                {"projectId": "01SOMEOTHERPROJECT", "stateBranch": "__epiq_state__",
+                 "createdAt": "2026-01-01T00:00:00.000Z"}), encoding="utf-8")
+            closeout = LocalCloseout(PROJECT_ID, project=root, caller=Ledger({}))
+            with self.assertRaises(LocalCloseoutError):
+                closeout.target_facts()
+
+    def test_a_state_worktree_owned_by_another_checkout_refuses_to_write(self):
+        """Every other Local writer in this repo gates on ownership. A second checkout
+        of the same project can own the `__epiq_state__` worktree; without this check
+        closeout would comment, retag and close through a worktree this checkout does
+        not own, and the preview would give no warning."""
+        import proposal_closeout_local as module
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.initialized(tmp)
+            original = module.state_worktree_status
+            module.state_worktree_status = lambda *a, **k: {"state": "foreign"}
+            try:
+                with self.assertRaises(LocalCloseoutError):
+                    LocalCloseout(PROJECT_ID, project=root, caller=Ledger({})
+                                  ).target_facts()
+            finally:
+                module.state_worktree_status = original
+
+    def test_the_preview_states_whether_the_ledger_publishes_to_a_remote(self):
+        """The ledger's state branch can be pushed to a Git remote, which on a public
+        repository makes the closeout record public. The operator authorizes the write
+        from the preview, so that has to be in it rather than left to be guessed."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self.initialized(tmp)
+            self.owned()
+            facts = LocalCloseout(PROJECT_ID, project=root,
+                                  caller=Ledger({})).target_facts()
+            self.assertIn("publishesTo", facts)
+            self.assertIsNone(facts["publishesTo"])
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(["git", "-C", str(root), "remote", "add", "origin",
+                            "https://example.invalid/x.git"], check=True)
+            with_remote = LocalCloseout(PROJECT_ID, project=root,
+                                        caller=Ledger({})).target_facts()
+            self.assertEqual(with_remote["publishesTo"], "origin")
+
+    def test_an_uninitialized_project_cannot_report_a_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            closeout = LocalCloseout(PROJECT_ID, project=pathlib.Path(tmp),
+                                     caller=Ledger({}))
+            with self.assertRaises(LocalCloseoutError):
+                closeout.target_facts()
 
 
 if __name__ == "__main__":

@@ -14,8 +14,10 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import stat
 import json
 import os
+import re
 from pathlib import Path
 
 from proposal_promotion_proof import prove_from_remote
@@ -228,8 +230,11 @@ def _journal_path(root, proposal_id, revision):
 
 
 def _private_root(root):
+    """A real directory we own, never a link someone else planted."""
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
+    if root.is_symlink() or not stat.S_ISDIR(root.lstat().st_mode):
+        raise OSError("journal root is not a directory")
     os.chmod(root, 0o700)
     return root
 
@@ -244,7 +249,8 @@ def _read_journal(path):
 
 
 def _write_journal(path, record):
-    descriptor = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+    descriptor = os.open(path, os.O_CREAT | os.O_WRONLY | os.O_TRUNC
+                         | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
         json.dump(record, handle, ensure_ascii=False, sort_keys=True)
     os.chmod(path, 0o600)
@@ -350,6 +356,14 @@ def _close_locked(preview, project, adapter, path, backend, target, remote,
         return _blocked(decision.state, decision.diagnostic)
     if getattr(proof, "promotion_commit", None) != preview["promotionCommit"]:
         return _blocked("not-eligible", "proof-changed")
+    # `record` is the one previewed field whose bytes get posted, so it is rebuilt from
+    # the facts just re-established rather than taken on trust. Everything else in the
+    # preview is compared against a live source; without this, anyone able to edit the
+    # preview file between the two commands could publish arbitrary text as us.
+    if preview["record"] != closeout_record(preview["proposalId"], proposal.revision,
+                                            proof.promotion_commit,
+                                            proof.review_commit):
+        return _blocked("preview-invalid")
 
     return _apply(preview, adapter, tracker, decision, path, backend)
 
@@ -368,8 +382,15 @@ def _apply(preview, adapter, tracker, decision, path, backend):
         comments = adapter.list_comments(issue_id)
         if comments.get("complete") is not True:
             return _blocked("unknown", "comments-incomplete")
-        if not any(str(item.get("body", "")).splitlines()[-1:] == [marker]
-                   for item in comments["comments"]):
+        # The marker is derivable from the Issue body anyone can read, so "ends with
+        # the marker" is not evidence that we wrote it. Only our own record, byte for
+        # byte, counts as already done; anything else wearing the marker is a conflict
+        # for a human, never a reason to skip writing the real one.
+        wearing = [_text(item.get("body")) for item in comments["comments"]
+                   if _text(item.get("body")).splitlines()[-1:] == [marker]]
+        if any(body != _text(preview["record"]) for body in wearing):
+            return _blocked("conflict", "closeout-marker-not-ours")
+        if not wearing:
             adapter.create_comment(issue_id, preview["record"])
     except Exception as error:
         refusal = _rejection(error)
@@ -402,10 +423,26 @@ def _apply(preview, adapter, tracker, decision, path, backend):
     _issue_id, _container, _body, labels, closed = fields
     if not closed or decision.target_stage not in labels:
         return refusal or _partial(path, record, "close-result-uncertain")
+    # The record is the point of the whole exercise, so read it back too: stage and
+    # closed alone would let a backend that accepted the comment and dropped it still
+    # be reported as verified.
+    try:
+        final = adapter.list_comments(issue_id)
+        ours = [item for item in final.get("comments", [])
+                if _text(item.get("body")) == _text(preview["record"])]
+    except Exception:
+        return _partial(path, record, "record-not-readable")
+    if final.get("complete") is not True or len(ours) != 1:
+        return _partial(path, record, "record-not-readable")
     _clear(path)
     return {"state": "verified", "issueId": issue_id,
             "stage": decision.target_stage, "closed": True,
             "promotionCommit": preview["promotionCommit"]}
+
+
+def _text(value):
+    """Compare comment bodies without being defeated by line endings."""
+    return str(value or "").replace("\r\n", "\n").strip()
 
 
 def _clear(path):
@@ -438,9 +475,17 @@ def _resolved(args):
     from tracker_default import read_default, resolve
 
     target = args.target
-    if target is not None and args.backend == "gitlab" and str(target).isdigit():
+    # `str.isdigit()` is true for characters like "²" that `int()` rejects, so an
+    # ASCII-only bound keeps a stray argument from becoming an uncaught traceback.
+    if (target is not None and args.backend == "gitlab" and
+            re.fullmatch(r"[0-9]{1,18}", str(target))):
         target = int(target)
     explicit = None
+    # Build the explicit target whenever one was given, even without a backend, so
+    # `resolve` can answer `backend-unselected` instead of this function quietly
+    # dropping it and labelling the project default as the chosen one.
+    if target is not None and not args.backend:
+        return None, {"state": "target-unselected", "diagnostic": "backend-unselected"}
     if args.backend and target is not None:
         explicit = ({"host": args.host or "github.com", "repo": target}
                     if args.backend == "github" else
@@ -497,9 +542,21 @@ def main(argv=None):
         result = build_preview(args.project, args.proposal_id, backend, container,
                                adapter, remote=args.remote, source=source, host=host)
         if result.get("state") == "preview":
-            Path(args.output).write_text(
-                json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8")
+            # The preview is read back by `close` and acted on, so it is created
+            # exclusively and never through a link someone else planted. O_EXCL also
+            # makes a leftover preview from an earlier run an explicit failure rather
+            # than a silent overwrite.
+            try:
+                descriptor = os.open(args.output, os.O_CREAT | os.O_EXCL | os.O_WRONLY
+                                     | getattr(os, "O_NOFOLLOW", 0), 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(json.dumps(result, ensure_ascii=False, indent=2,
+                                            sort_keys=True) + "\n")
+            except OSError:
+                print(json.dumps({"state": "unknown",
+                                  "diagnostic": "preview-output-unwritable"},
+                                 sort_keys=True))
+                return 2
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 0 if result.get("state") == "preview" else 2
 

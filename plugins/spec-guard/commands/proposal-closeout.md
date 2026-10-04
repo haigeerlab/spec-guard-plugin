@@ -72,7 +72,7 @@ open、阶段是否仍可关闭、proof 是否仍 `proved` 且 commit 相同、j
 
 | state | 怎么办 |
 | --- | --- |
-| `verified` | 已完成并读回：阶段 promoted、已关闭、marker 恰好一条 |
+| `verified` | 已完成并读回：阶段 promoted、已关闭、**本次收尾记录恰好一条** |
 | `already-closed` | 事项已关闭，**什么都没写**。这是正常的重跑结果，不是失败 |
 | `partial` | 部分成功，尝试已记进 journal。**只做只读对账，不要重跑指望它补齐** |
 | `conflict` | marker 多条、正文被改、或绑定目标不同。**需要人来判断**，不要自行选一条 |

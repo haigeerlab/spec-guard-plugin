@@ -162,7 +162,9 @@ Local 的预览**额外显示该账本是否会 sync 到公开远端**：本仓�
 <!-- spec-guard-proposal-closeout:v1 <proposalId>/<revision 前 12 位> -->
 ```
 
-置于收尾记录**最后一行**；只在最后一行认定有效，出现在别处即 `conflict: marker-ambiguous`。
+置于收尾记录**最后一行**；只在最后一行认定有效。带 marker 但正文不是本次记录的评论判为
+`conflict: closeout-marker-not-ours`：marker 由公开信息推得出来，任何能评论的人都伪造得出来，
+因此只有逐字相同的那条记录才算已写过。
 
 收尾记录正文固定包含一句边界声明：本事项记录的是**设计决定**，已随 `<promotionCommit>` 进入能力图；
 模块的 Spec、Plan、实现与验收由后续模块任务或普通事项跟踪，**不由本事项代表**。
@@ -174,7 +176,7 @@ Local 的预览**额外显示该账本是否会 sync 到公开远端**：本仓�
 1. 评论（带 marker）  → list_comments 已有 marker 则跳过
 2. 阶段 → promoted    → 已是 promoted 则跳过；否则先 tag_add 新阶段，再 remove 旧阶段
 3. 关闭               → 已 closed 则跳过
-4. 读回               → 阶段 == promoted ∧ closed == true ∧ marker 恰好一条
+4. 读回               → 阶段 == promoted ∧ closed == true ∧ **本次记录恰好一条**
 ```
 
 ### C7 私有 journal

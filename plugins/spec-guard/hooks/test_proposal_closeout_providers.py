@@ -221,6 +221,21 @@ class GitLabCloseoutTests(unittest.TestCase):
         self.assertEqual(len(recorder.write_calls), 1)
         self.assertEqual(body, {"add_labels": PROMOTED, "remove_labels": ACCEPTED})
 
+    def test_every_request_pins_the_host(self):
+        """Validating the host, publishing it in `exactTarget` and then letting glab's
+        own config decide where the call lands would make the authorized target a
+        label rather than the destination."""
+        provider, recorder = self.provider(
+            {self.ISSUES + "?state=all&per_page=100&page=1": [gitlab_raw()]},
+            {("PUT", self.ISSUES + "/9"): gitlab_raw(state="closed")})
+        provider.list_issues()
+        provider.set_closed(9)
+        for arguments in ([call for call in recorder.read_calls] +
+                          [arguments for arguments, _ in recorder.write_calls]):
+            self.assertIn("--hostname", arguments, arguments)
+            self.assertEqual(arguments[arguments.index("--hostname") + 1],
+                             "gitlab.example.com", arguments)
+
     def test_set_closed_uses_a_state_event(self):
         provider, recorder = self.provider(
             writes={("PUT", self.ISSUES + "/9"): gitlab_raw(state="closed")})
