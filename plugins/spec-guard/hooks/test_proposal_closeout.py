@@ -1,8 +1,19 @@
-"""Proposal closeout: the backend-neutral decision. No I/O, no network, no ledger."""
+"""Proposal closeout: the backend-neutral decision and the preview that precedes a
+write. No I/O, no network, no ledger -- publication, proof and transport are injected.
+"""
 import inspect
+import json
+import pathlib
 import unittest
 
-from proposal_closeout import CLOSEABLE_STAGES, PROMOTED_STAGE, closeout_decision
+from proposal_closeout import (
+    CLOSEABLE_STAGES, PROMOTED_STAGE, build_preview, closeout_record, closeout_decision,
+    preview_digest,
+)
+from proposal_contract import Baseline, Change, Proposal
+from proposal_publication import Publication
+from proposal_promotion_proof import Proof
+from proposal_tracker_read import TrackerRead
 
 ACCEPTED = "proposal-stage:accepted"
 OTHER_STAGES = ("proposal-stage:draft", "proposal-stage:published",
@@ -68,6 +79,234 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(names, ["stage", "closed", "proof_state", "proof_diagnostic"])
         for forbidden in ("project", "root", "provider", "path", "module"):
             self.assertNotIn(forbidden, names)
+
+
+PROPOSAL_ID = "gamma"
+REVISION = "sha256:" + "ab" * 32
+MARKER = "<!-- spec-guard-proposal:v2 id=gamma revision=" + REVISION + " -->"
+PROMOTION = "9507532400192d9e3e983028d863375d8ac2b0ac"
+REVIEW = "4f163fc6fbee356aeb90ff60091331b08846c91c"
+
+
+def proposal(revision=REVISION):
+    return Proposal(PROPOSAL_ID, MARKER,
+                    Baseline("origin", "main", "0" * 40, "0" * 12, {}, "alpha"),
+                    Change(PROPOSAL_ID, "Gamma.", ("alpha",), "end"),
+                    version="v2", revision=revision)
+
+
+class FakeAdapter:
+    """Only what the preview needs; the write methods must stay untouched here."""
+
+    def __init__(self, issues=(), complete=True, facts=None, comments=()):
+        self.page = {"complete": complete, "issues": list(issues)}
+        self.facts = facts or {"platform": "github", "host": "github.com",
+                               "target": "octo/repo", "targetId": 1,
+                               "visibility": "private"}
+        self.comments = list(comments)
+        self.writes = []
+
+    def target_facts(self):
+        return dict(self.facts)
+
+    def list_issues(self):
+        return {"complete": self.page["complete"],
+                "issues": list(self.page["issues"])}
+
+    def list_comments(self, issue_id):
+        return {"complete": True, "comments": [{"body": body}
+                                               for body in self.comments]}
+
+    def create_comment(self, *a):
+        self.writes.append("create_comment")
+
+    def set_stage(self, *a):
+        self.writes.append("set_stage")
+
+    def set_closed(self, *a):
+        self.writes.append("set_closed")
+
+
+def preview(tracker=None, publication=None, proof=None, adapter=None, **kwargs):
+    tracker = tracker or TrackerRead(
+        "verified", issue_id=149, stage=ACCEPTED, proposal_id=PROPOSAL_ID,
+        platform="github", target="octo/repo", closed=False)
+    publication = publication or Publication("published", review_commit=REVIEW,
+                                             proposal=proposal())
+    proof = proof or Proof("proved", review_commit=REVIEW, proposal_id=PROPOSAL_ID,
+                           module_id=PROPOSAL_ID, promotion_commit=PROMOTION)
+    adapter = adapter if adapter is not None else FakeAdapter()
+    return build_preview(
+        ".", PROPOSAL_ID, "github", "octo/repo", adapter,
+        publication_reader=lambda *a, **k: publication,
+        tracker_reader=lambda *a, **k: tracker,
+        prover=lambda *a, **k: proof, **kwargs)
+
+
+class PreviewTests(unittest.TestCase):
+    def test_a_proved_accepted_proposal_previews_every_fact_the_decision_rests_on(self):
+        result = preview()
+        self.assertEqual(result["state"], "preview")
+        self.assertEqual(result["backend"], "github")
+        self.assertEqual(result["exactTarget"],
+                         {"platform": "github", "host": "github.com",
+                          "target": "octo/repo", "targetId": 1,
+                          "visibility": "private"})
+        self.assertEqual(result["proposalId"], PROPOSAL_ID)
+        self.assertEqual(result["revision"], REVISION)
+        self.assertEqual(result["issueId"], 149)
+        self.assertEqual(result["currentStage"], ACCEPTED)
+        self.assertEqual(result["targetStage"], PROMOTED_STAGE)
+        self.assertEqual(result["promotionCommit"], PROMOTION)
+        self.assertEqual(result["reviewCommit"], REVIEW)
+        self.assertEqual(result["actions"], ["comment", "stage", "close"])
+        self.assertEqual(result["source"], "explicit")
+        # The record carries the closeout marker and must not echo the Proposal's own:
+        # two namespaces in one container is how marker ambiguity starts.
+        self.assertIn("spec-guard-proposal-closeout:v1", result["record"])
+        self.assertNotIn("spec-guard-proposal:v2", result["record"])
+
+    def test_the_record_ends_with_the_stable_marker_and_names_its_boundary(self):
+        record = preview()["record"]
+        self.assertEqual(record.splitlines()[-1],
+                         "<!-- spec-guard-proposal-closeout:v1 gamma/abababababab -->")
+        self.assertIn(PROMOTION, record)
+        # The record must say what closing does *not* mean, or a reader takes a closed
+        # Proposal for a delivered module.
+        self.assertIn("Spec", record)
+        self.assertIn("todo", record.lower())
+
+    def test_the_digest_covers_every_field_but_itself(self):
+        result = preview()
+        without = {key: value for key, value in result.items() if key != "digest"}
+        self.assertEqual(result["digest"], preview_digest(without))
+        changed = dict(without, promotionCommit="0" * 40)
+        self.assertNotEqual(result["digest"], preview_digest(changed))
+
+    def test_an_already_promoted_proposal_still_previews_without_a_stage_change(self):
+        tracker = TrackerRead("verified", issue_id=125, stage=PROMOTED_STAGE,
+                              proposal_id=PROPOSAL_ID, platform="github",
+                              target="octo/repo", closed=False)
+        result = preview(tracker=tracker)
+        self.assertEqual(result["state"], "preview")
+        self.assertEqual(result["actions"], ["comment", "close"])
+
+    def test_a_closed_issue_previews_nothing_and_reports_already_closed(self):
+        tracker = TrackerRead("verified", issue_id=125, stage=PROMOTED_STAGE,
+                              proposal_id=PROPOSAL_ID, platform="github",
+                              target="octo/repo", closed=True)
+        result = preview(tracker=tracker)
+        self.assertEqual(result["state"], "already-closed")
+        self.assertNotIn("digest", result)
+
+    def test_an_unproved_promotion_blocks_and_keeps_the_proof_diagnostic(self):
+        for state, diagnostic in (("not-promoted", "promotion-not-found"),
+                                  ("stale", "proposal-baseline-drifted"),
+                                  ("invalid", "promotion-row-mismatch"),
+                                  ("unknown", "promotion-unknown"),
+                                  ("not-accepted", "tracker-absent")):
+            result = preview(proof=Proof(state, proposal_id=PROPOSAL_ID,
+                                         diagnostic=diagnostic))
+            self.assertEqual(result["state"], "not-eligible", state)
+            self.assertEqual(result["diagnostic"], diagnostic, state)
+            self.assertNotIn("digest", result)
+
+    def test_publication_states_other_than_published_pass_straight_through(self):
+        for state in ("absent", "invalid", "unknown"):
+            result = preview(publication=Publication(state, diagnostic="x"))
+            self.assertEqual(result["state"], state)
+            self.assertNotIn("digest", result)
+
+    def test_a_v1_proposal_cannot_be_closed_out(self):
+        result = preview(publication=Publication(
+            "published", review_commit=REVIEW,
+            proposal=Proposal(PROPOSAL_ID, MARKER,
+                              Baseline("origin", "main", "0" * 40, "0" * 12, {}, "a"),
+                              Change(PROPOSAL_ID, "G.", (), "end"))))
+        self.assertEqual(result["state"], "not-eligible")
+        self.assertEqual(result["diagnostic"], "legacy-revision-required")
+
+    def test_tracker_states_other_than_verified_pass_through_with_a_stable_code(self):
+        for state, diagnostic in (("absent", "tracker-absent"),
+                                  ("invalid", "tracker-invalid"),
+                                  ("unknown", "tracker-unknown")):
+            result = preview(tracker=TrackerRead(state, diagnostic="raw detail"))
+            self.assertEqual(result["state"], state)
+            self.assertEqual(result["diagnostic"], diagnostic)
+            self.assertNotIn("raw detail", json.dumps(result))
+
+    def test_the_preview_never_writes(self):
+        adapter = FakeAdapter()
+        preview(adapter=adapter)
+        self.assertEqual(adapter.writes, [])
+
+    def test_the_preview_leaks_no_body_marker_or_raw_error(self):
+        result = preview()
+        serialized = json.dumps(result)
+        self.assertNotIn(MARKER, serialized)
+        self.assertNotIn("/private/", serialized)
+        self.assertNotIn("http", serialized)
+
+    def test_the_source_of_the_target_is_always_named(self):
+        for source in ("explicit", "project-default", "project-default-target"):
+            self.assertEqual(preview(source=source)["source"], source)
+
+
+class RecordTests(unittest.TestCase):
+    def test_the_marker_is_the_last_line_and_appears_exactly_once(self):
+        record = closeout_record(PROPOSAL_ID, REVISION, PROMOTION, REVIEW)
+        lines = record.splitlines()
+        markers = [line for line in lines
+                   if line.startswith("<!-- spec-guard-proposal-closeout:v1 ")]
+        self.assertEqual(len(markers), 1)
+        self.assertEqual(lines[-1], markers[0])
+
+    def test_the_marker_binds_the_proposal_to_its_revision(self):
+        other = closeout_record(PROPOSAL_ID, "sha256:" + "cd" * 32, PROMOTION, REVIEW)
+        self.assertNotEqual(closeout_record(PROPOSAL_ID, REVISION, PROMOTION,
+                                            REVIEW).splitlines()[-1],
+                            other.splitlines()[-1])
+
+
+class ProofRemainsReadOnlyTests(unittest.TestCase):
+    """The proof command must stay read-only. Closeout imports it as a caller; a
+    `--close`-style switch on a diagnostic command is one flag away from writing to a
+    remote tracker by accident, so its surface is pinned here rather than trusted."""
+
+    def test_the_proof_cli_exposes_no_write_switch(self):
+        import argparse
+        import proposal_promotion_proof as proof_module
+
+        parsers = []
+        original = argparse.ArgumentParser.parse_args
+
+        def capture(self, *args, **kwargs):
+            parsers.append(self)
+            raise SystemExit(0)
+
+        argparse.ArgumentParser.parse_args = capture
+        try:
+            try:
+                proof_module.main(["--proposal-id", "x", "--platform", "github",
+                                   "--target", "o/r"])
+            except SystemExit:
+                pass
+        finally:
+            argparse.ArgumentParser.parse_args = original
+        self.assertEqual(len(parsers), 1)
+        options = sorted(option for action in parsers[0]._actions
+                         for option in action.option_strings)
+        self.assertEqual(options, ["--help", "--platform", "--project",
+                                   "--proposal-id", "--prove", "--remote", "--target",
+                                   "-h"])
+
+    def test_the_proof_vocabulary_has_no_written_outcome(self):
+        import proposal_promotion_proof as proof_module
+
+        source = pathlib.Path(proof_module.__file__).read_text(encoding="utf-8")
+        for writing in ("create_comment", "set_closed", "set_stage", "--method",
+                        "gh issue", "glab issue", "epiq_issue_"):
+            self.assertNotIn(writing, source, writing)
 
 
 if __name__ == "__main__":
