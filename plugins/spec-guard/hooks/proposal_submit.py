@@ -131,7 +131,16 @@ def _published_ids(snapshot):
 
 
 def _next_steps(platform, title, marker, summary, revision_of):
-    if platform == "github":
+    if platform == "local":
+        # The ledger has no CLI to paste: the item is created through the daily entry,
+        # which asks for confirmation per write. Only the shape of the item is fixed
+        # here -- the marker alone on the first line, and the two tags.
+        create = ("create the item through /spec-guard:ticket (Codex: the `ticket` "
+                  "skill), titled %s, tagged %s and %s, with this body:\n\n%s"
+                  % (title, ISSUE_LABELS[0], ISSUE_LABELS[1],
+                     marker + "\n\n" + summary))
+        labels = ["tags are created on first use; no separate step is needed"]
+    elif platform == "github":
         create = "gh issue create --title %s --label proposal --label %s --body %s" % (
             shlex.quote(title), shlex.quote(ISSUE_LABELS[1]), shlex.quote(marker + "\n\n" + summary))
         labels = ["gh label create %s" % shlex.quote(label) for label in ISSUE_LABELS]
@@ -257,7 +266,8 @@ def main(argv=None):
     parser.add_argument("--project", default=".")
     parser.add_argument("--draft", required=True)
     parser.add_argument("--remote", default="origin")
-    parser.add_argument("--platform", required=True, choices=("github", "gitlab"))
+    parser.add_argument("--platform", required=True,
+                        choices=("github", "gitlab", "local"))
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args(argv)
     try:

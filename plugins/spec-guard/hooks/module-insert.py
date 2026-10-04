@@ -426,7 +426,7 @@ def main(argv=None, tracker_reader=None):
     parser.add_argument("--proposal",
                         help="从远端已发布且已接受的 Proposal 取出 id、职责、依赖与锚点；"
                              "不可与 --id/--responsibility/--depends-on/--anchor 同用")
-    parser.add_argument("--platform", choices=("github", "gitlab"),
+    parser.add_argument("--platform", choices=("github", "gitlab", "local"),
                         help="仅与 --proposal 同用")
     parser.add_argument("--target", help="仅与 --proposal 同用")
     parser.add_argument("--interrupt", action="store_true",
