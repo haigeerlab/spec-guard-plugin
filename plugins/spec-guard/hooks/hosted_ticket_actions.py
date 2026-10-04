@@ -53,7 +53,7 @@ def make_comment_preview(provider: Any, issue_id: int, event_id: str,
                                                   "body": issue["body"]}),
                    "body": message.rstrip("\n") + "\n\n" + marker}
         return {**preview, "digest": _digest(preview)}
-    except Exception:
+    except HostedTicketError:
         return {"state": "unknown", "diagnostic": "provider-unavailable"}
 
 
@@ -118,7 +118,7 @@ def publish_comment(preview: dict[str, Any], provider: Any, intent_root: Path,
                 _write_intent(path, {**record, "attempted": False,
                                      "rejectionStatus": error.status_code})
                 return {"state": "rejected", "statusCode": error.status_code}
-            except Exception:
+            except HostedTicketError:
                 pass
             existing = _comment_matches(provider, preview["issueId"], marker)
             if existing["state"] == "found" and existing["comment"]["body"] == preview["body"]:
@@ -127,7 +127,7 @@ def publish_comment(preview: dict[str, Any], provider: Any, intent_root: Path,
             if existing["state"] == "conflict":
                 return existing
             return {"state": "unknown", "diagnostic": "comment-result-uncertain"}
-    except Exception:
+    except (OSError, HostedTicketError):
         return {"state": "unknown", "diagnostic": "provider-or-intent-unavailable"}
 
 
@@ -155,7 +155,7 @@ def make_close_preview(provider: Any, issue_id: int, delivery_id: int,
                    "validationEvidence": validation_evidence.strip(),
                    "coverageComplete": True}
         return {**preview, "digest": _digest(preview)}
-    except Exception:
+    except HostedTicketError:
         return {"state": "unknown", "diagnostic": "provider-unavailable"}
 
 
@@ -188,7 +188,7 @@ def close_issue(preview: dict[str, Any], provider: Any,
             return {"state": "already-closed", "issue": issue}
         try:
             provider.set_closed(preview["issueId"])
-        except Exception:
+        except HostedTicketError:
             pass
         current = provider.get_issue(preview["issueId"])
         if current.get("closed") is True:
@@ -196,5 +196,5 @@ def close_issue(preview: dict[str, Any], provider: Any,
                     "issue": current,
                     "mergeCommit": preview["mergeCommit"]}
         return {"state": "unknown", "diagnostic": "close-result-uncertain"}
-    except Exception:
+    except HostedTicketError:
         return {"state": "unknown", "diagnostic": "provider-unavailable"}

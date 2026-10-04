@@ -185,5 +185,54 @@ class WriteTests(unittest.TestCase):
                 self.assertEqual(result["issue"]["id"], 1)
 
 
+class Defect:
+    """A provider whose one named method raises a programming error, as a typo would.
+
+    AttributeError is the realistic shape: a misspelled attribute inside an adapter.
+    It must not be reportable as a fact about the provider or the remote.
+    """
+
+    def __init__(self, provider, method):
+        self._provider, self._method = provider, method
+
+    def __getattr__(self, name):
+        if name == self._method:
+            def boom(*_arguments, **_keywords):
+                raise AttributeError("'Adapter' object has no attribute 'typo'")
+            return boom
+        return getattr(self._provider, name)
+
+
+class ProgrammingErrorTests(unittest.TestCase):
+    """A defect must not be folded into the create/read-back recovery path."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sg-hosted-write-defect-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "private-intents"
+        self.provider = FakeProvider()
+
+    def preview(self):
+        return make_preview(self.provider, "private", "B-1-F-2", "Crash", "Evidence")
+
+    def publish(self, provider):
+        return publish_preview(self.preview(), provider, self.root, confirm=True,
+                               root_cause_reviewed=True)
+
+    def test_a_programming_error_in_create_propagates(self):
+        with self.assertRaises(AttributeError):
+            self.publish(Defect(self.provider, "create_issue"))
+
+    def test_a_programming_error_in_the_read_back_propagates(self):
+        with self.assertRaises(AttributeError):
+            self.publish(Defect(self.provider, "get_issue"))
+
+    def test_a_lost_create_response_is_still_recovered_not_raised(self):
+        self.provider.lose_response = True
+        result = self.publish(self.provider)
+        self.assertEqual(result["state"], "verified")
+        self.assertEqual(self.provider.attempts, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

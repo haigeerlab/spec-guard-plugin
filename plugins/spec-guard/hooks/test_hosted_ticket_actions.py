@@ -238,5 +238,109 @@ class AdapterActionTests(unittest.TestCase):
         self.assertEqual(provider.get_delivery(12)["mergeCommit"], "d" * 40)
 
 
+class Defect:
+    """A provider whose one named method raises a programming error, as a typo would.
+
+    AttributeError is the realistic shape: a misspelled attribute inside an adapter.
+    It must not be reportable as a fact about the provider or the remote.
+    """
+
+    def __init__(self, provider, method):
+        self._provider, self._method = provider, method
+
+    def __getattr__(self, name):
+        if name == self._method:
+            def boom(*_arguments, **_keywords):
+                raise AttributeError("'Adapter' object has no attribute 'typo'")
+            return boom
+        return getattr(self._provider, name)
+
+
+class ProgrammingErrorTests(unittest.TestCase):
+    """A defect in our own code must not be reported as provider uncertainty.
+
+    Every handler here used to catch bare `Exception`, so an AttributeError inside an
+    adapter came back as `unknown` + `provider-unavailable` / `*-uncertain`. That reads
+    as "the remote flaked, retry", and sends the reader to check a remote that is fine.
+    The CLI in `hosted_ticket_action.py` already catches only
+    `(HostedTicketError, OSError, UnicodeError)`, so surfacing a programming error is
+    this module's own existing contract; the library layer disagreed with it.
+    """
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sg-hosted-defect-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name) / "intents"
+        self.provider = FakeProvider()
+
+    def comment_preview(self):
+        return make_comment_preview(self.provider, 7, "decision-1", "Fix scope A")
+
+    def close_preview(self):
+        return make_close_preview(self.provider, 7, 12, True, "regression suite green")
+
+    # ── a programming error propagates ────────────────────────────────────
+    def test_comment_preview_propagates_a_programming_error(self):
+        with self.assertRaises(AttributeError):
+            make_comment_preview(Defect(self.provider, "get_issue"), 7, "decision-1", "Fix")
+
+    def test_comment_publish_propagates_a_programming_error_in_the_write(self):
+        preview = self.comment_preview()
+        with self.assertRaises(AttributeError):
+            publish_comment(preview, Defect(self.provider, "create_comment"),
+                            self.root, confirm=True)
+
+    def test_comment_publish_propagates_a_programming_error_before_the_write(self):
+        preview = self.comment_preview()
+        with self.assertRaises(AttributeError):
+            publish_comment(preview, Defect(self.provider, "target_facts"),
+                            self.root, confirm=True)
+
+    def test_close_preview_propagates_a_programming_error(self):
+        with self.assertRaises(AttributeError):
+            make_close_preview(Defect(self.provider, "get_delivery"), 7, 12, True, "green")
+
+    def test_close_propagates_a_programming_error_in_the_write(self):
+        preview = self.close_preview()
+        with self.assertRaises(AttributeError):
+            close_issue(preview, Defect(self.provider, "set_closed"), confirm=True)
+
+    def test_close_propagates_a_programming_error_before_the_write(self):
+        preview = self.close_preview()
+        with self.assertRaises(AttributeError):
+            close_issue(preview, Defect(self.provider, "target_facts"), confirm=True)
+
+    # ── control: a real transport failure still degrades, not raises ──────
+    # Without these, a fix that simply let everything raise would look identical.
+    def test_transport_failure_still_degrades_on_comment_preview(self):
+        result = make_comment_preview(_Unavailable(self.provider, "get_issue"), 7,
+                                      "decision-1", "Fix")
+        self.assertEqual(result, {"state": "unknown", "diagnostic": "provider-unavailable"})
+
+    def test_transport_failure_still_degrades_on_close_preview(self):
+        result = make_close_preview(_Unavailable(self.provider, "get_delivery"), 7, 12,
+                                    True, "green")
+        self.assertEqual(result, {"state": "unknown", "diagnostic": "provider-unavailable"})
+
+    def test_lost_write_response_is_still_uncertain_not_raised(self):
+        preview = self.comment_preview()
+        self.provider.lose_comment_response = True
+        self.provider.hide_comment = True
+        result = publish_comment(preview, self.provider, self.root, confirm=True)
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["diagnostic"], "comment-result-uncertain")
+
+
+class _Unavailable(Defect):
+    """Same injection point, but the failure the transport actually raises."""
+
+    def __getattr__(self, name):
+        if name == self._method:
+            def unavailable(*_arguments, **_keywords):
+                raise HostedTicketError("provider-unavailable: request did not complete")
+            return unavailable
+        return getattr(self._provider, name)
+
+
 if __name__ == "__main__":
     unittest.main()
