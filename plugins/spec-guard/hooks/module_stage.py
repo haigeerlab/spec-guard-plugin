@@ -52,11 +52,6 @@ def active_module(root: Path) -> str | None:
     return active if isinstance(active, str) and active else None
 
 
-def retired_tracker(root: Path) -> bool:
-    """True when state.json still names the retired remote tracker mode (tasks lived in Issues)."""
-    return _state(root).get("tracker") in ("github", "gitlab")
-
-
 def project_stage(states: list, active: str | None) -> tuple:
     """Project-level stage: (stage, current, source, pending).
 
@@ -124,14 +119,13 @@ def describe(root: Path) -> str:
         notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
     active_state = by_id.get(active) if active else None
     no_todo_note = ""
-    if (active_state and active_state["stage"] == "DONE" and not active_state["todo"]
-            and not retired_tracker(root)):
+    if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
                         "add the todo if work remains." % (active, active))
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
-    if stage == "DONE" and not retired_tracker(root):
+    if stage == "DONE":
         missing_todo = sum(s["plan"] and not s["todo"] for s in states)
         if missing_todo:
             counts += ("\n- Plan without todo: %d module(s) counted as done; "

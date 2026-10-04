@@ -94,7 +94,7 @@ if [ "$DRY" = true ]; then
 else
   mkdir -p spec tasks .agent
   if [ ! -f .agent/state.json ]; then
-    printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > .agent/state.json
+    printf '%s\n' '{"activeModule":""}' > .agent/state.json
     echo '  ✅ created .agent/state.json (local only)'
   else
     echo '  ⏭ .agent/state.json already exists; it was not changed'

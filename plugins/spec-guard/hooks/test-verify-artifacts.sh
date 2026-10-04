@@ -133,14 +133,26 @@ check "12 个缺 todo 的模块只列前 10 个并以等 12 个结尾" 0 \
 check "12 个缺 todo 的模块仍只多一条警告" 0 "1 警告"
 check_absent "12 个缺 todo 的模块不列出第 11 个 id" "m11,"
 
-# 已退役的远端 tracker 模式：state.json 仍是 github／gitlab 时不发缺 todo 汇总（历史状态文件警告仍在）。
+# tracker 字段已退役，不再抑制任何判断：缺 todo 汇总只看文件，与 state.json 的内容无关。
 many_modules no-todo-github 3
 plan_only m02; mkdir -p "$PROJECT/.agent"
+SUMMARY="1 个模块有 Plan 但没有 todo.md，按已完成计：m02"
 printf '{"tracker":"github","modules":{}}\n' > "$PROJECT/.agent/state.json"
-check_absent "退役 tracker github 不发缺 todo 汇总" "没有 todo.md"
+check "退役 tracker github 不再抑制缺 todo 汇总" 0 "$SUMMARY"
 printf '{"tracker":"gitlab","modules":{}}\n' > "$PROJECT/.agent/state.json"
-check_absent "退役 tracker gitlab 不发缺 todo 汇总" "没有 todo.md"
-printf '{"tracker":"none","modules":{}}\n' > "$PROJECT/.agent/state.json"
-check "tracker none 仍发缺 todo 汇总" 0 "1 个模块有 Plan 但没有 todo.md，按已完成计：m02"
+check "退役 tracker gitlab 不再抑制缺 todo 汇总" 0 "$SUMMARY"
+printf '{"activeModule":""}\n' > "$PROJECT/.agent/state.json"
+check "当前格式的 state.json 同样发缺 todo 汇总" 0 "$SUMMARY"
+
+# 历史状态文件告警只针对真正的退役字段，不对插件自己刚装的 state.json 报警。
+LEGACY="检测到已退役的 tracker 字段"
+project legacy-state; mkdir -p "$PROJECT/.agent"
+printf '{"activeModule":""}\n' > "$PROJECT/.agent/state.json"
+check_absent "当前格式的 state.json 不发历史状态告警" "$LEGACY"
+check "当前格式的 state.json 没有警告" 0 "0 警告"
+printf '{"tracker":"none","modules":{},"activeModule":""}\n' > "$PROJECT/.agent/state.json"
+check "含 tracker 键时发退役字段告警" 0 "$LEGACY"
+rm -f "$PROJECT/.agent/state.json"
+check_absent "没有 state.json 时不发退役字段告警" "$LEGACY"
 
 echo "verify-artifacts regression passed ($PASS cases)"

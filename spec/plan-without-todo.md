@@ -40,6 +40,17 @@
 `verify-artifacts` 的"检测到历史状态文件"警告）。`tracker` 为 `none`、没有 `tracker` 字段或没有 `state.json` 时（本地模式），
 行为不变：本地模式下 `todo.md` 是 `/build` 取任务与阶段判断的依据，必须存在。
 
+### 再修订：抑制逻辑已删除（2026-10-04，用户决定）
+
+上一条修订已失效。`tracker` 字段本身随 2026-10-04 的决定一并退役，见
+[`docs/retirements/state-tracker-field.md`](../docs/retirements/state-tracker-field.md)：没有任何代码再读它，
+因此也没有可供抑制的条件。`module_stage.retired_tracker()` 与 `verify-artifacts` 里对应的抑制分支都已删除，
+T1 的提醒与 T2 的汇总现在只看文件是否存在，与 `state.json` 的内容无关。
+
+**本节的完成判据不受影响**：Objective 与 Assumptions 第 1 条所述「有 Plan 且没有未勾选项即完成，缺
+`todo.md` 仍算完成」逐字有效。删除的是警告抑制，不是判据；本仓库 13 个有 Plan 无 todo 的历史模块状态不变。
+证据：删除前后在本仓库运行两个版本的 hook，阶段注入与 `verify-artifacts` 输出逐字相同。
+
 ## Contract
 
 ### T1 阶段提示（`hooks/module_stage.py`）

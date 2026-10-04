@@ -134,6 +134,14 @@ allowed_index() {
 
 RETIRED_PATTERN='sync-map|spec-github-bridge|spec-gitlab-bridge|workspace_binding|bind-workspace'
 ISSUE_WRITE_PATTERN='gh issue (create|edit)|glab issue (create|update)'
+# `.agent/state.json` 的 `tracker` 字段随远端 tracker 模式一同退役
+# （docs/retirements/state-tracker-field.md）：没有任何代码再写它、读它，或据它改变判断。
+# 模式刻意覆盖多种重新引入的形态——带默认值的读取、单引号、下标、非字符串值、成员判断——
+# 因为最可能被写回来的恰是 `get("tracker", "none")` 这种，窄模式会放它过去。
+# verify-artifacts 自己那条「提醒用户删除」的探测不会被命中：它的正则里 `"tracker"` 后面紧跟
+# 的是 `[`，不是空白或冒号，所以不需要 allowlist 条目（能匹配不到任何行的条目只会误导读者）。
+# 能力历史快照里的 `"tracker": {...}` 在 test-capability-history.sh 中，按 test- 前缀被 find 排除。
+STATE_FIELD_PATTERN='retired_tracker|["'"'"']tracker["'"'"'][[:space:]]*\]|get\(["'"'"']tracker["'"'"']|"tracker"[[:space:]]*:|'"'"'tracker'"'"'[[:space:]]*:|["'"'"']tracker["'"'"'][[:space:]]+in[[:space:]]'
 
 scan_surface() {
   local pattern="$1" label="$2"
@@ -150,16 +158,20 @@ scan_surface() {
       printf '  ❌ %s references %s: %s:%s\n%s\n' "$rel" "$label" "$rel" "$lineno" "    $content"
       FAIL=$((FAIL + 1))
     done < <(grep -nE "$pattern" "$file" 2>/dev/null)
-  done < <(find "$PLUGIN" -type f \
+  # 扫描范围含 evals/ 与 scripts/：2026-10-04 的审查发现 evals/module-namespace.sh 一直在写
+  # 退役的 tracker 字段，而只扫 $PLUGIN 永远看不到它。仓库里会装进消费者项目或在 CI 跑的
+  # 脚本都算已发布表面。
+  done < <(find "$PLUGIN" "$ROOT/evals" "$ROOT/scripts" -type f \
              -not -path '*/__pycache__/*' \
              -not -name 'test_*' \
-             -not -name 'test-*')
+             -not -name 'test-*' 2>/dev/null)
 }
 
 echo ''
 echo '═══ broadened surface scan (all non-test files under plugins/spec-guard) ═══'
 scan_surface "$RETIRED_PATTERN" 'retired identifier'
 scan_surface "$ISSUE_WRITE_PATTERN" 'Issue-writing command'
+scan_surface "$STATE_FIELD_PATTERN" 'retired state.json tracker field'
 
 [ "$FAIL" -eq 0 ] || exit 1
 printf '  ✅ legacy tracker bridge is absent from the distributed surface\n'

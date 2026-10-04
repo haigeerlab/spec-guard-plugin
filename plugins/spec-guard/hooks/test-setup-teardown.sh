@@ -54,6 +54,11 @@ head -1 "$P/CLAUDE.md" | grep -Fx '# Mine' >/dev/null || fail "setup 改动了�
 grep -F 'MAP_ONLY' >/dev/null <<<"$(CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)" || fail "setup 后 hook 未激活"
 ok "首次 setup 建好目录与声明块，hook 激活"
 
+# state.json 只存当前模块书签：退役的 tracker 与无人读取的 modules 都不再写入。
+[ "$(cat "$P/.agent/state.json")" = '{"activeModule":""}' ] \
+  || fail "setup 写下的 state.json 应恰为 {\"activeModule\":\"\"}，实际: $(cat "$P/.agent/state.json")"
+ok "setup 写下的 state.json 只含 activeModule"
+
 cp "$P/CLAUDE.md" "$WORK/installed"
 run setup-convention.sh local
 [ "$RC" -eq 0 ] && cmp -s "$P/CLAUDE.md" "$WORK/installed" && grep -F 'already has a convention block' >/dev/null <<<"$OUT" || fail "重复 setup 不应改动声明块
@@ -99,7 +104,7 @@ printf '# Mine\n\nkeep me\n' > "$P/CLAUDE.md"
 cp "$P/CLAUDE.md" "$WORK/original"
 run setup-convention.sh local
 touch "$P/spec/alpha.md"; mkdir -p "$P/tasks/alpha"; printf 'plan\n' > "$P/tasks/alpha/plan.md"
-printf '%s\n' '{"tracker":"none","modules":{"alpha":{}},"activeModule":"alpha"}' > "$P/.agent/state.json"
+printf '%s\n' '{"activeModule":"alpha"}' > "$P/.agent/state.json"
 before="$(snapshot)"
 run teardown-convention.sh --dry-run
 [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] || fail "teardown --dry-run 不应改动任何文件
@@ -132,8 +137,8 @@ ok "停用状态阻止静默重建，显式恢复后上下文不变"
 
 project state-conflict
 mkdir -p "$P/.agent"
-printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$P/.agent/state.json"
-printf '%s\n' '{"tracker":"none","modules":{"alpha":{}},"activeModule":"alpha"}' > "$P/.agent/state.json.disabled"
+printf '%s\n' '{"activeModule":""}' > "$P/.agent/state.json"
+printf '%s\n' '{"activeModule":"alpha"}' > "$P/.agent/state.json.disabled"
 before="$(snapshot)"
 run setup-convention.sh local
 [ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] || fail "活动和停用状态并存时应拒绝且不写入\n$OUT"
@@ -157,7 +162,7 @@ ok "重复标记时 teardown 拒绝，state 保持原样"
 
 project prose-teardown
 mkdir -p "$P/.agent"
-printf '%s\n' '{"tracker":"none","modules":{},"activeModule":""}' > "$P/.agent/state.json"
+printf '%s\n' '{"activeModule":""}' > "$P/.agent/state.json"
 printf '%s\n' "正文提到 \`$BEGIN\` 不算声明块。" > "$P/CLAUDE.md"
 cp "$P/CLAUDE.md" "$WORK/prose-original"
 run teardown-convention.sh
@@ -175,5 +180,16 @@ run teardown-convention.sh --host=codex
 [ "$RC" -eq 0 ] && cmp -s "$P/AGENTS.md" "$WORK/agents-original" || fail "Codex 往返后 AGENTS.md 应逐字节还原
 $OUT"
 ok "Codex 主机的 setup 与 teardown 往返"
+
+# 删掉声明块后仍只凭 state.json 的 activeModule 激活：激活信号不因删除 tracker 字段而减少。
+# 放在最后，避免改写 $P 影响前面依赖同一个项目的用例。
+project signal-only
+run setup-convention.sh local
+[ "$RC" -eq 0 ] || fail "signal-only 夹具的 setup 失败
+$OUT"
+rm -f "$P/CLAUDE.md"
+grep -F 'MAP_ONLY' >/dev/null <<<"$(CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)" \
+  || fail "没有声明块时，仅凭 state.json 的 activeModule 应仍然激活"
+ok "仅凭 activeModule 激活，不依赖声明块"
 
 echo "setup/teardown regression passed (${PASS} cases)"

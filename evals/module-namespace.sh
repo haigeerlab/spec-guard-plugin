@@ -53,7 +53,7 @@ mk() {  # $1=目录 $2=with|without
       echo "<!-- END:agent-skills-convention -->"
     } >> "$1/CLAUDE.md"
     mkdir -p "$1/.agent"
-    echo '{"tracker":"none","modules":{"identity":{}},"activeModule":"identity"}' > "$1/.agent/state.json"
+    echo '{"activeModule":"identity"}' > "$1/.agent/state.json"
   fi
   printf '# 能力图\n\n## 目标\n\n让用户管理身份与账单。\n\n## 模块\n\n| Module id | Responsibility | Depends on |\n|---|---|---|\n| identity | 认证 | — |\n| billing | 计费 | identity |\n\nBuild order: identity → billing\n\n- [x] 已评审\n' > "$1/spec/CAPABILITY-MAP.md"
   printf '# identity\n\n验收：用户能注册、登录、登出。会话 30 天过期。\n' > "$1/spec/identity.md"

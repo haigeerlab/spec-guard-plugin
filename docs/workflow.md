@@ -13,7 +13,7 @@
    ```text
    CLAUDE.md 或 AGENTS.md 里的约定块   # 告诉 agent 多模块的目录规则
    spec/CAPABILITY-MAP.md               # 能力图模板
-   .agent/state.json                    # 只记录当前模块
+   .agent/state.json                    # 只记录当前模块：{"activeModule":""}
    ```
 
 2. **写能力图并评审。** 用 agent-skills 的 `/spec` 做 Phase 0：列出模块、职责、依赖和一行 Build order。
@@ -82,6 +82,14 @@ Issue 已关闭并读回，不代替对 CI／验收证据的实际核对。后�
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
 有 Plan 但没有 `todo.md` 的模块按已完成计（历史上已交付的模块常是这种写法，所以判据不变）。DONE 汇总会显示这类模块的数量，可用 `/spec-guard:verify-artifacts` 查看具体模块。插队或新加的模块如果只有 Plan、没有 `todo.md`，会被读成已完成；把 `activeModule` 指向它时阶段提示会多一行提醒，补上 `tasks/<模块>/todo.md` 列出剩余任务即可。
+
+阶段**不是存起来的状态，而是每轮实时算出来的**：模块清单与顺序取自 `spec/CAPABILITY-MAP.md`，每个模块处在
+哪一步只看 `spec/<模块>.md`、`tasks/<模块>/plan.md`、`tasks/<模块>/todo.md` 是否存在以及 todo 里还有几个
+未勾选项。`.agent/state.json` 只存一样东西——`activeModule`，也就是当前焦点这个书签。所以它丢了也算得出阶段，
+只是会退化为「按 Build order 取第一个没完成的模块」。
+
+hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`AGENTS.md` 里独占一行的声明块，或含
+`activeModule` 的 `.agent/state.json`。两者都没有时完全静默。
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 随时想看完整状态，用 `/spec-guard:phase`。
@@ -192,6 +200,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 |---|---|---|
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
+| 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、评审、预检、证明（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
