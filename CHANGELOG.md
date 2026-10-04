@@ -20,8 +20,17 @@
   `remote default branch is unavailable`（`_head` 读不到）、`remote default branch fetch failed`
   （fetch / rev-parse 读不到，可重试）、`remote default branch moved between observation and fetch`
   （真的移动，不可重试）各自独立，`read_published` 与 `read_published_pool` 原样透传，
-  `proposal_submit` 直接报给用户。`proposal_promotion_proof` 仍只报 `promotion-unknown`：它的
-  `as_json` 只透传 kebab 码形态的诊断，散文原因在那里会被归一化掉，补码形态诊断超出本次范围。
+  `proposal_submit` 直接报给用户。
+
+- **诊断：晋级证明把快照探测失败和 tip 真的移动都报成 `promotion-unknown`。** `proposal_promotion_proof`
+  的 `as_json` / `preflight_as_json` 只透传 kebab 码形态的诊断，散文原因会被归一化掉，而 `prove` 自己那段
+  快照的 `failure` 连传都没传。于是 `--prove` 和 preflight 对「重跑即可」和「有人在推」给的是同一个码。
+  现在 `proposal_publication.PROBE_CODES` / `probe_code()` 把四种快照失败映射成稳定码 ——
+  `snapshot-head-unavailable`、`snapshot-fetch-failed`、`snapshot-tip-moved`、
+  `snapshot-temp-repo-failed` —— 三个入口（`prove` 自己的快照、`prove_from_remote` 与 `_preflight`
+  读 pool 的那段）都带上。认不出的诊断仍返回 `None`，保留调用方原来的 `proposal-pool-<state>` /
+  `promotion-<state>` 折叠，绝不把别的错误装成快照判决。远端不可达现在报 `snapshot-head-unavailable`
+  而不是折叠后的 `proposal-pool-unknown`。
 
 - **诊断：把「探测读不到」说成了「这条 Proposal 不能关闭」。** `closeout_decision` 把 proof 的
   `unknown`（探测读不到）与 `not-promoted` / `stale` / `invalid` / `not-accepted`（读到了，不成立）

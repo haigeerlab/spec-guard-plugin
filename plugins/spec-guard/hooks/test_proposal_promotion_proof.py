@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -15,10 +15,11 @@ from unittest.mock import patch
 from capability_map import parse_map
 from proposal_contract import Change, compute, compute_revision
 from proposal_publication import (
-    Publication, PublicationPool, read_published, skipped_as_json)
+    FETCH_FAILED, HEAD_UNAVAILABLE, PROBE_CODES, Publication, PublicationPool, Snapshot,
+    TIP_MOVED, read_published, skipped_as_json)
 import proposal_promotion_proof
 from proposal_promotion_proof import (
-    Preflight, Proof, _matches, _mismatched_fields, as_json, main, preflight, preflight_as_json, promotion_base, prove)
+    DIAGNOSTIC_CODE, Preflight, Proof, _matches, _mismatched_fields, as_json, main, preflight, preflight_as_json, promotion_base, prove)
 from proposal_tracker_read import TrackerRead
 
 
@@ -669,8 +670,9 @@ class PromotionProofCliTests(PromotionFixture):
         self.assertEqual(self.run_cli("--proposal-id", "missing", "--prove"),
                          {"state": "absent", "proposalId": "missing"})
         self.git(self.consumer, "remote", "set-url", "origin", str(self.root / "gone.git"))
+        # Names the probe that failed, not the folded `proposal-pool-unknown`.
         self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
-                         {"state": "unknown", "diagnostic": "proposal-pool-unknown"})
+                         {"state": "unknown", "diagnostic": "snapshot-head-unavailable"})
 
     def test_cli_without_prove_still_runs_only_the_preflight(self):
         with patch("proposal_promotion_proof.prove",
@@ -739,6 +741,68 @@ class SkippedProposalOutputTests(PromotionFixture):
             {"proposalId": "b", "diagnostic": "proposal-baseline-unavailable"},
             {"proposalId": "c", "diagnostic": "proposal-invalid"}])
         self.assertNotIn("private", json.dumps(data))
+
+
+class SnapshotProbeDiagnosticTests(PromotionFixture):
+    """A snapshot probe that could not read must not read like a tip that moved.
+
+    `fixed_snapshot` tells the two apart, but every promotion-proof path folded the
+    reason into one `promotion-unknown` / `proposal-pool-unknown`: `as_json` passes only
+    code-shaped diagnostics through and normalizes prose away, and `prove` dropped the
+    failure of its own snapshot entirely. A reader told `promotion-unknown` cannot tell
+    "run it again" from "someone pushed while you were reading".
+    """
+
+    def proof_json(self, failure):
+        """Fail only the second snapshot -- the one `prove` takes for itself."""
+        @contextmanager
+        def failing(*args, **kwargs):
+            yield Snapshot(failure)
+        with patch("proposal_promotion_proof.fixed_snapshot", failing):
+            return as_json(self.prove())
+
+    def pool_json(self, diagnostic):
+        """Fail the first snapshot, the one both entry points read the pool from."""
+        pool = PublicationPool("unknown", diagnostic=diagnostic)
+        with patch("proposal_promotion_proof.read_published_pool", return_value=pool):
+            return (as_json(proposal_promotion_proof.prove_from_remote(
+                        self.consumer, "gamma", "github", "octo/spec-guard")),
+                    preflight_as_json(preflight(self.consumer, "gamma", "github",
+                                                "octo/spec-guard")))
+
+    def test_prove_distinguishes_a_retryable_probe_from_a_moved_tip(self):
+        retryable = self.proof_json(FETCH_FAILED)
+        moved = self.proof_json(TIP_MOVED)
+        self.assertEqual(retryable["state"], "unknown")
+        self.assertEqual(retryable["diagnostic"], "snapshot-fetch-failed")
+        self.assertEqual(moved["state"], "unknown")
+        self.assertEqual(moved["diagnostic"], "snapshot-tip-moved")
+
+    def test_prove_still_folds_a_failure_that_is_not_a_known_probe(self):
+        self.assertEqual(self.proof_json("Traceback: /tmp/x")["diagnostic"],
+                         "promotion-unknown")
+
+    def test_an_unreadable_pool_carries_the_probe_that_failed(self):
+        for failure, code in ((HEAD_UNAVAILABLE, "snapshot-head-unavailable"),
+                              (FETCH_FAILED, "snapshot-fetch-failed"),
+                              (TIP_MOVED, "snapshot-tip-moved")):
+            with self.subTest(failure=failure):
+                proof, preflight_result = self.pool_json(failure)
+                self.assertEqual((proof["state"], proof["diagnostic"]), ("unknown", code))
+                self.assertEqual((preflight_result["state"], preflight_result["diagnostic"]),
+                                 ("unknown", code))
+
+    def test_a_pool_failure_that_is_not_a_probe_still_folds(self):
+        proof, preflight_result = self.pool_json("proposal pool exceeds the fixed limit")
+        self.assertEqual(proof["diagnostic"], "proposal-pool-unknown")
+        self.assertEqual(preflight_result["diagnostic"], "proposal-pool-unknown")
+
+    def test_every_probe_code_survives_the_output_sanitizer(self):
+        self.assertTrue(PROBE_CODES)
+        for code in PROBE_CODES.values():
+            with self.subTest(code=code):
+                self.assertRegex(code, DIAGNOSTIC_CODE)
+                self.assertEqual(as_json(Proof("unknown", diagnostic=code))["diagnostic"], code)
 
 
 if __name__ == "__main__":

@@ -20,12 +20,30 @@ HEAD_UNAVAILABLE = "remote default branch is unavailable"
 FETCH_FAILED = "remote default branch fetch failed"
 TIP_MOVED = "remote default branch moved between observation and fetch"
 SNAPSHOT_FAILED = "temporary Git snapshot failed"
+# Stable codes for the same four facts.  Layers that emit only code-shaped
+# diagnostics cannot carry the strings above, and folding them into one state code
+# loses what the snapshot just established: whether this is worth running again.
+PROBE_CODES = {
+    HEAD_UNAVAILABLE: "snapshot-head-unavailable",
+    FETCH_FAILED: "snapshot-fetch-failed",
+    TIP_MOVED: "snapshot-tip-moved",
+    SNAPSHOT_FAILED: "snapshot-temp-repo-failed",
+}
 BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
 BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
 _SKIPPED_CODES = {
     BASELINE_REMOTE_MISMATCH: "proposal-baseline-remote-mismatch",
     BASELINE_UNAVAILABLE: "proposal-baseline-unavailable",
 }
+
+
+def probe_code(failure):
+    """Map a `fixed_snapshot` failure to its stable code, or None for anything else.
+
+    None keeps a caller's own fallback, so an unrecognized diagnostic -- a contract
+    error, a raw transport message -- is never dressed up as a snapshot verdict.
+    """
+    return PROBE_CODES.get(failure)
 
 
 def skipped_as_json(skipped):
