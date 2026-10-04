@@ -92,6 +92,8 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 `activeModule` 的 `.agent/state.json`。两者都没有时完全静默。
 
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
+它必须是 kebab-case 的 module id；写成别的会被报为无效并回退到 Build order（hook 仍然激活）。
+注入文本里来自仓库的值都经过净化，详见[决策记录](decisions/2026-10-04-phase-context-sanitization.md)。
 随时想看完整状态，用 `/spec-guard:phase`。
 存在被暂停的模块（见「插队」）时，`NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下会多一行 `Paused: …`。
 

@@ -52,6 +52,15 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 当前模块取 `.agent/state.json` 的 `activeModule`（须是能力图中的模块），否则取 Build order 中第一个未完成的模块。
 阶段只依据本地文件，不读取 tracker、GitHub 或 Git 历史。
 
+注入文本里凡是来自仓库的值都经过净化：折叠空白、去掉反引号与反斜杠、限长。因为这段文本每轮都进
+agent 的上下文，一个带换行的值能伪造出看起来像系统段落的块。诊断仍然看得出问题出在哪，只是那个值
+没法再冒充结构。`activeModule` 必须是 kebab-case 的 module id；不是的话会报
+「`.agent/state.json` 的 activeModule 不是有效的 module id」并按 Build order 取当前模块——
+**值不回显，但也不静默忽略**（你确实设了东西，不说会让人以为生效了），而且 hook 照常激活。
+
+这只作用于**注入边界**。`/spec-guard:verify-artifacts` 与 `/spec-guard:add-module` 打给你看的终端
+输出仍带原始单元格，那才是定位问题该有的信息。
+
 **无输出**说明当前项目没装约定，提示用户跑 `/spec-guard:setup-convention`。
 
 > 上面那串 `${CLAUDE_PROJECT_DIR:-…toplevel…}` 不是啰嗦：原先写的是 `$(pwd)`，
