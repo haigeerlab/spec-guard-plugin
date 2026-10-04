@@ -195,6 +195,38 @@ python3 -B "$ROOT/hooks/proposal_submit.py" --project "$PROJECT" \
 原样报告 JSON；除 `ready`、`proved` 外的状态都要停下并说明
 `diagnostic`。`ready` 不创建分支，`proved` 不回写 Issue。
 
+### 收尾（第四步的后半段）
+
+证明通过**不等于**事项已收尾：标签还是 accepted，事项还开着。收尾是独立入口，只在同一次运行内
+重新取得的 proof 为 `proved` 时才给出预览。预览只读：
+
+```bash
+python3 -B "$ROOT/hooks/proposal_closeout.py" preview --project "$PROJECT" \
+  --proposal-id <id> --backend <local|github|gitlab> --target <target> \
+  --output <preview.json>
+```
+
+`--target`：GitHub 是 `owner/name`（另给 `--host`），GitLab 是正整数 project id，Local 是 Epiq
+`projectId`。不给 `--backend`／`--target` 时按 `.agent/tracker.json` 的项目默认值解析，预览标明
+来源；解析不出即 `target-unselected`，**不要猜**。
+
+原样转述预览，至少包含 backend、精确目标、`revision`、事项编号、当前阶段、`promotionCommit`
+与**将写入的收尾记录全文**。取得用户针对**这一条 Proposal** 的明确同意后才写入：
+
+```bash
+python3 -B "$ROOT/hooks/proposal_closeout.py" close --project "$PROJECT" \
+  --preview <preview.json> --confirm
+```
+
+`--confirm` 不是授权，只是执行已授权的预览。写入前所有复核都会重做；任何一项不符就停下，什么都不写。
+
+`verified` 才算完成。`already-closed` 是正常的重跑结果，不是失败。`partial` 与 `unknown`
+**只做只读对账，绝不重发**——一次空查询不足以证明写入失败。`conflict` 需要人来判断，不要自行选一条。
+
+关闭 Proposal 事项**不代表模块已交付**；绝不读模块 stage 或 todo 作为关闭判据。
+只处理 `accepted` 与 `promoted`；`rejected`／`deferred` 的关闭是人的决定。完整契约见
+`references/proposal-closeout.md`。
+
 ## history
 
 历史验证与审计均为只读；导入或补正仍须单独确认：

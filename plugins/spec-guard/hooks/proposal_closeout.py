@@ -125,6 +125,20 @@ def adapter_tracker_reader(adapter):
     return reader
 
 
+def _rejection(error):
+    """A platform that said no outright, rather than a result we could not read.
+
+    Duck-typed on `status_code` so any adapter can report one without this module
+    importing a transport.  Folding a definite 4xx into `partial` or `unknown` would
+    claim the outcome is in doubt when the platform already answered, and would leave
+    a journal entry implying an attempt that never landed.
+    """
+    status = getattr(error, "status_code", None)
+    if isinstance(status, int) and 400 <= status < 500:
+        return {"state": "rejected", "statusCode": status}
+    return None
+
+
 def _blocked(state, diagnostic=None):
     result = {"state": state}
     if diagnostic:
@@ -304,8 +318,8 @@ def _close_locked(preview, project, adapter, path, backend, target, remote,
     try:
         if adapter.target_facts() != preview["exactTarget"]:
             return _blocked("unknown", "target-changed")
-    except Exception:
-        return _blocked("unknown", "target-unreadable")
+    except Exception as error:
+        return _rejection(error) or _blocked("unknown", "target-unreadable")
 
     tracker = reader(proposal, backend, target)
     if getattr(tracker, "state", None) != "verified":
@@ -322,8 +336,8 @@ def _close_locked(preview, project, adapter, path, backend, target, remote,
         current = adapter.get_issue(tracker.issue_id)
         if content_digest(backend, current) != preview["issueContentDigest"]:
             return _blocked("conflict", "issue-content-changed")
-    except Exception:
-        return _blocked("unknown", "issue-unreadable")
+    except Exception as error:
+        return _rejection(error) or _blocked("unknown", "issue-unreadable")
 
     proof = prover(project, preview["proposalId"], backend, target, remote,
                    tracker_reader=reader)
@@ -357,39 +371,162 @@ def _apply(preview, adapter, tracker, decision, path, backend):
         if not any(str(item.get("body", "")).splitlines()[-1:] == [marker]
                    for item in comments["comments"]):
             adapter.create_comment(issue_id, preview["record"])
-    except Exception:
+    except Exception as error:
+        refusal = _rejection(error)
+        if refusal is not None:
+            _clear(path)
+            return refusal
         return _partial(path, record, "comment-result-uncertain")
 
     try:
         if decision.needs_stage_change:
             adapter.set_stage(issue_id, tracker.stage, decision.target_stage)
-    except Exception:
+    except Exception as error:
+        refusal = _rejection(error)
+        if refusal is not None:
+            return refusal
         return _partial(path, record, "stage-result-uncertain")
 
+    refusal = None
     try:
         adapter.set_closed(issue_id)
-    except Exception:
-        pass
+    except Exception as error:
+        refusal = _rejection(error)
 
     try:
         fields = issue_identity(backend, adapter.get_issue(issue_id))
     except Exception:
         fields = None
     if fields is None:
-        return _partial(path, record, "close-result-uncertain")
+        return refusal or _partial(path, record, "close-result-uncertain")
     _issue_id, _container, _body, labels, closed = fields
     if not closed or decision.target_stage not in labels:
-        return _partial(path, record, "close-result-uncertain")
+        return refusal or _partial(path, record, "close-result-uncertain")
+    _clear(path)
+    return {"state": "verified", "issueId": issue_id,
+            "stage": decision.target_stage, "closed": True,
+            "promotionCommit": preview["promotionCommit"]}
+
+
+def _clear(path):
     try:
         os.unlink(path)
     except OSError:
         pass
-    return {"state": "verified", "issueId": issue_id,
-            "stage": decision.target_stage, "closed": True,
-            "promotionCommit": preview["promotionCommit"]}
 
 
 def _partial(path, record, diagnostic):
     """Keep the attempt on record and stop: the next run reconciles, never resends."""
     _write_journal(path, dict(record, attempted=True))
     return {"state": "partial", "diagnostic": diagnostic}
+
+
+def build_adapter(backend, target, host=None, project=None, runtime_dir=None):
+    """Construct the adapter for one backend, or raise with a stable reason."""
+    if backend == "local":
+        from proposal_closeout_local import LocalCloseout
+        return LocalCloseout(target, project=project, runtime_dir=runtime_dir)
+    if backend == "github":
+        from proposal_closeout_github import GitHubCloseout
+        return GitHubCloseout(host or "github.com", target)
+    from proposal_closeout_gitlab import GitLabCloseout
+    return GitLabCloseout(host or "gitlab.com", target)
+
+
+def _resolved(args):
+    """Explicit backend and target, else the project default; never a guess."""
+    from tracker_default import read_default, resolve
+
+    target = args.target
+    if target is not None and args.backend == "gitlab" and str(target).isdigit():
+        target = int(target)
+    explicit = None
+    if args.backend and target is not None:
+        explicit = ({"host": args.host or "github.com", "repo": target}
+                    if args.backend == "github" else
+                    {"host": args.host or "gitlab.com", "projectId": target}
+                    if args.backend == "gitlab" else {"projectId": target})
+    outcome = resolve(args.backend, explicit, read_default(Path(args.project)))
+    if outcome.state != "resolved":
+        return None, {"state": "target-unselected",
+                      "diagnostic": outcome.diagnostic, "source": None}
+    container = (outcome.target.get("repo") if outcome.backend == "github"
+                 else outcome.target.get("projectId"))
+    return (outcome.backend, container, outcome.target.get("host"),
+            outcome.source), None
+
+
+def main(argv=None):
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Preview, and after explicit authorization perform, a Proposal "
+                    "closeout. The preview is read-only; `close` re-checks everything "
+                    "it asserted before writing anything.")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    preview = commands.add_parser("preview", help="read-only")
+    preview.add_argument("--project", default=".")
+    preview.add_argument("--proposal-id", required=True)
+    preview.add_argument("--backend", choices=("local", "github", "gitlab"))
+    preview.add_argument("--host")
+    preview.add_argument("--target")
+    preview.add_argument("--remote", default="origin")
+    preview.add_argument("--output", required=True)
+
+    closer = commands.add_parser("close", help="write, only with --confirm")
+    closer.add_argument("--project", default=".")
+    closer.add_argument("--preview", required=True)
+    closer.add_argument("--remote", default="origin")
+    closer.add_argument("--confirm", action="store_true")
+
+    args = parser.parse_args(argv)
+    if args.command == "preview":
+        resolved, failure = _resolved(args)
+        if failure is not None:
+            print(json.dumps(failure, ensure_ascii=False, sort_keys=True))
+            return 2
+        backend, container, host, source = resolved
+        try:
+            adapter = build_adapter(backend, container, host=host,
+                                    project=Path(args.project))
+        except Exception:
+            print(json.dumps({"state": "unknown", "diagnostic": "target-unreadable"},
+                             sort_keys=True))
+            return 2
+        result = build_preview(args.project, args.proposal_id, backend, container,
+                               adapter, remote=args.remote, source=source, host=host)
+        if result.get("state") == "preview":
+            Path(args.output).write_text(
+                json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8")
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0 if result.get("state") == "preview" else 2
+
+    try:
+        view = json.loads(Path(args.preview).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        view = None
+    if not isinstance(view, dict):
+        print(json.dumps({"state": "preview-invalid"}, sort_keys=True))
+        return 2
+    if not args.confirm:
+        print(json.dumps({"state": "confirmation-required"}, sort_keys=True))
+        return 2
+    try:
+        adapter = build_adapter(view.get("backend"),
+                                (view.get("exactTarget") or {}).get("target"),
+                                host=(view.get("exactTarget") or {}).get("host"),
+                                project=Path(args.project))
+    except Exception:
+        print(json.dumps({"state": "unknown", "diagnostic": "target-unreadable"},
+                         sort_keys=True))
+        return 2
+    result = close_preview(view, args.project, adapter, confirm=True,
+                           remote=args.remote)
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0 if result.get("state") in ("verified", "already-closed") else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

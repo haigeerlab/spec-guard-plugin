@@ -152,7 +152,7 @@ Proposal 路径同样适用。
 
 ```text
 提交（写草稿 → proposal-submit → 合进 main → 开 Issue）→ 接受（评审 → 改标签）
-     → 晋级（add-module --proposal 插进能力图 → 合并）→ 收尾（证明 → 改标签）
+     → 晋级（add-module --proposal 插进能力图 → 合并）→ 收尾（证明 → 预览 → 授权 → 改阶段并关闭）
 ```
 
 | # | 步骤 | 谁来做 | 怎么做 |
@@ -160,7 +160,7 @@ Proposal 路径同样适用。
 | 1 | 提交 | agent + 命令 + 人 | agent 按[模板](../plugins/spec-guard/references/proposal-contract.md)写草稿 `spec/proposals/<id>.md`；运行 `/spec-guard:proposal-submit --draft spec/proposals/<id>.md --platform <github\|gitlab>` 预览，确认后加 `--confirm`，命令从远端 main 补全基线一节并算出 revision，只改这一份草稿；经 PR 把草稿合进 main（发布，只在本地或分支上都不算）；再用命令打印的现成命令开 Issue（标签 `proposal`、`proposal-stage:published`）。改了草稿，重跑一遍即可重算 revision |
 | 2 | 接受 | 命令 + 人 | `/spec-guard:proposal-review` 报告 Proposal 是否新鲜、过期或被卡住；人把 Issue 标签改成 `proposal-stage:accepted`。接受只看这个标签加一次新鲜评审（基线未漂移、模块还不在能力图里、依赖齐全、锚点有效） |
 | 3 | 晋级 | 人 + 命令 | 从预检给出的 `baseCommit` 开晋级分支，运行 `/spec-guard:add-module --proposal <id> --platform … --target …`（Codex 同等入口），预览确认后加 `--confirm` 写入能力图，提交并合并。命令已内嵌预检，通常无需单独再跑 `/spec-guard:proposal-promotion-preflight`。若正式 Spec 与 Plan 已可评审，可与能力图放在同一个晋级 PR；否则先合入能力图，随后按正常流程补齐。命令会自检写入结果能通过收尾的证明 |
-| 4 | 收尾 | 命令 + 人 | `/spec-guard:proposal-promotion-proof`：从 Proposal 的基线提交起沿远端默认分支找到第一个纳入该模块的提交，核对它与声明一致。证明为 `proved` 后，人把标签改成 `proposal-stage:promoted`；改成 promoted 之后重跑仍会得到 `proved` |
+| 4 | 收尾 | 命令 + 人 | `/spec-guard:proposal-promotion-proof`：从 Proposal 的基线提交起沿远端默认分支找到第一个纳入该模块的提交，核对它与声明一致。证明为 `proved` 后用 `/spec-guard:proposal-closeout` 预览收尾，确认后它写一条带稳定标记的收尾记录、把阶段改成 `proposal-stage:promoted` 并关闭事项，再读回这三项。也可以继续只手工改标签，命令不是强制的；但只改标签不会关闭事项 |
 
 晋级后，这个模块仍按 Spec → Plan → Build 的评审顺序推进；同一个晋级 PR 可以提交 Spec 与 Plan 并分别评审，不要求为每份文档再开 PR。`proposal-submit` 只在 `--confirm` 时写草稿；评审、预检、证明只读；晋级命令只写能力图；Issue、标签、分支与提交由人操作。合并后运行证明并报告结果，再把 Issue 标为 `promoted`；证明不需要第三个 PR。
 
@@ -202,7 +202,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
-| Proposal 提交、评审、预检、证明（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof` | `spec-guard-ops` skill 的 proposal 一节 |
+| Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
 | 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
 | 协作信箱 | `/spec-guard:collaboration`、`collab` skill | `collab`、`collaboration-ops` skill |

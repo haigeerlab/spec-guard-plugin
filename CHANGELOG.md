@@ -18,6 +18,23 @@
 
 ### 新增
 
+- **Proposal 收尾现在能关闭事项，而不只是改标签。** 四步流程的第四步此前只走了一半：证明能说明晋级
+  已进入远端默认分支，但之后没有任何东西收尾，事项长期保持 open，只能靠事后审查发现。
+  `/spec-guard:proposal-closeout`（Codex：`spec-guard-ops` 的 proposal 一节）在**同一次运行内**重新取得
+  `proved` 之后给出预览，经针对该 Proposal 的明确授权，写一条带稳定标记的收尾记录、把阶段改成
+  `proposal-stage:promoted`、关闭事项并读回这三项。
+  关闭只说明**设计决定已落地**，不代表模块已交付——收尾记录本身写明了这一点，判据也绝不读模块 stage
+  或 todo（有 Plan 无 `todo.md` 的模块按已完成计，刚晋级的模块因此一定「看起来完成了」）。
+  只读的 `proposal-promotion-proof` 没有获得任何写入开关，相对发布基线零字节改动。
+- **Proposal 的讨论与阶段可以落在本地事项账本。** `local` 与 `github`、`gitlab` 共用同一个纯状态机、
+  同一套 `proposal-stage:*` 取值和同一个身份判定，只有适配器不同；`proposal-submit` 与
+  `add-module --proposal` 同步支持 `--platform local`，且完成后的草稿与托管路径**逐字相同**。
+  因此一个有 Git 远端、但没有可用托管 Issues 的项目也能走完 Proposal。
+  **共享事实的来源没有放宽**：baseline 仍然只来自远端默认分支，没有 Git 远端的项目不支持 Proposal。
+- **Proposal 事项读取新增开闭状态与三个诊断短码。** 此前 `gh issue list` 只取 number/body/labels，
+  连「已关闭」都表达不出来；缺这个字段现在是 `unknown`，**不默认当作 open**。`invalid` 拆出
+  `tracker-marker-ambiguous`、`tracker-marker-foreign-container`、`tracker-legacy-marker`，
+  调用方得以分别处置而不必去匹配散文诊断。
 - **项目级默认事项后端。** `/spec-guard:tracker-default`（Codex：`spec-guard-ops` 的 tracker default 一节）
   查看或按明确确认设置 `.agent/tracker.json` 的 `defaultBackend`（`local`／`github`／`gitlab`）与精确目标，
   省去为一个几个月不变的选择逐次手打参数。它**只预填预览**：预览仍完整显示后端、精确目标与来源，每次外部

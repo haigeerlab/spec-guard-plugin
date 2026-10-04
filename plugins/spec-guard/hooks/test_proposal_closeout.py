@@ -14,6 +14,7 @@ from proposal_closeout import (
 from proposal_contract import Baseline, Change, Proposal
 from proposal_publication import Publication
 from proposal_promotion_proof import Proof
+from hosted_ticket_provider import ProviderRejected
 from proposal_tracker_read import TrackerRead
 
 ACCEPTED = "proposal-stage:accepted"
@@ -522,10 +523,92 @@ class CloseTests(unittest.TestCase):
         self.assertEqual(closing(adapter, self.journal)["state"], "verified")
         self.assertEqual(list(self.journal.iterdir()), [])
 
+    def test_a_definite_platform_rejection_is_not_reported_as_uncertain(self):
+        """403 is an answer: the write did not happen and retrying changes nothing.
+        Folding it into `partial`/`unknown` would claim the outcome is unknown when the
+        platform just said no, and would leave a journal entry implying an attempt."""
+        class Refusing(WritingAdapter):
+            def create_comment(self, issue_id, body):
+                self.calls.append("comment")
+                self.writes.append("comment")
+                raise ProviderRejected(403)
+        adapter = Refusing()
+        result = closing(adapter, self.journal)
+        self.assertEqual(result["state"], "rejected")
+        self.assertEqual(result["statusCode"], 403)
+        self.assertEqual(adapter.writes, ["comment"])
+
+    def test_a_rejection_while_reading_the_target_is_also_definite(self):
+        class Refusing(WritingAdapter):
+            def target_facts(self):
+                raise ProviderRejected(404)
+        adapter = WritingAdapter()
+        def refuse(target):
+            target.target_facts = Refusing(issue=dict(target.issue)).target_facts
+        result = closing(adapter, self.journal, before_close=refuse)
+        self.assertEqual(result["state"], "rejected")
+        self.assertEqual(result["statusCode"], 404)
+        self.assertEqual(adapter.writes, [])
+
     def test_the_result_leaks_no_body_or_raw_error(self):
         adapter = WritingAdapter(fail=("comment",))
         result = closing(adapter, self.journal)
         self.assertNotIn("provider exploded", json.dumps(result))
+
+
+class EntryTests(unittest.TestCase):
+    """The CLI shape the command file documents, and the gates it must keep."""
+
+    SCRIPT = pathlib.Path(__file__).resolve().parent / "proposal_closeout.py"
+
+    def run_cli(self, *arguments):
+        import subprocess
+        import sys as _sys
+        return subprocess.run([_sys.executable, "-B", str(self.SCRIPT), *arguments],
+                              capture_output=True, text=True, timeout=60,
+                              stdin=subprocess.DEVNULL)
+
+    def test_the_two_subcommands_exist_with_the_documented_options(self):
+        done = self.run_cli("--help")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("preview", done.stdout)
+        self.assertIn("close", done.stdout)
+        preview_help = self.run_cli("preview", "--help").stdout
+        for option in ("--project", "--proposal-id", "--backend", "--host",
+                       "--target", "--remote", "--output"):
+            self.assertIn(option, preview_help, option)
+        close_help = self.run_cli("close", "--help").stdout
+        for option in ("--project", "--preview", "--confirm"):
+            self.assertIn(option, close_help, option)
+        self.assertNotIn("--confirm", preview_help)
+
+    def test_the_backend_choices_are_exactly_the_three_supported_ones(self):
+        bad = self.run_cli("preview", "--proposal-id", "x", "--backend", "bitbucket",
+                           "--target", "o/r", "--output", "/dev/null")
+        self.assertNotEqual(bad.returncode, 0)
+        self.assertIn("bitbucket", bad.stderr)
+
+    def test_an_unresolvable_target_is_reported_not_guessed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            done = self.run_cli("preview", "--project", tmp, "--proposal-id", "gamma",
+                                "--output", str(pathlib.Path(tmp) / "out.json"))
+            self.assertEqual(json.loads(done.stdout)["state"], "target-unselected")
+            self.assertFalse((pathlib.Path(tmp) / "out.json").exists())
+
+    def test_close_without_confirm_writes_nothing_and_says_so(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            view = pathlib.Path(tmp) / "preview.json"
+            view.write_text(json.dumps({"state": "preview"}), encoding="utf-8")
+            done = self.run_cli("close", "--project", tmp, "--preview", str(view))
+            self.assertEqual(json.loads(done.stdout)["state"], "confirmation-required")
+
+    def test_an_unreadable_preview_file_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            view = pathlib.Path(tmp) / "preview.json"
+            view.write_text("{not json", encoding="utf-8")
+            done = self.run_cli("close", "--project", tmp, "--preview", str(view),
+                                "--confirm")
+            self.assertEqual(json.loads(done.stdout)["state"], "preview-invalid")
 
 
 class ProofRemainsReadOnlyTests(unittest.TestCase):
