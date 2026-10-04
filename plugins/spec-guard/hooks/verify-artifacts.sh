@@ -91,7 +91,7 @@ fi
 
 # `tracker` 字段已随远端 tracker 模式退役（docs/retirements/state-tracker-field.md），
 # 不再被任何代码读取。只对真正残留该字段的文件提醒，不对插件自己装的 state.json 报警。
-if grep -Eq '"tracker"[[:space:]]*:[[:space:]]*"' .agent/state.json 2>/dev/null; then
+if grep -Eq '"tracker"[[:space:]]*:' .agent/state.json 2>/dev/null; then
   warn '检测到已退役的 tracker 字段；它不再被读取，可从 .agent/state.json 中删除'
 fi
 

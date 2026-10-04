@@ -8,7 +8,9 @@
   充当激活信号、被 `setup-convention` 持续写入、又在另一处抑制 plan-without-todo 提醒，而
   `verify-artifacts` 还对插件自己刚装的文件告警。现在没有任何代码读它：新装项目的 state 文件是
   `{"activeModule":""}`，激活信号改判 `activeModule`（**信号数量不变**），抑制逻辑与无人读取的 `modules`
-  空对象一并删除，退役扫描会拦下任何重新引入的写入或读取。
+  空对象一并删除。退役扫描覆盖已发布表面（含 `evals/`、`scripts/`）里常见的重新引入形态——JSON 字面量写入、
+  `get("tracker")`（含带默认值）、单引号与下标读取、非字符串值、成员判断、`retired_tracker` 本身——每一种都有
+  实测；它按文本匹配，不保证穷尽所有写法。
   **完成判据不变**——有 Plan 且没有未勾选项仍算完成，缺 `todo.md` 的历史模块状态不受影响。
   迁移见[退役说明](docs/retirements/state-tracker-field.md)：绝大多数项目无需动作；只有既没有声明块、
   又只剩 `{"tracker":"none"}` 的项目需要补 `activeModule` 或重装声明块。

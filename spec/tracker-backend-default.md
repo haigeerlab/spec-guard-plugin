@@ -120,6 +120,27 @@ GitLab 的目标采用正整数 project id，与既有 Proposal 命令
 - `as_json()` 只输出 `state`、`backend`、`source`、规范化 target 与稳定诊断码；不输出文件
   绝对路径、原始解析错误或任何事项内容。
 
+### C5b 文档本身是攻击面（2026-10-04 审查后补入）
+
+`.agent/tracker.json` 是**仓库内容**：敌对仓库控制它的每一个字节，也控制那个 inode 本身。因此：
+
+- **读取不跟随符号链接、不无界读取。** 用 `O_NOFOLLOW | O_NONBLOCK` 打开，`fstat` 要求普通文件，
+  读取上限 64 KiB。悬空链接、指向真实文件的链接、目录、设备、FIFO、超限、非 UTF-8 字节
+  **一律 `invalid`**——其中任何一种被报成 `absent`，都会被读成「没配过默认值」。
+- **预览不回显文档原文。** 当前字节不是可用文档时，预览只说明「现有文档不可用，将被整体替换」并打印
+  **拟写入的内容**，绝不打印读到的内容。否则把 `.agent/tracker.json` 指向 `~/.ssh/id_ed25519` 即可在
+  **不需要 `--confirm`** 的预览里把它泄进 agent 上下文。
+- **`.agent` 是符号链接时拒绝写入**，报 `agent-directory-unsafe` 并退出 2。否则 `--confirm` 会把文档写进
+  别的项目，静默改掉那个项目的默认写入目标。
+- **写入走新建的独占临时文件**（`tempfile.mkstemp`，`O_CREAT|O_EXCL`，0600），再 `os.replace`。
+  文件名不可预测，所以预先埋在 `.agent/` 里的 `.tmp` 名字无法劫持写入；`rename` 不跟随链接，所以
+  目标处的符号链接是被**替换**而不是被写穿。权限用 `lstat` 读取，普通文件才沿用其 mode，否则 0644。
+  任何一步失败都删除临时文件并原样抛出。
+- **写入失败不泄露路径或异常原文**：报 `tracker-default-unwritable` 并退出 2。
+- **`set` 不创建任意祖先目录**：`--project` 必须已是目录，只 `mkdir` 缺失的 `.agent` 一层。
+- **标识符有长度上界**：host ≤ 253、`repo` 每段 ≤ 100 且**首字符须为字母数字**（避免未来的消费者把它
+  当成选项传递），`version` 必须是严格的整数 1（排除 `true` 与 `1.0`）。
+
 ### C6 入口（`hooks/tracker_default.py` CLI 与命令/skill）
 
 ```text
@@ -241,6 +262,22 @@ docs/, spec/plan-without-todo.md, CHANGELOG.md        -> C7
 - 带 `--confirm` → 原子写回，内容与预览一致，权限保留；
 - 目标形状不合法 → 非零退出，不写文件；
 - 不触碰 `.agent/state.json`（断言其内容在 set 前后逐字相同）。
+
+### T7b 敌对文档（C5b，2026-10-04 审查后补入）
+
+每条都先在当前代码上复现问题再修复，证据记在提交说明里：
+
+- `.agent/tracker.json` 是指向项目外文件的符号链接 → `read_default` 为 `invalid`；`set` **预览**
+  （无 `--confirm`）的输出**不含**被指向文件的任何内容；`set --confirm` 不修改被指向的文件，
+  且事后该路径不再是符号链接；
+- 悬空符号链接 → `invalid`（**不是 `absent`**）；
+- `.agent/` 中预埋 600 个 pid 形状的 `tracker.json.<n>.tmp` 符号链接 → `set --confirm` 不覆盖被指向文件，
+  且默认值写入成功；
+- `.agent` 本身是指向项目外目录的符号链接 → `set --confirm` 退出 2，目标目录内不出现 `tracker.json`；
+- 非 UTF-8 字节 → `read_default` 为 `invalid`；`show` 退出 0 并只输出 `{"state":"invalid",…}`；
+  `show` 与 `set` 的 stderr 都**不含** `Traceback`；
+- 文档超过 64 KiB → `invalid`；路径是目录 → `invalid`；
+- host 300 字符、`repo` 段 200 字符 → `normalize_target` 返回 `None`。
 
 ### T8 退役扫描
 

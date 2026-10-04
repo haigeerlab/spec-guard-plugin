@@ -53,9 +53,12 @@ Issue 上，因此那类模块**按设计就没有 `todo.md`**。模式本身随
 - **绝大多数项目无需动作。** 由 `setup-convention` 装好、声明块还在的项目，激活与阶段输出都不变。
 - **`state.json` 里还有 `tracker` 的项目**：`verify-artifacts` 会提示一次，手工从该文件删掉这个键即可。
   删不删都不影响任何判断——没有任何代码再读它。
-- **只有 `{"tracker":"none"}`、既没有 `activeModule` 也没有声明块的项目**：这是唯一会改变行为的情形，
-  hook 会从注入变为静默。补上 `activeModule` 键，或重新运行
+- **`state.json` 里没有 `activeModule`、也没有声明块的项目**：这是唯一会改变行为的情形，hook 会从注入
+  变为静默。两种形态都算：`{"tracker":"none"}`，以及退役前远端 tracker 项目的典型形态
+  `{"tracker":"github","modules":{"alpha":{"issue":1}}}`。补上 `activeModule` 键，或重新运行
   `/spec-guard:setup-convention`（Codex：`spec-guard-ops` 的 setup 一节）装回声明块。
+  注意 `teardown-convention` 的停用方式不变，仍是把 `state.json` 改名为 `.disabled`；单独删掉 `tracker`
+  键**不会**让 hook 停下。
 - **`modules` 对象**：从未被读取，留着无害，删掉也无影响。
 
 ## 取而代之的是什么

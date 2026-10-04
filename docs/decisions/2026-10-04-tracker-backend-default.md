@@ -35,16 +35,22 @@
    （`local`／`github`／`gitlab`）、`defaultTarget`。入口 `/spec-guard:tracker-default`
    （Codex：`spec-guard-ops` 的 tracker default 一节）。
 
-3. **五条不变量**（写进 [`spec/tracker-backend-default.md`](../../spec/tracker-backend-default.md)，
-   每条都有正反回归）：
+3. **五条不变量。** 前两条与第五条由本模块实现并有正反回归（见
+   [`spec/tracker-backend-default.md`](../../spec/tracker-backend-default.md) 的 Assumptions 5–7 与 C5–C6）；
+   第三、四条是对**写入方**的约束，本模块不提供写入路径，因此由第一个消费者
+   `proposal-closeout` 实现并回归，这里只作为它必须满足的条件记录在案：
 
-   - **只预填，不决定。** 只在没有显式后端与目标时填进预览；预览必须打印来源
-     （`explicit`／`project-default`／`project-default-target`）。
-   - **不改变授权。** 每次外部写入仍是一次预览、一次授权；默认值不省掉任何一次确认。
-   - **只对新事项生效。** 已有事项的绑定由它创建时的后端与目标固定；改默认值不移动、不复制、
-     不关闭任何已有事项。
-   - **冲突即停。** 已记录的绑定与当前默认不同时报 `conflict`，不静默切换。
-   - **不是激活信号。** 这个文件的有无与阶段注入无关。
+   | # | 不变量 | 落在哪 |
+   | --- | --- | --- |
+   | 1 | **只预填，不决定。** 只在没有显式后端与目标时填进预览；预览必须打印来源（`explicit`／`project-default`／`project-default-target`） | 本模块 · `resolve()` · 已回归 |
+   | 2 | **不改变授权。** 每次外部写入仍是一次预览、一次授权；默认值不省掉任何一次确认 | 本模块 · `set` 的 `--confirm` 闸门 · 已回归 |
+   | 3 | **只对新事项生效。** 已有事项的绑定由它创建时的后端与目标固定；改默认值不移动、不复制、不关闭任何已有事项 | **待 `proposal-closeout` 实现** |
+   | 4 | **冲突即停。** 已记录的绑定与当前默认不同时报 `conflict`，不静默切换 | **待 `proposal-closeout` 实现** |
+   | 5 | **不是激活信号。** 这个文件的有无与阶段注入无关 | 本模块 · `phase-guard.sh` 不引用它 · 已回归 |
+
+   `resolve()` 本身不判定第 3、4 条，这是刻意的：对它而言「显式值与默认不同」只是覆盖，不是冲突；
+   「与某条事项已记录的绑定矛盾」要读那条事项的 journal，属于写入方的职责。实现 `proposal-closeout`
+   时不得把第 4 条当成已覆盖。
 
 4. **非法绝不降级为缺席。** 文档不可解析、版本不是 1、后端未知、目标形状不符、有多余字段，一律 `invalid`
    并带 `tracker-default-invalid`，绝不读成 `absent`——否则一个拼写错误会被当成「没配过」而静默回到逐次手填。

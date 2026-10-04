@@ -4,6 +4,10 @@ The default only pre-fills a preview.  It never decides a write, never changes a
 existing item's binding, and is not an activation signal: `.agent/tracker.json` has
 no bearing on whether the phase hook speaks.  An unusable document is `invalid`, never
 `absent`, so a typo can never be read as "no default was configured".
+
+`.agent/tracker.json` is repository content: a hostile repository controls every byte
+of it and the inode itself.  So the document is never followed through a symlink,
+never read unbounded, and its text is never echoed back -- only the parsed values are.
 """
 from __future__ import annotations
 
@@ -12,6 +16,8 @@ import difflib
 import json
 import os
 import re
+import stat
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -23,9 +29,13 @@ TARGET_KEYS = {"github": ("host", "repo"), "gitlab": ("host", "projectId"),
 DOCUMENT_KEYS = ("version", "defaultBackend", "defaultTarget")
 VERSION = 1
 
-HOST = re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]*\Z")
-REPO_PART = re.compile(r"[A-Za-z0-9_.-]+\Z")
+# Every identifier is bounded: an unbounded one still ends up echoed into an agent's
+# context by `show`.  A `repo` part must start alphanumeric so it can never be read as
+# an option by a future consumer that passes it as its own argument.
+HOST = re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}\Z")
+REPO_PART = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}\Z")
 LOCAL_PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
+MAX_BYTES = 65536
 
 INVALID = "tracker-default-invalid"
 
@@ -85,19 +95,50 @@ def normalize_target(backend: str, value: Any) -> dict[str, Any] | None:
     return {"projectId": project_id}
 
 
+def read_text(path: Path) -> tuple[str | None, str]:
+    """Return (text, state) without following a link or reading unbounded.
+
+    Only a path with nothing at all at it is `absent`.  A dangling link, a link to a
+    real file, a directory, a device, a fifo, something larger than `MAX_BYTES` and
+    bytes that are not UTF-8 are all `invalid`: each one means the document cannot be
+    used, and reporting any of them as `absent` would read as "no default configured".
+    """
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except FileNotFoundError:
+        # A dangling symlink is something, so it is unusable rather than absent.
+        return (None, "invalid" if os.path.lexists(path) else "absent")
+    except OSError:
+        return None, "invalid"
+    try:
+        with os.fdopen(descriptor, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                return None, "invalid"
+            raw = stream.read(MAX_BYTES + 1)
+    except OSError:
+        return None, "invalid"
+    if len(raw) > MAX_BYTES:
+        return None, "invalid"
+    try:
+        return raw.decode("utf-8"), "configured"
+    except UnicodeDecodeError:
+        return None, "invalid"
+
+
 def read_default(root: Path) -> DefaultResult:
     """Read `.agent/tracker.json`.  Only a missing file is `absent`."""
-    try:
-        text = (Path(root) / RELATIVE_PATH).read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return DefaultResult("absent")
-    except OSError:
-        return DefaultResult("invalid", diagnostic=INVALID)
+    text, state = read_text(Path(root) / RELATIVE_PATH)
+    if text is None:
+        return (DefaultResult("absent") if state == "absent"
+                else DefaultResult("invalid", diagnostic=INVALID))
     try:
         document = json.loads(text)
     except ValueError:
         return DefaultResult("invalid", diagnostic=INVALID)
     if (not isinstance(document, dict) or set(document) != set(DOCUMENT_KEYS) or
+            isinstance(document["version"], bool) or
+            not isinstance(document["version"], int) or
             document["version"] != VERSION or
             document["defaultBackend"] not in BACKENDS):
         return DefaultResult("invalid", diagnostic=INVALID)
@@ -167,14 +208,31 @@ def _target_from_arguments(args: argparse.Namespace) -> dict[str, Any] | None:
 
 
 def _write_atomic(path: Path, text: str) -> None:
+    """Write through a fresh exclusive file, never through whatever sits at `path`.
+
+    `mkstemp` opens with O_CREAT|O_EXCL at mode 0600, so a name planted in `.agent/`
+    cannot capture the write, and `os.replace` renames without following a link, so a
+    symlink at `path` is replaced rather than written through.  The mode is read with
+    `lstat` for the same reason: `stat` would report the link target's mode.
+    """
     try:
-        mode = path.stat().st_mode & 0o777
-    except FileNotFoundError:
+        existing = path.lstat()
+        mode = existing.st_mode & 0o777 if stat.S_ISREG(existing.st_mode) else 0o644
+    except OSError:
         mode = 0o644
-    temporary = path.with_name(path.name + "." + str(os.getpid()) + ".tmp")
-    temporary.write_text(text, encoding="utf-8")
-    os.chmod(temporary, mode)
-    os.replace(temporary, path)
+    descriptor, name = tempfile.mkstemp(dir=str(path.parent),
+                                        prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.chmod(name, mode)
+        os.replace(name, path)
+    except BaseException:
+        try:
+            os.unlink(name)
+        except OSError:
+            pass
+        raise
 
 
 def _set(args: argparse.Namespace) -> int:
@@ -184,25 +242,42 @@ def _set(args: argparse.Namespace) -> int:
     if target is None:
         print("target-invalid: the target does not match the %s shape" % args.backend)
         return 2
-    path = Path(args.project) / RELATIVE_PATH
-    try:
-        before = path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        before = ""
-    except OSError:
-        print("tracker-default-unreadable: the existing document cannot be read")
+    root = Path(args.project)
+    if not root.is_dir():
+        print("project-absent: %s is not a directory" % args.project)
         return 2
+    directory = root / RELATIVE_PATH.parent
+    # Writing through a symlinked `.agent` would land the document in another project,
+    # silently repointing its default target.  Refuse rather than resolve.
+    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+        print("agent-directory-unsafe: %s is not a directory in this project"
+              % RELATIVE_PATH.parent)
+        return 2
+    path = root / RELATIVE_PATH
+    before, state = read_text(path)
+    if state == "invalid":
+        # The current bytes are not a usable document.  They are also repository
+        # content, so they are described, never echoed.
+        before = None
     after = render(args.backend, target)
-    diff = "".join(difflib.unified_diff(
-        before.splitlines(keepends=True), after.splitlines(keepends=True),
-        fromfile=str(RELATIVE_PATH) + " (current)",
-        tofile=str(RELATIVE_PATH) + " (proposed)"))
-    print(diff if diff else "no change: the project default already has these values")
+    if before is None and state == "invalid":
+        print("the existing %s is unusable and would be replaced in full" % RELATIVE_PATH)
+        print(after, end="")
+    else:
+        diff = "".join(difflib.unified_diff(
+            (before or "").splitlines(keepends=True), after.splitlines(keepends=True),
+            fromfile=str(RELATIVE_PATH) + " (current)",
+            tofile=str(RELATIVE_PATH) + " (proposed)"))
+        print(diff if diff else "no change: the project default already has these values")
     if not args.confirm:
         print("\npreview only; nothing was written. Re-run with --confirm to apply.")
         return 0
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_atomic(path, after)
+    try:
+        directory.mkdir(exist_ok=True)
+        _write_atomic(path, after)
+    except OSError:
+        print("tracker-default-unwritable: %s could not be written" % RELATIVE_PATH)
+        return 2
     print("\nwrote %s" % RELATIVE_PATH)
     return 0
 

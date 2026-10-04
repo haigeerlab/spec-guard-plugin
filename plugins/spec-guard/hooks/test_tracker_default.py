@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tracker_default import as_json, read_default, render, resolve
+from tracker_default import as_json, normalize_target, read_default, render, resolve
 
 
 GITHUB = {"host": "github.com", "repo": "team/repo"}
@@ -286,7 +286,9 @@ class EntryTests(unittest.TestCase):
             self.assertEqual(done.returncode, 0)
             # The write run prints the same diff as the preview run, so what landed is
             # what was shown; re-previewing afterwards then reports nothing left to do.
-            self.assertIn(preview.stdout.split("\npreview only")[0], done.stdout)
+            shown = preview.stdout.split("\npreview only")[0]
+            self.assertIn("defaultBackend", shown)  # 否则下一行会退化成 assertIn("", …)
+            self.assertIn(shown, done.stdout)
             self.assertEqual(path.read_text(encoding="utf-8"), render("gitlab", GITLAB))
             self.assertIn("no change", self.run_cli(root, *arguments).stdout)
             self.assertEqual(read_default(root).target, GITLAB)
@@ -304,8 +306,12 @@ class EntryTests(unittest.TestCase):
         with ProjectDir(document("github", GITHUB)) as root:
             path = root / ".agent" / "tracker.json"
             os.chmod(path, 0o600)
-            self.run_cli(root, "set", "--backend", "github", "--host", "github.com",
-                         "--repo", "team/other", "--confirm")
+            done = self.run_cli(root, "set", "--backend", "github", "--host",
+                                "github.com", "--repo", "team/other", "--confirm")
+            self.assertEqual(done.returncode, 0)
+            # Assert the write happened, so a `set` that stopped writing could not pass
+            # this case by leaving the original mode untouched.
+            self.assertEqual(read_default(root).target["repo"], "team/other")
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_set_rejects_a_wrong_shape_without_writing(self):
@@ -325,8 +331,12 @@ class EntryTests(unittest.TestCase):
         with ProjectDir(document("github", GITHUB)) as root:
             state = self.state_file(root)
             before, stamp = state.read_text(encoding="utf-8"), state.stat().st_mtime_ns
-            self.run_cli(root, "set", "--backend", "local",
-                         "--project-id", LOCAL["projectId"], "--confirm")
+            done = self.run_cli(root, "set", "--backend", "local",
+                                "--project-id", LOCAL["projectId"], "--confirm")
+            self.assertEqual(done.returncode, 0)
+            # The write must actually have happened, otherwise an unrelated early exit
+            # would satisfy the two assertions below vacuously.
+            self.assertEqual(read_default(root).backend, "local")
             self.assertEqual(state.read_text(encoding="utf-8"), before)
             self.assertEqual(state.stat().st_mtime_ns, stamp)
 
@@ -336,6 +346,125 @@ class EntryTests(unittest.TestCase):
                          "--project-id", LOCAL["projectId"], "--confirm")
             self.assertEqual(sorted(p.name for p in (root / ".agent").iterdir()),
                              ["tracker.json"])
+
+
+class HostileDocumentTests(unittest.TestCase):
+    """`.agent/tracker.json` is repository content, so every byte and the inode itself
+    are attacker-controlled: a hostile repo ships whatever it likes there."""
+
+    HOOKS = Path(__file__).resolve().parent
+
+    def run_cli(self, root, *arguments):
+        return subprocess.run(
+            [sys.executable, "-B", "tracker_default.py", *arguments,
+             "--project", str(root)],
+            cwd=str(self.HOOKS), capture_output=True, text=True, timeout=30)
+
+    def scene(self):
+        tmp = tempfile.TemporaryDirectory()
+        root = Path(tmp.name) / "project"
+        (root / ".agent").mkdir(parents=True)
+        outside = Path(tmp.name) / "outside"
+        outside.mkdir()
+        secret = outside / "secret"
+        secret.write_text("AWS_SECRET_ACCESS_KEY=hunter2\nsecond-line\n", encoding="utf-8")
+        return tmp, root, outside, secret
+
+    # ── the document is a symlink ──────────────────────────────────────────
+    def test_symlinked_document_is_invalid_and_discloses_nothing(self):
+        tmp, root, _outside, secret = self.scene()
+        with tmp:
+            (root / ".agent" / "tracker.json").symlink_to(secret)
+            result = read_default(root)
+            self.assertEqual(result.state, "invalid")
+            self.assertNotIn("hunter2", json.dumps(as_json(result)))
+
+    def test_set_preview_never_echoes_a_foreign_document(self):
+        tmp, root, _outside, secret = self.scene()
+        with tmp:
+            (root / ".agent" / "tracker.json").symlink_to(secret)
+            done = self.run_cli(root, "set", "--backend", "local",
+                                "--project-id", LOCAL["projectId"])
+            self.assertNotIn("hunter2", done.stdout + done.stderr)
+            self.assertNotIn("second-line", done.stdout + done.stderr)
+
+    def test_confirm_does_not_write_through_a_symlinked_document(self):
+        tmp, root, _outside, secret = self.scene()
+        with tmp:
+            path = root / ".agent" / "tracker.json"
+            path.symlink_to(secret)
+            self.run_cli(root, "set", "--backend", "local",
+                         "--project-id", LOCAL["projectId"], "--confirm")
+            self.assertIn("hunter2", secret.read_text(encoding="utf-8"))
+            self.assertFalse(path.is_symlink())
+
+    # ── a pre-planted temporary name ───────────────────────────────────────
+    def test_a_planted_temporary_name_cannot_capture_the_write(self):
+        tmp, root, _outside, secret = self.scene()
+        with tmp:
+            agent = root / ".agent"
+            # The attacker cannot know the exclusive name, so blanket the plausible
+            # space: every pid-shaped temp name this process could pick.
+            base = os.getpid()
+            for pid in range(base, base + 600):
+                (agent / ("tracker.json.%d.tmp" % pid)).symlink_to(secret)
+            self.run_cli(root, "set", "--backend", "local",
+                         "--project-id", LOCAL["projectId"], "--confirm")
+            self.assertIn("hunter2", secret.read_text(encoding="utf-8"))
+            self.assertEqual(read_default(root).target, LOCAL)
+
+    # ── the .agent directory is a symlink ──────────────────────────────────
+    def test_confirm_refuses_to_write_through_a_symlinked_agent_directory(self):
+        tmp, root, outside, _secret = self.scene()
+        with tmp:
+            agent = root / ".agent"
+            for child in agent.iterdir():
+                child.unlink()
+            agent.rmdir()
+            agent.symlink_to(outside, target_is_directory=True)
+            done = self.run_cli(root, "set", "--backend", "github",
+                                "--host", "github.com", "--repo", "o/n", "--confirm")
+            self.assertEqual(done.returncode, 2)
+            self.assertFalse((outside / "tracker.json").exists())
+
+    # ── bytes that are not a document at all ───────────────────────────────
+    def test_non_utf8_bytes_are_invalid_rather_than_a_traceback(self):
+        tmp, root, _outside, _secret = self.scene()
+        with tmp:
+            (root / ".agent" / "tracker.json").write_bytes(b'\xff\xfe{"version":1}')
+            self.assertEqual(read_default(root).state, "invalid")
+            show = self.run_cli(root, "show")
+            self.assertEqual(show.returncode, 0)
+            self.assertEqual(json.loads(show.stdout),
+                             {"state": "invalid", "diagnostic": "tracker-default-invalid"})
+            self.assertNotIn("Traceback", show.stderr)
+            setter = self.run_cli(root, "set", "--backend", "local",
+                                  "--project-id", LOCAL["projectId"])
+            self.assertNotIn("Traceback", setter.stderr)
+
+    def test_an_oversized_document_is_invalid(self):
+        tmp, root, _outside, _secret = self.scene()
+        with tmp:
+            payload = dict(document("local", LOCAL), padding="x" * 70000)
+            (root / ".agent" / "tracker.json").write_text(json.dumps(payload),
+                                                          encoding="utf-8")
+            self.assertEqual(read_default(root).state, "invalid")
+
+    def test_a_non_regular_document_is_invalid(self):
+        tmp, root, _outside, _secret = self.scene()
+        with tmp:
+            path = root / ".agent" / "tracker.json"
+            path.mkdir()
+            self.assertEqual(read_default(root).state, "invalid")
+
+    # ── bounded identifiers ────────────────────────────────────────────────
+    def test_overlong_host_and_repo_parts_are_invalid(self):
+        self.assertIsNone(normalize_target("github", {"host": "a" * 300,
+                                                      "repo": "team/repo"}))
+        self.assertIsNone(normalize_target("github", {"host": "github.com",
+                                                      "repo": "t" * 200 + "/repo"}))
+        self.assertIsNone(normalize_target("gitlab", {"host": "a" * 300,
+                                                      "projectId": 17}))
 
 
 if __name__ == "__main__":

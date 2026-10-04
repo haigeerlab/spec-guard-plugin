@@ -16,7 +16,9 @@ fi
 cd "$ROOT" 2>/dev/null || exit 0
 
 # 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或含
-# activeModule 的 state.json。正文里提到标记、或别的工具的 .agent/state.json 都不算。
+# activeModule 的 state.json。正文里提到标记不算。注意判据是纯文本匹配：别的工具若在自己的
+# .agent/state.json 里也用 activeModule 这个键（包括嵌套位置），同样会激活——比此前那条按值匹配
+# 的判据宽。代价有限：本 hook 只读文件并打印阶段，不写任何东西。
 # activeModule 是本插件写这个文件的唯一理由，所以它是准确的激活证据；此前判据用的
 # `tracker` 字段已随远端 tracker 模式退役（docs/retirements/state-tracker-field.md）。
 has_block() {

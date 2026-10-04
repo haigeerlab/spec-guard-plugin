@@ -47,8 +47,10 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 
 `--keep-state` 保留原名，**hook 会继续激活**，只在确实想切到零足迹模式时用。
 
-当前的激活判据：`CLAUDE.md`／`AGENTS.md` 中独占一行的 `BEGIN` 标记，或 `tracker` 为 `none`、`github`、
-`gitlab` 的 `.agent/state.json`。正文里提到标记、或其他工具写的 `.agent/state.json` 都不会激活。
+当前的激活判据：`CLAUDE.md`／`AGENTS.md` 中独占一行的 `BEGIN` 标记，或含 `activeModule` 的
+`.agent/state.json`。正文里提到标记不会激活。该文件里的 `tracker` 字段已退役，不再是激活信号
+（`docs/retirements/state-tracker-field.md`）——删掉它**不会**让 hook 停下，停用请按上面改名
+`state.json`，或移除声明块。
 
 ## 之后
 
