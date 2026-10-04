@@ -143,12 +143,12 @@ def publish_preview(preview: dict[str, Any], provider: Any, intent_root: Path,
                 _write_intent(path, {**record, "attempted": False,
                                      "rejectionStatus": error.status_code})
                 return {"state": "rejected", "statusCode": error.status_code}
-            except Exception:
+            except HostedTicketError:
                 created = None
             if isinstance(created, dict) and isinstance(created.get("id"), int):
                 try:
                     current = provider.get_issue(created["id"])
-                except Exception:
+                except HostedTicketError:
                     current = None
                 if current is not None:
                     if not _same_issue(current, preview):

@@ -173,5 +173,49 @@ class ProviderTests(unittest.TestCase):
             provider.list_issues()
 
 
+class Defect:
+    """A provider whose one named method raises a programming error, as a typo would.
+
+    AttributeError is the realistic shape: a misspelled attribute inside an adapter.
+    It must not be reportable as a fact about the provider or the remote.
+    """
+
+    def __init__(self, provider, method):
+        self._provider, self._method = provider, method
+
+    def __getattr__(self, name):
+        if name == self._method:
+            def boom(*_arguments, **_keywords):
+                raise AttributeError("'Adapter' object has no attribute 'typo'")
+            return boom
+        return getattr(self._provider, name)
+
+
+class ProgrammingErrorTests(unittest.TestCase):
+    """`inspect_ticket` must not turn our own defect into `provider-unavailable`."""
+
+    def test_a_programming_error_propagates(self):
+        with self.assertRaises(AttributeError):
+            inspect_ticket(Defect(FakeProvider(), "list_issues"), "private", "B-1-F-2", "Crash")
+
+    def test_a_transport_failure_still_degrades(self):
+        result = inspect_ticket(_Unavailable(FakeProvider(), "list_issues"), "private",
+                                "B-1-F-2", "Crash")
+        self.assertEqual(result["state"], "unknown")
+        # The full transport message is passed through on purpose; that detail
+        # is what tells a reader it was the request, not our code.
+        self.assertEqual(result["diagnostic"],
+                         "provider-unavailable: request did not complete")
+
+
+class _Unavailable(Defect):
+    def __getattr__(self, name):
+        if name == self._method:
+            def unavailable(*_arguments, **_keywords):
+                raise HostedTicketError("provider-unavailable: request did not complete")
+            return unavailable
+        return getattr(self._provider, name)
+
+
 if __name__ == "__main__":
     unittest.main()

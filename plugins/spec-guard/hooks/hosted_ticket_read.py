@@ -48,8 +48,8 @@ def inspect_ticket(provider: Any, visibility: str, request_id: str,
             return {**summary, "state": "conflict", "diagnostic": "root-cause-candidate",
                     "candidates": candidates}
         return {**summary, "state": "absent", "rootCauseReviewRequired": True}
-    except Exception as error:
-        diagnostic = str(error) if isinstance(error, HostedTicketError) else "provider-unavailable"
+    except HostedTicketError as error:
+        diagnostic = str(error)
         return {"state": "unknown", "diagnostic": diagnostic}
 
 
