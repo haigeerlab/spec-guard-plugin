@@ -26,12 +26,24 @@
     },
     {
       "subject": "spec-guard-native-claude-repeat-wake",
-      "status": "not-verified",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
-        "id": "claude-code:v0.41.0"
+        "id": "claude-code:v0.41.0;test:installed-native-repeat-wake-20261005"
       },
-      "reason": "No wake was exercised for this release. The acceptance needs a live interactive Claude Code session as the wake target, and a one-shot `claude -p` run exits with nothing left to wake. A persistent session was started in a disposable repository, but Claude Code's folder-trust confirmation for that path was never completed, so the target never registered on the bridge and no message was sent. Bypassing that confirmation by pre-writing the host trust store was rejected as working around a security gate. The v0.40.0 record is not carried forward: collaboration-messaging is unchanged in v0.41.0, but an unchanged surface is not an observation."
+      "observedAt": "2026-10-04T16:53:41Z",
+      "evidence": [
+        "correction:this record previously stood as not-verified in the same release. That was published in error -- the target had in fact registered, and the operator misread the bridge state as a failed trust confirmation. The acceptance below was then run in full.",
+        "host:one user-authorized Claude Code 2.1.289 session in a disposable Git repository, started after the v0.41.0 upgrade, registered one exact synthetic identity once with wake \"auto\" bound to claude session 554a0375-cb61-49ef-bfc6-87eda2d12839",
+        "result:round 1 -- message 69 sent 16:52:01Z, the target entered a new turn, read, replied on thread v041-repeat-wake-20261005 at 16:52:13Z and acknowledged at 16:52:25Z",
+        "result:round 2 -- message 71 sent 16:53:24Z to the same identity with no re-registration and no rebinding between rounds; the target entered a second new turn, replied at 16:53:37Z and acknowledged at 16:53:41Z",
+        "result:bridge_wake_status reports both jobs at state read with attempts 1 and no replay; both immediate receipts were \"unknown\", which means only that the adapter saw no positive receipt inside its short wait, exactly as in the v0.38.3 and v0.40.0 runs",
+        "result:the sender outbox shows zero unacknowledged messages and an acknowledgement timestamp for both",
+        "limit:the target attested that no user message entered its context, and flagged on its own that it cannot observe the physical terminal, so \"nobody pressed a key\" is its inference; the wake receipts are the authoritative record and they are what this status rests on",
+        "boundary:the target also declined to claim a spec-guard stage injection it did not receive -- the disposable directory carries no activation signal, so spec-guard correctly stayed silent, and the 【阶段轴检查】 block in its turn is this machine's own global hook, not this plugin",
+        "cleanup:both exact synthetic identities were retired through native_collaboration_retire.py with --keep-backlog after unread reached zero on both sides; message history was retained",
+        "boundary:no project file, Git state, host configuration, Local ticket, remote ticket or unrelated mailbox message was changed in either round"
+      ]
     }
   ]
 }
