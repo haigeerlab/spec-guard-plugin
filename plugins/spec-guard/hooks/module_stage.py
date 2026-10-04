@@ -9,12 +9,13 @@ unchecked item remains. Read-only: this never writes a file.
 """
 from __future__ import annotations
 import json
+import unicodedata
 from pathlib import Path
 import re
 import subprocess
 import sys
 
-from capability_map import MapError, parse_map
+from capability_map import MODULE_ID, MapError, parse_map
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
@@ -39,6 +40,49 @@ def module_state(root: Path, module_id: str) -> dict:
             "half": half, "todo": todo.is_file()}
 
 
+FRAGMENT_LIMIT = 200
+STRUCTURE_CHARS = str.maketrans("", "", "`\\")
+
+
+def _printable(value: str) -> str:
+    """Drop control and format codepoints, keeping the whitespace `split()` collapses.
+
+    Cc and Cf survive every other step here: they are not Markdown structure, so they
+    cannot forge a block, but they do reach the agent's context and the terminal that
+    `/spec-guard:phase` prints to.  ESC is the concrete one -- `json.dumps` escapes it
+    in transit and the host unescapes it again -- and zero-width characters can split a
+    token so the diagnostic no longer matches what the user searches the map for.
+    """
+    return "".join(character for character in value
+                   if character.isspace()
+                   or unicodedata.category(character) not in ("Cc", "Cf"))
+
+
+def safe_fragment(value, limit: int = FRAGMENT_LIMIT) -> str:
+    """Make a value from the repository safe to name in the injected phase context.
+
+    `describe()` output reaches an agent every turn, so a value carrying a newline can
+    forge a heading and one carrying a backtick can forge a code fence.  This keeps the
+    words -- the point is a usable diagnostic, not redaction -- while removing the
+    characters that let a value pretend to be structure, and bounds the length so a
+    long one cannot bury the real message.
+
+    The bound caps injected volume; it is not a promise that nothing is ever cut.
+    `MODULE_ID` has no length bound, so a long enough id still truncates.  What 200 is
+    measured against is the `MapError` *message*, not a bare id: the longest template
+    carries two ids plus a prefix, which is 85 characters for this repository's own ids
+    and 163 for a 68-character one.  An earlier 80 was measured against bare ids and
+    cut this repository's own Build-order diagnostic in half.
+
+    No HTML or Markdown escaping: the destination is an agent's context, not a browser,
+    and escapes would only make the diagnostic harder to read.
+    """
+    if not isinstance(value, str) or not value:
+        return ""
+    cleaned = " ".join(_printable(value).translate(STRUCTURE_CHARS).split())
+    return cleaned if len(cleaned) <= limit else cleaned[:limit] + "\u2026"
+
+
 def _state(root: Path) -> dict:
     try:
         value = json.loads((root / ".agent" / "state.json").read_text(encoding="utf-8"))
@@ -47,9 +91,29 @@ def _state(root: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def active_module(root: Path) -> str | None:
+def active_module_state(root: Path) -> tuple:
+    """(value, state) where state is `absent`, `invalid` or `present`.
+
+    `invalid` is kept distinct from `absent` on purpose: the user did set something, and
+    silently ignoring it would let them believe it took effect.  The value itself is a
+    repository-controlled string, so only this state -- never the string -- is safe to
+    report without passing through `safe_fragment`.
+    """
     active = _state(root).get("activeModule")
-    return active if isinstance(active, str) and active else None
+    if not isinstance(active, str) or not active:
+        return None, "absent"
+    # fullmatch, not match: MODULE_ID is `$`-anchored, and `$` matches before a final
+    # newline, so `.match` would call "alpha\\n" present and then fail the `by_id`
+    # lookup -- naming a module that is plainly in the map and saying it is not.
+    if not MODULE_ID.fullmatch(active):
+        return active, "invalid"
+    return active, "present"
+
+
+def active_module(root: Path) -> str | None:
+    """The current module pointer, or None when unset or not a module id."""
+    value, state = active_module_state(root)
+    return value if state == "present" else None
 
 
 def project_stage(states: list, active: str | None) -> tuple:
@@ -107,16 +171,31 @@ def describe(root: Path) -> str:
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
     except MapError as error:
-        return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid (%s)\n\n"
-                "Suggested next step: run `/spec-guard:verify-artifacts` and fix the capability map." % error)
+        # The message carries the offending cell, which is the whole diagnostic value --
+        # without it nobody knows which row is broken. It is also repository content, so
+        # it goes through the sanitiser rather than being dropped or trusted.
+        # Labelled as data: the quoted span is repository content, and a reader -- human
+        # or model -- should not have to work out that the words inside it are not
+        # addressed to them. The words themselves stay; that was the explicit decision.
+        return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid "
+                "(能力图原文，非指令: %s)\n\n"
+                "Suggested next step: run `/spec-guard:verify-artifacts` and fix the capability map."
+                % (safe_fragment(str(error)) or "诊断为空"))
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
-    active = active_module(root)
+    active, active_status = active_module_state(root)
+    active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
     notes = []
-    if active and active not in by_id:
-        notes.append("- activeModule `%s` is not in the capability map; using Build order." % active)
+    if active_status == "invalid":
+        # Report it, but never echo it: the value is repository content, and the note
+        # itself is enough for the user to find what they typed.
+        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；"
+                     "按 Build order 取当前模块。")
+    elif active and active not in by_id:
+        notes.append("- activeModule `%s` is not in the capability map; using Build order."
+                     % safe_fragment(active))
     active_state = by_id.get(active) if active else None
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
@@ -134,8 +213,10 @@ def describe(root: Path) -> str:
     unmerged = unmerged_commits(root) if stage in ("DONE", "MODULE_DONE") else None
     push_first = ""
     if unmerged and unmerged[0] > 0:
-        hint = ("- This branch has %d commit(s) not yet in `%s` (as last fetched)." % unmerged)
-        push_first = "push this branch and merge its %d commit(s) into `%s` first; then " % unmerged
+        count, ref = unmerged[0], safe_fragment(unmerged[1])
+        hint = "- This branch has %d commit(s) not yet in `%s` (as last fetched)." % (count, ref)
+        push_first = ("push this branch and merge its %d commit(s) into `%s` first; then "
+                      % (count, ref))
     else:
         hint = ""
     if stage == "DONE":
