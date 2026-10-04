@@ -2,6 +2,8 @@
 import json
 import unittest
 
+import proposal_tracker_read
+
 from proposal_contract import Baseline, Change, Proposal
 from proposal_tracker_read import TrackerRead, as_json, read_tracker, recover_tracker_issue
 
@@ -26,6 +28,43 @@ def github_issue(number=42, body=None, labels=None, repository=None,
         "labels": [{"name": label} for label in (
             ["proposal", "proposal-stage:in-review"] if labels is None else labels)],
     }
+
+
+class GithubStateCasingTests(unittest.TestCase):
+    """`gh issue list --json state` answers OPEN/CLOSED, not the REST API's open/closed.
+
+    `_github_page` reads through `gh`, so uppercase is the shape this adapter actually
+    receives. The fixtures above were written with the REST spelling and nothing ever
+    compared them with a real response, so a lookup table keyed on lowercase passed
+    every test while failing against every real repository.
+    """
+
+    def test_the_casing_gh_actually_returns_is_parsed(self):
+        for state, closed in (("OPEN", False), ("CLOSED", True)):
+            issue = github_issue(state=state)
+            fields = proposal_tracker_read._issue_fields("github", issue)
+            self.assertIsNotNone(fields, "gh state=%r rejected as malformed" % state)
+            self.assertEqual(fields[4], closed, state)
+
+    def test_the_rest_api_casing_still_parses(self):
+        """Both spellings must work: this adapter is the only reader, but a caller may
+        hand it a REST payload, and silently dropping that would be a second gap."""
+        for state, closed in (("open", False), ("closed", True)):
+            fields = proposal_tracker_read._issue_fields("github", github_issue(state=state))
+            self.assertIsNotNone(fields, state)
+            self.assertEqual(fields[4], closed, state)
+
+    def test_an_unknown_state_is_still_a_failure_to_read(self):
+        """Normalising case must not turn into accepting anything: a value this adapter
+        does not understand has to stay unreadable rather than defaulting to open."""
+        for state in ("merged", "", "draft", None, 7):
+            self.assertIsNone(proposal_tracker_read._issue_fields(
+                "github", github_issue(state=state)), repr(state))
+
+    def test_gitlab_casing_is_unchanged(self):
+        self.assertIsNotNone(proposal_tracker_read._issue_fields("gitlab", gitlab_issue(state="opened")))
+        self.assertIsNotNone(proposal_tracker_read._issue_fields("gitlab", gitlab_issue(state="closed")))
+        self.assertIsNone(proposal_tracker_read._issue_fields("gitlab", gitlab_issue(state="OPENED")))
 
 
 def gitlab_issue(iid=9, body=None, labels=None, project_id=17, title="Proposal: gamma",

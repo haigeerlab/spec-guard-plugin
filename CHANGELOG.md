@@ -4,6 +4,16 @@
 
 ### 修复
 
+- **回归：GitHub Proposal tracker 只读整条链路失效。** `proposal_tracker_read` 的 `CLOSED_STATES`
+  用 REST API 的小写 `open`/`closed` 建表，但同文件 `_github_page` 走的是
+  `gh issue list --json state`，它返回 `OPEN`/`CLOSED`。查不到即判 `tracker issue response is
+  malformed`，于是 `proposal-review`、`proposal-promotion-proof`、`proposal-closeout` 在 GitHub 上
+  全部不可用。该表随 `closed` 字段一并引入，所以这是从能用变成不能用。现在 GitHub 的 `state` 在查表前
+  规范化大小写，两种拼写都接受，未知值仍然是「读不到」而不是默认当作 open。GitLab 不动：`glab api`
+  返回 REST 拼写，放宽一个没有实测过的大小写等于猜。
+  单元测试没抓到，是因为夹具里 `state` 写的是小写——一个从未与真实 `gh` 输出核对过的假设。
+  全仓库审计确认只有这一处走 CLI 形状，其余三处读 GitHub `state` 的都走 `gh api`，拼写正确。
+
 - **安全：阶段提示不再把仓库内容原样注入 agent 上下文。** 这段文本每轮注入，此前两处会逐字带出仓库值：
   `.agent/state.json` 的 `activeModule`，以及能力图坏 module id 经 `MapError` 引用的单元格。
   两处都已复现——一个带换行的值能伪造出看起来像系统段落的块。
