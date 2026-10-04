@@ -7,6 +7,7 @@ import pathlib
 import tempfile
 import unittest
 
+import proposal_closeout
 from proposal_closeout import (
     CLOSEABLE_STAGES, PROMOTED_STAGE, build_preview, close_preview, closeout_record,
     closeout_decision, preview_digest,
@@ -765,6 +766,55 @@ class ProofRemainsReadOnlyTests(unittest.TestCase):
         for writing in ("create_comment", "set_closed", "set_stage", "--method",
                         "gh issue", "glab issue", "epiq_issue_"):
             self.assertNotIn(writing, source, writing)
+
+
+class ProbeFailureDiagnosticTests(unittest.TestCase):
+    """A probe that could not read must not be reported as a link that broke.
+
+    `_close_locked` and `build_preview` both collapsed "the snapshot probe failed",
+    "the Proposal is gone" and "the revision moved" into one verdict. The first is a
+    retry; the others are not. Reported as revision-changed, a flaky `git fetch` sends
+    the reader to diff a Proposal document that never changed -- which is what happened
+    on 2026-10-04 against this repository.
+    """
+
+    PREVIEW = {"proposalId": "gamma", "revision": "r" * 64}
+
+    def _publication(self, state, diagnostic=None, revision="r" * 64, marker="<!-- m -->"):
+        proposal = type("P", (), {"revision": revision, "marker": marker})
+        return type("Pub", (), {"state": state, "diagnostic": diagnostic,
+                                "proposal": proposal if state == "published" else None})
+
+    def _close(self, publication):
+        return proposal_closeout._close_locked(
+            self.PREVIEW, ".", None, None, "github", "t", "origin",
+            lambda *a, **k: publication(), None, None)
+
+    def test_a_probe_failure_is_not_reported_as_a_changed_revision(self):
+        out = self._close(self._publication(
+            "unknown", "remote default branch moved or fetch failed"))
+        self.assertNotEqual(out.get("diagnostic"), "proposal-revision-changed", out)
+        self.assertNotEqual(out.get("state"), "preview-stale", out)
+
+    def test_a_probe_failure_keeps_the_reason_it_failed(self):
+        out = self._close(self._publication(
+            "unknown", "remote default branch moved or fetch failed"))
+        self.assertIn("fetch failed", str(out.get("diagnostic")), out)
+
+    def test_a_genuinely_changed_revision_still_says_so(self):
+        out = self._close(self._publication("published", revision="q" * 64))
+        self.assertEqual(out, {"state": "preview-stale",
+                               "diagnostic": "proposal-revision-changed"})
+
+    def test_an_absent_or_invalid_proposal_is_distinguishable(self):
+        for state in ("absent", "invalid"):
+            out = self._close(self._publication(state))
+            self.assertEqual(out.get("state"), "preview-stale", state)
+            self.assertNotEqual(out.get("diagnostic"), "proposal-revision-changed", state)
+
+    def test_a_missing_marker_is_distinguishable(self):
+        out = self._close(self._publication("published", marker=None))
+        self.assertNotEqual(out.get("diagnostic"), "proposal-revision-changed", out)
 
 
 if __name__ == "__main__":

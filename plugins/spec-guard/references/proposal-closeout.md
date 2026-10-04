@@ -106,7 +106,9 @@ Spec、Plan、todo、实现与验收由模块自己的任务清单或普通事�
 | 复核 | 不通过 |
 | --- | --- |
 | 预览 `digest` 重算一致、`record` 末行就是该 marker | `preview-invalid` |
-| Proposal 仍 `published`，revision 未变 | `preview-stale` + `proposal-revision-changed` |
+| Proposal 快照读得到（`published`） | 探测失败：`unknown` + 探测自己的原因；`absent` / `invalid`：`preview-stale` + `proposal-absent` / `proposal-invalid` |
+| Proposal 带 marker | `preview-stale` + `proposal-marker-missing` |
+| revision 未变 | `preview-stale` + `proposal-revision-changed` |
 | `target_facts()` 与预览一致 | `unknown` + `target-changed` |
 | 事项仍是同一条（`issueId`） | `conflict` + `issue-changed` |
 | 正文与标签的 digest 未变 | `conflict` + `issue-content-changed` |
@@ -144,6 +146,7 @@ journal 位于 `~/.local/state/spec-guard/proposal-closeout/`，文件 0600、�
 | `conflict` | marker 多条 / 正文被改 / 绑定目标不同 |
 | `not-eligible` | proof 非 proved、阶段不可关闭、proof 变化 |
 | `preview-stale` / `preview-invalid` | 预览失效 |
+| `unknown` + 探测原因 | 读不到，不是失效：重试；原来这会被误报成 `proposal-revision-changed` |
 | `unknown` | 传输不可用、读回不完整、Epiq runtime 不可用 |
 | `rejected` + `statusCode` | 平台明确 4xx 拒绝（权限不足走这里） |
 | `target-unselected` | 未给出精确目标且无可用项目默认值 |

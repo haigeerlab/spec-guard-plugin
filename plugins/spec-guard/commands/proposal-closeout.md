@@ -78,6 +78,7 @@ open、阶段是否仍可关闭、proof 是否仍 `proved` 且 commit 相同、j
 | `conflict` | marker 多条、正文被改、或绑定目标不同。**需要人来判断**，不要自行选一条 |
 | `not-eligible` | proof 不是 proved、阶段不可关闭、或 proof 已变。照实报告 `diagnostic` |
 | `preview-stale` / `preview-invalid` | 预览失效，重新预览并重新取得授权 |
+| `unknown` + 探测原因 | **读不到，不是失效**：git 探测或 tracker 探测失败，重试即可，不要去改 Proposal |
 | `unknown` | 读写完整性无法证明。**不等于失败，更不等于没写入** —— 先按 marker 对账 |
 | `rejected` + `statusCode` | 平台明确拒绝（403 多半是权限） |
 | `target-unselected` | 补齐 backend 与精确目标，或配好项目默认值 |

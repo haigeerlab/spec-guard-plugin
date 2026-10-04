@@ -4,6 +4,14 @@
 
 ### 修复
 
+- **诊断：把探测失败说成了「Proposal 的 revision 变了」。** `proposal_closeout` 的 `_close_locked`
+  把三件事塌缩成同一个 `preview-stale` + `proposal-revision-changed`：快照探测读不到、Proposal 不在或
+  不合法、revision 真的变了。只有最后一种跟 revision 有关。一次偶发的 `git fetch` 失败因此会让人
+  去 diff 一份从没变过的 Proposal 文档（2026-10-04 实际踩到）。这违反本仓库「探测失败必须降级，
+  不能把环境故障说成链路断裂」的不变量。现在三者各有诊断：探测失败是 `unknown` 并带上探测自己的
+  原因，`absent` / `invalid` 各有其码，`proposal-revision-changed` 只在 revision 真的变了时出现。
+  `build_preview` 原先只回 `{"state": "unknown"}`、把原因整个丢掉，现在同样带上。
+
 - **回归：GitHub Proposal tracker 只读整条链路失效。** `proposal_tracker_read` 的 `CLOSED_STATES`
   用 REST API 的小写 `open`/`closed` 建表，但同文件 `_github_page` 走的是
   `gh issue list --json state`，它返回 `OPEN`/`CLOSED`。查不到即判 `tracker issue response is
