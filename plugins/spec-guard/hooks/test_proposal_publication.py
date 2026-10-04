@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import proposal_publication
 from proposal_contract import compute_revision
 from proposal_publication import as_json, read_published, read_published_pool
 
@@ -183,18 +184,19 @@ Gamma is separate.
         with patch("proposal_publication._run", side_effect=lambda *args, **kwargs: next(replies)):
             result = read_published(self.consumer, "gamma")
         self.assertEqual(result.state, "unknown")
-        self.assertEqual(result.diagnostic, "remote default branch moved or fetch failed")
+        self.assertEqual(result.diagnostic, proposal_publication.TIP_MOVED)
         self.assertIsNone(result.review_commit)
 
     def test_malformed_remote_head_is_unavailable_before_any_snapshot(self):
-        replies = iter((
-            SimpleNamespace(stdout="/tmp/remote\n"),
-            SimpleNamespace(stdout="ref: refs/heads/trunk HEAD\nnot-a-commit HEAD\n"),
-        ))
-        with patch("proposal_publication._run", side_effect=lambda *args, **kwargs: next(replies)):
+        # A head that cannot be read is retried, so the script answers every attempt.
+        replies = iter((SimpleNamespace(stdout="/tmp/remote\n"),) + tuple(
+            SimpleNamespace(stdout="ref: refs/heads/trunk HEAD\nnot-a-commit HEAD\n")
+            for _ in range(proposal_publication.SNAPSHOT_ATTEMPTS)))
+        with patch("proposal_publication._run", side_effect=lambda *args, **kwargs: next(replies)), \
+                patch("proposal_publication.SNAPSHOT_BACKOFF_SECONDS", 0):
             result = read_published(self.consumer, "gamma")
         self.assertEqual(result.state, "unknown")
-        self.assertEqual(result.diagnostic, "remote default branch is unavailable")
+        self.assertEqual(result.diagnostic, proposal_publication.HEAD_UNAVAILABLE)
 
     def test_pool_reads_only_published_remote_proposals_from_one_snapshot(self):
         dirty = self.consumer / "spec/proposals/local-only.md"
@@ -380,6 +382,120 @@ Gamma is separate.
     def _write(self, rel, text):
         (self.seed / rel).write_text(text, encoding="utf-8")
         return rel
+
+
+class SnapshotProbeRetryTests(unittest.TestCase):
+    """A probe that could not read is retried; a tip that moved is never retried.
+
+    One `proposal_closeout close` makes six git network round trips across three
+    independent snapshots. Measured against the real remote on 2026-10-04, a single
+    snapshot succeeded 9 times in 10 while the machine was quiet, and far less often
+    under concurrent git activity -- one issue needed eight `close --confirm` attempts.
+    Every failure was safe, but it made the reader re-run a *write* command to get past
+    a *read* problem.
+
+    Retrying the probe is safe: it only reads the remote into a throwaway temporary
+    repository. Retrying a moved tip would not be safe -- pinning the tip observed
+    before the fetch is the entire guarantee this snapshot provides, so two reads that
+    both succeeded and disagree must stay a failure rather than becoming a fresh
+    snapshot of the newer tip.
+    """
+
+    PROJECT = "/project-need-not-exist"
+    A = "a" * 40
+    B = "b" * 40
+
+    @staticmethod
+    def head(commit, branch="trunk"):
+        return SimpleNamespace(stdout="ref: refs/heads/%s HEAD\n%s HEAD\n" % (branch, commit))
+
+    @staticmethod
+    def tip(commit):
+        return SimpleNamespace(stdout="%s\n" % commit)
+
+    OK = SimpleNamespace(stdout="")
+
+    def runner(self, heads, fetches, tips):
+        """Answer `_run` from one queue per git subcommand; the last reply repeats.
+
+        `None` is a probe that failed. Nothing here reaches a network or a real
+        repository, so `self.seen` counts exactly the probes the code attempted.
+        """
+        queues = {"ls-remote": list(heads), "fetch": list(fetches), "rev-parse": list(tips)}
+        self.seen = dict.fromkeys(queues, 0)
+
+        def run(args, cwd=None):
+            if "get-url" in args:
+                return SimpleNamespace(stdout="/remote.git\n")
+            for key, queue in queues.items():
+                if key in args:
+                    self.seen[key] += 1
+                    return queue.pop(0) if len(queue) > 1 else queue[0]
+            return self.OK  # git init --bare
+        return run
+
+    def snapshot(self, heads, fetches=None, tips=None):
+        """Record the backoff instead of serving it, so these tests stay instant."""
+        self.slept = []
+        with patch("proposal_publication._run",
+                   side_effect=self.runner(heads, fetches or [self.OK],
+                                           tips or [self.tip(self.A)])), \
+                patch("proposal_publication.time.sleep", self.slept.append):
+            with proposal_publication.fixed_snapshot(self.PROJECT, "origin", "sg-test-") as result:
+                return result
+
+    def test_a_failed_fetch_is_retried_and_still_pins_the_observed_tip(self):
+        snapshot = self.snapshot([self.head(self.A)], fetches=[None, self.OK])
+        self.assertIsNone(snapshot.failure)
+        self.assertEqual(snapshot.commit, self.A)
+        self.assertEqual(self.seen["fetch"], 2)
+
+    def test_a_failed_head_probe_is_retried(self):
+        snapshot = self.snapshot([None, None, self.head(self.A)])
+        self.assertIsNone(snapshot.failure)
+        self.assertEqual(snapshot.commit, self.A)
+        self.assertEqual(self.seen["ls-remote"], 3)
+
+    def test_a_failed_rev_parse_is_retried(self):
+        snapshot = self.snapshot([self.head(self.A)], tips=[None, self.tip(self.A)])
+        self.assertIsNone(snapshot.failure)
+        self.assertEqual(snapshot.commit, self.A)
+        self.assertEqual(self.seen["rev-parse"], 2)
+
+    def test_retries_are_bounded_and_name_the_probe_that_failed(self):
+        snapshot = self.snapshot([None])
+        self.assertEqual(snapshot.failure, proposal_publication.HEAD_UNAVAILABLE)
+        self.assertEqual(self.seen["ls-remote"], proposal_publication.SNAPSHOT_ATTEMPTS)
+
+    def test_attempts_are_separated_by_a_short_growing_backoff(self):
+        backoff = proposal_publication.SNAPSHOT_BACKOFF_SECONDS
+        self.assertGreater(backoff, 0)
+        self.snapshot([None])
+        self.assertEqual(self.slept, [backoff * n for n in
+                                      range(1, proposal_publication.SNAPSHOT_ATTEMPTS)])
+
+    def test_a_persistent_fetch_failure_is_not_reported_as_a_moved_tip(self):
+        snapshot = self.snapshot([self.head(self.A)], fetches=[None])
+        self.assertEqual(snapshot.failure, proposal_publication.FETCH_FAILED)
+        self.assertNotEqual(snapshot.failure, proposal_publication.TIP_MOVED)
+        self.assertEqual(self.seen["fetch"], proposal_publication.SNAPSHOT_ATTEMPTS)
+
+    def test_a_moved_tip_fails_at_once_and_is_never_retried(self):
+        snapshot = self.snapshot([self.head(self.A)], tips=[self.tip(self.B)])
+        self.assertEqual(snapshot.failure, proposal_publication.TIP_MOVED)
+        self.assertIsNone(snapshot.repo)
+        self.assertIsNone(snapshot.commit)
+        self.assertEqual(self.seen["fetch"], 1)
+        self.assertEqual(self.slept, [])
+
+    def test_a_tip_that_moves_between_retries_is_never_snapshotted(self):
+        """The retry must not quietly re-observe and snapshot the newer tip."""
+        snapshot = self.snapshot([self.head(self.A), self.head(self.B)],
+                                 fetches=[None, self.OK], tips=[self.tip(self.B)])
+        self.assertEqual(snapshot.failure, proposal_publication.TIP_MOVED)
+        self.assertIsNone(snapshot.repo)
+        self.assertIsNone(snapshot.commit)
+        self.assertEqual(self.seen["ls-remote"], 2)
 
 
 if __name__ == "__main__":

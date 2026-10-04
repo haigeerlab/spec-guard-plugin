@@ -836,13 +836,13 @@ class ProbeFailureDiagnosticTests(unittest.TestCase):
 
     def test_a_probe_failure_is_not_reported_as_a_changed_revision(self):
         out = self._close(self._publication(
-            "unknown", "remote default branch moved or fetch failed"))
+            "unknown", "remote default branch fetch failed"))
         self.assertNotEqual(out.get("diagnostic"), "proposal-revision-changed", out)
         self.assertNotEqual(out.get("state"), "preview-stale", out)
 
     def test_a_probe_failure_keeps_the_reason_it_failed(self):
         out = self._close(self._publication(
-            "unknown", "remote default branch moved or fetch failed"))
+            "unknown", "remote default branch fetch failed"))
         self.assertIn("fetch failed", str(out.get("diagnostic")), out)
 
     def test_a_genuinely_changed_revision_still_says_so(self):

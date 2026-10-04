@@ -4,22 +4,24 @@
 
 ### 修复
 
-- **诊断：把「探测读不到」说成了「这条 Proposal 不能关闭」。** `closeout_decision` 把 proof 的
-  `unknown`（探测读不到）与 `not-promoted` / `stale` / `invalid` / `not-accepted`（读到了，不成立）
-  一起映射到 `not-eligible`。`not-eligible` 读起来是对 Proposal 的判决，于是读者去查一份从没动过的
-  文档，而真正该做的是重试。诊断本该区分两者，但 `prove()` 的四条 `unknown` 路径（快照取不到、
-  `rev-list` 空、读不到第一父提交、publication 非 published）**根本不带诊断**，closeout 于是补成
-  `promotion-not-proved`——state 和 diagnostic 两格都在指责 Proposal，探测失败完全不出现在输出里。
-  2026-10-04 收尾真实事项时踩到：八次 `close --confirm` 里三次报 `not-eligible`，实际原因是偶发的
-  `remote default branch moved or fetch failed`。现在 proof 的 `unknown` 映射到 state `unknown`
-  并透传 proof 自己的诊断（没有时用 `promotion-unknown`），`not-eligible` 只留给读到了而不成立的那几种
-  与 `stage-not-closeable`。这与同一次发布里 `build_preview` / `_close_locked` 对 publication 探测
-  失败的处理同形，也是本仓库「探测失败必须降级」的不变量。
-  **这是契约变更，不只是修 bug**：`unknown` 与 `not-eligible` 都写在
-  `references/proposal-closeout.md` 与命令文档的结果表里，两处都已更新；`closeout_decision` 的签名
-  不变（仍不含 project/root/provider）。写入行为一字未改——两种 state 都什么都不写。
-  正反两向都有测试锁死：探测失败不得报 `not-eligible`，真正不成立的 proof 仍须报。六个变异全红，
-  含「每个非 proved 都变成 unknown」这一过度修正。
+- **可靠性：一次偶发的只读探测失败，要靠重跑写命令才能绕过。** `proposal_publication.fixed_snapshot()`
+  用两次 git 网络往返把远端默认分支 tip 钉住（`ls-remote` 观察 + 临时 bare 仓库 `fetch` 核对），任一次
+  抖动就整体失败，而且全链路没有任何地方重试。一次 `proposal_closeout close` 要跑三段互不相干的快照、
+  共 6 次网络往返；2026-10-04 对真实远端实测：机器空闲时单段成功率 9/10，三段串起来约 0.73；本机有并发
+  git 活动时更差 —— 关掉一条真实事项用了 8 次 `close --confirm`，另两条分别 3 次和 2 次。每次失败都是安全
+  的（什么都没写），但读不到却要人重跑**写**命令，而且每次重跑把 6 次往返全部重做。现在探测失败在
+  `fixed_snapshot` 内部有界重试（3 次，退避 0.2s 递增）：`_head` 读不到、`fetch` 失败、`rev-parse
+  FETCH_HEAD` 失败。**tip 真的动了永不重试** —— 两次都成功的读取一旦不一致（重新观察到不同的 head，
+  或 `FETCH_HEAD` 不是观察时的 tip），立刻失败，绝不把更新的 tip 当成新快照；把这一条弄反会把安全属性
+  变成竞态，所以它在代码里写明并有正反回归钉住。
+
+- **诊断：探测失败与 tip 真的移动共用同一句话。** 上面那两件事原先都报
+  `remote default branch moved or fetch failed`，调用方分不出「重试即可」和「真的有人在推」。现在
+  `remote default branch is unavailable`（`_head` 读不到）、`remote default branch fetch failed`
+  （fetch / rev-parse 读不到，可重试）、`remote default branch moved between observation and fetch`
+  （真的移动，不可重试）各自独立，`read_published` 与 `read_published_pool` 原样透传，
+  `proposal_submit` 直接报给用户。`proposal_promotion_proof` 仍只报 `promotion-unknown`：它的
+  `as_json` 只透传 kebab 码形态的诊断，散文原因在那里会被归一化掉，补码形态诊断超出本次范围。
 
 - **诊断：把探测失败说成了「Proposal 的 revision 变了」。** `proposal_closeout` 的 `_close_locked`
   把三件事塌缩成同一个 `preview-stale` + `proposal-revision-changed`：快照探测读不到、Proposal 不在或

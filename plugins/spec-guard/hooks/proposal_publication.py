@@ -3,7 +3,8 @@ import argparse
 import json
 import subprocess
 import tempfile
-from contextlib import contextmanager
+import time
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 from capability_map import MapError, parse_map
@@ -11,6 +12,14 @@ from proposal_contract import COMMIT, ContractError, PROPOSAL_ID, parse_proposal
 
 
 MAX_POOL_SIZE = 100
+SNAPSHOT_ATTEMPTS = 3
+SNAPSHOT_BACKOFF_SECONDS = 0.2
+# A probe that could not read and a tip that actually moved used to share one string,
+# so no caller could tell a retry from a real moving target.
+HEAD_UNAVAILABLE = "remote default branch is unavailable"
+FETCH_FAILED = "remote default branch fetch failed"
+TIP_MOVED = "remote default branch moved between observation and fetch"
+SNAPSHOT_FAILED = "temporary Git snapshot failed"
 BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
 BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
 _SKIPPED_CODES = {
@@ -106,28 +115,66 @@ def fixed_snapshot(project, remote, prefix):
     Yields a Snapshot whose `failure` names why no snapshot exists, or whose
     repo/branch/commit are pinned to the tip observed before the fetch.  A tip
     that moves between observation and fetch is a failure, never a new snapshot.
+
+    An attempt only reads the remote into a throwaway temporary repository --
+    nothing in the project or on the remote is written -- so a probe that could
+    not read is retried up to SNAPSHOT_ATTEMPTS times: `_head` reading nothing
+    (HEAD_UNAVAILABLE), or the fetch or its `rev-parse` failing (FETCH_FAILED).
+    One closeout chains three of these snapshots, and a single intermittent probe
+    made the reader re-run a write command to get past a read problem.
+
+    A tip that moved is never retried.  Pinning the observed tip is the entire
+    guarantee here, so the moment two reads that both succeeded disagree -- a
+    re-observed head, or a FETCH_HEAD that is not the tip observed before it --
+    this fails with TIP_MOVED instead of snapshotting the newer tip.
     """
     url = _remote(Path(project), remote)
-    observed = _head(url) if url else None
-    if not observed:
-        yield Snapshot("remote default branch is unavailable")
-        return
-    branch, commit = observed
-    with tempfile.TemporaryDirectory(prefix=prefix) as temp:
-        repo = Path(temp) / "snapshot.git"
-        if not _run(["git", "init", "--bare", str(repo)]):
-            yield Snapshot("temporary Git snapshot failed")
-            return
-        # No auto-maintenance: fetch would detach a background `git maintenance`
-        # that can still write into the snapshot while the temp dir is removed.
-        fetched = _run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0",
-                        "-C", str(repo), "fetch", "--no-tags", url,
-                        "refs/heads/%s" % branch])
-        tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
-        if not fetched or not tip or tip.stdout.strip() != commit:
-            yield Snapshot("remote default branch moved or fetch failed")
-            return
-        yield Snapshot(repo=repo, temp=Path(temp), url=url, branch=branch, commit=commit)
+    with ExitStack() as stack:
+        yield _snapshot(stack, url, prefix) if url else Snapshot(HEAD_UNAVAILABLE)
+
+
+def _snapshot(stack, url, prefix):
+    """Observe and fetch the tip, retrying probe failures only (see fixed_snapshot).
+
+    A successful snapshot's temporary directory is handed to `stack` so it outlives
+    this call; a failed attempt's is removed before the next one.
+    """
+    observed = None
+    failure = HEAD_UNAVAILABLE
+    for attempt in range(SNAPSHOT_ATTEMPTS):
+        if attempt:
+            time.sleep(SNAPSHOT_BACKOFF_SECONDS * attempt)
+        fresh = _head(url)
+        if not fresh:
+            failure = HEAD_UNAVAILABLE
+            continue
+        if observed is not None and fresh != observed:
+            # Both reads succeeded and disagree: the tip is moving under the retry.
+            return Snapshot(TIP_MOVED)
+        observed = fresh
+        branch, commit = observed
+        attempt_stack = ExitStack()
+        with attempt_stack:
+            temp = Path(attempt_stack.enter_context(
+                tempfile.TemporaryDirectory(prefix=prefix)))
+            repo = temp / "snapshot.git"
+            if not _run(["git", "init", "--bare", str(repo)]):
+                return Snapshot(SNAPSHOT_FAILED)
+            # No auto-maintenance: fetch would detach a background `git maintenance`
+            # that can still write into the snapshot while the temp dir is removed.
+            fetched = _run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0",
+                            "-C", str(repo), "fetch", "--no-tags", url,
+                            "refs/heads/%s" % branch])
+            tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
+            if not fetched or not tip:
+                failure = FETCH_FAILED
+                continue
+            if tip.stdout.strip() != commit:
+                # Both reads succeeded and disagree: moved, not a probe that failed.
+                return Snapshot(TIP_MOVED)
+            stack.push(attempt_stack.pop_all())
+            return Snapshot(repo=repo, temp=temp, url=url, branch=branch, commit=commit)
+    return Snapshot(failure)
 
 
 def _show(repo, commit, path):
