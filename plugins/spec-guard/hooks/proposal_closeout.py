@@ -134,7 +134,9 @@ def adapter_tracker_reader(adapter):
     def reader(proposal, platform, target):
         try:
             page = adapter.list_issues()
-        except Exception:
+        except Exception as error:
+            if _is_defect(error):
+                raise
             return recover_tracker_issue(proposal, platform, target,
                                          {"complete": False, "issues": []})
         return recover_tracker_issue(proposal, platform, target, page)
@@ -153,6 +155,34 @@ def _rejection(error):
     if isinstance(status, int) and 400 <= status < 500:
         return {"state": "rejected", "statusCode": status}
     return None
+
+
+# Python's own programming-error types.  A defect in this module or in an adapter must
+# not be reported as a fact about the provider, the remote or the journal: `unknown` and
+# `partial` both tell the reader to retry, and a retry cannot fix a typo.  That is the
+# third variant of the class v0.41.0 split apart -- it separated "the probe could not
+# read" from "it read and the fact does not hold", and left "our code is broken" sharing
+# the first bucket.
+#
+# This is a language-level set rather than the adapters' exception types because
+# `_rejection` above is this module's standing rule: it stays transport-free, so it
+# cannot name a transport.  Nothing legitimate is caught by it -- `HostedTicketError` is
+# a `ValueError`, `ProviderRejected` its subclass, and `LocalCloseoutError` a plain
+# `Exception`.  `ValueError` is deliberately absent: the journal already uses it for
+# unreadable JSON, and `_read_journal` catches it on purpose.
+#
+# Re-raising `KeyError` and `TypeError` is safe because the inputs are pinned before any
+# of these paths run: `close_preview` rejects anything `_valid_preview` does not accept,
+# and every key the write path subscripts is in that required set, so a hand-edited
+# preview is still a clean `preview-invalid` rather than a traceback.  Injected reader
+# and prover results are read through `getattr(..., None)` throughout.
+DEFECTS = (AttributeError, TypeError, NameError, KeyError, IndexError,
+           AssertionError, ImportError)
+
+
+def _is_defect(error):
+    """True when the exception says our own code is wrong, not that a read failed."""
+    return isinstance(error, DEFECTS)
 
 
 def _blocked(state, diagnostic=None):
@@ -209,7 +239,9 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
     try:
         facts = adapter.target_facts()
         content = content_digest(backend, adapter.get_issue(tracker.issue_id))
-    except Exception:
+    except Exception as error:
+        if _is_defect(error):
+            raise
         return _blocked("unknown", "target-unreadable")
 
     actions = ["comment"] + (["stage"] if decision.needs_stage_change else []) + ["close"]
@@ -352,6 +384,8 @@ def _close_locked(preview, project, adapter, path, backend, target, remote,
         if adapter.target_facts() != preview["exactTarget"]:
             return _blocked("unknown", "target-changed")
     except Exception as error:
+        if _is_defect(error):
+            raise
         return _rejection(error) or _blocked("unknown", "target-unreadable")
 
     tracker = reader(proposal, backend, target)
@@ -370,6 +404,8 @@ def _close_locked(preview, project, adapter, path, backend, target, remote,
         if content_digest(backend, current) != preview["issueContentDigest"]:
             return _blocked("conflict", "issue-content-changed")
     except Exception as error:
+        if _is_defect(error):
+            raise
         return _rejection(error) or _blocked("unknown", "issue-unreadable")
 
     proof = prover(project, preview["proposalId"], backend, target, remote,
@@ -420,6 +456,8 @@ def _apply(preview, adapter, tracker, decision, path, backend):
         if not wearing:
             adapter.create_comment(issue_id, preview["record"])
     except Exception as error:
+        if _is_defect(error):
+            raise
         refusal = _rejection(error)
         if refusal is not None:
             _clear(path)
@@ -430,6 +468,8 @@ def _apply(preview, adapter, tracker, decision, path, backend):
         if decision.needs_stage_change:
             adapter.set_stage(issue_id, tracker.stage, decision.target_stage)
     except Exception as error:
+        if _is_defect(error):
+            raise
         refusal = _rejection(error)
         if refusal is not None:
             return refusal
@@ -439,11 +479,15 @@ def _apply(preview, adapter, tracker, decision, path, backend):
     try:
         adapter.set_closed(issue_id)
     except Exception as error:
+        if _is_defect(error):
+            raise
         refusal = _rejection(error)
 
     try:
         fields = issue_identity(backend, adapter.get_issue(issue_id))
-    except Exception:
+    except Exception as error:
+        if _is_defect(error):
+            raise
         fields = None
     if fields is None:
         return refusal or _partial(path, record, "close-result-uncertain")
@@ -457,7 +501,9 @@ def _apply(preview, adapter, tracker, decision, path, backend):
         final = adapter.list_comments(issue_id)
         ours = [item for item in final.get("comments", [])
                 if _text(item.get("body")) == _text(preview["record"])]
-    except Exception:
+    except Exception as error:
+        if _is_defect(error):
+            raise
         return _partial(path, record, "record-not-readable")
     if final.get("complete") is not True or len(ours) != 1:
         return _partial(path, record, "record-not-readable")
@@ -562,7 +608,9 @@ def main(argv=None):
         try:
             adapter = build_adapter(backend, container, host=host,
                                     project=Path(args.project))
-        except Exception:
+        except Exception as error:
+            if _is_defect(error):
+                raise
             print(json.dumps({"state": "unknown", "diagnostic": "target-unreadable"},
                              sort_keys=True))
             return 2
@@ -602,7 +650,9 @@ def main(argv=None):
                                 (view.get("exactTarget") or {}).get("target"),
                                 host=(view.get("exactTarget") or {}).get("host"),
                                 project=Path(args.project))
-    except Exception:
+    except Exception as error:
+        if _is_defect(error):
+            raise
         print(json.dumps({"state": "unknown", "diagnostic": "target-unreadable"},
                          sort_keys=True))
         return 2

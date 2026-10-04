@@ -15,7 +15,9 @@ from proposal_closeout import (
 from proposal_contract import Baseline, Change, Proposal
 from proposal_publication import Publication
 from proposal_promotion_proof import Proof
-from hosted_ticket_provider import ProviderRejected
+from unittest.mock import patch
+
+from hosted_ticket_provider import HostedTicketError, ProviderRejected
 from proposal_tracker_read import TrackerRead
 
 ACCEPTED = "proposal-stage:accepted"
@@ -859,6 +861,147 @@ class ProbeFailureDiagnosticTests(unittest.TestCase):
     def test_a_missing_marker_is_distinguishable(self):
         out = self._close(self._publication("published", marker=None))
         self.assertNotEqual(out.get("diagnostic"), "proposal-revision-changed", out)
+
+
+TYPO = "'Adapter' object has no attribute 'typo'"
+
+
+def _nth(adapter, method, nth):
+    """Make `method` raise a programming error on its nth call, succeed before that."""
+    original = getattr(adapter, method)
+    state = {"calls": 0}
+
+    def wrapped(*arguments, **keywords):
+        state["calls"] += 1
+        if state["calls"] == nth:
+            raise AttributeError(TYPO)
+        return original(*arguments, **keywords)
+
+    setattr(adapter, method, wrapped)
+    return adapter
+
+
+def _boom(adapter, method):
+    setattr(adapter, method, lambda *a, **k: (_ for _ in ()).throw(AttributeError(TYPO)))
+    return adapter
+
+
+class DefectTests(unittest.TestCase):
+    """A defect in this module or an adapter must not be reported as uncertainty.
+
+    All eleven handlers here caught bare `Exception`, so an AttributeError from a typo
+    inside an adapter came back as `unknown`/`partial` with a diagnostic naming the
+    provider, the target or the journal. Both states tell the reader to retry, and a
+    retry cannot fix a typo -- this is the same failure class v0.41.0 split into "probe
+    failed" and "the fact does not hold", with "our code is broken" still folded in.
+
+    The narrow set is a language-level one rather than the adapters' exception types
+    because `_rejection` is this module's standing rule: it stays transport-free, so it
+    cannot name a transport. `HostedTicketError` is a `ValueError` and
+    `LocalCloseoutError` a plain `Exception`, so neither is affected.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.journal = pathlib.Path(self.tmp.name) / "journal"
+
+    # ── the read paths ────────────────────────────────────────────────────
+    def test_the_shared_tracker_reader_propagates_a_defect(self):
+        reader = proposal_closeout.adapter_tracker_reader(_boom(WritingAdapter(), "list_issues"))
+        with self.assertRaises(AttributeError):
+            reader(published().proposal, "github", "octo/repo")
+
+    def test_build_preview_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            build_preview(".", PROPOSAL_ID, "github", "octo/repo",
+                          _boom(WritingAdapter(), "target_facts"),
+                          publication_reader=lambda *a, **k: published(),
+                          tracker_reader=lambda *a, **k: tracker_read(),
+                          prover=lambda *a, **k: good_proof())
+
+    def test_rereading_the_target_before_writing_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _boom(target, "target_facts"))
+
+    def test_rereading_the_issue_before_writing_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _boom(target, "get_issue"))
+
+    # ── the write path ────────────────────────────────────────────────────
+    def test_the_comment_step_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _boom(target, "create_comment"))
+
+    def test_the_stage_step_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _boom(target, "set_stage"))
+
+    def test_the_close_step_propagates_a_defect(self):
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _boom(target, "set_closed"))
+
+    def test_the_close_read_back_propagates_a_defect(self):
+        # get_issue runs in build_preview, then in _close_locked, then in the read-back.
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _nth(target, "get_issue", 2))
+
+    def test_the_record_read_back_propagates_a_defect(self):
+        # list_comments runs once before writing and once to read the record back.
+        with self.assertRaises(AttributeError):
+            closing(WritingAdapter(), self.journal,
+                    before_close=lambda target: _nth(target, "list_comments", 2))
+
+    # ── the CLI ───────────────────────────────────────────────────────────
+    def test_the_preview_command_propagates_a_defect_building_the_adapter(self):
+        with patch.object(proposal_closeout, "build_adapter",
+                          side_effect=AttributeError(TYPO)):
+            with self.assertRaises(AttributeError):
+                proposal_closeout.main(["preview", "--proposal-id", PROPOSAL_ID,
+                                        "--backend", "github", "--host", "github.com",
+                                        "--target", "octo/repo", "--output",
+                                        str(pathlib.Path(self.tmp.name) / "p.json")])
+
+    def test_the_close_command_propagates_a_defect_building_the_adapter(self):
+        view = pathlib.Path(self.tmp.name) / "view.json"
+        view.write_text(json.dumps({"state": "preview", "backend": "github",
+                                    "exactTarget": {"host": "github.com",
+                                                    "target": "octo/repo"}}),
+                        encoding="utf-8")
+        with patch.object(proposal_closeout, "build_adapter",
+                          side_effect=AttributeError(TYPO)):
+            with self.assertRaises(AttributeError):
+                proposal_closeout.main(["close", "--preview", str(view), "--confirm"])
+
+    # ── controls: real failures still degrade, they do not raise ──────────
+    # Without these, a change that simply let everything raise would look identical.
+    def test_a_transport_failure_reading_the_target_still_degrades(self):
+        def unreadable(target):
+            target.target_facts = lambda *a, **k: (_ for _ in ()).throw(
+                HostedTicketError("provider-unavailable: request did not complete"))
+        result = closing(WritingAdapter(), self.journal, before_close=unreadable)
+        self.assertEqual(result["state"], "unknown")
+        self.assertEqual(result["diagnostic"], "target-unreadable")
+
+    def test_a_lost_write_response_is_still_partial(self):
+        adapter = WritingAdapter(lose=("close",), fail=("close",))
+        result = closing(adapter, self.journal)
+        self.assertEqual(result["state"], "partial")
+        self.assertEqual(result["diagnostic"], "close-result-uncertain")
+
+    def test_a_definite_rejection_is_still_rejected(self):
+        def refuse(target):
+            target.create_comment = lambda *a, **k: (_ for _ in ()).throw(
+                ProviderRejected(403))
+        result = closing(WritingAdapter(), self.journal, before_close=refuse)
+        self.assertEqual(result["state"], "rejected")
+        self.assertEqual(result["statusCode"], 403)
 
 
 if __name__ == "__main__":
