@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### 变更
+
+- **A10 native 转正改为单 Mac、多版本实机门槛。** 连续两个发布版本均只需在一台本机 Mac 完成收发、空闲唤醒与回退，不再要求第二台 Mac；上游 revision 升级复验、无开放 native P1/P2、Proposal 人工接受及 XATS 默认状态均不变。GitHub-hosted macOS CI 可补充源码兼容性，但不能替代带真实登录态和目标会话的宿主验收。
+
 ### 新增
 
 - **同机 Claude Code／Codex 会话使用统一的双向路由。** 用户按宿主、会话名称和项目描述即可发现并联系目标；Claude 同宿主复用 `ListAgents`／`SendMessage` 和 reply address，Codex 同宿主复用 App task/thread、turn 与 wait/read，跨宿主继续走当前唯一选择的持久 bridge。目录标明 `[Claude Code]`／`[Codex]` 与 `native-visible`／`bridge-joined`；同宿主原生能力不可用时，只有授权有效、bridge ready 且两端唯一加入才显式 fallback，不双写正文。
