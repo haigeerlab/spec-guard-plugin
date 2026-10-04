@@ -7,7 +7,10 @@ no bearing on whether the phase hook speaks.  An unusable document is `invalid`,
 """
 from __future__ import annotations
 
+import argparse
+import difflib
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -144,3 +147,97 @@ def as_json(result: DefaultResult | Resolution) -> dict[str, Any]:
     fields = ("state", "backend", "target", "source", "diagnostic")
     return {name: getattr(result, name) for name in fields
             if getattr(result, name, None) is not None}
+
+
+def render(backend: str, target: dict[str, Any]) -> str:
+    """The canonical on-disk text, so a rewrite with the same values is a no-op diff."""
+    document = {"version": VERSION, "defaultBackend": backend, "defaultTarget": target}
+    return json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+
+
+def _target_from_arguments(args: argparse.Namespace) -> dict[str, Any] | None:
+    if args.backend == "github":
+        return {"host": args.host, "repo": args.repo}
+    if args.backend == "gitlab":
+        project_id = args.project_id
+        if not isinstance(project_id, str) or not project_id.isdigit():
+            return None
+        return {"host": args.host, "projectId": int(project_id)}
+    return {"projectId": args.project_id}
+
+
+def _write_atomic(path: Path, text: str) -> None:
+    try:
+        mode = path.stat().st_mode & 0o777
+    except FileNotFoundError:
+        mode = 0o644
+    temporary = path.with_name(path.name + "." + str(os.getpid()) + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+
+
+def _set(args: argparse.Namespace) -> int:
+    """Preview the document change; only `--confirm` writes, and only this one file."""
+    target = _target_from_arguments(args)
+    target = None if target is None else normalize_target(args.backend, target)
+    if target is None:
+        print("target-invalid: the target does not match the %s shape" % args.backend)
+        return 2
+    path = Path(args.project) / RELATIVE_PATH
+    try:
+        before = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        before = ""
+    except OSError:
+        print("tracker-default-unreadable: the existing document cannot be read")
+        return 2
+    after = render(args.backend, target)
+    diff = "".join(difflib.unified_diff(
+        before.splitlines(keepends=True), after.splitlines(keepends=True),
+        fromfile=str(RELATIVE_PATH) + " (current)",
+        tofile=str(RELATIVE_PATH) + " (proposed)"))
+    print(diff if diff else "no change: the project default already has these values")
+    if not args.confirm:
+        print("\npreview only; nothing was written. Re-run with --confirm to apply.")
+        return 0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_atomic(path, after)
+    print("\nwrote %s" % RELATIVE_PATH)
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Show or set the project default tracker backend. The default only "
+                    "pre-fills a preview; it never authorizes or performs a write.")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    show = commands.add_parser("show", help="read-only")
+    show.add_argument("--project", default=".")
+    show.add_argument("--format", choices=("json", "text"), default="json")
+
+    setter = commands.add_parser("set", help="preview, and with --confirm write")
+    setter.add_argument("--project", default=".")
+    setter.add_argument("--backend", choices=BACKENDS, required=True)
+    setter.add_argument("--host")
+    setter.add_argument("--repo")
+    setter.add_argument("--project-id")
+    setter.add_argument("--confirm", action="store_true")
+
+    args = parser.parse_args()
+    if args.command == "set":
+        return _set(args)
+    result = read_default(Path(args.project))
+    if args.format == "json":
+        print(json.dumps(as_json(result), ensure_ascii=False, sort_keys=True))
+    elif result.state == "configured":
+        print("%s %s" % (result.backend,
+                         json.dumps(result.target, ensure_ascii=False, sort_keys=True)))
+    else:
+        print(result.state)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

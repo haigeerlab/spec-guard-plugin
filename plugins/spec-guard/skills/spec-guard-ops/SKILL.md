@@ -75,6 +75,38 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 
 旧 remote-tracker state 按本地约定报告阶段；phase 不认证、不读取其中的映射，也不选择任务。
 
+## tracker default
+
+项目默认的事项后端与精确目标，存在 `.agent/tracker.json`。读取只读：
+
+```bash
+python3 -B "$ROOT/hooks/tracker_default.py" show --project "$PROJECT" --format json
+```
+
+`configured` 给出 `backend`（`local`／`github`／`gitlab`）与规范化目标；`absent` 表示没有默认值，
+不是错误；`invalid`（诊断 `tracker-default-invalid`）表示文件不可用，**绝不当作 `absent`**，
+照实报告要修哪一项，不要替用户猜一个默认值。
+
+这个默认值**只预填预览**：没有显式后端与目标时用它，预览仍完整显示后端、精确目标与来源
+（`explicit`／`project-default`／`project-default-target`），每次外部写入仍逐次授权。它不改变
+已有事项的绑定（只影响此后新建的事项），不是激活信号，也不决定能力图、Proposal 基线或
+Spec/Plan/todo 等共享事实。换平台要逐条显式交接，不自动迁移。
+
+设置先预览，用户确认后才加 `--confirm`；只写 `.agent/tracker.json` 这一个文件，
+不碰 `.agent/state.json`、`spec/`、`tasks/` 或 Git：
+
+```bash
+python3 -B "$ROOT/hooks/tracker_default.py" set --project "$PROJECT" \
+  --backend github --host github.com --repo owner/name
+python3 -B "$ROOT/hooks/tracker_default.py" set --project "$PROJECT" \
+  --backend gitlab --host gitlab.example.com --project-id 17
+python3 -B "$ROOT/hooks/tracker_default.py" set --project "$PROJECT" \
+  --backend local --project-id 01XXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致。目标形状不合法时退出码 2
+且不写文件。
+
 ## add-module
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并

@@ -1,11 +1,13 @@
 """Project default tracker backend: parsing and resolution. No network, no real project."""
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from tracker_default import as_json, read_default, resolve
+from tracker_default import as_json, read_default, render, resolve
 
 
 GITHUB = {"host": "github.com", "repo": "team/repo"}
@@ -231,6 +233,109 @@ class ResolveTests(unittest.TestCase):
         payload = as_json(resolve(None, None, self.configured))
         self.assertEqual(payload, {"state": "resolved", "backend": "github",
                                    "target": GITHUB, "source": "project-default"})
+
+
+class EntryTests(unittest.TestCase):
+    """Spec T7: `show` is read-only and only `--confirm` writes, and only one file."""
+
+    HOOKS = Path(__file__).resolve().parent
+
+    def run_cli(self, root, *arguments):
+        return subprocess.run(
+            [sys.executable, "-B", "tracker_default.py", *arguments,
+             "--project", str(root)],
+            cwd=str(self.HOOKS), capture_output=True, text=True, timeout=30)
+
+    def state_file(self, root):
+        path = root / ".agent" / "state.json"
+        path.write_text('{"activeModule":"alpha"}\n', encoding="utf-8")
+        return path
+
+    def test_show_reports_the_configured_default_as_json(self):
+        with ProjectDir(document("gitlab", GITLAB)) as root:
+            done = self.run_cli(root, "show")
+            self.assertEqual(done.returncode, 0)
+            self.assertEqual(json.loads(done.stdout),
+                             {"state": "configured", "backend": "gitlab",
+                              "target": GITLAB})
+
+    def test_show_reports_absent_without_failing(self):
+        with ProjectDir() as root:
+            done = self.run_cli(root, "show")
+            self.assertEqual(done.returncode, 0)
+            self.assertEqual(json.loads(done.stdout), {"state": "absent"})
+
+    def test_set_without_confirm_writes_nothing(self):
+        with ProjectDir(document("github", GITHUB)) as root:
+            path = root / ".agent" / "tracker.json"
+            before, stamp = path.read_text(encoding="utf-8"), path.stat().st_mtime_ns
+            done = self.run_cli(root, "set", "--backend", "local",
+                                "--project-id", LOCAL["projectId"])
+            self.assertEqual(done.returncode, 0)
+            self.assertIn("preview only", done.stdout)
+            self.assertEqual(path.read_text(encoding="utf-8"), before)
+            self.assertEqual(path.stat().st_mtime_ns, stamp)
+
+    def test_set_with_confirm_writes_exactly_what_the_preview_showed(self):
+        arguments = ("set", "--backend", "gitlab", "--host", "gitlab.example.com",
+                     "--project-id", "17")
+        with ProjectDir(document("github", GITHUB)) as root:
+            path = root / ".agent" / "tracker.json"
+            preview = self.run_cli(root, *arguments)
+            done = self.run_cli(root, *arguments, "--confirm")
+            self.assertEqual(done.returncode, 0)
+            # The write run prints the same diff as the preview run, so what landed is
+            # what was shown; re-previewing afterwards then reports nothing left to do.
+            self.assertIn(preview.stdout.split("\npreview only")[0], done.stdout)
+            self.assertEqual(path.read_text(encoding="utf-8"), render("gitlab", GITLAB))
+            self.assertIn("no change", self.run_cli(root, *arguments).stdout)
+            self.assertEqual(read_default(root).target, GITLAB)
+
+    def test_set_creates_the_document_when_absent(self):
+        with ProjectDir() as root:
+            done = self.run_cli(root, "set", "--backend", "github",
+                                "--host", "github.com", "--repo", "team/repo", "--confirm")
+            self.assertEqual(done.returncode, 0)
+            self.assertEqual(read_default(root).target, GITHUB)
+            self.assertEqual((root / ".agent" / "tracker.json").stat().st_mode & 0o777,
+                             0o644)
+
+    def test_set_preserves_the_existing_file_mode(self):
+        with ProjectDir(document("github", GITHUB)) as root:
+            path = root / ".agent" / "tracker.json"
+            os.chmod(path, 0o600)
+            self.run_cli(root, "set", "--backend", "github", "--host", "github.com",
+                         "--repo", "team/other", "--confirm")
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_set_rejects_a_wrong_shape_without_writing(self):
+        with ProjectDir() as root:
+            path = root / ".agent" / "tracker.json"
+            for arguments in (("set", "--backend", "github", "--host", "github.com"),
+                              ("set", "--backend", "github", "--host", "github.com",
+                               "--repo", "repo"),
+                              ("set", "--backend", "gitlab", "--host",
+                               "gitlab.example.com", "--project-id", "seventeen"),
+                              ("set", "--backend", "local", "--project-id", "has space")):
+                done = self.run_cli(root, *arguments, "--confirm")
+                self.assertEqual(done.returncode, 2, arguments)
+                self.assertFalse(path.exists(), arguments)
+
+    def test_set_never_touches_the_module_bookmark(self):
+        with ProjectDir(document("github", GITHUB)) as root:
+            state = self.state_file(root)
+            before, stamp = state.read_text(encoding="utf-8"), state.stat().st_mtime_ns
+            self.run_cli(root, "set", "--backend", "local",
+                         "--project-id", LOCAL["projectId"], "--confirm")
+            self.assertEqual(state.read_text(encoding="utf-8"), before)
+            self.assertEqual(state.stat().st_mtime_ns, stamp)
+
+    def test_set_leaves_no_temporary_file_behind(self):
+        with ProjectDir() as root:
+            self.run_cli(root, "set", "--backend", "local",
+                         "--project-id", LOCAL["projectId"], "--confirm")
+            self.assertEqual(sorted(p.name for p in (root / ".agent").iterdir()),
+                             ["tracker.json"])
 
 
 if __name__ == "__main__":
