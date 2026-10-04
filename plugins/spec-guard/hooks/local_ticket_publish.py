@@ -164,7 +164,7 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                 write_entry(path, key, {**entry, "createAttempted": False,
                                         "rejectionStatus": error.status_code})
                 return {"state": "provider-rejected", "diagnostic": str(error)}
-            except Exception:
+            except InventoryError:
                 issues = _items(provider.list_issues(), "issues")
                 if any(_contains_marker(item.get("body"), marker) and
                        not _has_issue_marker(item.get("body"), marker)
@@ -245,7 +245,7 @@ def publish_preview(preview: dict[str, Any], project: Path, runtime_dir: Path,
                     entry["commentAttempts"].remove(event_id)
                     write_entry(path, key, {**entry, "rejectionStatus": error.status_code})
                     return {"state": "provider-rejected", "diagnostic": str(error)}
-                except Exception:
+                except InventoryError:
                     comments = _items(provider.list_comments(remote_id), "comments")
                     if sum(item.get("body") == body for item in comments) != 1:
                         return {"state": "publication-uncertain",

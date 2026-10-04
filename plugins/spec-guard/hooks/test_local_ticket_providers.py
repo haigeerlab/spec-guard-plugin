@@ -54,7 +54,8 @@ class ApiFixture:
             self.issues.append(self.issue(1, body["title"],
                                           body.get("body", body.get("description", ""))))
             if self.lose_issue_after:
-                raise TimeoutError("response lost after issue creation")
+                raise InventoryError(
+                    "provider-unavailable: response lost after issue creation")
             return dict(self.issues[-1])
         parts = endpoint.split("/")
         issue_id = int(parts[-2] if parts[-1] in ("comments", "notes") else parts[-1])
@@ -65,7 +66,8 @@ class ApiFixture:
                     note.update({"system": False, "internal": False})
                 self.comments.setdefault(issue_id, []).append(note)
                 if self.lose_note_after:
-                    raise TimeoutError("response lost after note creation")
+                    raise InventoryError(
+                        "provider-unavailable: response lost after note creation")
                 return note
             return list(self.comments.get(issue_id, []))
         issue = next(item for item in self.issues if self.key(item) == issue_id)

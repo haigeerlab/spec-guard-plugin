@@ -24,6 +24,12 @@ DESTINATION = {"platform": "github", "host": "github.com", "target": "team/repo"
 
 
 class FakeProvider:
+    """Failures use `InventoryError`: `local_ticket_provider.run_json` converts
+    OSError, `subprocess.TimeoutExpired`, non-zero exits and bad JSON into it, so a
+    real provider never raises a bare `TimeoutError`. The fake used to, which meant
+    these tests pinned a shape the transport cannot produce.
+    """
+
     def __init__(self):
         self.issues = []
         self.comments = {}
@@ -46,13 +52,13 @@ class FakeProvider:
         if self.reject_create:
             raise ProviderRejected(422)
         if self.lose_create == "before":
-            raise TimeoutError("response lost before write")
+            raise InventoryError("provider-unavailable: response lost before write")
         issue = {"id": self.next_id, "title": title, "body": body,
                  "closed": False, "url": "https://example.invalid/issues/1"}
         self.next_id += 1
         self.issues.append(issue)
         if self.lose_create == "after":
-            raise TimeoutError("response lost after write")
+            raise InventoryError("provider-unavailable: response lost after write")
         return dict(issue)
 
     def list_comments(self, issue_id):
@@ -62,10 +68,10 @@ class FakeProvider:
         if self.reject_comment:
             raise ProviderRejected(403)
         if self.lose_comment == "before":
-            raise TimeoutError("comment result lost before write")
+            raise InventoryError("provider-unavailable: comment lost before write")
         self.comments.setdefault(issue_id, []).append({"body": body})
         if self.lose_comment == "after":
-            raise TimeoutError("comment result lost after write")
+            raise InventoryError("provider-unavailable: comment lost after write")
 
     def set_closed(self, issue_id, closed):
         next(issue for issue in self.issues if issue["id"] == issue_id)["closed"] = closed
@@ -570,6 +576,57 @@ class HandoffTests(unittest.TestCase):
                 "--legacy-format",
             ]), 0)
         self.assertTrue(create.call_args.kwargs["legacy"])
+
+
+TYPO = "'Provider' object has no attribute 'typo'"
+
+
+class DefectTests(unittest.TestCase):
+    # Borrow the fixture without inheriting the parent's test methods.
+    setUp = HandoffTests.setUp
+    publish = HandoffTests.publish
+
+    """A defect must not be reported as an uncertain publication.
+
+    Both handlers caught bare `Exception`, so an AttributeError from a typo inside an
+    adapter came back as `publication-uncertain` -- which says "the result is in doubt,
+    do not retry automatically" and sends the reader to inspect a remote that is fine.
+
+    The narrow set is this module's own transport error: `run_json` in
+    `local_ticket_provider` already converts OSError, timeouts, non-zero exits and bad
+    JSON into `InventoryError`, and definite rejections into its `ProviderRejected`
+    subclass, so nothing a real provider raises is left uncaught.
+    """
+
+    def test_a_defect_creating_the_issue_propagates(self):
+        self.provider.create_issue = lambda *a, **k: (_ for _ in ()).throw(
+            AttributeError(TYPO))
+        with self.assertRaises(AttributeError):
+            self.publish()
+
+    def test_a_defect_creating_the_comment_propagates(self):
+        original = self.provider.create_comment
+        calls = {"n": 0}
+
+        def wrapped(issue_id, body):
+            calls["n"] += 1
+            raise AttributeError(TYPO)
+
+        self.provider.create_comment = wrapped
+        with self.assertRaises(AttributeError):
+            self.publish()
+        self.assertEqual(calls["n"], 1)
+        del original
+
+    def test_a_transport_failure_creating_the_issue_still_degrades(self):
+        self.provider.create_issue = lambda *a, **k: (_ for _ in ()).throw(
+            InventoryError("provider-unavailable: API request did not complete"))
+        result = self.publish()
+        self.assertEqual(result["state"], "publication-uncertain")
+
+    def test_a_definite_rejection_is_still_reported_as_rejected(self):
+        self.provider.reject_create = True
+        self.assertEqual(self.publish()["state"], "provider-rejected")
 
 
 if __name__ == "__main__":
