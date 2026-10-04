@@ -72,12 +72,12 @@ import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from capability_map import parse_map
-from module_stage import module_state, retired_tracker
+from module_stage import module_state
 root = Path(".")
 parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
 order = list(parsed.order) or [row.module_id for row in parsed.rows]
 ids = [s["id"] for s in (module_state(root, m) for m in order) if s["plan"] and not s["todo"]]
-if ids and not retired_tracker(root):
+if ids:
     listed = ", ".join(ids[:10]) + (" 等 %d 个" % len(ids) if len(ids) > 10 else "")
     print("%d 个模块有 Plan 但没有 todo.md，按已完成计：%s" % (len(ids), listed))
 ' "$HOOKDIR" 2>/dev/null </dev/null)"; then
@@ -89,8 +89,10 @@ if ids and not retired_tracker(root):
   fi
 fi
 
-if [ -f .agent/state.json ]; then
-  warn '检测到历史状态文件；远端 tracker 映射不会被读取或验证'
+# `tracker` 字段已随远端 tracker 模式退役（docs/retirements/state-tracker-field.md），
+# 不再被任何代码读取。只对真正残留该字段的文件提醒，不对插件自己装的 state.json 报警。
+if grep -Eq '"tracker"[[:space:]]*:[[:space:]]*"' .agent/state.json 2>/dev/null; then
+  warn '检测到已退役的 tracker 字段；它不再被读取，可从 .agent/state.json 中删除'
 fi
 
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"

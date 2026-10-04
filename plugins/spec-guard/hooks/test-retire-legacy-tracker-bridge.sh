@@ -134,6 +134,12 @@ allowed_index() {
 
 RETIRED_PATTERN='sync-map|spec-github-bridge|spec-gitlab-bridge|workspace_binding|bind-workspace'
 ISSUE_WRITE_PATTERN='gh issue (create|edit)|glab issue (create|update)'
+# `.agent/state.json` 的 `tracker` 字段随远端 tracker 模式一同退役
+# （docs/retirements/state-tracker-field.md）：没有任何代码再写它、读它，或据它改变判断。
+# 唯一允许的残留是 verify-artifacts 里提醒用户删除它的探测——那条用的是
+# `[[:space:]]` 字面量，不匹配本模式，因此不需要豁免条目。
+# 能力历史快照里的 `"tracker": {...}` 是另一回事（对象值，非字符串值），本模式不会误伤。
+STATE_FIELD_PATTERN='retired_tracker|get\("tracker"\)|"tracker"[[:space:]]*:[[:space:]]*"'
 
 scan_surface() {
   local pattern="$1" label="$2"
@@ -160,6 +166,7 @@ echo ''
 echo '═══ broadened surface scan (all non-test files under plugins/spec-guard) ═══'
 scan_surface "$RETIRED_PATTERN" 'retired identifier'
 scan_surface "$ISSUE_WRITE_PATTERN" 'Issue-writing command'
+scan_surface "$STATE_FIELD_PATTERN" 'retired state.json tracker field'
 
 [ "$FAIL" -eq 0 ] || exit 1
 printf '  ✅ legacy tracker bridge is absent from the distributed surface\n'
