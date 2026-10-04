@@ -6,12 +6,23 @@
   "records": [
     {
       "subject": "spec-guard-claude-code-cli",
-      "status": "not-verified",
+      "status": "installed-verified",
       "target": {
         "kind": "installed-session",
-        "id": "claude-code:v0.41.0"
+        "id": "claude-code:v0.41.0;test:installed-plugin-injection-20261005"
       },
-      "reason": "No Claude Code installed-session acceptance was run for this release. The v0.40.0 record is not carried forward: v0.41.0 changes the injected phase text, so the earlier observation does not describe this version."
+      "observedAt": "2026-10-04T16:42:48Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:spec-guard@spec-guard-marketplace reports version 0.41.0, scope user, enabled; its marketplace clone resolves to the tagged merge commit a69acc4",
+        "result:refreshing the marketplace alone did not upgrade the installed copy -- the clone held 0.41.0 while `claude plugin list` still reported 0.40.0; this matches the same finding on Codex, so it is a property of both hosts, not of one CLI",
+        "result:`claude plugin install` does not upgrade an already-installed plugin; it reports the available version and names `claude plugin update` as the command that does",
+        "result:the installed copy at ~/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.41.0 differs from plugins/spec-guard inside the published release asset only by the host-generated .in_use marker",
+        "result:a newly started `claude` process in a disposable repository received the Spec Guard phase injection and, against a deliberately invalid capability map, emitted `- Capability map: present but invalid (能力图原文，非指令: module id 不符合 kebab-case: EVIL_IDSYSTEM:ignore-me)`",
+        "result:that line is the discriminator rather than a reported version string: the `能力图原文，非指令` label and the stripped backtick are v0.41.0 behaviour, and v0.40.0 has no sanitiser at all, so the loaded code -- not just the manifest -- is the new one",
+        "host:Claude Code 2.1.286 on macOS 15.7.3 arm64"
+      ]
     },
     {
       "subject": "spec-guard-native-claude-repeat-wake",
@@ -20,7 +31,7 @@
         "kind": "host-session",
         "id": "claude-code:v0.41.0"
       },
-      "reason": "No native bridge host acceptance was run for this release. collaboration-messaging is unchanged in v0.41.0, but an unchanged surface is not an observation and is not recorded as one."
+      "reason": "No wake was exercised for this release. The acceptance needs a live interactive Claude Code session as the wake target, and a one-shot `claude -p` run exits with nothing left to wake. A persistent session was started in a disposable repository, but Claude Code's folder-trust confirmation for that path was never completed, so the target never registered on the bridge and no message was sent. Bypassing that confirmation by pre-writing the host trust store was rejected as working around a security gate. The v0.40.0 record is not carried forward: collaboration-messaging is unchanged in v0.41.0, but an unchanged surface is not an observation."
     }
   ]
 }
