@@ -207,7 +207,8 @@ for host in claude codex; do
   grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
   # 交接内容与不派条件：todo 常只有一行，验收标准等在 plan.md 的任务块里；派活本身不省钱。
   # 2026-10-05 tier-guard 对照实验：派活不减少主会话轮次，规格明确的小 task 派出去更贵，所以默认不派。
-  for needle in '默认由主代理自己做' '大量探索或调试' '必要条件'; do
+  # 2026-10-06 ledgerlite 联调：只有「改多个文件、验收明确」的 task 派出去省钱；探索量小的 task 派了主会话轮次不降。
+  for needle in '默认由主代理自己做' '预计要改动 3 个以上文件、验收明确' '必要条件'; do
     grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
   done
   for needle in '完整任务块' 'plan.md' 'Architecture Decisions' '由主代理自己做、不派' '缺验收标准或验证步骤' 'L3' '不比你自己的模型便宜'; do
@@ -225,6 +226,8 @@ done
 grep -F 'Agent 工具' "$TEMPLATES/claude-dispatch-rule.md" >/dev/null || fail "claude 规则段应指明 Agent 工具"
 grep -F 'spawn_agent' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应指明 spawn_agent"
 grep -F '只作建议' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应写明 tier-guard 在 Codex 上只作建议"
+# 2026-10-06 联调：Codex 主代理每 10–40 秒 wait_agent 轮询一次，每次都是一轮主会话，吃掉了子代理的差价。
+grep -F '不要短间隔轮询' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应要求一次长等待、不要短间隔轮询"
 ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
 
 # ── setup-convention --dispatch / --no-dispatch（开关状态存在块里）──
