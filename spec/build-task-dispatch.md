@@ -189,3 +189,19 @@ transcript、tier-guard 日志、git 历史与测试结果，不采信主代理�
 结论：按修订后的五条标准，本轮全部满足。每个场景只有一个样本，不证明以后不会再犯；规则仍只是引导（Assumption 1），
 「提交受阻时先派下一个」若再出现，按用户 2026-10-05 的决定作为已知限制接受，不加 hook。
 
+## 修订：交接内容、不派条件与实验性（2026-10-05，用户决定）
+
+对照 agent-skills 0.6.11 原文（`.claude/commands/build.md`、`skills/planning-and-task-breakdown/SKILL.md`、
+`references/orchestration-patterns.md`；Codex 侧 0.6.12 这三份逐字相同）复核插口位置后：
+
+- **插口位置不变**：`/build` 每个 task 循环的第 2–6 步（加载上下文 → RED → GREEN → 回归 → 构建）。拆任务与计划审批
+  不接子代理（orchestration-patterns 的 Anti-pattern C）；第 6 步的停止条件与 Checkpoint 留在主代理。
+- **交接内容**：原规则只交「task 原文」，而 spec-guard 约定下 todo 常只有一行，验收标准、验证、依赖、涉及文件在
+  plan.md 的任务块里。改为交完整任务块、plan.md 的 Architecture Decisions 与模块 spec 路径。
+- **不派条件**：任务块缺验收标准或验证步骤；属于停止条件（spec 未覆盖的决策、高风险或不可逆）；L3；为子代理选的
+  模型不比主会话便宜。
+- **实验性**：tier-guard 会话以 textkit 验收运行算总账（主会话加全部子代理，按 message.id 去重，父子都是 sonnet）：
+  不派 $0.233，派 $0.50–0.70，贵 2.1–3.0 倍——父子同模型没有差价，主代理仍要读 diff、验收、提交，子代理另付一次
+  上下文启动费。「子代理模型更便宜」只是省钱的必要条件，不是充分条件；可能省钱的主要场景是主会话上下文很大。
+  在对照数据证明省钱之前，`--dispatch` 标为实验性；「上下文多大才派」的阈值由 tier-guard 的对照实验给出后再补。
+

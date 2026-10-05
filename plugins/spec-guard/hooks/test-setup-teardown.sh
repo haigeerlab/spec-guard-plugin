@@ -205,6 +205,11 @@ for host in claude codex; do
   done
   # 2026-10-05 验收：不等上一个 task 提交就派下一个；没装 tier-guard 时档位无统一依据。
   grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
+  # 交接内容与不派条件：todo 常只有一行，验收标准等在 plan.md 的任务块里；派活本身不省钱。
+  for needle in '完整任务块' 'plan.md' 'Architecture Decisions' '由主代理自己做、不派' '缺验收标准或验证步骤' 'L3' '不比你自己的模型便宜'; do
+    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
+  done
+  ! grep -F '写入该 task 原文' "$tpl" >/dev/null || fail "${host} 规则段不应只交 task 原文（todo 常只有一行）"
   # 第二轮复验：提交被拦后主代理仍先派了下一个，事后才停掉。
   grep -F '提交受阻时先解决提交或停下问人，不派下一个' "$tpl" >/dev/null || fail "${host} 规则段应写明提交受阻时不派下一个"
   for needle in 'L1 机械、只读' 'L2 单模块内、验收明确的实现' 'L3 跨模块、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
