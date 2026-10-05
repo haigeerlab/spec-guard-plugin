@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.42.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.42.0;test:marketplace-ref-upgrade-20261005"
+      },
+      "observedAt": "2026-10-05T02:24:01Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.41.0 to v0.42.0",
+        "command:codex plugin marketplace upgrade",
+        "result:`codex plugin list --json` reports spec-guard version 0.42.0, installed and enabled",
+        "result:`marketplace add --ref` is not usable here -- it refuses an existing marketplace name, so the ref line is edited and upgraded instead",
+        "limit:the upgrade command exited non-zero because of an unrelated stale marketplace (`github-integration-session`, whose source repository no longer exists); spec-guard itself upgraded, which is what `plugin list` confirms"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.42.0;test:installed-plugin-smoke-20261005"
+      },
+      "observedAt": "2026-10-05T02:24:01Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "result:--expected-source was taken verbatim from the source.path reported by `codex plugin list --json`, not assumed",
+        "host:codex-cli 0.160.0; the smoke builds and removes its own temporary consumer project"
+      ]
+    }
+  ]
+}
