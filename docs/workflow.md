@@ -31,7 +31,8 @@
 派活 prompt 带一行 tier-guard 档位标记，验收 diff、提交、勾选和问人仍由主代理完成。装了
 [tier-guard](https://github.com/haigeerlab/tier-guard) 时它据此为子代理选模型；没装时标记只是一行注释。
 这条规则只是引导，spec-guard 不检测是否照做。默认关闭；已开启的项目 `--replace` 升级时保持开启，
-关闭用 `--replace --no-dispatch`。
+关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
+也没有程序读取，只作建议。
 
 **怎么看省没省钱。** `/spec-guard:cost-report <模块>`（Codex 里让 `spec-guard-ops` 跑 cost report）离线读取本机的
 Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 token、主会话轮次、派活次数与返工信号；加
