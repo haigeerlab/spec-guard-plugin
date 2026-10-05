@@ -16,7 +16,18 @@
 #   旧版把「约定成立」和「对照组更差」压进同一个退出码，于是对照组一变好它就只能
 #   永远退 2 —— 正是 docs/lenses.md A4 说的「永远在降级的探测器等于坏掉的探测器」。
 #   按 B2，对照组是「不装 / 不用」的基线：它表现得一样好**不是产品缺陷**，
-#   不该让产品判据变红。2026-10-02 与 2026-10-05 两次实测都是两组同样分目录。
+#   不该让产品判据变红。
+#
+# 真实运行记录（非 scaffold，都是真实 claude）：
+#   2026-10-02 旧判据：两组都进模块目录 → 旧判据退 2。
+#   2026-10-05 旧判据复跑（_preflight 三条前提首次全部满足）：同上 → 退 2。
+#   2026-10-05 新判据第一次：有约定组两模块各自隔离；**对照组把 plan+todo 写进共用的
+#     tasks/plan.md** —— README 问题① 的原形，本仓库第一次真的观察到。第二轮没动，
+#     很可能被上游 0.6.8 的止损挡住。
+#   2026-10-05 新判据第二次：有约定组结果逐字相同；对照组这次自己分了模块目录。
+#   → 有约定组两次一致，对照组两次不同。约定给的是**保证**，无约定是碰运气。这是判据
+#     改为证「保证」而不是证「两组路径不同」的实证依据，也是 README 问题① 改成
+#     「共用一份、没有保证」的依据。两个观察，不是定律。
 #
 # 为什么挑 local 模式：
 #   - local 模式没有 skill 兜底，声明块就是全部约定 —— 它不 work 就是真不 work
@@ -111,11 +122,18 @@ def pair(module):
     return ["tasks/%s/%s" % (module, name) for name in ("plan.md", "todo.md")]
 
 
-first = [p for p in pair(m1) if p in before]
+FLAT = ("tasks/plan.md", "tasks/todo.md")
 one = [p for p in pair(m1) if p in now]
 two = [p for p in pair(m2) if p in now]
-flat = [p for p in ("tasks/plan.md", "tasks/todo.md") if p in now]
-changed = [p for p in pair(m1) if p in before and now.get(p) != before[p]]
+flat = [p for p in FLAT if p in now]
+# 第一轮「有没有交付」要问**任意路径**，不能只问模块1 自己的路径：对照组会把
+# 第一轮的 plan+todo 写进共用的 tasks/plan.md，那本身就是发现，不是「没结论」。
+# 2026-10-05 首次真实运行踩到：对照组正是这个形状，却被守卫判成了无结论。
+first = ([p for p in pair(m1) if p in before] or [p for p in FLAT if p in before])
+# 改动也要覆盖共用路径，否则「第二轮把第一轮的计划覆盖掉了」这件事看不见 ——
+# 而那恰恰是 README 问题① 的原形。
+changed = [p for p in list(pair(m1)) + list(FLAT)
+           if p in before and now.get(p) != before[p]]
 added = sorted(set(now) - set(before))
 
 print("  [%s] 第二轮后 tasks/ 下：%s" % (label, " ".join(sorted(now)) or "(空)"))
@@ -126,14 +144,21 @@ print("  [%s] 模块1 %d/2 · 模块2 %d/2 · 根下单例 %d · 模块1 被改�
 if len(first) != 2:
     print("  [%s] ⏭  第一轮没有产出模块1 的 plan+todo（%d/2），隔离无从判断" % (label, len(first)))
     raise SystemExit(2)
+# 共用路径要在「第二轮零产出」之前判：被测性质的第三个分量是「没有产物落在共用的
+# tasks/plan.md」，第一轮落在那里就已经违反它了，与第二轮做了什么无关。
+# 2026-10-05 首次真实运行里对照组正是这个形状 —— 第一轮写共用文件、第二轮没动
+# （很可能被上游 0.6.8 的止损挡住）；按旧顺序它会被报成「无结论」，把唯一有价值的
+# 观察丢掉。
+if flat:
+    print("  [%s] ❌ 产物落在共用的根路径：%s%s"
+          % (label, " ".join(flat),
+             "；且第二轮改动了它" if [p for p in flat if p in changed] else ""))
+    raise SystemExit(1)
 if not added and not changed:
     print("  [%s] ⏭  第二轮既没有新文件也没有改动 —— 模型没推进，这一组没有结论" % label)
     raise SystemExit(2)
-if changed:
+if changed and not [p for p in changed if p in FLAT]:
     print("  [%s] ❌ 第二轮改动了模块1 的产物：%s" % (label, " ".join(changed)))
-    raise SystemExit(1)
-if flat:
-    print("  [%s] ❌ 产物落在共用的根路径：%s" % (label, " ".join(flat)))
     raise SystemExit(1)
 if len(two) != 2:
     print("  [%s] ❌ 模块2 的 plan+todo 不完整（%d/2）；新增的是：%s"
@@ -231,6 +256,23 @@ selftest() {
 
   fake "$D" "tasks/$M1/plan.md" "tasks/$M1/todo.md"
   want 2 "isolated: 第二轮零产出 → 无结论（不是失败）" isolated "$D" "$SNAP" 自检 || F=1
+
+  # 2026-10-05 首次真实运行里对照组的真实形状：第一轮把 plan+todo 写进共用路径。
+  # 这是 README 问题① 的原形，必须报「未能隔离」，不能报「无结论」—— 早先的守卫
+  # 只问模块1 自己的路径有没有交付，于是把这次唯一有价值的观察丢掉了。
+  fake "$SMOKE/flat1" "tasks/plan.md" "tasks/todo.md"
+  snapshot "$SMOKE/flat1" > "$SMOKE/snap-flat"
+  fake "$D" "tasks/plan.md" "tasks/todo.md"
+  want 1 "isolated: 第一轮就落在共用路径 → 未能隔离（不是无结论）" \
+    isolated "$D" "$SMOKE/snap-flat" 自检 || F=1
+
+  # 第二轮覆盖了第一轮的共用计划 —— 碰撞本身，输出要点明「且第二轮改动了它」
+  fake "$D" "tasks/plan.md" "tasks/todo.md"
+  printf 'round2\n' > "$D/tasks/plan.md"
+  want 1 "isolated: 第二轮覆盖了共用计划 → 未能隔离" \
+    isolated "$D" "$SMOKE/snap-flat" 自检 || F=1
+  grep -q "且第二轮改动了它" <<<"$(isolated "$D" "$SMOKE/snap-flat" 自检)" \
+    || { echo "  ❌ 覆盖共用计划时应点明第二轮改动了它"; F=1; }
 
   # 第一轮本身没交付 → 第二轮的隔离是空话，必须判无结论而不是通过
   fake "$SMOKE/empty"
