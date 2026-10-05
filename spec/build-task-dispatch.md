@@ -217,3 +217,36 @@ AGENTS.md；种子为 textkit 的两个 task 加 Checkpoint；提示只有「按
 另见：Codex 默认 workspace-write 沙箱不允许写 `.git`，主代理的 `git add` / `git commit` 都以 `require_escalated`
 申请提权；本机由 guardian 自动审批，普通用户会看到审批提示，性质与 Claude Code 的权限提示相同。
 
+## 修订：交接内容、不派条件与实验性（2026-10-05，用户决定）
+
+对照 agent-skills 0.6.11 原文（`.claude/commands/build.md`、`skills/planning-and-task-breakdown/SKILL.md`、
+`references/orchestration-patterns.md`；Codex 侧 0.6.12 这三份逐字相同）复核插口位置后：
+
+- **插口位置不变**：`/build` 每个 task 循环的第 2–6 步（加载上下文 → RED → GREEN → 回归 → 构建）。拆任务与计划审批
+  不接子代理（orchestration-patterns 的 Anti-pattern C）；第 6 步的停止条件与 Checkpoint 留在主代理。
+- **交接内容**：原规则只交「task 原文」，而 spec-guard 约定下 todo 常只有一行，验收标准、验证、依赖、涉及文件在
+  plan.md 的任务块里。改为交完整任务块、plan.md 的 Architecture Decisions 与模块 spec 路径。
+- **不派条件**：任务块缺验收标准或验证步骤；属于停止条件（spec 未覆盖的决策、高风险或不可逆）；L3；为子代理选的
+  模型不比主会话便宜。
+- **实验性**：tier-guard 会话以 textkit 验收运行算总账（主会话加全部子代理，按 message.id 去重，父子都是 sonnet）：
+  不派 $0.233，派 $0.50–0.70，贵 2.1–3.0 倍——父子同模型没有差价，主代理仍要读 diff、验收、提交，子代理另付一次
+  上下文启动费。「子代理模型更便宜」只是省钱的必要条件，不是充分条件；可能省钱的主要场景是主会话上下文很大。
+  在对照数据证明省钱之前，`--dispatch` 标为实验性；「上下文多大才派」的阈值由 tier-guard 的对照实验给出后再补。
+
+### 再修订：默认不派（2026-10-05，用户决定）
+
+tier-guard 会话的两份对照实验（tier-guard 提交 5282010）：
+
+- `docs/research/2026-10-05-dispatch-cost-experiment.md`：opus 父代理、sonnet 子代理，textkit 两个 task，主会话上下文
+  小（约 2.5 万 token）与大（约 12 万，追加系统提示模拟）各跑 2 次，8 次全部通过。不派 $0.321 / $1.076，派
+  $0.523 / $1.284，分别贵 63% 与 19%。原因：派活没有减少主会话的轮次（两组都是 11–16 条消息），主代理仍要派活、
+  读 diff、跑测试、提交、勾选；子代理每个约 $0.10 全是额外开销。推算一个 task 要让主会话少跑约 4–5 轮（12 万上下文）
+  或约 2 轮（26 万上下文）才能回本——此项为推算，未实测。
+- `docs/research/2026-10-05-codex-l2-luna-experiment.md`：Codex 10 个 L2 任务，luna/high 与 sol/medium 都是 10/10，
+  luna 每任务成本约 1/14；tier-guard 将把 Codex L2 改为 luna/high（0.2.5）。
+
+agent-skills 的 `/plan` 本就要求把 task 拆成规格明确的 S/M，这正是派出去最不划算的一类。据此规则改为：**默认由主代理
+自己做**；只有预计需要大量探索或调试的 task（要先读懂大量现有代码、跨多个文件反复修改）才考虑派；原有不派条件保留，
+并写明只是必要条件。`--dispatch` 继续标为实验性；回本条件由联调中的「大 task」模块实测（模块由 spec-guard 设计），
+实测前不转正。
+
