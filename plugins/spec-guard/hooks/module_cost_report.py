@@ -147,8 +147,8 @@ def _text(content):
 
 
 def _claude_events(path, in_project):
-    """Tool results (for denials and hand-back times) and main-agent file edits; never their content."""
-    results, edits, seen = {}, [], set()
+    """Tool results (for denials and hand-back times), main-agent file edits and user-prompt times; never content."""
+    results, edits, seen, prompts = {}, [], set(), []
     for row in _rows(path):
         if not in_project(row.get("cwd")):
             continue
@@ -156,7 +156,12 @@ def _claude_events(path, in_project):
             ts = parse_iso(row["timestamp"])
         except (KeyError, ValueError, AttributeError):
             continue
-        for block in (row.get("message") or {}).get("content") or []:
+        content = (row.get("message") or {}).get("content")
+        if row.get("type") == "user" and not row.get("isSidechain"):
+            blocks = content if isinstance(content, list) else [{"type": "text"}]
+            if not any(isinstance(b, dict) and b.get("type") == "tool_result" for b in blocks):
+                prompts.append(ts)
+        for block in content if isinstance(content, list) else []:
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "tool_result" and block.get("tool_use_id") not in results:
@@ -166,7 +171,7 @@ def _claude_events(path, in_project):
                 target = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("notebook_path")
                 if isinstance(target, str):
                     edits.append((ts, target))
-    return results, edits
+    return results, edits, sorted(prompts)
 
 
 def encode_project_dir(real_path):
@@ -268,9 +273,9 @@ def read_claude(claude_home, project, skipped=None):
             if link and transcript.is_file():
                 # Linked through toolUseId already; the subagent may run in another worktree, so no cwd filter.
                 subagents[link] = _claude_messages(transcript, lambda _cwd: True, skipped)[0]
-        results, edits = _claude_events(main, in_project)
+        results, edits, prompts = _claude_events(main, in_project)
         sessions.append({"id": "claude:" + main.stem, "messages": messages, "dispatches": calls,
-                         "subagents": subagents, "results": results, "edits": edits})
+                         "subagents": subagents, "results": results, "edits": edits, "prompts": prompts})
     return sessions
 
 
@@ -294,7 +299,7 @@ def _codex_categories(before, after):
 def _codex_thread(path, in_project, skipped=None):
     """One rollout as {"meta", "records": [(ts, model, categories)], "spawns": [(ts, call_id, task_name)]}.
     Cumulative token_count totals become per-snapshot deltas, each tagged with the model in effect."""
-    meta, model, previous, records, spawns, edits = None, "unknown", {}, [], [], []
+    meta, model, previous, records, spawns, edits, prompts = None, "unknown", {}, [], [], [], []
     for row in _rows(path):
         kind, payload = row.get("type"), row.get("payload") or {}
         if kind == "session_meta":
@@ -312,6 +317,8 @@ def _codex_thread(path, in_project, skipped=None):
             continue
         if kind == "turn_context":
             model = payload.get("model") or model
+        elif kind == "response_item" and payload.get("type") == "message" and payload.get("role") == "user":
+            prompts.append(ts)
         elif kind == "event_msg" and payload.get("type") == "token_count":
             total = (payload.get("info") or {}).get("total_token_usage")
             if isinstance(total, dict):
@@ -328,7 +335,8 @@ def _codex_thread(path, in_project, skipped=None):
             is_patch = payload.get("name") == "apply_patch" or (isinstance(body, str) and "tools.apply_patch(" in body)
             if isinstance(body, str) and is_patch:
                 edits.extend((ts, target.strip()) for target in PATCH_FILE.findall(body))
-    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns, "edits": edits}
+    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns, "edits": edits,
+                                      "prompts": prompts}
 
 
 def _is_guardian(meta):
@@ -372,7 +380,7 @@ def read_codex(codex_home, project, skipped=None):
                     for record in other["records"]]
         sessions.append({"id": "codex:" + str(thread_id), "messages": thread["records"],
                          "dispatches": dispatches, "subagents": subagents, "guardian": guardian,
-                         "results": {}, "edits": thread["edits"]})
+                         "results": {}, "edits": thread["edits"], "prompts": thread["prompts"]})
     return sessions
 
 
@@ -436,7 +444,38 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
         task["edits_after_handback"] = len(edited)
         task["coverage"] = "%d/%d" % (task["dispatches"] - task["dispatches_unrecorded"], task["dispatches"])
         tasks.append(task)
-    return {"module": module, "tasks": tasks, "skipped_rows": len(skipped)}
+    return {"module": module, "tasks": tasks, "skipped_rows": len(skipped), "wrap_up": _wrap_up(tasks, sessions)}
+
+
+def _wrap_up(tasks, sessions):
+    """Usage after the module's last tick, up to each contributing session's next user prompt.
+
+    This is the agent's closing reply to the prompt that finished the module; it belongs to no task window,
+    so without it the module total falls short of the run. Sessions that never touched the module add
+    nothing, and work after the next prompt is somebody else's. None while any task is still open."""
+    if not tasks or not all(task["done"] for task in tasks):
+        return None
+    last = max(task["end"] for task in tasks)
+    contributors = {name for task in tasks for name in task["sessions"]}
+    wrap = {"start": last, "main": {}, "guardian": {}, "turns": 0, "sessions": {}}
+    for session in sessions:
+        if session["id"] not in contributors:
+            continue
+        stop = next((ts for ts in session.get("prompts", []) if ts > last), None)
+        inside = lambda ts: last < ts and (stop is None or ts < stop)  # noqa: E731
+        used = 0
+        for ts, model, categories in session["messages"]:
+            if inside(ts):
+                _add(wrap["main"], model, categories)
+                used += _total(categories)
+                wrap["turns"] += _total(categories) > 0
+        for ts, model, categories in session.get("guardian", []):
+            if inside(ts):
+                _add(wrap["guardian"], model, categories)
+                used += _total(categories)
+        if used:
+            wrap["sessions"][session["id"]] = used
+    return wrap
 
 
 def _jsonable(value):
@@ -545,6 +584,19 @@ def render(report, priced):
         lines.append("  %-28s %8d %14s %14s %14s %8d" % ("合计", totals["turns"], _fmt(totals["main"]), _fmt(totals["read"]),
                                                         _fmt(totals["sub"]), totals["disp"]) +
                      ("            %.4f%s" % (totals["money"], " *" if totals["partial"] else "") if priced else ""))
+        wrap = module.get("wrap_up")
+        if wrap is not None:
+            main = _role_total(wrap["main"])
+            row = "  %-28s %8d %14s %14s" % ("模块完成后的收尾", wrap["turns"], _fmt(main), _fmt(_role_total(wrap["main"], "cache_read")))
+            if priced:
+                money = wrap["cost"]["main"]
+                row += "%34s%.4f%s" % ("", money, " *" if wrap["cost"]["unpriced"] else "")
+            lines.append(row)
+            total = "  %-28s %8d %14s" % ("合计（含收尾）", totals["turns"] + wrap["turns"], _fmt(totals["main"] + main))
+            if priced:
+                partial = totals["partial"] or bool(wrap["cost"]["unpriced"])
+                total += "%49s%.4f%s" % ("", totals["money"] + wrap["cost"]["main"], " *" if partial else "")
+            lines.append(total)
         sessions = {}
         for task in module["tasks"]:
             for name, used in task["sessions"].items():
@@ -609,6 +661,8 @@ def main(argv=None):
         if prices is not None:
             for task in entry["tasks"]:
                 task["cost"] = price_task(task, prices)
+            if entry.get("wrap_up") is not None:
+                entry["wrap_up"]["cost"] = price_task(dict(entry["wrap_up"], sub={}), prices)
         report["modules"].append(entry)
     if len(args.modules) > 1:
         report["comparison"] = comparison(report["modules"])
