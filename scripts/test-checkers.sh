@@ -358,6 +358,51 @@ printf '# acceptance\n' > "$TMP/accnosrc/plugins/spec-guard/hooks/test_demo_acce
 want fail "acceptance-wired: 读不到任何运行器或维护者文档 → 不算通过" \
   python3 "$ROOT/scripts/check-acceptance-wired.py" "$TMP/accnosrc"
 
+# ── check-decision-supersession.py ──
+# 2026-10-05：native-only 决策取代了 xats-sunset 与 a10 两份门槛，但两份旧文件的状态行
+# 仍写着「XATS 仍是默认传输」「其余条款继续有效」，也都不指回取代者 —— 搜 XATS 的人第一眼
+# 读到的是一个 v0.40.0 就不成立的现在时事实。最关键的是第三个反例：**指回去了但状态行
+# 没承认**，那正是这次真实缺陷的另一半；只查链接的版本会把它判过。
+mkdec() {  # $1=目录；拼出一对最小决策文件，$2 决定旧文件的状态行怎么写
+  rm -rf "$1"
+  mkdir -p "$1/docs/decisions"
+  printf '# 新决策\n\n状态：已接受。本决策取代\n[`old.md`](old.md)。\n' \
+    > "$1/docs/decisions/new.md"
+  printf '# 旧决策\n\n%s\n' "$2" > "$1/docs/decisions/old.md"
+}
+
+mkdec "$TMP/decgood" '状态：已批准，已被取代。见 [`new.md`](new.md)。本文件保留原方案作为记录。'
+want pass "decision-supersession: 旧决策状态行承认被取代并指回取代者 → 放行" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decgood"
+
+mkdec "$TMP/decnolink" '状态：已批准，已被取代。本文件保留原方案作为记录。'
+want fail "decision-supersession: 旧决策不指回取代者 → 报错" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decnolink"
+
+mkdec "$TMP/decstale" '状态：已批准。尚未触发，仍然生效。另见 [`new.md`](new.md)。'
+want fail "decision-supersession: 指回去了但状态行仍读作生效中 → 报错" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decstale"
+
+mkdec "$TMP/decnostatus" '本文件开头没有那一段，只有 [`new.md`](new.md) 的链接。'
+want fail "decision-supersession: 被取代的决策没有状态行 → 报错" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decnostatus"
+
+rm -rf "$TMP/deconeway"; mkdir -p "$TMP/deconeway/docs/decisions"
+printf '# 新决策\n\n状态：已接受。与旧方案无关。\n' > "$TMP/deconeway/docs/decisions/new.md"
+printf '# 旧决策\n\n状态：已被取代。见 [`new.md`](new.md)。\n' \
+  > "$TMP/deconeway/docs/decisions/old.md"
+want fail "decision-supersession: 取代者不提被取代者 → 报错" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/deconeway"
+
+rm -rf "$TMP/decnone"; mkdir -p "$TMP/decnone/docs/decisions"
+want fail "decision-supersession: 零个决策文件 → 不算通过" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decnone"
+
+rm -rf "$TMP/decquiet"; mkdir -p "$TMP/decquiet/docs/decisions"
+printf '# 决策\n\n状态：已接受。没有任何取代关系。\n' > "$TMP/decquiet/docs/decisions/only.md"
+want fail "decision-supersession: 零条取代声明 → 不算通过（声明丢了，不是没问题）" \
+  python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decquiet"
+
 # ── test-retire-legacy-tracker-bridge.sh（广度扫描，R6）──
 # 扩大后的扫描要能对着一棵干净夹具树全绿，对反例喂 gh issue create 和
 # 残留在 hook 脚本里的 /sync-map 各报一次，而带理由的允许清单不受影响。
