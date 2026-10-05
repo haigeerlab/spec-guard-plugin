@@ -297,6 +297,31 @@ selftest() {
   mv "$WORK/withblk/spec/broken.md" "$WORK/withblk/spec/CAPABILITY-MAP.md"
   check_scaffold >/dev/null 2>&1 && { echo "  ❌ 能力图坏掉时 check_scaffold 必须失败"; F=1; }
 
+  # 鉴权探测的四条路径。未登录那条**只能靠注入**验：要用真 CLI 验它，得先登出使用者的账号。
+  # 不假阻塞是重点 —— 认不出形状时必须放行并声明「跳过不代表通过」，否则 claude 的输出
+  # 一改版，整个评测就被一条探测挡死（本仓库对 check-gh-json-fields 的同一条取舍）。
+  mkdir -p "$SMOKE/bin"
+  printf '#!/bin/sh\nprintf %%s \x27{"loggedIn":false}\x27\n' > "$SMOKE/bin/claude-out"
+  printf '#!/bin/sh\necho "not json at all"\n'                  > "$SMOKE/bin/claude-weird"
+  printf '#!/bin/sh\n'                                          > "$SMOKE/bin/claude-empty"
+  printf '#!/bin/sh\nexit 1\n'                                 > "$SMOKE/bin/claude-fail"
+  printf '#!/bin/sh\nprintf %%s \x27{"loggedIn":true}\x27\n'  > "$SMOKE/bin/claude-in"
+  chmod +x "$SMOKE/bin"/claude-*
+  want 1 "auth: loggedIn=false → 阻断（退 1）" \
+    preflight_cli_can_authenticate "$SMOKE/bin/claude-out" || F=1
+  want 0 "auth: loggedIn=true → 放行" \
+    preflight_cli_can_authenticate "$SMOKE/bin/claude-in" || F=1
+  want 0 "auth: 输出不是 JSON → 放行且不假阻塞" \
+    preflight_cli_can_authenticate "$SMOKE/bin/claude-weird" || F=1
+  want 0 "auth: 输出为空 → 放行且不假阻塞" \
+    preflight_cli_can_authenticate "$SMOKE/bin/claude-empty" || F=1
+  want 0 "auth: 命令本身失败 → 放行且不假阻塞" \
+    preflight_cli_can_authenticate "$SMOKE/bin/claude-fail" || F=1
+  grep -q "跳过不代表通过" <<<"$(preflight_cli_can_authenticate "$SMOKE/bin/claude-weird")" \
+    || { echo "  ❌ 认不出形状时必须声明跳过不代表通过"; F=1; }
+  grep -q "/login" <<<"$(preflight_cli_can_authenticate "$SMOKE/bin/claude-out" 2>&1)" \
+    || { echo "  ❌ 未登录时必须给出 /login 的修法"; F=1; }
+
   # 读不到安装版插件时必须报环境未就绪（退 2），不能当成产品结论
   mkdir -p "$SMOKE/empty-home"
   HOME="$SMOKE/empty-home" /bin/bash "$HERE/module-namespace.sh" >/dev/null 2>&1
@@ -312,6 +337,8 @@ if [ "$MODE" = selftest ]; then
 fi
 
 if [ "$MODE" != scaffold ]; then
+  # 鉴权先查：登不上的话插件版本对不对都不重要，而且这一条不花模型调用。
+  preflight_cli_can_authenticate || exit 2
   preflight_installed_matches_repo "$REPO" || exit 2
 fi
 
