@@ -26,11 +26,13 @@
 
 整个过程中不用自己记进度，每轮对话开头 hook 都会告诉 agent 现在到了哪一步。
 
-**可选：把 task 交给子代理执行。** agent-skills 的 `/build` 默认在主会话里直接实现每个 task。安装约定时加
+**可选（实验性）：把 task 交给子代理执行。** agent-skills 的 `/build` 默认在主会话里直接实现每个 task。安装约定时加
 `--dispatch`，约定块会多一段规则：非 Checkpoint 的 task 交给一个子代理做 RED → GREEN → 回归 → 构建，
 派活 prompt 带一行 tier-guard 档位标记，验收 diff、提交、勾选和问人仍由主代理完成。装了
 [tier-guard](https://github.com/haigeerlab/tier-guard) 时它据此为子代理选模型；没装时标记只是一行注释。
-这条规则只是引导，spec-guard 不检测是否照做。默认关闭；已开启的项目 `--replace` 升级时保持开启，
+任务块不完整、属于停止条件、L3、或为子代理选的模型不比主会话便宜时，主代理自己做。这条规则只是引导，spec-guard
+不检测是否照做。省钱效果尚未证明：对照实验里派活没有减少主会话轮次，比不派贵 19%–63%，因此规则默认由主代理自己做，
+只有预计需要大量探索或调试的 task 才考虑派。默认关闭；已开启的项目 `--replace` 升级时保持开启，
 关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
 也没有程序读取，只作建议。
 
