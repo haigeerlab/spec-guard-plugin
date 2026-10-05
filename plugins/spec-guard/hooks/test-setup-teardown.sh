@@ -206,6 +206,10 @@ for host in claude codex; do
   # 2026-10-05 验收：不等上一个 task 提交就派下一个；没装 tier-guard 时档位无统一依据。
   grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
   # 交接内容与不派条件：todo 常只有一行，验收标准等在 plan.md 的任务块里；派活本身不省钱。
+  # 2026-10-05 tier-guard 对照实验：派活不减少主会话轮次，规格明确的小 task 派出去更贵，所以默认不派。
+  for needle in '默认由主代理自己做' '大量探索或调试' '必要条件'; do
+    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
+  done
   for needle in '完整任务块' 'plan.md' 'Architecture Decisions' '由主代理自己做、不派' '缺验收标准或验证步骤' 'L3' '不比你自己的模型便宜'; do
     grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
   done
