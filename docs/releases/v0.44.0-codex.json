@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.44.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.44.0;test:marketplace-ref-upgrade-20261005c"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.43.0 to v0.44.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0, and `codex plugin list --json` reports spec-guard version 0.44.0, installed and enabled; the installed setup-convention.sh references the dispatch-rule templates"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.44.0;test:installed-plugin-smoke-20261005c"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "result:--expected-source was taken verbatim from the source.path reported by `codex plugin list --json`, not assumed",
+        "host:codex-cli 0.160.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-dispatch-rule",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.44.0;test:installed-dispatch-rule-build-20261005"
+      },
+      "observedAt": "2026-10-05T10:41:17Z",
+      "evidence": [
+        "command:CLAUDE_PROJECT_DIR=<tmp> /bin/bash <installed spec-guard>/hooks/setup-convention.sh local --host=codex --dispatch",
+        "command:codex exec --json '按 AGENTS.md 的约定，实现 tasks/textkit/todo.md 中的全部任务（含 Checkpoint）。计划已获批准，不需要再确认。…' </dev/null",
+        "result:group A (tier-guard enabled) and group B (tier-guard disabled for that run with -c 'plugins.\"tier-guard@tier-guard\".enabled=false') each issued exactly one spawn_agent per non-Checkpoint task (slugify, word_count)",
+        "result:in both groups the main agent committed and ticked Task 1 before spawning Task 2 (A 10:33:02 -> 10:33:24, B 10:38:54 -> 10:39:11, from rollout timestamps and git history); no child ran git commit; three commits each touching only that task's files; 8 tests pass; todo fully ticked",
+        "limit:Codex encrypts the dispatch payload (spawn_agent.message and the child's agent_message carry only encrypted_content), so whether the tier marker line was written into the prompt cannot be verified from host records; accepted by the user as a known limitation, criterion 2 applies to Claude Code only",
+        "limit:the workspace-write sandbox does not allow writing .git, so each git add/commit was requested with require_escalated and approved here by the configured guardian reviewer; an ordinary user sees an approval prompt",
+        "host:codex-cli 0.160.0, features.multi_agent=true, agent-skills 0.6.12, spec-guard 0.44.0, tier-guard 0.2.4"
+      ]
+    }
+  ]
+}

@@ -31,7 +31,8 @@
 派活 prompt 带一行 tier-guard 档位标记，验收 diff、提交、勾选和问人仍由主代理完成。装了
 [tier-guard](https://github.com/haigeerlab/tier-guard) 时它据此为子代理选模型；没装时标记只是一行注释。
 这条规则只是引导，spec-guard 不检测是否照做。默认关闭；已开启的项目 `--replace` 升级时保持开启，
-关闭用 `--replace --no-dispatch`。
+关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
+也没有程序读取，只作建议。
 
 若项目已明确采用可用的 Local 事项账本，并决定实施一个可追踪需求或修复，
 先用 `ticket` 入口查重并取得事项 ID，再开始编码；Spec 和 Plan 可随后细化。
