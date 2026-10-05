@@ -1,5 +1,16 @@
 # Changelog
 
+## [未发布]
+
+### 新增
+
+- **`/spec-guard:cost-report`：只读的模块成本与返工报告。** 离线读取本机 Claude Code transcript 与 Codex rollout，
+  按 `tasks/<模块>/todo.md` 的勾选提交切出 task 时间窗，统计每个 task 的主代理与子代理 token（按模型、按类别）、
+  主会话轮次与缓存读、派活次数与覆盖率、重派、收回、交回后主代理改动的文件数；`--prices` 折算等价金额，缺价标
+  「未定价」；多个模块附「有派活 / 没派活」对照。口径与 tier-guard 一致：Claude 按（文件, message.id）取用量最大的一行，
+  子代理文件整份只计一次；Codex 取累计值之差、非缓存输入 = input − cached、推理含在输出内。宿主没留下记录的派活、
+  被 hook 拦下的调用、通过 shell 的改动都单列说明，不报为 0。Codex 侧由 `spec-guard-ops` 的 cost report 一节调用。
+
 ## [0.44.0] - 2026-10-05
 
 ### 新增
