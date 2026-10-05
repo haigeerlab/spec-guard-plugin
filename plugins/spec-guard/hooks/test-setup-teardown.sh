@@ -203,6 +203,11 @@ for host in claude codex; do
   for needle in 'Checkpoint' 'RED → GREEN' '<!-- tier-guard: tier=' 'failures=N' '不提交' '不勾选' '交回'; do
     grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
   done
+  # 2026-10-05 验收：不等上一个 task 提交就派下一个；没装 tier-guard 时档位无统一依据。
+  grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
+  for needle in 'L1 机械、只读' 'L2 单模块内、验收明确的实现' 'L3 跨模块、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
+    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少档位定义「${needle}」"
+  done
   ok "${host} 规则段：首行标记，覆盖何时派、子代理四步不提交、tier-guard 标记与停止条件交回"
 done
 grep -F 'Agent 工具' "$TEMPLATES/claude-dispatch-rule.md" >/dev/null || fail "claude 规则段应指明 Agent 工具"

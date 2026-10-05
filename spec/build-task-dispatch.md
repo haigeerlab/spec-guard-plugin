@@ -49,7 +49,10 @@ agent-skills 是第三方插件，不能改。本模块在 spec-guard 写入项�
   - 何时派：`/build` 执行 `todo.md` 中非 Checkpoint 的 task；
   - 派给谁、做什么：一个 task 一个子代理，只做 RED → GREEN → 全量回归 → 构建，不提交、不勾选；
   - prompt 必含：task 原文、模块 spec 路径、独占一行的 tier-guard 标记（规则同 Assumption 5）；
-  - 停止条件原样交回；验收 diff、只暂存该 task 的文件、提交、勾选、问人由主代理完成。
+  - 停止条件原样交回；验收 diff、只暂存该 task 的文件、提交、勾选、问人由主代理完成；
+  - 上一个 task 提交、勾选完再派下一个；
+  - 三档的一句话定义（L1 机械、只读；L2 单模块内、验收明确的实现；L3 跨模块、有歧义、高风险或不可逆），
+    有 `tier-routing` 时以它为准——没装 tier-guard 时没有这个 skill，标记取值仍要有统一依据。
 - Codex 段把「Agent 工具」写成 `spawn_agent`，并加一句「tier-guard 在 Codex 上只作建议」。
 - 现有 `claude-block-local.md`、`codex-block-local.md` 不改。
 - 规则段不用 `*-block-*.md` 命名：`test_workflow_checkpoints.py` 要求每份完整约定块模板都带检查点规则，
@@ -124,6 +127,34 @@ docs/workflow.md, CHANGELOG.md                                                  
 - 不带开关的新项目与 `--replace` 升级，约定块与当前版本逐字相同。
 - 开启的项目在升级后仍是开启，只有 `--no-dispatch` 能关。
 - tier-guard 会话用 `--plugin-dir` 指向本模块分支、在开启规则的消费者项目里重跑 textkit 两个 task 的
-  `/build auto`，达到其验收标准：每个非 Checkpoint task 恰一次 Agent 派活；tier-guard 日志每次派活都有记录、
-  `upstream_tier.status = accepted`、`tier_source` 为 `upstream` 或 `floor`；模型与档位对应；每个 task 一次由主代理完成的
-  提交且测试全过；不装 tier-guard 时流程照常走完。该项由对方会话执行并回报，结果记入本 spec。
+  `/build auto`，达到其验收标准：
+  1. 每个非 Checkpoint task 恰一次 Agent 派活；
+  2. tier-guard 日志每次派活都有记录、`upstream_tier.status = accepted`，且请求的模型与标记档位对应
+     （L1→haiku / L2→sonnet / L3→opus），`tier_conflict` 若出现须由 floor 解释（2026-10-05 修订，见下）；
+  3. 实际执行的模型与档位对应；
+  4. 每个 task 一次由主代理完成的提交，且上一个 task 提交后才派下一个，测试全过；
+  5. 不装 tier-guard 时流程照常走完。
+  该项由对方会话执行并回报，结果记入本 spec。
+
+## 验收记录
+
+### 第一轮（2026-10-05，`b200f39`）
+
+tier-guard 会话以 `git archive b200f39 plugins/spec-guard` 只读导出插件，两个相同的 textkit 消费者项目以
+`setup-convention.sh local --dispatch` 安装约定块；`claude -p --setting-sources project,local --model sonnet`，
+A 加载 agent-skills 0.6.11 + 本分支 + tier-guard 0.2.4，B 不装 tier-guard；`/build auto` 后 `approve`。判据取自
+transcript、tier-guard 日志、git 历史与测试结果，不采信主代理自述。以下为对方报告，本会话未亲自读取其日志。
+
+1. 通过：A、B 各 2 次派活（Task 1、Task 2 各一次）。
+2. 按原字面不通过：A 两条记录 `upstream_tier = {status: accepted, tier: L2}`、无 `tier_conflict`、`recommended = sonnet`，
+   但 `tier_source = pin`——主代理同时遵守 tier-routing 显式传了 `model: sonnet`，按 pin > floor > tier 记为 pin。
+   原标准没预见到这一点：guard 模式会拦首次未 pin 的派活，pin 几乎必然发生。用户 2026-10-05 决定按上面的
+   修订标准判定，修订后通过。
+3. 通过：标记 L2、请求 sonnet，`actual_execution = claude-sonnet-5-5`（2/2）。
+4. 通过但有插曲：3 个提交（两个 task + checkpoint），子代理未执行任何 git 命令，8 个测试全过。主代理把「提交
+   Task 1」与「派 Task 2」放在同一轮，提交被测试环境的权限白名单拦下，Task 2 的改动混入工作区后由主代理拆开。
+5. 通过：B 无 tier-guard 日志，流程走完。另见：B 两次标 L1、A 标 L2——没装 tier-guard 就没有 tier-routing，
+   档位无统一依据。
+
+据此修订（用户 2026-10-05 确认）：规则段补「上一个 task 提交、勾选完再派下一个」与三档一句话定义；
+标准第 2 条按上文修订；只复验第 4 条（顺带看 B 的档位是否按定义标注）。

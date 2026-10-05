@@ -7,7 +7,8 @@
 - **可选规则：`/build` 把 task 交给子代理执行（`setup-convention --dispatch`）。** agent-skills 的 `/build`
   在主会话里直接实现每个 task，从不派子代理，所以子代理模型路由（如 tier-guard）在 spec → plan → build
   主干上没有入口。开启后约定块多一段规则：非 Checkpoint 的 task 交给一个子代理做 RED → GREEN → 回归 → 构建，
-  不提交、不勾选；派活 prompt 带独占一行的 tier-guard 档位标记；遇到 `/build` 的停止条件原样交回，由主代理
+  不提交、不勾选，上一个 task 提交、勾选完再派下一个；派活 prompt 带独占一行的 tier-guard 档位标记
+  （规则段内联三档定义，装了 tier-guard 时以 `tier-routing` 为准）；遇到 `/build` 的停止条件原样交回，由主代理
   验收、提交、勾选和问人。**默认关闭**，不带开关时约定块逐字不变；开关状态存在块里，`--replace` 保留已开启
   的状态，关闭须 `--no-dispatch`。Claude 与 Codex 两份规则段，Codex 段写明 tier-guard 在 Codex 上只作建议。
   spec-guard 不检测、不要求安装 tier-guard。
