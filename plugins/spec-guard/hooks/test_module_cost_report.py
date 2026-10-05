@@ -116,5 +116,148 @@ class TaskWindowTests(unittest.TestCase):
         self.assertEqual((task["start"], task["end"]), ("2026-10-05T10:00:00Z", "2026-10-05T10:20:00Z"))
 
 
+def claude_row(kind, ts, cwd, mid=None, model="claude-opus-5-5", usage=None, content=None, sidechain=False, agent=None):
+    row = {"type": kind, "timestamp": ts, "cwd": str(cwd), "isSidechain": sidechain, "sessionId": "s1"}
+    if agent:
+        row["agentId"] = agent
+    message = {"role": kind, "content": content or [{"type": "text", "text": "SECRET-PROMPT-TEXT"}]}
+    if kind == "assistant":
+        message.update({"model": model, "usage": usage or {}})
+        if mid:
+            message["id"] = mid
+    row["message"] = message
+    return row
+
+
+def usage(inp=0, w5=0, w1=0, read=0, out=0):
+    return {"input_tokens": inp, "cache_creation_input_tokens": w5 + w1, "cache_read_input_tokens": read,
+            "output_tokens": out, "cache_creation": {"ephemeral_5m_input_tokens": w5, "ephemeral_1h_input_tokens": w1}}
+
+
+def agent_call(tool_id):
+    return [{"type": "tool_use", "id": tool_id, "name": "Agent", "input": {"prompt": "SECRET-TASK-PROMPT"}}]
+
+
+class ClaudeUsageTests(unittest.TestCase):
+    """Two tasks; Task 1 window 10:00-10:20, Task 2 window 10:20-10:45 (UTC)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.project = base / "my.proj_dir"
+        self.project.mkdir()
+        self.repo = Repo(self.project)
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:00:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:20:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [x] Task 2：b"], "2026-10-05T10:45:00Z")
+        self.home = base / "claude-home"
+        real = os.path.realpath(self.project)
+        self.dir = self.home / "projects" / mcr.encode_project_dir(real)
+        self.dir.mkdir(parents=True)
+        self.real = real
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, name, rows):
+        path = self.dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+        return path
+
+    def report(self):
+        return mcr.build_report(self.project, MODULE, claude_home=self.home, codex_home=None,
+                                now=utc("2026-10-05T12:00:00Z"))
+
+    def test_project_dir_encoding_uses_realpath_and_replaces_dot_and_underscore(self):
+        self.assertTrue(mcr.encode_project_dir(self.real).endswith("-my-proj-dir"))
+        self.assertNotIn(".", mcr.encode_project_dir(self.real))
+        self.assertEqual(mcr.claude_project_dir(self.home, self.project), self.dir)
+
+    def test_message_id_rows_keep_only_the_largest_usage(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", usage=usage(inp=2, w1=100, out=5)),
+            claude_row("assistant", "2026-10-05T10:05:01Z", cwd, "m1", usage=usage(inp=2, w1=100, out=40)),
+            claude_row("assistant", "2026-10-05T10:05:02Z", cwd, "m1", usage=usage(inp=2, w1=100, out=90)),
+            claude_row("assistant", "2026-10-05T10:06:00Z", cwd, None, usage=usage(read=7)),
+            claude_row("assistant", "2026-10-05T10:07:00Z", cwd, None, usage=usage(read=7)),
+        ])
+        task1 = self.report()["tasks"][0]
+        main = task1["main"]["claude-opus-5-5"]
+        self.assertEqual((main["input"], main["cache_write_1h"], main["output"], main["cache_read"]), (2, 100, 90, 14))
+
+    def test_messages_outside_the_window_go_to_their_own_task(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", usage=usage(out=10)),
+            claude_row("assistant", "2026-10-05T10:30:00Z", cwd, "m2", usage=usage(out=20)),
+            claude_row("assistant", "2026-10-05T09:00:00Z", cwd, "m0", usage=usage(out=999)),
+        ])
+        tasks = self.report()["tasks"]
+        self.assertEqual(tasks[0]["main"]["claude-opus-5-5"]["output"], 10)
+        self.assertEqual(tasks[1]["main"]["claude-opus-5-5"]["output"], 20)
+
+    def test_model_switch_mid_session_is_split_per_message(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", model="claude-opus-5", usage=usage(out=1)),
+            claude_row("assistant", "2026-10-05T10:06:00Z", cwd, "m2", model="claude-opus-5-5", usage=usage(out=2)),
+        ])
+        main = self.report()["tasks"][0]["main"]
+        self.assertEqual((main["claude-opus-5"]["output"], main["claude-opus-5-5"]["output"]), (1, 2))
+
+    def test_subagent_file_is_linked_by_tool_use_id_and_counted_once(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("toolu_A")),
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("toolu_A")),
+        ])
+        sub = [claude_row("assistant", "2026-10-05T10:22:00Z", cwd, "x1", model="claude-sonnet-5-5",
+                          usage=usage(w1=60000, out=10), sidechain=True, agent="aa"),
+               claude_row("assistant", "2026-10-05T10:22:01Z", cwd, "x1", model="claude-sonnet-5-5",
+                          usage=usage(w1=60000, out=30), sidechain=True, agent="aa"),
+               # a SendMessage continuation appended to the same file, later
+               claude_row("assistant", "2026-10-05T10:40:00Z", cwd, "x2", model="claude-sonnet-5-5",
+                          usage=usage(read=500, out=5), sidechain=True, agent="aa")]
+        self.write("s1/subagents/agent-aa.jsonl", sub)
+        (self.dir / "s1/subagents/agent-aa.meta.json").write_text(
+            json.dumps({"agentType": "executor", "model": "sonnet", "toolUseId": "toolu_A"}), encoding="utf-8")
+        report = self.report()
+        task2 = report["tasks"][1]
+        self.assertEqual(task2["dispatches"], 1)
+        self.assertEqual(task2["dispatches_unrecorded"], 0)
+        s = task2["sub"]["claude-sonnet-5-5"]
+        self.assertEqual((s["cache_write_1h"], s["output"], s["cache_read"]), (60000, 35, 500))
+        self.assertEqual(report["tasks"][0]["sub"], {})
+
+    def test_dispatch_without_subagent_file_is_unrecorded_not_zero(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("toolu_B")),
+        ])
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["dispatches_unrecorded"]), (1, 1))
+        self.assertEqual(task2["coverage"], "0/1")
+
+    def test_cache_write_split_5m_and_1h(self):
+        cwd = self.real
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", usage=usage(w5=3, w1=4))])
+        main = self.report()["tasks"][0]["main"]["claude-opus-5-5"]
+        self.assertEqual((main["cache_write_5m"], main["cache_write_1h"]), (3, 4))
+
+    def test_rows_from_another_cwd_are_ignored(self):
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", "/somewhere/else", "m1", usage=usage(out=50)),
+        ])
+        self.assertEqual(self.report()["tasks"][0]["main"], {})
+
+    def test_contributing_sessions_are_listed(self):
+        cwd = self.real
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", usage=usage(out=5))])
+        self.write("s2.jsonl", [claude_row("assistant", "2026-10-05T10:06:00Z", cwd, "m9", usage=usage(out=6))])
+        self.assertEqual(sorted(self.report()["tasks"][0]["sessions"]), ["claude:s1", "claude:s2"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
