@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.42.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.42.0;test:installed-plugin-upgrade-20261005"
+      },
+      "observedAt": "2026-10-05T02:24:01Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.41.0 to 0.42.0 for scope user",
+        "result:the installed copy records gitCommitSha 6ebb844222c04abfefb5a9045af37189f1fc5c5a -- the v0.42.0 tag commit -- its manifest reads 0.42.0, and it contains this release's new hooks/defect_guard.py"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.42.0;test:installed-headless-phase-20261005"
+      },
+      "observedAt": "2026-10-05T02:24:01Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '只复述你收到的 spec-guard 当前阶段那一行' --max-turns 2",
+        "result:exit 0 and the first output line was `当前阶段: **BUILDING**`, injected by the installed 0.42.0 copy's UserPromptSubmit hook",
+        "host:a disposable Git project whose CLAUDE.md carries the full convention block copied from the installed copy's templates/claude-block-local.md, with one mapped module, a plan and one unchecked todo item",
+        "host:PATH was restricted so python3 resolved to /usr/bin/python3 3.9.6, the macOS system interpreter"
+      ]
+    }
+  ]
+}

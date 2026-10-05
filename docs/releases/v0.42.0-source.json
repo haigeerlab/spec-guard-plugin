@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.42.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6ebb844222c04abfefb5a9045af37189f1fc5c5a"
+      },
+      "observedAt": "2026-10-05T02:24:01Z",
+      "evidence": [
+        "result:the v0.42.0 annotated tag and origin/main both resolve to merge commit 6ebb844222c04abfefb5a9045af37189f1fc5c5a; pull request #181 merged after `validate (ubuntu-latest)` passed on f0969e0",
+        "command:python3 scripts/check-manifests.py",
+        "command:python3 scripts/check-readme-sync.py",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "host:macOS, system /bin/bash 3.2.57 and /usr/bin/python3 3.9.6; all of the above exited 0"
+      ]
+    }
+  ]
+}

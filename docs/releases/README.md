@@ -16,9 +16,9 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.41.0）：codex-cli 0.160.0，marketplace 重钉到 v0.41.0 后 `codex plugin add` 升级安装副本，临时消费者项目 smoke 退出 0，见 [v0.41.0-codex.json](v0.41.0-codex.json)；v0.40.0 记录：app-managed CLI 0.160.0 使用默认模型的仓库 smoke 退出 0，见 [v0.40.0-codex.json](v0.40.0-codex.json)；PATH 旧版 0.154.0 未用于本结论 | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.42.0）：codex-cli 0.160.0，改 `~/.codex/config.toml` 的 `ref` 行到 v0.42.0 后 `codex plugin marketplace upgrade`，临时消费者项目 smoke 退出 0，见 [v0.42.0-codex.json](v0.42.0-codex.json)；v0.41.0 记录：codex-cli 0.160.0，marketplace 重钉到 v0.41.0 后 `codex plugin add` 升级安装副本，临时消费者项目 smoke 退出 0，见 [v0.41.0-codex.json](v0.41.0-codex.json)；v0.40.0 记录：app-managed CLI 0.160.0 使用默认模型的仓库 smoke 退出 0，见 [v0.40.0-codex.json](v0.40.0-codex.json)；PATH 旧版 0.154.0 未用于本结论 | 显式确认；模块严格串行推进 |
 | Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.40.0）：安装版 native-only 会话完成两轮 Claude→Codex 回传及一次 Codex→Claude→Codex 同线程闭环，见 [v0.40.0-codex.json](v0.40.0-codex.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified`（v0.41.0）：Claude Code 2.1.286 升级到 0.41.0 后，新进程的阶段注入含本版特有的净化行为，见 [v0.41.0-claude.json](v0.41.0-claude.json)；native repeat-wake `host-verified`（v0.41.0）：同一活会话被连续唤醒两次，两个 wake job 均 `read`、`attempts: 1`；`host-verified`（v0.40.0）：同一 Claude 会话被连续两次唤醒，随后完成反向消息的读取、确认和回复，见 [v0.40.0-claude.json](v0.40.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.42.0）：`claude plugin update` 升到 0.42.0（安装副本的 gitCommitSha 即 v0.42.0 的 tag 提交，且含本版新增的 `hooks/defect_guard.py`），headless 运行在系统 python 3.9 下注入 `BUILDING`，见 [v0.42.0-claude.json](v0.42.0-claude.json)；`installed-verified`（v0.41.0）：Claude Code 2.1.286 升级到 0.41.0 后，新进程的阶段注入含本版特有的净化行为，见 [v0.41.0-claude.json](v0.41.0-claude.json)；native repeat-wake `host-verified`（v0.41.0）：同一活会话被连续唤醒两次，两个 wake job 均 `read`、`attempts: 1`；`host-verified`（v0.40.0）：同一 Claude 会话被连续两次唤醒，随后完成反向消息的读取、确认和回复，见 [v0.40.0-claude.json](v0.40.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
 | Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `host-verified`（v0.38.3）：新 Code 模式会话在合成项目收到 UserPromptSubmit 的 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 不因其他宿主而获得写入结论 |
@@ -102,3 +102,14 @@ Proposal 收尾、Proposal 的 Local 后端、项目级默认事项后端 ——
 按本文件的约定，这是**新增**一份未验证记录，不反向改写已有的四份；补记本身不改变任何结论，
 也不把回归或变更日志里的叙述当成宿主验收。改动日志中 2026-10-04 的真实运行是**修复前**代码的
 观察，不作为已发布行为的证据。
+
+v0.42.0 的发布后证据见
+[`v0.42.0-source.json`](v0.42.0-source.json)、
+[`v0.42.0-package.json`](v0.42.0-package.json)、
+[`v0.42.0-claude.json`](v0.42.0-claude.json)、
+[`v0.42.0-codex.json`](v0.42.0-codex.json) 与
+[`v0.42.0-write-paths.json`](v0.42.0-write-paths.json)。本版是 2026-10-05 只读项目审计的交付：
+23 处吞掉型宽捕获按各模块能支持的方式收窄（全仓库 24 → 1），新增共享的 `hooks/defect_guard.py`，
+并带一条行为变更——这些路径里潜藏的代码缺陷现在以 traceback 暴露，不再是柔和的
+`unknown` / `partial` / `publication-uncertain`。那几条写入路径仍没有宿主级写入验收，
+按本文件的约定补记为 `not-verified` 并写明现有覆盖是注入式与假传输，不反向改写 v0.41.0 的同类记录。

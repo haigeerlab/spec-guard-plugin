@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.42.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-ticket-write-paths",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "capabilities": [
+        "hosted-ticket-workflow",
+        "proposal-closeout",
+        "local-ticket-portability",
+        "authorized-session-delegation"
+      ],
+      "reason": "v0.42.0 changes how these write paths report a failure: a defect now raises instead of degrading to `unknown` / `partial` / `publication-uncertain`. No host session exercised a real write on them for this release. What does cover them is 24 defect-propagation tests with 11 paired controls over injected or faked transports, which pin what the adapters send and how they classify an error, not what a real tracker accepts. Recorded as not-verified rather than left absent, the same way v0.41.0-write-paths.json records the gap for the capabilities that release added."
+    }
+  ]
+}
