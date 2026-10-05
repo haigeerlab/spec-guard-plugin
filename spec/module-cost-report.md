@@ -60,8 +60,9 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
   累计值相加。某时间窗的用量是窗内最后一条与窗前最后一条累计值之差；整条子线程取其最后一条。模型在
   `turn_context.payload.model` 与 `effort`。
 - `input_tokens` **已包含**缓存命中（实测 `total_tokens = input_tokens + output_tokens`）：非缓存输入 =
-  `input_tokens − cached_input_tokens`。`reasoning_output_tokens` 是否已含在 `output_tokens` 内未经核实，实现时以
-  大样本核实后再定口径，并在报告中注明。
+  `input_tokens − cached_input_tokens`。`reasoning_output_tokens` **已含在** `output_tokens` 内：2026-10-05 本机
+  1417 份 rollout 的最后累计值全部满足 `total = input + output`，有推理的 1344 份全部满足 `reasoning ≤ output`。
+  计价时推理不另加，只作参考列出。
 - `codex exec --ephemeral` 不写 rollout，这类运行没有用量数据。
 - 派活：主线程 `function_call` 中 `name == "spawn_agent"`，参数明文含 `task_name`、`model`、`reasoning_effort`；
   `message` 是加密的，不读。
@@ -82,8 +83,8 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 - **主代理**：主会话在窗口内的用量。Claude 按 `message.id` 去重后求和；Codex 取累计值之差。
 - **子代理**：窗口内发起的每次派活（Claude：主会话 `Agent` 工具调用，经 `toolUseId` 关联子代理文件；Codex：
   `spawn_agent`，经 thread 关联子 rollout）的全部用量，计到发起它的 task；按模型分列。
-- **类别**：Claude 为输入、缓存写（5m / 1h 分列）、缓存读、输出；Codex 为非缓存输入、缓存读、缓存写、输出（推理
-  输出按核实后的口径列出）。宿主未提供的类别标「未提供」，不推算。
+- **类别**：Claude 为输入、缓存写（5m / 1h 分列）、缓存读、输出；Codex 为非缓存输入、缓存读、缓存写、输出（其中
+  推理输出单列作参考，已含在输出内、不重复计价）。宿主未提供的类别标「未提供」，不推算。
 - **覆盖率**：每个 task 报「有记录的派活 / 全部派活」；无记录的派活不计入平均值。
 - **派活次数**、**重派**（同一 task 派活次数减一）、**收回**（主会话中 Agent 调用的错误结果以 tier-guard 收回原因
   开头，即包含「第二次失败后的收回」）、**子代理交回后主代理改动的文件数**（该 task 最后一次派活结束之后、窗口结束
