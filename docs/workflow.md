@@ -36,6 +36,11 @@
 关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
 也没有程序读取，只作建议。
 
+**怎么看省没省钱。** `/spec-guard:cost-report <模块>`（Codex 里让 `spec-guard-ops` 跑 cost report）离线读取本机的
+Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 token、主会话轮次、派活次数与返工信号；加
+`--prices <价格文件>` 折算成等价金额（订阅账号省的是额度，金额只是统一的尺子）。派活省不省钱主要看它让主会话少跑了
+几轮，报告里的「主会话轮次」就是为此列出的。多个模块一起报告时附「有派活 / 没派活」的对照，只能看趋势。
+
 若项目已明确采用可用的 Local 事项账本，并决定实施一个可追踪需求或修复，
 先用 `ticket` 入口查重并取得事项 ID，再开始编码；Spec 和 Plan 可随后细化。
 探索、讨论与无需追踪的小操作不强制建事项。Local 完成时把代码引用和验证结果

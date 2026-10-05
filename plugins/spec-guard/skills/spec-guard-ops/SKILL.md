@@ -80,6 +80,17 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 不读取其中的 Issue 映射，也不选择任务。那个文件里的 `tracker` 字段已退役，不再被读取，也不再抑制
 任何提醒（`docs/retirements/state-tracker-field.md`）。
 
+## cost report
+
+只读的模块成本与返工报告（Claude 侧为 `/spec-guard:cost-report`）：
+
+```bash
+python3 -B "$ROOT/hooks/module_cost_report.py" --project "$PROJECT" <module-id> [更多模块] [--prices <价格文件>] [--json]
+```
+
+原样转述输出与「无法统计的部分」。退出码 2 是「无法归属」（todo.md 没有提交历史），不是用量为 0；金额只在用户给了
+价格文件时出现，缺价标「未定价」，不替用户补价格；多模块对照只能看趋势，不下因果结论。
+
 ## tracker default
 
 项目默认的事项后端与精确目标，存在 `.agent/tracker.json`。读取只读：
