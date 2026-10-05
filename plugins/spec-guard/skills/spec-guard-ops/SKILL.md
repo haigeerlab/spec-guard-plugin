@@ -38,7 +38,9 @@ PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local --host=codex --dry-run
 ```
 
-已有声明块要升级时追加 `--replace`。遗留 `.agent/state.json` 是历史记录，不得用
+已有声明块要升级时追加 `--replace`。用户要求把 `/build` 的 task 交给子代理执行时加 `--dispatch`
+（默认关闭；开关存在块里，`--replace` 会保留已开启的状态，关闭须 `--no-dispatch`；转述预览中的
+`build-task-dispatch rule:` 行）。Codex 段写明 tier-guard 在 Codex 上只作建议。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
 
 ## teardown
