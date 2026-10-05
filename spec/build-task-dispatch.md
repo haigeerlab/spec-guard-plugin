@@ -64,6 +64,7 @@ agent-skills 是第三方插件，不能改。本模块在 spec-guard 写入项�
   说明开关需配合 `--replace` 生效。
 - 预览（`--dry-run`）在原有行之外多一行，写明规则段状态及来源：
   `build-task-dispatch rule: on (--dispatch)` / `on (kept from existing block)` / `off (--no-dispatch)` / `off`。
+  状态行只在块会被写入（新建或 `--replace`）时出现；块被跳过时不打印，以免让人以为开关已生效。
 - 其他行为（目录、state.json、能力图模板、标记校验、`.disabled` 拒绝）逐字不变。
 - `teardown-convention` 不改：它删除整块，规则段随块一起移除。
 

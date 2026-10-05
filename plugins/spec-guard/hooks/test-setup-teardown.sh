@@ -210,4 +210,89 @@ grep -F 'spawn_agent' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "co
 grep -F '只作建议' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应写明 tier-guard 在 Codex 上只作建议"
 ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
 
+# ── setup-convention --dispatch / --no-dispatch（开关状态存在块里）──
+# $1=文件 $2=BEGIN $3=END：输出两条标记之间的正文（不含标记行）
+block_body() { awk -v b="$2" -v e="$3" '{s=$0; gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)} s==e{inb=0} inb{print} s==b{inb=1}' "$1"; }
+host_run() { run setup-convention.sh local ${HOSTARG:+"$HOSTARG"} "$@"; }
+for host in claude codex; do
+  if [ "$host" = codex ]; then
+    HB='<!-- BEGIN:spec-guard-codex-convention -->'; HE='<!-- END:spec-guard-codex-convention -->'
+    HT=AGENTS.md; HOSTARG=--host=codex
+  else
+    HB="$BEGIN"; HE="$END"; HT=CLAUDE.md; HOSTARG=""
+  fi
+  BASE="$TEMPLATES/${host}-block-local.md"; RULE="$TEMPLATES/${host}-dispatch-rule.md"
+  base_body="$(cat "$BASE")"; on_body="$(cat "$BASE" "$RULE")"
+
+  project "${host}-dispatch-default"
+  host_run
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：默认 setup 的块应与基础模板逐字相同
+$OUT"
+  ok "${host}：默认 setup 不含规则段，块与基础模板逐字相同"
+
+  project "${host}-dispatch-on"
+  host_run --dispatch
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：--dispatch 应在基础模板之后接规则段
+$OUT"
+  ok "${host}：--dispatch 新建块＝基础模板＋规则段"
+
+  host_run --replace
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：开启的块 --replace 后应保持开启
+$OUT"
+  ok "${host}：开启的块 --replace 保持开启"
+
+  before="$(snapshot)"
+  host_run --dispatch --no-dispatch
+  [ "$RC" -eq 2 ] && [ "$(snapshot)" = "$before" ] || fail "${host}：--dispatch 与 --no-dispatch 同时给出应退出 2 且不改文件
+$OUT"
+  ok "${host}：--dispatch 与 --no-dispatch 互斥，退出 2，不改文件"
+
+  before="$(snapshot)"
+  host_run --no-dispatch
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -F -- '--replace' >/dev/null <<<"$OUT" || fail "${host}：已有块且无 --replace 时开关不生效，应提示配合 --replace
+$OUT"
+  ok "${host}：已有块无 --replace 时开关不生效并提示"
+
+  before="$(snapshot)"
+  host_run --replace --dry-run
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -Fx '  • build-task-dispatch rule: on (kept from existing block)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明沿用已有块的开启状态
+$OUT"
+  host_run --replace --no-dispatch --dry-run
+  grep -Fx '  • build-task-dispatch rule: off (--no-dispatch)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明 --no-dispatch
+$OUT"
+  ok "${host}：预览写明规则段状态与来源，且不改文件"
+
+  host_run --replace --no-dispatch
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：--replace --no-dispatch 后块应与基础模板逐字相同
+$OUT"
+  ok "${host}：--replace --no-dispatch 关闭，块回到基础模板"
+
+  host_run --replace --dry-run
+  grep -Fx '  • build-task-dispatch rule: off' >/dev/null <<<"$OUT" || fail "${host}：关闭的块预览应为 off
+$OUT"
+  host_run --replace --dispatch --dry-run
+  grep -Fx '  • build-task-dispatch rule: on (--dispatch)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明 --dispatch
+$OUT"
+  host_run --replace --dispatch
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：关闭的块 --replace --dispatch 应开启
+$OUT"
+  ok "${host}：关闭的块 --replace --dispatch 开启"
+
+  # 正文里提到标记、或标记不在块内，都不算开启。
+  project "${host}-dispatch-prose"
+  host_run
+  python3 - "$P/$HT" "$HE" "$DISPATCH_MARKER" <<'PY'
+import sys
+from pathlib import Path
+p, end, mark = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+t = p.read_text(encoding="utf-8")
+t = t.replace(end, "正文提到 `%s` 不算开启。\n%s" % (mark, end), 1) + "\n%s\n" % mark
+p.write_text(t, encoding="utf-8")
+PY
+  host_run --replace
+  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：块内行中提及或块外的标记不应算开启
+$OUT"
+  ok "${host}：块内正文提及或块外的标记不算开启"
+done
+
 echo "setup/teardown regression passed (${PASS} cases)"
