@@ -398,5 +398,121 @@ class CodexUsageTests(unittest.TestCase):
         self.assertNotIn("ENCRYPTED", json.dumps(mcr._jsonable(self.report()), ensure_ascii=False))
 
 
+def tool_result(ts, cwd, tool_id, text, error=False):
+    row = {"type": "user", "timestamp": ts, "cwd": str(cwd), "isSidechain": False, "sessionId": "s1",
+           "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": tool_id,
+                                                     "is_error": error, "content": text}]}}
+    return row
+
+
+def edit_call(tool_id, name, path):
+    return [{"type": "tool_use", "id": tool_id, "name": name, "input": {"file_path": path, "new_string": "SECRET-CODE"}}]
+
+
+RECLAIM = "PreToolUse:Agent hook error: tier-guard：这是 L2 任务第二次失败后的收回（上游报告连续失败 2 次）。"
+
+
+class ReworkSignalTests(ClaudeUsageTests):
+    """Rework signals on the Claude side; inherits the two-task fixture."""
+
+    def subagent(self, name, tool_id, ts):
+        self.write("s1/subagents/agent-%s.jsonl" % name, [
+            claude_row("assistant", ts, self.real, "sub-" + name, model="claude-sonnet-5-5", usage=usage(out=3),
+                       sidechain=True, agent=name)])
+        (self.dir / ("s1/subagents/agent-%s.meta.json" % name)).write_text(json.dumps({"toolUseId": tool_id}), encoding="utf-8")
+
+    def test_two_dispatches_of_one_task_count_one_redispatch(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("t1")),
+            tool_result("2026-10-05T10:25:00Z", cwd, "t1", "done"),
+            claude_row("assistant", "2026-10-05T10:26:00Z", cwd, "m2", usage=usage(out=1), content=agent_call("t2")),
+            tool_result("2026-10-05T10:30:00Z", cwd, "t2", "done"),
+        ])
+        self.subagent("a1", "t1", "2026-10-05T10:22:00Z")
+        self.subagent("a2", "t2", "2026-10-05T10:27:00Z")
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["redispatches"]), (2, 1))
+
+    def test_reclaimed_call_is_a_reclaim_not_a_dispatch(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("t1")),
+            tool_result("2026-10-05T10:21:01Z", cwd, "t1", RECLAIM, error=True),
+        ])
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["dispatches_unrecorded"], task2["reclaims"]), (0, 0, 1))
+
+    def test_other_hook_denials_are_not_dispatches_either(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("t1")),
+            tool_result("2026-10-05T10:21:01Z", cwd, "t1", "PreToolUse:Agent hook error: tier-guard：本会话第一次未 pin 的派活已被拦下。", error=True),
+        ])
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["reclaims"], task2["coverage"]), (0, 0, "0/0"))
+
+    def test_main_edits_after_handback_count_distinct_files_except_todo(self):
+        cwd = self.real
+        todo = os.path.join(self.real, "tasks", MODULE, "todo.md")
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("t1")),
+            claude_row("assistant", "2026-10-05T10:21:30Z", cwd, "m0", usage=usage(out=1),
+                       content=edit_call("e0", "Edit", os.path.join(self.real, "before.py"))),
+            tool_result("2026-10-05T10:25:00Z", cwd, "t1", "done"),
+            claude_row("assistant", "2026-10-05T10:26:00Z", cwd, "m2", usage=usage(out=1),
+                       content=edit_call("e1", "Edit", os.path.join(self.real, "src.py"))),
+            claude_row("assistant", "2026-10-05T10:27:00Z", cwd, "m3", usage=usage(out=1),
+                       content=edit_call("e2", "Write", os.path.join(self.real, "src.py"))),
+            claude_row("assistant", "2026-10-05T10:28:00Z", cwd, "m4", usage=usage(out=1),
+                       content=edit_call("e3", "MultiEdit", os.path.join(self.real, "test_src.py"))),
+            claude_row("assistant", "2026-10-05T10:29:00Z", cwd, "m5", usage=usage(out=1), content=edit_call("e4", "Edit", todo)),
+        ])
+        self.subagent("a1", "t1", "2026-10-05T10:22:00Z")
+        task2 = self.report()["tasks"][1]
+        self.assertEqual(task2["edits_after_handback"], 2)
+
+    def test_no_dispatch_means_no_edits_after_handback(self):
+        cwd = self.real
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T10:26:00Z", cwd, "m2", usage=usage(out=1),
+                                           content=edit_call("e1", "Edit", os.path.join(self.real, "src.py")))])
+        self.assertEqual(self.report()["tasks"][1]["edits_after_handback"], 0)
+
+    def test_report_never_carries_prompts_or_code(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1), content=agent_call("t1")),
+            tool_result("2026-10-05T10:25:00Z", cwd, "t1", "SECRET-RESULT"),
+            claude_row("assistant", "2026-10-05T10:26:00Z", cwd, "m2", usage=usage(out=1),
+                       content=edit_call("e1", "Edit", os.path.join(self.real, "src.py"))),
+        ])
+        self.subagent("a1", "t1", "2026-10-05T10:22:00Z")
+        dumped = json.dumps(mcr._jsonable(self.report()), ensure_ascii=False)
+        for secret in ("SECRET-PROMPT-TEXT", "SECRET-TASK-PROMPT", "SECRET-RESULT", "SECRET-CODE", "src.py"):
+            self.assertNotIn(secret, dumped)
+
+
+class CodexReworkTests(CodexUsageTests):
+    def test_main_apply_patch_after_child_finishes_counts_files(self):
+        patch = ("*** Begin Patch\n*** Update File: %s/textkit/slug.py\n@@\n-SECRET\n+SECRET\n"
+                 "*** Add File: %s/tests/test_slug.py\n+x\n*** Update File: %s/tasks/demo/todo.md\n*** End Patch") % (
+                     self.real, self.real, self.real)
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_spawn("2026-10-05T10:21:00Z", "word_count", "call_1"),
+            {"timestamp": "2026-10-05T10:30:00Z", "type": "response_item",
+             "payload": {"type": "custom_tool_call", "name": "exec",
+                         "input": "text(await tools.apply_patch(%s));" % json.dumps(patch)}},
+        ])
+        self.rollout("child1", [
+            codex_meta("child1", self.real, "2026-10-05T10:21:01Z", parent="main1", task="word_count"),
+            codex_model("2026-10-05T10:21:01Z", "gpt-6-luna", "high"),
+            codex_tokens("2026-10-05T10:25:00Z", 10, 0, 1),
+        ])
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["edits_after_handback"]), (1, 2))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

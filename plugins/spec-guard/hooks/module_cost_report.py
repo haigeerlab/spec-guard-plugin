@@ -94,6 +94,41 @@ def task_windows(root, module, now=None):
 
 CLAUDE_CATEGORIES = ("input", "cache_write_5m", "cache_write_1h", "cache_write", "cache_read", "output")
 DISPATCH_TOOLS = ("Agent", "Task")
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+HOOK_DENIAL = "hook error"
+RECLAIM_MARK = "第二次失败后的收回"
+PATCH_FILE = re.compile(r"\*\*\* (?:Update|Add|Delete) File: (.+?)(?=\\n|\n|$)")
+
+
+def _text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(_text(item.get("text") if isinstance(item, dict) else item) for item in content)
+    return ""
+
+
+def _claude_events(path, in_project):
+    """Tool results (for denials and hand-back times) and main-agent file edits; never their content."""
+    results, edits, seen = {}, [], set()
+    for row in _rows(path):
+        if not in_project(row.get("cwd")):
+            continue
+        try:
+            ts = parse_iso(row["timestamp"])
+        except (KeyError, ValueError, AttributeError):
+            continue
+        for block in (row.get("message") or {}).get("content") or []:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_result" and block.get("tool_use_id") not in results:
+                results[block.get("tool_use_id")] = (ts, bool(block.get("is_error")), _text(block.get("content")))
+            elif block.get("type") == "tool_use" and block.get("name") in EDIT_TOOLS and block.get("id") not in seen:
+                seen.add(block.get("id"))
+                target = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("notebook_path")
+                if isinstance(target, str):
+                    edits.append((ts, target))
+    return results, edits
 
 
 def encode_project_dir(real_path):
@@ -181,8 +216,9 @@ def read_claude(claude_home, project):
             transcript = meta.with_name(meta.name[:-len(".meta.json")] + ".jsonl")
             if link and transcript.is_file():
                 subagents[link] = _claude_messages(transcript, in_project)[0]
+        results, edits = _claude_events(main, in_project)
         sessions.append({"id": "claude:" + main.stem, "messages": messages, "dispatches": calls,
-                         "subagents": subagents})
+                         "subagents": subagents, "results": results, "edits": edits})
     return sessions
 
 
@@ -206,7 +242,7 @@ def _codex_categories(before, after):
 def _codex_thread(path, in_project):
     """One rollout as {"meta", "records": [(ts, model, categories)], "spawns": [(ts, call_id, task_name)]}.
     Cumulative token_count totals become per-snapshot deltas, each tagged with the model in effect."""
-    meta, model, previous, records, spawns = None, "unknown", {}, [], []
+    meta, model, previous, records, spawns, edits = None, "unknown", {}, [], [], []
     for row in _rows(path):
         kind, payload = row.get("type"), row.get("payload") or {}
         if kind == "session_meta":
@@ -233,7 +269,11 @@ def _codex_thread(path, in_project):
             except (ValueError, AttributeError):
                 task_name = None
             spawns.append((ts, payload.get("call_id"), task_name))
-    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns}
+        elif kind == "response_item" and payload.get("type") in ("custom_tool_call", "function_call"):
+            body = payload.get("input") if payload.get("type") == "custom_tool_call" else payload.get("arguments")
+            if isinstance(body, str) and "apply_patch" in (payload.get("name") or "") + body:
+                edits.extend((ts, target.strip()) for target in PATCH_FILE.findall(body))
+    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns, "edits": edits}
 
 
 def _is_guardian(meta):
@@ -279,7 +319,8 @@ def read_codex(codex_home, project):
                     and thread_id in (other["meta"].get("parent_thread_id"), other["meta"].get("session_id"))
                     for record in other["records"]]
         sessions.append({"id": "codex:" + str(thread_id), "messages": thread["records"],
-                         "dispatches": dispatches, "subagents": subagents, "guardian": guardian})
+                         "dispatches": dispatches, "subagents": subagents, "guardian": guardian,
+                         "results": {}, "edits": thread["edits"]})
     return sessions
 
 
@@ -297,7 +338,9 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
     for window in windows["tasks"]:
         start, end = window["start"], window["end"]
         inside = lambda ts: start < ts <= end  # noqa: E731
-        task = dict(window, main={}, sub={}, guardian={}, dispatches=0, dispatches_unrecorded=0, sessions={})
+        task = dict(window, main={}, sub={}, guardian={}, dispatches=0, dispatches_unrecorded=0, reclaims=0,
+                    sessions={})
+        handbacks, edited = [], set()
         for session in sessions:
             used = 0
             for ts, model, categories in session["messages"]:
@@ -307,8 +350,16 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
             for ts, tool_id in session["dispatches"]:
                 if not inside(ts):
                     continue
+                result = session.get("results", {}).get(tool_id)
+                if result and result[1] and HOOK_DENIAL in result[2]:
+                    # Denied before the subagent existed: not a dispatch; a reclaim if tier-guard said so.
+                    task["reclaims"] += RECLAIM_MARK in result[2]
+                    continue
                 task["dispatches"] += 1
                 records = session["subagents"].get(tool_id)
+                handback = result[0] if result else (records[-1][0] if records else None)
+                if handback is not None:
+                    handbacks.append(handback)
                 if records is None:
                     task["dispatches_unrecorded"] += 1
                     continue
@@ -321,6 +372,14 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
                     used += _total(categories)
             if used:
                 task["sessions"][session["id"]] = used
+        if handbacks:
+            last = max(handbacks)
+            todo = os.path.join("tasks", module, "todo.md")
+            for session in sessions:
+                edited.update(target for ts, target in session.get("edits", [])
+                              if last < ts <= end and not target.replace("\\", "/").endswith(todo))
+        task["redispatches"] = max(task["dispatches"] - 1, 0)
+        task["edits_after_handback"] = len(edited)
         task["coverage"] = "%d/%d" % (task["dispatches"] - task["dispatches_unrecorded"], task["dispatches"])
         tasks.append(task)
     return {"module": module, "tasks": tasks}
