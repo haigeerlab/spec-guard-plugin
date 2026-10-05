@@ -4,6 +4,8 @@
 > （见 [`docs/decisions/2026-09-28-single-capability-map.md`](../../docs/decisions/2026-09-28-single-capability-map.md) 的「本次改动」第一条）。登记时模块已交付，因此没有
 > `tasks/<module-id>/todo.md`；`plan-without-todo` 判据据此按已完成计，这不是漏建。
 
+<!-- spec-guard: no-todo -->
+
 Spec: `spec/proposal-promotion-proof.md`
 
 ## Architecture decisions

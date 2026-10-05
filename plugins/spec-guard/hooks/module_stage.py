@@ -19,11 +19,13 @@ from capability_map import MODULE_ID, MapError, parse_map
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
+NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
 
 
 def module_state(root: Path, module_id: str) -> dict:
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
-    has_plan = (root / "tasks" / module_id / "plan.md").is_file()
+    plan = root / "tasks" / module_id / "plan.md"
+    has_plan = plan.is_file()
     todo = root / "tasks" / module_id / "todo.md"
     text = todo.read_text(encoding="utf-8") if todo.is_file() else ""
     open_items = len(UNCHECKED.findall(text))
@@ -37,7 +39,14 @@ def module_state(root: Path, module_id: str) -> dict:
     else:
         stage = "DONE"
     return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
-            "half": half, "todo": todo.is_file()}
+            "half": half, "todo": todo.is_file(),
+            "no_todo_declared": has_plan and not todo.is_file() and any(
+                line.strip() == NO_TODO_MARKER for line in plan.read_text(encoding="utf-8").splitlines())}
+
+
+def plan_without_todo(state: dict) -> bool:
+    """A plan with no todo.md that the plan does not declare intentional; still counted as done."""
+    return state["plan"] and not state["todo"] and not state["no_todo_declared"]
 
 
 FRAGMENT_LIMIT = 200
@@ -198,14 +207,14 @@ def describe(root: Path) -> str:
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
     no_todo_note = ""
-    if active_state and active_state["stage"] == "DONE" and not active_state["todo"]:
+    if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
                         "add the todo if work remains." % (active, active))
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
         sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
     if stage == "DONE":
-        missing_todo = sum(s["plan"] and not s["todo"] for s in states)
+        missing_todo = sum(plan_without_todo(s) for s in states)
         if missing_todo:
             counts += ("\n- Plan without todo: %d module(s) counted as done; "
                        "run /spec-guard:verify-artifacts to review." % missing_todo)

@@ -271,6 +271,17 @@ injects "退役 tracker gitlab 不再抑制缺 todo 提醒" "$notodo" "$NOTODO_N
 printf '{"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 injects "当前格式的 state.json 同样给缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
 
+# plan.md 里独占一行的 no-todo 声明：模块仍按已完成计，但不再提醒、不再计数。
+printf '%s\n' '# Plan' '> 登记说明：已交付。' '  <!-- spec-guard: no-todo -->  ' > "$notodo/tasks/alpha/plan.md"
+injects "带 no-todo 声明的模块仍按已完成计" "$notodo" "当前阶段: **DONE**"
+lacks "带 no-todo 声明的 activeModule 无缺 todo 提醒" "$notodo" "has a plan but no"
+lacks "带 no-todo 声明的模块不计入缺 todo 数量" "$notodo" "Plan without todo"
+printf '%s\n' '# Plan' '> 登记说明：已交付，所以没有 todo.md。' > "$notodo/tasks/alpha/plan.md"
+injects "自由文本的登记说明不算声明" "$notodo" "$NOTODO_NOTE"
+printf '%s\n' '# Plan' 'x <!-- spec-guard: no-todo -->' > "$notodo/tasks/alpha/plan.md"
+injects "同一行有别的文字时不算声明" "$notodo" "Plan without todo: 1 module(s) counted as done"
+printf '# Plan\n' > "$notodo/tasks/alpha/plan.md"
+
 # 注入点 2：能力图里的坏 module id 会被 MapError 原样带进注入文本。原文要留（否则用户
 # 不知道哪一行坏了），但不能让它伪造出代码块或段落。
 badmap="$WORK/bad-map"
