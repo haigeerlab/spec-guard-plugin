@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.44.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.44.0;test:installed-plugin-upgrade-20261005c"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.43.0 to 0.44.0 for scope user",
+        "result:the installed copy records gitCommitSha 3992da3acb86ba9da2221b9d3b746c42c8b75cfa -- the v0.44.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.44.0;test:installed-dispatch-rule-headless-20261005"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:CLAUDE_PROJECT_DIR=<tmp> /bin/bash ~/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.44.0/hooks/setup-convention.sh local --dispatch",
+        "result:the installed copy wrote the convention block with exactly one `<!-- spec-guard: build-task-dispatch -->` marker line and the rule segment after the base template",
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '逐字回答两项……当前阶段……包含「提交受阻」的那一行' --max-turns 2",
+        "result:exit 0; the reply was `当前阶段: **BUILDING**` and the rule line `上一个 task 提交、勾选完再派下一个，提交受阻时先解决提交或停下问人，不派下一个`, so the new process both received the phase injection and read the installed rule segment from CLAUDE.md",
+        "host:a disposable Git project with one mapped module, a plan and one unchecked todo item; PATH was restricted so python3 resolved to /usr/bin/python3 3.9.6",
+        "limit:this proves the rule reaches the host; whether /build follows it is the separate three-round acceptance recorded in spec/build-task-dispatch.md, run by the tier-guard session"
+      ]
+    }
+  ]
+}

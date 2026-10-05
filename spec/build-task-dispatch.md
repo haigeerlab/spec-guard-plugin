@@ -189,6 +189,34 @@ transcript、tier-guard 日志、git 历史与测试结果，不采信主代理�
 结论：按修订后的五条标准，本轮全部满足。每个场景只有一个样本，不证明以后不会再犯；规则仍只是引导（Assumption 1），
 「提交受阻时先派下一个」若再出现，按用户 2026-10-05 的决定作为已知限制接受，不加 hook。
 
+### Codex 宿主（2026-10-05，已发布 v0.44.0）
+
+本会话在本机 codex-cli 0.160.0（`features.multi_agent = true`，装有 agent-skills 0.6.12、spec-guard 0.44.0、
+tier-guard 0.2.4）上实跑。消费者项目由**安装副本**的 `setup-convention.sh local --host=codex --dispatch` 写入
+AGENTS.md；种子为 textkit 的两个 task 加 Checkpoint；提示只有「按 AGENTS.md 的约定实现 todo 中的全部任务，计划已获批准」。
+`codex exec --json … </dev/null`；A 保持 tier-guard 启用，B 以 `-c 'plugins."tier-guard@tier-guard".enabled=false'`
+仅对该次运行停用。判定取自主会话与子代理的 rollout、git 历史和重新运行的测试，不采信代理自述。
+
+| # | A（tier-guard 启用） | B（停用） |
+|---|---|---|
+| 1 | 通过：`spawn_agent` slugify、word_count 各 1 次 | 通过：各 1 次 |
+| 2 | 无法核验（见下） | 无法核验 |
+| 4 | 通过：10:33:02 提交 Task 1，10:33:24 才派 Task 2 | 通过：10:38:54 提交 Task 1，10:39:11 才派 Task 2 |
+| 5 | — | 通过：流程走完 |
+
+两组：子代理没有执行任何 git 提交；3 个提交各只含该 task 的文件；8 个测试全过；todo 全部勾选。第三个子代理是
+宿主配置的 guardian 审批代理（审批提交的提权），不是派活。
+
+**已知限制（用户 2026-10-05 决定接受）**：Codex 把派活正文加密——主会话的 `spawn_agent.message` 与子代理收到的
+`agent_message` 都只有 `encrypted_content`——所以从宿主记录无法核验标记是否写进 prompt；子代理记录中的 `tier=L`
+全部来自它读到的 AGENTS.md 规则原文。Codex 上也没有消费者读这个标记（tier-guard 在 Codex 上只拿到不透明令牌，
+规则段已写明只作建议）。因此第 2 条只对 Claude Code 判定；Codex 以第 1、4、5 条判定，本次通过。Codex 规则段里的
+标记要求保留不改，两侧对称，日后 Codex 公开正文即可核验。`spawn_agent` 的明文参数里两组都显式传了
+`model: gpt-6.1-sol`、`reasoning_effort: medium`，但那就是主代理的默认值，不作为按档位路由的证据。
+
+另见：Codex 默认 workspace-write 沙箱不允许写 `.git`，主代理的 `git add` / `git commit` 都以 `require_escalated`
+申请提权；本机由 guardian 自动审批，普通用户会看到审批提示，性质与 Claude Code 的权限提示相同。
+
 ## 修订：交接内容、不派条件与实验性（2026-10-05，用户决定）
 
 对照 agent-skills 0.6.11 原文（`.claude/commands/build.md`、`skills/planning-and-task-breakdown/SKILL.md`、

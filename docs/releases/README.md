@@ -16,9 +16,9 @@
 
 | 接入方式 | 源码证据 | 安装/真实宿主证据 | 写入边界 |
 | --- | --- | --- | --- |
-| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.43.0）：codex-cli 0.160.0，`ref` 行改到 v0.43.0 后 `codex plugin marketplace upgrade` 退出 0，临时消费者项目 smoke 退出 0，见 [v0.43.0-codex.json](v0.43.0-codex.json)；v0.42.0 记录：codex-cli 0.160.0，改 `~/.codex/config.toml` 的 `ref` 行到 v0.42.0 后 `codex plugin marketplace upgrade`，临时消费者项目 smoke 退出 0，见 [v0.42.0-codex.json](v0.42.0-codex.json)；v0.41.0 记录：codex-cli 0.160.0，marketplace 重钉到 v0.41.0 后 `codex plugin add` 升级安装副本，临时消费者项目 smoke 退出 0，见 [v0.41.0-codex.json](v0.41.0-codex.json)；v0.40.0 记录：app-managed CLI 0.160.0 使用默认模型的仓库 smoke 退出 0，见 [v0.40.0-codex.json](v0.40.0-codex.json)；PATH 旧版 0.154.0 未用于本结论 | 显式确认；模块严格串行推进 |
+| Codex CLI | `source-verified`：adapter、hook 与 smoke 判决器回归 | `installed-verified` / `host-verified`（v0.44.0）：codex-cli 0.160.0，`ref` 行改到 v0.44.0 后 `codex plugin marketplace upgrade` 退出 0，临时消费者项目 smoke 退出 0，见 [v0.44.0-codex.json](v0.44.0-codex.json)；v0.43.0 记录：codex-cli 0.160.0，`ref` 行改到 v0.43.0 后 `codex plugin marketplace upgrade` 退出 0，临时消费者项目 smoke 退出 0，见 [v0.43.0-codex.json](v0.43.0-codex.json)；v0.42.0 记录：codex-cli 0.160.0，改 `~/.codex/config.toml` 的 `ref` 行到 v0.42.0 后 `codex plugin marketplace upgrade`，临时消费者项目 smoke 退出 0，见 [v0.42.0-codex.json](v0.42.0-codex.json)；v0.41.0 记录：codex-cli 0.160.0，marketplace 重钉到 v0.41.0 后 `codex plugin add` 升级安装副本，临时消费者项目 smoke 退出 0，见 [v0.41.0-codex.json](v0.41.0-codex.json)；v0.40.0 记录：app-managed CLI 0.160.0 使用默认模型的仓库 smoke 退出 0，见 [v0.40.0-codex.json](v0.40.0-codex.json)；PATH 旧版 0.154.0 未用于本结论 | 显式确认；模块严格串行推进 |
 | Codex 桌面 | `source-verified`：共享 skill/hook 回归 | `host-verified`（v0.40.0）：安装版 native-only 会话完成两轮 Claude→Codex 回传及一次 Codex→Claude→Codex 同线程闭环，见 [v0.40.0-codex.json](v0.40.0-codex.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 遵从桌面批准；模块严格串行推进 |
-| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.43.0）：`claude plugin update` 升到 0.43.0（gitCommitSha 即 tag 提交），headless 在系统 python 3.9 下注入 `BUILDING`，带 no-todo 声明的模块计入 Done、不再出现 `Plan without todo` 行，见 [v0.43.0-claude.json](v0.43.0-claude.json)；v0.42.0 记录：`claude plugin update` 升到 0.42.0（安装副本的 gitCommitSha 即 v0.42.0 的 tag 提交，且含本版新增的 `hooks/defect_guard.py`），headless 运行在系统 python 3.9 下注入 `BUILDING`，见 [v0.42.0-claude.json](v0.42.0-claude.json)；`installed-verified`（v0.41.0）：Claude Code 2.1.286 升级到 0.41.0 后，新进程的阶段注入含本版特有的净化行为，见 [v0.41.0-claude.json](v0.41.0-claude.json)；native repeat-wake `host-verified`（v0.41.0）：同一活会话被连续唤醒两次，两个 wake job 均 `read`、`attempts: 1`；`host-verified`（v0.40.0）：同一 Claude 会话被连续两次唤醒，随后完成反向消息的读取、确认和回复，见 [v0.40.0-claude.json](v0.40.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
+| Claude Code CLI | `source-verified`：命令、hook 与 bridge 回归 | `installed-verified` / `host-verified`（v0.44.0）：`claude plugin update` 升到 0.44.0（gitCommitSha 即 tag 提交），用安装副本 `setup-convention --dispatch` 建项目后 headless 注入 `BUILDING` 并逐字复述规则段，见 [v0.44.0-claude.json](v0.44.0-claude.json)；v0.43.0 记录：`claude plugin update` 升到 0.43.0（gitCommitSha 即 tag 提交），headless 在系统 python 3.9 下注入 `BUILDING`，带 no-todo 声明的模块计入 Done、不再出现 `Plan without todo` 行，见 [v0.43.0-claude.json](v0.43.0-claude.json)；v0.42.0 记录：`claude plugin update` 升到 0.42.0（安装副本的 gitCommitSha 即 v0.42.0 的 tag 提交，且含本版新增的 `hooks/defect_guard.py`），headless 运行在系统 python 3.9 下注入 `BUILDING`，见 [v0.42.0-claude.json](v0.42.0-claude.json)；`installed-verified`（v0.41.0）：Claude Code 2.1.286 升级到 0.41.0 后，新进程的阶段注入含本版特有的净化行为，见 [v0.41.0-claude.json](v0.41.0-claude.json)；native repeat-wake `host-verified`（v0.41.0）：同一活会话被连续唤醒两次，两个 wake job 均 `read`、`attempts: 1`；`host-verified`（v0.40.0）：同一 Claude 会话被连续两次唤醒，随后完成反向消息的读取、确认和回复，见 [v0.40.0-claude.json](v0.40.0-claude.json)；MAP_ONLY hook 证据仍见 v0.38.3 | 显式确认；模块严格串行推进 |
 | ChatGPT in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后在既有 Chrome profile 中成功读取公开 PR，见 [v0.20.1-codex.json](v0.20.1-codex.json) | 只验证既有浏览器能力未受升级影响；不声明 Codex 桌面 hook |
 | Claude Code in Chrome | 不把浏览器访问冒充为插件 hook 源码证据 | `host-verified`（v0.20.1）：升级后通过已安装扩展成功读取公开 PR，见 [v0.20.1-claude.json](v0.20.1-claude.json) | 只验证既有浏览器能力未受升级影响；不声明浏览器侧 spec-guard hook |
 | Claude Code 桌面模式 | `not-verified`：未把它与 MCPB 混同 | `host-verified`（v0.38.3）：新 Code 模式会话在合成项目收到 UserPromptSubmit 的 MAP_ONLY 阶段注入，见 [v0.38.3-claude.json](v0.38.3-claude.json) | 不因其他宿主而获得写入结论 |
@@ -121,3 +121,13 @@ v0.43.0 的发布后证据见
 [`v0.43.0-codex.json`](v0.43.0-codex.json)。本版新增 plan.md 中的 `<!-- spec-guard: no-todo -->`
 声明：有意不建 todo 的模块不再出现在 plan-without-todo 的提醒与汇总里，完成判据不变。headless
 记录直接在安装副本上观察到了这一行为。本版没有新增写入路径，因此不另立写入边界记录。
+
+v0.44.0 的发布后证据见
+[`v0.44.0-source.json`](v0.44.0-source.json)、
+[`v0.44.0-package.json`](v0.44.0-package.json)、
+[`v0.44.0-claude.json`](v0.44.0-claude.json) 与
+[`v0.44.0-codex.json`](v0.44.0-codex.json)。本版新增可选的 `setup-convention --dispatch`：`/build` 把 task 交给子代理执行，
+派活 prompt 带 tier-guard 档位标记。宿主证据只证明规则段被写入、并被新进程读到；`/build` 是否照做，是
+`spec/build-task-dispatch.md` 里由 tier-guard 会话完成的三轮真实验收，不在这里重复声明。Codex 宿主上另由本会话
+用安装副本实跑了两组（tier-guard 启用／停用），派活次数与「先提交再派下一个」均通过，见
+[v0.44.0-codex.json](v0.44.0-codex.json)；档位标记因 Codex 加密派活正文而无法核验，按已知限制记录。
