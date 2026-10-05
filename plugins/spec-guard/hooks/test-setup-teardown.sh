@@ -205,6 +205,8 @@ for host in claude codex; do
   done
   # 2026-10-05 验收：不等上一个 task 提交就派下一个；没装 tier-guard 时档位无统一依据。
   grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
+  # 第二轮复验：提交被拦后主代理仍先派了下一个，事后才停掉。
+  grep -F '提交受阻时先解决提交或停下问人，不派下一个' "$tpl" >/dev/null || fail "${host} 规则段应写明提交受阻时不派下一个"
   for needle in 'L1 机械、只读' 'L2 单模块内、验收明确的实现' 'L3 跨模块、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
     grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少档位定义「${needle}」"
   done
