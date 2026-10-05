@@ -54,11 +54,17 @@ except Exception:
 # 前者是工具故障，绝不能算成产品缺陷 —— 那是本仓最看重的那类误报。
 run_headless() {  # $1=工作目录 $2=stdout 落盘路径 ; 其余=claude 参数
   local dir="$1" out="$2"; shift 2
-  ( cd "${dir}" && claude "$@" ) > "${out}" 2> "${out}.err"
+  # `< /dev/null`：非 TTY 的 stdin 会让 claude 等 3 秒再警告（其他宿主上同形的写法会直接挂住）。
+  ( cd "${dir}" && claude "$@" < /dev/null ) > "${out}" 2> "${out}.err"
   local rc=$?
   if [ "${rc}" -ne 0 ]; then
     echo "  ❌ claude 退出码 ${rc} —— **评测没跑起来**，这不是产品的结论"
-    sed -n '1,5p' "${out}.err" | sed 's/^/     /'
+    # stdout 也要打：claude 把致命错误写在 **stdout**，只打 stderr 会把真正的原因吞掉。
+    # 2026-10-05 实测踩到：stderr 只有一句 stdin 警告，而
+    # 「Failed to authenticate: OAuth session expired」在 stdout 里，于是评测输出里
+    # 完全看不出是登录过期（docs/lenses.md A4：失败必须可观察）。
+    sed -n '1,5p' "${out}" | sed 's/^/     out: /'
+    sed -n '1,5p' "${out}.err" | sed 's/^/     err: /'
     return 2
   fi
   if [ ! -s "${out}" ]; then
