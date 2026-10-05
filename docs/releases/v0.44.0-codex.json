@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.44.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.44.0;test:marketplace-ref-upgrade-20261005c"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.43.0 to v0.44.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0, and `codex plugin list --json` reports spec-guard version 0.44.0, installed and enabled; the installed setup-convention.sh references the dispatch-rule templates"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.44.0;test:installed-plugin-smoke-20261005c"
+      },
+      "observedAt": "2026-10-05T10:22:47Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "result:--expected-source was taken verbatim from the source.path reported by `codex plugin list --json`, not assumed",
+        "host:codex-cli 0.160.0",
+        "limit:the Codex dispatch rule segment was not exercised on a Codex host; tier-guard reads no marker on Codex, which the segment itself states"
+      ]
+    }
+  ]
+}
