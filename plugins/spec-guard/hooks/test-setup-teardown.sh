@@ -216,7 +216,8 @@ for host in claude codex; do
   ! grep -F '写入该 task 原文' "$tpl" >/dev/null || fail "${host} 规则段不应只交 task 原文（todo 常只有一行）"
   # 第二轮复验：提交被拦后主代理仍先派了下一个，事后才停掉。
   grep -F '提交受阻时先解决提交或停下问人，不派下一个' "$tpl" >/dev/null || fail "${host} 规则段应写明提交受阻时不派下一个"
-  for needle in 'L1 机械、只读' 'L2 单模块内、验收明确的实现' 'L3 跨模块、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
+  # 2026-10-05 联调：「L3 跨模块」漏了「取舍」，改 5 个文件但验收明确的 task 两次被判 L3 派给 opus，没有差价。
+  for needle in 'L1 机械、只读' 'L2 验收明确的实现，可以改多个文件' 'L3 需要跨模块取舍、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
     grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少档位定义「${needle}」"
   done
   ok "${host} 规则段：首行标记，覆盖何时派、子代理四步不提交、tier-guard 标记与停止条件交回"
