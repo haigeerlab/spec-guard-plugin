@@ -13,6 +13,8 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 继续只管「派活时选哪个模型」。两个插件互不读取对方的数据。
 
 登记：2026-10-05 按用户决定经 `/spec-guard:add-module` 插入能力图，依赖 `local-convention`、`build-task-dispatch`。
+数据来源一节的若干口径来自 tier-guard 会话实测踩过的坑（2026-10-05），与 tier-guard `hooks/tier_report.py` 的
+`_usage_groups` 口径一致，以便联调时交叉核对。
 
 ## Assumptions
 
@@ -30,15 +32,23 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 
 ### Claude Code
 
-- 主会话：`~/.claude/projects/<项目路径编码>/<sessionId>.jsonl`。路径编码是把绝对路径中的 `/` 换成 `-`
-  （本仓库为 `-Users-vilin-Documents-haigeerlab-spec-guard-plugin`）；另以每条记录的 `cwd` 复核属于本项目。
+- 主会话：`~/.claude/projects/<项目路径编码>/<sessionId>.jsonl`。路径编码：先取 realpath（macOS 上
+  `/var/folders/…` 记作 `/private/var/folders/…`），再把 `/`、`.`、`_` 换成 `-`（本仓库为
+  `-Users-vilin-Documents-haigeerlab-spec-guard-plugin`）；另以每条记录的 `cwd` 复核属于本项目。
+  `--continue` 追加到同一主会话文件，`-p` 每次新建文件；同目录下可能有别的会话，一律按时间窗筛选。
 - 子代理：`<sessionId>/subagents/agent-<agentId>.jsonl`，记录带 `isSidechain: true` 与 `agentId`；同名
   `.meta.json` 带 `agentType`、`model`、`toolUseId`（对应主会话里那次 Agent 调用的 `tool_use.id`）。
+  主会话文件里不含子代理消息，**不能**靠主文件中的 `isSidechain` 找子代理。以 SendMessage 续派同一子代理时内容
+  追加到同一文件，所以每个子代理文件**整份只计一次**。
+- 有些子代理宿主不写 transcript（tier-guard 日志里约 85% 的结束事件属此类）：主会话有 Agent 调用、却找不到对应
+  子代理文件时，计为「无记录的派活」，其用量未知，报告单列次数与覆盖率，不当作 0。
 - 用量：`type: assistant` 记录的 `message.usage`，字段 `input_tokens`、`cache_creation_input_tokens`（其中
   `cache_creation.ephemeral_5m_input_tokens` / `ephemeral_1h_input_tokens` 分开）、`cache_read_input_tokens`、
   `output_tokens`；模型在 `message.model`。
-- **必须按 `message.id` 去重**：同一条消息会以多行出现（本会话 521 行带用量的记录只有 226 个不同 `message.id`，
-  最多重复 5 次）。同一 `message.id` 只计一次。
+- **必须去重**：同一条消息会按内容块各写一行，流式时还会重写，每行都带一份 usage（本会话 521 行带用量的记录只有
+  226 个不同 `message.id`，最多重复 5 次；tier-guard 在 109 份 transcript 上实测，不去重时输入多算 1.97×）。规则：
+  按（文件, `message.id`）分组，每组取 usage 总量最大的一行；没有 `message.id` 的行逐行计入。
+- 按**每条消息自己的** `message.model` 计价，不按会话；会话中途可换模型。
 
 ### Codex
 
@@ -46,8 +56,13 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 - 子代理：`session_meta.payload.session_id` 等于主线程 id、`id` 不同的 rollout；`source.subagent.thread_spawn`
   带 `parent_thread_id` 与 `agent_path`。`source.other == "guardian"` 是宿主的审批代理，单列，不算派活。
 - 用量：`event_msg` 的 `token_count.info.total_token_usage`，为线程内**累计值**（`input_tokens`、
-  `cached_input_tokens`、`cache_write_input_tokens`、`output_tokens`、`reasoning_output_tokens`）；某时间窗的用量是
-  窗末与窗初累计值之差。模型在 `turn_context.payload.model` 与 `effort`。
+  `cached_input_tokens`、`cache_write_input_tokens`、`output_tokens`、`reasoning_output_tokens`）；不要把每条事件的
+  累计值相加。某时间窗的用量是窗内最后一条与窗前最后一条累计值之差；整条子线程取其最后一条。模型在
+  `turn_context.payload.model` 与 `effort`。
+- `input_tokens` **已包含**缓存命中（实测 `total_tokens = input_tokens + output_tokens`）：非缓存输入 =
+  `input_tokens − cached_input_tokens`。`reasoning_output_tokens` 是否已含在 `output_tokens` 内未经核实，实现时以
+  大样本核实后再定口径，并在报告中注明。
+- `codex exec --ephemeral` 不写 rollout，这类运行没有用量数据。
 - 派活：主线程 `function_call` 中 `name == "spawn_agent"`，参数明文含 `task_name`、`model`、`reasoning_effort`；
   `message` 是加密的，不读。
 
@@ -67,8 +82,9 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 - **主代理**：主会话在窗口内的用量。Claude 按 `message.id` 去重后求和；Codex 取累计值之差。
 - **子代理**：窗口内发起的每次派活（Claude：主会话 `Agent` 工具调用，经 `toolUseId` 关联子代理文件；Codex：
   `spawn_agent`，经 thread 关联子 rollout）的全部用量，计到发起它的 task；按模型分列。
-- **类别**：Claude 为输入、缓存写（5m / 1h 分列）、缓存读、输出；Codex 为输入（不含缓存）、缓存读、缓存写、输出、
-  推理输出。宿主未提供的类别标「未提供」，不推算。
+- **类别**：Claude 为输入、缓存写（5m / 1h 分列）、缓存读、输出；Codex 为非缓存输入、缓存读、缓存写、输出（推理
+  输出按核实后的口径列出）。宿主未提供的类别标「未提供」，不推算。
+- **覆盖率**：每个 task 报「有记录的派活 / 全部派活」；无记录的派活不计入平均值。
 - **派活次数**、**重派**（同一 task 派活次数减一）、**收回**（主会话中 Agent 调用的错误结果以 tier-guard 收回原因
   开头，即包含「第二次失败后的收回」）、**子代理交回后主代理改动的文件数**（该 task 最后一次派活结束之后、窗口结束
   之前，主代理用 Edit / Write / MultiEdit 或 Codex `apply_patch` 改动的不同路径数，排除 `tasks/<模块>/todo.md`）。
@@ -128,8 +144,12 @@ scripts/validate.sh                                  -> 登记新测试
 先写测试并确认在当前代码上失败，再实现。夹具全部合成，不依赖本机真实会话：
 
 - 归属：两个 task 的勾选提交切出两个窗口；窗口外的消息不计入；未提交的 todo → 无法归属、退出 2。
-- Claude 去重：同一 `message.id` 出现三行只计一次；子代理经 `toolUseId` 计到发起它的 task；缓存写 5m / 1h 分列。
-- Codex：累计值求差；子 rollout 经 `session_id` 关联；guardian 单列不算派活；`spawn_agent` 计数。
+- Claude 去重：同一 `message.id` 出现三行（output 逐行增长）只计 usage 最大的一行；无 id 的行逐行计入；子代理经
+  `toolUseId` 计到发起它的 task，续派追加的文件只计一次；缓存写 5m / 1h 分列；会话中途换模型时按消息各自计价；
+  有 Agent 调用但无子代理文件 → 无记录的派活、覆盖率下降。
+- 路径编码：含 `.`、`_` 的项目路径与 `/var` → `/private/var` 的 realpath 能找到正确的项目目录。
+- Codex：累计值求差而非相加；非缓存输入 = input − cached；子 rollout 经 `session_id` 关联；guardian 单列不算派活；
+  `spawn_agent` 计数。
 - 返工信号：同一 task 两次派活 → 重派 1；收回原因 → 收回 1；交回后主代理改两个文件（含 todo.md）→ 计 1。
 - 价格：有价折算；缺价标「未定价」且总额注明；无价格文件只出 token。
 - 隐私：夹具里的 prompt 与代码字符串不出现在任何输出（人读与 `--json`）。
