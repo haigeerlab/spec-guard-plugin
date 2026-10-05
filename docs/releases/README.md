@@ -128,4 +128,6 @@ v0.44.0 的发布后证据见
 [`v0.44.0-claude.json`](v0.44.0-claude.json) 与
 [`v0.44.0-codex.json`](v0.44.0-codex.json)。本版新增可选的 `setup-convention --dispatch`：`/build` 把 task 交给子代理执行，
 派活 prompt 带 tier-guard 档位标记。宿主证据只证明规则段被写入、并被新进程读到；`/build` 是否照做，是
-`spec/build-task-dispatch.md` 里由 tier-guard 会话完成的三轮真实验收，不在这里重复声明。规则段在 Codex 宿主上未实跑。
+`spec/build-task-dispatch.md` 里由 tier-guard 会话完成的三轮真实验收，不在这里重复声明。Codex 宿主上另由本会话
+用安装副本实跑了两组（tier-guard 启用／停用），派活次数与「先提交再派下一个」均通过，见
+[v0.44.0-codex.json](v0.44.0-codex.json)；档位标记因 Codex 加密派活正文而无法核验，按已知限制记录。

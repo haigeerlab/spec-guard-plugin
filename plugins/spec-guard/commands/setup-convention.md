@@ -18,7 +18,7 @@ RED → GREEN → 回归 → 构建，派活 prompt 带 tier-guard 档位标记�
 不带开关时约定块与基础模板逐字相同。开关状态存在块里（规则段首行 `<!-- spec-guard: build-task-dispatch -->`）：
 `--replace` 时块内有这一行就保持开启，关闭须显式 `--no-dispatch`；两者同时给出时拒绝。已有块不带 `--replace`
 时开关不生效。预览里的 `build-task-dispatch rule:` 一行写明状态与来源，转述时不要省略。规则只是引导，
-spec-guard 不检测、也不要求安装 tier-guard。
+spec-guard 不检测、也不要求安装 tier-guard。Codex（`--host=codex`）上同样可用：Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。
 GitHub 与 GitLab tracker 模式已退役，脚本会拒绝它们且不写文件。
 若 teardown 留有 .agent/state.json.disabled，setup 会在预览阶段拒绝新建空状态；确认要恢复时，
 先人工核对并将其改回 .agent/state.json。两个文件并存时也先人工核对，不自动选择副本。
