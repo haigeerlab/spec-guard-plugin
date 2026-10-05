@@ -121,9 +121,9 @@ install_block() {
       return
     fi
     BODY="$(mktemp)"
+    trap 'rm -f "$BODY"' EXIT
     block_content > "$BODY"
-    python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" >/dev/null || { rm -f "$BODY"; exit 1; }
-    rm -f "$BODY"
+    python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" >/dev/null
     printf '  ✅ updated %s\n' "$TARGET"
     return
   fi

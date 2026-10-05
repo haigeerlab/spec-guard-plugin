@@ -214,6 +214,8 @@ ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
 # $1=文件 $2=BEGIN $3=END：输出两条标记之间的正文（不含标记行）
 block_body() { awk -v b="$2" -v e="$3" '{s=$0; gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)} s==e{inb=0} inb{print} s==b{inb=1}' "$1"; }
 host_run() { run setup-convention.sh local ${HOSTARG:+"$HOSTARG"} "$@"; }
+# $1=期望内容文件：块正文与它逐字节相同（不经 $(...)，末尾换行也算数）
+block_is() { block_body "$P/$HT" "$HB" "$HE" > "$WORK/actual-body"; cmp -s "$WORK/actual-body" "$1"; }
 for host in claude codex; do
   if [ "$host" = codex ]; then
     HB='<!-- BEGIN:spec-guard-codex-convention -->'; HE='<!-- END:spec-guard-codex-convention -->'
@@ -222,22 +224,23 @@ for host in claude codex; do
     HB="$BEGIN"; HE="$END"; HT=CLAUDE.md; HOSTARG=""
   fi
   BASE="$TEMPLATES/${host}-block-local.md"; RULE="$TEMPLATES/${host}-dispatch-rule.md"
-  base_body="$(cat "$BASE")"; on_body="$(cat "$BASE" "$RULE")"
+  base_body="$WORK/${host}-base-body"; on_body="$WORK/${host}-on-body"
+  cat "$BASE" > "$base_body"; cat "$BASE" "$RULE" > "$on_body"
 
   project "${host}-dispatch-default"
   host_run
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：默认 setup 的块应与基础模板逐字相同
+  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：默认 setup 的块应与基础模板逐字相同
 $OUT"
   ok "${host}：默认 setup 不含规则段，块与基础模板逐字相同"
 
   project "${host}-dispatch-on"
   host_run --dispatch
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：--dispatch 应在基础模板之后接规则段
+  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：--dispatch 应在基础模板之后接规则段
 $OUT"
   ok "${host}：--dispatch 新建块＝基础模板＋规则段"
 
   host_run --replace
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：开启的块 --replace 后应保持开启
+  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：开启的块 --replace 后应保持开启
 $OUT"
   ok "${host}：开启的块 --replace 保持开启"
 
@@ -249,7 +252,7 @@ $OUT"
 
   before="$(snapshot)"
   host_run --no-dispatch
-  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -F -- '--replace' >/dev/null <<<"$OUT" || fail "${host}：已有块且无 --replace 时开关不生效，应提示配合 --replace
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -F -- 'only take effect together with --replace' >/dev/null <<<"$OUT" || fail "${host}：已有块且无 --replace 时开关不生效，应提示配合 --replace
 $OUT"
   ok "${host}：已有块无 --replace 时开关不生效并提示"
 
@@ -263,7 +266,7 @@ $OUT"
   ok "${host}：预览写明规则段状态与来源，且不改文件"
 
   host_run --replace --no-dispatch
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：--replace --no-dispatch 后块应与基础模板逐字相同
+  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：--replace --no-dispatch 后块应与基础模板逐字相同
 $OUT"
   ok "${host}：--replace --no-dispatch 关闭，块回到基础模板"
 
@@ -274,9 +277,31 @@ $OUT"
   grep -Fx '  • build-task-dispatch rule: on (--dispatch)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明 --dispatch
 $OUT"
   host_run --replace --dispatch
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$on_body" ] || fail "${host}：关闭的块 --replace --dispatch 应开启
+  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：关闭的块 --replace --dispatch 应开启
 $OUT"
   ok "${host}：关闭的块 --replace --dispatch 开启"
+
+  project "${host}-dispatch-fresh-dry"
+  before="$(snapshot)"
+  host_run --dispatch --dry-run
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -Fx '  • build-task-dispatch rule: on (--dispatch)' >/dev/null <<<"$OUT" || fail "${host}：新项目 --dispatch --dry-run 应只预览开启状态
+$OUT"
+  ok "${host}：新项目 --dispatch --dry-run 只预览，不写文件"
+
+  # 标记行带缩进、文件是 CRLF 时，仍认作开启。
+  project "${host}-dispatch-crlf"
+  host_run --dispatch
+  python3 - "$P/$HT" "$DISPATCH_MARKER" <<'PY'
+import sys
+from pathlib import Path
+p, mark = Path(sys.argv[1]), sys.argv[2]
+t = p.read_text(encoding="utf-8").replace(mark, "  " + mark + " ")
+p.write_bytes(t.replace("\n", "\r\n").encode("utf-8"))
+PY
+  host_run --replace --dry-run
+  grep -Fx '  • build-task-dispatch rule: on (kept from existing block)' >/dev/null <<<"$OUT" || fail "${host}：CRLF 与缩进的标记行应仍认作开启
+$OUT"
+  ok "${host}：CRLF 文件与带缩进的标记行仍认作开启"
 
   # 正文里提到标记、或标记不在块内，都不算开启。
   project "${host}-dispatch-prose"
@@ -290,7 +315,7 @@ t = t.replace(end, "正文提到 `%s` 不算开启。\n%s" % (mark, end), 1) + "
 p.write_text(t, encoding="utf-8")
 PY
   host_run --replace
-  [ "$RC" -eq 0 ] && [ "$(block_body "$P/$HT" "$HB" "$HE")" = "$base_body" ] || fail "${host}：块内行中提及或块外的标记不应算开启
+  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：块内行中提及或块外的标记不应算开启
 $OUT"
   ok "${host}：块内正文提及或块外的标记不算开启"
 done
