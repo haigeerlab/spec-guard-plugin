@@ -1,5 +1,100 @@
 # Changelog
 
+## [未发布]
+
+### 变更
+
+- **这些路径里潜藏的代码缺陷，现在会以 traceback 暴露，不再是一句柔和的「读不到」。**
+  托管事项、Proposal 收尾、Local 事项交接发布与 native-wake 续轮一共 23 个处理器此前捕获裸
+  `Exception`，于是适配器里一个拼写错误产生的 `AttributeError` 被报成 `unknown` +
+  `provider-unavailable`、`partial` + `close-result-uncertain`、`publication-uncertain`
+  或 `host-result-unknown`。这些状态的含义都是「结果存疑，重试或去查远端」，而**重试修不了拼写错误**，
+  读者会去检查一个根本没问题的远端。
+  这是 v0.41.0 拆开的那一类的第三种形态：那一版分开了「探测读不到」与「读到了但不成立」，
+  却把「我们的代码坏了」留在第一个桶里。
+  **升级后看到 traceback，说明撞上的是一个此前被静默吞掉的缺陷，请按栈报告，不要当成环境问题重试。**
+  已降级的行为一字未改：探测失败、响应丢失、确定性 4xx 仍然各走各的路（见下）。
+
+### 修复
+
+- **诊断：四条链路把自身缺陷与探测失败共用一个结果。** 按每个模块能支持的方式分别收窄，
+  没有把一种形状硬套到所有地方：
+  - 托管事项家族（`hosted_ticket_actions|write|read.py`，9 处）收窄到 `HostedTicketError`。
+    这不是新策略——`publish_preview` 的外层与两个 CLI 顶层本来就在用它；传输层
+    （`run_json` / `run_write_json` / `pages` / `_target`）已把 OSError、超时、非零退出与坏 JSON
+    全部转成它，确定性拒绝转成子类 `ProviderRejected`，所以没有合法异常会漏出去。
+  - `local_ticket_publish.py`（2 处）收窄到 `InventoryError`，该模块在每处的上一行就已捕获
+    `ProviderRejected`。
+  - `proposal_closeout.py`（11 处）**不能**具名传输异常：`_rejection` 的契约写明它按 `status_code`
+    鸭子类型判断，「so any adapter can report one without this module importing a transport」。
+    改为在降级前重抛确定属于编程错误的那些。
+  - `session_delegation_claude.py`（1 处）包的是注入式 `native_wake`，类型不可知；而且该处理器
+    还做状态推进，`begin_follow_up` 已经跑过。改为**先 `advance` 到 `unknown`，再重抛**，
+    否则委派会停在 follow-up 中途无法恢复。异常类型也无法写进诊断：`DelegationStore.advance`
+    把 evidence 串硬校验成枚举，不匹配即 `untrusted-state-evidence`。
+  判据集中在新增的 `plugins/spec-guard/hooks/defect_guard.py`，两个无法具名传输异常的模块共用一份；
+  它刻意**不含 `ValueError`**：`HostedTicketError`、`InventoryError`、`ClaudeAdapterError` 都是它的子类，
+  journal 也用它表示 JSON 读不出来，收进来就会误伤本该降级的失败。
+  全仓库吞掉型宽捕获由 24 处降到 1 处；剩下的 `spec-digest.py:72` 不是缺陷，它把 error 原文打印出来。
+  19 处 `except BaseException` 后接清理再 `raise` 是正确惯用法，未改动。
+
+- **放行 `KeyError` / `TypeError` 前先钉死了输入来源。** 托管事项的 preview 由 `make_*_preview`
+  在进程内生成，只有 digest 经 CLI 往返；Proposal 收尾的 preview 虽然来自文件，但 `close_preview`
+  在任何下游动作之前就以 `_valid_preview` 拒绝不合格输入，且写入路径下标用到的每个键都在它的必查
+  集合内（用 AST 机械核对，不靠通读）。手改坏的 preview 仍然是干净的 `preview-invalid`，不是 traceback。
+
+- **`session-routing` 与 `collab` 不再争同一个意图。** 两个 skill 的 description 都宣称「按名称告诉
+  另一个 Agent 一件事」，而选错是**静默的**：正文会被复制进协作信箱，不走同宿主原生通道。
+  现在「告诉某个会话一件事」只由 `session-routing` 宣称，`collab` 只宣称加入、收件箱与会话清单，
+  并指明另两个 skill。`collab` 的发送能力一个都没删，只是明确标为「`session-routing` 不可用或只能经
+  bridge 时」才直接使用。
+
+### 测试
+
+- 新增 24 个缺陷传播用例（每个收窄点一个，外加 native-wake 的状态推进不变量），并配对了
+  「探测失败仍降级」「响应丢失仍 `partial`」「确定性 4xx 仍 `rejected`」三类对照用例：
+  缺了它们，「让一切都抛出」的改法会与正确修复长得一样。
+- **两个测试夹具此前钉死了传输层不可能产生的形状。** `test_local_ticket_publish.py` 的 `FakeProvider`
+  与 `test_local_ticket_providers.py` 的 `ApiFixture` 都顶替 `run_json`——而 `run_json` 的全部职责就是
+  把 OSError 与 `subprocess.TimeoutExpired` 转成 `InventoryError`——却都抛裸 `TimeoutError` 来模拟
+  响应丢失。收窄产品代码把这件事暴露出来；现在它们抛真实传输真正会抛的异常，而**那些用例的断言一条
+  没改也全部仍绿**：夹具不忠实，期望本身是对的。与 v0.41.0 的 `gh --json state` 大小写事故同类——
+  一个从未与真实形状核对过的夹具。
+- **新增 `scripts/check-acceptance-wired.py`。** `hooks/test*acceptance*` 需要固定外部运行时，
+  刻意不进 `validate.sh` 与 CI；但此前没有任何运行器或维护者文档提到它们，
+  `test_proposal_closeout_local_acceptance.py` 处于全仓库零引用状态——而它是唯一能证明 Local 适配器
+  发出的参数名被真实 `epiq@1.11.0` 接受的测试。判据只问「有没有东西告诉下一个维护者跑它」，
+  不问「它是否在 CI 里跑」；`docs/reports/` 这类历史运行记录不算运行指引。
+- 两个 skill 入口契约测试随意图归属一并搬移：`test_collab_entry` 去掉该词汇并新增反向断言
+  （`collab` 的 description 不得再宣称它），`test_session_routing_entry` 断言它必须带。
+  少了这一对，两个 skill 会漂回互相竞争，或这个意图从两边同时消失——第一版正是删掉而不是搬移，
+  被前者当场抓住。
+
+### 文档
+
+- `docs/maintainer-workflow.md` 新增「可选验收测试」一节：三个验收测试的运行方式、所需的
+  `SPEC_GUARD_EPIQ_RUNTIME`，以及它们未设该变量时**退出 2**（实测）而非 0 ——
+  接进任何运行器都要按 `2` 判「没跑起来」。
+- `CONTRIBUTING.md` 不再声称 CI 定义了 Ubuntu + macOS 两个 job。`ci.yml` 自 `150169e` 起只跑
+  `ubuntu-latest`，其 `/bin/bash` 是 5.x；bash 3.2 在 CI 里只由静态判据 `check-bash32.py` 覆盖，
+  真正在 3.2 上跑过的只有贡献者本机那一次。
+- README 的功能一览补上「会话路由」与「跨宿主会话委派」：两者都是双宿主可自然语言触发的 skill，
+  此前只作为 `docs/optional-features.md` 里协作信箱的子节出现，而那份文档开头写「下面四项」，
+  数能力的读者看不到它们。
+- `docs/optional-features.md`：兼容传输的退役不再写成「等待下一版本发布」（v0.40.0 已发）；
+  本地事项账本的「需要什么」注明它按插件自带 lockfile 装入 Epiq 运行时，连传递依赖共 270 个包。
+- `references/proposal-closeout.md` 补上阶段迁移「先加后删」真的留下两个阶段标签时的处理办法：
+  `closeout` 返回 `state: invalid` + `tracker-contract-invalid`，人工删掉旧标签后重新 preview，
+  不要改 Proposal 文档。诊断码是实跑该情形核对的，不是推的。
+- 13 个有 Plan 而没有 `todo.md` 的模块中，此前只有 6 个在 Plan 里写了登记说明；其余 7 个补齐，
+  分两组各写其真实来源（转单图时原样恢复的 initiative 计划 / 既有能力的一次性人工登记）。
+  完成判据未变，`verify-artifacts` 仍报同样的 13 个模块。
+- `hosted_ticket_action.py`（CLI）与 `hosted_ticket_actions.py`（库）在各自 docstring 里互相点明分工。
+  没有重命名：`docs/reports/` 的历史审计按行号引用后者，改名会让那些记录指向不存在的文件。
+- 新增 `docs/releases/v0.41.0-write-paths.json`：v0.41.0 的三条写入能力（Proposal 收尾、Proposal 的
+  Local 后端、项目级默认事项后端）当时没有留下任何证据记录，现补记为三条 `not-verified` 并写明原因。
+  按 `docs/releases/README.md` 的约定这是**新增**一份未验证记录，不反向改写已发布的四份。
+
 ## [0.41.0] - 2026-10-05
 
 ### 修复
