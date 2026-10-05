@@ -206,7 +206,7 @@ grep -n -iE "module|capability map|per-module|SPEC-" \
 # → 无匹配
 ```
 
-**确认缺口 B**：多模块递归时，各模块的 `/plan` 会互相覆盖 `tasks/plan.md`。
+**确认缺口 B**：多模块递归时，各模块的 `/plan` 共用同一份 `tasks/plan.md`。
 
 0.6.8 起上游加了一道**止损**（`SKILL.md:150`，`/plan` 命令同步）：`tasks/plan.md` 或
 `tasks/todo.md` 仍有未勾选任务、而这次是另一件事时，停下来问，不覆盖。这把「静默覆盖」
