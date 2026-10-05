@@ -259,5 +259,144 @@ class ClaudeUsageTests(unittest.TestCase):
         self.assertEqual(sorted(self.report()["tasks"][0]["sessions"]), ["claude:s1", "claude:s2"])
 
 
+def codex_meta(thread, cwd, ts, parent=None, task=None, guardian=False):
+    payload = {"id": thread, "session_id": parent or thread, "cwd": str(cwd), "timestamp": ts}
+    if guardian:  # shape copied from a real codex-cli 0.160.0 guardian rollout
+        payload["source"] = {"subagent": {"other": "guardian"}}
+        payload["parent_thread_id"] = parent
+    elif parent:
+        payload["source"] = {"subagent": {"thread_spawn": {"parent_thread_id": parent, "depth": 1,
+                                                           "agent_path": "/root/" + task}}}
+    else:
+        payload["source"] = "exec"
+    return {"timestamp": ts, "type": "session_meta", "payload": payload}
+
+
+def codex_model(ts, model, effort="medium"):
+    return {"timestamp": ts, "type": "turn_context", "payload": {"model": model, "effort": effort}}
+
+
+def codex_tokens(ts, inp, cached, out, reasoning=0, write=0):
+    total = {"input_tokens": inp, "cached_input_tokens": cached, "cache_write_input_tokens": write,
+             "output_tokens": out, "reasoning_output_tokens": reasoning, "total_tokens": inp + out}
+    return {"timestamp": ts, "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": total}}}
+
+
+def codex_spawn(ts, task, call_id):
+    args = {"task_name": task, "model": "gpt-6-luna", "reasoning_effort": "high", "message": "gAAAAAB-ENCRYPTED"}
+    return {"timestamp": ts, "type": "response_item",
+            "payload": {"type": "function_call", "name": "spawn_agent", "call_id": call_id, "arguments": json.dumps(args)}}
+
+
+class CodexUsageTests(unittest.TestCase):
+    """Same two windows as ClaudeUsageTests: Task 1 10:00-10:20, Task 2 10:20-10:45 (UTC)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.project = base / "proj"
+        self.project.mkdir()
+        self.repo = Repo(self.project)
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:00:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:20:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [x] Task 2：b"], "2026-10-05T10:45:00Z")
+        self.home = base / "codex-home"
+        self.real = os.path.realpath(self.project)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def rollout(self, thread, rows):
+        path = self.home / "sessions" / "2026" / "10" / "05" / ("rollout-2026-10-05T10-00-00-%s.jsonl" % thread)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    def report(self):
+        return mcr.build_report(self.project, MODULE, claude_home=None, codex_home=self.home,
+                                now=utc("2026-10-05T12:00:00Z"))
+
+    def test_cumulative_totals_are_differenced_not_summed(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T09:59:00Z"),
+            codex_model("2026-10-05T09:59:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T09:59:30Z", 1000, 0, 10),        # before Task 1: not counted
+            codex_tokens("2026-10-05T10:05:00Z", 5000, 3000, 50, reasoning=20),
+            codex_tokens("2026-10-05T10:10:00Z", 9000, 6000, 90, reasoning=30),
+            codex_tokens("2026-10-05T10:30:00Z", 12000, 8000, 100, reasoning=35),
+        ])
+        tasks = self.report()["tasks"]
+        t1 = tasks[0]["main"]["gpt-6.1-sol"]
+        # Task 1 = 10:10 total minus 09:59:30 total: input 8000 of which cached 6000 -> uncached 2000
+        self.assertEqual((t1["input"], t1["cache_read"], t1["output"], t1["reasoning_output"]), (2000, 6000, 80, 30))
+        t2 = tasks[1]["main"]["gpt-6.1-sol"]
+        self.assertEqual((t2["input"], t2["cache_read"], t2["output"]), (1000, 2000, 10))
+
+    def test_reasoning_is_reference_only_not_added_to_session_total(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T10:05:00Z", 100, 40, 30, reasoning=25),
+        ])
+        task1 = self.report()["tasks"][0]
+        self.assertEqual(task1["sessions"]["codex:main1"], 130)  # input 100 + output 30; reasoning not added
+
+    def test_child_rollout_counts_whole_thread_to_spawning_task(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_spawn("2026-10-05T10:21:00Z", "word_count", "call_1"),
+            codex_tokens("2026-10-05T10:22:00Z", 100, 0, 10),
+        ])
+        self.rollout("child1", [
+            codex_meta("child1", self.real, "2026-10-05T10:21:01Z", parent="main1", task="word_count"),
+            codex_model("2026-10-05T10:21:01Z", "gpt-6-luna", "high"),
+            codex_tokens("2026-10-05T10:23:00Z", 4000, 1000, 200),
+            codex_tokens("2026-10-05T10:50:00Z", 6000, 2000, 300),   # after the window: still this child
+        ])
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["dispatches"], task2["dispatches_unrecorded"], task2["coverage"]), (1, 0, "1/1"))
+        child = task2["sub"]["gpt-6-luna"]
+        self.assertEqual((child["input"], child["cache_read"], child["output"]), (4000, 2000, 300))
+        self.assertEqual(self.report()["tasks"][0]["sub"], {})
+
+    def test_spawn_without_child_rollout_is_unrecorded(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_spawn("2026-10-05T10:05:00Z", "slugify", "call_1"),
+        ])
+        task1 = self.report()["tasks"][0]
+        self.assertEqual((task1["dispatches"], task1["dispatches_unrecorded"]), (1, 1))
+
+    def test_guardian_thread_is_listed_apart_and_not_a_dispatch(self):
+        self.rollout("main1", [codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+                               codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol")])
+        self.rollout("guard1", [
+            codex_meta("guard1", self.real, "2026-10-05T10:02:00Z", parent="main1", guardian=True),
+            codex_model("2026-10-05T10:02:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T10:03:00Z", 500, 100, 5),
+        ])
+        task1 = self.report()["tasks"][0]
+        self.assertEqual(task1["dispatches"], 0)
+        self.assertEqual(task1["sub"], {})
+        self.assertEqual(task1["guardian"]["gpt-6.1-sol"]["input"], 400)
+
+    def test_rollouts_of_another_project_are_ignored(self):
+        self.rollout("other", [
+            codex_meta("other", "/somewhere/else", "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T10:05:00Z", 999, 0, 9),
+        ])
+        self.assertEqual(self.report()["tasks"][0]["main"], {})
+
+    def test_encrypted_spawn_message_never_reaches_output(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_spawn("2026-10-05T10:05:00Z", "slugify", "call_1"),
+        ])
+        self.assertNotIn("ENCRYPTED", json.dumps(mcr._jsonable(self.report()), ensure_ascii=False))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

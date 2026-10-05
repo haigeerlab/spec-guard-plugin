@@ -54,7 +54,8 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 
 - 会话：`~/.codex/sessions/YYYY/MM/DD/rollout-*-<threadId>.jsonl`；`session_meta.payload.cwd` 判断是否属于本项目。
 - 子代理：`session_meta.payload.session_id` 等于主线程 id、`id` 不同的 rollout；`source.subagent.thread_spawn`
-  带 `parent_thread_id` 与 `agent_path`。`source.other == "guardian"` 是宿主的审批代理，单列，不算派活。
+  带 `parent_thread_id` 与 `agent_path`。`source.subagent.other == "guardian"`（真实 rollout 的形状；`parent_thread_id` 指向主线程）是宿主的审批代理，
+  单列，不算派活。
 - 用量：`event_msg` 的 `token_count.info.total_token_usage`，为线程内**累计值**（`input_tokens`、
   `cached_input_tokens`、`cache_write_input_tokens`、`output_tokens`、`reasoning_output_tokens`）；不要把每条事件的
   累计值相加。某时间窗的用量是窗内最后一条与窗前最后一条累计值之差；整条子线程取其最后一条。模型在

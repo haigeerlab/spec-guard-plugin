@@ -186,6 +186,103 @@ def read_claude(claude_home, project):
     return sessions
 
 
+INFO_ONLY = ("reasoning_output",)
+
+
+def _total(categories):
+    """Tokens that count toward a total; reasoning is already inside Codex output, so it is reference only."""
+    return sum(value for key, value in categories.items() if key not in INFO_ONLY)
+
+
+def _codex_categories(before, after):
+    def delta(key):
+        return (after.get(key) or 0) - (before.get(key) or 0)
+    cached = delta("cached_input_tokens")
+    return {"input": delta("input_tokens") - cached, "cache_read": cached,
+            "cache_write": delta("cache_write_input_tokens"), "output": delta("output_tokens"),
+            "reasoning_output": delta("reasoning_output_tokens")}
+
+
+def _codex_thread(path, in_project):
+    """One rollout as {"meta", "records": [(ts, model, categories)], "spawns": [(ts, call_id, task_name)]}.
+    Cumulative token_count totals become per-snapshot deltas, each tagged with the model in effect."""
+    meta, model, previous, records, spawns = None, "unknown", {}, [], []
+    for row in _rows(path):
+        kind, payload = row.get("type"), row.get("payload") or {}
+        if kind == "session_meta":
+            meta = payload
+            if not in_project(payload.get("cwd")):
+                return None
+            continue
+        if meta is None:
+            continue
+        try:
+            ts = parse_iso(row["timestamp"])
+        except (KeyError, ValueError, AttributeError):
+            continue
+        if kind == "turn_context":
+            model = payload.get("model") or model
+        elif kind == "event_msg" and payload.get("type") == "token_count":
+            total = (payload.get("info") or {}).get("total_token_usage")
+            if isinstance(total, dict):
+                records.append((ts, model, _codex_categories(previous, total)))
+                previous = total
+        elif kind == "response_item" and payload.get("type") == "function_call" and payload.get("name") == "spawn_agent":
+            try:
+                task_name = json.loads(payload.get("arguments") or "{}").get("task_name")
+            except (ValueError, AttributeError):
+                task_name = None
+            spawns.append((ts, payload.get("call_id"), task_name))
+    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns}
+
+
+def _is_guardian(meta):
+    """The host's approval reviewer. Real rollouts nest it as source.subagent.other; accept the flat form too."""
+    source = meta.get("source")
+    if not isinstance(source, dict):
+        return False
+    nested = source.get("subagent") if isinstance(source.get("subagent"), dict) else {}
+    return source.get("other") == "guardian" or nested.get("other") == "guardian"
+
+
+def read_codex(codex_home, project):
+    """Main threads with their spawns linked to child rollouts; guardian threads listed apart."""
+    real = os.path.realpath(str(project))
+
+    def in_project(cwd):
+        return isinstance(cwd, str) and (cwd == real or cwd.startswith(real + os.sep))
+
+    threads = {}
+    for path in sorted((Path(codex_home) / "sessions").glob("**/rollout-*.jsonl")):
+        thread = _codex_thread(path, in_project)
+        if thread:
+            threads[thread["meta"].get("id")] = thread
+    sessions = []
+    for thread_id, thread in threads.items():
+        source = thread["meta"].get("source")
+        if _is_guardian(thread["meta"]) or (isinstance(source, dict) and source.get("subagent")):
+            continue
+        children = {}
+        for child in threads.values():
+            child_source = child["meta"].get("source")
+            spawn = (child_source.get("subagent") or {}).get("thread_spawn") if isinstance(child_source, dict) else None
+            if spawn and spawn.get("parent_thread_id") == thread_id:
+                children.setdefault((spawn.get("agent_path") or "").rsplit("/", 1)[-1], []).append(child)
+        dispatches, subagents = [], {}
+        for ts, call_id, task_name in thread["spawns"]:
+            dispatches.append((ts, call_id))
+            queue = children.get(task_name or "", [])
+            if queue:
+                subagents[call_id] = queue.pop(0)["records"]
+        guardian = [record for other in threads.values()
+                    if _is_guardian(other["meta"])
+                    and thread_id in (other["meta"].get("parent_thread_id"), other["meta"].get("session_id"))
+                    for record in other["records"]]
+        sessions.append({"id": "codex:" + str(thread_id), "messages": thread["records"],
+                         "dispatches": dispatches, "subagents": subagents, "guardian": guardian})
+    return sessions
+
+
 def _add(bucket, model, categories):
     slot = bucket.setdefault(model, {})
     for key, value in categories.items():
@@ -194,18 +291,19 @@ def _add(bucket, model, categories):
 
 def build_report(project, module, claude_home=None, codex_home=None, now=None):
     windows = task_windows(project, module, now=now)
-    sessions = read_claude(claude_home, project) if claude_home else []
+    sessions = (read_claude(claude_home, project) if claude_home else []) + \
+        (read_codex(codex_home, project) if codex_home else [])
     tasks = []
     for window in windows["tasks"]:
         start, end = window["start"], window["end"]
         inside = lambda ts: start < ts <= end  # noqa: E731
-        task = dict(window, main={}, sub={}, dispatches=0, dispatches_unrecorded=0, sessions={})
+        task = dict(window, main={}, sub={}, guardian={}, dispatches=0, dispatches_unrecorded=0, sessions={})
         for session in sessions:
             used = 0
             for ts, model, categories in session["messages"]:
                 if inside(ts):
                     _add(task["main"], model, categories)
-                    used += sum(categories.values())
+                    used += _total(categories)
             for ts, tool_id in session["dispatches"]:
                 if not inside(ts):
                     continue
@@ -216,7 +314,11 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
                     continue
                 for _ts, model, categories in records:
                     _add(task["sub"], model, categories)
-                    used += sum(categories.values())
+                    used += _total(categories)
+            for ts, model, categories in session.get("guardian", []):
+                if inside(ts):
+                    _add(task["guardian"], model, categories)
+                    used += _total(categories)
             if used:
                 task["sessions"][session["id"]] = used
         task["coverage"] = "%d/%d" % (task["dispatches"] - task["dispatches_unrecorded"], task["dispatches"])
@@ -240,12 +342,14 @@ def main(argv=None):
     parser.add_argument("--project", default=".")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--claude-home", default=str(Path.home() / ".claude"))
+    parser.add_argument("--codex-home", default=str(Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")))
     args = parser.parse_args(argv)
     root = Path(args.project).resolve()
     report, failed = {"modules": []}, False
     for module in args.modules:
         try:
-            report["modules"].append(build_report(root, module, claude_home=Path(args.claude_home)))
+            report["modules"].append(build_report(root, module, claude_home=Path(args.claude_home),
+                                                       codex_home=Path(args.codex_home)))
         except AttributionError as error:
             failed = True
             report["modules"].append({"module": module, "unattributable": str(error)})
