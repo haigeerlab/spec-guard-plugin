@@ -50,6 +50,46 @@ except Exception:
   return 0
 }
 
+# CLI 能不能鉴权 —— 不花模型调用。
+# 为什么需要它：评测 spawn 的 `claude -p` 是独立的 CLI 进程，读 Keychain 里
+# `Claude Code-credentials` 那份 OAuth 会话，**与桌面 app／网页各自独立**。桌面 app 能用
+# 不代表 CLI 能用（桌面会话走宿主鉴权，env 里有 CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH）。
+# 2026-10-05 实际踩到：CLI 会话在评测跑到一半时失效，4 次调用全白烧，而 preflight 当时
+# 只查插件版本，一个字都没提鉴权。
+#
+# **这条探测只能证明「有登录记录」，不能证明模型调用会成功。** 没有验证过
+# 「已登录但 token 刷不动」时 auth status 会报什么 —— 要验它得先登出使用者的 CLI。
+# 跑到一半仍可能失败，那一步由 run_headless 负责报得清楚。
+preflight_cli_can_authenticate() {  # $1=claude 可执行文件（可选，自检用）
+  local binary="${1:-claude}" raw state
+  raw="$("${binary}" auth status --json 2>/dev/null </dev/null)"
+  state="$(python3 -c "
+import json, sys
+try:
+    value = json.loads(sys.argv[1])
+except ValueError:
+    value = {}
+if not isinstance(value, dict):
+    value = {}
+print('in' if value.get('loggedIn') is True
+      else 'out' if value.get('loggedIn') is False else 'unreadable')
+" "${raw}")"
+  case "${state}" in
+    in)  echo "  ✅ claude CLI 已登录（auth status，未调用模型）"; return 0 ;;
+    out)
+      echo "  ❌ claude CLI 未登录 —— 4 次模型调用会全部白跑"
+      echo "     在交互式 claude 里打斜杠命令 /login（不是 shell 的 claude login）"
+      return 1
+      ;;
+    *)
+      # 认不出的输出形状不假阻塞：按本仓库对 check-gh-json-fields 的做法，
+      # 干净跳过并声明「跳过不代表通过」。
+      echo "  ⏭  读不出 claude auth status 的形状，未检查登录态 —— 跳过不代表通过"
+      return 0
+      ;;
+  esac
+}
+
 # 跑一次 headless claude，并把「没跑起来」和「跑了但结果不对」分开。
 # 前者是工具故障，绝不能算成产品缺陷 —— 那是本仓最看重的那类误报。
 run_headless() {  # $1=工作目录 $2=stdout 落盘路径 ; 其余=claude 参数
