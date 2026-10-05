@@ -608,5 +608,137 @@ class OutputTests(ClaudeUsageTests):
         self.assertIn("趋势", data["comparison"]["note"])
 
 
+class ReviewFixTests(unittest.TestCase):
+    """Regressions for the 2026-10-05 code review of the cost report."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Repo(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def windows(self):
+        return mcr.task_windows(self.repo.root, MODULE, now=utc("2026-10-05T12:00:00Z"))["tasks"]
+
+    def test_items_ticked_in_one_commit_share_one_window(self):
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:00:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [x] Task 2：b"], "2026-10-05T10:30:00Z")
+        t1, t2 = self.windows()
+        self.assertEqual((t1["start"], t1["end"]), (utc("2026-10-05T10:00:00Z"), utc("2026-10-05T10:30:00Z")))
+        self.assertEqual(t2["start"], t2["end"])
+        self.assertEqual(t2["shared_with"], 0)
+
+    def test_open_items_share_one_window(self):
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b", "- [ ] Task 3：c"], "2026-10-05T10:00:00Z")
+        t1, t2, t3 = self.windows()
+        self.assertEqual(t1["end"], utc("2026-10-05T12:00:00Z"))
+        self.assertEqual((t2["start"] == t2["end"], t3["start"] == t3["end"]), (True, True))
+        self.assertEqual((t2["shared_with"], t3["shared_with"]), (0, 0))
+
+    def test_items_are_matched_by_title_when_one_is_inserted_above(self):
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:00:00Z")
+        self.repo.todo(["- [x] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:20:00Z")
+        self.repo.todo(["- [ ] Task 0：new", "- [x] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:25:00Z")
+        self.repo.todo(["- [x] Task 0：new", "- [x] Task 1：a", "- [ ] Task 2：b"], "2026-10-05T10:40:00Z")
+        tasks = {t["title"]: t for t in self.windows()}
+        self.assertEqual(tasks["Task 1：a"]["end"], utc("2026-10-05T10:20:00Z"))
+        self.assertEqual(tasks["Task 0：new"]["end"], utc("2026-10-05T10:40:00Z"))
+
+    def test_renamed_ticked_item_falls_back_to_position_and_says_so(self):
+        self.repo.todo(["- [ ] Task 1：old name"], "2026-10-05T10:00:00Z")
+        self.repo.todo(["- [x] Task 1：old name"], "2026-10-05T10:20:00Z")
+        self.repo.todo(["- [x] Task 1：new name"], "2026-10-05T10:30:00Z")
+        task = self.windows()[0]
+        self.assertEqual(task["end"], utc("2026-10-05T10:20:00Z"))
+        self.assertTrue(task["matched_by_position"])
+
+    def test_windows_use_author_time_so_a_rebase_does_not_move_them(self):
+        self.repo.todo(["- [ ] Task 1：a"], "2026-10-05T10:00:00Z")
+        path = self.repo.root / TODO
+        path.write_text("# Todo: demo\n\n- [x] Task 1：a\n", encoding="utf-8")
+        self.repo.git("add", "-A")
+        env = dict(os.environ, GIT_AUTHOR_DATE="2026-10-05T10:20:00Z", GIT_COMMITTER_DATE="2026-10-05T11:59:00Z")
+        subprocess.run(["git", "-C", str(self.repo.root), "commit", "-qm", "tick"], check=True, env=env)
+        self.assertEqual(self.windows()[0]["end"], utc("2026-10-05T10:20:00Z"))
+
+    def test_git_failure_text_does_not_leak_paths(self):
+        with tempfile.TemporaryDirectory() as plain:
+            (Path(plain) / TODO).parent.mkdir(parents=True)
+            (Path(plain) / TODO).write_text("- [x] Task 1：a\n", encoding="utf-8")
+            with self.assertRaises(mcr.AttributionError) as caught:
+                mcr.task_windows(Path(plain), MODULE)
+            self.assertNotIn(plain, str(caught.exception))
+            self.assertNotIn("/private", str(caught.exception))
+
+    def test_timestamps_with_unusual_fractions_parse_on_python_39(self):
+        self.assertEqual(mcr.parse_iso("2026-10-05T10:00:00.12Z"), utc("2026-10-05T10:00:00.120000Z"))
+        self.assertEqual(mcr.parse_iso("2026-10-05T10:00:00.1234567Z").microsecond, 123456)
+
+
+class ReviewFixUsageTests(ClaudeUsageTests):
+    def test_overlapping_windows_never_double_count(self):
+        self.repo.todo(["- [ ] Task 1：a", "- [ ] Task 2：b", "- [ ] Task 3：c"], "2026-10-05T10:50:00Z")
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T11:00:00Z", self.real, "m1", usage=usage(out=7))])
+        tasks = self.report()["tasks"]
+        outputs = [sum(c.get("output", 0) for c in t["main"].values()) for t in tasks]
+        self.assertEqual(sum(outputs), 7)
+
+    def test_linked_subagent_running_elsewhere_still_counts(self):
+        cwd = self.real
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m1", usage=usage(out=1),
+                                           content=agent_call("t1"))])
+        self.write("s1/subagents/agent-w.jsonl", [claude_row("assistant", "2026-10-05T10:22:00Z", "/elsewhere/worktree",
+                                                             "x1", model="claude-sonnet-5-5", usage=usage(out=40),
+                                                             sidechain=True, agent="w")])
+        (self.dir / "s1/subagents/agent-w.meta.json").write_text(json.dumps({"toolUseId": "t1"}), encoding="utf-8")
+        task2 = self.report()["tasks"][1]
+        self.assertEqual((task2["coverage"], task2["sub"]["claude-sonnet-5-5"]["output"]), ("1/1", 40))
+
+    def test_symlinked_cwd_in_transcript_still_matches(self):
+        link = Path(self.tmp.name) / "link-to-proj"
+        link.symlink_to(self.project)
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T10:05:00Z", str(link), "m1", usage=usage(out=9))])
+        self.assertEqual(self.report()["tasks"][0]["main"]["claude-opus-5-5"]["output"], 9)
+
+    def test_unparseable_rows_are_counted_not_silently_dropped(self):
+        rows = [claude_row("assistant", "not-a-time", self.real, "m1", usage=usage(out=9))]
+        self.write("s1.jsonl", rows)
+        self.assertEqual(self.report()["skipped_rows"], 1)
+
+
+class ReviewFixPriceTests(OutputTests):
+    def test_bad_price_file_exits_2_with_a_reason(self):
+        self.seed()
+        result = self.run_cli(prices={"per": "1K", "models": []})
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("价格文件", result.stderr)
+
+    def test_total_row_is_starred_when_anything_is_unpriced(self):
+        self.seed()
+        out = self.run_cli(prices={"currency": "USD", "per": "1M", "models": {"claude-opus-5-5": {"input": 5}}}).stdout
+        total = [line for line in out.splitlines() if line.strip().startswith("合计")][0]
+        self.assertIn("*", total)
+
+    def test_unknowns_mention_continuations_and_codex_reclaims(self):
+        self.seed()
+        out = self.run_cli().stdout
+        self.assertIn("续派", out)
+        self.assertIn("Codex", out)
+
+
+class ReviewFixCodexTests(CodexUsageTests):
+    def test_echoed_patch_text_in_a_shell_call_is_not_an_edit(self):
+        echo = {"timestamp": "2026-10-05T10:30:00Z", "type": "response_item",
+                "payload": {"type": "function_call", "name": "exec_command",
+                            "arguments": json.dumps({"cmd": "echo '*** Update File: %s/x.py' # apply_patch" % self.real})}}
+        self.rollout("main1", [codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+                               codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+                               codex_spawn("2026-10-05T10:21:00Z", "word_count", "call_1"), echo])
+        self.rollout("child1", [codex_meta("child1", self.real, "2026-10-05T10:21:01Z", parent="main1", task="word_count"),
+                                codex_tokens("2026-10-05T10:25:00Z", 10, 0, 1)])
+        self.assertEqual(self.report()["tasks"][1]["edits_after_handback"], 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
