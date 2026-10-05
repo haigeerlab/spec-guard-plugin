@@ -339,7 +339,7 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
         start, end = window["start"], window["end"]
         inside = lambda ts: start < ts <= end  # noqa: E731
         task = dict(window, main={}, sub={}, guardian={}, dispatches=0, dispatches_unrecorded=0, reclaims=0,
-                    sessions={})
+                    main_turns=0, sessions={})
         handbacks, edited = [], set()
         for session in sessions:
             used = 0
@@ -347,6 +347,7 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
                 if inside(ts):
                     _add(task["main"], model, categories)
                     used += _total(categories)
+                    task["main_turns"] += _total(categories) > 0
             for ts, tool_id in session["dispatches"]:
                 if not inside(ts):
                     continue
@@ -395,34 +396,142 @@ def _jsonable(value):
     return value
 
 
+def price_task(task, prices):
+    """Equivalent money per role; tokens in a model or category without a price are listed, never guessed."""
+    per = 1_000_000 if str(prices.get("per", "1M")).upper() == "1M" else float(prices.get("per"))
+    table, cost = prices.get("models") or {}, {"main": 0.0, "sub": 0.0, "guardian": 0.0, "unpriced": []}
+    for role in ("main", "sub", "guardian"):
+        for model, categories in task[role].items():
+            for category, tokens in categories.items():
+                if category in INFO_ONLY or not tokens:
+                    continue
+                price = (table.get(model) or {}).get(category)
+                if price is None:
+                    label = "%s:%s" % (model, category)
+                    if label not in cost["unpriced"]:
+                        cost["unpriced"].append(label)
+                    continue
+                cost[role] += tokens * float(price) / per
+    return cost
+
+
+def _role_total(bucket, category=None):
+    return sum((categories.get(category, 0) if category else _total(categories)) for categories in bucket.values())
+
+
+def comparison(modules):
+    groups = {"dispatched": {"tasks": 0, "tokens": 0, "cost": 0.0, "priced": True},
+              "not_dispatched": {"tasks": 0, "tokens": 0, "cost": 0.0, "priced": True}}
+    for module in modules:
+        for task in module.get("tasks", []):
+            group = groups["dispatched" if task["dispatches"] else "not_dispatched"]
+            group["tasks"] += 1
+            group["tokens"] += _role_total(task["main"]) + _role_total(task["sub"])
+            if "cost" in task:
+                group["cost"] += task["cost"]["main"] + task["cost"]["sub"]
+                group["priced"] = group["priced"] and not task["cost"]["unpriced"]
+            else:
+                group["priced"] = False
+    for group in groups.values():
+        group["avg_tokens"] = group["tokens"] / group["tasks"] if group["tasks"] else None
+        group["avg_cost"] = group["cost"] / group["tasks"] if group["tasks"] and group["priced"] else None
+    groups["note"] = "不同模块与 task 的规模不同，这里只能看趋势；派活是否省钱的因果结论须来自受控对照实验。"
+    return groups
+
+
+def _fmt(number):
+    return "{:,}".format(int(number))
+
+
+def render(report, priced):
+    lines = []
+    for module in report["modules"]:
+        if "unattributable" in module:
+            lines.append("模块 %s：无法归属——%s" % (module["module"], module["unattributable"]))
+            continue
+        lines.append("模块 %s" % module["module"])
+        header = "  %-28s %8s %14s %14s %14s %8s %4s %4s %6s" % (
+            "task", "主会话轮次", "主代理 token", "主会话缓存读", "子代理 token", "派活", "重派", "收回", "交回后改")
+        lines.append(header + ("   等价金额" if priced else ""))
+        totals = {"turns": 0, "main": 0, "read": 0, "sub": 0, "disp": 0, "money": 0.0}
+        for task in module["tasks"]:
+            main, read, sub = _role_total(task["main"]), _role_total(task["main"], "cache_read"), _role_total(task["sub"])
+            row = "  %-28s %8d %14s %14s %14s %8s %4d %4d %6d" % (
+                task["title"][:28] + ("" if task["done"] else "（进行中）"), task["main_turns"], _fmt(main), _fmt(read),
+                _fmt(sub), "%d(%s)" % (task["dispatches"], task["coverage"]), task["redispatches"], task["reclaims"],
+                task["edits_after_handback"])
+            if priced:
+                money = task["cost"]["main"] + task["cost"]["sub"]
+                totals["money"] += money
+                row += "   %.4f%s" % (money, " *" if task["cost"]["unpriced"] else "")
+            lines.append(row)
+            for key, value in (("turns", task["main_turns"]), ("main", main), ("read", read), ("sub", sub),
+                               ("disp", task["dispatches"])):
+                totals[key] += value
+        lines.append("  %-28s %8d %14s %14s %14s %8d" % ("合计", totals["turns"], _fmt(totals["main"]), _fmt(totals["read"]),
+                                                        _fmt(totals["sub"]), totals["disp"]) +
+                     ("            %.4f" % totals["money"] if priced else ""))
+        sessions = {}
+        for task in module["tasks"]:
+            for name, used in task["sessions"].items():
+                sessions[name] = sessions.get(name, 0) + used
+        if sessions:
+            lines.append("  贡献会话（时间窗内本项目的所有会话都会计入，含并行会话）：")
+            lines.extend("    %s  %s token" % (name, _fmt(used)) for name, used in sorted(sessions.items()))
+        else:
+            lines.append("  没有找到会话数据：时间窗内本项目没有 Claude transcript 或 Codex rollout。")
+        unknown = ["主代理通过 shell 命令（sed -i、脚本写文件等）改的文件不计入「交回后改」，只统计编辑工具与 apply_patch。"]
+        unrecorded = sum(task["dispatches_unrecorded"] for task in module["tasks"])
+        if unrecorded:
+            unknown.append("%d 次派活宿主没有留下子代理记录，用量未知，未计入。" % unrecorded)
+        unpriced = sorted({label for task in module["tasks"] for label in task.get("cost", {}).get("unpriced", [])})
+        if unpriced:
+            unknown.append("未定价（金额不含这部分，带 * 的行受影响）：" + "、".join(unpriced))
+        lines.append("  无法统计的部分：")
+        lines.extend("    - " + item for item in unknown)
+    if "comparison" in report:
+        lines.append("对照（%s）" % report["comparison"]["note"])
+        for key, label in (("dispatched", "有派活的 task"), ("not_dispatched", "没有派活的 task")):
+            group = report["comparison"][key]
+            average = "-" if group["avg_tokens"] is None else _fmt(group["avg_tokens"])
+            money = "" if group["avg_cost"] is None else "，平均等价金额 %.4f" % group["avg_cost"]
+            lines.append("  %s：%d 个，平均 %s token%s" % (label, group["tasks"], average, money))
+    return "\n".join(lines)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="只读的模块成本与返工报告")
     parser.add_argument("modules", nargs="+", metavar="MODULE")
     parser.add_argument("--project", default=".")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--prices", help="价格文件（JSON）；不给则只输出 token")
     parser.add_argument("--claude-home", default=str(Path.home() / ".claude"))
     parser.add_argument("--codex-home", default=str(Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")))
     args = parser.parse_args(argv)
     root = Path(args.project).resolve()
+    now = parse_iso(os.environ["SPEC_GUARD_COST_REPORT_NOW"]) if os.environ.get("SPEC_GUARD_COST_REPORT_NOW") else None
+    prices = None
+    if args.prices:
+        try:
+            prices = json.loads(Path(args.prices).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
+            print("价格文件无法读取：%s" % error, file=sys.stderr)
+            return 2
     report, failed = {"modules": []}, False
     for module in args.modules:
         try:
-            report["modules"].append(build_report(root, module, claude_home=Path(args.claude_home),
-                                                       codex_home=Path(args.codex_home)))
+            entry = build_report(root, module, claude_home=Path(args.claude_home), codex_home=Path(args.codex_home), now=now)
         except AttributionError as error:
             failed = True
             report["modules"].append({"module": module, "unattributable": str(error)})
-    if args.json:
-        print(json.dumps(_jsonable(report), ensure_ascii=False, indent=2))
-    else:
-        for entry in report["modules"]:
-            if "unattributable" in entry:
-                print("模块 %s：无法归属——%s" % (entry["module"], entry["unattributable"]))
-                continue
-            print("模块 %s" % entry["module"])
+            continue
+        if prices is not None:
             for task in entry["tasks"]:
-                print("  %s  %s → %s%s" % (task["title"], iso(task["start"]), iso(task["end"]),
-                                          "" if task["done"] else "（进行中）"))
+                task["cost"] = price_task(task, prices)
+        report["modules"].append(entry)
+    if len(args.modules) > 1:
+        report["comparison"] = comparison(report["modules"])
+    print(json.dumps(_jsonable(report), ensure_ascii=False, indent=2) if args.json else render(report, prices is not None))
     if failed:
         print("无法归属的模块不报告为 0；修正后重试。", file=sys.stderr)
         return 2

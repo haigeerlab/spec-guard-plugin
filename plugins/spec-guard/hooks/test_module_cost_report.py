@@ -389,6 +389,16 @@ class CodexUsageTests(unittest.TestCase):
         ])
         self.assertEqual(self.report()["tasks"][0]["main"], {})
 
+    def test_repeated_identical_totals_are_not_extra_turns(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T10:05:00Z", 100, 0, 10),
+            codex_tokens("2026-10-05T10:05:01Z", 100, 0, 10),   # the host re-emits the same total
+            codex_tokens("2026-10-05T10:06:00Z", 300, 100, 20),
+        ])
+        self.assertEqual(self.report()["tasks"][0]["main_turns"], 2)
+
     def test_encrypted_spawn_message_never_reaches_output(self):
         self.rollout("main1", [
             codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
@@ -512,6 +522,90 @@ class CodexReworkTests(CodexUsageTests):
         ])
         task2 = self.report()["tasks"][1]
         self.assertEqual((task2["dispatches"], task2["edits_after_handback"]), (1, 2))
+
+
+PRICES = {"currency": "USD", "per": "1M", "models": {
+    "claude-opus-5-5": {"input": 5, "cache_write_5m": 6.25, "cache_write_1h": 10, "cache_read": 0.5, "output": 25},
+    "claude-sonnet-5-5": {"input": 2, "cache_read": 0.2, "output": 10}}}
+
+
+class OutputTests(ClaudeUsageTests):
+    def run_cli(self, *extra, prices=None):
+        args = ["python3", "-B", str(Path(mcr.__file__)), "--project", str(self.project),
+                "--claude-home", str(self.home), "--codex-home", str(Path(self.tmp.name) / "no-codex")]
+        if prices is not None:
+            price_file = Path(self.tmp.name) / "prices.json"
+            price_file.write_text(json.dumps(prices), encoding="utf-8")
+            args += ["--prices", str(price_file)]
+        result = subprocess.run(args + list(extra) + [MODULE], capture_output=True, text=True,
+                                env=dict(os.environ, SPEC_GUARD_COST_REPORT_NOW="2026-10-05T12:00:00Z"))
+        return result
+
+    def seed(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", cwd, "m1", usage=usage(inp=1000, w1=1000, read=2000000, out=1000)),
+            claude_row("assistant", "2026-10-05T10:06:00Z", cwd, "m2", usage=usage(read=1000000, out=1000)),
+            claude_row("assistant", "2026-10-05T10:21:00Z", cwd, "m3", usage=usage(out=1), content=agent_call("t1")),
+            tool_result("2026-10-05T10:25:00Z", cwd, "t1", "SECRET-RESULT"),
+        ])
+        self.write("s1/subagents/agent-a1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:22:00Z", cwd, "x1", model="claude-sonnet-5-5",
+                       usage=usage(w1=50000, out=2000), sidechain=True, agent="a1")])
+        (self.dir / "s1/subagents/agent-a1.meta.json").write_text(json.dumps({"toolUseId": "t1"}), encoding="utf-8")
+
+    def test_main_turns_count_deduplicated_model_calls(self):
+        self.seed()
+        tasks = self.report()["tasks"]
+        self.assertEqual((tasks[0]["main_turns"], tasks[1]["main_turns"]), (2, 1))
+
+    def test_prices_convert_tokens_and_flag_unpriced_categories(self):
+        self.seed()
+        data = json.loads(self.run_cli("--json", prices=PRICES).stdout)
+        t1, t2 = data["modules"][0]["tasks"]
+        # opus: 1000*5 + 1000*10 + 3,000,000*0.5 + 2000*25 = 5000+10000+1500000+50000 = 1,565,000 per 1M -> 1.565
+        self.assertAlmostEqual(t1["cost"]["main"], 1.565, places=6)
+        self.assertEqual(t1["cost"]["unpriced"], [])
+        # sonnet subagent has cache_write_1h tokens but no cache_write_1h price -> flagged, not guessed
+        self.assertIn("claude-sonnet-5-5:cache_write_1h", t2["cost"]["unpriced"])
+        self.assertAlmostEqual(t2["cost"]["sub"], 2000 * 10 / 1e6, places=6)
+
+    def test_without_prices_there_is_no_money(self):
+        self.seed()
+        data = json.loads(self.run_cli("--json").stdout)
+        self.assertNotIn("cost", data["modules"][0]["tasks"][0])
+
+    def test_table_output_has_task_rows_and_unknowns_but_no_content(self):
+        self.seed()
+        result = self.run_cli(prices=PRICES)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        out = result.stdout
+        for needle in ("Task 1：a", "Task 2：b", "主会话轮次", "合计", "无法统计的部分", "未定价", "claude:s1", "shell 命令"):
+            self.assertIn(needle, out)
+        for secret in ("SECRET-PROMPT-TEXT", "SECRET-TASK-PROMPT", "SECRET-RESULT"):
+            self.assertNotIn(secret, out)
+
+    def test_no_session_data_is_reported_as_empty_not_an_error(self):
+        result = self.run_cli()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("没有找到会话数据", result.stdout)
+
+    def test_two_modules_get_a_dispatched_versus_not_comparison(self):
+        self.seed()
+        other = self.project / "tasks" / "solo" / "todo.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("- [ ] Task 1：x\n", encoding="utf-8")
+        self.repo.git("add", "-A"); self.repo.git("commit", "-qm", "solo", when="2026-10-05T11:00:00Z")
+        other.write_text("- [x] Task 1：x\n", encoding="utf-8")
+        self.repo.git("add", "-A"); self.repo.git("commit", "-qm", "solo done", when="2026-10-05T11:30:00Z")
+        self.write("s3.jsonl", [claude_row("assistant", "2026-10-05T11:10:00Z", self.real, "z1", usage=usage(out=300))])
+        args = ["python3", "-B", str(Path(mcr.__file__)), "--project", str(self.project), "--claude-home", str(self.home),
+                "--codex-home", str(Path(self.tmp.name) / "no-codex"), "--json", MODULE, "solo"]
+        data = json.loads(subprocess.run(args, capture_output=True, text=True,
+                                         env=dict(os.environ, SPEC_GUARD_COST_REPORT_NOW="2026-10-05T12:00:00Z")).stdout)
+        groups = data["comparison"]
+        self.assertEqual((groups["dispatched"]["tasks"], groups["not_dispatched"]["tasks"]), (1, 2))
+        self.assertIn("趋势", data["comparison"]["note"])
 
 
 if __name__ == "__main__":
