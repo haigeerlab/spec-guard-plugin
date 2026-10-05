@@ -1,4 +1,11 @@
-"""Explicit comment and post-delivery close entry for hosted Issues."""
+"""Explicit comment and post-delivery close entry for hosted Issues.
+
+This is the CLI. The operations live in `hosted_ticket_actions.py` -- plural, one
+letter apart. Same split as `hosted_ticket.py` (CLI) over `hosted_ticket_write.py`,
+but with a name that greps and autocompletes almost identically, so check which of
+the two you have open before editing. Renaming it is not free: dated audit records
+under `docs/reports/` cite the plural file by line number.
+"""
 from __future__ import annotations
 
 import argparse

@@ -1,4 +1,10 @@
-"""Conservative comment and delivery-close operations for one hosted Issue."""
+"""Conservative comment and delivery-close operations for one hosted Issue.
+
+This is the library. The CLI that drives it is `hosted_ticket_action.py` --
+singular, one letter apart; check which of the two you have open before editing.
+No other product module imports this one, so a behaviour change here reaches users
+only through that CLI and the `hosted-ticket-workflow` skill.
+"""
 from __future__ import annotations
 
 import fcntl

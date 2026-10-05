@@ -64,6 +64,13 @@ publication 探测失败的处理同形。
 **阶段迁移一律先加后删。** 若先删成功、后加失败，事项会变成一个阶段标签都没有，直接破坏 tracker 契约、
 让它读不出来；先加最坏只留两个，而下一次读取会把它报成契约违规，不会静默误判。
 
+真的落到两个阶段标签时，插件不会替你修。下一次读取由 `validate_tracker` 判为契约违规，
+`closeout` 返回 `state: invalid` + `tracker-contract-invalid`，诊断正文是
+`Issue must contain exactly one allowed proposal stage label`（2026-10-05 以两个阶段标签实跑核对）。
+**处理办法是人工在事项上删掉旧的那个阶段标签**（保留新的），然后重新运行
+`/spec-guard:proposal-closeout preview`。不要改 Proposal 文档——revision 没有变，
+变的只是事项上的标签。
+
 ### Local 的两个实测约束
 
 下面两条都是在隔离临时账本里对固定的 `epiq@1.11.0` 实测得出的，不是从压缩包反推的：
