@@ -2,6 +2,8 @@
 
 > 登记说明（2026-09-28）：本模块已交付，登记时无待办。以下是 documentation-governance initiative 归档时的原计划，保留作为交付记录。
 
+<!-- spec-guard: no-todo -->
+
 ## Overview
 
 为已启用基线且已记录模块影响的项目增加交付前只读核验。它以保守提醒呈现声明性文档结果，默认不阻止实现、Issue 或 PR 工作流。

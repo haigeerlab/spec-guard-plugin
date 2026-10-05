@@ -2,6 +2,14 @@
 
 ## [未发布]
 
+### 新增
+
+- **有意不建 todo 的模块可以声明，提醒只列真正缺 todo 的模块。** 已交付的模块常常只有 Plan，此前
+  `verify-artifacts` 的汇总和阶段注入的 `Plan without todo: N` 每次都把它们全部列出，真正漏建 todo
+  的模块被淹没在里面。现在 `tasks/<id>/plan.md` 中独占一行的 `<!-- spec-guard: no-todo -->` 声明它是
+  有意的：汇总、计数行和 `activeModule` 提醒都跳过它。**完成判据不变**，带不带声明都按已完成计。
+  判据由 `module_stage.plan_without_todo` 唯一实现，两边共用；本仓库 13 个登记模块已加上声明。
+
 ### 修复
 
 - **两份被取代的决策不再读作生效中。** `docs/decisions/2026-09-28-xats-sunset.md` 的状态行此前

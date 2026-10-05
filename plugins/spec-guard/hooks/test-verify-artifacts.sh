@@ -133,6 +133,16 @@ check "12 个缺 todo 的模块只列前 10 个并以等 12 个结尾" 0 \
 check "12 个缺 todo 的模块仍只多一条警告" 0 "1 警告"
 check_absent "12 个缺 todo 的模块不列出第 11 个 id" "m11,"
 
+# plan.md 里独占一行的 no-todo 声明：汇总只列没有声明的模块，全有声明时不发警告。
+many_modules no-todo-marked 3
+plan_only m01; plan_only m02; plan_only m03
+printf '%s\n' '# Plan' '<!-- spec-guard: no-todo -->' | tee "$PROJECT/tasks/m01/plan.md" "$PROJECT/tasks/m03/plan.md" >/dev/null
+printf '%s\n' '# Plan' '> 登记说明：没有 todo 是有意的。' > "$PROJECT/tasks/m02/plan.md"
+check "只列没有 no-todo 声明的模块" 0 "1 个模块有 Plan 但没有 todo.md，按已完成计：m02"
+printf '%s\n' '# Plan' '<!-- spec-guard: no-todo -->' > "$PROJECT/tasks/m02/plan.md"
+check "全部带声明时警告数为 0" 0 "0 警告"
+check_absent "全部带声明时没有汇总警告" "没有 todo.md"
+
 # tracker 字段已退役，不再抑制任何判断：缺 todo 汇总只看文件，与 state.json 的内容无关。
 many_modules no-todo-github 3
 plan_only m02; mkdir -p "$PROJECT/.agent"

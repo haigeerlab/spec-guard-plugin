@@ -47,7 +47,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 `- Paused:` 行表示有被暂停的模块：当前模块以外、todo 既有已勾又有未勾项的模块（显式插队留下的）。它出现在 `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下，`MODULE_DONE` 的下一步会指回它；没有被暂停的模块时不输出。
 
 有 Plan 但没有 `tasks/<id>/todo.md` 的模块按已完成计（没有未勾选项）。现有项目里这类已交付的模块很常见，所以这是有意为之，完成判据不变。
-只有 `activeModule` 明确指向这样的模块时，`MODULE_DONE` / `DONE` 才会多一行 ``- activeModule `<id>` has a plan but no `tasks/<id>/todo.md`, so it counts as done; add the todo if work remains.``（在计数行之后、`Paused` 行之前）。模块其实还有活要做时，补一份 `tasks/<id>/todo.md` 列出剩余任务；确已交付则无需处理。其他情况输出不变。这行提醒只看文件是否存在，与 `.agent/state.json` 的内容无关（原先对已退役 tracker 模式的抑制已随该字段一并删除，见 `docs/retirements/state-tracker-field.md`）。
+只有 `activeModule` 明确指向这样的模块时，`MODULE_DONE` / `DONE` 才会多一行 ``- activeModule `<id>` has a plan but no `tasks/<id>/todo.md`, so it counts as done; add the todo if work remains.``（在计数行之后、`Paused` 行之前）。模块其实还有活要做时，补一份 `tasks/<id>/todo.md` 列出剩余任务；确已交付则无需处理；已交付、有意不建 todo 的模块，可在 `plan.md` 里加独占一行的 `<!-- spec-guard: no-todo -->` 声明，之后这行提醒不再出现，该模块也不计入 DONE 汇总的 `Plan without todo: N`（仍按已完成计）。自由文本说明不算声明。其他情况输出不变。这行提醒只看文件是否存在，与 `.agent/state.json` 的内容无关（原先对已退役 tracker 模式的抑制已随该字段一并删除，见 `docs/retirements/state-tracker-field.md`）。
 
 当前模块取 `.agent/state.json` 的 `activeModule`（须是能力图中的模块），否则取 Build order 中第一个未完成的模块。
 阶段只依据本地文件，不读取 tracker、GitHub 或 Git 历史。
