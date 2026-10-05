@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.43.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.43.0;test:installed-plugin-upgrade-20261005b"
+      },
+      "observedAt": "2026-10-05T08:24:25Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.42.0 to 0.43.0 for scope user",
+        "result:the installed copy records gitCommitSha 18e30ad4aaebbbc8c261b26a3d063a5d304d68e0 -- the v0.43.0 tag commit -- and its hooks/module_stage.py carries this release's NO_TODO_MARKER and plan_without_todo"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.43.0;test:installed-headless-no-todo-declaration-20261005"
+      },
+      "observedAt": "2026-10-05T08:24:25Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '只复述你收到的 spec-guard 注入里「当前阶段」那一行和所有以 \"- \" 开头的行，逐字，不要加别的' --max-turns 2",
+        "result:exit 0; the reply was `当前阶段: **BUILDING**`, `Current module: work-mod`, `Modules 2 · Specs 2 · Plans 2 · In progress 1 · Done 1`, and no `Plan without todo` line",
+        "host:a disposable Git project whose CLAUDE.md wraps the installed copy's templates/claude-block-local.md in the BEGIN/END convention markers; module done-mod has only a plan.md carrying `<!-- spec-guard: no-todo -->`, module work-mod has one unchecked todo item",
+        "result:the declared module still counts as done (Done 1) and is no longer counted as plan-without-todo -- the behaviour this release adds",
+        "limit:the first attempt omitted the BEGIN/END markers, so the hook stayed silent as designed for an unactivated project; that was a fixture error, not a product result",
+        "host:PATH was restricted so python3 resolved to /usr/bin/python3 3.9.6, the macOS system interpreter"
+      ]
+    }
+  ]
+}
