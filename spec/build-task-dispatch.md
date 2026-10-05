@@ -44,7 +44,7 @@ agent-skills 是第三方插件，不能改。本模块在 spec-guard 写入项�
 
 ### C1 规则段模板
 
-- 新增 `templates/claude-block-dispatch.md` 与 `templates/codex-block-dispatch.md`。两份第一行都是
+- 新增 `templates/claude-dispatch-rule.md` 与 `templates/codex-dispatch-rule.md`。两份第一行都是
   `<!-- spec-guard: build-task-dispatch -->`，其后是规则正文，正文为 2–4 个列表项，覆盖：
   - 何时派：`/build` 执行 `todo.md` 中非 Checkpoint 的 task；
   - 派给谁、做什么：一个 task 一个子代理，只做 RED → GREEN → 全量回归 → 构建，不提交、不勾选；
@@ -52,6 +52,8 @@ agent-skills 是第三方插件，不能改。本模块在 spec-guard 写入项�
   - 停止条件原样交回；验收 diff、只暂存该 task 的文件、提交、勾选、问人由主代理完成。
 - Codex 段把「Agent 工具」写成 `spawn_agent`，并加一句「tier-guard 在 Codex 上只作建议」。
 - 现有 `claude-block-local.md`、`codex-block-local.md` 不改。
+- 规则段不用 `*-block-*.md` 命名：`test_workflow_checkpoints.py` 要求每份完整约定块模板都带检查点规则，
+  规则段只是追加在基础块之后的片段，基础块已带该规则，不该落入那条守卫的范围。
 
 ### C2 `setup-convention.sh`
 
@@ -85,7 +87,7 @@ python3 scripts/check-command-parity.py
 ## Project structure
 
 ```text
-plugins/spec-guard/templates/claude-block-dispatch.md, codex-block-dispatch.md  -> C1
+plugins/spec-guard/templates/claude-dispatch-rule.md, codex-dispatch-rule.md  -> C1
 plugins/spec-guard/hooks/setup-convention.sh                                     -> C2
 plugins/spec-guard/hooks/test-setup-teardown.sh                                  -> C1/C2 回归
 plugins/spec-guard/commands/setup-convention.md, skills/spec-guard-ops/SKILL.md,

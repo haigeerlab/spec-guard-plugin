@@ -19,7 +19,7 @@
 
 ## Task 1：规则段模板（C1）
 
-- 新增 `templates/claude-block-dispatch.md`、`templates/codex-block-dispatch.md`。首行都是
+- 新增 `templates/claude-dispatch-rule.md`、`templates/codex-dispatch-rule.md`。首行都是
   `<!-- spec-guard: build-task-dispatch -->`，正文 2–4 个列表项，覆盖 Spec C1 的四点：何时派、子代理只做
   RED → GREEN → 回归 → 构建且不提交不勾选、prompt 必含（task 原文、spec 路径、独占一行的 tier-guard 标记，
   重试带 `failures=N`，todo 行已有标记原样带上）、停止条件交回与主代理收尾。

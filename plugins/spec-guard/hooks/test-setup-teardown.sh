@@ -192,4 +192,22 @@ grep -F 'MAP_ONLY' >/dev/null <<<"$(CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOKDIR/
   || fail "没有声明块时，仅凭 state.json 的 activeModule 应仍然激活"
 ok "仅凭 activeModule 激活，不依赖声明块"
 
+# ── build-task-dispatch 规则段模板 ──────────────────────
+DISPATCH_MARKER='<!-- spec-guard: build-task-dispatch -->'
+TEMPLATES="$HOOKDIR/../templates"
+for host in claude codex; do
+  tpl="$TEMPLATES/${host}-dispatch-rule.md"
+  [ -f "$tpl" ] || fail "缺少规则段模板 ${host}-dispatch-rule.md"
+  [ "$(head -n 1 "$tpl")" = "$DISPATCH_MARKER" ] || fail "${host} 规则段首行必须是开关标记"
+  [ "$(grep -Fxc "$DISPATCH_MARKER" "$tpl")" -eq 1 ] || fail "${host} 规则段的开关标记必须恰好出现一次"
+  for needle in 'Checkpoint' 'RED → GREEN' '<!-- tier-guard: tier=' 'failures=N' '不提交' '不勾选' '交回'; do
+    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
+  done
+  ok "${host} 规则段：首行标记，覆盖何时派、子代理四步不提交、tier-guard 标记与停止条件交回"
+done
+grep -F 'Agent 工具' "$TEMPLATES/claude-dispatch-rule.md" >/dev/null || fail "claude 规则段应指明 Agent 工具"
+grep -F 'spawn_agent' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应指明 spawn_agent"
+grep -F '只作建议' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应写明 tier-guard 在 Codex 上只作建议"
+ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
+
 echo "setup/teardown regression passed (${PASS} cases)"
