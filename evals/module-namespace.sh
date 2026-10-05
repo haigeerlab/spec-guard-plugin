@@ -25,9 +25,16 @@
 #     tasks/plan.md** —— README 问题① 的原形，本仓库第一次真的观察到。第二轮没动，
 #     很可能被上游 0.6.8 的止损挡住。
 #   2026-10-05 新判据第二次：有约定组结果逐字相同；对照组这次自己分了模块目录。
-#   → 有约定组两次一致，对照组两次不同。约定给的是**保证**，无约定是碰运气。这是判据
-#     改为证「保证」而不是证「两组路径不同」的实证依据，也是 README 问题① 改成
-#     「共用一份、没有保证」的依据。两个观察，不是定律。
+#   2026-10-05 新判据第三次：有约定组**第一轮零产出** → 无结论（退 2，未判违反）；
+#     对照组又落共用路径。这次暴露了「判无结论却不留诊断」，diagnose() 因此而加。
+#   2026-10-05 新判据第四次：两组都隔离 → 退 0。
+#   → 四次汇总 —— 有约定组：3 次隔离成立、1 次无结论、**0 次违反**；
+#     对照组：2 次落共用根路径、2 次自己分目录，一半一半。
+#     约定给的是**保证**，无约定是碰运气。这是判据改为证「保证」而不是证「两组路径
+#     不同」的实证依据，也是 README 问题① 改成「共用一份、没有保证」的依据。
+#     四个观察，不是定律。
+#     注意 diagnose() 至今没在真实失败中被跑到 —— 四次里唯一的非 0 判决（第三次）
+#     发生在它加进来之前。它的行为由 selftest 与变异覆盖，调用点由静态断言钉住。
 #
 # 为什么挑 local 模式：
 #   - local 模式没有 skill 兜底，声明块就是全部约定 —— 它不 work 就是真不 work
@@ -172,6 +179,22 @@ raise SystemExit(0)
 PY
 }
 
+diagnose() {  # $1=本组输出前缀（$WORK/<组>）$2=组名 ；只在判决不为 0 时调用
+  # 判出「没有结论」却不留任何可诊断的东西，和静默失败是同一个形状
+  # （docs/lenses.md A4）。$WORK 在 trap 里会被删掉，所以这里必须当场把尾部打出来 ——
+  # 2026-10-05 第三次真实运行踩到：有约定组第一轮零产出，4 次调用的代价付了，
+  # 「为什么」却查不回来。行宽截到 200 字符，避免一条长行把输出冲掉。
+  local out
+  for out in "$1.r1.out" "$1.r2.out"; do
+    if [ -s "$out" ]; then
+      printf '  [%s] %s 末 8 行：\n' "$2" "${out##*/}"
+      tail -n 8 "$out" | cut -c1-200 | sed 's/^/      /'
+    else
+      printf '  [%s] %s 为空 —— 该轮模型没有任何输出\n' "$2" "${out##*/}"
+    fi
+  done
+}
+
 conclude() {  # $1=有约定组判据 $2=对照组判据
   local W="$1" N="$2"
   case "$W" in
@@ -297,6 +320,23 @@ selftest() {
   mv "$WORK/withblk/spec/broken.md" "$WORK/withblk/spec/CAPABILITY-MAP.md"
   check_scaffold >/dev/null 2>&1 && { echo "  ❌ 能力图坏掉时 check_scaffold 必须失败"; F=1; }
 
+  # diagnose：判决不为 0 时必须留下可诊断的东西。$WORK 会被 trap 删掉，所以尾部要当场打。
+  printf 'line1\nline2\nFAILED: something\n' > "$SMOKE/g.r1.out"
+  : > "$SMOKE/g.r2.out"
+  grep -q "FAILED: something" <<<"$(diagnose "$SMOKE/g" 自检)" \
+    || { echo "  ❌ diagnose 应打出非空 transcript 的尾部"; F=1; }
+  grep -q "为空 —— 该轮模型没有任何输出" <<<"$(diagnose "$SMOKE/g" 自检)" \
+    || { echo "  ❌ diagnose 应把空 transcript 明说为空，而不是沉默"; F=1; }
+  printf '%0.sx' $(seq 1 400) > "$SMOKE/g.r1.out"; printf '\n' >> "$SMOKE/g.r1.out"
+  [ "$(diagnose "$SMOKE/g" 自检 | awk '{ if (length($0) > m) m = length($0) } END { print m }')" -le 210 ] \
+    || { echo "  ❌ diagnose 必须截断长行，否则一条长输出会冲掉其余诊断"; F=1; }
+  echo "  ✅ diagnose: 打尾部、空也明说、长行截断"
+  # 调用点本身也要钉住：diagnose 写得再对，没人调它也等于没有。selftest 跑的是
+  # 合成夹具，到不了真实运行那两行，所以这里用静态断言兜 —— 判据覆盖不到的地方
+  # 要承认并补，而不是当它不存在。
+  [ "$(grep -c '|| diagnose "\$WORK/' "$HERE/module-namespace.sh")" -eq 2 ] \
+    || { echo "  ❌ 两个组的判决后都必须调 diagnose（判决不为 0 时）"; F=1; }
+
   # 鉴权探测的四条路径。未登录那条**只能靠注入**验：要用真 CLI 验它，得先登出使用者的账号。
   # 不假阻塞是重点 —— 认不出形状时必须放行并声明「跳过不代表通过」，否则 claude 的输出
   # 一改版，整个评测就被一条探测挡死（本仓库对 check-gh-json-fields 的同一条取舍）。
@@ -378,7 +418,9 @@ fi
 
 echo ""
 isolated "$WORK/withblk" "$WORK/withblk.snap1" 有块; W=$?
+[ "$W" -eq 0 ] || diagnose "$WORK/withblk" 有块
 isolated "$WORK/noblk"   "$WORK/noblk.snap1"   无块; N=$?
+[ "$N" -eq 0 ] || diagnose "$WORK/noblk" 无块
 echo ""
 conclude "$W" "$N"
 exit $?
