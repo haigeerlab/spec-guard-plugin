@@ -37,8 +37,9 @@ git -C "$REPO" show "${BASE}:scripts/collaboration-extraction-paths.txt" > "$WOR
 
 mkdir -p "$TARGET"
 git -C "$TARGET" init -q -b main
-git -C "$TARGET" fetch -q --no-tags "$REPO" "${BASE}:refs/heads/main"
-git -C "$TARGET" checkout -q main
+git -C "$TARGET" fetch -q --no-tags "$REPO" "$BASE"
+git -C "$TARGET" update-ref refs/heads/main FETCH_HEAD
+git -C "$TARGET" reset -q --hard main
 (cd "$TARGET" && git filter-repo --quiet --force --paths-from-file "$WORK/paths.txt")
 git -C "$TARGET" remote remove origin 2>/dev/null || true
 
