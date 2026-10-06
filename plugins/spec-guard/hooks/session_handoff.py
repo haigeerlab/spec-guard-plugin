@@ -9,23 +9,15 @@ writes a file and never reads a session transcript.
 from __future__ import annotations
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import active_module_state, module_state, project_stage, safe_fragment, unmerged_commits
+from session_context import _git
 
 UNKNOWN = "未知"
 EVIDENCE_NAME = re.compile(r"^v(\d+(?:\.\d+)*)-[^/]+\.json$")
-
-
-def _git(root: Path, *args: str) -> str | None:
-    try:
-        done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=5)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
 
 
 def _header(root: Path) -> str:
