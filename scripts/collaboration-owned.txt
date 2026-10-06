@@ -1,5 +1,6 @@
-# Collaboration-owned paths: exempt from check-collaboration-boundary.py and moved to agent-relay by
-# collaboration-extraction. One repository path per line; a trailing "/" means a whole directory.
+# Paths that moved to agent-relay (collaboration-extraction) and were removed from Spec Guard
+# (collaboration-dependency). check-collaboration-boundary.py fails if any of them exists again.
+# One repository path per line; a trailing "/" means a whole directory.
 # Source: docs/baselines/collaboration-pre-split.md, "Inventory and coupling points".
 
 # Code
@@ -31,12 +32,11 @@ plugins/spec-guard/hooks/test_native_collaboration_host_config.py
 plugins/spec-guard/hooks/test_skill_entrypoints.py
 plugins/spec-guard/hooks/test-collaboration-suite.sh
 
-# Skills and command
+# Skills
 plugins/spec-guard/skills/collab/
 plugins/spec-guard/skills/collaboration-ops/
 plugins/spec-guard/skills/session-routing/
 plugins/spec-guard/skills/session-delegation/
-plugins/spec-guard/commands/collaboration.md
 
 # References
 plugins/spec-guard/references/collaboration-runtime.md
