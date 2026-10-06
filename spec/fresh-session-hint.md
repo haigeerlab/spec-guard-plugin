@@ -37,7 +37,8 @@
    `transcript_path` 为可空字符串；真实 Codex 会话中是否非空**未实测**（临时注册的 hook 未获信任，没有执行），放到
    Checkpoint 用安装版在真实 Codex 会话里核对。为空或缺失时按第 2 条只做"模块完成"一条。
 8. **只读末尾。** 会话记录可达数十 MB；只从文件末尾向前读，最多读 4 MiB，找到第一条符合第 2 条的记录即停；读满仍没有
-   就当作拿不到。读取中遇到无法解析的行跳过。
+   就当作拿不到。读取中遇到无法解析的行跳过；用量合计为 0 的记录（宿主中断后写入的 synthetic 消息）
+   不算读数，继续向前找。
 9. **输出。** 两行都写在阶段输出的末尾、`Suggested next step` 之前的事实列表里，英文，与现有行风格一致：
    - 模块完成：`- Module boundary: start the next piece of work in a new session; this stage summary carries over, the conversation does not need to.`
    - 上下文过长：`- Session context: about N k tokens in the last turn (over 200k); every turn re-reads it. At the next task boundary, record decisions in the spec and start a new session.`
