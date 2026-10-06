@@ -21,7 +21,7 @@ spec-guard 为 `addyosmani/agent-skills` 提供：
 1. 本地多模块 Spec 约定：一张能力图、模块 Spec、Plan 与任务清单；
 2. Proposal 生命周期：只读地评审 GitHub / GitLab Proposal Issue，把新需求按锚点插入能力图；
 3. UserPromptSubmit 阶段注入：报告当前模块缺 Spec、缺 Plan、在构建中还是已完成；
-4. 可选的本机能力：agent 协作信箱与本地事项账本。
+4. 可选的本机能力：本地事项账本（会话协作已拆为独立插件 agent-relay，Spec Guard 只经 `agent_relay_probe.py` 检测它）。
 5. 按需托管日常事项：明确目标后处理 GitHub/GitLab 普通 Issue，不恢复旧 bridge。
 
 改动前先阅读 [docs/design.md](docs/design.md)；已有故障模式和审查方法在

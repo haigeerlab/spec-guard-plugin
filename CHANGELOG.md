@@ -1,5 +1,18 @@
 # Changelog
 
+## [未发布]
+
+### 移除
+
+- **会话协作拆为独立插件 agent-relay。** 本机协作信箱、统一会话路由与跨宿主会话委派（`collab`、`collaboration-ops`、
+  `session-routing`、`session-delegation` skill 及其运行时、宿主适配器与测试）移到 agent-relay，代码连同逐文件历史迁入
+  新仓库。只想让会话互相通信的项目不必再装 Spec Guard 的工作流；只用工作流的人也不再背 macOS／Node.js 依赖。
+  Spec Guard 只通过 `agent_relay_probe.py` 检测 agent-relay（读宿主的插件记录与它的 `interface.json`，失败报 `unknown`，
+  从不写文件），未安装时工作流照常运行。`/spec-guard:collaboration` 保留一到两个版本作为转交入口：agent-relay 可用时
+  转交给它，否则提示安装与迁移。旧的信箱与委派数据不会被删除，迁移步骤见
+  [`docs/migrations/2026-10-07-collaboration-split.md`](docs/migrations/2026-10-07-collaboration-split.md)。
+  `scripts/check-collaboration-boundary.py` 防止协作实现或其内部名字重新进入 Spec Guard。
+
 ## [0.49.0] - 2026-10-06
 
 ### 新增

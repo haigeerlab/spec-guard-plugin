@@ -43,6 +43,12 @@ BUILTIN = {
     "plugin", "reload-plugins", "config", "permissions", "hooks", "help", "clear",
 }
 
+# 其他插件里、本插件文字明确会提到的命令：协作拆成 agent-relay 后，过渡期的
+# /spec-guard:collaboration 要把用户转交到它（collaboration-dependency）。只登记真实存在的
+# 那一条，取自 agent-relay `plugins/agent-relay/commands/*.md` 的文件名（2026-10-07 核对）；
+# 写错名字（/agent-relay:collab 之类）照样报错。
+EXTERNAL_COMMANDS = {"agent-relay": {"collaboration"}}
+
 # 上游的 skill 名（`skills/*/` 的目录名）。命令文里 `invoke <name>` 引用的是这些，
 # 和斜杠命令是两个不同的命名空间 —— `/plan` 是命令，
 # `planning-and-task-breakdown` 是 skill，二者都存在且不可互换。
@@ -154,7 +160,8 @@ def main() -> int:
                 for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
                     for namespace, name in CMD.findall(line):
                         if namespace:
-                            if namespace not in own_names or name not in own_cmds:
+                            external = name in EXTERNAL_COMMANDS.get(namespace, set())
+                            if not external and (namespace not in own_names or name not in own_cmds):
                                 print(f"  ❌ {path}:{lineno} 引用了不存在的插件命令 /{namespace}:{name}")
                                 ok = False
                             continue
