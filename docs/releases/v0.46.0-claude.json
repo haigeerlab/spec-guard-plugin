@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.46.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.46.0;test:installed-plugin-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T06:32:45Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.45.0 to 0.46.0 for scope user",
+        "result:the installed copy records gitCommitSha 0bcda2946c584b338698fae89c6b253c7d9851e4 -- the v0.46.0 tag commit -- and carries hooks/session_context.py"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.46.0;test:installed-session-context-20261006"
+      },
+      "observedAt": "2026-10-06T06:32:45Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p --resume <release session> --fork-session --output-format json 'Release host check. Reply with exactly: ok'",
+        "result:exit 0; the fork's injected phase text had the location line (`branch `main` · worktree `<this repository>``) but no context line: a forked session's transcript file is created only when its first message is written, after UserPromptSubmit runs, so the hook found no file and stayed quiet as designed",
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p --resume <that fork> --output-format json 'Second host check. Reply with exactly: ok'",
+        "result:exit 0; the injected phase text read from the session transcript contained `- Session context: about 245 k tokens in the last turn (over 200k); every turn re-reads it. At the next task boundary, record decisions in the spec and start a new session.` after the counts line, plus the location line under the heading",
+        "result:the installed session_context.py run directly on the same transcript afterwards also reported 244658 tokens",
+        "limit:the first turn of a new or freshly forked session has no transcript yet, so it never carries the context line; a new session is small, so this only matters for --fork-session of a long one",
+        "limit:the module boundary line was not observed on a real host in this release; it is covered by the phase-guard regression (MODULE_DONE / DONE cases)",
+        "host:python3 resolved to /usr/bin/python3 3.9.6; the two calls cost $1.66 and $1.73"
+      ]
+    }
+  ]
+}
