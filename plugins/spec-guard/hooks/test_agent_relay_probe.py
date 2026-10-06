@@ -68,7 +68,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(report["state"], "not-installed")
         self.assertIsNone(report["interface"])
         self.assertIn(NOT_INSTALLED_TEXT, report["message"])
-        self.assertIn("docs/migrations/<date>-collaboration-split.md", report["message"])
+        self.assertIn("docs/migrations/2026-10-07-collaboration-split.md", report["message"])
 
     def test_claude_ready_reports_the_interface_version(self):
         self.install_claude()

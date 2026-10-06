@@ -24,7 +24,7 @@ MIN_VERSION, MAX_VERSION = (1, 0), (2, 0)
 TIMEOUT_SECONDS = 10
 NOT_INSTALLED = (
     "协作能力已移到独立插件 agent-relay，当前未安装。工作流不受影响。安装与旧状态迁移见\n"
-    "`docs/migrations/<date>-collaboration-split.md`。"
+    "`docs/migrations/2026-10-07-collaboration-split.md`。"
 )
 
 
