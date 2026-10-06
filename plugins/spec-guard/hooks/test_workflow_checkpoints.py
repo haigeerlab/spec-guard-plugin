@@ -81,5 +81,44 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, workflow)
 
 
+    # checkpoint-tiers: discoverability of the rules only -- whether a host follows them is checked in real sessions.
+
+    def section(self, title):
+        text = self.target.read_text(encoding="utf-8")
+        self.assertIn(title, text)
+        start = text.index(title)
+        end = text.find("\n## ", start + len(title))
+        return text[start:] if end < 0 else text[start:end]
+
+    def test_plan_checkpoints_are_gate_or_report(self):
+        tiers = self.section("## Plan 检查点分级")
+        for phrase in ("`gate`", "`report`", "未标注的检查点按 `gate`", "记入 todo", "不倒计时",
+                       "测试改不红", "权限被拒", "合并永远由用户"):
+            self.assertIn(phrase, tiers)
+        self.assertIn("`gate` 检查点写明的授权", self.section("## 阶段交接"))
+
+    def test_batch_review_and_continuous_build(self):
+        batch = self.section("## 按需求批量前置审")
+        for phrase in ("批量批准", "activeModule", "Build order", "80%", "/spec-guard:handoff", "不自行开新会话"):
+            self.assertIn(phrase, batch)
+
+    def test_ui_self_verification(self):
+        ui = self.section("## UI 自验")
+        for phrase in ("浏览器", "电脑操作", "缺失", "提前提醒", "兜底", "Claude 桌面应用"):
+            self.assertIn(phrase, ui)
+
+    def test_no_remote_write_is_authorized_by_default(self):
+        text = self.target.read_text(encoding="utf-8")
+        for phrase in ("默认授权推送", "默认授权开 PR", "默认推送", "自动合并"):
+            self.assertNotIn(phrase, text)
+        self.assertIn("只有当 Plan 的 `gate` 检查点逐项写明授权", self.section("## Plan 检查点分级"))
+
+    def test_templates_point_at_checkpoint_tiers(self):
+        for name in ("claude-block-local.md", "codex-block-local.md"):
+            template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                for phrase in ("`gate`", "`report`", "批量前置审", "UI 自验", "共享检查点规则"):
+                    self.assertIn(phrase, template)
+
 if __name__ == "__main__":
     unittest.main()
