@@ -41,4 +41,6 @@ python3 -B "$ROOT/hooks/module_cost_report.py" --project "$PROJECT" $ARGUMENTS
   `{"currency":"USD","per":"1M","models":{"<宿主记录里的模型名>":{"input":…,"cache_write_5m":…,"cache_write_1h":…,"cache_read":…,"output":…}}}`；
   Codex 的类别是 `input`（非缓存）、`cache_read`、`cache_write`、`output`。缺价的部分标「未定价」，不要替用户补价格。
   主会话的缓存读通常占绝大部分 token，价格表缺缓存价时金额会严重偏低，要提醒。
+- **模块完成后的收尾**：模块全部勾选后，报告多一行收尾（最后一次勾选到该会话下一次用户发言之间的用量，通常是收尾总结），
+  以及「合计（含收尾）」；要和整次运行的花费对账时看这一行。
 - **多个模块**：报告附「有派活 / 没派活」的对照，只能看趋势；派活是否省钱的结论须来自受控对照实验，不要从这里下因果结论。

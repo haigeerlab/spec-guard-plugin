@@ -740,5 +740,73 @@ class ReviewFixCodexTests(CodexUsageTests):
         self.assertEqual(self.report()["tasks"][1]["edits_after_handback"], 0)
 
 
+def user_prompt(ts, cwd, text="继续"):
+    return {"type": "user", "timestamp": ts, "cwd": str(cwd), "isSidechain": False, "sessionId": "s1",
+            "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
+
+
+class WrapUpTests(ClaudeUsageTests):
+    """Usage after the module's last tick, up to the session's next user prompt (2026-10-06 joint run)."""
+
+    def test_wrap_up_after_last_tick_is_reported_apart(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:40:00Z", cwd, "m1", usage=usage(out=10)),
+            claude_row("assistant", "2026-10-05T10:45:08Z", cwd, "m2", usage=usage(out=30)),   # wrap-up summary
+            user_prompt("2026-10-05T11:00:00Z", cwd),
+            claude_row("assistant", "2026-10-05T11:01:00Z", cwd, "m3", usage=usage(out=999)),  # unrelated later work
+        ])
+        report = self.report()
+        self.assertEqual(report["wrap_up"]["main"]["claude-opus-5-5"]["output"], 30)
+        self.assertEqual(report["wrap_up"]["turns"], 1)
+        self.assertNotIn(999, [c.get("output") for c in report["wrap_up"]["main"].values()])
+
+    def test_tool_results_are_not_a_new_prompt(self):
+        cwd = self.real
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:40:00Z", cwd, "m0", usage=usage(out=1)),   # the session worked on the module
+            claude_row("assistant", "2026-10-05T10:45:05Z", cwd, "m1", usage=usage(out=5)),
+            tool_result("2026-10-05T10:45:06Z", cwd, "x", "ok"),
+            claude_row("assistant", "2026-10-05T10:45:08Z", cwd, "m2", usage=usage(out=7)),
+        ])
+        self.assertEqual(self.report()["wrap_up"]["main"]["claude-opus-5-5"]["output"], 12)
+
+    def test_open_module_has_no_wrap_up(self):
+        self.repo.todo(["- [x] Task 1：a", "- [x] Task 2：b", "- [ ] Task 3：c"], "2026-10-05T10:50:00Z")
+        self.write("s1.jsonl", [claude_row("assistant", "2026-10-05T11:00:00Z", self.real, "m1", usage=usage(out=5))])
+        self.assertIsNone(self.report()["wrap_up"])
+
+    def test_sessions_that_never_touched_the_module_add_no_wrap_up(self):
+        self.write("s9.jsonl", [claude_row("assistant", "2026-10-05T10:46:00Z", self.real, "z1", usage=usage(out=44))])
+        self.assertEqual(self.report()["wrap_up"]["main"], {})
+
+
+class CodexWrapUpTests(CodexUsageTests):
+    def test_codex_wrap_up_stops_at_next_user_message(self):
+        self.rollout("main1", [
+            codex_meta("main1", self.real, "2026-10-05T10:01:00Z"),
+            codex_model("2026-10-05T10:01:00Z", "gpt-6.1-sol"),
+            codex_tokens("2026-10-05T10:40:00Z", 100, 0, 10),
+            codex_tokens("2026-10-05T10:45:08Z", 300, 100, 20),     # wrap-up: +200 in (100 cached), +10 out
+            {"timestamp": "2026-10-05T11:00:00Z", "type": "response_item",
+             "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "继续"}]}},
+            codex_tokens("2026-10-05T11:01:00Z", 9000, 0, 900),
+        ])
+        wrap = self.report()["wrap_up"]["main"]["gpt-6.1-sol"]
+        self.assertEqual((wrap["input"], wrap["cache_read"], wrap["output"]), (100, 100, 10))
+
+
+class WrapUpOutputTests(OutputTests):
+    def test_table_shows_wrap_up_and_total_including_it(self):
+        self.seed()
+        self.write("s1.jsonl", [
+            claude_row("assistant", "2026-10-05T10:05:00Z", self.real, "m1", usage=usage(out=1000)),
+            claude_row("assistant", "2026-10-05T10:45:08Z", self.real, "mw", usage=usage(out=2000)),
+        ])
+        out = self.run_cli(prices=PRICES).stdout
+        self.assertIn("模块完成后的收尾", out)
+        self.assertIn("合计（含收尾）", out)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

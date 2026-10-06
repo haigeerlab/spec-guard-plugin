@@ -7,4 +7,4 @@
 - [x] Task 4：返工信号——重派、收回、交回后主代理改动文件数
 - [x] Task 5：价格、输出与隐私——--prices、--json、多模块对照、无法统计的部分
 - [x] Task 6：命令、skill 路由与文档——cost-report.md、SKILL 路由、workflow、CHANGELOG
-- [ ] Checkpoint：全量 + 实跑手查 + 牙齿检查 + 审查 + PR + 联调
+- [x] Checkpoint：全量 + 实跑手查 + 牙齿检查 + 审查 + PR + 联调（ledgerlite 18 次运行，与 tier-guard 交叉核对一致）
