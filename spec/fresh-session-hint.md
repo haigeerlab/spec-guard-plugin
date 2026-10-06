@@ -51,7 +51,7 @@
 11. **位置行。** 所有阶段（含 `IDLE`、`MAP_ONLY`、`MAP_INVALID`、`UNKNOWN`）在标题 `## spec-guard local workflow` 与
     `当前阶段` 之间注入一行：
     `Location: branch `<分支>` · worktree `<工作树根目录>`. State this location to the user whenever you ask them to review or confirm.`
-    分支取 `git rev-parse --abbrev-ref HEAD`，分离 HEAD 时写 `detached at <短 sha>`；工作树取 `git rev-parse --show-toplevel`。
+    分支取 `git symbolic-ref --short HEAD`（尚无提交的新分支也有名字），分离 HEAD 时写 `detached at <短 sha>`；工作树取 `git rev-parse --show-toplevel`。
     两个值都经 `module_stage.safe_fragment` 清洗；不是 git 仓库或 git 失败时不出这一行，其余输出照常。只用 git 读，不联网。
     转告用户是对 agent 的软约束，不做强制。
 
@@ -90,8 +90,8 @@ python3 -B plugins/spec-guard/hooks/test_session_context.py
   - Codex 记录：取最后一条 `token_count` 的 `last_token_usage.input_tokens`；`info` 为 null 的事件跳过；
   - 末尾 4 MiB 内没有用量记录、坏行、空文件、文件不存在、路径为空 → `None`；
   - hook 输入：正常、非 JSON、缺字段、`null`、非字符串 → 对应结果；
-  - 位置行：普通分支、分离 HEAD、linked worktree（报告该 worktree 自己的根目录）、非 git 目录 → `None`、含控制字符的
-    分支名被清洗。
+  - 位置行：普通分支、分离 HEAD、linked worktree（报告该 worktree 自己的根目录）、非 git 目录 → `None`、含反引号的
+    分支名被清洗（git 禁止分支名含控制字符）。
 - `test-phase-guard.sh`：通过标准输入喂 hook 输入：
   - `MODULE_DONE` / `DONE` → 有"模块完成"一行；`BUILDING` 且上下文 25 万 → 只有上下文一行；`DONE` 且 25 万 → 两行，
     顺序固定；`BUILDING` 且 15 万 → 输出与现在逐字相同；

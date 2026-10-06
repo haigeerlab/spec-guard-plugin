@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 import session_context
-from session_context import TAIL_LIMIT, context_tokens, transcript_path_from_hook_input
+from session_context import TAIL_LIMIT, context_tokens, location_line, transcript_path_from_hook_input
 
 
 def claude_assistant(inp, read, write, sidechain=False):
@@ -154,6 +154,77 @@ class CommandLine(unittest.TestCase):
     def test_input_over_the_limit_is_not_read(self):
         big = json.dumps({"transcript_path": str(self.transcript), "pad": "x" * session_context.INPUT_LIMIT})
         self.assertEqual(self.run_cli(big).split("\n")[0], "")
+
+
+def git(*args, cwd):
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
+                    *args], cwd=cwd, check=True, capture_output=True)
+
+
+TELL = "State this location to the user whenever you ask them to review or confirm."
+
+
+class Location(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name, "repo")
+        self.repo.mkdir()
+        git("init", "-q", "-b", "main", cwd=self.repo)
+        self.top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=self.repo,
+                                  capture_output=True, text=True).stdout.strip()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def commit(self):
+        (self.repo / "f").write_text("x")
+        git("add", "f", cwd=self.repo)
+        git("commit", "-q", "-m", "c", cwd=self.repo)
+
+    def test_branch_and_worktree(self):
+        self.commit()
+        self.assertEqual(location_line(self.repo), "Location: branch `main` · worktree `%s`. %s" % (self.top, TELL))
+
+    def test_unborn_branch_still_has_a_name(self):
+        self.assertEqual(location_line(self.repo), "Location: branch `main` · worktree `%s`. %s" % (self.top, TELL))
+
+    def test_subdirectory_reports_the_worktree_root(self):
+        self.commit()
+        (self.repo / "sub").mkdir()
+        self.assertIn("worktree `%s`." % self.top, location_line(self.repo / "sub"))
+
+    def test_detached_head(self):
+        self.commit()
+        git("checkout", "-q", "--detach", cwd=self.repo)
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=self.repo,
+                             capture_output=True, text=True).stdout.strip()
+        self.assertEqual(location_line(self.repo), "Location: detached at `%s` · worktree `%s`. %s" % (sha, self.top, TELL))
+
+    def test_linked_worktree_reports_its_own_root(self):
+        self.commit()
+        linked = Path(self.tmp.name, "linked")
+        git("worktree", "add", "-q", "-b", "side", str(linked), cwd=self.repo)
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=linked,
+                             capture_output=True, text=True).stdout.strip()
+        self.assertEqual(location_line(linked), "Location: branch `side` · worktree `%s`. %s" % (top, TELL))
+
+    def test_not_a_repository(self):
+        plain = Path(self.tmp.name, "plain")
+        plain.mkdir()
+        self.assertIsNone(location_line(plain))
+
+    def test_branch_name_cannot_forge_structure(self):
+        self.commit()
+        git("checkout", "-q", "-b", "x`y", cwd=self.repo)
+        line = location_line(self.repo)
+        self.assertIn("branch `xy`", line)
+        self.assertEqual(line.count("`"), 4)
+
+    def test_command_line_prints_the_location_second(self):
+        self.commit()
+        done = subprocess.run([sys.executable, "-B", SCRIPT, str(self.repo)], input="", capture_output=True,
+                              text=True, timeout=10)
+        self.assertEqual(done.stdout.split("\n")[1], location_line(self.repo))
 
 
 if __name__ == "__main__":

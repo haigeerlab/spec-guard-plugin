@@ -460,8 +460,15 @@ lacks "推送后 DONE 不再报告未合并提交" "$um_done" "not yet in"
 lacks "推送后 DONE 不再建议先推送" "$um_done" "push this branch"
 um_plain="$WORK/um-plain"
 cp -R "$um_done" "$um_plain"; git -C "$um_plain" remote remove origin
-[ "$(run "$um_done")" = "$(run "$um_plain")" ] || fail "推送后的输出应与无远端时逐字相同"
-echo "  ✅ 推送后输出与无远端时逐字相同"; PASS=$((PASS + 1))
+# 两棵树的目录不同，位置行必然不同；比较的是远端状态，所以去掉位置行后逐字比较。
+sans_location() {
+  python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+print("\n".join(l for l in text.split("\n") if not l.startswith("Location: ")))'
+}
+[ "$(run "$um_done" | sans_location)" = "$(run "$um_plain" | sans_location)" ] || fail "推送后的输出应与无远端时逐字相同"
+echo "  ✅ 推送后输出与无远端时逐字相同（位置行除外）"; PASS=$((PASS + 1))
 # 没有远端：无提示。
 two_commits "$um_plain"
 lacks "没有远端时不提示未合并提交" "$um_plain" "not yet in"
@@ -569,5 +576,41 @@ mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "
 out="$(run_input "$idle_ctx" "$HOOK_INPUT" | context_of)"
 grep -F "Session context" >/dev/null <<<"$out" && fail "IDLE 不应有上下文行"
 echo "  ✅ IDLE 没有上下文行"; PASS=$((PASS + 1))
+
+# 位置行（fresh-session-hint 第 11 条）：git 仓库里每个阶段都在标题与“当前阶段”之间给出分支与 worktree。
+TELL='State this location to the user whenever you ask them to review or confirm.'
+located() {  # $1=用例名 $2=项目目录 $3=期望的阶段
+  local out top
+  out="$(run "$2")"; top="$(git -C "$2" rev-parse --show-toplevel)"
+  python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+want = "## spec-guard local workflow\n\nLocation: branch `main` · worktree `%s`. %s\n\n当前阶段: **%s**" % tuple(sys.argv[1:4])
+assert text.startswith(want), text
+assert text.count("Location:") == 1, text
+' "$top" "$TELL" "$3" <<<"$out" || fail "$1: 位置行缺失或位置不对
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+loc="$WORK/loc"
+mkdir -p "$loc"
+git -C "$loc" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$loc/CLAUDE.md"
+located "IDLE 有位置行" "$loc" IDLE
+map "$loc"
+located "MAP_ONLY 有位置行" "$loc" MAP_ONLY
+mkdir -p "$loc/tasks/alpha"; touch "$loc/spec/alpha.md"; printf '# Plan\n' > "$loc/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$loc/tasks/alpha/todo.md"
+located "BUILDING 有位置行" "$loc" BUILDING
+printf '%s\n' '- [x] open' > "$loc/tasks/alpha/todo.md"
+located "DONE 有位置行" "$loc" DONE
+printf '\377\376 not utf-8\n' > "$loc/tasks/alpha/todo.md"
+located "UNKNOWN 有位置行" "$loc" UNKNOWN
+printf '%s\n' '| alpha | x | — |' > "$loc/spec/CAPABILITY-MAP.md"
+located "MAP_INVALID 有位置行" "$loc" MAP_INVALID
+lacks "非 git 目录没有位置行" "$ctx" "Location:"
+grep -F "worktree \`$(git -C "$git_project" rev-parse --show-toplevel)\`." >/dev/null <<<"$(run_from "$git_project/src/deep")" \
+  || fail "Codex 从仓库子目录启动时位置行应报告仓库根目录"
+echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PASS=$((PASS + 1))
 
 echo "phase-guard regression passed (${PASS} cases)"

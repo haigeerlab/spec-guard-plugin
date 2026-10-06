@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only session facts for the phase hint: the main-session context size.
+"""Read-only session facts for the phase hint: the main-session context size and location.
 
 Only the last usage numbers are read; no transcript content ever leaves this module.
 Anything unreadable is "unknown" (None), never a guess.
@@ -9,8 +9,11 @@ from __future__ import annotations
 import json
 import os
 import select
+import subprocess
 import sys
 import time
+
+from module_stage import safe_fragment
 
 TAIL_LIMIT = 4 * 1024 * 1024
 INPUT_LIMIT = 1024 * 1024
@@ -77,6 +80,31 @@ def transcript_path_from_hook_input(text) -> str | None:
     return path if isinstance(path, str) and path else None
 
 
+def _git(root, *args) -> str | None:
+    try:
+        done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
+
+
+def location_line(root) -> str | None:
+    """Branch (or detached commit) and worktree root of `root`, or None outside a git worktree."""
+    top = _git(root, "rev-parse", "--show-toplevel")
+    if not top:
+        return None
+    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    if branch:
+        head = "branch `%s`" % safe_fragment(branch)
+    else:
+        sha = _git(root, "rev-parse", "--short", "HEAD")
+        if not sha:
+            return None
+        head = "detached at `%s`" % safe_fragment(sha)
+    return ("Location: %s · worktree `%s`. State this location to the user whenever you ask them "
+            "to review or confirm." % (head, safe_fragment(top)))
+
+
 def read_hook_input(fd: int) -> str:
     """Hook input from fd, waiting at most INPUT_WAIT seconds; "" if it is over INPUT_LIMIT."""
     deadline = time.monotonic() + INPUT_WAIT
@@ -99,8 +127,12 @@ def main() -> None:
         tokens = context_tokens(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
     except Exception:  # a hook helper must never break the stage injection
         tokens = None
+    try:
+        location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".")
+    except Exception:
+        location = None
     print("" if tokens is None else tokens)
-    print("")
+    print(location or "")
 
 
 if __name__ == "__main__":
