@@ -41,3 +41,7 @@ plugins/spec-guard/commands/collaboration.md
 # References
 plugins/spec-guard/references/collaboration-runtime.md
 plugins/spec-guard/references/collaboration-protocol.md
+
+# Extraction record (collaboration-extraction); names collaboration paths, removed with the rest
+scripts/collaboration-extraction-paths.txt
+scripts/extract-collaboration.sh

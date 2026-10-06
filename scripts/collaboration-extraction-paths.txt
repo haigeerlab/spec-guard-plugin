@@ -1,0 +1,82 @@
+# git filter-repo --paths-from-file input for collaboration-extraction (spec/collaboration-extraction.md).
+# Literal lines keep a path (a trailing "/" keeps a directory); "old==>new" lines re-root it (decision D6).
+# No file in this set was ever renamed in Spec Guard (git log --follow, 2026-10-06), so no earlier names.
+
+# Collaboration-owned files (scripts/collaboration-owned.txt) and the C1/C2 copies
+plugins/spec-guard/hooks/native_collaboration_runtime.py
+plugins/spec-guard/hooks/native_collaboration_adapters.py
+plugins/spec-guard/hooks/native_collaboration_retire.py
+plugins/spec-guard/hooks/session_routing.py
+plugins/spec-guard/hooks/session_delegation.py
+plugins/spec-guard/hooks/session_delegation_backend.py
+plugins/spec-guard/hooks/session_delegation_claude.py
+plugins/spec-guard/hooks/session_delegation_codex.py
+plugins/spec-guard/hooks/session_delegation_control.py
+plugins/spec-guard/hooks/test_native_collaboration_runtime.py
+plugins/spec-guard/hooks/test_native_collaboration_adapters.py
+plugins/spec-guard/hooks/test_native_collaboration_retire.py
+plugins/spec-guard/hooks/test_native_only_collaboration.py
+plugins/spec-guard/hooks/test_native_collab_entry.py
+plugins/spec-guard/hooks/test_collab_entry.py
+plugins/spec-guard/hooks/test_session_routing.py
+plugins/spec-guard/hooks/test_session_routing_entry.py
+plugins/spec-guard/hooks/test_session_delegation.py
+plugins/spec-guard/hooks/test_session_delegation_backend.py
+plugins/spec-guard/hooks/test_session_delegation_claude.py
+plugins/spec-guard/hooks/test_session_delegation_codex.py
+plugins/spec-guard/hooks/test_session_delegation_recovery.py
+plugins/spec-guard/hooks/test_native_collaboration_host_config.py
+plugins/spec-guard/hooks/test_skill_entrypoints.py
+plugins/spec-guard/hooks/test-collaboration-suite.sh
+plugins/spec-guard/skills/collab/
+plugins/spec-guard/skills/collaboration-ops/
+plugins/spec-guard/skills/session-routing/
+plugins/spec-guard/skills/session-delegation/
+plugins/spec-guard/commands/collaboration.md
+plugins/spec-guard/references/collaboration-runtime.md
+plugins/spec-guard/references/collaboration-protocol.md
+plugins/spec-guard/hooks/host_config_removal.py
+plugins/spec-guard/hooks/test_host_config_removal.py
+plugins/spec-guard/hooks/defect_guard.py
+
+# Split documents (kept at the same path)
+docs/collaboration-interface.md
+docs/collaboration-split-brief.md
+docs/baselines/collaboration-pre-split.md
+
+# Collaboration records (decision D5)
+spec/collaboration-messaging.md
+spec/collaboration-safe-defaults.md
+spec/authorized-session-delegation.md
+spec/host-native-session-routing.md
+spec/proposals/collaboration-messaging.md
+spec/proposals/authorized-session-delegation.md
+tasks/collaboration-messaging/
+tasks/collaboration-safe-defaults/
+tasks/authorized-session-delegation/
+tasks/host-native-session-routing/
+docs/decisions/2026-09-28-xats-sunset.md
+docs/decisions/2026-10-04-native-only-collaboration-sunset.md
+docs/reports/2026-10-04-a10-native-promotion-readiness.md
+docs/reports/2026-10-04-native-only-collaboration-closeout.md
+docs/research/2026-09-17-agent-collaboration-design.md
+docs/retirements/xats-collaboration-transport.md
+
+# Renames (decision D6)
+plugins/spec-guard/==>plugins/agent-relay/
+spec/collaboration-messaging.md==>docs/history/spec-guard/spec/collaboration-messaging.md
+spec/collaboration-safe-defaults.md==>docs/history/spec-guard/spec/collaboration-safe-defaults.md
+spec/authorized-session-delegation.md==>docs/history/spec-guard/spec/authorized-session-delegation.md
+spec/host-native-session-routing.md==>docs/history/spec-guard/spec/host-native-session-routing.md
+spec/proposals/collaboration-messaging.md==>docs/history/spec-guard/spec/proposals/collaboration-messaging.md
+spec/proposals/authorized-session-delegation.md==>docs/history/spec-guard/spec/proposals/authorized-session-delegation.md
+tasks/collaboration-messaging/==>docs/history/spec-guard/tasks/collaboration-messaging/
+tasks/collaboration-safe-defaults/==>docs/history/spec-guard/tasks/collaboration-safe-defaults/
+tasks/authorized-session-delegation/==>docs/history/spec-guard/tasks/authorized-session-delegation/
+tasks/host-native-session-routing/==>docs/history/spec-guard/tasks/host-native-session-routing/
+docs/decisions/2026-09-28-xats-sunset.md==>docs/history/spec-guard/docs/decisions/2026-09-28-xats-sunset.md
+docs/decisions/2026-10-04-native-only-collaboration-sunset.md==>docs/history/spec-guard/docs/decisions/2026-10-04-native-only-collaboration-sunset.md
+docs/reports/2026-10-04-a10-native-promotion-readiness.md==>docs/history/spec-guard/docs/reports/2026-10-04-a10-native-promotion-readiness.md
+docs/reports/2026-10-04-native-only-collaboration-closeout.md==>docs/history/spec-guard/docs/reports/2026-10-04-native-only-collaboration-closeout.md
+docs/research/2026-09-17-agent-collaboration-design.md==>docs/history/spec-guard/docs/research/2026-09-17-agent-collaboration-design.md
+docs/retirements/xats-collaboration-transport.md==>docs/history/spec-guard/docs/retirements/xats-collaboration-transport.md
