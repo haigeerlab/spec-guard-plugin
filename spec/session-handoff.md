@@ -39,8 +39,13 @@ UserPromptSubmit hook 本地作答，不调用模型。阶段提示里的 Module
     `not-verified` 的 `subject`；目录不存在或没有这类文件时写"无发布证据"，不报错。
 12. **位置以会话所在目录为准。** 本会话（桌面版、worktree `hello-226c46`）里阶段提示报告的是 `main` 与主仓路径，与实际
     worktree 不符。phase-guard 优先用 `CLAUDE_PROJECT_DIR`；推测桌面版 worktree 会话中它指向原项目目录。处理：hook 输入带
-    `cwd` 时用 `git -C <cwd> rev-parse --show-toplevel` 作为项目根，取不到再退回现有逻辑。**推测需先实测确认**
-    （见 Testing strategy 第一项）；若不成立，本条只用于交接命令，不改 phase-guard 的根目录判定。
+    `cwd` 时用 `git -C <cwd> rev-parse --show-toplevel` 作为项目根，取不到再退回现有逻辑。
+
+    实测记录（2026-10-06，Task 1）：本会话记录的 `cwd` 字段全部是该 worktree（或其子目录），而同一会话每轮注入的阶段提示
+    报告主仓路径与 `main`，即 phase-guard 的根目录解析落在主仓。worktree 内临时 `.claude/settings.local.json` 注册的探针
+    hook 一轮未执行；在主仓放同样探针的操作被宿主权限检查拒绝，未执行。因此 hook 输入 `cwd` 的实际值与
+    `CLAUDE_PROJECT_DIR` 的取值**未直接实测**。用户确认按此推进：改动只在输入 `cwd` 解析出的 git 根与现有根不同时生效，
+    `cwd` 若同样指向主仓则行为不变（无害）；是否真正修正由 Checkpoint 2 的安装版桌面会话核对。
 
 ## Contract
 
