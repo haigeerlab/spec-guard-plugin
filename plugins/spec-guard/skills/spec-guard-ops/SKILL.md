@@ -91,6 +91,17 @@ python3 -B "$ROOT/hooks/module_cost_report.py" --project "$PROJECT" <module-id> 
 原样转述输出与「无法统计的部分」。退出码 2 是「无法归属」（todo.md 没有提交历史），不是用量为 0；金额只在用户给了
 价格文件时出现，缺价标「未定价」，不替用户补价格；多模块对照只能看趋势，不下因果结论。
 
+## handoff
+
+只读的会话交接文本（Claude 侧为 `/spec-guard:handoff`）。在已启用约定的项目里，整条提示词恰好是
+`spec-guard handoff` 时，UserPromptSubmit hook 已在本地作答、不调用模型；hook 没有拦截时运行：
+
+```bash
+python3 -B "$ROOT/hooks/session_handoff.py" "$PROJECT"
+```
+
+把输出原样放进代码块交给用户复制；不改写、不推测“下一步”，那一行由用户填写。
+
 ## tracker default
 
 项目默认的事项后端与精确目标，存在 `.agent/tracker.json`。读取只读：

@@ -234,5 +234,60 @@ class Location(unittest.TestCase):
         self.assertEqual(done.stdout.split("\n")[1], location_line(self.repo))
 
 
+
+class RootFromHookInput(unittest.TestCase):
+    """session-handoff 第 12 条：项目根以 hook 输入的 cwd 所在 git 仓库为准，取不到才用调用方的默认根。"""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name).resolve()
+        self.main = base / "main"
+        (self.main / "src").mkdir(parents=True)
+        git("init", "-q", "-b", "main", cwd=self.main)
+        (self.main / "f").write_text("x\n")
+        git("add", "f", cwd=self.main)
+        git("commit", "-q", "-m", "init", cwd=self.main)
+        self.linked = base / "linked"
+        git("worktree", "add", "-q", "-b", "feat", str(self.linked), cwd=self.main)
+        self.plain = base / "plain"
+        self.plain.mkdir()
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def root(self, payload, fallback=None):
+        text = payload if isinstance(payload, str) else json.dumps(payload)
+        return session_context.root_from_hook_input(text, str(fallback or self.main))
+
+    def test_cwd_in_a_linked_worktree_wins_over_the_fallback(self):
+        self.assertEqual(self.root({"cwd": str(self.linked)}), str(self.linked))
+
+    def test_cwd_in_a_subdirectory_resolves_to_the_repository_root(self):
+        self.assertEqual(self.root({"cwd": str(self.main / "src")}), str(self.main))
+
+    def test_unusable_cwd_keeps_the_fallback(self):
+        for payload in ("", "not json", "null", {}, {"cwd": None}, {"cwd": ""}, {"cwd": 3},
+                        {"cwd": str(self.plain)}, {"cwd": str(self.main / "missing")}):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.root(payload), str(self.main))
+
+    def test_command_line_prints_the_root_then_the_input_on_one_line(self):
+        payload = {"cwd": str(self.linked), "prompt": "a\nb", "transcript_path": "/t"}
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--resolve-root", str(self.main)],
+                              input=json.dumps(payload), capture_output=True, text=True, timeout=10)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        lines = done.stdout.split("\n")
+        self.assertEqual(lines[0], str(self.linked))
+        self.assertEqual(json.loads(lines[1]), payload)
+        self.assertEqual(done.stdout.count("\n"), 2)
+
+    def test_command_line_without_usable_input_prints_the_fallback_and_an_empty_line(self):
+        for text in ("", "not json", "[1]"):
+            with self.subTest(text=text):
+                done = subprocess.run([sys.executable, "-B", SCRIPT, "--resolve-root", str(self.main)],
+                                      input=text, capture_output=True, text=True, timeout=10)
+                self.assertEqual(done.stdout, "%s\n\n" % self.main)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -47,7 +47,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 在 git 仓库里，标题下第一行是 ``Location: branch `<分支>` · worktree `<工作树根目录>`. …``（分离 HEAD 时为 ``detached at `<短 sha>` ``），
 各阶段都有；呈现结果时把它一并告诉用户，agent 请用户评审或确认时也应说明这个位置。不在 git 仓库里时没有这一行。
 
-`MODULE_DONE` / `DONE` 的事实列表末尾有一行 `- Module boundary: …`，建议在新会话里开始下一项工作。宿主在 hook 输入里
+`MODULE_DONE` / `DONE` 的事实列表末尾有一行 `- Module boundary: …`，建议在新会话里开始下一项工作，并指向 `/spec-guard:handoff`（Codex：`spec-guard handoff`）生成可直接粘贴的交接文本。宿主在 hook 输入里
 给出会话记录（`transcript_path`）且最近一轮主会话上下文超过 200k token 时，`NEEDS_SPEC` 到 `DONE` 各阶段再多一行
 `- Session context: about N k tokens …`，建议在下一个 task 边界记下决定、开新会话。本命令手工运行时没有 hook 输入，
 所以不会出现上下文行；读不到会话记录时同样不出现，不猜。

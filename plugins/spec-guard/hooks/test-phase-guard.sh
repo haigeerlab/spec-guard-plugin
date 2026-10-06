@@ -46,7 +46,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: start the next piece of work in a new session; this stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: start the next piece of work in a new session; run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"
@@ -612,5 +612,84 @@ lacks "非 git 目录没有位置行" "$ctx" "Location:"
 grep -F "worktree \`$(git -C "$git_project" rev-parse --show-toplevel)\`." >/dev/null <<<"$(run_from "$git_project/src/deep")" \
   || fail "Codex 从仓库子目录启动时位置行应报告仓库根目录"
 echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PASS=$((PASS + 1))
+
+
+# 项目根以 hook 输入的 cwd 为准（session-handoff 第 12 条）：宿主把 CLAUDE_PROJECT_DIR 指向主检出目录、会话却在
+# linked worktree 里时，阶段与位置都应来自 worktree。
+gitc() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+wt_main="$WORK/wt-main"
+mkdir -p "$wt_main/tasks/alpha" "$wt_main/src"
+gitc -C "$wt_main" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$wt_main/CLAUDE.md"
+map "$wt_main"; printf '# alpha\n' > "$wt_main/spec/alpha.md"; printf '# Plan\n' > "$wt_main/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$wt_main/tasks/alpha/todo.md"
+touch "$wt_main/src/.keep"
+gitc -C "$wt_main" add -A && gitc -C "$wt_main" commit -q -m init
+wt_linked="$WORK/wt-linked"
+gitc -C "$wt_main" worktree add -q -b feat "$wt_linked"
+printf '%s\n' '- [x] open' > "$wt_linked/tasks/alpha/todo.md"
+wt_top="$(git -C "$wt_linked" rev-parse --show-toplevel)"
+out="$(run_input "$wt_main" "{\"cwd\":\"$wt_linked/src\"}" | context_of)"
+python3 -c '
+import sys
+t, top = sys.stdin.read(), sys.argv[1]
+assert "Location: branch `feat` · worktree `%s`." % top in t, t
+assert "当前阶段: **DONE**" in t, t
+' "$wt_top" <<<"$out" || fail "cwd 在 linked worktree 时应报告 worktree 的分支、目录与阶段
+$out"
+echo "  ✅ cwd 在 linked worktree 时按 worktree 注入"; PASS=$((PASS + 1))
+
+plain_main="$(run "$wt_main" | context_of)"
+for input in "{\"cwd\":\"$wt_main/src\"}" "{\"cwd\":\"$WORK/empty\"}" "{\"cwd\":\"$WORK/missing-dir\"}" '{"cwd":null}' '{}' 'not json'; do
+  [ "$(run_input "$wt_main" "$input" | context_of)" = "$plain_main" ] || fail "cwd 不改变根目录时应逐字相同: $input"
+done
+echo "  ✅ cwd 为子目录、非 git、缺失或不可用时逐字不变"; PASS=$((PASS + 1))
+
+[ -z "$(run_input "$wt_main" "{\"cwd\":\"$unrelated/sub\"}")" ] || fail "cwd 在未启用的仓库里时应静默"
+echo "  ✅ cwd 在未启用的仓库里时静默"; PASS=$((PASS + 1))
+
+
+# 交接命令本地作答（session-handoff 第 7、8、9 条）：整条提示词恰好是触发词时输出拦截 JSON，其余逐字不变。
+ho="$WORK/handoff"
+mkdir -p "$ho/tasks/alpha"
+git -C "$ho" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ho/CLAUDE.md"
+map "$ho"; printf '# alpha\n' > "$ho/spec/alpha.md"; printf '# Plan\n' > "$ho/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$ho/tasks/alpha/todo.md"
+want="$(python3 -B "$HOOKDIR/session_handoff.py" "$ho")"
+out="$(run_input "$ho" '{"prompt":"  /spec-guard:handoff\n"}')"
+python3 -c '
+import json, sys
+out = json.loads(sys.stdin.read())
+assert out == {"decision": "block", "reason": sys.argv[1], "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True}}, out
+' "$want" <<<"$out" || fail "Claude 触发词应输出带 suppressOriginalPrompt 的拦截 JSON
+$out"
+echo "  ✅ Claude 触发词本地作答"; PASS=$((PASS + 1))
+
+out="$(cd "$ho" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" <<<'{"prompt":"spec-guard handoff"}')"
+python3 -c '
+import json, sys
+out = json.loads(sys.stdin.read())
+assert out == {"decision": "block", "reason": sys.argv[1]}, out
+' "$want" <<<"$out" || fail "Codex 触发词的拦截 JSON 不得带 Claude 专用字段
+$out"
+echo "  ✅ Codex 触发词本地作答且无 Claude 专用字段"; PASS=$((PASS + 1))
+
+plain_ho="$(run "$ho" | context_of)"
+for prompt in '继续 /spec-guard:handoff' '/spec-guard:handoff now' '/spec-guard:phase' 'handoff'; do
+  [ "$(run_input "$ho" "{\"prompt\":\"$prompt\"}" | context_of)" = "$plain_ho" ] || fail "非触发词应与现在逐字相同: $prompt"
+done
+echo "  ✅ 非触发词照常注入阶段"; PASS=$((PASS + 1))
+
+broken="$WORK/broken-hooks"
+cp -R "$HOOKDIR" "$broken"
+printf '%s\n' 'import sys' 'sys.exit(1)' > "$broken/session_handoff.py"
+[ "$(CLAUDE_PROJECT_DIR="$ho" /bin/bash "$broken/phase-guard.sh" <<<'{"prompt":"/spec-guard:handoff"}' | context_of)" = "$plain_ho" ] \
+  || fail "拼装失败时应放行并照常注入阶段"
+echo "  ✅ 拼装失败即放行"; PASS=$((PASS + 1))
+
+[ -z "$(run_input "$WORK/empty" '{"prompt":"/spec-guard:handoff"}')" ] || fail "未启用项目里触发词也应静默"
+echo "  ✅ 未启用项目里触发词静默"; PASS=$((PASS + 1))
 
 echo "phase-guard regression passed (${PASS} cases)"

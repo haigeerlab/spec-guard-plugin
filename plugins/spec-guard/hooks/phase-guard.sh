@@ -13,6 +13,14 @@ else
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
   [ -n "$ROOT" ] || ROOT="$(pwd)"
 fi
+# 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
+# 所在 git 仓库优先（session_context.py --resolve-root，最多等 1 秒）。标准输入只读这一次，原文留给后面的会话事实。
+# 输入不可用或缺 python3 时根目录不变。
+HOOK_INPUT=""
+if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
+  RESOLVED="$(python3 "$HOOKDIR/session_context.py" --resolve-root "$ROOT" 2>/dev/null)" || RESOLVED=""
+  case "$RESOLVED" in *$'\n'*) ROOT="${RESOLVED%%$'\n'*}"; HOOK_INPUT="${RESOLVED#*$'\n'}" ;; esac
+fi
 cd "$ROOT" 2>/dev/null || exit 0
 
 # 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或含
@@ -50,13 +58,22 @@ print(json.dumps({"hookSpecificOutput": {
 '
 }
 
+# 交接命令本地作答（session_handoff.py --hook）：整条提示词恰好是触发词时输出拦截 JSON 并结束，不调用模型。
+# 先用字面过滤省掉无关提示词的 python 启动；拼装失败或没有答复时照常注入阶段。
+case "$HOOK_INPUT" in
+  *handoff*)
+    if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude; else HOST=codex; fi
+    ANSWER="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_handoff.py" --hook "$HOST" . 2>/dev/null)" || ANSWER=""
+    if [ -n "$ANSWER" ]; then
+      printf '%s\n' "$ANSWER"
+      exit 0
+    fi
+    ;;
+esac
+
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
-# 标准输入是终端（手工运行）时不转交；它最多等 1 秒，宿主不关标准输入也不会挂住。
-if [ -t 0 ]; then
-  FACTS="$(python3 "$HOOKDIR/session_context.py" . </dev/null 2>/dev/null)" || FACTS=""
-else
-  FACTS="$(python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""
-fi
+# hook 输入已在上面读过，这里转交那一行原文。
+FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""
 TOKENS="${FACTS%%$'\n'*}"
 case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
 LOCATION=""
