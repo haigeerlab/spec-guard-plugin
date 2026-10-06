@@ -1,0 +1,266 @@
+{
+  "modules": [
+    {
+      "module": "ledgerlite",
+      "tasks": [
+        {
+          "index": 0,
+          "title": "Task 1：currency.format_amount——按 spec 示例格式化金额",
+          "done": true,
+          "start": "2026-10-05T13:40:53Z",
+          "end": "2026-10-05T17:43:37Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "gpt-6.1-sol": {
+              "input": 51711,
+              "cache_read": 226048,
+              "cache_write": 0,
+              "output": 1793,
+              "reasoning_output": 36
+            }
+          },
+          "sub": {},
+          "guardian": {},
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 6,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 279552
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.1665616,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 1,
+          "title": "Task 2：cli 对非法 --month 参数报错并以退出码 2 退出",
+          "done": true,
+          "start": "2026-10-05T17:43:37Z",
+          "end": "2026-10-05T17:43:41Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {},
+          "sub": {},
+          "guardian": {
+            "codex-auto-review": {
+              "input": 24770,
+              "cache_read": 9728,
+              "cache_write": 0,
+              "output": 241,
+              "reasoning_output": 112
+            }
+          },
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 0,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 34739
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.0,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": [
+              "codex-auto-review:input",
+              "codex-auto-review:cache_read",
+              "codex-auto-review:output"
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "title": "Task 3：修复月报合计与逐笔之和差 1 分",
+          "done": true,
+          "start": "2026-10-05T17:43:41Z",
+          "end": "2026-10-05T17:44:53Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "gpt-6.1-sol": {
+              "input": 2840,
+              "cache_read": 129664,
+              "cache_write": 0,
+              "output": 1397,
+              "reasoning_output": 11
+            }
+          },
+          "sub": {},
+          "guardian": {},
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 2,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 133901
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.04558280000000001,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 3,
+          "title": "Task 4：Entry 增加必填字段 category，贯通解析、记账、报表、cli 与测试",
+          "done": true,
+          "start": "2026-10-05T17:44:53Z",
+          "end": "2026-10-05T17:48:54Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "gpt-6.1-sol": {
+              "input": 17687,
+              "cache_read": 379648,
+              "cache_write": 0,
+              "output": 5880,
+              "reasoning_output": 530
+            }
+          },
+          "sub": {},
+          "guardian": {
+            "codex-auto-review": {
+              "input": 4936,
+              "cache_read": 16128,
+              "cache_write": 0,
+              "output": 125,
+              "reasoning_output": 62
+            }
+          },
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 5,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 424404
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.1701036,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": [
+              "codex-auto-review:input",
+              "codex-auto-review:cache_read",
+              "codex-auto-review:output"
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "title": "Task 5：修复月末流水被归到下个月（见 spec 中给出的失败用例）",
+          "done": true,
+          "start": "2026-10-05T17:48:54Z",
+          "end": "2026-10-05T17:49:16Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "gpt-6.1-sol": {
+              "input": 1444,
+              "cache_read": 83328,
+              "cache_write": 0,
+              "output": 1286,
+              "reasoning_output": 54
+            }
+          },
+          "sub": {},
+          "guardian": {
+            "codex-auto-review": {
+              "input": 11605,
+              "cache_read": 17152,
+              "cache_write": 0,
+              "output": 140,
+              "reasoning_output": 70
+            }
+          },
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 1,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 114955
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.0324136,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": [
+              "codex-auto-review:input",
+              "codex-auto-review:cache_read",
+              "codex-auto-review:output"
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "title": "Checkpoint：全量测试通过，月报端到端一致",
+          "done": true,
+          "start": "2026-10-05T17:49:16Z",
+          "end": "2026-10-05T17:53:00Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "gpt-6.1-sol": {
+              "input": 33764,
+              "cache_read": 922368,
+              "cache_write": 0,
+              "output": 5962,
+              "reasoning_output": 1223
+            }
+          },
+          "sub": {},
+          "guardian": {
+            "codex-auto-review": {
+              "input": 8770,
+              "cache_read": 58880,
+              "cache_write": 0,
+              "output": 233,
+              "reasoning_output": 90
+            }
+          },
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 9,
+          "sessions": {
+            "codex:01a10d28-3978-72d0-ade1-8f3db8a803d4": 1029977
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.31162160000000005,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": [
+              "codex-auto-review:input",
+              "codex-auto-review:cache_read",
+              "codex-auto-review:output"
+            ]
+          }
+        }
+      ],
+      "skipped_rows": 0
+    }
+  ]
+}

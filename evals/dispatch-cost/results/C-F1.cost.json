@@ -1,0 +1,266 @@
+{
+  "modules": [
+    {
+      "module": "ledgerlite",
+      "tasks": [
+        {
+          "index": 0,
+          "title": "Task 1：currency.format_amount——按 spec 示例格式化金额",
+          "done": true,
+          "start": "2026-10-05T13:40:53Z",
+          "end": "2026-10-05T14:01:00Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 24,
+              "cache_read": 526977,
+              "output": 3294,
+              "cache_write_5m": 0,
+              "cache_write_1h": 31495
+            }
+          },
+          "sub": {
+            "claude-sonnet-5-5": {
+              "input": 12,
+              "cache_read": 187905,
+              "output": 3347,
+              "cache_write_5m": 41037,
+              "cache_write_1h": 0
+            }
+          },
+          "guardian": {},
+          "dispatches": 1,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 12,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 794091
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "1/1",
+          "cost": {
+            "main": 0.4233314,
+            "sub": 0.1736675,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 1,
+          "title": "Task 2：cli 对非法 --month 参数报错并以退出码 2 退出",
+          "done": true,
+          "start": "2026-10-05T14:01:00Z",
+          "end": "2026-10-05T14:01:30Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 6,
+              "cache_read": 162786,
+              "output": 1301,
+              "cache_write_5m": 0,
+              "cache_write_1h": 2935
+            }
+          },
+          "sub": {
+            "claude-sonnet-5-5": {
+              "input": 6,
+              "cache_read": 85618,
+              "output": 2301,
+              "cache_write_5m": 19055,
+              "cache_write_1h": 0
+            }
+          },
+          "guardian": {},
+          "dispatches": 1,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 3,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 274008
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "1/1",
+          "cost": {
+            "main": 0.0820812,
+            "sub": 0.0877831,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 2,
+          "title": "Task 3：修复月报合计与逐笔之和差 1 分",
+          "done": true,
+          "start": "2026-10-05T14:01:30Z",
+          "end": "2026-10-05T14:02:30Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 6,
+              "cache_read": 171911,
+              "output": 2838,
+              "cache_write_5m": 0,
+              "cache_write_1h": 3898
+            }
+          },
+          "sub": {
+            "claude-sonnet-5-5": {
+              "input": 18,
+              "cache_read": 357703,
+              "output": 6418,
+              "cache_write_5m": 28925,
+              "cache_write_1h": 0
+            }
+          },
+          "guardian": {},
+          "dispatches": 1,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 3,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 571717
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "1/1",
+          "cost": {
+            "main": 0.1223502,
+            "sub": 0.2080691,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 3,
+          "title": "Task 4：Entry 增加必填字段 category，贯通解析、记账、报表、cli 与测试",
+          "done": true,
+          "start": "2026-10-05T14:02:30Z",
+          "end": "2026-10-05T14:05:17Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 4,
+              "cache_read": 124008,
+              "output": 2219,
+              "cache_write_5m": 0,
+              "cache_write_1h": 8316
+            }
+          },
+          "sub": {
+            "claude-opus-5-5": {
+              "input": 24,
+              "cache_read": 637838,
+              "output": 17785,
+              "cache_write_5m": 71102,
+              "cache_write_1h": 0
+            }
+          },
+          "guardian": {},
+          "dispatches": 1,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 2,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 861296
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "1/1",
+          "cost": {
+            "main": 0.1357256,
+            "sub": 0.8388736,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 4,
+          "title": "Task 5：修复月末流水被归到下个月（见 spec 中给出的失败用例）",
+          "done": true,
+          "start": "2026-10-05T14:05:17Z",
+          "end": "2026-10-05T14:06:30Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 8,
+              "cache_read": 283970,
+              "output": 847,
+              "cache_write_5m": 0,
+              "cache_write_1h": 4194
+            }
+          },
+          "sub": {
+            "claude-sonnet-5-5": {
+              "input": 22,
+              "cache_read": 425720,
+              "output": 8004,
+              "cache_write_5m": 27215,
+              "cache_write_1h": 0
+            }
+          },
+          "guardian": {},
+          "dispatches": 1,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 4,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 749980
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "1/1",
+          "cost": {
+            "main": 0.107318,
+            "sub": 0.2332655,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        },
+        {
+          "index": 5,
+          "title": "Checkpoint：全量测试通过，月报端到端一致",
+          "done": true,
+          "start": "2026-10-05T14:06:30Z",
+          "end": "2026-10-05T14:07:22Z",
+          "shared_with": null,
+          "matched_by_position": false,
+          "main": {
+            "claude-opus-5-5": {
+              "input": 14,
+              "cache_read": 528770,
+              "output": 4492,
+              "cache_write_5m": 0,
+              "cache_write_1h": 5708
+            }
+          },
+          "sub": {},
+          "guardian": {},
+          "dispatches": 0,
+          "dispatches_unrecorded": 0,
+          "reclaims": 0,
+          "main_turns": 7,
+          "sessions": {
+            "claude:43fd94ec-0e90-4b84-aeca-254d2e5d53f5": 538984
+          },
+          "redispatches": 0,
+          "edits_after_handback": 0,
+          "coverage": "0/0",
+          "cost": {
+            "main": 0.241314,
+            "sub": 0.0,
+            "guardian": 0.0,
+            "unpriced": []
+          }
+        }
+      ],
+      "skipped_rows": 0
+    }
+  ]
+}

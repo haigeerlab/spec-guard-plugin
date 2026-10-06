@@ -1,0 +1,38 @@
+{
+ "currency": "USD",
+ "per": "1M",
+ "note": "tier-guard 口径（用户 2026-10-05 批准）：输入/输出取用户截图的 API 报价；缓存读 $0.20/MTok（Opus 5.5、Sonnet 5.5）；缓存写 5m 为 1.25×输入、1h 为 2×输入；haiku 缓存读按输入 10%。未经官方核实。 Codex：输入/输出取用户截图 API 报价，缓存读按输入 10%；codex-auto-review 无公开价格，不计价。",
+ "models": {
+  "claude-opus-5-5": {
+   "input": 4,
+   "cache_write_5m": 5,
+   "cache_write_1h": 8,
+   "cache_read": 0.2,
+   "output": 20
+  },
+  "claude-sonnet-5-5": {
+   "input": 2,
+   "cache_write_5m": 2.5,
+   "cache_write_1h": 4,
+   "cache_read": 0.2,
+   "output": 10
+  },
+  "claude-haiku-4-5-20251001": {
+   "input": 1,
+   "cache_write_5m": 1.25,
+   "cache_write_1h": 2,
+   "cache_read": 0.1,
+   "output": 5
+  },
+  "gpt-6.1-sol": {
+   "input": 2,
+   "cache_read": 0.2,
+   "output": 10
+  },
+  "gpt-6-luna": {
+   "input": 0.1,
+   "cache_read": 0.01,
+   "output": 0.5
+  }
+ }
+}

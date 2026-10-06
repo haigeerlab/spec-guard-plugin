@@ -1,5 +1,14 @@
 # Changelog
 
+## [未发布]
+
+### 新增
+
+- **派活成本对照脚手架存档到 `evals/dispatch-cost/`。** 与 tier-guard 联调用的 ledgerlite 种子项目、参考实现、隐藏测试、
+  价格表与 18 次运行的成本数据原来只在临时目录里。现在 `run.sh <claude|codex> <组> <编号>` 按组从本仓库导出当时的
+  spec-guard 版本（联调中途的两版临时规则存在 `variants/`），`grade.sh` 判分并计价，`verify-seed.sh` 证明种子有效；
+  运行目录必须在仓库之外。要调用真实宿主、花真钱，不进 `validate.sh`。
+
 ## [0.45.0] - 2026-10-06
 
 ### 新增
