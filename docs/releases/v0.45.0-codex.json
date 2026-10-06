@@ -33,6 +33,22 @@
         "result:--expected-source was taken verbatim from the source.path reported by `codex plugin list --json`",
         "host:codex-cli 0.160.0"
       ]
+    },
+    {
+      "subject": "spec-guard-codex-cost-report",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.45.0;test:installed-cost-report-skill-route-20261006"
+      },
+      "observedAt": "2026-10-06T01:45:00Z",
+      "evidence": [
+        "command:cd <ledgerlite run X-N1> && codex exec --json --sandbox read-only -c 'model=\"gpt-6.1-sol\"' -c 'model_reasoning_effort=\"medium\"' '用 spec-guard 的 cost report 看看 ledgerlite 这个模块花了多少钱，价格文件用 <tier-guard price basis>。把报告原样给我，不要改任何文件。' </dev/null",
+        "result:the session read the installed 0.45.0 spec-guard-ops SKILL.md, resolved the plugin root through `codex plugin list --available --json`, and ran the installed hooks/module_cost_report.py under ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the report it returned gave the total including wrap-up as $0.7445 for X-N1, equal to this repository's figure and to tier-guard's independent whole-run figure ($0.745), with the unknowns section intact",
+        "result:read-only sandbox; the project's worktree was clean afterwards",
+        "host:codex-cli 0.160.0 (thread 01a10ef7-8036-7bf1-8df9-b5bd76dadefc)"
+      ]
     }
   ]
 }
