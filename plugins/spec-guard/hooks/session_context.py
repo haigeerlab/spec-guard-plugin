@@ -88,6 +88,22 @@ def _git(root, *args) -> str | None:
     return done.stdout.strip() if done.returncode == 0 and done.stdout.strip() else None
 
 
+def root_from_hook_input(text, fallback: str) -> str:
+    """Git root of the hook input's `cwd`, else `fallback`.
+
+    A desktop worktree session can hand the hook a project directory that is the main checkout while the
+    conversation runs in a linked worktree; the input's `cwd` is where the session actually is.
+    """
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return fallback
+    cwd = data.get("cwd") if isinstance(data, dict) else None
+    if not isinstance(cwd, str) or not cwd or not os.path.isdir(cwd):
+        return fallback
+    return _git(cwd, "rev-parse", "--show-toplevel") or fallback
+
+
 def location_line(root) -> str | None:
     """Branch (or detached commit) and worktree root of `root`, or None outside a git worktree."""
     top = _git(root, "rev-parse", "--show-toplevel")
@@ -122,7 +138,26 @@ def read_hook_input(fd: int) -> str:
         chunks.append(chunk)
 
 
+def resolve_root_main(fallback: str) -> None:
+    """`--resolve-root <fallback>`: the project root, then the hook input as one JSON line (empty if unusable)."""
+    try:
+        text = read_hook_input(sys.stdin.fileno())
+        data = json.loads(text)
+        line = json.dumps(data, ensure_ascii=False) if isinstance(data, dict) else ""
+    except Exception:
+        text, line = "", ""
+    try:
+        root = root_from_hook_input(text, fallback) if line else fallback
+    except Exception:
+        root = fallback
+    print(root)
+    print(line)
+
+
 def main() -> None:
+    if len(sys.argv) > 2 and sys.argv[1] == "--resolve-root":
+        resolve_root_main(sys.argv[2])
+        return
     try:
         tokens = context_tokens(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
     except Exception:  # a hook helper must never break the stage injection

@@ -613,4 +613,39 @@ grep -F "worktree \`$(git -C "$git_project" rev-parse --show-toplevel)\`." >/dev
   || fail "Codex 从仓库子目录启动时位置行应报告仓库根目录"
 echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PASS=$((PASS + 1))
 
+
+# 项目根以 hook 输入的 cwd 为准（session-handoff 第 12 条）：宿主把 CLAUDE_PROJECT_DIR 指向主检出目录、会话却在
+# linked worktree 里时，阶段与位置都应来自 worktree。
+gitc() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
+wt_main="$WORK/wt-main"
+mkdir -p "$wt_main/tasks/alpha" "$wt_main/src"
+gitc -C "$wt_main" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$wt_main/CLAUDE.md"
+map "$wt_main"; printf '# alpha\n' > "$wt_main/spec/alpha.md"; printf '# Plan\n' > "$wt_main/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$wt_main/tasks/alpha/todo.md"
+touch "$wt_main/src/.keep"
+gitc -C "$wt_main" add -A && gitc -C "$wt_main" commit -q -m init
+wt_linked="$WORK/wt-linked"
+gitc -C "$wt_main" worktree add -q -b feat "$wt_linked"
+printf '%s\n' '- [x] open' > "$wt_linked/tasks/alpha/todo.md"
+wt_top="$(git -C "$wt_linked" rev-parse --show-toplevel)"
+out="$(run_input "$wt_main" "{\"cwd\":\"$wt_linked/src\"}" | context_of)"
+python3 -c '
+import sys
+t, top = sys.stdin.read(), sys.argv[1]
+assert "Location: branch `feat` · worktree `%s`." % top in t, t
+assert "当前阶段: **DONE**" in t, t
+' "$wt_top" <<<"$out" || fail "cwd 在 linked worktree 时应报告 worktree 的分支、目录与阶段
+$out"
+echo "  ✅ cwd 在 linked worktree 时按 worktree 注入"; PASS=$((PASS + 1))
+
+plain_main="$(run "$wt_main" | context_of)"
+for input in "{\"cwd\":\"$wt_main/src\"}" "{\"cwd\":\"$WORK/empty\"}" "{\"cwd\":\"$WORK/missing-dir\"}" '{"cwd":null}' '{}' 'not json'; do
+  [ "$(run_input "$wt_main" "$input" | context_of)" = "$plain_main" ] || fail "cwd 不改变根目录时应逐字相同: $input"
+done
+echo "  ✅ cwd 为子目录、非 git、缺失或不可用时逐字不变"; PASS=$((PASS + 1))
+
+[ -z "$(run_input "$wt_main" "{\"cwd\":\"$unrelated/sub\"}")" ] || fail "cwd 在未启用的仓库里时应静默"
+echo "  ✅ cwd 在未启用的仓库里时静默"; PASS=$((PASS + 1))
+
 echo "phase-guard regression passed (${PASS} cases)"
