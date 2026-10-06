@@ -6,4 +6,4 @@
 - [x] Task 4：触发词拦截——is_trigger 正反例、Claude / Codex 两种 JSON、失败即放行、其余逐字不变
 - [x] Checkpoint：本地作答端到端、牙齿检查、claude -p 费用为 0 展示给用户
 - [x] Task 5：命令与 Module boundary 行——commands/handoff.md、spec-guard-ops handoff、MODULE_BOUNDARY、CHANGELOG
-- [ ] Checkpoint：全量验证 + 审查 + PR + 发版 + Claude CLI / 桌面版 / Codex TUI 实测 + 提醒开新会话
+- [x] Checkpoint：全量验证 + 审查 + PR + 发版 + Claude CLI / 桌面版 / Codex TUI 实测 + 提醒开新会话

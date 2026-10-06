@@ -48,13 +48,19 @@
       ]
     },
     {
-      "subject": "spec-guard-codex-tui-handoff-display",
-      "status": "not-verified",
+      "subject": "spec-guard-codex-app-handoff-display",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
-        "id": "not-run"
+        "id": "codex-app:v0.47.0;test:installed-handoff-consumer-project-20261006"
       },
-      "reason": "whether the Codex TUI shows the block reason (the handoff text) to the user is not observed: exec mode prints only the Blocked status, and the TUI run needs the user to type the trigger once."
+      "observedAt": "2026-10-06T10:20:00Z",
+      "evidence": [
+        "host:Codex desktop app, in a separate consumer project with the convention enabled",
+        "command:the user typed exactly `spec-guard handoff`",
+        "result:the app marked the message `Hook 已阻止此消息` and showed a hook card with the complete handoff text for that project (location, stage and module counts, unmerged commits, no release evidence, the `下一步：____` blank); no model reply followed",
+        "result:the Codex terminal TUI itself was not separately checked; `codex exec` prints only the Blocked status"
+      ]
     },
     {
       "subject": "spec-guard-codex-session-context",

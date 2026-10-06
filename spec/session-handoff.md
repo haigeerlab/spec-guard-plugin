@@ -112,7 +112,9 @@ python3 -B plugins/spec-guard/hooks/test_session_handoff.py
 
 ## Open questions
 
-- Codex 触发词：Codex TUI 对未知的 `/` 命令可能在客户端就报错、到不了 hook，所以暂定纯文本 `spec-guard handoff`；
-  需在 Checkpoint 实测 Codex 的 skill 调用方式后定稿。
-- 桌面版 Code 标签页里拦截消息带 "UserPromptSubmit operation blocked by hook:" 前缀，若显示为错误样式、体验不可接受，
-  是否退回为只提供普通命令（第 7 条取消）——Checkpoint 后由用户决定。
+已于 2026-10-06 Checkpoint 2 实测后关闭：
+
+- Codex 触发词定为纯文本 `spec-guard handoff`：Codex 应用里整条输入这句时，hook 拦下并以卡片显示交接文本（“Hook 已阻止此消息”），
+  不调用模型；`codex exec` 只显示 Blocked。Codex 终端 TUI 未单独核对。
+- 桌面版不显示英文前缀，而是一张本地化的警示卡片（“钩子已阻止您的提示词”），交接文本完整、换行保留、原提示词不回显。
+  警示样式只影响观感，第 7 条保留本地作答。
