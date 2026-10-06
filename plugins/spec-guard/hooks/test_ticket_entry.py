@@ -78,6 +78,14 @@ class TicketEntryContractTest(unittest.TestCase):
                 for tool in GATED_TOOLS:
                     self.assertIn(f"`{tool}`", text)
 
+    def test_agent_notification_goes_through_the_agent_relay_probe(self) -> None:
+        text = SKILL.read_text(encoding="utf-8")
+
+        self.assertIn('python3 -B "$ROOT/hooks/agent_relay_probe.py" --host <claude|codex>', text)
+        self.assertIn("`state` 为 `ready` 时，使用\n`agent-relay:collab` skill", text)
+        self.assertIn("并跳过通知", text)
+        self.assertIn("`unknown` 不能说成未安装", text)
+
     def test_repository_validation_runs_ticket_contract(self) -> None:
         text = VALIDATE.read_text(encoding="utf-8")
 

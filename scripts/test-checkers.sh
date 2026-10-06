@@ -403,6 +403,38 @@ printf '# 决策\n\n状态：已接受。没有任何取代关系。\n' > "$TMP/
 want fail "decision-supersession: 零条取代声明 → 不算通过（声明丢了，不是没问题）" \
   python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decquiet"
 
+# ── check-collaboration-boundary.py ──
+# 协作拆分的边界：协作代码之外不得直接引用协作内部实现。坏样本**运行时拼装**，
+# 理由同 bash32：本文件在检查范围内，写成字面量会被检查抓到自己。
+CB="$TMP/collab-boundary"
+cb_fixture() {  # 每个用例一棵干净的夹具树，只带一个所有权清单和一个协作自有文件
+  rm -rf "$CB"; mkdir -p "$CB/scripts" "$CB/plugins/spec-guard/hooks" "$CB/plugins/spec-guard/skills/ticket"
+  printf '# owned\nplugins/spec-guard/hooks/owned_impl.py\n' > "$CB/scripts/collaboration-owned.txt"
+  printf 'import %s\n' "native_""collaboration_runtime" > "$CB/plugins/spec-guard/hooks/owned_impl.py"
+  printf '通过 agent-relay 的协作信箱发 mailbox 消息；legacy_bridge_marker 不是工具名。\n' \
+    > "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
+}
+cb_plant() {  # $1=用例名 $2=违规行
+  cb_fixture; printf '%s\n' "$2" >> "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
+  want fail "collab-boundary: $1 → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+}
+cb_fixture
+want pass "collab-boundary: 协作自有文件与普通词 → 放行" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+cb_plant "模块名" "python3 -B hooks/test_session""_routing.py"
+cb_plant "skill 路径" "见 skills/session""-delegation/SKILL.md"
+cb_plant "裸 skill 名" "使用 \`col""lab\` 发送"
+cb_plant "带 spec-guard 前缀的 skill 名" "使用 spec-guard:col""lab"
+cb_fixture; printf '使用 agent-relay:col''lab 与 agent-relay:session-routing\n' >> "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
+want pass "collab-boundary: agent-relay 的 skill 名 → 放行" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+cb_plant "旧命令名" "运行 /spec-guard:""collaboration"
+cb_plant "信箱工具名" "调用 mcp__x__bridge""_send"
+cb_plant "MCP 服务名" "[mcp_servers.spec_guard_native""_collaboration]"
+cb_plant "状态路径" "rm ~/.spec-guard/native""-collaboration"
+cb_fixture; printf 'plugins/spec-guard/hooks/gone.py\n' >> "$CB/scripts/collaboration-owned.txt"
+want fail "collab-boundary: 所有权清单里的路径不存在 → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+cb_fixture; printf '# only comments\n' > "$CB/scripts/collaboration-owned.txt"
+want fail "collab-boundary: 空清单 → 不算通过" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+
 # ── test-retire-legacy-tracker-bridge.sh（广度扫描，R6）──
 # 扩大后的扫描要能对着一棵干净夹具树全绿，对反例喂 gh issue create 和
 # 残留在 hook 脚本里的 /sync-map 各报一次，而带理由的允许清单不受影响。

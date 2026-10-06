@@ -3,7 +3,7 @@ description: 查看或按明确确认启用本地事项账本，并连接 Claude
 allowed-tools: Bash, Read
 ---
 
-这是一个可选的、同机同仓库 linked worktree 共享的持久事项账本入口。它不替代协作邮箱，不是
+这是一个可选的、同机同仓库 linked worktree 共享的持久事项账本入口。它不替代 agent-relay 协作信箱，不是
 GitHub/GitLab 的本地克隆，也不包含项目组、角色、派单、排期或自动同步。
 
 普通查看、创建、评论和关闭事项使用 `/spec-guard:ticket`；本命令负责只读状态、显式安装、初始化与
@@ -83,7 +83,7 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" install-claude --confirm-insta
 细节见 `references/local-ticket-ledger-runtime.md`。
 
 接入后的 Agent 可以通过 Epiq MCP 工具用可读名字和当前工作作自由自我说明，先查询可能相关的事项，再按
-需要创建 bug、需求、排查记录或完成说明。不要把标签、负责人或状态解释成访问控制或硬性流程。若协作邮箱
+需要创建 bug、需求、排查记录或完成说明。不要把标签、负责人或状态解释成访问控制或硬性流程。若 agent-relay 协作信箱
 也可用，消息应携带标题和事项短编号，例如“《测试环境接口响应异常》（R85YPWB）已处理，
 请拉取后验证”；消息投递和事项改动仍是两个独立、明确的动作。
 
