@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.48.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.48.0;test:installed-plugin-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T11:15:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.47.0 to 0.48.0 for scope user; the installed copy records gitCommitSha 8c7604cc120791ecbb821dffc9711f7e76234adf -- the v0.48.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-context-thresholds",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-desktop:v0.48.0;test:installed-context-thresholds-20261006"
+      },
+      "observedAt": "2026-10-06T11:15:00Z",
+      "evidence": [
+        "command:printf '{\"cwd\":...,\"transcript_path\":<this release session>,...}' | PATH=/usr/bin:/bin /bin/bash <installed 0.48.0>/hooks/phase-guard.sh",
+        "result:on the release session's real transcript (main-session context above 400k, stage BUILDING) the installed hook emitted no Session context line; 0.47.0 emitted it on every turn above 200k",
+        "host:Claude desktop Code tab, worktree session of this repository",
+        "result:after the update the same session's own UserPromptSubmit injection (BUILDING, context above 400k) no longer carried the Session context line, so the desktop host loaded 0.48.0 and applies the 800k mid-module threshold"
+      ]
+    }
+  ]
+}
