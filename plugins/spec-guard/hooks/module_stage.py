@@ -175,6 +175,10 @@ def unmerged_commits(root: Path) -> tuple | None:
     return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
 
 
+MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new session; "
+                   "this stage summary carries over, the conversation does not need to.")
+
+
 def describe(root: Path) -> str:
     root = Path(root)
     try:
@@ -235,6 +239,7 @@ def describe(root: Path) -> str:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
         if hint:
             notes.append(hint)
+        notes.append(MODULE_BOUNDARY)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
@@ -260,6 +265,8 @@ def describe(root: Path) -> str:
     else:
         module_done = ("`%s` is done; next unfinished module in Build order is `%s` (%s). "
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
+    if stage == "MODULE_DONE":
+        notes.append(MODULE_BOUNDARY)
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
