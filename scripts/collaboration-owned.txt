@@ -27,6 +27,9 @@ plugins/spec-guard/hooks/test_session_delegation_backend.py
 plugins/spec-guard/hooks/test_session_delegation_claude.py
 plugins/spec-guard/hooks/test_session_delegation_codex.py
 plugins/spec-guard/hooks/test_session_delegation_recovery.py
+plugins/spec-guard/hooks/test_native_collaboration_host_config.py
+plugins/spec-guard/hooks/test_skill_entrypoints.py
+plugins/spec-guard/hooks/test-collaboration-suite.sh
 
 # Skills and command
 plugins/spec-guard/skills/collab/
