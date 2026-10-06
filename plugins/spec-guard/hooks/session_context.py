@@ -45,8 +45,22 @@ def _usage(record) -> int | None:
     return None
 
 
+def _window(record) -> int | None:
+    """Codex's model context window on a token_count record; Claude records carry none."""
+    payload = record.get("payload") if isinstance(record, dict) else None
+    info = payload.get("info") if isinstance(payload, dict) else None
+    window = info.get("model_context_window") if isinstance(info, dict) else None
+    return window if isinstance(window, int) and not isinstance(window, bool) and window > 0 else None
+
+
 def context_tokens(transcript_path) -> int | None:
     """Context size of the last main-session turn, read from the last TAIL_LIMIT bytes."""
+    usage = context_usage(transcript_path)
+    return usage[0] if usage else None
+
+
+def context_usage(transcript_path) -> tuple | None:
+    """(context size, model context window or None) of the last main-session turn, from one record."""
     if not isinstance(transcript_path, str) or not transcript_path:
         return None
     try:
@@ -67,7 +81,7 @@ def context_tokens(transcript_path) -> int | None:
             continue
         tokens = _usage(record)
         if tokens:  # zero is a synthetic record (e.g. after an interruption), not a reading
-            return tokens
+            return tokens, _window(record)
     return None
 
 
@@ -159,15 +173,17 @@ def main() -> None:
         resolve_root_main(sys.argv[2])
         return
     try:
-        tokens = context_tokens(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
+        usage = context_usage(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
     except Exception:  # a hook helper must never break the stage injection
-        tokens = None
+        usage = None
+    tokens, window = usage if usage else (None, None)
     try:
         location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".")
     except Exception:
         location = None
     print("" if tokens is None else tokens)
     print(location or "")
+    print("" if window is None else window)
 
 
 if __name__ == "__main__":

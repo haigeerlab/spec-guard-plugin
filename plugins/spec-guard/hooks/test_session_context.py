@@ -11,7 +11,7 @@ import unittest
 from pathlib import Path
 
 import session_context
-from session_context import TAIL_LIMIT, context_tokens, location_line, transcript_path_from_hook_input
+from session_context import TAIL_LIMIT, context_tokens, context_usage, location_line, transcript_path_from_hook_input
 
 
 def claude_assistant(inp, read, write, sidechain=False):
@@ -101,6 +101,28 @@ class Transcript(unittest.TestCase):
         self.assertIsNone(context_tokens(self.write(bad)))
 
 
+    # context-hint-thresholds item 3 and 6: the window comes from the same record as the tokens.
+
+    def test_codex_usage_carries_the_model_context_window(self):
+        self.assertEqual(context_usage(self.write(codex_token_count(250000))), (250000, 258400))
+
+    def test_codex_window_that_is_not_a_positive_integer_is_none(self):
+        for window in (None, 0, -1, "258400", 25.5, True):
+            with self.subTest(window=window):
+                record = codex_token_count(9000)
+                if window is None:
+                    del record["payload"]["info"]["model_context_window"]
+                else:
+                    record["payload"]["info"]["model_context_window"] = window
+                self.assertEqual(context_usage(self.write(record)), (9000, None))
+
+    def test_claude_usage_has_no_window(self):
+        self.assertEqual(context_usage(self.write(claude_assistant(10, 200000, 300))), (200310, None))
+
+    def test_no_usage_is_none(self):
+        self.assertIsNone(context_usage(self.write()))
+        self.assertIsNone(context_usage(None))
+
 class HookInput(unittest.TestCase):
     def test_reads_transcript_path(self):
         self.assertEqual(transcript_path_from_hook_input(
@@ -135,7 +157,14 @@ class CommandLine(unittest.TestCase):
     def test_prints_tokens_then_the_location_line(self):
         out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
         self.assertEqual(out.split("\n")[0], "250610")
-        self.assertEqual(out.count("\n"), 2)
+        self.assertEqual(out.split("\n")[2], "")  # Claude records carry no window
+        self.assertEqual(out.count("\n"), 3)
+
+    def test_prints_the_codex_window_as_the_third_line(self):
+        self.transcript.write_text(json.dumps(codex_token_count(120000)) + "\n")
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
+        self.assertEqual(out.split("\n")[0], "120000")
+        self.assertEqual(out.split("\n")[2], "258400")
 
     def test_unusable_input_prints_two_empty_lines(self):
         for text in ("", "not json", json.dumps({"transcript_path": "/no/such/file"})):
