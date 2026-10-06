@@ -56,6 +56,13 @@ class Transcript(unittest.TestCase):
         path = self.write(claude_assistant(1, 300000, 0), claude_assistant(1, 5000, 0, sidechain=True))
         self.assertEqual(context_tokens(path), 300001)
 
+    def test_zero_usage_records_are_not_a_reading(self):
+        # Claude writes a "<synthetic>" assistant message with all-zero usage after an interruption.
+        synthetic = claude_assistant(0, 0, 0)
+        synthetic["message"]["model"] = "<synthetic>"
+        path = self.write(claude_assistant(1, 250000, 0), synthetic, codex_token_count(0))
+        self.assertEqual(context_tokens(path), 250001)
+
     def test_codex_takes_the_last_token_count_input(self):
         path = self.write(codex_token_count(1000), {"type": "response_item", "payload": {}},
                           codex_token_count(250000))

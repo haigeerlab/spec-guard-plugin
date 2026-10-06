@@ -66,7 +66,7 @@ def context_tokens(transcript_path) -> int | None:
         except ValueError:
             continue
         tokens = _usage(record)
-        if tokens is not None:
+        if tokens:  # zero is a synthetic record (e.g. after an interruption), not a reading
             return tokens
     return None
 

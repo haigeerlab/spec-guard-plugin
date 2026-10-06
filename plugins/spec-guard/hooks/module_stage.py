@@ -219,6 +219,8 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
         notes.append("- activeModule `%s` is not in the capability map; using Build order."
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
+    context_note = (context_line(context_tokens)
+                    if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD else "")
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
@@ -249,8 +251,8 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
         if hint:
             notes.append(hint)
         notes.append(MODULE_BOUNDARY)
-        if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD:
-            notes.append(context_line(context_tokens))
+        if context_note:
+            notes.append(context_note)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
@@ -278,8 +280,8 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
     if stage == "MODULE_DONE":
         notes.append(MODULE_BOUNDARY)
-    if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD:
-        notes.append(context_line(context_tokens))
+    if context_note:
+        notes.append(context_note)
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
