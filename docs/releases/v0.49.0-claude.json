@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.49.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.49.0;test:installed-plugin-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T11:55:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.48.0 to 0.49.0 for scope user; the installed copy records gitCommitSha ca273f906c95c44c4248d4db821d8d8779e124df -- the v0.49.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-checkpoint-tiers-behavior",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "reason": "checkpoint tiers, batch pre-review and UI self-verification are rules for agents; the regression tests only prove the rules are discoverable. The module's own Plan was executed under these rules in the authoring session (report checkpoint continued without stopping; push and PRs went ahead on the Plan's gate authorization), but no fresh consumer session has been observed following them."
+    }
+  ]
+}

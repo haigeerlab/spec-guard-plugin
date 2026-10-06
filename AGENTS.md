@@ -16,4 +16,6 @@
 - Proposal 共享事实只来自远端默认分支；GitHub/GitLab 仅可作为只读 Proposal Issue 来源。
 - Proposal 不调用旧 tracker bridge，不创建或修改 Issue、PR、分支、任务或 `.agent/state.json`。
 - 退役 Spec 与 Plan 位于 `docs/retirements/`，不加入当前能力图。
+- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），未标注按 `gate`；按需求批量前置审与
+  UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
 <!-- END:spec-guard-codex-convention -->
