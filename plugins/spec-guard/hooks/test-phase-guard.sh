@@ -45,6 +45,22 @@ $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
 
+# 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
+BOUNDARY='- Module boundary: start the next piece of work in a new session; this stage summary carries over, the conversation does not need to.'
+boundary() {  # $1=用例名 $2=项目目录
+  local out
+  out="$(run "$2")"
+  python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+line = sys.argv[1]
+assert text.count(line) == 1, text
+assert text.index(line) < text.index("Suggested next step"), text
+' "$BOUNDARY" <<<"$out" || fail "$1: 模块完成行缺失、重复或位置不对
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
 map() {  # $1=项目目录
   mkdir -p "$1/spec"
   printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
@@ -88,6 +104,7 @@ mkdir -p "$WORK/crlf"
 printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
 map "$WORK/crlf"
 injects "CRLF 声明块激活并报告 MAP_ONLY" "$WORK/crlf" "MAP_ONLY"
+lacks "MAP_ONLY 没有模块完成行" "$WORK/crlf" "Module boundary"
 
 local_project="$WORK/local"
 mkdir -p "$local_project"
@@ -113,8 +130,10 @@ printf '%s\n' '- [x] done' '- [ ] one' '* [ ] two' > "$stages/tasks/alpha/todo.m
 injects "todo 有未勾选项时报告 BUILDING" "$stages" "当前阶段: **BUILDING**"
 injects "BUILDING 给出剩余项数" "$stages" "2 unchecked item(s) in \`tasks/alpha/todo.md\`"
 injects "进行中时的全局计数" "$stages" "Modules 2 · Specs 2 · Plans 1 · In progress 1 · Done 0"
+lacks "BUILDING 没有模块完成行" "$stages" "Module boundary"
 printf '%s\n' '- [x] done' '- [X] one' > "$stages/tasks/alpha/todo.md"
 injects "当前模块完成后推进到下一个模块" "$stages" 'Current module: `beta` (next in Build order)'
+lacks "NEEDS_PLAN 没有模块完成行" "$stages" "Module boundary"
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 优先于 Build order" "$stages" 'Current module: `alpha` (activeModule)'
 printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
@@ -141,6 +160,7 @@ activation_only="$WORK/invalid-active-only"
 mkdir -p "$activation_only/.agent"
 printf '%s\n' '{"activeModule":"NOT A VALID ID"}' > "$activation_only/.agent/state.json"
 injects "activeModule 值无效时激活信号仍然触发" "$activation_only" "IDLE"
+lacks "IDLE 没有模块完成行" "$activation_only" "Module boundary"
 # 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 已完成但项目未完成时报告 MODULE_DONE" "$stages" "当前阶段: **MODULE_DONE**"
@@ -148,6 +168,7 @@ injects "MODULE_DONE 仍指出当前模块" "$stages" 'Current module: `alpha` (
 injects "MODULE_DONE 指向 Build order 中第一个未完成模块" "$stages" '`beta`'
 injects "MODULE_DONE 报告该模块自己的阶段" "$stages" 'NEEDS_PLAN'
 lacks "MODULE_DONE 不再冒充项目 DONE" "$stages" "当前阶段: **DONE**"
+boundary "MODULE_DONE 有模块完成行" "$stages"
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 # 全部完成且 activeModule 不在图中：回退后仍是项目 DONE（与拆分前同一场景）。
 printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
@@ -155,24 +176,30 @@ injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
+boundary "DONE 有模块完成行" "$stages"
 # 全部完成但 activeModule 仍指向已完成模块：仍是项目 DONE，并提示可清除。
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "全部完成且 activeModule 未清除时仍报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "全部完成且 activeModule 未清除时指向 add-module" "$stages" "/spec-guard:add-module"
 injects "全部完成且 activeModule 未清除时提示可清除" "$stages" 'activeModule `alpha` is already done and can be cleared'
+boundary "DONE 且 activeModule 未清除时有模块完成行" "$stages"
 lacks "全部完成时不出现模块级提示" "$stages" "before building it"
 # 全部完成且没有 activeModule：输出不带清除提示。
 printf '{"activeModule":""}\n' > "$stages/.agent/state.json"
 injects "全部完成且无 activeModule 时报告 DONE" "$stages" "当前阶段: **DONE**"
 lacks "全部完成且无 activeModule 时无清除提示" "$stages" "can be cleared"
+boundary "DONE 且无 activeModule 时有模块完成行" "$stages"
 rm "$stages/spec/beta.md"
 injects "缺 Spec 的模块报告 NEEDS_SPEC" "$stages" "当前阶段: **NEEDS_SPEC**"
+lacks "NEEDS_SPEC 没有模块完成行" "$stages" "Module boundary"
 printf '%s\n' '| alpha | x | — |' > "$stages/spec/CAPABILITY-MAP.md"
 injects "能力图无效时报告 MAP_INVALID" "$stages" "当前阶段: **MAP_INVALID**"
+lacks "MAP_INVALID 没有模块完成行" "$stages" "Module boundary"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
 printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
 injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶段: **UNKNOWN**"
+lacks "UNKNOWN 没有模块完成行" "$stages" "Module boundary"
 
 # 插队：base 完成、infra 做到一半，当前模块是 urgent。
 paused="$WORK/paused"
@@ -198,6 +225,7 @@ printf '%s\n' '- [x] u1' > "$paused/tasks/urgent/todo.md"
 injects "插队完成后报告 MODULE_DONE" "$paused" "当前阶段: **MODULE_DONE**"
 injects "MODULE_DONE 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
 injects "MODULE_DONE 点名被暂停的模块" "$paused" 'resume paused module `infra` (BUILDING). Set activeModule to it.'
+boundary "有暂停模块的 MODULE_DONE 有模块完成行" "$paused"
 printf '%s\n' '- [x] a' '- [x] b' > "$paused/tasks/infra/todo.md"
 lacks "没有被暂停模块时不出现 Paused" "$paused" "Paused"
 printf '%s\n' '- [ ] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
@@ -237,6 +265,7 @@ printf '{"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 NOTODO_NOTE='activeModule `alpha` has a plan but no `tasks/alpha/todo.md`, so it counts as done; add the todo if work remains.'
 injects "无 todo 的 activeModule 且项目未完成时报告 MODULE_DONE" "$notodo" "当前阶段: **MODULE_DONE**"
 injects "MODULE_DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
+boundary "缺 todo 的 MODULE_DONE 有模块完成行" "$notodo"
 python3 -c '
 import json, sys
 text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
@@ -249,6 +278,7 @@ printf '%s\n' '- [x] a' '- [x] b' > "$notodo/tasks/beta/todo.md"
 injects "无 todo 的 activeModule 且全部完成时报告 DONE" "$notodo" "当前阶段: **DONE**"
 injects "DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
 injects "DONE 仍保留可清除提示" "$notodo" 'activeModule `alpha` is already done and can be cleared'
+boundary "缺 todo 的 DONE 有模块完成行" "$notodo"
 python3 -c '
 import json, sys
 text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
@@ -412,6 +442,7 @@ injects "DONE 且领先远端默认分支时报告未合并提交" "$um_done" "$
 injects "DONE 且领先时建议先推送合并" "$um_done" "$PUSHFIRST"
 injects "DONE 且领先时仍保留 add-module 与 Proposal 指引" "$um_done" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 且领先时仍报告 DONE" "$um_done" "当前阶段: **DONE**"
+boundary "DONE 且领先时有模块完成行" "$um_done"
 # 只读：运行 hook 前后引用与工作区状态不变。
 refs_before="$(git -C "$um_done" for-each-ref)"; status_before="$(git -C "$um_done" status --porcelain)"
 run "$um_done" >/dev/null
@@ -429,8 +460,15 @@ lacks "推送后 DONE 不再报告未合并提交" "$um_done" "not yet in"
 lacks "推送后 DONE 不再建议先推送" "$um_done" "push this branch"
 um_plain="$WORK/um-plain"
 cp -R "$um_done" "$um_plain"; git -C "$um_plain" remote remove origin
-[ "$(run "$um_done")" = "$(run "$um_plain")" ] || fail "推送后的输出应与无远端时逐字相同"
-echo "  ✅ 推送后输出与无远端时逐字相同"; PASS=$((PASS + 1))
+# 两棵树的目录不同，位置行必然不同；比较的是远端状态，所以去掉位置行后逐字比较。
+sans_location() {
+  python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+print("\n".join(l for l in text.split("\n") if not l.startswith("Location: ")))'
+}
+[ "$(run "$um_done" | sans_location)" = "$(run "$um_plain" | sans_location)" ] || fail "推送后的输出应与无远端时逐字相同"
+echo "  ✅ 推送后输出与无远端时逐字相同（位置行除外）"; PASS=$((PASS + 1))
 # 没有远端：无提示。
 two_commits "$um_plain"
 lacks "没有远端时不提示未合并提交" "$um_plain" "not yet in"
@@ -442,6 +480,7 @@ two_commits "$um_mod"
 injects "MODULE_DONE 且领先时报告未合并提交" "$um_mod" "$HINT"
 injects "MODULE_DONE 且领先时在原建议前加先推送合并" "$um_mod" "Suggested next step: $PUSHFIRST; then \`alpha\` is done; next unfinished module"
 injects "MODULE_DONE 且领先时仍报告 MODULE_DONE" "$um_mod" "当前阶段: **MODULE_DONE**"
+boundary "MODULE_DONE 且领先时有模块完成行" "$um_mod"
 
 um_build="$WORK/um-build"
 unmerged_fixture "$um_build" '- [ ] open'
@@ -449,5 +488,129 @@ two_commits "$um_build"
 injects "BUILDING 仍报告 BUILDING" "$um_build" "当前阶段: **BUILDING**"
 lacks "BUILDING 且领先时不提示未合并提交" "$um_build" "not yet in"
 lacks "BUILDING 且领先时不建议先推送" "$um_build" "push this branch"
+lacks "BUILDING 且领先时没有模块完成行" "$um_build" "Module boundary"
+
+# 上下文行（fresh-session-hint 第 2、8、9 条）：经标准输入的 hook 输入读会话记录，超过 200k 才提示。
+run_input() {  # $1=项目目录 $2=标准输入文本
+  CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+}
+context_of() {  # 从 hook JSON 取 additionalContext
+  python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
+}
+transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
+  printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
+}
+CTX_LINE='- Session context: about 251 k tokens in the last turn (over 200k); every turn re-reads it. At the next task boundary, record decisions in the spec and start a new session.'
+ctx="$WORK/ctx"
+mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
+map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+T="$WORK/ctx-transcript.jsonl"
+HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
+plain_building="$(run "$ctx" | context_of)"
+
+transcript "$T" 250599
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+grep -F -- "$CTX_LINE" >/dev/null <<<"$out" || fail "BUILDING 且 25 万时应有上下文行
+$out"
+python3 -c 'import sys; t=sys.stdin.read(); assert t.index(sys.argv[1]) < t.index("Suggested next step"), t' "$CTX_LINE" <<<"$out" \
+  || fail "上下文行应在 Suggested next step 之前"
+grep -F "Module boundary" >/dev/null <<<"$out" && fail "BUILDING 不应有模块完成行"
+echo "  ✅ BUILDING 且超过阈值时只有上下文行"; PASS=$((PASS + 1))
+
+transcript "$T" 149999
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "BUILDING 且 15 万时应与现在逐字相同"
+echo "  ✅ 低于阈值时输出逐字不变"; PASS=$((PASS + 1))
+transcript "$T" 199999
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "恰好 200000 时不应提示"
+echo "  ✅ 恰好 200k 不提示"; PASS=$((PASS + 1))
+
+transcript "$T" 250599
+for bad in "not json" "{}" "{\"transcript_path\":\"$WORK/missing.jsonl\"}"; do
+  [ "$(run_input "$ctx" "$bad" | context_of)" = "$plain_building" ] || fail "不可用的 hook 输入应与无输入逐字相同: $bad"
+done
+echo "  ✅ 不可用的 hook 输入不改变输出"; PASS=$((PASS + 1))
+
+# 标准输入一直不关闭：hook 必须照常输出，不能挂住。
+python3 - "$HOOKDIR/phase-guard.sh" "$ctx" <<'HANG' || fail "标准输入不关闭时 hook 挂住或输出不对"
+import json, os, subprocess, sys, time
+started = time.monotonic()
+proc = subprocess.Popen(["/bin/bash", sys.argv[1]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        env=dict(os.environ, CLAUDE_PROJECT_DIR=sys.argv[2]))
+try:
+    out = proc.stdout.read()
+    proc.wait(timeout=5)
+finally:
+    proc.stdin.close()
+    proc.kill()
+assert time.monotonic() - started < 3, time.monotonic() - started
+assert "BUILDING" in json.loads(out)["hookSpecificOutput"]["additionalContext"], out
+HANG
+echo "  ✅ 标准输入不关闭时约 1 秒内照常输出"; PASS=$((PASS + 1))
+
+# 只读：项目文件与会话记录的修改时间不变。
+snap() { python3 -c '
+import os, sys
+for root in sys.argv[1:]:
+    for d, _, fs in os.walk(root) if os.path.isdir(root) else [(os.path.dirname(root), [], [os.path.basename(root)])]:
+        for f in sorted(fs):
+            p = os.path.join(d, f); print(p, os.stat(p).st_mtime_ns)
+' "$ctx" "$T"; }
+before="$(snap)"; run_input "$ctx" "$HOOK_INPUT" >/dev/null; [ "$before" = "$(snap)" ] || fail "上下文读取必须只读"
+echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+python3 -c '
+import sys
+t, a, b = sys.stdin.read(), sys.argv[1], sys.argv[2]
+assert t.count(a) == 1 and t.count(b) == 1, t
+assert t.index(a) < t.index(b) < t.index("Suggested next step"), t
+' "$BOUNDARY" "$CTX_LINE" <<<"$out" || fail "DONE 且超过阈值时两行都应出现、模块完成在前
+$out"
+echo "  ✅ DONE 且超过阈值时两行顺序固定"; PASS=$((PASS + 1))
+
+idle_ctx="$WORK/idle-ctx"
+mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle_ctx/CLAUDE.md"
+out="$(run_input "$idle_ctx" "$HOOK_INPUT" | context_of)"
+grep -F "Session context" >/dev/null <<<"$out" && fail "IDLE 不应有上下文行"
+echo "  ✅ IDLE 没有上下文行"; PASS=$((PASS + 1))
+
+# 位置行（fresh-session-hint 第 11 条）：git 仓库里每个阶段都在标题与“当前阶段”之间给出分支与 worktree。
+TELL='State this location to the user whenever you ask them to review or confirm.'
+located() {  # $1=用例名 $2=项目目录 $3=期望的阶段
+  local out top
+  out="$(run "$2")"; top="$(git -C "$2" rev-parse --show-toplevel)"
+  python3 -c '
+import json, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+want = "## spec-guard local workflow\n\nLocation: branch `main` · worktree `%s`. %s\n\n当前阶段: **%s**" % tuple(sys.argv[1:4])
+assert text.startswith(want), text
+assert text.count("Location:") == 1, text
+' "$top" "$TELL" "$3" <<<"$out" || fail "$1: 位置行缺失或位置不对
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+loc="$WORK/loc"
+mkdir -p "$loc"
+git -C "$loc" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$loc/CLAUDE.md"
+located "IDLE 有位置行" "$loc" IDLE
+map "$loc"
+located "MAP_ONLY 有位置行" "$loc" MAP_ONLY
+mkdir -p "$loc/tasks/alpha"; touch "$loc/spec/alpha.md"; printf '# Plan\n' > "$loc/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$loc/tasks/alpha/todo.md"
+located "BUILDING 有位置行" "$loc" BUILDING
+printf '%s\n' '- [x] open' > "$loc/tasks/alpha/todo.md"
+located "DONE 有位置行" "$loc" DONE
+printf '\377\376 not utf-8\n' > "$loc/tasks/alpha/todo.md"
+located "UNKNOWN 有位置行" "$loc" UNKNOWN
+printf '%s\n' '| alpha | x | — |' > "$loc/spec/CAPABILITY-MAP.md"
+located "MAP_INVALID 有位置行" "$loc" MAP_INVALID
+lacks "非 git 目录没有位置行" "$ctx" "Location:"
+grep -F "worktree \`$(git -C "$git_project" rev-parse --show-toplevel)\`." >/dev/null <<<"$(run_from "$git_project/src/deep")" \
+  || fail "Codex 从仓库子目录启动时位置行应报告仓库根目录"
+echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PASS=$((PASS + 1))
 
 echo "phase-guard regression passed (${PASS} cases)"

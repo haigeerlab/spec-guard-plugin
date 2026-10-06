@@ -175,7 +175,20 @@ def unmerged_commits(root: Path) -> tuple | None:
     return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
 
 
-def describe(root: Path) -> str:
+MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new session; "
+                   "this stage summary carries over, the conversation does not need to.")
+
+
+CONTEXT_THRESHOLD = 200_000
+
+
+def context_line(tokens: int) -> str:
+    return ("- Session context: about %d k tokens in the last turn (over 200k); every turn re-reads it. "
+            "At the next task boundary, record decisions in the spec and start a new session."
+            % ((tokens + 500) // 1000))
+
+
+def describe(root: Path, context_tokens: int | None = None) -> str:
     root = Path(root)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
@@ -206,6 +219,8 @@ def describe(root: Path) -> str:
         notes.append("- activeModule `%s` is not in the capability map; using Build order."
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
+    context_note = (context_line(context_tokens)
+                    if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD else "")
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
@@ -235,6 +250,9 @@ def describe(root: Path) -> str:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
         if hint:
             notes.append(hint)
+        notes.append(MODULE_BOUNDARY)
+        if context_note:
+            notes.append(context_note)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
@@ -260,6 +278,10 @@ def describe(root: Path) -> str:
     else:
         module_done = ("`%s` is done; next unfinished module in Build order is `%s` (%s). "
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
+    if stage == "MODULE_DONE":
+        notes.append(MODULE_BOUNDARY)
+    if context_note:
+        notes.append(context_note)
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
@@ -272,4 +294,9 @@ def describe(root: Path) -> str:
 
 
 if __name__ == "__main__":
-    print(describe(Path(sys.argv[1] if len(sys.argv) > 1 else ".")))
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--context-tokens", type=int)
+    args = parser.parse_args()
+    print(describe(Path(args.root), args.context_tokens))
