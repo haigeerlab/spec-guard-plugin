@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.47.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.47.0;test:marketplace-ref-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.46.0 to v0.47.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.47.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.47.0;test:installed-plugin-smoke-20261006"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "host:codex-cli 0.160.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-handoff",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.47.0;test:installed-handoff-exec-20261006"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "command:codex exec --skip-git-repo-check -c model_reasoning_effort=low 'spec-guard handoff' (in a temporary activated project, installed plugin, no trust bypass)",
+        "result:the run printed `hook: UserPromptSubmit Blocked` and no model output or `tokens used` line: the prompt never reached the model",
+        "result:`codex exec` does not print the block reason, so the handoff text itself is not visible in exec mode",
+        "host:codex-cli 0.160.0 (thread 01a110a0-9ec0-7a02-bacc-b5536ed975ae)"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-tui-handoff-display",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "reason": "whether the Codex TUI shows the block reason (the handoff text) to the user is not observed: exec mode prints only the Blocked status, and the TUI run needs the user to type the trigger once."
+    },
+    {
+      "subject": "spec-guard-codex-session-context",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "reason": "carried over from v0.46.0: whether Codex passes a non-empty transcript_path to UserPromptSubmit in a real session is still not observed."
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.47.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.47.0;test:installed-plugin-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.46.0 to 0.47.0 for scope user; the installed copy records gitCommitSha 552eb5551495401f9a91cc0859ac14deb4d696ec -- the v0.47.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-handoff",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.47.0;test:installed-handoff-headless-20261006"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '/spec-guard:handoff' --output-format json --model haiku (in a temporary activated project)",
+        "result:total_cost_usd 0, num_turns 0; result was `UserPromptSubmit operation blocked by hook:` followed by the handoff text (location, BUILDING with module counts, unmerged commits unknown, no release evidence, the `下一步：____` blank)",
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '<ask to quote the 当前阶段 line>' --output-format json --model haiku",
+        "result:exit 0; the reply quoted `当前阶段: **BUILDING**` -- ordinary prompts still get the stage injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-desktop-handoff-display",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "reason": "the desktop app applies the plugin update only after a restart, and the release session itself still ran 0.46.0; how the desktop Code tab renders the blocked-prompt message, and whether a desktop worktree session now reports the worktree instead of the main checkout (the hook input cwd change), are left for the next desktop session, checked with computer-use."
+    }
+  ]
+}
