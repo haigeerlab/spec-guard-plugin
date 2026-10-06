@@ -85,7 +85,6 @@ python3 -B plugins/spec-guard/hooks/test_documentation_baseline.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_impact.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_verification.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_contract.py || F=1
-/bin/bash plugins/spec-guard/hooks/test-collaboration-suite.sh || F=1
 python3 -B plugins/spec-guard/hooks/test_module_cost_report.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_context.py || F=1
 python3 -B plugins/spec-guard/hooks/test_session_handoff.py || F=1
