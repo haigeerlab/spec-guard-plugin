@@ -255,7 +255,8 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 看板或泳道 ID。短编号可以在同一仓库的其他 linked worktree 中读取。
 
 例如：“记个 bug：测试环境的接口响应异常，并告诉另一位 Agent 复查。”Agent 先在当前仓库
-创建事项，再单独通过 `collab` 发送带标题和短编号的消息，并分别报告账本写入和消息投递结果。若收件人
+创建事项，再单独通过 agent-relay 协作信箱（`agent-relay:collab`，仅当 `hooks/agent_relay_probe.py` 报告
+`ready`；否则转述探测提示并跳过通知）发送带标题和短编号的消息，并分别报告账本写入和消息投递结果。若收件人
 属于另一个仓库，消息还需说明来源项目和问题内容；仅有本仓库的短编号不足以让对方读取事项。
 
 账本不可用时，日常入口只做状态诊断并给出下一步；安装、初始化、宿主配置仍由

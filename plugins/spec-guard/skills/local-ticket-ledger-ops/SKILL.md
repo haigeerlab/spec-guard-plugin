@@ -7,7 +7,7 @@ description: Inspect, explicitly enable, or connect Spec Guard's optional same-M
 
 Use this skill only for the optional Epiq-backed local ledger. It is a durable, same-Mac fallback
 for a Git repository's linked worktrees when GitHub/GitLab Issues are unavailable. It is separate
-from the Spec Guard collaboration mailbox: a mailbox message may mention a ledger short ID, but
+from the agent-relay mailbox: a mailbox message may mention a ledger short ID, but
 neither system may automatically create, update, route, or require the other.
 
 For ordinary listing, reading, creating, commenting, or closing an already enabled ticket, use the

@@ -73,8 +73,11 @@ PR 合并或本地阶段 `DONE` 本身不构成关闭证明；合并后无法访
 `epiq_sync` 前先说明目标远端及其公开或私有状态。宿主可能对这些工具逐次询问（Claude）或不暴露
 （Codex）；工具不可用或被拒绝时如实说明，不改用 shell、Git 或其他途径绕过。
 
-用户还要求通知另一个 Agent 时，先完成事项操作，再使用 `collab` 协作邮箱按名称发送消息，包含事项
-标题、短编号和具体处理请求。报告事项写入与消息投递各自的结果。若对方在同一仓库的 worktree，可请其按
+用户还要求通知另一个 Agent 时，先完成事项操作，再确认协作插件 agent-relay 可用：从当前启用的插件解析
+`ROOT`（Codex 采用 `spec-guard-ops` 的解析环境；Claude 使用 `CLAUDE_PLUGIN_ROOT`），运行
+`python3 -B "$ROOT/hooks/agent_relay_probe.py" --host <claude|codex>`。`state` 为 `ready` 时，使用
+`agent-relay:collab` skill 按名称发送消息，包含事项标题、短编号和具体处理请求；其他状态原样转述 `message`
+并跳过通知，不改用其他途径发送，`unknown` 不能说成未安装。报告事项写入与消息投递（或跳过）各自的结果。若对方在同一仓库的 worktree，可请其按
 短编号读取；若在另一个仓库，消息还须包含来源项目和足够的文字摘要，不能声称对方能直接读取本仓库账本。
 没有明确收件人时，展示标题及短编号供用户引用，不猜测发送对象。
 
