@@ -66,11 +66,14 @@ UserPromptSubmit hook 本地作答，不调用模型。阶段提示里的 Module
 <仓库名> 仓库（<worktree 根目录>，分支 <分支>|分离 HEAD，HEAD <短 sha>）。
 ## 现状
 阶段 <STAGE>；模块 <总数>，Spec <n>，Plan <n>，进行中 <n>，完成 <n>；当前模块 <id|无>。
-未合并提交：<n> 个（相对 <origin/main>）| 无 | 未知
-发布证据 v<版本> 中 not-verified：<subject 列表> | 无
+未合并提交：<n> 个（相对 <ref>）| 无（相对 <ref>）| 未知（没有本地已知的远端默认分支）
+发布证据 v<版本> 中 not-verified：<subject、…> | 无      ← 没有发布证据文件时整行为“发布证据：无”
 ## 下一步
 下一步：____
 ```
+
+IDLE、MAP_ONLY、MAP_INVALID 的阶段行分别为"阶段 IDLE；没有能力图。""阶段 MAP_ONLY；有能力图，没有模块 Spec。"
+"阶段 MAP_INVALID；能力图无法解析，运行 verify-artifacts 查看。"；不在 git 仓库里时分支、HEAD 与未合并提交写"未知"。
 
 ## Commands
 
