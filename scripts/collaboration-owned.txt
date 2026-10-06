@@ -1,0 +1,40 @@
+# Collaboration-owned paths: exempt from check-collaboration-boundary.py and moved to agent-relay by
+# collaboration-extraction. One repository path per line; a trailing "/" means a whole directory.
+# Source: docs/baselines/collaboration-pre-split.md, "Inventory and coupling points".
+
+# Code
+plugins/spec-guard/hooks/native_collaboration_runtime.py
+plugins/spec-guard/hooks/native_collaboration_adapters.py
+plugins/spec-guard/hooks/native_collaboration_retire.py
+plugins/spec-guard/hooks/session_routing.py
+plugins/spec-guard/hooks/session_delegation.py
+plugins/spec-guard/hooks/session_delegation_backend.py
+plugins/spec-guard/hooks/session_delegation_claude.py
+plugins/spec-guard/hooks/session_delegation_codex.py
+plugins/spec-guard/hooks/session_delegation_control.py
+
+# Tests
+plugins/spec-guard/hooks/test_native_collaboration_runtime.py
+plugins/spec-guard/hooks/test_native_collaboration_adapters.py
+plugins/spec-guard/hooks/test_native_collaboration_retire.py
+plugins/spec-guard/hooks/test_native_only_collaboration.py
+plugins/spec-guard/hooks/test_native_collab_entry.py
+plugins/spec-guard/hooks/test_collab_entry.py
+plugins/spec-guard/hooks/test_session_routing.py
+plugins/spec-guard/hooks/test_session_routing_entry.py
+plugins/spec-guard/hooks/test_session_delegation.py
+plugins/spec-guard/hooks/test_session_delegation_backend.py
+plugins/spec-guard/hooks/test_session_delegation_claude.py
+plugins/spec-guard/hooks/test_session_delegation_codex.py
+plugins/spec-guard/hooks/test_session_delegation_recovery.py
+
+# Skills and command
+plugins/spec-guard/skills/collab/
+plugins/spec-guard/skills/collaboration-ops/
+plugins/spec-guard/skills/session-routing/
+plugins/spec-guard/skills/session-delegation/
+plugins/spec-guard/commands/collaboration.md
+
+# References
+plugins/spec-guard/references/collaboration-runtime.md
+plugins/spec-guard/references/collaboration-protocol.md
