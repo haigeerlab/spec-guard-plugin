@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.45.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:e376b43ad28357750eb4b3a2420fc646bcdd8358"
+      },
+      "observedAt": "2026-10-06T01:27:35Z",
+      "evidence": [
+        "result:the v0.45.0 annotated tag and origin/main both resolve to merge commit e376b43ad28357750eb4b3a2420fc646bcdd8358; pull request #201 merged after `validate (ubuntu-latest)` passed on cf90cfd",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh",
+        "command:python3 -B plugins/spec-guard/hooks/test_module_cost_report.py",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS, system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 101, verify-artifacts 26, setup/teardown 43, cost-report 149 cases)"
+      ]
+    }
+  ]
+}

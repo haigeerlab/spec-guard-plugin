@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.45.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.45.0;test:installed-plugin-upgrade-20261006"
+      },
+      "observedAt": "2026-10-06T01:29:32Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.44.0 to 0.45.0 for scope user",
+        "result:the installed copy records gitCommitSha e376b43ad28357750eb4b3a2420fc646bcdd8358 -- the v0.45.0 tag commit -- and carries hooks/module_cost_report.py"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-hook",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.45.0;test:installed-headless-phase-20261006"
+      },
+      "observedAt": "2026-10-06T01:29:32Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p '只复述你收到的 spec-guard 注入里「当前阶段」那一行，逐字，不要加别的' --max-turns 2",
+        "result:exit 0; the reply was `当前阶段: **BUILDING**`, injected by the installed 0.45.0 copy",
+        "host:a disposable Git project whose CLAUDE.md wraps the installed templates/claude-block-local.md in the BEGIN/END markers, one mapped module, a plan and one unchecked todo item; python3 resolved to /usr/bin/python3 3.9.6"
+      ]
+    },
+    {
+      "subject": "spec-guard-cost-report-installed",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.45.0;test:installed-cost-report-joint-run-20261006"
+      },
+      "observedAt": "2026-10-06T01:29:32Z",
+      "evidence": [
+        "command:/usr/bin/python3 -B <installed 0.45.0>/hooks/module_cost_report.py --project <ledgerlite run C-N1> --prices <tier-guard price basis> ledgerlite",
+        "result:the installed copy reported the total including wrap-up as $2.0170 for the ledgerlite run C-N1, the same figure tier-guard computed independently for the whole run ($2.017)",
+        "limit:the price file follows the tier-guard basis the user approved (cache-read and cache-write prices not checked against official pricing)"
+      ]
+    }
+  ]
+}
