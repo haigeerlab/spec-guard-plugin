@@ -47,10 +47,16 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 在 git 仓库里，标题下第一行是 ``Location: branch `<分支>` · worktree `<工作树根目录>`. …``（分离 HEAD 时为 ``detached at `<短 sha>` ``），
 各阶段都有；呈现结果时把它一并告诉用户，agent 请用户评审或确认时也应说明这个位置。不在 git 仓库里时没有这一行。
 
-`MODULE_DONE` / `DONE` 的事实列表末尾有一行 `- Module boundary: …`，建议在新会话里开始下一项工作，并指向 `/spec-guard:handoff`（Codex：`spec-guard handoff`）生成可直接粘贴的交接文本。宿主在 hook 输入里
-给出会话记录（`transcript_path`）且最近一轮主会话上下文超过 200k token 时，`NEEDS_SPEC` 到 `DONE` 各阶段再多一行
-`- Session context: about N k tokens …`，建议在下一个 task 边界记下决定、开新会话。本命令手工运行时没有 hook 输入，
-所以不会出现上下文行；读不到会话记录时同样不出现，不猜。
+上下文提醒以模块为单位，按最近一轮主会话上下文分两档（宿主在 hook 输入里给出会话记录 `transcript_path` 时才读得到）：
+
+- `MODULE_DONE` / `DONE`：达到窗口 50% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，建议在新会话里开始
+  下一项工作，并指向 `/spec-guard:handoff`（Codex：`spec-guard handoff`）生成可直接粘贴的交接文本；低于 50% 时没有这一行；
+  读不到大小时保留不带大小的 `- Module boundary: …`。
+- `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`：只在达到窗口 80% 时多一行 `- Session context: about N k tokens …`，
+  建议做完或记下当前 task 后开新会话。
+
+Codex 的窗口取自会话记录；Claude 的会话记录没有窗口大小，按 1M 窗口折算为 500k / 800k。本命令手工运行时没有
+hook 输入，所以不会出现带大小的行。
 
 `- Paused:` 行表示有被暂停的模块：当前模块以外、todo 既有已勾又有未勾项的模块（显式插队留下的）。它出现在 `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下，`MODULE_DONE` 的下一步会指回它；没有被暂停的模块时不输出。
 
