@@ -17,7 +17,6 @@ fi
 BASE_ARG="$1"
 TARGET="$2"
 REPO="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
-PATHS="$REPO/scripts/collaboration-extraction-paths.txt"
 
 command -v git-filter-repo >/dev/null 2>&1 || { echo "git-filter-repo is not installed" >&2; exit 2; }
 BASE="$(git -C "$REPO" rev-parse --verify --quiet "${BASE_ARG}^{commit}")" \
