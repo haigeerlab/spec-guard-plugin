@@ -179,7 +179,16 @@ MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new ses
                    "this stage summary carries over, the conversation does not need to.")
 
 
-def describe(root: Path) -> str:
+CONTEXT_THRESHOLD = 200_000
+
+
+def context_line(tokens: int) -> str:
+    return ("- Session context: about %d k tokens in the last turn (over 200k); every turn re-reads it. "
+            "At the next task boundary, record decisions in the spec and start a new session."
+            % ((tokens + 500) // 1000))
+
+
+def describe(root: Path, context_tokens: int | None = None) -> str:
     root = Path(root)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
@@ -240,6 +249,8 @@ def describe(root: Path) -> str:
         if hint:
             notes.append(hint)
         notes.append(MODULE_BOUNDARY)
+        if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD:
+            notes.append(context_line(context_tokens))
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
@@ -267,6 +278,8 @@ def describe(root: Path) -> str:
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
     if stage == "MODULE_DONE":
         notes.append(MODULE_BOUNDARY)
+    if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD:
+        notes.append(context_line(context_tokens))
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
@@ -279,4 +292,9 @@ def describe(root: Path) -> str:
 
 
 if __name__ == "__main__":
-    print(describe(Path(sys.argv[1] if len(sys.argv) > 1 else ".")))
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--context-tokens", type=int)
+    args = parser.parse_args()
+    print(describe(Path(args.root), args.context_tokens))

@@ -3,7 +3,10 @@
 Fixtures are built here; nothing reads this machine's real transcripts or rollouts.
 """
 import json
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -102,6 +105,55 @@ class HookInput(unittest.TestCase):
                      json.dumps({"transcript_path": 3})):
             with self.subTest(text=text):
                 self.assertIsNone(transcript_path_from_hook_input(text))
+
+
+SCRIPT = str(Path(__file__).resolve().parent / "session_context.py")
+
+
+class CommandLine(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.transcript = Path(self.tmp.name) / "t.jsonl"
+        self.transcript.write_text(json.dumps(claude_assistant(10, 250000, 600)) + "\n")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_cli(self, stdin_text):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, self.tmp.name], input=stdin_text,
+                              capture_output=True, text=True, timeout=10)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout
+
+    def test_prints_tokens_then_the_location_line(self):
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
+        self.assertEqual(out.split("\n")[0], "250610")
+        self.assertEqual(out.count("\n"), 2)
+
+    def test_unusable_input_prints_two_empty_lines(self):
+        for text in ("", "not json", json.dumps({"transcript_path": "/no/such/file"})):
+            with self.subTest(text=text):
+                self.assertEqual(self.run_cli(text).split("\n")[0], "")
+
+    def test_an_open_stdin_does_not_hang(self):
+        started = time.monotonic()
+        proc = subprocess.Popen([sys.executable, "-B", SCRIPT, self.tmp.name], stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            proc.stdin.write(b'{"transcript_path": ')
+            proc.stdin.flush()
+            out = proc.stdout.read()  # returns once the script exits; stdin stays open
+            proc.wait(timeout=5)
+        finally:
+            proc.stdin.close()
+            proc.kill()
+        self.assertLess(time.monotonic() - started, 3)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(out.split(b"\n")[0], b"")
+
+    def test_input_over_the_limit_is_not_read(self):
+        big = json.dumps({"transcript_path": str(self.transcript), "pad": "x" * session_context.INPUT_LIMIT})
+        self.assertEqual(self.run_cli(big).split("\n")[0], "")
 
 
 if __name__ == "__main__":

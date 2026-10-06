@@ -8,8 +8,13 @@ from __future__ import annotations
 
 import json
 import os
+import select
+import sys
+import time
 
 TAIL_LIMIT = 4 * 1024 * 1024
+INPUT_LIMIT = 1024 * 1024
+INPUT_WAIT = 1.0
 
 
 def _count(value) -> int | None:
@@ -70,3 +75,33 @@ def transcript_path_from_hook_input(text) -> str | None:
         return None
     path = data.get("transcript_path") if isinstance(data, dict) else None
     return path if isinstance(path, str) and path else None
+
+
+def read_hook_input(fd: int) -> str:
+    """Hook input from fd, waiting at most INPUT_WAIT seconds; "" if it is over INPUT_LIMIT."""
+    deadline = time.monotonic() + INPUT_WAIT
+    chunks, size = [], 0
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([fd], [], [], remaining)[0]:
+            return ""  # the caller never closed stdin: treat the input as unavailable
+        chunk = os.read(fd, 65536)
+        if not chunk:
+            return b"".join(chunks).decode("utf-8", "replace")
+        size += len(chunk)
+        if size > INPUT_LIMIT:
+            return ""
+        chunks.append(chunk)
+
+
+def main() -> None:
+    try:
+        tokens = context_tokens(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
+    except Exception:  # a hook helper must never break the stage injection
+        tokens = None
+    print("" if tokens is None else tokens)
+    print("")
+
+
+if __name__ == "__main__":
+    main()

@@ -483,4 +483,91 @@ lacks "BUILDING 且领先时不提示未合并提交" "$um_build" "not yet in"
 lacks "BUILDING 且领先时不建议先推送" "$um_build" "push this branch"
 lacks "BUILDING 且领先时没有模块完成行" "$um_build" "Module boundary"
 
+# 上下文行（fresh-session-hint 第 2、8、9 条）：经标准输入的 hook 输入读会话记录，超过 200k 才提示。
+run_input() {  # $1=项目目录 $2=标准输入文本
+  CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+}
+context_of() {  # 从 hook JSON 取 additionalContext
+  python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
+}
+transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
+  printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
+}
+CTX_LINE='- Session context: about 251 k tokens in the last turn (over 200k); every turn re-reads it. At the next task boundary, record decisions in the spec and start a new session.'
+ctx="$WORK/ctx"
+mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
+map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+T="$WORK/ctx-transcript.jsonl"
+HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
+plain_building="$(run "$ctx" | context_of)"
+
+transcript "$T" 250599
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+grep -F -- "$CTX_LINE" >/dev/null <<<"$out" || fail "BUILDING 且 25 万时应有上下文行
+$out"
+python3 -c 'import sys; t=sys.stdin.read(); assert t.index(sys.argv[1]) < t.index("Suggested next step"), t' "$CTX_LINE" <<<"$out" \
+  || fail "上下文行应在 Suggested next step 之前"
+grep -F "Module boundary" >/dev/null <<<"$out" && fail "BUILDING 不应有模块完成行"
+echo "  ✅ BUILDING 且超过阈值时只有上下文行"; PASS=$((PASS + 1))
+
+transcript "$T" 149999
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "BUILDING 且 15 万时应与现在逐字相同"
+echo "  ✅ 低于阈值时输出逐字不变"; PASS=$((PASS + 1))
+transcript "$T" 199999
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "恰好 200000 时不应提示"
+echo "  ✅ 恰好 200k 不提示"; PASS=$((PASS + 1))
+
+transcript "$T" 250599
+for bad in "not json" "{}" "{\"transcript_path\":\"$WORK/missing.jsonl\"}"; do
+  [ "$(run_input "$ctx" "$bad" | context_of)" = "$plain_building" ] || fail "不可用的 hook 输入应与无输入逐字相同: $bad"
+done
+echo "  ✅ 不可用的 hook 输入不改变输出"; PASS=$((PASS + 1))
+
+# 标准输入一直不关闭：hook 必须照常输出，不能挂住。
+python3 - "$HOOKDIR/phase-guard.sh" "$ctx" <<'HANG' || fail "标准输入不关闭时 hook 挂住或输出不对"
+import json, os, subprocess, sys, time
+started = time.monotonic()
+proc = subprocess.Popen(["/bin/bash", sys.argv[1]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                        env=dict(os.environ, CLAUDE_PROJECT_DIR=sys.argv[2]))
+try:
+    out = proc.stdout.read()
+    proc.wait(timeout=5)
+finally:
+    proc.stdin.close()
+    proc.kill()
+assert time.monotonic() - started < 3, time.monotonic() - started
+assert "BUILDING" in json.loads(out)["hookSpecificOutput"]["additionalContext"], out
+HANG
+echo "  ✅ 标准输入不关闭时约 1 秒内照常输出"; PASS=$((PASS + 1))
+
+# 只读：项目文件与会话记录的修改时间不变。
+snap() { python3 -c '
+import os, sys
+for root in sys.argv[1:]:
+    for d, _, fs in os.walk(root) if os.path.isdir(root) else [(os.path.dirname(root), [], [os.path.basename(root)])]:
+        for f in sorted(fs):
+            p = os.path.join(d, f); print(p, os.stat(p).st_mtime_ns)
+' "$ctx" "$T"; }
+before="$(snap)"; run_input "$ctx" "$HOOK_INPUT" >/dev/null; [ "$before" = "$(snap)" ] || fail "上下文读取必须只读"
+echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+python3 -c '
+import sys
+t, a, b = sys.stdin.read(), sys.argv[1], sys.argv[2]
+assert t.count(a) == 1 and t.count(b) == 1, t
+assert t.index(a) < t.index(b) < t.index("Suggested next step"), t
+' "$BOUNDARY" "$CTX_LINE" <<<"$out" || fail "DONE 且超过阈值时两行都应出现、模块完成在前
+$out"
+echo "  ✅ DONE 且超过阈值时两行顺序固定"; PASS=$((PASS + 1))
+
+idle_ctx="$WORK/idle-ctx"
+mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle_ctx/CLAUDE.md"
+out="$(run_input "$idle_ctx" "$HOOK_INPUT" | context_of)"
+grep -F "Session context" >/dev/null <<<"$out" && fail "IDLE 不应有上下文行"
+echo "  ✅ IDLE 没有上下文行"; PASS=$((PASS + 1))
+
 echo "phase-guard regression passed (${PASS} cases)"

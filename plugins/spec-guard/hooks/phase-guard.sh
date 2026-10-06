@@ -80,8 +80,18 @@ Suggested next step: write the first reviewed module spec under \`spec/\`."
   exit 0
 fi
 
+# 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，读不到为空。
+# 标准输入是终端（手工运行）时不转交；它最多等 1 秒，宿主不关标准输入也不会挂住。
+if [ -t 0 ]; then
+  FACTS="$(python3 "$HOOKDIR/session_context.py" . </dev/null 2>/dev/null)" || FACTS=""
+else
+  FACTS="$(python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""
+fi
+TOKENS="${FACTS%%$'\n'*}"
+case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
+
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} 2>/dev/null)"; then
   emit "## spec-guard local workflow
 
 ${STAGE}"
