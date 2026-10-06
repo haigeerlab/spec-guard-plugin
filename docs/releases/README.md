@@ -139,4 +139,5 @@ v0.45.0 的发布后证据见
 [`v0.45.0-codex.json`](v0.45.0-codex.json)。本版新增只读的 `/spec-guard:cost-report`，并按 ledgerlite 联调（Claude 10 次、
 Codex 8 次，成本与 tier-guard 逐次交叉核对）收紧 `--dispatch` 规则：默认不派、只派改动 3 个以上文件且验收明确的 task、
 Codex 一次长等待；联调结论是派活在规格化 task 上不能稳定省钱，`--dispatch` 维持实验性。成本报告的验收以安装副本在真实
-联调运行上的结果为准；Codex 宿主上没有单独实跑安装版的 cost-report。
+联调运行上的结果为准；Codex 宿主上，一次只给自然语言的 `codex exec` 会话经 `spec-guard-ops` 找到并运行了安装版 cost-report，在 X-N1 上
+给出同样的 $0.7445。
