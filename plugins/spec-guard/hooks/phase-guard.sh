@@ -78,6 +78,10 @@ TOKENS="${FACTS%%$'\n'*}"
 case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
 LOCATION=""
 case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
+# 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
+WINDOW=""
+case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
+case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
 # 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
@@ -116,7 +120,7 @@ Suggested next step: write the first reviewed module spec under \`spec/\`."
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} 2>/dev/null)"; then
   emit "${HEADER}
 
 ${STAGE}"

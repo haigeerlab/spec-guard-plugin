@@ -500,7 +500,18 @@ context_of() {  # 从 hook JSON 取 additionalContext
 transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
   printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
 }
-CTX_LINE='- Session context: about 251 k tokens in the last turn (over 200k); every turn re-reads it. At the next task boundary, record decisions in the spec and start a new session.'
+# context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
+# 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
+mid_line() {  # $1=N k $2=阈值说明
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then continue in a new session with /spec-guard:handoff (Codex: spec-guard handoff).' "$1" "$2"
+}
+sized_boundary() {  # $1=N k $2=阈值说明
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); start the next piece of work in a new session; run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
+}
+codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
+  printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
+}
+CTX_LINE="$(mid_line 800 'at or over 800 k')"
 ctx="$WORK/ctx"
 mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
 printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
@@ -510,23 +521,23 @@ T="$WORK/ctx-transcript.jsonl"
 HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
 plain_building="$(run "$ctx" | context_of)"
 
-transcript "$T" 250599
+transcript "$T" 799999
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-grep -F -- "$CTX_LINE" >/dev/null <<<"$out" || fail "BUILDING 且 25 万时应有上下文行
+grep -F -- "$CTX_LINE" >/dev/null <<<"$out" || fail "BUILDING 且达到 800k 时应有上下文行
 $out"
 python3 -c 'import sys; t=sys.stdin.read(); assert t.index(sys.argv[1]) < t.index("Suggested next step"), t' "$CTX_LINE" <<<"$out" \
   || fail "上下文行应在 Suggested next step 之前"
 grep -F "Module boundary" >/dev/null <<<"$out" && fail "BUILDING 不应有模块完成行"
 echo "  ✅ BUILDING 且超过阈值时只有上下文行"; PASS=$((PASS + 1))
 
-transcript "$T" 149999
-[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "BUILDING 且 15 万时应与现在逐字相同"
-echo "  ✅ 低于阈值时输出逐字不变"; PASS=$((PASS + 1))
-transcript "$T" 199999
-[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "恰好 200000 时不应提示"
-echo "  ✅ 恰好 200k 不提示"; PASS=$((PASS + 1))
-
 transcript "$T" 250599
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "BUILDING 且 25 万时不应再提示"
+echo "  ✅ 模块进行中低于 80% 时输出逐字不变"; PASS=$((PASS + 1))
+transcript "$T" 799998
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "799999 时不应提示"
+echo "  ✅ 差一个 token 到 800k 不提示"; PASS=$((PASS + 1))
+
+transcript "$T" 799999
 for bad in "not json" "{}" "{\"transcript_path\":\"$WORK/missing.jsonl\"}"; do
   [ "$(run_input "$ctx" "$bad" | context_of)" = "$plain_building" ] || fail "不可用的 hook 输入应与无输入逐字相同: $bad"
 done
@@ -561,15 +572,63 @@ before="$(snap)"; run_input "$ctx" "$HOOK_INPUT" >/dev/null; [ "$before" = "$(sn
 echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
 
 printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-python3 -c '
+done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
+  python3 -c '
 import sys
-t, a, b = sys.stdin.read(), sys.argv[1], sys.argv[2]
-assert t.count(a) == 1 and t.count(b) == 1, t
-assert t.index(a) < t.index(b) < t.index("Suggested next step"), t
-' "$BOUNDARY" "$CTX_LINE" <<<"$out" || fail "DONE 且超过阈值时两行都应出现、模块完成在前
+t, want = sys.stdin.read(), sys.argv[1]
+assert "Session context" not in t, t
+if want:
+    assert t.count(want) == 1 and t.count("Module boundary") == 1, t
+    assert t.index(want) < t.index("Suggested next step"), t
+else:
+    assert "Module boundary" not in t, t
+' "$2" <<<"$out" || fail "$1
 $out"
-echo "  ✅ DONE 且超过阈值时两行顺序固定"; PASS=$((PASS + 1))
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "DONE 且 800k 时只出带大小的 Module boundary 行" "$(sized_boundary 800 'at or over 500 k')"
+transcript "$T" 499999
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "DONE 恰好 500k 时出带大小的 Module boundary 行" "$(sized_boundary 500 'at or over 500 k')"
+transcript "$T" 499998
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "DONE 低于 500k 时不出 Module boundary 行" ""
+out="$(run "$ctx" | context_of)"
+done_has_only "DONE 读不到大小时保持现行 Module boundary 行" "$BOUNDARY"
+
+# Codex：窗口取自同一条 token_count（258400）；DONE 50% = 129200，BUILDING 80% = 206720。
+codex_rollout "$T" 129200
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex DONE 达到窗口 50% 时出带大小的行" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
+codex_rollout "$T" 129199
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex DONE 低于窗口 50% 时不出行" ""
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+codex_rollout "$T" 206720
+grep -F -- "$(mid_line 207 'at or over 80% of the 258 k window')" >/dev/null <<<"$(run_input "$ctx" "$HOOK_INPUT" | context_of)" \
+  || fail "Codex BUILDING 达到窗口 80% 时应有上下文行"
+echo "  ✅ Codex BUILDING 达到窗口 80% 时有上下文行"; PASS=$((PASS + 1))
+codex_rollout "$T" 206719
+[ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "Codex BUILDING 低于窗口 80% 时不应提示"
+echo "  ✅ Codex BUILDING 低于窗口 80% 时不提示"; PASS=$((PASS + 1))
+
+# MODULE_DONE 与 DONE 同一规则。
+md="$WORK/ctx-module-done"
+mkdir -p "$md/spec" "$md/tasks/alpha" "$md/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$md/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$md/spec/CAPABILITY-MAP.md"
+touch "$md/spec/alpha.md"; printf '# Plan\n' > "$md/tasks/alpha/plan.md"; printf '%s\n' '- [x] open' > "$md/tasks/alpha/todo.md"
+printf '%s\n' '{"activeModule":"alpha"}' > "$md/.agent/state.json"
+transcript "$T" 599999
+out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
+grep -F "MODULE_DONE" >/dev/null <<<"$out" || fail "夹具应为 MODULE_DONE
+$out"
+done_has_only "MODULE_DONE 达到 500k 时出带大小的行" "$(sized_boundary 600 'at or over 500 k')"
+transcript "$T" 100000
+out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
+done_has_only "MODULE_DONE 低于 500k 时不出行" ""
 
 idle_ctx="$WORK/idle-ctx"
 mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle_ctx/CLAUDE.md"

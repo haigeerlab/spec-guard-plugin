@@ -180,16 +180,39 @@ MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new ses
                    "This stage summary carries over, the conversation does not need to.")
 
 
-CONTEXT_THRESHOLD = 200_000
+# context-hint-thresholds: a module boundary suggests a new session from half the context window, the middle of a
+# module only from 80% of it. Claude transcripts carry no window, so they use a 1M window's figures.
+BOUNDARY_SHARE, MID_SHARE = 0.5, 0.8
+DEFAULT_WINDOW = 1_000_000
 
 
-def context_line(tokens: int) -> str:
-    return ("- Session context: about %d k tokens in the last turn (over 200k); every turn re-reads it. "
-            "At the next task boundary, record decisions in the spec and start a new session."
-            % ((tokens + 500) // 1000))
+def _k(tokens: int) -> int:
+    return (tokens + 500) // 1000
 
 
-def describe(root: Path, context_tokens: int | None = None) -> str:
+def thresholds(window: int | None) -> tuple:
+    """(boundary tokens, mid-module tokens, boundary note, mid note) for a context window or the Claude default."""
+    if window:
+        boundary, mid = -(-window * 5 // 10), -(-window * 8 // 10)  # ceil, in integers
+        return (boundary, mid, "at or over 50%% of the %d k window" % _k(window),
+                "at or over 80%% of the %d k window" % _k(window))
+    boundary, mid = int(DEFAULT_WINDOW * BOUNDARY_SHARE), int(DEFAULT_WINDOW * MID_SHARE)
+    return boundary, mid, "at or over %d k" % _k(boundary), "at or over %d k" % _k(mid)
+
+
+def boundary_line(tokens: int, note: str) -> str:
+    return ("- Module boundary: this session's context is about %d k tokens (%s); start the next piece of work in a "
+            "new session; run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. "
+            "This stage summary carries over, the conversation does not need to." % (_k(tokens), note))
+
+
+def context_line(tokens: int, note: str) -> str:
+    return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
+            "current task, then continue in a new session with /spec-guard:handoff (Codex: spec-guard handoff)."
+            % (_k(tokens), note))
+
+
+def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None) -> str:
     root = Path(root)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
@@ -220,8 +243,15 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
         notes.append("- activeModule `%s` is not in the capability map; using Build order."
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
-    context_note = (context_line(context_tokens)
-                    if context_tokens is not None and context_tokens > CONTEXT_THRESHOLD else "")
+    boundary_at, mid_at, boundary_note, mid_note = thresholds(context_window)
+    context_note = (context_line(context_tokens, mid_note)
+                    if context_tokens is not None and context_tokens >= mid_at else "")
+    if context_tokens is None:
+        boundary_note_line = MODULE_BOUNDARY  # size unknown: keep the conservative suggestion
+    elif context_tokens >= boundary_at:
+        boundary_note_line = boundary_line(context_tokens, boundary_note)
+    else:
+        boundary_note_line = ""
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
@@ -251,9 +281,8 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
             notes.append("- activeModule `%s` is already done and can be cleared." % current["id"])
         if hint:
             notes.append(hint)
-        notes.append(MODULE_BOUNDARY)
-        if context_note:
-            notes.append(context_note)
+        if boundary_note_line:
+            notes.append(boundary_note_line)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
@@ -280,8 +309,9 @@ def describe(root: Path, context_tokens: int | None = None) -> str:
         module_done = ("`%s` is done; next unfinished module in Build order is `%s` (%s). "
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
     if stage == "MODULE_DONE":
-        notes.append(MODULE_BOUNDARY)
-    if context_note:
+        if boundary_note_line:
+            notes.append(boundary_note_line)
+    elif context_note:
         notes.append(context_note)
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
@@ -299,5 +329,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--context-tokens", type=int)
+    parser.add_argument("--context-window", type=int)
     args = parser.parse_args()
-    print(describe(Path(args.root), args.context_tokens))
+    print(describe(Path(args.root), args.context_tokens, args.context_window))
