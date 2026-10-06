@@ -5,5 +5,5 @@
 - [x] Task 3：上下文行与接线——>200k 才提示、--context-tokens、stdin 1 秒 / 1 MiB、挂起管道与只读用例
 - [x] Checkpoint：两类建议行端到端、牙齿检查、向用户展示实际注入文本
 - [x] Task 4：位置行——分支 / 分离 HEAD / linked worktree / 非 git，所有阶段插在标题与当前阶段之间
-- [ ] Task 5：文档与变更记录——CHANGELOG 最上面的 [未发布]，同步列出阶段输出行的文档
+- [x] Task 5：文档与变更记录——CHANGELOG 最上面的 [未发布]，同步列出阶段输出行的文档
 - [ ] Checkpoint：全量验证 + 审查 + PR + 发版 + 安装版 Claude / Codex 实测 + 提醒开新会话

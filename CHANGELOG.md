@@ -4,6 +4,13 @@
 
 ### 新增
 
+- **阶段提示建议开新会话。** 费用的大头是每轮重读整个主会话上下文；spec-guard 把需求、计划与进度放在文件里，开新会话
+  不丢东西，但提示从不这样建议。现在 `MODULE_DONE` / `DONE` 多一行 `Module boundary`，建议在新会话里开始下一项工作；
+  宿主 hook 输入带 `transcript_path` 且最近一轮主会话上下文超过 200k token 时，再多一行 `Session context` 给出大小，
+  建议在下一个 task 边界记下决定、开新会话。只读会话记录末尾 4 MiB 里的最后一条用量（跳过子代理记录），读不到就不提示；
+  标准输入最多等 1 秒。Claude Code 已确认提供 `transcript_path`；Codex 真实会话里是否有值待安装版核对。
+- **每个阶段提示都给出当前分支与 worktree。** 标题下多一行 `Location: branch … · worktree …`，并要求 agent 在请用户
+  评审或确认时说明位置，挂着多个 worktree 时不用再问代码在哪。不在 git 仓库里时没有这一行。
 - **派活成本对照脚手架存档到 `evals/dispatch-cost/`。** 与 tier-guard 联调用的 ledgerlite 种子项目、参考实现、隐藏测试、
   价格表与 18 次运行的成本数据原来只在临时目录里。现在 `run.sh <claude|codex> <组> <编号>` 按组从本仓库导出当时的
   spec-guard 版本（联调中途的两版临时规则存在 `variants/`），`grade.sh` 判分并计价，`verify-seed.sh` 证明种子有效；
