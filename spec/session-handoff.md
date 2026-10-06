@@ -63,7 +63,7 @@ UserPromptSubmit hook 本地作答，不调用模型。阶段提示里的 Module
 交接文本格式（中文标签，与用户手写的交接一致）：
 
 ```text
-<repo 名> 插件仓库（<worktree 根目录>，<分支> <短 HEAD>）。
+<仓库名> 仓库（<worktree 根目录>，分支 <分支>|分离 HEAD，HEAD <短 sha>）。
 ## 现状
 阶段 <STAGE>；模块 <总数>，Spec <n>，Plan <n>，进行中 <n>，完成 <n>；当前模块 <id|无>。
 未合并提交：<n> 个（相对 <origin/main>）| 无 | 未知
