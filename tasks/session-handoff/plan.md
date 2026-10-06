@@ -16,8 +16,10 @@
   `phase-guard.sh`（经一个小的 python 发射函数），使命令行退路与 hook 共用同一份文本。
 - **复用而不复制。** 阶段与计数取 `module_stage.describe` 用的同一判定函数，未合并提交取 `unmerged_commits`，位置取
   `session_context.location_line`；不新增 git 判据。
-- **标准输入只读一次。** `session_context.py` 已在 1 秒 / 1 MiB 上限内读 hook 输入；扩展它多输出一行 `prompt` 是否为触发词
-  （第三行 `1` / 空），不再另读标准输入。
+- **标准输入只读一次。** `session_context.py --resolve-root` 在 1 秒 / 1 MiB 上限内读 hook 输入，输出项目根与一行原文；
+  后续的会话事实与触发判定都从这一行原文读，不再另读标准输入。（实现时调整：触发判定放在
+  `session_handoff.py --hook`，并先用 bash 字面过滤 `*handoff*` 省掉无关提示词的 python 启动，而不是给
+  `session_context.py` 加第三行。）
 - **宿主判别。** 有 `CLAUDE_PROJECT_DIR` 视为 Claude，否则 Codex；Codex 输出里不得出现 `hookSpecificOutput`。
 - **失败即放行。** 拼装非零退出、超时或输出为空 → 走原有阶段注入。
 - 共同验证命令（每个 task 都跑，并在 `PATH=/usr/bin:/bin` 的 python3 3.9 下再跑一次 python 测试）：

@@ -648,4 +648,48 @@ echo "  ✅ cwd 为子目录、非 git、缺失或不可用时逐字不变"; PAS
 [ -z "$(run_input "$wt_main" "{\"cwd\":\"$unrelated/sub\"}")" ] || fail "cwd 在未启用的仓库里时应静默"
 echo "  ✅ cwd 在未启用的仓库里时静默"; PASS=$((PASS + 1))
 
+
+# 交接命令本地作答（session-handoff 第 7、8、9 条）：整条提示词恰好是触发词时输出拦截 JSON，其余逐字不变。
+ho="$WORK/handoff"
+mkdir -p "$ho/tasks/alpha"
+git -C "$ho" init -q -b main
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ho/CLAUDE.md"
+map "$ho"; printf '# alpha\n' > "$ho/spec/alpha.md"; printf '# Plan\n' > "$ho/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$ho/tasks/alpha/todo.md"
+want="$(python3 -B "$HOOKDIR/session_handoff.py" "$ho")"
+out="$(run_input "$ho" '{"prompt":"  /spec-guard:handoff\n"}')"
+python3 -c '
+import json, sys
+out = json.loads(sys.stdin.read())
+assert out == {"decision": "block", "reason": sys.argv[1], "hookSpecificOutput": {
+    "hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True}}, out
+' "$want" <<<"$out" || fail "Claude 触发词应输出带 suppressOriginalPrompt 的拦截 JSON
+$out"
+echo "  ✅ Claude 触发词本地作答"; PASS=$((PASS + 1))
+
+out="$(cd "$ho" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" <<<'{"prompt":"spec-guard handoff"}')"
+python3 -c '
+import json, sys
+out = json.loads(sys.stdin.read())
+assert out == {"decision": "block", "reason": sys.argv[1]}, out
+' "$want" <<<"$out" || fail "Codex 触发词的拦截 JSON 不得带 Claude 专用字段
+$out"
+echo "  ✅ Codex 触发词本地作答且无 Claude 专用字段"; PASS=$((PASS + 1))
+
+plain_ho="$(run "$ho" | context_of)"
+for prompt in '继续 /spec-guard:handoff' '/spec-guard:handoff now' '/spec-guard:phase' 'handoff'; do
+  [ "$(run_input "$ho" "{\"prompt\":\"$prompt\"}" | context_of)" = "$plain_ho" ] || fail "非触发词应与现在逐字相同: $prompt"
+done
+echo "  ✅ 非触发词照常注入阶段"; PASS=$((PASS + 1))
+
+broken="$WORK/broken-hooks"
+cp -R "$HOOKDIR" "$broken"
+printf '%s\n' 'import sys' 'sys.exit(1)' > "$broken/session_handoff.py"
+[ "$(CLAUDE_PROJECT_DIR="$ho" /bin/bash "$broken/phase-guard.sh" <<<'{"prompt":"/spec-guard:handoff"}' | context_of)" = "$plain_ho" ] \
+  || fail "拼装失败时应放行并照常注入阶段"
+echo "  ✅ 拼装失败即放行"; PASS=$((PASS + 1))
+
+[ -z "$(run_input "$WORK/empty" '{"prompt":"/spec-guard:handoff"}')" ] || fail "未启用项目里触发词也应静默"
+echo "  ✅ 未启用项目里触发词静默"; PASS=$((PASS + 1))
+
 echo "phase-guard regression passed (${PASS} cases)"

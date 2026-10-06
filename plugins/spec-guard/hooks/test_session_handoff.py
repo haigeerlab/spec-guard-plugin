@@ -189,5 +189,59 @@ class Handoff(unittest.TestCase):
         self.assertEqual(done.stdout, self.text() + "\n")
 
 
+
+class Trigger(unittest.TestCase):
+    """Only a prompt that is exactly the command (spec items 6, 7) is answered locally."""
+
+    def test_exact_commands_trigger(self):
+        for prompt in ("/spec-guard:handoff", "spec-guard handoff", "  /spec-guard:handoff\n", "\tspec-guard handoff "):
+            with self.subTest(prompt=prompt):
+                self.assertTrue(session_handoff.is_trigger(prompt))
+
+    def test_anything_else_passes_through(self):
+        for prompt in ("", "/spec-guard:handoff now", "继续 /spec-guard:handoff", "/Spec-Guard:handoff",
+                       "spec-guard  handoff", "handoff", "/spec-guard:phase", None, 3):
+            with self.subTest(prompt=prompt):
+                self.assertFalse(session_handoff.is_trigger(prompt))
+
+
+class HookAnswer(unittest.TestCase):
+    """`--hook <host> <root>`: the block JSON for a trigger, nothing otherwise (spec items 8, 9)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name).resolve()
+        git("init", "-q", "-b", "main", cwd=self.root)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def hook(self, host, stdin_text):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--hook", host, str(self.root)], input=stdin_text,
+                              capture_output=True, text=True, timeout=20)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout
+
+    def test_claude_block_hides_the_prompt(self):
+        out = json.loads(self.hook("claude", json.dumps({"prompt": "/spec-guard:handoff"})))
+        self.assertEqual(set(out), {"decision", "reason", "hookSpecificOutput"})
+        self.assertEqual(out["decision"], "block")
+        self.assertEqual(out["reason"], session_handoff.handoff_text(self.root))
+        self.assertEqual(out["hookSpecificOutput"],
+                         {"hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True})
+
+    def test_codex_block_has_no_claude_only_fields(self):
+        out = json.loads(self.hook("codex", json.dumps({"prompt": "spec-guard handoff"})))
+        self.assertEqual(out, {"decision": "block", "reason": session_handoff.handoff_text(self.root)})
+
+    def test_no_answer_unless_triggered(self):
+        for text in ("", "not json", "[]", json.dumps({"prompt": "继续"}), json.dumps({})):
+            with self.subTest(text=text):
+                self.assertEqual(self.hook("claude", text), "")
+
+    def test_unknown_host_gives_no_answer(self):
+        self.assertEqual(self.hook("other", json.dumps({"prompt": "/spec-guard:handoff"})), "")
+
+
 if __name__ == "__main__":
     unittest.main()

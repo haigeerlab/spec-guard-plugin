@@ -111,7 +111,41 @@ def handoff_text(root) -> str:
     ])
 
 
+# Exact commands only: a natural-language status question is never intercepted (spec item 6).
+TRIGGERS = frozenset({"/spec-guard:handoff", "spec-guard handoff"})
+
+
+def is_trigger(prompt) -> bool:
+    return isinstance(prompt, str) and prompt.strip() in TRIGGERS
+
+
+def hook_answer(hook_input: str, host: str, root) -> str | None:
+    """The UserPromptSubmit block JSON when the prompt is a trigger, else None.
+
+    Codex rejects fields it does not know -- a Claude-only `hookSpecificOutput` turns the
+    block into a failed hook and the prompt goes to the model -- so each host gets its own shape.
+    """
+    if host not in ("claude", "codex"):
+        return None
+    try:
+        data = json.loads(hook_input)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict) or not is_trigger(data.get("prompt")):
+        return None
+    answer = {"decision": "block", "reason": handoff_text(root)}
+    if host == "claude":
+        answer["hookSpecificOutput"] = {"hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True}
+    return json.dumps(answer, ensure_ascii=False)
+
+
 def main() -> None:
+    if len(sys.argv) > 3 and sys.argv[1] == "--hook":
+        from session_context import read_hook_input
+        answer = hook_answer(read_hook_input(sys.stdin.fileno()), sys.argv[2], sys.argv[3])
+        if answer:
+            print(answer)
+        return
     print(handoff_text(sys.argv[1] if len(sys.argv) > 1 else "."))
 
 
