@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.47.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:552eb5551495401f9a91cc0859ac14deb4d696ec"
+      },
+      "observedAt": "2026-10-06T09:55:00Z",
+      "evidence": [
+        "result:the v0.47.0 annotated tag and origin/main both resolve to merge commit 552eb5551495401f9a91cc0859ac14deb4d696ec; its tree equals release commit 7184196af736b24c6d662c29c4b0ba01c19320d0, on which the commands below ran; pull request #209 merged after the required checks passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "command:python3 -B plugins/spec-guard/hooks/test_session_handoff.py and test_session_context.py (also under /usr/bin/python3 3.9.6)",
+        "host:macOS arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 142, verify-artifacts 26 cases)"
+      ]
+    }
+  ]
+}
