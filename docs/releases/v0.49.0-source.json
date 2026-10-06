@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.49.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:ca273f906c95c44c4248d4db821d8d8779e124df"
+      },
+      "observedAt": "2026-10-06T11:55:00Z",
+      "evidence": [
+        "result:the v0.49.0 annotated tag and origin/main both resolve to merge commit ca273f906c95c44c4248d4db821d8d8779e124df; its tree equals release commit b300e048fb4f42723bf262247b4c0539a87f4535, on which the commands below ran; pull request #216 merged after the required checks passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 151, verify-artifacts 26 cases)"
+      ]
+    }
+  ]
+}
