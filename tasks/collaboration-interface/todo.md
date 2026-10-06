@@ -5,4 +5,4 @@
 - [x] Task 3: sections 11–13 (single entry, detection and degradation, state and migration) — inventory and coupling points added to the baseline first (d74f562)
 - [x] Checkpoint (report): sections 1–13 drafted; three suites green after each task
 - [x] Task 4: section 14 index and review checklist — 14 sections in order; no empty cells; all S: paths exist; BL refs resolve (Findings N → Findings list item N); 18 index rows; findings 3 and 4 owner pending at the gate; three suites green
-- [ ] Checkpoint (gate): user review of the interface document; then push + PR + promotion proof with separate approval
+- [x] Checkpoint (gate): user accepted the interface document on 2026-10-06; findings 3/4 → new agent-relay module `delegation-fixes` (after translation, before hardening); probe name, interface.json, Codex table `agent_relay`, and the not-installed text confirmed. Push + PR + promotion proof still need separate approval
