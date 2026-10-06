@@ -46,7 +46,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: start the next piece of work in a new session; this stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: start the next piece of work in a new session; run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"

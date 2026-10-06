@@ -176,7 +176,8 @@ def unmerged_commits(root: Path) -> tuple | None:
 
 
 MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new session; "
-                   "this stage summary carries over, the conversation does not need to.")
+                   "run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. "
+                   "This stage summary carries over, the conversation does not need to.")
 
 
 CONTEXT_THRESHOLD = 200_000
