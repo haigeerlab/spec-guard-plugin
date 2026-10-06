@@ -35,12 +35,19 @@
     },
     {
       "subject": "spec-guard-claude-desktop-handoff-display",
-      "status": "not-verified",
+      "status": "host-verified",
       "target": {
         "kind": "host-session",
-        "id": "not-run"
+        "id": "claude-desktop:v0.47.0;test:installed-handoff-worktree-session-20261006"
       },
-      "reason": "the desktop app applies the plugin update only after a restart, and the release session itself still ran 0.46.0; how the desktop Code tab renders the blocked-prompt message, and whether a desktop worktree session now reports the worktree instead of the main checkout (the hook input cwd change), are left for the next desktop session, checked with computer-use."
+      "observedAt": "2026-10-06T10:20:00Z",
+      "evidence": [
+        "host:Claude desktop Code tab, a worktree session of this repository after the plugin update to 0.47.0",
+        "result:the phase injection in that session changed from `branch main` and the main checkout (stage DONE, 41 modules) to the session's own branch and worktree (stage BUILDING, 42 modules): the hook input cwd is the worktree, and the root resolution fix takes effect",
+        "command:the user typed exactly `/spec-guard:handoff` in that session",
+        "result:the desktop app showed a card titled `钩子已阻止您的提示词` with a warning icon; the body was the complete handoff text with line breaks kept, ending in `下一步：____`; the original prompt was not echoed and no model turn ran",
+        "result:computer-use cannot be granted access to the Claude desktop app itself, so the check was the user's screenshot, not an automated capture"
+      ]
     }
   ]
 }
