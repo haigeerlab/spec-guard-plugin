@@ -45,6 +45,20 @@ def read_json(path):
         raise ProbeFailure(f"cannot read {path}: {exc}") from exc
 
 
+def main_checkout_local_settings(project):
+    """Claude Code keeps a linked git worktree's local settings in its main checkout."""
+    try:
+        done = subprocess.run(["git", "-C", str(project), "rev-parse", "--path-format=absolute",
+                               "--git-common-dir", "--git-dir"], stdin=subprocess.DEVNULL,
+                              capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return ()
+    lines = done.stdout.splitlines()
+    if done.returncode != 0 or len(lines) != 2 or lines[0] == lines[1]:
+        return ()
+    return (Path(lines[0]).parent / ".claude" / "settings.local.json",)
+
+
 def claude_root(project):
     """Plugin root of an enabled agent-relay for this project in Claude Code, or None."""
     home = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
@@ -55,7 +69,7 @@ def claude_root(project):
         raise ProbeFailure("installed_plugins.json has no plugins table")
     enabled = {}
     for settings in (home / "settings.json", project / ".claude" / "settings.json",
-                     project / ".claude" / "settings.local.json"):
+                     *main_checkout_local_settings(project), project / ".claude" / "settings.local.json"):
         data = read_json(settings)
         if isinstance(data, dict) and isinstance(data.get("enabledPlugins"), dict):
             enabled.update(data["enabledPlugins"])

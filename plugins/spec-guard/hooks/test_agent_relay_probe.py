@@ -98,6 +98,33 @@ class ProbeTests(unittest.TestCase):
         self.interface({"interface": "1.0"})
         self.assertEqual(self.run_probe()["state"], "ready")
 
+    def linked_worktree(self):
+        """Make self.project a linked worktree of a main checkout; return the main checkout."""
+        main = self.tmp / "main"
+        git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main"]
+        subprocess.run(git + ["init", "-q", str(main)], check=True)
+        subprocess.run(git + ["-C", str(main), "commit", "-q", "--allow-empty", "-m", "init"], check=True)
+        self.project.rmdir()
+        subprocess.run(git + ["-C", str(main), "worktree", "add", "-q", str(self.project)], check=True)
+        return main
+
+    def test_worktree_enabled_in_the_main_checkout_local_settings_counts(self):
+        # Claude Code keeps a linked worktree's local enabledPlugins in the main checkout.
+        main = self.linked_worktree()
+        self.install_claude(enabled=False, project_path=self.project)
+        self.write_json(main / ".claude" / "settings.local.json",
+                        {"enabledPlugins": {"agent-relay@relay-market": True}})
+        self.interface({"interface": "1.0"})
+        self.assertEqual(self.run_probe()["state"], "ready")
+
+    def test_worktree_disabled_in_the_main_checkout_is_not_installed(self):
+        main = self.linked_worktree()
+        self.install_claude(enabled=False, project_path=self.project)
+        self.write_json(main / ".claude" / "settings.local.json",
+                        {"enabledPlugins": {"agent-relay@relay-market": False}})
+        self.interface({"interface": "1.0"})
+        self.assertEqual(self.run_probe()["state"], "not-installed")
+
     def test_a_different_plugin_with_a_similar_name_does_not_count(self):
         self.install_claude(key="agent-relay-lite@relay-market")
         self.interface({"interface": "1.0"})
