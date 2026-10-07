@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.50.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:81b8845eb902115c213436b2f5d2fd0ff0aaf8ff"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "result:the v0.50.0 annotated tag and origin/main both resolve to merge commit 81b8845eb902115c213436b2f5d2fd0ff0aaf8ff; its tree equals release commit 43de4606bccfda17fd7dffd8084829a7c78a9df3, on which the commands below ran; pull request #225 merged after the validate (ubuntu-latest) check passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 151, verify-artifacts 26 cases)",
+        "result:integration round 1 of the collaboration split passed by the current column (agent-relay docs/acceptance/2026-10-07-round1.md); its D6 finding was fixed in 326836c before the bump"
+      ]
+    }
+  ]
+}

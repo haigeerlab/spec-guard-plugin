@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.50.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.50.0;test:installed-plugin-upgrade-20261007"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.49.0 to 0.50.0 for scope user; the installed copy records gitCommitSha 81b8845eb902115c213436b2f5d2fd0ff0aaf8ff -- the v0.50.0 tag commit; it carries hooks/agent_relay_probe.py and no collab, collaboration-ops, session-routing or session-delegation skill"
+      ]
+    },
+    {
+      "subject": "spec-guard-collaboration-handoff",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.50.0;test:collaboration-handoff-headless-20261007"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p \"/spec-guard:collaboration\" in this repository's worktree, which has no agent-relay plugin record",
+        "result:the installed probe reported not-installed and the session relayed the message verbatim with the migration pointer, writing nothing; agent-relay's `ready` path was verified in integration round 1 (D6 rerun)",
+        "result:the command's own snippet exited 2 because CLAUDE_PLUGIN_ROOT was empty in the Bash tool; /spec-guard:phase shows the same in a headless session, so this predates the split and is tracked separately",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}

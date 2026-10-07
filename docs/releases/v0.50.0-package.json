@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.50.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.50.0;asset:spec-guard-v0.50.0.tar.gz;sha256:d40c66d4cc70da50c1d620996534db8f4ea2258d06008da4a15842ed9e3824a4"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.50.0",
+        "asset:spec-guard-v0.50.0.tar.gz;size:424748",
+        "source-tag:v0.50.0@81b8845eb902115c213436b2f5d2fd0ff0aaf8ff",
+        "command:git archive --prefix=spec-guard-v0.50.0/ v0.50.0 .claude-plugin plugins/spec-guard",
+        "command:python3 scripts/release-package.py validate <dir> 0.50.0",
+        "result:built from the tag, not the worktree; no `._*` entries; revalidates after extraction",
+        "result:the asset downloaded back from the Release has the same sha256 and the same 424748 bytes",
+        "result:smaller than v0.49.0 (511747 bytes) because the collaboration runtime, adapters and tests moved to agent-relay"
+      ]
+    }
+  ]
+}
