@@ -126,6 +126,13 @@ class CheckpointContractTests(unittest.TestCase):
         batch = self.section("## 按需求批量前置审")
         for phrase in ("批量批准", "activeModule", "Build order", "80%", "/spec-guard:handoff", "不自行开新会话"):
             self.assertIn(phrase, batch)
+        # context-hint-no-paste: one sentence, never the pasted handoff text.
+        for phrase in ("/compact", "一句话", "不贴交接文本"):
+            self.assertIn(phrase, batch)
+        self.assertNotIn("给出 `/spec-guard:handoff` 的交接文本", batch)
+        phase = (self.plugin / "commands" / "phase.md").read_text(encoding="utf-8")
+        self.assertNotIn("生成可直接粘贴的交接文本", phase)
+        self.assertIn("不贴交接文本", phase)
 
     def test_ui_self_verification(self):
         ui = self.section("## UI 自验")
