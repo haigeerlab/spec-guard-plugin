@@ -125,7 +125,7 @@ class ProposalReviewFixtures(unittest.TestCase):
                                  "tracker-%s" % state)
         self.assertEqual(as_json(review(published(), None, "github", "octo/spec-guard")),
                          {"state": "unknown", "reviewCommit": "a" * 40, "proposalId": "gamma",
-                          "diagnostic": "tracker-unknown"})
+                          "moduleId": "gamma", "diagnostic": "tracker-unknown"})
 
     def test_a_module_already_in_the_map_is_in_map_not_stale(self):
         # A promoted Proposal's module is meant to be in the map; `stale` told people to
@@ -152,6 +152,33 @@ class ProposalReviewFixtures(unittest.TestCase):
         self.assertNotIn("`stale` means the remote review map already contains", reference)
         preflight = (plugin / "commands" / "proposal-promotion-preflight.md").read_text(encoding="utf-8")
         self.assertIn("`in-map`", preflight)
+        self.assertIn("`moduleId`", command)
+        self.assertIn("`moduleId`", preflight)
+
+    def test_results_that_read_the_proposal_name_its_module(self):
+        # review-module-id: the Proposal id is not the module id; a session once called
+        # collaboration-interface "collaboration-split" because only proposalId was printed.
+        base = proposal()
+        split = Proposal("split", "<!-- spec-guard-proposal:v1 id=split -->", base.baseline,
+                         base.change)
+        def pub(review_map):
+            return Publication("published", review_commit="a" * 40, proposal=split,
+                               baseline_map=BASE_MAP, review_map=review_map)
+        def issue(stage):
+            return TrackerRead("verified", issue_id=7, stage=stage, proposal_id="split",
+                               platform="github", target="octo/spec-guard")
+        drifted = BASE_MAP.replace("Keep review facts explicit.", "Changed review facts.")
+        cases = (("accepted", pub(REVIEW_MAP), issue("proposal-stage:accepted")),
+                 ("in-map", pub(ABSORBED_MAP), issue("proposal-stage:promoted")),
+                 ("stale", pub(drifted), issue("proposal-stage:accepted")),
+                 ("absent", pub(REVIEW_MAP), TrackerRead("absent")))
+        for state, publication, tracker in cases:
+            with self.subTest(state=state):
+                data = as_json(review(publication, tracker, "github", "octo/spec-guard"))
+                self.assertEqual(data["state"], state)
+                self.assertEqual((data["proposalId"], data["moduleId"]), ("split", "gamma"))
+        missing = as_json(review(Publication("absent"), None, "github", "octo/spec-guard"))
+        self.assertNotIn("moduleId", missing)
 
     def test_baseline_drift_still_wins_over_in_map(self):
         drifted = ABSORBED_MAP.replace("Keep review facts explicit.", "Changed review facts.")

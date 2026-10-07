@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.51.3] - 2026-10-07
+
+### 修复
+
+- **Proposal 评审与晋级预检写明要加入的模块。** 两者输出只有 `proposalId`，而 Proposal 的 id 不一定是它要加入的模块 id
+  （`collaboration-split` 加入的是 `collaboration-interface`），读结果的会话曾把前者当成模块名。现在凡是读到了 Proposal
+  的结果都带 `moduleId`，与晋级证明的字段同名；没读到 Proposal 时不带，不猜。状态与判定不变。
+
 ## [0.51.2] - 2026-10-07
 
 ### 修复

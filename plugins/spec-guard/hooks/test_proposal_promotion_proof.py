@@ -633,6 +633,14 @@ class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
                 self.assertEqual(as_json(Proof("unknown", diagnostic=raw)),
                                  {"state": "unknown", "diagnostic": "promotion-unknown"})
 
+    def test_preflight_names_the_module_only_when_it_read_the_proposal(self):
+        self.assertEqual(preflight_as_json(Preflight("ready", proposal_id="split", revision="r",
+                                                     base_commit="c" * 40, module_id="gamma")),
+                         {"state": "ready", "proposalId": "split", "moduleId": "gamma",
+                          "revision": "r", "baseCommit": "c" * 40})
+        self.assertNotIn("moduleId", preflight_as_json(Preflight("absent",
+                                                                 diagnostic="publication-absent")))
+
     def test_preflight_as_json_keeps_only_code_shaped_diagnostics(self):
         self.assertEqual(
             preflight_as_json(Preflight("blocked", diagnostic="mainline-policy-invalid")),
@@ -708,6 +716,7 @@ class PromotionProofCliTests(PromotionFixture):
         # 晋级后模块已在能力图中，preflight 报告 in-map（不是 ready），绝不输出晋级证明。
         self.assertEqual((result["state"], result["diagnostic"]),
                          ("in-map", "proposal-module-already-present"))
+        self.assertEqual(result["moduleId"], "gamma")
         self.assertNotIn("promotionCommit", result)
 
 
