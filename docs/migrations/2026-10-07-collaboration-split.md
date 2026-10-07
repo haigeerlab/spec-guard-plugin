@@ -26,12 +26,12 @@ Spec Guard 的工作流（Spec、计划、阶段提示、Proposal、事项账本
 
 ## 迁移步骤
 
-1. **安装 agent-relay。** 目前从本地路径安装，发布后改用 GitHub 地址：
+1. **安装 agent-relay。**
 
    ```bash
-   claude plugin marketplace add /path/to/agent-relay
+   claude plugin marketplace add haigeerlab/agent-relay
    claude plugin install agent-relay@agent-relay-marketplace
-   codex plugin marketplace add /path/to/agent-relay
+   codex plugin marketplace add haigeerlab/agent-relay --ref v0.1.0
    codex plugin add agent-relay@agent-relay-marketplace
    ```
 
