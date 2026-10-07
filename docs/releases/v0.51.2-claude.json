@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.51.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.51.2;test:installed-plugin-upgrade-20261007"
+      },
+      "observedAt": "2026-10-07T14:42:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.51.1 to 0.51.2 for scope user; the installed copy records gitCommitSha c99bbc3925ff347387d11b0df8ef7b06a4cf896b -- the v0.51.2 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-proposal-review-in-map",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.51.2;test:proposal-review-in-map-headless-20261007"
+      },
+      "observedAt": "2026-10-07T14:42:00Z",
+      "evidence": [
+        "command:claude -p \"/spec-guard:proposal-review <review collaboration-split on haigeerlab/spec-guard-plugin, read-only>\" --model sonnet",
+        "result:the session ran the installed 0.51.2 proposal_review.py from the host-substituted root and got state in-map, diagnostic proposal-module-already-present, issueId 221, stage proposal-stage:promoted (0.51.1 gave stale / proposal-stale on the same input); it advised the promotion proof and then closeout, and republishing only if the proof fails -- not republishing outright",
+        "result:observation, not a defect of this change: the reply called the module `collaboration-split`, which is the Proposal id; the module is `collaboration-interface`, and the review JSON carries no module id",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}

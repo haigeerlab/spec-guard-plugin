@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.51.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:c99bbc3925ff347387d11b0df8ef7b06a4cf896b"
+      },
+      "observedAt": "2026-10-07T14:42:00Z",
+      "evidence": [
+        "result:the v0.51.2 annotated tag and origin/main both resolve to merge commit c99bbc3925ff347387d11b0df8ef7b06a4cf896b; its tree equals release commit 8d0cd9a4865e6ab36664bed3b3aaecfd7efc584e, on which the commands below ran; pull request #233 merged and main's push run of validate (ubuntu-latest) passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 151, verify-artifacts 26 cases)",
+        "result:the in-map review tests, the preflight expectation and the proof guard were red before the change; hand mutations of the state and of the JSON diagnostic are caught"
+      ]
+    }
+  ]
+}
