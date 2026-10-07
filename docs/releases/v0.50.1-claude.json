@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.50.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.50.1;test:installed-plugin-upgrade-20261007"
+      },
+      "observedAt": "2026-10-07T04:25:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.50.0 to 0.50.1 for scope user; the installed copy records gitCommitSha 90aafe429f9f207179d5ed76df6023cecad0da9e -- the v0.50.1 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-command-plugin-root",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.50.1;test:command-plugin-root-headless-20261007"
+      },
+      "observedAt": "2026-10-07T04:25:00Z",
+      "evidence": [
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p \"/spec-guard:phase\" --model sonnet in this repository's worktree; codex is not on that PATH",
+        "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p \"/spec-guard:collaboration\" --model sonnet, same worktree",
+        "result:in both session transcripts the command text carries ROOT=\"/Users/vilin/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.50.1\" substituted by the host; phase ran the installed hook and reported BUILDING, collaboration ran the installed agent_relay_probe.py (not-installed) and relayed it; neither exited 2, where 0.50.0 exited 2 in the same setting",
+        "result:the same substitution was seen before release in an interactive session (tmux, typed slash command) with a probe plugin: only the exact token is substituted, the `:-` form stays literal, and the Bash environment has neither variable",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}
