@@ -22,10 +22,8 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
 | 项目审查交接 | 限定审查批次，整理发现并转入事项和修复 | 项目约定与共享检查点 | 安装约定后按需使用 |
 | Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
-| 协作信箱 | 同一台 Mac 上的 Claude Code 与 Codex 会话互相传话 | `/spec-guard:collaboration` | 需单独启用 |
+| 会话协作（已移到 agent-relay） | 同一台 Mac 上的会话互相传话、按名字联系、跨宿主委派，现在由独立插件 agent-relay 提供 | 安装 agent-relay；过渡期 `/spec-guard:collaboration` 会转交 | 见[迁移说明](docs/migrations/2026-10-07-collaboration-split.md) |
 | 本地事项账本 | 明确选择 Local 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
-| 会话路由 | 按宿主与会话名称联系本机另一个会话，优先复用同宿主原生通道 | `session-routing` skill | 需先启用协作信箱 |
-| 跨宿主会话委派 | 在有限授权内创建本机 Codex 审查或 Claude Code 开发会话 | `session-delegation` skill | 需先启用协作信箱 |
 | 托管日常事项 | 明确选择 GitHub/GitLab 后逐项查重、授权创建并在交付后对账 | `/spec-guard:ticket`、`hosted-ticket-workflow` skill | 需登录对应 CLI；外部写入逐次授权 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
 | 能力历史 | 核验旧版本归档下来的能力图没被改动 | `/spec-guard:history-integrity` | 只对有归档的项目有用 |
@@ -44,7 +42,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 - 已安装 agent-skills；
 - `bash`、`git`、`python3`（3.9 及以上，macOS 自带的即可）；
 - 用 Proposal 或托管日常事项流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
-- 用协作信箱或本地事项账本时，需要 macOS 和 Node.js。
+- 用本地事项账本时，需要 macOS 和 Node.js。
 
 **Claude Code：**
 
@@ -56,7 +54,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 **Codex：**
 
 ```bash
-codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.49.0
+codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.50.0
 codex plugin add spec-guard@spec-guard-marketplace
 ```
 
@@ -89,7 +87,7 @@ codex plugin add spec-guard@spec-guard-marketplace
 |---|---|
 | [使用流程](docs/workflow.md) | 新项目从零到交付、快速插入与 Proposal 两种加需求方式、能力图规则、Claude 与 Codex 命令对照 |
 | [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、Proposal、revision 等术语的含义 |
-| [可选能力](docs/optional-features.md) | 协作信箱、本地事项账本、文档治理、能力历史：各自解决什么、怎么启用 |
+| [可选能力](docs/optional-features.md) | 本地事项账本、文档治理、能力历史：各自解决什么、怎么启用；会话协作已移到 agent-relay |
 | [更新日志](CHANGELOG.md) | 每个版本改了什么 |
 
 ## 约定块

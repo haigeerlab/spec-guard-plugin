@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Fail when Spec Guard code refers to collaboration internals outside the collaboration-owned files.
+"""Fail if collaboration comes back into Spec Guard after it moved to agent-relay.
 
-Spec Guard reaches collaboration only through `hooks/agent_relay_probe.py` and agent-relay skill names
-(docs/collaboration-interface.md section 11). Everything else that names a collaboration module, skill,
-command, mailbox tool, MCP server, or state path is a call site that would break when the code moves to
-agent-relay, so it fails here instead of in a reviewer's memory.
+Spec Guard reaches collaboration only through `hooks/agent_relay_probe.py`, agent-relay skill names, and the
+`/spec-guard:collaboration` handoff command (docs/collaboration-interface.md sections 11-12). The check fails when
+any path on the removed list exists again, or when anything in scope names a collaboration module, skill, mailbox
+tool, MCP server, or state path (collaboration-dependency, decision D17).
 
-Scope: the shipped plugin tree, scripts, evals, and the marketplace manifest. User-facing repository docs join
-the scope in collaboration-dependency; spec/, tasks/, docs/ records and CHANGELOG.md describe the past and are
-never in scope. This file and the owned list define the boundary, so they are the only other exemptions.
+Scope: the shipped plugin tree, scripts, evals, the marketplace manifest, and the user-facing docs below. spec/,
+tasks/, docs/ records, the migration document and CHANGELOG.md describe the past and are never in scope. This file
+and the removed list define the rule, so they are the only other exemptions.
 """
 from pathlib import Path
 import re
@@ -17,6 +17,7 @@ import sys
 OWNED_LIST = "scripts/collaboration-owned.txt"
 SELF = "scripts/check-collaboration-boundary.py"
 SCOPE = ("plugins/spec-guard", "scripts", "evals", ".claude-plugin", ".agents")
+USER_DOCS = ("README.md", "CLAUDE.md", "AGENTS.md", "docs/optional-features.md", "docs/workflow.md")
 SKIP_DIRS = {".git", "__pycache__", "node_modules"}
 
 MAILBOX_TOOLS = (
@@ -28,11 +29,9 @@ FORBIDDEN = (
         r"native_collaboration_\w+|(?<![A-Za-z0-9])session_(?:routing|delegation)\w*"
         r"|collaboration-runtime\.md|collaboration-protocol\.md")),
     ("skill or command path", re.compile(
-        r"skills/(?:collab|collaboration-ops|session-routing|session-delegation)\b(?![\w-])"
-        r"|commands/collaboration\.md")),
+        r"skills/(?:collab|collaboration-ops|session-routing|session-delegation)\b(?![\w-])")),
     ("skill or command name", re.compile(
-        r"(?<!agent-relay:)(?<![\w/.-])(?:collab|collaboration-ops|session-routing|session-delegation)(?![\w/-])"
-        r"|/spec-guard:collaboration(?![\w-])")),
+        r"(?<!agent-relay:)(?<![\w/.-])(?:collab|collaboration-ops|session-routing|session-delegation)(?![\w/-])")),
     ("mailbox tool", re.compile(
         r"(?<![A-Za-z0-9])bridge_(?:" + "|".join(MAILBOX_TOOLS) + r")(?![A-Za-z0-9_])"
         r"|(?<![A-Za-z0-9])(?:ask_codex|review_with_codex)(?![A-Za-z0-9_])")),
@@ -44,42 +43,44 @@ FORBIDDEN = (
 )
 
 
-def load_owned(root: Path) -> tuple[list[str], list[str]]:
-    owned, missing = [], []
+def load_removed(root: Path) -> tuple[list[str], list[str]]:
+    removed, present = [], []
     for raw in (root / OWNED_LIST).read_text(encoding="utf-8").splitlines():
         entry = raw.strip()
         if not entry or entry.startswith("#"):
             continue
-        owned.append(entry)
-        if not (root / entry.rstrip("/")).exists():
-            missing.append(entry)
-    return owned, missing
+        removed.append(entry)
+        if (root / entry.rstrip("/")).exists():
+            present.append(entry)
+    return removed, present
 
 
-def is_owned(rel: str, owned: list[str]) -> bool:
-    return any(rel.startswith(entry) if entry.endswith("/") else rel == entry for entry in owned)
-
-
-def scan(root: Path, owned: list[str]) -> list[str]:
-    hits = []
+def files_in_scope(root: Path):
     for top in SCOPE:
         base = root / top
-        if not base.exists():
+        if base.exists():
+            yield from sorted(path for path in base.rglob("*") if path.is_file())
+    for name in USER_DOCS:
+        if (root / name).is_file():
+            yield root / name
+
+
+def scan(root: Path) -> list[str]:
+    hits = []
+    for path in files_in_scope(root):
+        if SKIP_DIRS.intersection(path.relative_to(root).parts):
             continue
-        for path in sorted(base.rglob("*")):
-            if not path.is_file() or SKIP_DIRS.intersection(path.relative_to(root).parts):
-                continue
-            rel = path.relative_to(root).as_posix()
-            if rel in (SELF, OWNED_LIST) or is_owned(rel, owned):
-                continue
-            try:
-                text = path.read_text(encoding="utf-8")
-            except (UnicodeDecodeError, OSError):
-                continue
-            for lineno, line in enumerate(text.splitlines(), 1):
-                for kind, pattern in FORBIDDEN:
-                    for match in pattern.finditer(line):
-                        hits.append(f"{rel}:{lineno}: {kind} `{match.group(0)}`")
+        rel = path.relative_to(root).as_posix()
+        if rel in (SELF, OWNED_LIST):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for kind, pattern in FORBIDDEN:
+                for match in pattern.finditer(line):
+                    hits.append(f"{rel}:{lineno}: {kind} `{match.group(0)}`")
     return hits
 
 
@@ -87,22 +88,22 @@ def main() -> int:
     # 可传入另一个仓库根（测试夹具用），默认检查本仓库。
     root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     if not (root / OWNED_LIST).is_file():
-        print(f"  ❌ missing {OWNED_LIST}: nothing defines the collaboration-owned files")
+        print(f"  ❌ missing {OWNED_LIST}: nothing records what moved to agent-relay")
         return 1
-    owned, missing = load_owned(root)
-    if not owned:
-        print(f"  ❌ {OWNED_LIST} lists no paths: that is not a clean boundary, it is no boundary")
+    removed, present = load_removed(root)
+    if not removed:
+        print(f"  ❌ {OWNED_LIST} lists no paths: an empty list checks nothing")
         return 1
-    for entry in missing:
-        print(f"  ❌ owned path does not exist: {entry} (a stale list widens the exemption)")
-    hits = scan(root, owned)
+    for entry in present:
+        print(f"  ❌ moved to agent-relay but present again: {entry}")
+    hits = scan(root)
     for hit in hits:
         print(f"  ❌ {hit}")
-    if missing or hits:
-        print("  Reach collaboration only through hooks/agent_relay_probe.py and agent-relay skill names "
-              "(docs/collaboration-interface.md section 11).")
+    if present or hits:
+        print("  Collaboration lives in agent-relay; reach it only through hooks/agent_relay_probe.py, agent-relay "
+              "skill names and /spec-guard:collaboration (docs/collaboration-interface.md sections 11-12).")
         return 1
-    print(f"  ✅ collaboration boundary: no internal reference outside {len(owned)} owned paths")
+    print(f"  ✅ collaboration removed: {len(removed)} moved paths absent, no internal reference in scope")
     return 0
 
 

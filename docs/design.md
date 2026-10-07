@@ -12,9 +12,9 @@ spec-guard adds two independent safeguards around agent-skills:
 2. A Proposal lifecycle that reads a published remote-default-branch snapshot
    and explicit GitHub/GitLab Proposal Issue facts without side effects.
 
-It also ships two optional same-Mac capabilities that need explicit setup: a
-collaboration mailbox for Claude Code and Codex sessions, and a local ticket
-ledger for work explicitly tracked locally. The Local ledger does not
+It also ships an optional same-Mac local ticket ledger, which needs explicit
+setup, for work explicitly tracked locally. Session collaboration moved to the
+standalone agent-relay plugin; Spec Guard only detects it. The Local ledger does not
 synchronize remote Issues. An on-demand hosted ticket workflow handles ordinary
 GitHub/GitLab Issues after an explicit target choice; it does not project tasks
 or bind worktrees. The separate Local ticket

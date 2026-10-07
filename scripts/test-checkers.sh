@@ -193,6 +193,13 @@ want pass "command-names: 引用本插件真实命令 → 放行" \
 printf '跑一下 `/demo:real` 就好。\n' >> "$TMP/cngood/plugins/demo/templates/t.md"
 want pass "command-names: Claude 插件命名空间命令 → 放行" \
   bash -c "cd '$TMP/cngood' && python3 '$ROOT/scripts/check-command-names.py'"
+printf '转交给 `/agent-relay:collaboration`。\n' >> "$TMP/cngood/plugins/demo/templates/t.md"
+want pass "command-names: 登记过的外部插件命令 → 放行" \
+  bash -c "cd '$TMP/cngood' && python3 '$ROOT/scripts/check-command-names.py'"
+mkc "$TMP/cnext" real
+printf '转交给 `/agent-relay:not-a-command`。\n' >> "$TMP/cnext/plugins/demo/templates/t.md"
+want fail "command-names: 外部插件里不存在的命令 → 报错" \
+  bash -c "cd '$TMP/cnext' && python3 '$ROOT/scripts/check-command-names.py'"
 printf '跑一下 `/demo:not-real` 就好。\n' >> "$TMP/cngood/plugins/demo/templates/t.md"
 want fail "command-names: 命名空间里的不存在命令 → 报错" \
   bash -c "cd '$TMP/cngood' && python3 '$ROOT/scripts/check-command-names.py'"
@@ -404,34 +411,35 @@ want fail "decision-supersession: 零条取代声明 → 不算通过（声明�
   python3 "$ROOT/scripts/check-decision-supersession.py" "$TMP/decquiet"
 
 # ── check-collaboration-boundary.py ──
-# 协作拆分的边界：协作代码之外不得直接引用协作内部实现。坏样本**运行时拼装**，
-# 理由同 bash32：本文件在检查范围内，写成字面量会被检查抓到自己。
+# 协作已迁到 agent-relay：迁走的路径不得再出现，范围内（含 README 等用户文档）不得引用协作内部实现。
+# 坏样本**运行时拼装**，理由同 bash32：本文件在检查范围内，写成字面量会被检查抓到自己。
 CB="$TMP/collab-boundary"
-cb_fixture() {  # 每个用例一棵干净的夹具树，只带一个所有权清单和一个协作自有文件
-  rm -rf "$CB"; mkdir -p "$CB/scripts" "$CB/plugins/spec-guard/hooks" "$CB/plugins/spec-guard/skills/ticket"
-  printf '# owned\nplugins/spec-guard/hooks/owned_impl.py\n' > "$CB/scripts/collaboration-owned.txt"
-  printf 'import %s\n' "native_""collaboration_runtime" > "$CB/plugins/spec-guard/hooks/owned_impl.py"
+cb_fixture() {  # 每个用例一棵干净的夹具树：一份迁走清单（其中路径不存在）、一个技能文件、一份 README
+  rm -rf "$CB"; mkdir -p "$CB/scripts" "$CB/plugins/spec-guard/skills/ticket"
+  printf '# removed\nplugins/spec-guard/hooks/moved_impl.py\n' > "$CB/scripts/collaboration-owned.txt"
   printf '通过 agent-relay 的协作信箱发 mailbox 消息；legacy_bridge_marker 不是工具名。\n' \
     > "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
+  printf '# 项目\n协作已移到 agent-relay，过渡期运行 /spec-guard:collaboration 转交。\n' > "$CB/README.md"
 }
 cb_plant() {  # $1=用例名 $2=违规行
   cb_fixture; printf '%s\n' "$2" >> "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
   want fail "collab-boundary: $1 → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
 }
 cb_fixture
-want pass "collab-boundary: 协作自有文件与普通词 → 放行" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+want pass "collab-boundary: 普通词、agent-relay 与转交命令 → 放行" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
 cb_plant "模块名" "python3 -B hooks/test_session""_routing.py"
 cb_plant "skill 路径" "见 skills/session""-delegation/SKILL.md"
 cb_plant "裸 skill 名" "使用 \`col""lab\` 发送"
 cb_plant "带 spec-guard 前缀的 skill 名" "使用 spec-guard:col""lab"
 cb_fixture; printf '使用 agent-relay:col''lab 与 agent-relay:session-routing\n' >> "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
 want pass "collab-boundary: agent-relay 的 skill 名 → 放行" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
-cb_plant "旧命令名" "运行 /spec-guard:""collaboration"
 cb_plant "信箱工具名" "调用 mcp__x__bridge""_send"
 cb_plant "MCP 服务名" "[mcp_servers.spec_guard_native""_collaboration]"
 cb_plant "状态路径" "rm ~/.spec-guard/native""-collaboration"
-cb_fixture; printf 'plugins/spec-guard/hooks/gone.py\n' >> "$CB/scripts/collaboration-owned.txt"
-want fail "collab-boundary: 所有权清单里的路径不存在 → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+cb_fixture; printf '见 `session''-routing` skill\n' >> "$CB/README.md"
+want fail "collab-boundary: README 里引用协作 skill → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
+cb_fixture; mkdir -p "$CB/plugins/spec-guard/hooks"; printf 'x = 1\n' > "$CB/plugins/spec-guard/hooks/moved_impl.py"
+want fail "collab-boundary: 迁走的路径重新出现 → 报错" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
 cb_fixture; printf '# only comments\n' > "$CB/scripts/collaboration-owned.txt"
 want fail "collab-boundary: 空清单 → 不算通过" python3 "$ROOT/scripts/check-collaboration-boundary.py" "$CB"
 
