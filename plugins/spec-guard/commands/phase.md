@@ -63,11 +63,12 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 
 上下文提醒以模块为单位，按最近一轮主会话上下文分两档（宿主在 hook 输入里给出会话记录 `transcript_path` 时才读得到）：
 
-- `MODULE_DONE` / `DONE`：达到窗口 50% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，建议在新会话里开始
-  下一项工作，并指向 `/spec-guard:handoff`（Codex：`spec-guard handoff`）生成可直接粘贴的交接文本；低于 50% 时没有这一行；
-  读不到大小时保留不带大小的 `- Module boundary: …`。
+- `MODULE_DONE` / `DONE`：达到窗口 50% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，让 agent 用一句话
+  提示可以 `/compact` 或在新会话里开始下一项工作；低于 50% 时没有这一行；读不到大小时保留不带大小的 `- Module boundary: …`。
 - `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`：只在达到窗口 80% 时多一行 `- Session context: about N k tokens …`，
-  建议做完或记下当前 task 后开新会话。
+  让 agent 做完或记下当前 task 后用一句话提示可以 `/compact` 或换会话。
+
+两行都要求 agent 不贴交接文本：交接文本由用户需要时自己运行 `/spec-guard:handoff`（Codex：`spec-guard handoff`）。
 
 Codex 的窗口取自会话记录；Claude 的会话记录没有窗口大小，按 1M 窗口折算为 500k / 800k。本命令手工运行时没有
 hook 输入，所以不会出现带大小的行。

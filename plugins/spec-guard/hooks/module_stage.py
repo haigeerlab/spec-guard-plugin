@@ -175,8 +175,12 @@ def unmerged_commits(root: Path) -> tuple | None:
     return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
 
 
-MODULE_BOUNDARY = ("- Module boundary: start the next piece of work in a new session; "
-                   "run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. "
+# context-hint-no-paste: the agent says one sentence; the handoff text is the user's to ask for.
+NO_PASTE = ("do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, "
+            "when they want it)")
+
+MODULE_BOUNDARY = ("- Module boundary: a good point to /compact or start the next piece of work in a new session. "
+                   "Say so in one sentence; " + NO_PASTE + ". "
                    "This stage summary carries over, the conversation does not need to.")
 
 
@@ -201,15 +205,15 @@ def thresholds(window: int | None) -> tuple:
 
 
 def boundary_line(tokens: int, note: str) -> str:
-    return ("- Module boundary: this session's context is about %d k tokens (%s); start the next piece of work in a "
-            "new session; run /spec-guard:handoff (Codex: spec-guard handoff) for paste-ready handoff text. "
-            "This stage summary carries over, the conversation does not need to." % (_k(tokens), note))
+    return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to /compact or start "
+            "the next piece of work in a new session. Say so in one sentence; %s. "
+            "This stage summary carries over, the conversation does not need to." % (_k(tokens), note, NO_PASTE))
 
 
 def context_line(tokens: int, note: str) -> str:
     return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
-            "current task, then continue in a new session with /spec-guard:handoff (Codex: spec-guard handoff)."
-            % (_k(tokens), note))
+            "current task, then say in one sentence that the user can /compact or continue in a new session; %s."
+            % (_k(tokens), note, NO_PASTE))
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None) -> str:

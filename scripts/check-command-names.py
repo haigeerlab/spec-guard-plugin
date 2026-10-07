@@ -40,7 +40,7 @@ UPSTREAM = {
 
 # Claude Code 自带的命令（不属于任何插件）。模板/命令文里写安装步骤会用到。
 BUILTIN = {
-    "plugin", "reload-plugins", "config", "permissions", "hooks", "help", "clear",
+    "plugin", "reload-plugins", "config", "permissions", "hooks", "help", "clear", "compact",
 }
 
 # 其他插件里、本插件文字明确会提到的命令：协作拆成 agent-relay 后，过渡期的
