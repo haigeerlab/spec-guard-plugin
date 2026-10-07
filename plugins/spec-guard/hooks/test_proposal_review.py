@@ -127,11 +127,38 @@ class ProposalReviewFixtures(unittest.TestCase):
                          {"state": "unknown", "reviewCommit": "a" * 40, "proposalId": "gamma",
                           "diagnostic": "tracker-unknown"})
 
-    def test_absorbed_module_is_stale_before_an_accepted_stage(self):
-        tracker = TrackerRead("verified", issue_id=42, stage="proposal-stage:accepted",
-                              proposal_id="gamma", platform="gitlab", target=17)
-        result = review(published(ABSORBED_MAP), tracker, "gitlab", 17)
-        self.assertEqual(result.state, "stale")
+    def test_a_module_already_in_the_map_is_in_map_not_stale(self):
+        # A promoted Proposal's module is meant to be in the map; `stale` told people to
+        # republish it (proposal-review-in-map).
+        for stage in ("proposal-stage:accepted", "proposal-stage:promoted"):
+            with self.subTest(stage=stage):
+                tracker = TrackerRead("verified", issue_id=42, stage=stage,
+                                      proposal_id="gamma", platform="gitlab", target=17)
+                result = review(published(ABSORBED_MAP), tracker, "gitlab", 17)
+                self.assertEqual(result.state, "in-map")
+                data = as_json(result)
+                self.assertEqual(data["diagnostic"], "proposal-module-already-present")
+                self.assertEqual((data["issueId"], data["stage"], data["proposalId"]),
+                                 (42, stage, "gamma"))
+                self.assertEqual(data["reviewCommit"], "a" * 40)
+
+    def test_docs_send_an_in_map_proposal_to_the_proof_not_to_republish(self):
+        plugin = Path(__file__).resolve().parents[1]
+        command = (plugin / "commands" / "proposal-review.md").read_text(encoding="utf-8")
+        for phrase in ("`in-map`", "proposal-promotion-proof", "proposal-closeout", "重名"):
+            self.assertIn(phrase, command)
+        reference = (plugin / "references" / "proposal-review.md").read_text(encoding="utf-8")
+        self.assertIn("`in-map`", reference)
+        self.assertNotIn("`stale` means the remote review map already contains", reference)
+        preflight = (plugin / "commands" / "proposal-promotion-preflight.md").read_text(encoding="utf-8")
+        self.assertIn("`in-map`", preflight)
+
+    def test_baseline_drift_still_wins_over_in_map(self):
+        drifted = ABSORBED_MAP.replace("Keep review facts explicit.", "Changed review facts.")
+        result = review(published(drifted), verified("proposal-stage:promoted"),
+                        "github", "octo/spec-guard")
+        self.assertEqual((result.state, result.diagnostic),
+                         ("stale", "proposal-baseline-drifted"))
 
     def test_goal_drift_is_stale_but_unrelated_new_module_is_fresh(self):
         drifted = BASE_MAP.replace("Keep review facts explicit.", "Changed review facts.")

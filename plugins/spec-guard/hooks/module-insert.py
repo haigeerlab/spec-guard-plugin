@@ -412,7 +412,7 @@ def format_report(result):
     if result["proposal_conflict"]:
         lines.append("")
         lines.append("警告: 本地存在 spec/proposals/%s.md；若该 Proposal 之后发布，"
-                     "将被判为 proposal-module-already-present。" % result["module_id"])
+                     "评审将报告 in-map（proposal-module-already-present）。" % result["module_id"])
     return "\n".join(lines)
 
 

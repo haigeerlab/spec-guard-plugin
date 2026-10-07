@@ -302,6 +302,12 @@ class PromotionProofRemoteTests(PromotionFixture):
         self.assertEqual((result.proposal_id, result.module_id), ("gamma", "gamma"))
         self.assertEqual(dirty.read_text(encoding="utf-8"), "not shared remote fact")
 
+    def test_an_in_map_review_at_the_parent_never_proves(self):
+        from proposal_review import Review
+        with patch("proposal_promotion_proof.review",
+                   return_value=Review("in-map", diagnostic="proposal-module-already-present")):
+            self.assertNotEqual(self.prove().state, "proved")
+
     def test_promoted_stage_still_proves(self):
         result = self.prove("proposal-stage:promoted")
         self.assertEqual((result.state, result.promotion_commit),
@@ -699,9 +705,9 @@ class PromotionProofCliTests(PromotionFixture):
         with patch("proposal_promotion_proof.prove",
                    side_effect=AssertionError("preflight must not prove")):
             result = self.run_cli("--proposal-id", "gamma")
-        # 晋级后能力图已变，preflight 只能报告 stale，绝不输出晋级证明。
+        # 晋级后模块已在能力图中，preflight 报告 in-map（不是 ready），绝不输出晋级证明。
         self.assertEqual((result["state"], result["diagnostic"]),
-                         ("stale", "proposal-module-already-present"))
+                         ("in-map", "proposal-module-already-present"))
         self.assertNotIn("promotionCommit", result)
 
 

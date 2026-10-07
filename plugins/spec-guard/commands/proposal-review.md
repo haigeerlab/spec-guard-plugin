@@ -44,6 +44,8 @@ python3 -B "$ROOT/hooks/proposal_review.py" \
 ~~~
 
 原样报告 JSON。`awaiting-review` 与 `in-review` 表示可由人把 Issue 标签改成 `proposal-stage:accepted`；`stale` 表示能力图或基线已变化，
-需要作者按新基线重新发布；`absent` 表示远端默认分支上没有该 Proposal，或没有对应 Issue。
+需要作者按新基线重新发布；`in-map` 表示远端能力图里已经有这个模块（`proposal-module-already-present`）：若是本 Proposal
+已晋级，下一步运行 `/spec-guard:proposal-promotion-proof`，`proved` 后用 `/spec-guard:proposal-closeout` 收尾；若是与已有模块
+重名，换一个 module id 重新发布。本命令不判断是哪一种，判断交给晋级证明；`absent` 表示远端默认分支上没有该 Proposal，或没有对应 Issue。
 `accepted` 与 `promoted-claim` 只是观察到的 Issue 标签，既不是晋级授权，也不是晋级证明。
 本命令不会创建或修改 Issue、标签、能力图、Proposal、分支、任务或 PR。

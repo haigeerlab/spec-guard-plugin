@@ -6,8 +6,12 @@ Git, the capability map, Proposal files or `.agent/state.json`.
 
 `accepted` is an observed Issue label, not promotion authorization. `promoted-claim`
 is also only an observed label; run a fresh review before the later Promotion-proof
-module. `stale` means the remote review map already contains the proposed module or
-the Proposal baseline/anchor facts have drifted.
+module. `stale` means the Proposal baseline, dependency or anchor facts have drifted.
+`in-map` (diagnostic `proposal-module-already-present`) means the remote review map
+already contains the proposed module: after this Proposal's own promotion that is
+expected (prove it, then close out), otherwise it is a clash with an existing module
+(republish under another id). Review does not tell the two apart; the proof does.
+Baseline drift is checked first and still reports `stale`.
 
 The CLI `proposal_review.py --proposal-id <id> --platform <github|gitlab> --target <t>`
 composes the fixed remote-default Publication, the read-only tracker adapter and this
