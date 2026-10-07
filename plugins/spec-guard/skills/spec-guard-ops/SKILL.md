@@ -28,7 +28,8 @@ for plugin in plugins:
 PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ```
 
-`ROOT` 为空时停止并说明插件未安装或未启用。
+`ROOT` 为空时停止：`CODEX_PLUGINS` 为空或不是合法 JSON 说明是 `codex plugin list` 查询失败，只报查询失败；
+能读到列表但没有已启用的 spec-guard 时，才说列表里没有已启用的 spec-guard。
 
 ## setup
 

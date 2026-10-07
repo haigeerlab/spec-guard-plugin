@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.50.1] - 2026-10-07
+
+### 修复
+
+- **Claude Code 上的命令找不到插件根目录。** 17 条命令（`phase`、`verify-artifacts`、`add-module`、`handoff`、
+  `cost-report`、文档与历史、Proposal 各命令、`tracker-default`、`collaboration`、`local-ticket-ledger`）的第一行写的是
+  `${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-}}`。Claude Code 不把 `CLAUDE_PLUGIN_ROOT` 导出给 Bash 工具，只在命令 Markdown
+  里把精确的 `${CLAUDE_PLUGIN_ROOT}` 换成路径（2026-10-07 在 2.1.291 上实测，headless 与交互式一致；官方插件参考
+  同样写明），所以这些命令在 Claude 上一律退出 2 并报「插件未安装或未启用」；机器上装了 `codex` 时则改跑 Codex 那份
+  安装，版本可能不同。现在第一行改为会被代入的 `ROOT="${CLAUDE_PLUGIN_ROOT}"`，再依次回退到 `PLUGIN_ROOT` 与
+  `codex plugin list`；全部失败时说明是哪一步没定位到（没有代入或环境变量、没有 `codex`、`codex` 的退出码或输出无法
+  解析、列表里没有已启用的 spec-guard、目录不存在），并明确这是定位失败、不代表插件未安装。`ticket` 与
+  `hosted-ticket-workflow` skill 改为让 Claude 使用会被代入的写法；Codex 的 `spec-guard-ops` 不再把查询失败说成未安装。
+  `evals/test-codex-command-roots.sh` 按宿主真实的代入方式回归每条路径，并禁止不会被代入的写法回来。
+
 ## [0.50.0] - 2026-10-07
 
 ### 移除
