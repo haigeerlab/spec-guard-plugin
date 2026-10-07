@@ -22,8 +22,9 @@ STAGES = {
 
 class Review(object):
     def __init__(self, state, review_commit=None, proposal_id=None, platform=None, target=None,
-                 issue_id=None, stage=None, revision=None, diagnostic=None):
+                 issue_id=None, stage=None, revision=None, diagnostic=None, module_id=None):
         self.state = state
+        self.module_id = module_id
         self.review_commit = review_commit
         self.proposal_id = proposal_id
         self.platform = platform
@@ -38,7 +39,8 @@ def as_json(result):
     """Serialize stable review facts without snapshot, Issue, or error content."""
     data = {"state": result.state}
     for key, value in (("reviewCommit", result.review_commit),
-                       ("proposalId", result.proposal_id), ("platform", result.platform),
+                       ("proposalId", result.proposal_id), ("moduleId", result.module_id),
+                       ("platform", result.platform),
                        ("target", result.target), ("issueId", result.issue_id),
                        ("stage", result.stage), ("revision", result.revision)):
         if value is not None:
@@ -81,7 +83,22 @@ def _review_map(baseline, review):
 
 
 def review(publication, tracker, platform, target):
-    """Interpret already-read facts; never query or mutate Git/tracker state."""
+    """Interpret already-read facts; never query or mutate Git/tracker state.
+
+    Every result that names the Proposal also names the module it adds: the two ids
+    differ (collaboration-split adds collaboration-interface), and a reader given only
+    the first took it for the second.
+    """
+    result = _review(publication, tracker, platform, target)
+    proposal = getattr(publication, "proposal", None)
+    change = getattr(proposal, "change", None)
+    if (change is not None and result.proposal_id is not None
+            and result.proposal_id == getattr(proposal, "proposal_id", None)):
+        result.module_id = change.module_id
+    return result
+
+
+def _review(publication, tracker, platform, target):
     publication_state = getattr(publication, "state", None)
     if publication_state in ("absent", "invalid", "unknown"):
         return Review(publication_state, diagnostic="publication-%s" % publication_state)

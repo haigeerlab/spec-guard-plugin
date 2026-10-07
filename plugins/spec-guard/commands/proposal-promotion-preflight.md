@@ -45,7 +45,8 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
   --platform "<github|gitlab>" --target "<target>"
 ~~~
 
-仅当 JSON state 为 ready 时，baseCommit 才是人工创建 promotion 分支可使用的起点。`in-map` 表示模块已在远端能力图里：
+仅当 JSON state 为 ready 时，baseCommit 才是人工创建 promotion 分支可使用的起点。找到 Proposal 后的结果都带 `moduleId`
+（要加入能力图的模块，可能与 `proposalId` 不同）。`in-map` 表示模块已在远端能力图里：
 已晋级的 Proposal 不需要再预检，改跑 `/spec-guard:proposal-promotion-proof`。
 `/spec-guard:add-module --proposal` 在插入前会通过 `promotion_base` 运行同一预检，因此本命令是可选的只读预览。
 命令本身不创建分支，也不更新 Issue、标签、能力图、模块 Spec、Plan、任务或 PR。

@@ -36,10 +36,11 @@ class Proof(object):
 
 class Preflight(object):
     def __init__(self, state, proposal_id=None, revision=None, base_commit=None,
-                 diagnostic=None, skipped_proposals=()):
+                 diagnostic=None, skipped_proposals=(), module_id=None):
         self.skipped_proposals = tuple(skipped_proposals)
         self.state = state
         self.proposal_id = proposal_id
+        self.module_id = module_id
         self.revision = revision
         self.base_commit = base_commit
         self.diagnostic = diagnostic
@@ -47,8 +48,8 @@ class Preflight(object):
 
 def preflight_as_json(result):
     data = {"state": result.state}
-    for key, value in (("proposalId", result.proposal_id), ("revision", result.revision),
-                       ("baseCommit", result.base_commit)):
+    for key, value in (("proposalId", result.proposal_id), ("moduleId", result.module_id),
+                       ("revision", result.revision), ("baseCommit", result.base_commit)):
         if value is not None:
             data[key] = value
     if result.state != "ready":
@@ -207,10 +208,12 @@ def _preflight(pool, proposal_id, platform, target, tracker_reader):
     if acceptance.state != "accepted":
         return Preflight(acceptance.state, proposal_id=proposal_id,
                          revision=getattr(publication.proposal, "revision", None),
-                         diagnostic=acceptance.diagnostic)
+                         diagnostic=acceptance.diagnostic,
+                         module_id=publication.proposal.change.module_id)
     return Preflight("ready", proposal_id=proposal_id,
                      revision=publication.proposal.revision,
-                     base_commit=pool.review_commit)
+                     base_commit=pool.review_commit,
+                     module_id=publication.proposal.change.module_id)
 
 
 def prove(project, publication, tracker, platform, target, remote="origin"):

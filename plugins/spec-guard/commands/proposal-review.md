@@ -48,4 +48,5 @@ python3 -B "$ROOT/hooks/proposal_review.py" \
 已晋级，下一步运行 `/spec-guard:proposal-promotion-proof`，`proved` 后用 `/spec-guard:proposal-closeout` 收尾；若是与已有模块
 重名，换一个 module id 重新发布。本命令不判断是哪一种，判断交给晋级证明；`absent` 表示远端默认分支上没有该 Proposal，或没有对应 Issue。
 `accepted` 与 `promoted-claim` 只是观察到的 Issue 标签，既不是晋级授权，也不是晋级证明。
+读到了 Proposal 的结果都带 `moduleId`：这是 Proposal 要加入能力图的模块，与 `proposalId` 不一定相同，转述时按它称呼模块。
 本命令不会创建或修改 Issue、标签、能力图、Proposal、分支、任务或 PR。
