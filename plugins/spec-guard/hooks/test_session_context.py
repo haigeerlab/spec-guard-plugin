@@ -26,6 +26,11 @@ def codex_token_count(inp):
         "total_token_usage": {"input_tokens": inp * 10}, "model_context_window": 258400}}}
 
 
+def claude_compact(post):
+    return {"type": "system", "subtype": "compact_boundary",
+            "compactMetadata": {"trigger": "manual", "preTokens": 601658, "postTokens": post}}
+
+
 class Transcript(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -100,6 +105,35 @@ class Transcript(unittest.TestCase):
         bad["message"]["usage"]["input_tokens"] = "lots"
         self.assertIsNone(context_tokens(self.write(bad)))
 
+    # context-after-compact: a compaction newer than the last reading sets the size.
+
+    def test_claude_compaction_gives_the_post_compaction_size(self):
+        path = self.write(claude_assistant(1, 601429, 0), claude_compact(13951),
+                          {"type": "user", "isCompactSummary": True, "message": {"role": "user", "content": "s"}})
+        self.assertEqual(context_usage(path), (13951, None))
+
+    def test_a_reading_after_the_claude_compaction_wins(self):
+        path = self.write(claude_assistant(1, 601429, 0), claude_compact(13951), claude_assistant(1, 93434, 0))
+        self.assertEqual(context_tokens(path), 93435)
+
+    def test_claude_compaction_without_a_usable_size_counts_as_compacted(self):
+        for post in (None, "14k", -1, 1.5, True):
+            with self.subTest(post=post):
+                record = claude_compact(post)
+                if post is None:
+                    del record["compactMetadata"]["postTokens"]
+                self.assertEqual(context_usage(self.write(claude_assistant(1, 601429, 0), record)), (0, None))
+
+    def test_codex_compaction_counts_as_compacted(self):
+        path = self.write(codex_token_count(223005), {"type": "compacted", "payload": {"message": "m"}},
+                          codex_token_count(0))
+        self.assertEqual(context_usage(path), (0, None))
+
+    def test_a_reading_after_the_codex_compaction_wins(self):
+        path = self.write(codex_token_count(223005), {"type": "compacted", "payload": {}}, codex_token_count(0),
+                          codex_token_count(37599))
+        self.assertEqual(context_usage(path), (37599, 258400))
+
 
     # context-hint-thresholds item 3 and 6: the window comes from the same record as the tokens.
 
@@ -165,6 +199,13 @@ class CommandLine(unittest.TestCase):
         out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
         self.assertEqual(out.split("\n")[0], "120000")
         self.assertEqual(out.split("\n")[2], "258400")
+
+    def test_prints_zero_right_after_a_codex_compaction(self):
+        self.transcript.write_text("\n".join(json.dumps(r) for r in (
+            codex_token_count(223005), {"type": "compacted", "payload": {}}, codex_token_count(0))) + "\n")
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
+        self.assertEqual(out.split("\n")[0], "0")
+        self.assertEqual(out.split("\n")[2], "")
 
     def test_unusable_input_prints_two_empty_lines(self):
         for text in ("", "not json", json.dumps({"transcript_path": "/no/such/file"})):

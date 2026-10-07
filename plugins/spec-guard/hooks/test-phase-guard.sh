@@ -609,6 +609,19 @@ done_has_only "Codex DONE 达到窗口 50% 时出带大小的行" "$(sized_bound
 codex_rollout "$T" 129199
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "Codex DONE 低于窗口 50% 时不出行" ""
+# context-after-compact：压缩记录比最近一条读数新时，按压缩后的大小判断（2026-10-08 实测压缩后首轮仍报 601k）。
+transcript "$T" 601429
+printf '%s\n' '{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":601658,"postTokens":13951}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Claude 刚压缩完（601k → 14k）不出 Module boundary 行" ""
+codex_rollout "$T" 223005
+printf '%s\n' '{"type":"compacted","payload":{}}' \
+  '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":0},"model_context_window":258400}}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex 刚压缩完不出 Module boundary 行" ""
+printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":129200},"model_context_window":258400}}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "压缩之后的新读数照常判断" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 codex_rollout "$T" 206720
 grep -F -- "$(mid_line 207 'at or over 80% of the 258 k window')" >/dev/null <<<"$(run_input "$ctx" "$HOOK_INPUT" | context_of)" \
