@@ -639,9 +639,10 @@ class PromotionProofDiagnosticFallbackTests(unittest.TestCase):
 
 class PromotionProofCliTests(PromotionFixture):
 
-    def run_cli(self, *extra, stage="proposal-stage:accepted"):
+    def run_cli(self, *extra, stage="proposal-stage:accepted", closed=None):
         tracker = TrackerRead("verified", issue_id=42, stage=stage,
-                              proposal_id="gamma", platform="github", target="octo/spec-guard")
+                              proposal_id="gamma", platform="github", target="octo/spec-guard",
+                              closed=closed)
         output = io.StringIO()
         with patch("proposal_promotion_proof.read_tracker", return_value=tracker), \
                 redirect_stdout(output):
@@ -673,6 +674,26 @@ class PromotionProofCliTests(PromotionFixture):
         # Names the probe that failed, not the folded `proposal-pool-unknown`.
         self.assertEqual(self.run_cli("--proposal-id", "gamma", "--prove"),
                          {"state": "unknown", "diagnostic": "snapshot-head-unavailable"})
+
+    def test_a_proved_promotion_whose_item_is_open_flags_the_pending_closeout(self):
+        # 2026-10-07: #221 sat open a day after its promotion merged; the proof is the
+        # step people do run, so it says what is left.
+        result = self.run_cli("--proposal-id", "gamma", "--prove",
+                              stage="proposal-stage:promoted", closed=False)
+        self.assertEqual(result["state"], "proved")
+        self.assertIs(result["closeoutPending"], True)
+
+    def test_a_proved_promotion_whose_item_is_closed_is_not_pending(self):
+        result = self.run_cli("--proposal-id", "gamma", "--prove",
+                              stage="proposal-stage:promoted", closed=True)
+        self.assertIs(result["closeoutPending"], False)
+
+    def test_the_flag_is_absent_when_the_open_state_is_unknown_or_unproved(self):
+        self.assertNotIn("closeoutPending",
+                         self.run_cli("--proposal-id", "gamma", "--prove", closed=None))
+        self.assertNotIn("closeoutPending",
+                         self.run_cli("--proposal-id", "gamma", "--prove",
+                                      stage="proposal-stage:in-review", closed=False))
 
     def test_cli_without_prove_still_runs_only_the_preflight(self):
         with patch("proposal_promotion_proof.prove",

@@ -29,6 +29,9 @@ class Proof(object):
         self.module_id = module_id
         self.promotion_commit = promotion_commit
         self.diagnostic = diagnostic
+        # Whether a proved promotion's item is still open; None when not proved or the
+        # open state was not read.  Step 4 is the only thing that closes the item.
+        self.closeout_pending = None
 
 
 class Preflight(object):
@@ -74,6 +77,8 @@ def as_json(result):
                               else "promotion-%s" % result.state)
     if result.mismatched_fields:
         data["mismatchedFields"] = list(result.mismatched_fields)
+    if isinstance(result.closeout_pending, bool):
+        data["closeoutPending"] = result.closeout_pending
     if result.skipped_proposals:
         data["skippedProposals"] = skipped_as_json(result.skipped_proposals)
     return data
@@ -313,6 +318,9 @@ def prove_from_remote(project, proposal_id, platform, target, remote="origin",
         reader = read_tracker if tracker_reader is None else tracker_reader
         tracker = reader(publication.proposal, platform, target)
         result = prove(project, publication, tracker, platform, target, remote)
+        closed = getattr(tracker, "closed", None)
+        if result.state == "proved" and isinstance(closed, bool):
+            result.closeout_pending = not closed
     result.skipped_proposals = tuple(getattr(pool, "skipped", ()))
     return result
 

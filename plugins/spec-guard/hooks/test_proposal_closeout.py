@@ -10,10 +10,10 @@ import unittest
 import proposal_closeout
 from proposal_closeout import (
     CLOSEABLE_STAGES, PROMOTED_STAGE, build_preview, close_preview, closeout_record,
-    closeout_decision, preview_digest,
+    closeout_decision, preview_digest, scan,
 )
 from proposal_contract import Baseline, Change, Proposal
-from proposal_publication import Publication
+from proposal_publication import Publication, PublicationPool
 from proposal_promotion_proof import Proof
 from unittest.mock import patch
 
@@ -1002,6 +1002,151 @@ class DefectTests(unittest.TestCase):
         result = closing(WritingAdapter(), self.journal, before_close=refuse)
         self.assertEqual(result["state"], "rejected")
         self.assertEqual(result["statusCode"], 403)
+
+
+def named(name, revision=REVISION):
+    return Proposal(name, MARKER.replace("id=gamma", "id=" + name),
+                    Baseline("origin", "main", "0" * 40, "0" * 12, {}, "alpha"),
+                    Change(name, name.title() + ".", ("alpha",), "end"),
+                    version="v2", revision=revision)
+
+
+def scanning(trackers, proofs=None, pool=None, adapter=None, skipped=()):
+    """Scan a pool whose Proposals are named by `trackers`' keys, in that order."""
+    proofs = proofs or {}
+    pool = pool or PublicationPool(
+        "published", review_commit=REVIEW,
+        publications=[Publication("published", review_commit=REVIEW, proposal=named(name))
+                      for name in trackers],
+        skipped=skipped)
+    adapter = adapter if adapter is not None else FakeAdapter()
+
+    def tracker_reader(proposal, *a, **k):
+        return trackers[proposal.proposal_id]
+
+    def prover(project, proposal_id, *a, **k):
+        return proofs.get(proposal_id) or Proof(
+            "proved", review_commit=REVIEW, proposal_id=proposal_id,
+            module_id=proposal_id, promotion_commit=PROMOTION)
+
+    return scan(".", "github", "octo/repo", adapter,
+                pool_reader=lambda *a, **k: pool,
+                tracker_reader=tracker_reader, prover=prover), adapter
+
+
+def item(name, stage=PROMOTED_STAGE, closed=False, state="verified", issue_id=7):
+    if state != "verified":
+        return TrackerRead(state, diagnostic="x")
+    return TrackerRead("verified", issue_id=issue_id, stage=stage, proposal_id=name,
+                       platform="github", target="octo/repo", closed=closed)
+
+
+class ScanTests(unittest.TestCase):
+    """Spec design 1: one read of the pool, the preview's judgement per Proposal."""
+
+    def test_a_proved_open_proposal_is_pending_and_nothing_is_written(self):
+        result, adapter = scanning({"gamma": item("gamma", closed=False, issue_id=221)})
+        self.assertEqual(result["state"], "scanned")
+        self.assertEqual(result["items"], [
+            {"proposalId": "gamma", "state": "closeout-pending", "issueId": 221}])
+        self.assertEqual(result["pending"], ["gamma"])
+        self.assertEqual(result["backend"], "github")
+        self.assertEqual(result["source"], "explicit")
+        self.assertEqual(adapter.writes, [])
+
+    def test_a_closed_proposal_is_already_closed_not_pending(self):
+        result, _ = scanning({"gamma": item("gamma", closed=True)})
+        self.assertEqual(result["items"], [{"proposalId": "gamma", "state": "already-closed"}])
+        self.assertEqual(result["pending"], [])
+
+    def test_an_unpromoted_proposal_keeps_the_proof_diagnostic(self):
+        result, _ = scanning(
+            {"gamma": item("gamma", stage=ACCEPTED)},
+            proofs={"gamma": Proof("not-promoted", proposal_id="gamma",
+                                   diagnostic="promotion-not-found")})
+        self.assertEqual(result["items"], [{"proposalId": "gamma", "state": "not-eligible",
+                                            "diagnostic": "promotion-not-found"}])
+        self.assertEqual(result["pending"], [])
+
+    def test_a_proof_that_could_not_read_is_unknown_never_pending(self):
+        result, _ = scanning({"gamma": item("gamma")},
+                             proofs={"gamma": Proof("unknown", proposal_id="gamma")})
+        self.assertEqual(result["items"][0]["state"], "unknown")
+        self.assertEqual(result["pending"], [])
+
+    def test_an_item_that_could_not_read_is_unknown_never_pending(self):
+        result, _ = scanning({"gamma": item("gamma", state="unknown")})
+        self.assertEqual(result["items"], [{"proposalId": "gamma", "state": "unknown",
+                                            "diagnostic": "tracker-unknown"}])
+        self.assertEqual(result["pending"], [])
+
+    def test_items_keep_pool_order_and_only_pending_ones_are_listed(self):
+        result, adapter = scanning({
+            "alpha2": item("alpha2", closed=True),
+            "beta": item("beta", closed=False, issue_id=8),
+            "delta": item("delta", state="unknown"),
+            "eta": item("eta", closed=False, issue_id=9),
+        })
+        self.assertEqual([entry["proposalId"] for entry in result["items"]],
+                         ["alpha2", "beta", "delta", "eta"])
+        self.assertEqual(result["pending"], ["beta", "eta"])
+        self.assertEqual(adapter.writes, [])
+
+    def test_skipped_proposals_are_reported_as_codes(self):
+        result, _ = scanning({"gamma": item("gamma", closed=True)},
+                             skipped=[("old", "anything raw")])
+        self.assertEqual(result["skippedProposals"],
+                         [{"proposalId": "old", "diagnostic": "proposal-invalid"}])
+
+    def test_an_unreadable_pool_is_a_failure_not_an_empty_scan(self):
+        for state in ("unknown", "invalid"):
+            result, _ = scanning({}, pool=PublicationPool(state, diagnostic="raw text"))
+            self.assertEqual(result["state"], state)
+            self.assertNotIn("items", result)
+            self.assertNotIn("pending", result)
+            self.assertEqual(result["diagnostic"], "proposal-pool-%s" % state)
+
+    def test_an_empty_pool_scans_to_nothing_pending(self):
+        result, _ = scanning({})
+        self.assertEqual(result, {"state": "scanned", "backend": "github",
+                                  "source": "explicit", "items": [], "pending": []})
+
+    def test_scan_never_reaches_a_write_or_a_preview_file(self):
+        source = inspect.getsource(scan)
+        for forbidden in ("create_comment", "set_stage", "set_closed", "os.open",
+                          "write_text", "_write_journal"):
+            self.assertNotIn(forbidden, source)
+
+
+class ScanCommandTests(unittest.TestCase):
+    def run_main(self, result):
+        out = []
+        with patch.object(proposal_closeout, "_resolved",
+                          return_value=(("github", "octo/repo", "github.com", "explicit"), None)), \
+                patch.object(proposal_closeout, "build_adapter", return_value=FakeAdapter()), \
+                patch.object(proposal_closeout, "scan", return_value=result), \
+                patch("builtins.print", side_effect=out.append):
+            code = proposal_closeout.main(["scan", "--project", ".",
+                                           "--backend", "github", "--target", "octo/repo"])
+        return code, json.loads(out[0])
+
+    def test_a_completed_scan_prints_and_exits_zero(self):
+        code, printed = self.run_main({"state": "scanned", "items": [], "pending": []})
+        self.assertEqual(code, 0)
+        self.assertEqual(printed["state"], "scanned")
+
+    def test_a_failed_scan_exits_two(self):
+        code, printed = self.run_main({"state": "unknown", "diagnostic": "proposal-pool-unknown"})
+        self.assertEqual(code, 2)
+        self.assertEqual(printed["state"], "unknown")
+
+    def test_scan_takes_no_output_or_confirm_argument(self):
+        with self.assertRaises(SystemExit):
+            with patch("sys.stderr"):
+                proposal_closeout.main(["scan", "--output", "x"])
+        with self.assertRaises(SystemExit):
+            with patch("sys.stderr"):
+                proposal_closeout.main(["scan", "--confirm"])
 
 
 if __name__ == "__main__":

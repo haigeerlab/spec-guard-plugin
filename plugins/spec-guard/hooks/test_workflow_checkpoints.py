@@ -59,6 +59,31 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, ticket)
         self.assertIn("PR 合并后", workflow)
 
+    def test_a_merged_promotion_is_closed_out_not_just_relabelled(self):
+        # 2026-10-07: #221 stayed open a day after its promotion merged because the docs
+        # told people to change the label by hand, which closes nothing.
+        checkpoint = self.target.read_text(encoding="utf-8")
+        for phrase in ("Proposal 晋级 PR 合并后", "closeoutPending", "proposal-closeout",
+                       "不会关闭事项"):
+            self.assertIn(phrase, checkpoint)
+        closeout = (self.plugin / "commands" / "proposal-closeout.md").read_text(encoding="utf-8")
+        self.assertIn("proposal_closeout.py\" scan", closeout)
+        self.assertIn("扫描结果不构成写入授权", closeout)
+        proof = (self.plugin / "commands" / "proposal-promotion-proof.md").read_text(encoding="utf-8")
+        self.assertIn("closeoutPending", proof)
+        ops = (self.plugin / "skills" / "spec-guard-ops" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("proposal_closeout.py\" scan", ops)
+        repo = self.plugin.parents[1]
+        surfaces = list(self.live_surfaces()) + [repo / "docs" / "workflow.md"]
+        for path in surfaces:
+            text = path.read_text(encoding="utf-8")
+            for stale in ("由人工把 Issue 标签改为", "由人工把标签改为",
+                          "再把 Issue 标为 `promoted`", "也可以继续只手工改标签"):
+                self.assertNotIn(stale, text, path.name)
+        release = repo / "docs" / "release-process.md"
+        if release.exists():  # absent in an installed copy
+            self.assertIn("proposal_closeout.py scan", release.read_text(encoding="utf-8"))
+
     def test_project_audit_handoff_is_discoverable_on_both_hosts(self):
         checkpoint = self.target.read_text(encoding="utf-8")
         for name in ("claude-block-local.md", "codex-block-local.md"):

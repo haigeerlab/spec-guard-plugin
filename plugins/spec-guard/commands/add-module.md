@@ -99,7 +99,8 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次。命令只改 `spec/CAPABILITY-MAP.md`，
 不创建分支、不提交、不改 Issue 标签。写入后由用户提交并合并；合并后运行 `/spec-guard:proposal-promotion-proof`，
-证明为 `proved` 后，由人工把 Issue 标签改为 `proposal-stage:promoted`。正式 Spec 与 Plan 若已可评审，
+证明为 `proved` 后（输出带 `closeoutPending: true` 表示事项还开着），用 `/spec-guard:proposal-closeout` 预览收尾，经授权后
+由它改阶段并关闭事项；只手工改标签不会关闭事项。正式 Spec 与 Plan 若已可评审，
 可在同一个晋级 PR 中补齐；本命令仍只写能力图，Spec、Plan 必须分别按其阶段审阅，
 不因同 PR 而跳过。预检已内嵌于本命令，通常无需另跑独立 preflight。
 不带 `--proposal` 时行为不变。

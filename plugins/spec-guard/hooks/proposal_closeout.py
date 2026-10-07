@@ -21,7 +21,7 @@ import re
 from pathlib import Path
 
 from proposal_promotion_proof import prove_from_remote
-from proposal_publication import read_published
+from proposal_publication import read_published, read_published_pool, skipped_as_json
 from defect_guard import is_defect
 from proposal_tracker_read import (
     CONTRACT_INVALID, MARKER_AMBIGUOUS, issue_identity, recover_tracker_issue,
@@ -232,6 +232,47 @@ def build_preview(project, proposal_id, backend, target, adapter, remote="origin
     }
     preview["digest"] = preview_digest(preview)
     return preview
+
+
+def scan(project, backend, target, adapter, remote="origin", source="explicit", host=None,
+         pool_reader=None, tracker_reader=None, prover=None):
+    """Judge every published Proposal the way `preview` would; read-only.
+
+    A Proposal item is closed only by step 4, and nothing reminded anyone to run it: a
+    stage label changed by hand is allowed but closes nothing, so a promoted item can
+    sit open indefinitely.  This lists the ones `preview` would accept.  The pool is
+    read once and each Proposal goes through `build_preview` with that publication, so
+    the judgement cannot drift from the one that guards the write.  Nothing is kept
+    from a preview but its state: writing still needs `preview` and an authorization.
+    """
+    pool = (pool_reader or read_published_pool)(project, remote)
+    state = getattr(pool, "state", None)
+    if state != "published":
+        state = state if state == "invalid" else "unknown"
+        return {"state": state, "diagnostic": "proposal-pool-%s" % state}
+    items = []
+    pending = []
+    for publication in pool.publications:
+        proposal_id = publication.proposal.proposal_id
+        result = build_preview(project, proposal_id, backend, target, adapter,
+                               remote=remote, source=source, host=host,
+                               publication_reader=lambda *a, _p=publication, **k: _p,
+                               tracker_reader=tracker_reader, prover=prover)
+        entry = {"proposalId": proposal_id}
+        if result.get("state") == "preview":
+            entry["state"] = "closeout-pending"
+            entry["issueId"] = result["issueId"]
+            pending.append(proposal_id)
+        else:
+            entry["state"] = result.get("state")
+            if result.get("diagnostic"):
+                entry["diagnostic"] = result["diagnostic"]
+        items.append(entry)
+    report = {"state": "scanned", "backend": backend, "source": source,
+              "items": items, "pending": pending}
+    if pool.skipped:
+        report["skippedProposals"] = skipped_as_json(pool.skipped)
+    return report
 
 
 def content_digest(backend, raw_issue):
@@ -565,6 +606,13 @@ def main(argv=None):
     preview.add_argument("--remote", default="origin")
     preview.add_argument("--output", required=True)
 
+    scanner = commands.add_parser("scan", help="read-only: list promoted items still open")
+    scanner.add_argument("--project", default=".")
+    scanner.add_argument("--backend", choices=("local", "github", "gitlab"))
+    scanner.add_argument("--host")
+    scanner.add_argument("--target")
+    scanner.add_argument("--remote", default="origin")
+
     closer = commands.add_parser("close", help="write, only with --confirm")
     closer.add_argument("--project", default=".")
     closer.add_argument("--preview", required=True)
@@ -572,6 +620,26 @@ def main(argv=None):
     closer.add_argument("--confirm", action="store_true")
 
     args = parser.parse_args(argv)
+    if args.command == "scan":
+        resolved, failure = _resolved(args)
+        if failure is not None:
+            print(json.dumps(failure, ensure_ascii=False, sort_keys=True))
+            return 2
+        backend, container, host, source = resolved
+        try:
+            adapter = build_adapter(backend, container, host=host,
+                                    project=Path(args.project))
+        except Exception as error:
+            if is_defect(error):
+                raise
+            print(json.dumps({"state": "unknown", "diagnostic": "target-unreadable"},
+                             sort_keys=True))
+            return 2
+        result = scan(args.project, backend, container, adapter, remote=args.remote,
+                      source=source, host=host)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0 if result.get("state") == "scanned" else 2
+
     if args.command == "preview":
         resolved, failure = _resolved(args)
         if failure is not None:

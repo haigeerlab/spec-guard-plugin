@@ -68,6 +68,23 @@ Local 是 Epiq `projectId`。
 把预览**原样转述给用户**，至少包含 backend、精确目标、`proposalId`、`revision`、事项编号、当前阶段、
 `promotionCommit`、以及**将要写入的收尾记录全文**和动作清单。Local 还要说明该账本是否会 sync 到公开远端。
 
+## 扫描：哪些 Proposal 还欠收尾（只读）
+
+晋级 PR 合并后，事项只会被本命令关闭；只手工改标签不会关闭它（2026-10-07 本仓库的 #221 就这样开了一天）。
+不确定有没有漏的，用扫描：
+
+```bash
+python3 -B "$ROOT/hooks/proposal_closeout.py" scan --project "$PROJECT" \
+  --backend <local|github|gitlab> --target <target>
+```
+
+backend／target 的解析与预览相同。它只读一次远端默认分支上的 Proposal，再对每一条走与预览**同一套**判据（现取
+proof、读事项），不写任何东西，也不产出预览文件。输出 `items` 每条一个 Proposal：`closeout-pending`（附 `issueId`）
+表示可以收尾；其余沿用预览的状态与 `diagnostic`（`already-closed`、`not-eligible`、`unknown` 等）。`pending` 是
+待收尾的 id 列表。读不到的项是 `unknown`，**既不算待收尾也不算已关闭**；整个 Proposal 池读不到时退出 2。
+
+把 `pending` 原样告诉用户。对其中每一条仍要按上文**单独预览、单独取得授权**，扫描结果不构成写入授权。
+
 ## 确认后写入
 
 ```bash

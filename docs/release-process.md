@@ -48,7 +48,15 @@ codex plugin marketplace list
 codex plugin list --json
 ```
 
-核对 `spec-guard@spec-guard-marketplace` 已启用、版本正确且 `source.path` 是预期来源。真实
+核对 `spec-guard@spec-guard-marketplace` 已启用、版本正确且 `source.path` 是预期来源。
+
+项目有 `spec/proposals/` 时，再跑一次只读收尾扫描（本仓库每次发版都跑），把 `pending` 列给用户；每一条仍按
+`/spec-guard:proposal-closeout` 单独预览、单独授权，扫描结果不构成授权：
+
+```bash
+python3 -B plugins/spec-guard/hooks/proposal_closeout.py scan --project . \
+  --backend github --target haigeerlab/spec-guard-plugin
+```真实
 smoke 的 `--expected-source` 必须与该字段精确一致：本地 marketplace 通常是候选工作区，Git
 marketplace 则是 Codex 的缓存副本。不要猜测这两个路径相同。
 
