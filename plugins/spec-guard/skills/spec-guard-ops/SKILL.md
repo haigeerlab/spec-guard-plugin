@@ -179,7 +179,7 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 未评审先评审再 `--confirm`。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
 不改 Issue 标签。正式 Spec 与 Plan 若已可评审，可与能力图放在同一个晋级 PR；
 本命令仍只写能力图，且内嵌预检通常无需再单独运行。Spec 与 Plan 分别按阶段审阅，
-不能因同 PR 跳过。合并后运行 proposal 一节的 `--prove`，`proved` 后由人工把标签改为 `proposal-stage:promoted`。
+不能因同 PR 跳过。合并后运行 proposal 一节的 `--prove`，`proved` 后按「收尾」一节预览并经授权关闭事项；只手工改标签不会关闭事项。
 
 ## documentation
 
@@ -244,6 +244,16 @@ python3 -B "$ROOT/hooks/proposal_closeout.py" close --project "$PROJECT" \
 ```
 
 `--confirm` 不是授权，只是执行已授权的预览。写入前所有复核都会重做；任何一项不符就停下，什么都不写。
+
+只想知道哪些 Proposal 还欠收尾时，用只读扫描（参数与预览相同，但没有 `--proposal-id` 与 `--output`）：
+
+```bash
+python3 -B "$ROOT/hooks/proposal_closeout.py" scan --project "$PROJECT" \
+  --backend <local|github|gitlab> --target <target>
+```
+
+`pending` 列出证明为 `proved` 而事项仍开着的 Proposal；对其中每一条仍要单独预览并取得授权。读不到的项是
+`unknown`，不算待收尾也不算已关闭。
 
 `verified` 才算完成。`already-closed` 是正常的重跑结果，不是失败。`partial` 与 `unknown`
 **只做只读对账，绝不重发**——一次空查询不足以证明写入失败。`conflict` 需要人来判断，不要自行选一条。

@@ -44,7 +44,9 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
   --platform "<github|gitlab>" --target "<target>" --prove
 ~~~
 
-原样报告 JSON。只有 `proved` 才是晋级证明，并给出 promotion commit 与 module id。`not-accepted`
+原样报告 JSON。只有 `proved` 才是晋级证明，并给出 promotion commit 与 module id。`proved` 时若同次读到事项的开闭，
+还带 `closeoutPending`：`true` 表示事项仍开着，下一步是 `/spec-guard:proposal-closeout` 预览并经授权收尾（只改标签
+不会关闭事项）；`false` 表示已关闭。`not-accepted`
 表示 Issue 阶段不是 accepted 或 promoted；`invalid` 表示首次纳入该 module 的提交不符合声明（职责、依赖、
 位置），或该提交改动了其他模块行；`stale` 表示晋级提交的父提交上评审已不新鲜（如基线漂移）；
 `reviewCommit` 是晋级提交的父提交；`not-promoted` 表示至今

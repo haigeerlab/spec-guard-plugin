@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.51.0] - 2026-10-07
+
+### 新增
+
+- **提醒还没收尾的 Proposal。** Proposal 事项只有第四步 `/spec-guard:proposal-closeout` 会关闭，此前没有任何东西提醒
+  去跑它；文档还写着「证明通过后由人工把标签改为 promoted」，而只改标签不会关闭事项——本仓库的 #221 就在晋级
+  合并一天后仍开着。现在：`proposal_closeout.py scan`（命令里的「扫描」一节）只读地对远端默认分支上每一份
+  Proposal 走与预览同一套判据，列出证明已通过而事项仍开着的 `pending`，读不到的报 `unknown`、不算待收尾，不写任何
+  东西；`proposal-promotion-proof --prove` 在 `proved` 时带 `closeoutPending`；共享检查点规则新增「Proposal 晋级 PR
+  合并后」一条，发布流程的发布后核对加跑一次扫描。`add-module`、`spec-guard-ops` 与 `docs/workflow.md` 里让人手工改
+  标签的说法改为走收尾命令。关闭仍须逐条预览并取得授权，扫描结果不构成授权。
+
 ## [0.50.1] - 2026-10-07
 
 ### 修复

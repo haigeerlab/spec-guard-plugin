@@ -99,6 +99,13 @@ tracker 的读取经由收尾适配器，而**同一个 reader 也交给 `prove_
 `promotionCommit`、`reviewCommit`、`issueContentDigest`、完整的 `record`、`actions`、`source`
 （`explicit` / `project-default` / `project-default-target`）与 `digest`。
 
+## 扫描
+
+`scan` 只读：读一次远端默认分支上的 Proposal 池，对每一条把已读到的 publication 交给 `build_preview`，
+所以判据与预览逐字相同，不会出现两套结论。每条结果只保留状态：能生成预览的记作 `closeout-pending`
+（附 `issueId`），其余沿用预览的 state 与 diagnostic。池读不到是 `unknown`／`invalid`，不是空结果。
+扫描不写事项、不写 journal、不产出预览文件；`pending` 不是授权。
+
 ## 收尾记录
 
 ```
