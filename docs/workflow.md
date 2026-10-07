@@ -115,8 +115,9 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 它必须是 kebab-case 的 module id；写成别的会被报为无效并回退到 Build order（hook 仍然激活）。
 注入文本里来自仓库的值都经过净化，详见[决策记录](decisions/2026-10-04-phase-context-sanitization.md)。
-随时想看完整状态，用 `/spec-guard:phase`。开新会话前用 `/spec-guard:handoff`（Codex 里输入 `spec-guard handoff`）
-拿一份可直接粘贴的交接文本；整条提示词恰好是这条命令时由 hook 本地作答，不调用模型。
+随时想看完整状态，用 `/spec-guard:phase`。上下文提示出现时不必开新会话：接着做相关工作就带重点 `/compact`，
+换到不相关工作就 `/clear`（两个宿主都有这两条命令）；刚压缩过时提示按压缩后的大小判断。`/clear` 会保留用 `/rename`
+起的会话名，别的会话仍能按名字联系它，但只在对话里说过的约定会丢，长期约定写进项目的 agent 说明或记忆。
 存在被暂停的模块（见「插队」）时，`NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下会多一行 `Paused: …`。
 
 ## 已有项目：加新需求

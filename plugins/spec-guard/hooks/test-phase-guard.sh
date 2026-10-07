@@ -46,7 +46,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: a good point to /compact or start the next piece of work in a new session. Say so in one sentence; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it). This stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"
@@ -503,15 +503,18 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
 # context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
 # 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
 mid_line() {  # $1=N k $2=阈值说明
-  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact or continue in a new session; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it).' "$1" "$2"
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
 }
 sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to /compact or start the next piece of work in a new session. Say so in one sentence; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it). This stage summary carries over, the conversation does not need to." "$1" "$2"
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
 # context-hint-no-paste：任何注入都不得再要求 agent 贴交接文本（2026-10-07 用户在接近满窗时仍看到被贴出的交接文本）。
 for line in "$BOUNDARY" "$(mid_line 1 x)" "$(sized_boundary 1 x)"; do
   case "$line" in *paste-ready*|*"for paste"*) fail "上下文提示仍要求贴交接文本: $line" ;; esac
   case "$line" in *"do not paste handoff text"*) ;; *) fail "上下文提示缺少不贴交接文本的说明: $line" ;; esac
+  # context-after-compact：按相关性建议 /compact 或 /clear，不再建议开新会话，也不再提交接命令。
+  case "$line" in *"/clear if the next work is unrelated"*) ;; *) fail "上下文提示缺少 /clear 的建议: $line" ;; esac
+  case "$line" in *"new session"*|*"spec-guard handoff"*|*spec-guard:handoff*) fail "上下文提示不应建议新会话或交接命令: $line" ;; esac
 done
 codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
   printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
