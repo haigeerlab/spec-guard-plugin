@@ -4,8 +4,8 @@
 - [x] Checkpoint 1 (report): tests green
 - [x] Task 2: hint wording — Module boundary (sized and size-less) and Session context lines now say /compact with a focus for related work or /clear for unrelated work, no new session, no handoff command name; `NO_PASTE` kept as "do not paste handoff text". phase-guard pins the exact lines and rejects "new session" / handoff command names in them; shared checkpoint rule, phase.md, workflow.md (with the /rename note) and README reworded, contract test updated
 - [x] Checkpoint 2 (report): tests green — phase-guard 154, checkpoints contract OK, validate.sh pass
-- [ ] Task 3: retire session-handoff
-- [ ] Checkpoint 3 (report): full suites green, verify-artifacts clean
+- [x] Task 3: retire session-handoff — removed commands/handoff.md, session_handoff.py, test_session_handoff.py, the phase-guard.sh local-answer branch (13 lines) and its 5 regressions, the spec-guard-ops handoff section, the validate.sh line and the workflow.md table row; map row and Build order entry removed, context-hint-thresholds depends on fresh-session-hint; spec/plan/todo `git mv`'d to docs/retirements/session-handoff/ with docs/retirements/session-handoff.md. New: a phase-guard case that the old trigger prompts get the normal stage injection (Codex no longer blocked) and a static check that no command, skill, reference, hint, workflow.md or README offers the command. Mutations caught: re-offering it in a reference, re-adding an interception branch
+- [x] Checkpoint 3 (report): full suites green, verify-artifacts clean — validate.sh pass, phase-guard 150, verify-artifacts 26 (project 3 pass), ShellCheck clean
 - [ ] Task 4: real host + CHANGELOG + 0.52.0
 - [ ] Checkpoint 4 (gate): module review; push and PR authorized by Plan approval, merge by the user
 - [ ] Task 5: post-release evidence

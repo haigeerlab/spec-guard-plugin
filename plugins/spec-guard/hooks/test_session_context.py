@@ -306,7 +306,7 @@ class Location(unittest.TestCase):
 
 
 class RootFromHookInput(unittest.TestCase):
-    """session-handoff 第 12 条：项目根以 hook 输入的 cwd 所在 git 仓库为准，取不到才用调用方的默认根。"""
+    """原 session-handoff 第 12 条（该模块已退役，此规则保留）：项目根以 hook 输入的 cwd 所在 git 仓库为准，取不到才用调用方的默认根。"""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
