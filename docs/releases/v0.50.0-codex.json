@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.50.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.50.0;test:marketplace-ref-upgrade-20261007"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.49.0 to v0.50.0 (backup kept)",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade reported 2 marketplaces upgraded and `codex plugin list --json` reports spec-guard 0.50.0, installed and enabled, beside agent-relay 0.1.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.50.0;test:installed-plugin-smoke-20261007"
+      },
+      "observedAt": "2026-10-07T03:00:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "host:codex-cli 0.160.0"
+      ]
+    }
+  ]
+}
