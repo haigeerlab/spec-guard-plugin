@@ -12,7 +12,7 @@ description: 在明确选用 GitHub 或 GitLab 普通 Issue 时，逐项查重�
 只读审查到报告为止。
 
 从当前启用的插件解析 `ROOT`（Codex 采用 `spec-guard-ops` 的解析环境；Claude
-使用 `CLAUDE_PLUGIN_ROOT`）。以下脚本均在 `$ROOT/hooks/`，命令里的编号和目标
+使用加载时代入的 `ROOT="${CLAUDE_PLUGIN_ROOT}"`，Bash 环境里没有这个变量）。以下脚本均在 `$ROOT/hooks/`，命令里的编号和目标
 须替换为本次事实，不能从示例照抄。
 
 ## 查重与创建

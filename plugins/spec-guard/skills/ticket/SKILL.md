@@ -74,7 +74,7 @@ PR 合并或本地阶段 `DONE` 本身不构成关闭证明；合并后无法访
 （Codex）；工具不可用或被拒绝时如实说明，不改用 shell、Git 或其他途径绕过。
 
 用户还要求通知另一个 Agent 时，先完成事项操作，再确认协作插件 agent-relay 可用：从当前启用的插件解析
-`ROOT`（Codex 采用 `spec-guard-ops` 的解析环境；Claude 使用 `CLAUDE_PLUGIN_ROOT`），运行
+`ROOT`（Codex 采用 `spec-guard-ops` 的解析环境；Claude 使用加载时代入的 `ROOT="${CLAUDE_PLUGIN_ROOT}"`，Bash 环境里没有这个变量），运行
 `python3 -B "$ROOT/hooks/agent_relay_probe.py" --host <claude|codex>`。`state` 为 `ready` 时，使用
 `agent-relay:collab` skill 按名称发送消息，包含事项标题、短编号和具体处理请求；其他状态原样转述 `message`
 并跳过通知，不改用其他途径发送，`unknown` 不能说成未安装。报告事项写入与消息投递（或跳过）各自的结果。若对方在同一仓库的 worktree，可请其按
