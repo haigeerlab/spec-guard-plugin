@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.51.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.51.1;test:installed-plugin-upgrade-20261007"
+      },
+      "observedAt": "2026-10-07T13:18:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.51.0 to 0.51.1 for scope user; the installed copy records gitCommitSha 7554f9e3e8a73502dfb08d67d25ca8953e3dc124 -- the v0.51.1 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-context-hint-wording",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.51.1;test:context-hint-no-paste-20261007"
+      },
+      "observedAt": "2026-10-07T13:18:00Z",
+      "evidence": [
+        "command:the Claude installed copy's hooks/phase-guard.sh run on a DONE fixture with a Claude transcript of 600 k and a BUILDING one of 850 k (cache_read_input_tokens), hook input carrying transcript_path",
+        "result:the Module boundary line reads 'a good point to /compact or start the next piece of work in a new session. Say so in one sentence; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it)', the Session context line asks for one sentence and carries the same clause, and no injected text contains 'paste-ready'"
+      ]
+    },
+    {
+      "subject": "spec-guard-context-hint-agent-reply",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.51.1;test:context-hint-agent-reply-20261007"
+      },
+      "reason": "reaching the 500 k / 800 k thresholds in a real session needs a long conversation; whether an agent then answers in one sentence without pasting handoff text is observed in use, not in this release run"
+    }
+  ]
+}
