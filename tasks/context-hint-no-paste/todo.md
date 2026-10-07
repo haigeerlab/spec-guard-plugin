@@ -4,5 +4,5 @@
 - [x] Task 2: checkpoint rule and docs (tests first), CHANGELOG — contract assertions in test_workflow_checkpoints.py ("/compact", "一句话", "不贴交接文本"; old "给出 … 的交接文本" and phase.md "生成可直接粘贴的交接文本" banned) red, then workflow-checkpoints.md and commands/phase.md green. No plugin text outside the user-invoked handoff command mentions handoff text
 - [x] Checkpoint 1 (report): wording changed, regressions green and red under the old wording
 - [x] Task 3: 0.51.1 and full validation — both manifests 0.51.1, README `--ref v0.51.1`, CHANGELOG `## [0.51.1] - 2026-10-07`. `/compact` added to check-command-names' host built-ins (the checker rejected it in phase.md). macOS 15.7.3, `/bin/bash` 3.2.57: validate.sh pass, phase-guard 151, verify-artifacts 26, ShellCheck clean
-- [ ] Checkpoint 2 (gate): module review; push and PR authorized by Plan approval, merge by the user
-- [ ] Task 4: post-release evidence on the installed plugin
+- [x] Checkpoint 2 (gate): module review; push and PR authorized by Plan approval, merge by the user — PR #231 merged at 7554f9e by the user
+- [x] Task 4: post-release evidence on the installed plugin — tag v0.51.1 on 7554f9e, asset sha256 838633ba…abba694 (430096 bytes; download matches). Codex ref v0.51.0->v0.51.1, upgrade exit 0, smoke exit 0. Claude 0.51.0->0.51.1 (gitCommitSha = tag commit). Both installed hooks on a 600 k DONE and an 850 k BUILDING fixture emit the one-sentence wording with no 'paste-ready'. An agent's actual reply at the threshold is recorded not-verified (observed in use). Records in `docs/releases/v0.51.1-*.json`
