@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.51.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:da7bc9fe55b769c0779c3208f5d4a81167a1d93f"
+      },
+      "observedAt": "2026-10-07T16:02:00Z",
+      "evidence": [
+        "result:the v0.51.3 annotated tag and origin/main both resolve to merge commit da7bc9fe55b769c0779c3208f5d4a81167a1d93f; its tree equals release commit 3b1968307345e5c8bbc5773cf299c8475ae1938b, on which the commands below ran; pull request #235 merged after its pull_request run passed (the first PR event never started a run; closing and reopening the PR did) and main's push run of validate (ubuntu-latest) passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 151, verify-artifacts 26 cases)",
+        "result:the moduleId tests (a Proposal whose id differs from its module) were red before the change; filling moduleId with the Proposal id is caught"
+      ]
+    }
+  ]
+}
