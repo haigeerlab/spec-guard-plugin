@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.51.2] - 2026-10-07
+
+### 修复
+
+- **已晋级的 Proposal 不再被报成「过期」。** 远端能力图里已经有该 Proposal 的模块时，`/spec-guard:proposal-review` 与晋级
+  预检报的是 `stale`（JSON 里甚至只有笼统的 `proposal-stale`），而命令说明把 `stale` 解释为「按新基线重新发布」——
+  对已晋级的 Proposal 正好说反。现在这种情况报 `in-map`（`proposal-module-already-present`），说明写明两种去向：本
+  Proposal 已晋级就跑晋级证明再收尾，与已有模块重名就换 id 重新发布。基线、依赖、锚点漂移仍报 `stale`，基线漂移
+  优先；预检照样不放行，晋级证明与收尾判据不变。
+
 ## [0.51.1] - 2026-10-07
 
 ### 修复

@@ -49,6 +49,8 @@ def as_json(result):
         data["diagnostic"] = "review-%s" % result.state
     elif result.state == "stale":
         data["diagnostic"] = "proposal-stale"
+    elif result.state == "in-map":
+        data["diagnostic"] = "proposal-module-already-present"
     return data
 
 
@@ -116,7 +118,9 @@ def review(publication, tracker, platform, target):
                       stage=tracker.stage, revision=getattr(proposal, "revision", None),
                       diagnostic="proposal-baseline-drifted")
     if proposal.change.module_id in review_map.order:
-        return Review("stale", review_commit=review_commit, proposal_id=proposal.proposal_id,
+        # Not stale: a promoted Proposal's module is meant to be here.  Whether it is this
+        # Proposal's own promotion or a clash with an existing module is the proof's call.
+        return Review("in-map", review_commit=review_commit, proposal_id=proposal.proposal_id,
                       platform=platform, target=target, issue_id=tracker.issue_id,
                       stage=tracker.stage, revision=getattr(proposal, "revision", None),
                       diagnostic="proposal-module-already-present")
