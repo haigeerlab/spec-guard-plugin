@@ -168,6 +168,22 @@ python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key revi
 未知键、非法取值）时所有项按默认处理、`set`／`unset` 拒绝写入，照问题代码报告，不替用户猜值；`show` 提示
 文件被 `.gitignore` 忽略时照实转述。
 
+## module-suspend
+
+挂起一个在等外部条件的已开工模块（Claude 侧为 `/spec-guard:module-suspend`）：在 `tasks/<id>/todo.md` 写一行
+`<!-- spec-guard: suspended -->`。选当前模块时跳过它、保留 Build order 原位，阶段提示列出 `Suspended: <id>`；
+它不算做到一半，随后 add-module 不需要 `--interrupt`；永不自动恢复，插件不记录原因或日期。默认只预览，用户确认后
+才加 `--confirm`，只改这一行并读回：
+
+```bash
+python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <module-id>
+python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module-id> --confirm
+```
+
+只能挂起有 Plan、todo 且至少一项未勾选的模块；拒绝时退出码 2 且不写文件。恢复只去掉标记、不改 `.agent/state.json`。
+挂起确认后问用户要不要设提醒：时间和内容由用户说；宿主有持久的提醒或自动化能力且支持这个时间就用并读回，
+否则请用户自己设。不从对话推断日期，插件不保存提醒，提醒失败不影响挂起。
+
 ## add-module
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并

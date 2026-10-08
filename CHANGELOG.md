@@ -4,6 +4,12 @@
 
 ### 新增
 
+- **挂起在等外部条件的模块：`/spec-guard:module-suspend`。** 代码做完、只剩某天复核或发版后观察的模块会一直占着
+  当前模块，项目到不了 DONE，`add-module` 也插不进新模块。现在可以挂起它：`todo.md` 里一行标记，选当前模块时跳过它、
+  保留 Build order 原位，阶段提示列出“挂起中”，只剩挂起模块时 DONE 不再说成全部完成；它不算做到一半，加新模块不需要
+  `--interrupt`。只有明确 `--resume` 才回来，插件不记录原因或日期；挂起后可按用户给出的时间和内容借宿主的持久提醒设一个，
+  插件不保存提醒。`verify-artifacts` 对重复标记判失败、对过期标记给警告。没有标记的项目行为不变。
+
 - **项目配置 `.agent/config.json` 与 `/spec-guard:config`。** 产物语言没人决定，Spec、Plan、todo 中英混写；单个模块的
   Spec 与 Plan 评审常被连着批，却只有“分别评审”一种节奏。现在项目可以入库一份配置：`artifactLanguage`（新写产物的
   正文语言，结构关键字不变，已有产物不翻译）与 `reviewCadence`（默认 `separate`；`combined` 时写入能力图后 Spec 与
