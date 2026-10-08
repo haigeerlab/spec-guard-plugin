@@ -4,6 +4,6 @@
 - [x] Task 2：managed-block 与 teardown-convention 实现 — `remove` 增加 `--known`、`--accept-removals`、`--dry-run`，与 `replace` 共用选项解析、已知行与拒绝输出；输出改为“删除行数 保留行数”。setup/teardown 56 例通过。变异均被抓到：去掉本地段保留、去掉删除闸门、teardown 不传 `--known`
 - [x] Task 3：文档 — 命令 `teardown-convention.md`（含 argument-hint）、Codex skill teardown 一节、`docs/workflow.md`
 - [x] Checkpoint 1（report）：全部套件通过，ShellCheck 无告警
-- [ ] Task 4：CHANGELOG + 0.54.2 + macOS 校验
+- [x] Task 4：CHANGELOG + 0.54.2 + macOS 校验
 - [ ] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行
 - [ ] Task 5：发版后证据
