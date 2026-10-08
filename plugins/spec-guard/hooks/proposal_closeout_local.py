@@ -25,12 +25,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 from local_ledger_runtime import (
-    MCP_RELATIVE_PATH, RuntimeContractError, mcp_tool_call, node_status, project_status,
+    MCP_RELATIVE_PATH, RuntimeContractError, default_runtime_dir, mcp_tool_call, node_status, project_status,
     runtime_status, state_worktree_status,
 )
 
 PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
-DEFAULT_RUNTIME = Path.home() / ".spec-guard" / "local-ticket-ledger" / "runtime"
+DEFAULT_RUNTIME = default_runtime_dir()
 
 
 class LocalCloseoutError(Exception):

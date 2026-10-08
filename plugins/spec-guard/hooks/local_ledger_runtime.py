@@ -11,6 +11,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Sequence
 
+from state_paths import state_dir
+
 
 PACKAGE_NAME = "epiq"
 PACKAGE_VERSION = "1.11.0"
@@ -62,7 +64,7 @@ def validate_lock_files(lock_dir: Path) -> list[str]:
 
 
 def default_runtime_dir() -> Path:
-    return Path.home() / ".spec-guard" / "local-ticket-ledger" / "runtime"
+    return state_dir("local-ticket-ledger") / "runtime"
 
 
 def runtime_contract() -> dict[str, Any]:
