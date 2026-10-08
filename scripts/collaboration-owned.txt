@@ -45,3 +45,8 @@ plugins/spec-guard/references/collaboration-protocol.md
 # Extraction record (collaboration-extraction); names collaboration paths, removed with the rest
 scripts/collaboration-extraction-paths.txt
 scripts/extract-collaboration.sh
+
+# Retired in 0.54.0 (collaboration-command-retirement), as the 0.53.0 changelog announced: the
+# transitional handoff command that sent users on to agent-relay. Not moved; removed outright.
+plugins/spec-guard/commands/collaboration.md
+plugins/spec-guard/hooks/test_collaboration_handoff.py

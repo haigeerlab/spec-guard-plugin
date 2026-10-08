@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Fail if collaboration comes back into Spec Guard after it moved to agent-relay.
 
-Spec Guard reaches collaboration only through `hooks/agent_relay_probe.py`, agent-relay skill names, and the
-`/spec-guard:collaboration` handoff command (docs/collaboration-interface.md sections 11-12). The check fails when
+Spec Guard reaches collaboration only through `hooks/agent_relay_probe.py` and agent-relay skill names
+(docs/collaboration-interface.md sections 11-12; the transitional handoff command was removed in 0.54.0). The check fails when
 any path on the removed list exists again, or when anything in scope names a collaboration module, skill, mailbox
 tool, MCP server, or state path (collaboration-dependency, decision D17).
 
@@ -95,13 +95,13 @@ def main() -> int:
         print(f"  ❌ {OWNED_LIST} lists no paths: an empty list checks nothing")
         return 1
     for entry in present:
-        print(f"  ❌ moved to agent-relay but present again: {entry}")
+        print(f"  ❌ removed from Spec Guard but present again: {entry}")
     hits = scan(root)
     for hit in hits:
         print(f"  ❌ {hit}")
     if present or hits:
-        print("  Collaboration lives in agent-relay; reach it only through hooks/agent_relay_probe.py, agent-relay "
-              "skill names and /spec-guard:collaboration (docs/collaboration-interface.md sections 11-12).")
+        print("  Collaboration lives in agent-relay; reach it only through hooks/agent_relay_probe.py and agent-relay "
+              "skill names (docs/collaboration-interface.md sections 11-12).")
         return 1
     print(f"  ✅ collaboration removed: {len(removed)} moved paths absent, no internal reference in scope")
     return 0

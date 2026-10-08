@@ -1,6 +1,6 @@
 # Changelog
 
-## [未发布]
+## [0.54.0] - 2026-10-08
 
 ### 新增
 
@@ -23,6 +23,12 @@
   `separate` 与未设置不注入；`/spec-guard:config`（Codex：`spec-guard-ops` 的 config 一节）先预览再写入，并汇总派活
   开关与默认事项后端的当前值和去处。文件无效时所有项按默认处理、阶段提示只报一行问题代码、`verify-artifacts` 判
   失败；问题代码是固定词表，不复述文件内容。没有这个文件的项目行为完全不变。
+
+### 移除
+
+- **`/spec-guard:collaboration` 已移除**（0.53.0 预告，用户 2026-10-08 决定）。这条把用户转交到 agent-relay 的过渡命令
+  已随多个版本发布；请直接安装并使用 agent-relay（`/agent-relay:collaboration` 及其 skill）。Spec Guard 仍只经
+  `agent_relay_probe.py` 检测 agent-relay，`ticket` 的通知路径不变。退役扫描与已移除路径清单防止它再回来。
 
 ## [0.53.0] - 2026-10-08
 

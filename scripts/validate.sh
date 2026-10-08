@@ -107,7 +107,6 @@ python3 -B plugins/spec-guard/hooks/test_hosted_ticket_write.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_actions.py || F=1
 python3 -B plugins/spec-guard/hooks/test_host_config_removal.py || F=1
 python3 -B plugins/spec-guard/hooks/test_agent_relay_probe.py || F=1
-python3 -B plugins/spec-guard/hooks/test_collaboration_handoff.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_publication.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_submit.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py || F=1

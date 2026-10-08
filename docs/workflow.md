@@ -232,7 +232,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
 | 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
-| 会话协作（已移到 agent-relay） | `/spec-guard:collaboration`（过渡期转交） | 安装 agent-relay 后用它的 skill |
+| 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | agent-relay 的 skill |
 | 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
 | 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | `local-ticket-portability` skill |
 | 模块成本与返工报告 | `/spec-guard:cost-report` | `spec-guard-ops` skill 的 cost report 一节 |

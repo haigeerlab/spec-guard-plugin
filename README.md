@@ -22,7 +22,7 @@ agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦�
 | 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
 | 项目审查交接 | 限定审查批次，整理发现并转入事项和修复 | 项目约定与共享检查点 | 安装约定后按需使用 |
 | Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
-| 会话协作（已移到 agent-relay） | 同一台 Mac 上的会话互相传话、按名字联系、跨宿主委派，现在由独立插件 agent-relay 提供 | 安装 agent-relay；过渡期 `/spec-guard:collaboration` 会转交 | 见[迁移说明](docs/migrations/2026-10-07-collaboration-split.md) |
+| 会话协作（已移到 agent-relay） | 同一台 Mac 上的会话互相传话、按名字联系、跨宿主委派，现在由独立插件 agent-relay 提供 | 安装 agent-relay，用 `/agent-relay:collaboration` | 见[迁移说明](docs/migrations/2026-10-07-collaboration-split.md) |
 | 本地事项账本 | 明确选择 Local 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
 | 托管日常事项 | 明确选择 GitHub/GitLab 后逐项查重、授权创建并在交付后对账 | `/spec-guard:ticket`、`hosted-ticket-workflow` skill | 需登录对应 CLI；外部写入逐次授权 |
 | 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
@@ -54,7 +54,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 **Codex：**
 
 ```bash
-codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.53.0
+codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.54.0
 codex plugin add spec-guard@spec-guard-marketplace
 ```
 

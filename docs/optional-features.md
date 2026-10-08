@@ -13,8 +13,8 @@
 
 同一台 Mac 上 Claude Code 与 Codex 会话之间的协作信箱、统一会话路由与跨宿主会话委派，已拆成独立插件
 **agent-relay**：只想让会话互相通信的项目不必再装 Spec Guard 的工作流。Spec Guard 只通过
-`agent_relay_probe.py` 检测它是否可用，未安装时工作流照常运行。过渡期内 `/spec-guard:collaboration` 会转交给
-agent-relay，或提示安装。安装与旧数据迁移见
+`agent_relay_probe.py` 检测它是否可用，未安装时工作流照常运行。原先转交过去的过渡命令已于 0.54.0 移除，
+请直接使用 agent-relay 的 `/agent-relay:collaboration`。安装与旧数据迁移见
 [迁移说明](migrations/2026-10-07-collaboration-split.md)。
 
 ## 本地事项账本
