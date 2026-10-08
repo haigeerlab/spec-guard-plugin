@@ -7,6 +7,7 @@ HOOKDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 PASS=0
+TEMPLATES="$HOOKDIR/../templates"
 BEGIN='<!-- BEGIN:agent-skills-convention -->'
 END='<!-- END:agent-skills-convention -->'
 
@@ -71,11 +72,88 @@ from pathlib import Path
 p = Path(sys.argv[1]); t = p.read_text(encoding="utf-8")
 p.write_text(t.replace("能力图", "被手改的能力图", 1) + "\n# Tail\n", encoding="utf-8")
 PY
+# convention-block-local-lines：手改过的行是用户的行，删掉它要先经用户接受。
+before="$(snapshot)"
 run setup-convention.sh local --replace
-[ "$RC" -eq 0 ] || fail "--replace 失败
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] && grep -F '被手改的能力图' >/dev/null <<<"$OUT" \
+  && grep -F -- '--accept-removals' >/dev/null <<<"$OUT" || fail "块内有手改行时 --replace 应拒绝、列出该行且不改文件
+$OUT"
+ok "--replace 遇到手改行：拒绝、列出该行、不改文件"
+run setup-convention.sh local --replace --accept-removals
+[ "$RC" -eq 0 ] || fail "--replace --accept-removals 失败
 $OUT"
 [ "$(tail -1 "$P/CLAUDE.md")" = "# Tail" ] && ! grep -F '被手改的能力图' "$P/CLAUDE.md" >/dev/null && [ "$(markers "$P/CLAUDE.md")" -eq 2 ] || fail "--replace 应恢复模板并保留标记外内容"
-ok "--replace 恢复模板正文，标记外内容不动"
+ok "--replace --accept-removals 恢复模板正文，标记外内容不动"
+
+# 本地段：块内用标记圈出的行在 --replace 后原样保留，放在新块末尾。
+LB='<!-- BEGIN:spec-guard-local -->'; LE='<!-- END:spec-guard-local -->'
+project local-keep
+run setup-convention.sh local
+python3 - "$P/CLAUDE.md" "$BEGIN" "$LB" "$LE" <<'PY'
+import sys
+from pathlib import Path
+p, begin, lb, le = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+t = p.read_text(encoding="utf-8")
+t = t.replace(begin + "\n", begin + "\n" + lb + "\n- 本项目自己的规则\n" + le + "\n", 1)
+p.write_text(t, encoding="utf-8")
+PY
+before="$(snapshot)"
+run setup-convention.sh local --replace --dry-run
+[ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && ! grep -F 'will remove' >/dev/null <<<"$OUT" || fail "只有本地段时预览不应列出删除，也不应改文件
+$OUT"
+run setup-convention.sh local --replace
+[ "$RC" -eq 0 ] || fail "只有本地段时 --replace 不需要接受
+$OUT"
+python3 - "$P/CLAUDE.md" "$BEGIN" "$END" "$LB" "$LE" "$TEMPLATES/claude-block-local.md" <<'PY' || fail "本地段应原样保留在新块末尾，模板正文完整"
+import sys
+from pathlib import Path
+p, begin, end, lb, le, tpl = sys.argv[1:7]
+lines = Path(p).read_text(encoding="utf-8").splitlines()
+body = lines[lines.index(begin) + 1:lines.index(end)]
+assert body[-3:] == [lb, "- 本项目自己的规则", le], body[-3:]
+assert body[:-3] == Path(tpl).read_text(encoding="utf-8").splitlines(), "template part differs"
+PY
+ok "本地段原样保留在新块末尾，模板正文完整"
+
+# 预览逐行列出将删除与将新增的行。
+python3 - "$P/CLAUDE.md" "$END" <<'PY'
+import sys
+from pathlib import Path
+p, end = Path(sys.argv[1]), sys.argv[2]
+t = p.read_text(encoding="utf-8").replace("能力图", "被手改的能力图", 1)
+p.write_text(t.replace(end, "- 一行手写规则\n" + end, 1), encoding="utf-8")
+PY
+before="$(snapshot)"
+run setup-convention.sh local --replace --dry-run
+[ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -F 'will remove: - 一行手写规则' >/dev/null <<<"$OUT" \
+  && grep -F 'will add:' >/dev/null <<<"$OUT" && ! grep -F 'will remove: - 本项目自己的规则' >/dev/null <<<"$OUT" || fail "预览应逐行列出将删除与将新增的行，不列本地段
+$OUT"
+ok "预览逐行列出将删除与将新增的行，本地段不在其中"
+
+# 本地段标记无效时拒绝、不改文件。
+for case in two-sections reversed unpaired; do
+  project "local-$case"
+  run setup-convention.sh local
+  python3 - "$P/CLAUDE.md" "$BEGIN" "$LB" "$LE" "$case" <<'PY'
+import sys
+from pathlib import Path
+p, begin, lb, le, case = Path(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+extra = {"two-sections": [lb, "a", le, lb, "b", le], "reversed": [le, "a", lb], "unpaired": [lb, "a"]}[case]
+t = p.read_text(encoding="utf-8")
+p.write_text(t.replace(begin + "\n", begin + "\n" + "\n".join(extra) + "\n", 1), encoding="utf-8")
+PY
+  before="$(snapshot)"
+  run setup-convention.sh local --replace --accept-removals
+  [ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] || fail "${case}：本地段标记无效应拒绝且不改文件
+$OUT"
+  ok "${case}：本地段标记无效时拒绝，不改文件"
+done
+
+project accept-alone
+run setup-convention.sh local --accept-removals
+[ "$RC" -eq 2 ] || fail "--accept-removals 不配合 --replace 应是用法错误
+$OUT"
+ok "--accept-removals 单独给出是用法错误"
 
 for case in duplicate missing-end; do
   project "$case"
@@ -194,7 +272,6 @@ ok "仅凭 activeModule 激活，不依赖声明块"
 
 # ── build-task-dispatch 规则段模板 ──────────────────────
 DISPATCH_MARKER='<!-- spec-guard: build-task-dispatch -->'
-TEMPLATES="$HOOKDIR/../templates"
 for host in claude codex; do
   tpl="$TEMPLATES/${host}-dispatch-rule.md"
   [ -f "$tpl" ] || fail "缺少规则段模板 ${host}-dispatch-rule.md"
@@ -334,7 +411,7 @@ t = p.read_text(encoding="utf-8")
 t = t.replace(end, "正文提到 `%s` 不算开启。\n%s" % (mark, end), 1) + "\n%s\n" % mark
 p.write_text(t, encoding="utf-8")
 PY
-  host_run --replace
+  host_run --replace --accept-removals
   [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：块内行中提及或块外的标记不应算开启
 $OUT"
   ok "${host}：块内正文提及或块外的标记不算开启"
