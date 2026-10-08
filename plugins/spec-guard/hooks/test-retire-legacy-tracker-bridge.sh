@@ -72,6 +72,10 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
   "$PLUGIN/hooks/proposal_review.py" \
   "$PLUGIN/hooks/proposal_promotion_proof.py"
 
+# 当前能力图只描述现行能力：已退役命令的名字不得出现在任何模块行里（2026-10-08 审查 F14）。
+absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|workspace_binding|spec-guard:handoff|spec-guard handoff|session_handoff' \
+  "$ROOT/spec/CAPABILITY-MAP.md"
+
 # ── broadened scan: every non-test file under plugins/spec-guard (R6) ──────
 #
 # The checks above only look at a fixed list of paths and a handful of
