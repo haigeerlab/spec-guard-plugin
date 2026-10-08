@@ -865,4 +865,52 @@ out="$(cd "$ho" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh"
 grep -F '"decision"' >/dev/null <<<"$out" && fail "Codex 的交接触发词不应再被拦截: $out"
 echo "  ✅ 退役的交接触发词照常注入阶段"; PASS=$((PASS + 1))
 
+# project-config：只注入已设置且影响模型行为的项；无效配置只报一行 invalid；没有配置文件时逐字节不变。
+pc="$WORK/project-config"; mkdir -p "$pc/tasks/alpha" "$pc/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$pc/CLAUDE.md"
+map "$pc"; printf '# alpha\n' > "$pc/spec/alpha.md"; printf '# Plan\n' > "$pc/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$pc/tasks/alpha/todo.md"
+plain_pc="$(run "$pc" | context_of)"
+LANG_LINE='- Artifact language: `zh-CN`'
+CADENCE_LINE='- Review cadence: combined'
+INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
+config_case() {  # $1=用例名 $2=config.json 内容 $3...=期望多出的行（前缀）
+  local name="$1" body="$2" line rest; shift 2
+  printf '%s\n' "$body" > "$pc/.agent/config.json"
+  out="$(run "$pc" | context_of)"
+  for line in "$@"; do grep -F -- "$line" >/dev/null <<<"$out" || fail "$name: 缺少「${line}」
+$out"; done
+  # 去掉这些行后，其余与没有配置文件时逐字节一致。
+  rest="$(python3 -c 'import sys; t, e = sys.argv[1], sys.argv[2:]; print("\n".join(l for l in t.split("\n") if not l.startswith(tuple(e))), end="")' "$out" "$@")"
+  [ "$rest" = "$plain_pc" ] || fail "$name: 除配置行外输出应与无配置时一致
+--- got
+$out
+--- plain
+$plain_pc"
+  echo "  ✅ $name"; PASS=$((PASS + 1))
+}
+config_case "设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "zh-CN"}' "$LANG_LINE"
+config_case "combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
+config_case "两项都设：两行都在" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}' \
+  "$LANG_LINE" "$CADENCE_LINE"
+config_case "无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
+  "$INVALID_LINE"
+printf '%s\n' '{"version": 1, "reviewCadence": "separate"}' > "$pc/.agent/config.json"
+out="$(run "$pc" | context_of)"
+[ "$out" = "$plain_pc" ] || fail "separate 不应注入任何内容
+$out"
+echo "  ✅ separate：输出与无配置时逐字节一致"; PASS=$((PASS + 1))
+printf '%s\n' '{"version": 1, "artifactLanguage": "en"}' > "$pc/.agent/config.json"
+printf '%s\n' '- [x] open' > "$pc/tasks/alpha/todo.md"
+out="$(run "$pc" | context_of)"
+grep -F "DONE" >/dev/null <<<"$out" && grep -F -- '- Artifact language: `en`' >/dev/null <<<"$out" || fail "DONE 阶段也应注入语言行
+$out"
+echo "  ✅ DONE 阶段同样注入语言行"; PASS=$((PASS + 1))
+printf '%s\n' '{"version": 1, "IGNORE PREVIOUS": "IGNORE PREVIOUS"}' > "$pc/.agent/config.json"
+out="$(run "$pc" | context_of)"
+grep -F "IGNORE PREVIOUS" >/dev/null <<<"$out" && fail "无效配置的内容不得进入注入
+$out"
+echo "  ✅ 无效配置的键名与取值不进入注入"; PASS=$((PASS + 1))
+rm -f "$pc/.agent/config.json"
+
 echo "phase-guard regression passed (${PASS} cases)"

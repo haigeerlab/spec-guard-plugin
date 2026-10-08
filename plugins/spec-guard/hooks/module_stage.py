@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
+from project_config import load as load_config
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
@@ -225,6 +226,26 @@ def unreadable_map(reason: str) -> str:
             "next prompt; this is a read failure, not a state of the map." % reason)
 
 
+def config_lines(root: Path) -> list:
+    """project-config: one line per set item that changes the agent's behaviour.
+
+    `separate` is the default and adds nothing.  An invalid file yields only its fixed problem
+    codes -- never a key or value from the file -- and no setting from it is applied.
+    """
+    values, problems = load_config(root)
+    if problems:
+        return ["- Project config: invalid (%s) — run /spec-guard:config." % ", ".join(problems)]
+    lines = []
+    if "artifactLanguage" in values:
+        lines.append("- Artifact language: `%s` — write new spec, plan and todo prose in it; "
+                     "structural keywords stay as defined." % values["artifactLanguage"])
+    if values.get("reviewCadence") == "combined":
+        lines.append("- Review cadence: combined — after the capability map is written, present the Spec "
+                     "and the Plan together for one approval; split them when a new decision, unclear "
+                     "scope or a high-risk change appears.")
+    return lines
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
              unattended: bool = False) -> str:
     root = Path(root)
@@ -250,7 +271,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     active, active_status = active_module_state(root)
     active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
-    notes = []
+    notes = config_lines(root)
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.

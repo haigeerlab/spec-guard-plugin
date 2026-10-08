@@ -49,6 +49,19 @@ The optional local convention stores module documents under `spec/` and
 `tasks/<module-id>/`.  Its state file can record a local active module, but is
 not a Proposal pool and is never read by Proposal code.
 
+## Project configuration
+
+`.agent/config.json` is committed project configuration, shared by the team and by
+both hosts.  `hooks/project_config.py` is its only parser; the phase hint,
+`verify-artifacts` and `/spec-guard:config` all call it.  A missing file changes
+nothing.  An invalid file is reported with fixed problem codes and none of its
+settings apply; its keys and values never reach the injected context, because the
+file is repository content.  The first items are `artifactLanguage` (the language
+of new spec, plan and todo prose; structural keywords never change) and
+`reviewCadence` (`separate` by default, or `combined`, which reviews one module's
+Spec and Plan together).  The dispatch switch and the default tracker keep their
+own homes and are only summarized.
+
 ## Retired boundary
 
 The v0.14-era mutable remote tracker bridge is not part of the product.  It is

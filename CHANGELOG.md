@@ -1,5 +1,17 @@
 # Changelog
 
+## [未发布]
+
+### 新增
+
+- **项目配置 `.agent/config.json` 与 `/spec-guard:config`。** 产物语言没人决定，Spec、Plan、todo 中英混写；单个模块的
+  Spec 与 Plan 评审常被连着批，却只有“分别评审”一种节奏。现在项目可以入库一份配置：`artifactLanguage`（新写产物的
+  正文语言，结构关键字不变，已有产物不翻译）与 `reviewCadence`（默认 `separate`；`combined` 时写入能力图后 Spec 与
+  Plan 一次给出、一次批准，出现新决策、范围不清或高风险改动时仍分开审）。设置了的项每轮在阶段提示里各占一行，
+  `separate` 与未设置不注入；`/spec-guard:config`（Codex：`spec-guard-ops` 的 config 一节）先预览再写入，并汇总派活
+  开关与默认事项后端的当前值和去处。文件无效时所有项按默认处理、阶段提示只报一行问题代码、`verify-artifacts` 判
+  失败；问题代码是固定词表，不复述文件内容。没有这个文件的项目行为完全不变。
+
 ## [0.53.0] - 2026-10-08
 
 ### 修复

@@ -18,4 +18,6 @@
 - 退役 Spec 与 Plan 位于 `docs/retirements/`，不加入当前能力图。
 - Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），未标注按 `gate`；按需求批量前置审与
   UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 产物语言与评审节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
+  新写的 spec、plan、todo 正文用配置的产物语言，结构关键字不变
 <!-- END:spec-guard-codex-convention -->
