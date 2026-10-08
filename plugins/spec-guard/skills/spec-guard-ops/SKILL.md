@@ -154,6 +154,8 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 ```
 
+`show` 末尾列出本机状态根目录（`~/.spec-guard` 或 `SPEC_GUARD_STATE_DIR`）以及仍在回退读取的旧位置，照实转述，不建议删除。
+
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
 

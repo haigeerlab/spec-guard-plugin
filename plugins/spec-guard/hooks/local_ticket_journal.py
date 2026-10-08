@@ -14,6 +14,7 @@ from typing import Any
 
 from local_ticket_inventory import InventoryError
 from local_ticket_lock import acquire_lock
+from state_paths import state_dir
 
 
 SCHEMA_VERSION = 1
@@ -28,7 +29,7 @@ def binding_checksum(value: dict[str, Any]) -> str:
 
 
 def default_journal_root() -> Path:
-    return Path.home() / ".spec-guard" / "local-ticket-portability"
+    return state_dir("local-ticket-portability")
 
 
 def _common_dir(project: Path) -> Path:

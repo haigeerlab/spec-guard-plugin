@@ -7,9 +7,10 @@ from pathlib import Path
 
 from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError, public_result
 from hosted_ticket_write import draft_preview, make_preview, publish_preview
+from state_paths import legacy_root, state_dir
 
 
-INTENT_ROOT = Path.home() / ".local" / "state" / "spec-guard" / "hosted-ticket-intents"
+INTENT_ROOT = state_dir("hosted-ticket-intents", legacy_root() / "hosted-ticket-intents")
 
 
 def main() -> int:

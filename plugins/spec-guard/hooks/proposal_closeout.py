@@ -23,11 +23,12 @@ from pathlib import Path
 from proposal_promotion_proof import prove_from_remote
 from proposal_publication import read_published, read_published_pool, skipped_as_json
 from defect_guard import is_defect
+from state_paths import legacy_root, state_dir
 from proposal_tracker_read import (
     CONTRACT_INVALID, MARKER_AMBIGUOUS, issue_identity, recover_tracker_issue,
 )
 
-JOURNAL_ROOT = Path.home() / ".local" / "state" / "spec-guard" / "proposal-closeout"
+JOURNAL_ROOT = state_dir("proposal-closeout", legacy_root() / "proposal-closeout")
 
 PROMOTED_STAGE = "proposal-stage:promoted"
 ACCEPTED_STAGE = "proposal-stage:accepted"

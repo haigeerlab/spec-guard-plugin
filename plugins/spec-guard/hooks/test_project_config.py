@@ -189,5 +189,38 @@ class Cli(unittest.TestCase):
         self.assertIn("unknown-key", out)
 
 
+class MachineState(unittest.TestCase):
+    """runtime-state-layout: `show` states the machine-state root and any legacy directory still read."""
+
+    def show(self, home, override=None):
+        env = {key: value for key, value in os.environ.items()
+               if not key.startswith("GIT_") and key != "SPEC_GUARD_STATE_DIR"}
+        env["HOME"] = str(home)
+        if override is not None:
+            env["SPEC_GUARD_STATE_DIR"] = override
+        with Project() as project:
+            done = subprocess.run([sys.executable, "-B", SCRIPT, "show", "--project", str(project.root)],
+                                  capture_output=True, text=True, timeout=20, env=env)
+        return done.stdout
+
+    def test_default_root_and_no_legacy_line(self):
+        with tempfile.TemporaryDirectory() as home:
+            out = self.show(Path(home))
+        self.assertIn("machine state: %s" % (Path(home) / ".spec-guard"), out)
+        self.assertNotIn("legacy", out)
+
+    def test_override_is_named(self):
+        with tempfile.TemporaryDirectory() as home:
+            out = self.show(Path(home), override="/tmp/sg-elsewhere")
+        self.assertIn("machine state: /tmp/sg-elsewhere (from SPEC_GUARD_STATE_DIR)", out)
+
+    def test_legacy_directory_in_use_is_reported(self):
+        with tempfile.TemporaryDirectory() as home:
+            old = Path(home) / ".local" / "state" / "spec-guard" / "proposal-closeout"
+            old.mkdir(parents=True)
+            out = self.show(Path(home))
+        self.assertIn("legacy directory still read: %s" % old, out)
+
+
 if __name__ == "__main__":
     unittest.main()
