@@ -21,6 +21,8 @@ from project_config import load as load_config
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
+# module-suspend: one exact line in todo.md parks a started module until the user resumes it.
+SUSPEND_MARKER = "<!-- spec-guard: suspended -->"
 
 
 def module_state(root: Path, module_id: str) -> dict:
@@ -31,6 +33,8 @@ def module_state(root: Path, module_id: str) -> dict:
     text = todo.read_text(encoding="utf-8") if todo.is_file() else ""
     open_items = len(UNCHECKED.findall(text))
     half = bool(open_items) and bool(CHECKED.search(text))
+    # A marker on a module with nothing left open is stale: the module simply counts as done.
+    suspended = bool(open_items) and any(line.strip() == SUSPEND_MARKER for line in text.splitlines())
     if not has_spec:
         stage = "NEEDS_SPEC"
     elif not has_plan:
@@ -40,7 +44,7 @@ def module_state(root: Path, module_id: str) -> dict:
     else:
         stage = "DONE"
     return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
-            "half": half, "todo": todo.is_file(),
+            "half": half and not suspended, "suspended": suspended, "todo": todo.is_file(),
             "no_todo_declared": has_plan and not todo.is_file() and any(
                 line.strip() == NO_TODO_MARKER for line in plan.read_text(encoding="utf-8").splitlines())}
 
@@ -135,8 +139,8 @@ def project_stage(states: list, active: str | None) -> tuple:
     is done but `pending` is not None; otherwise the current module's own stage.
     """
     by_id = {state["id"]: state for state in states}
-    pending = next((state for state in states if state["stage"] != "DONE"), None)
-    if active and active in by_id:
+    pending = next((state for state in states if state["stage"] != "DONE" and not state["suspended"]), None)
+    if active and active in by_id and not by_id[active]["suspended"]:
         current, source = by_id[active], "activeModule"
     else:
         current, source = pending, "next in Build order"
@@ -277,6 +281,8 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         # itself is enough for the user to find what they typed.
         notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；"
                      "按 Build order 取当前模块。")
+    elif active and active in by_id and by_id[active]["suspended"]:
+        notes.append("- activeModule `%s` is suspended; using Build order." % active)
     elif active and active not in by_id:
         notes.append("- activeModule `%s` is not in the capability map; using Build order."
                      % safe_fragment(active))
@@ -298,7 +304,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                         "add the todo if work remains." % (active, active))
     counts = "- Modules %d · Specs %d · Plans %d · In progress %d · Done %d" % (
         len(states), sum(s["spec"] for s in states), sum(s["plan"] for s in states),
-        sum(s["stage"] == "BUILDING" for s in states), sum(s["stage"] == "DONE" for s in states))
+        sum(s["stage"] == "BUILDING" and not s["suspended"] for s in states),
+        sum(s["stage"] == "DONE" for s in states))
+    suspended = [s for s in states if s["suspended"]]
+    if suspended:
+        counts += " · Suspended %d" % len(suspended)
+    suspended_lines = ["- Suspended: `%s` (%d unchecked item(s)); resume with `/spec-guard:module-suspend --resume %s` "
+                       "(Codex: spec-guard-ops module-suspend)." % (s["id"], s["open"], s["id"]) for s in suspended]
     if stage == "DONE":
         missing_todo = sum(plan_without_todo(s) for s in states)
         if missing_todo:
@@ -315,6 +327,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     else:
         hint = ""
     if stage == "DONE":
+        notes.extend(suspended_lines)
         if no_todo_note:
             notes.append(no_todo_note)
         if current is not None:
@@ -325,10 +338,18 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(boundary_note_line)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
-                    "\nSuggested next step: every mapped module has a plan and no open todo item; " + push_first +
+                    "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
+                                                 % len(suspended) if suspended else
+                                                 "every mapped module has a plan and no open todo item; ") + push_first +
                     "for new work, insert a module with /spec-guard:add-module "
                     "(Codex: spec-guard-ops add-module); "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
+        if suspended:
+            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+                    "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
+                    "when its wait is over). For new work, insert a module with /spec-guard:add-module "
+                    "(Codex: spec-guard-ops add-module) at this checkpoint; "
+                    "use a Proposal when the addition needs a recorded, reviewed decision." % len(suspended))
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
                 "For new work, insert a module with /spec-guard:add-module "
@@ -339,6 +360,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         counts += "\n" + no_todo_note
     if hint:
         counts += "\n" + hint
+    counts += "".join("\n" + line for line in suspended_lines)
     counts += "".join("\n- Paused: `%s` (%d unchecked item(s)); resume it after `%s`." % (p["id"], p["open"], module)
                       for p in paused)
     if stage == "MODULE_DONE" and paused:
