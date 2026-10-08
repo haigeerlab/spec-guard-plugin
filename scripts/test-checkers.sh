@@ -314,6 +314,27 @@ printf -- '---\ndescription: d\n---\n运行 `hooks/uncovered.py` 完成检查。
 want fail "command-parity: 新命令引用的 hook 没有任何 skill 提供 → 报错" \
   python3 "$ROOT/scripts/check-command-parity.py" "$TMP/paritybad"
 
+# 参数级：命令传给脚本的 --flag（续行拼接后）必须出现在某个也引用该脚本的 skill 里。
+mkparity "$TMP/parityflaggood"
+printf -- '---\ndescription: d\n---\n```bash\npython3 "$ROOT/hooks/covered.py" \\\n  --prove --format json\n```\n' \
+  > "$TMP/parityflaggood/plugins/spec-guard/commands/covered.md"
+printf -- '---\nname: ops\n---\n```bash\npython3 "$ROOT/hooks/covered.py" --format json\n# 合并后加 --prove 做证明\n```\n' \
+  > "$TMP/parityflaggood/plugins/spec-guard/skills/ops/SKILL.md"
+want pass "command-parity: 命令的参数在引用同一脚本的 skill 里都出现 → 放行" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityflaggood"
+
+mkparity "$TMP/parityflagbad"
+printf -- '---\ndescription: d\n---\n```bash\npython3 "$ROOT/hooks/covered.py" \\\n  --prove --format json\n```\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/commands/covered.md"
+printf -- '---\nname: ops\n---\n```bash\npython3 "$ROOT/hooks/covered.py" --format json\n```\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/skills/ops/SKILL.md"
+# 另一个 skill 写了 --prove 但不引用该脚本：不算覆盖。
+mkdir -p "$TMP/parityflagbad/plugins/spec-guard/skills/other"
+printf -- '---\nname: other\n---\n别的脚本 `hooks/elsewhere.py` 才用 --prove。\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/skills/other/SKILL.md"
+want fail "command-parity: 续行上的 --prove 在引用该脚本的 skill 里缺失 → 报错" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityflagbad"
+
 rm -rf "$TMP/parityempty"; mkdir -p "$TMP/parityempty/plugins/spec-guard/skills/ops"
 printf -- '---\nname: ops\n---\n什么都没有。\n' > "$TMP/parityempty/plugins/spec-guard/skills/ops/SKILL.md"
 want fail "command-parity: 零个命令文件 → 不算通过" \
@@ -502,6 +523,52 @@ mkretire "$TMP/retireallow-newhit"
 } > "$TMP/retireallow-newhit/plugins/spec-guard/references/proposal-promotion-proof.md"
 want fail "retire-scan: 同一允许清单文件里新增一条不同文本的违规仍报错" \
   bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow-newhit"
+
+
+# ── check-digest-single-source.py ──
+# 审查 F13：spec-digest.py 是唯一指纹算法；复制一份实现必须被拦下。
+mkdigest() {  # $1=目录
+  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/hooks" "$1/scripts"
+  printf '%s\n' 'import hashlib' 'def _h(t): return hashlib.sha256(t.encode()).hexdigest()[:12]' \
+    > "$1/plugins/spec-guard/hooks/spec-digest.py"
+  printf '%s\n' 'import hashlib' 'def key(b): return hashlib.sha256(b).hexdigest()' \
+    > "$1/plugins/spec-guard/hooks/other.py"
+}
+mkdigest "$TMP/digestgood"
+want pass "digest-single-source: 只有 spec-digest.py 实现指纹，别处整文件哈希 → 放行" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestgood"
+mkdigest "$TMP/digestcopy"
+printf '%s\n' 'import hashlib' 'def row(r): return hashlib.sha256(r.normalized_row.encode()).hexdigest()' \
+  > "$TMP/digestcopy/plugins/spec-guard/hooks/copy.py"
+want fail "digest-single-source: 别处对 normalized_row 取哈希 → 报错" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestcopy"
+mkdigest "$TMP/digesttrunc"
+printf '%s\n' 'import hashlib' 'def h(t): return hashlib.sha256(t).hexdigest() [ :12]' \
+  > "$TMP/digesttrunc/scripts/trunc.py"
+want fail "digest-single-source: 别处做截断摘要 → 报错" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digesttrunc"
+mkdigest "$TMP/digesttest"
+printf '%s\n' 'import hashlib' 'EXPECTED = hashlib.sha256(b"x").hexdigest()[:12]' \
+  > "$TMP/digesttest/plugins/spec-guard/hooks/test_digest.py"
+want pass "digest-single-source: 测试文件里的期望值不算实现 → 放行" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digesttest"
+rm -rf "$TMP/digestempty"; mkdir -p "$TMP/digestempty/plugins/spec-guard/hooks"
+want fail "digest-single-source: 一个 Python 文件都没有 → 不算通过" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestempty"
+
+# ── evals/dispatch-cost/grade.sh ──
+# 审查 F10：隐藏测试经 `| tail -3` 运行且没有 pipefail，失败时判分仍退出 0。
+# 用替身 PYTHON：unittest 按 GRADE_HIDDEN_RC 退出，成本报告恒成功（不跑付费评测）。
+mkdir -p "$TMP/grade-run"
+printf '%s\n' '#!/bin/sh' 'case "$*" in *unittest*) echo "hidden: rc=${GRADE_HIDDEN_RC}"; exit "${GRADE_HIDDEN_RC}" ;; esac' \
+  'echo "cost: ok"' > "$TMP/grade-python"
+chmod +x "$TMP/grade-python"
+want pass "grade.sh: 隐藏测试通过 → 退出 0" \
+  env PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=0 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run"
+want fail "grade.sh: 隐藏测试失败 → 非零退出" \
+  env PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=1 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run"
+GRADE_OUT="$(PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=1 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run" 2>&1)"
+want pass "grade.sh: 隐藏测试失败时仍输出成本部分" grep -Fq "cost: ok" <<<"$GRADE_OUT"
 
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"

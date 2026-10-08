@@ -76,6 +76,7 @@ echo ""
 # 指纹算法供能力图与 Proposal 校验共用；免费，所以进这一层。
 echo "═══ 指纹算法自检 ═══"
 python3 plugins/spec-guard/hooks/spec-digest.py --selftest || F=1
+python3 scripts/check-digest-single-source.py || F=1
 echo ""
 
 echo "═══ Proposal 与本地结构回归 ═══"

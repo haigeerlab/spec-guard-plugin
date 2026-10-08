@@ -54,14 +54,25 @@ import pathlib, re, sys
 canon = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
 plugin = pathlib.Path(sys.argv[2])
 bad = []
-users = 0
-for path in sorted((plugin / "commands").glob("*.md")):
-    text = path.read_text(encoding="utf-8")
-    if "$ROOT" not in text:
+# 不带规范引导段的命令必须登记在这里并写明理由；其余每个命令都必须带（丢掉整段引导会变红）。
+EXEMPT = {
+    "setup-convention.md": "直接调用会被代入的 ${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention.sh",
+    "teardown-convention.md": "直接调用会被代入的 ${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh",
+    "ticket.md": "只转交 ticket skill，不调用 hooks/ 脚本",
+    "local-ticket-portability.md": "只转交 local-ticket-portability skill，不调用 hooks/ 脚本",
+}
+commands = sorted((plugin / "commands").glob("*.md"))
+names = {path.name for path in commands}
+for name in sorted(set(EXEMPT) - names):
+    bad.append(f"豁免名单里的 {name} 不存在：删掉这条豁免")
+for path in commands:
+    if path.name in EXEMPT:
         continue
-    users += 1
+    text = path.read_text(encoding="utf-8")
     at = text.find(canon)
-    if at < 0 or text.find("$ROOT") < at:
+    if at < 0:
+        bad.append(f"{path.name}: 没有逐字的规范引导段（不需要时登记进 EXEMPT 并写明理由）")
+    elif "$ROOT" in text and text.find("$ROOT") < at:
         bad.append(f"{path.name}: 第一次用 $ROOT 之前没有逐字的规范引导段")
 banned = {
     "${CLAUDE_PLUGIN_ROOT:-": "宿主不会代入带默认值的写法",
@@ -81,8 +92,8 @@ for name in ("ticket", "hosted-ticket-workflow"):
     text = (plugin / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
     if 'ROOT="${CLAUDE_PLUGIN_ROOT}"' not in text:
         bad.append(f"skills/{name}/SKILL.md: 缺少 Claude 可代入的 ROOT=\"${{CLAUDE_PLUGIN_ROOT}}\"")
-if users < 15:
-    bad.append(f"只找到 {users} 个用 $ROOT 的命令，少于预期")
+if not commands:
+    bad.append("0 个命令文件：这是没找到，不是没问题")
 for line in bad:
     print(line, file=sys.stderr)
 sys.exit(1 if bad else 0)

@@ -1,5 +1,25 @@
 # Changelog
 
+## [未发布]
+
+### 修复
+
+- **Codex 的本地账本 skill 补上初始化命令。** 2026-10-08 架构审查的 F8：Claude 的 `/spec-guard:local-ticket-ledger`
+  给出 `initialize --confirm-initialize --user-name … --preferred-editor … --auto-sync …`，Codex 读的
+  `local-ticket-ledger-ops` skill 只用文字提到这几个值，没有可照抄的命令。现在 skill 带上 `preflight` 与 `initialize`
+  两条命令，同样要求向用户索取实际值、不得猜测。
+
+### 维护
+
+- **守门检查在被守的东西坏掉时真的会变红**（审查第 4 组：F7、F8、F9、F10、F13、F19）：
+  - 命令插件根回归不再只要求“至少 15 个命令”：每个不在豁免名单（各附理由）里的命令都必须带逐字的规范引导段；
+  - 双宿主一致性检查器在脚本级之外也核对参数：命令传给 `hooks/<脚本>` 的每个 `--参数`（续行拼接后）必须出现在
+    引用同一脚本的某个 skill 里；
+  - 严格能力图解析新增反向测试：表头下一行不是分隔行时判无效；
+  - `evals/dispatch-cost/grade.sh` 在隐藏测试失败时照常计价后以非零退出；
+  - 新检查器 `scripts/check-digest-single-source.py` 拒绝能力图指纹算法的第二份实现（进 `validate.sh`）；
+  - CI 的 ShellCheck 覆盖 `evals/*/*.sh`，并修掉其中两条已有警告。
+
 ## [0.52.3] - 2026-10-08
 
 ### 修复
