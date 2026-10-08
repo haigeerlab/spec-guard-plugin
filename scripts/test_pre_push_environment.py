@@ -74,6 +74,58 @@ git -C "$SG_SCRATCH/normal" config remote.origin.url "fixture-only"
             self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
             self.assertIn('refs/heads/probe', refs)
 
+    def push_refs(self, work, *refspecs):
+        """Push refspecs once; return the process and how many checks the hook ran."""
+        log = self.root / 'calls'
+        if log.exists():
+            log.unlink()
+        scratch = Path(tempfile.mkdtemp(dir=self.root))
+        env = dict(self.env, SG_PROBE_LOG=str(log), SG_SCRATCH=str(scratch), SG_FAIL='')
+        p = subprocess.run(['git', '-C', str(work), 'push', 'origin', *refspecs],
+                           env=env, text=True, capture_output=True)
+        calls = len(log.read_text().splitlines()) if log.exists() else 0
+        return p, calls
+
+    def remote_refs(self):
+        return self.run_git('--git-dir', str(self.remote), 'for-each-ref', '--format=%(refname)')
+
+    # pre-push-ref-only-skip: deletions and tag pushes verify nothing new, so they skip the checks.
+    def test_branch_deletion_skips_checks(self):
+        work = self.prepare()
+        p, calls = self.push_refs(work, 'HEAD:refs/heads/done')
+        self.assertEqual((p.returncode, calls), (0, 3), p.stdout + p.stderr)
+        p, calls = self.push_refs(work, '--delete', 'done')
+        self.assertEqual((p.returncode, calls), (0, 0), p.stdout + p.stderr)
+        self.assertNotIn('refs/heads/done', self.remote_refs())
+        self.assertIn('跳过', p.stderr + p.stdout)
+
+    def test_tag_only_push_skips_checks(self):
+        work = self.prepare()
+        self.run_git('-C', str(work), 'tag', '-a', 'v9.9.9', '-m', 'fixture tag')
+        p, calls = self.push_refs(work, 'refs/tags/v9.9.9')
+        self.assertEqual((p.returncode, calls), (0, 0), p.stdout + p.stderr)
+        self.assertIn('refs/tags/v9.9.9', self.remote_refs())
+        self.assertIn('跳过', p.stderr + p.stdout)
+
+    def test_branch_with_tag_runs_checks(self):
+        work = self.prepare()
+        self.run_git('-C', str(work), 'tag', 'v9.9.8')
+        p, calls = self.push_refs(work, 'HEAD:refs/heads/mixed', 'refs/tags/v9.9.8')
+        self.assertEqual((p.returncode, calls), (0, 3), p.stdout + p.stderr)
+        self.assertIn('refs/heads/mixed', self.remote_refs())
+
+    def test_empty_ref_list_runs_checks(self):
+        # git does not call the hook with nothing to push, so run the installed hook directly.
+        work = self.prepare()
+        hook = self.run_git('-C', str(work), 'rev-parse', '--git-path', 'hooks/pre-push')
+        log = self.root / 'calls'
+        scratch = Path(tempfile.mkdtemp(dir=self.root))
+        env = dict(self.env, SG_PROBE_LOG=str(log), SG_SCRATCH=str(scratch), SG_FAIL='')
+        p = subprocess.run(['/bin/bash', str(work / hook), 'origin', str(self.remote)], cwd=work, env=env,
+                           stdin=subprocess.DEVNULL, text=True, capture_output=True)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(len(log.read_text().splitlines()), 3)
+
     def test_regular_checkout_preserves_config(self):
         self.push()
 
