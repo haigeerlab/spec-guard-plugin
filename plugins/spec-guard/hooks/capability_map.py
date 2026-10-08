@@ -92,11 +92,23 @@ def _visible_lines(lines):
     return visible
 
 
+TABLE_LINES_SHOWN = 5
+
+
+def _table_count_error(headers):
+    """Name how many module tables there are and where (1-based header lines), so the fix is findable."""
+    if not headers:
+        return MapError("没有模块表（需要恰好一张表头为 Module id 的表）")
+    shown = "、".join(str(index + 1) for index in headers[:TABLE_LINES_SHOWN])
+    more = "等" if len(headers) > TABLE_LINES_SHOWN else ""
+    return MapError("必须恰好有一个模块表，找到 %d 张：第 %s 行%s" % (len(headers), shown, more))
+
+
 def _strict_rows(lines):
     headers = [index for index, line in enumerate(lines)
                if line.lstrip().startswith("|") and _table_cells(line)[0].lower() == "module id"]
     if len(headers) != 1:
-        raise MapError("必须恰好有一个模块表")
+        raise _table_count_error(headers)
     start = headers[0]
     header = _table_cells(lines[start])
     if [cell.lower() for cell in header[:3]] != ["module id", "responsibility", "depends on"]:
@@ -225,7 +237,7 @@ def parse_map(path, validate_graph=True):
                    if line.lstrip().startswith("|")
                    and _table_cells(line)[0].lower() == "module id"]
         if len(headers) > 1:
-            raise MapError("必须恰好有一个模块表")
+            raise _table_count_error(headers)
         selected = []
         if headers:
             for line in lines[headers[0] + 1:]:
