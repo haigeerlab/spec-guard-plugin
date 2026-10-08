@@ -27,6 +27,8 @@ PYTHON3_PREFIX = "spec-guard: "
 PYTHON3_STAGE = "python3 故障"
 DIAGNOSTIC_STAGES = {"UNKNOWN", "MAP_INVALID", "?", PYTHON3_STAGE}
 EXAMPLES = 3
+# Fixtures and throwaway checkouts live here; their injections say nothing about real use.
+TEMP_PREFIXES = ("/private/tmp/", "/private/var/folders/", "/tmp/", "/var/folders/")
 MIN_SPAN = timedelta(hours=24)
 UNOBSERVABLE = (
     "hook 进程失败：两个宿主都不记录 hook 崩溃或无输出，看不到就不报，不等于没有。",
@@ -125,6 +127,10 @@ def read_codex(codex_home, since):
     return events, unparsed[0]
 
 
+def is_temp(project):
+    return project.startswith(TEMP_PREFIXES)
+
+
 def normalise(text):
     return re.sub(r"\d+", "<n>", re.sub(r"`[^`]*`", "<id>", text))
 
@@ -204,8 +210,9 @@ def _since(text):
 SIGNAL_NAMES = {"S1": "重复未变", "S2": "诊断态"}
 
 
-def render(found, scanned, unparsed, reveal):
-    lines = ["spec-guard 自观测报告（只读；扫描到 %d 段注入，无法解析 %d 行）" % (scanned, unparsed), ""]
+def render(found, scanned, unparsed, reveal, excluded=0):
+    lines = ["spec-guard 自观测报告（只读；扫描到 %d 段注入，无法解析 %d 行；已排除临时目录中的 %d 段）"
+             % (scanned, unparsed, excluded), ""]
     if not found:
         lines.append("没有发现疑似问题。")
     for item in found:
@@ -235,17 +242,19 @@ def main(argv=None):
     args = parser.parse_args(argv)
     claude, claude_bad = read_claude(Path(args.claude_home), args.since)
     codex, codex_bad = read_codex(Path(args.codex_home), args.since)
-    events = claude + codex
+    events = [e for e in claude + codex if not is_temp(e["project"])]
+    excluded = len(claude) + len(codex) - len(events)
     found = findings(events, args.min_repeat)
     reveal = {project_hash(e["project"]): e["project"] for e in events} if args.reveal else {}
     if args.json:
-        data = {"scanned": len(events), "unparsed": claude_bad + codex_bad, "unobservable": list(UNOBSERVABLE),
+        data = {"scanned": len(events), "unparsed": claude_bad + codex_bad, "excluded_temp": excluded,
+                "unobservable": list(UNOBSERVABLE),
                 "findings": [dict(f, first=_iso(f["first"]), last=_iso(f["last"])) for f in found]}
         if reveal:
             data["reveal"] = reveal
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
-        print(render(found, len(events), claude_bad + codex_bad, reveal))
+        print(render(found, len(events), claude_bad + codex_bad, reveal, excluded))
     return 0
 
 
