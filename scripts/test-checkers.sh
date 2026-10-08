@@ -563,6 +563,24 @@ rm -rf "$TMP/digestempty"; mkdir -p "$TMP/digestempty/plugins/spec-guard/hooks"
 want fail "digest-single-source: 一个 Python 文件都没有 → 不算通过" \
   python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestempty"
 
+# ── check-command-table.py ──
+# 审查 F18：docs/workflow.md 的命令对照表要列出每个命令（前缀可省，允许 `documentation-*` 这样的通配）。
+mktable() {  # $1=目录 $2=对照表正文
+  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/commands" "$1/docs"
+  for c in phase documentation-impact documentation-baseline; do printf 'x\n' > "$1/plugins/spec-guard/commands/$c.md"; done
+  printf '# Workflow\n\n## 命令对照\n\n%s\n\n## 移除\n\n`cost-report` 在别的节里不算。\n' "$2" > "$1/docs/workflow.md"
+}
+mktable "$TMP/tablegood" '| 查看阶段 | `/spec-guard:phase` | x |
+| 文档 | `/spec-guard:documentation-*` 两条 | x |'
+want pass "command-table: 每个命令都在表里（含通配） → 放行" python3 "$ROOT/scripts/check-command-table.py" "$TMP/tablegood"
+mktable "$TMP/tablebad" '| 查看阶段 | `/spec-guard:phase` | x |
+| 文档 | `/spec-guard:documentation-impact` | x |'
+printf 'x\n' > "$TMP/tablebad/plugins/spec-guard/commands/cost-report.md"
+want fail "command-table: 漏了命令（只在别的节出现） → 报错" python3 "$ROOT/scripts/check-command-table.py" "$TMP/tablebad"
+mktable "$TMP/tablenone" '| 查看阶段 | `/spec-guard:phase` | x |'
+rm -f "$TMP/tablenone/plugins/spec-guard/commands/"*.md
+want fail "command-table: 零个命令文件 → 不算通过" python3 "$ROOT/scripts/check-command-table.py" "$TMP/tablenone"
+
 # ── evals/dispatch-cost/grade.sh ──
 # 审查 F10：隐藏测试经 `| tail -3` 运行且没有 pipefail，失败时判分仍退出 0。
 # 用替身 PYTHON：unittest 按 GRADE_HIDDEN_RC 退出，成本报告恒成功（不跑付费评测）。
