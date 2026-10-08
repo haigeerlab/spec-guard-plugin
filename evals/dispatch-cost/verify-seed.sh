@@ -44,7 +44,7 @@ done
 
 echo "== 5. line counts (seed, excl .git) =="
 ( cd "$SEED" && find . -type f -not -path './.git/*' | sort | xargs wc -l | tail -1 | sed 's/^/  all files: /'
-  find . -name '*.py' -not -path './.git/*' | xargs wc -l | tail -1 | sed 's/^/  python only: /' )
+  find . -name '*.py' -not -path './.git/*' -print0 | xargs -0 wc -l | tail -1 | sed 's/^/  python only: /' )
 
 [ $rc -eq 0 ] && echo "VERIFY OK" || echo "VERIFY FAILED"
 exit $rc

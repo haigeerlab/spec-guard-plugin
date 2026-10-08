@@ -54,6 +54,8 @@ START=$(date -u +%FT%TZ); stops=0; thread=""
 if [ "$host" = claude ]; then
   A="${AGENT_SKILLS_DIR:?set AGENT_SKILLS_DIR to the agent-skills plugin directory}"
   TG="${TIER_GUARD_DIR:?set TIER_GUARD_DIR to the tier-guard plugin directory}"
+  # `project,local` is a single --setting-sources value, not two array elements.
+  # shellcheck disable=SC2054
   COMMON=(--model "${CLAUDE_MODEL:-opus}" --setting-sources project,local --plugin-dir "$A" --plugin-dir "$SG"
           --plugin-dir "$TG" --permission-mode acceptEdits --allowedTools "Bash(python3:*)" "Bash(git:*)"
           "Bash(sed:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(head:*)" "Bash(tail:*)" "Bash(wc:*)")
