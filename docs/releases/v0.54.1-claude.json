@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.1;test:installed-plugin-upgrade-20261008g"
+      },
+      "observedAt": "2026-10-08T15:24:11Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.54.0 to 0.54.1 for scope user; the installed copy records gitCommitSha 61c807f3a919e5f2e8bb3f54f717ad99f4dabee5 -- the v0.54.1 tag commit",
+        "host:Claude Code 2.1.294"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.54.1-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.1;test:installed-copy-local-section-20261008"
+      },
+      "observedAt": "2026-10-08T15:24:11Z",
+      "evidence": [
+        "command:<installed>/hooks/setup-convention.sh local against the fixture CLAUDE.md",
+        "command:a fresh git fixture; setup-convention local (first install), then a local section `<!-- BEGIN:spec-guard-local -->` with one line added before the block END marker",
+        "result:setup-convention --replace exited 0 without --accept-removals and the local section stayed verbatim at the end of the block",
+        "result:after one hand-written line was added outside the local section, --replace exited 1, listed that line and mentioned --accept-removals, and the file hash was unchanged",
+        "result:--replace --accept-removals exited 0, removed the hand-written line and kept the local section"
+      ]
+    }
+  ]
+}

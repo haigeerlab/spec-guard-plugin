@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:61c807f3a919e5f2e8bb3f54f717ad99f4dabee5"
+      },
+      "observedAt": "2026-10-08T15:24:11Z",
+      "evidence": [
+        "result:the v0.54.1 annotated tag and origin/main both resolve to merge commit 61c807f3a919e5f2e8bb3f54f717ad99f4dabee5 (pull request #262, merged after its pull_request run passed)",
+        "result:the merge commit's tree equals release commit f52b49a's tree; the commands below ran on f52b49a on macOS with /bin/bash 3.2.57",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh",
+        "command:npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh evals/*.sh evals/*/*.sh",
+        "result:all passed before the push; phase-guard 189 cases, verify-artifacts 39 cases, setup/teardown 50 cases"
+      ]
+    }
+  ]
+}

@@ -6,5 +6,5 @@
 - [x] Checkpoint 1（report）：全部套件通过，ShellCheck 无告警 — validate.sh 通过，phase-guard、verify-artifacts、setup/teardown 50 例通过，CI ShellCheck 范围无告警
 - [x] Task 4：本仓库 AGENTS.md 迁移（预览给用户后再替换）
 - [x] Task 5：CHANGELOG + 0.54.1 + macOS 校验
-- [ ] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行
-- [ ] Task 6：发版后证据
+- [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #262 由用户合并于 61c807f
+- [x] Task 6：发版后证据 — v0.54.1 已发版；两份安装副本均验证：本地段保留、手写行被拒绝且文件不变、加 `--accept-removals` 后替换；记录见 `docs/releases/v0.54.1-*.json`
