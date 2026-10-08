@@ -348,6 +348,20 @@ class Unattended(unittest.TestCase):
         self.check('{"type":"event_msg","payload":{"source":"exec"}}', False)
         self.check("not json", False)
 
+    def test_long_first_record_still_counts(self):
+        # unattended-long-first-record: Codex writes its whole base instructions into session_meta (19-24 KB on
+        # 2026-10-08); a record past the old 64 KB read must still be recognised.
+        meta = json.dumps({"type": "session_meta",
+                           "payload": {"source": "exec", "base_instructions": {"text": "x" * 100_000}}})
+        self.assertGreater(len(meta), 65536)
+        self.check(meta, True)
+
+    def test_first_record_over_the_limit_counts_as_attended(self):
+        # A complete JSON object padded past 1 MB: its first 1 MB parses on its own, so only the
+        # "no line end within the limit" rule can keep it attended.
+        meta = '{"type":"session_meta","payload":{"source":"exec"}}' + " " * (1 << 20)
+        self.check(meta, False)
+
     def test_missing_or_absent_transcript_is_attended(self):
         self.check(None, False)
         with mock.patch.dict(os.environ, {}, clear=False):
