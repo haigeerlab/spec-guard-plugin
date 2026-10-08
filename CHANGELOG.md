@@ -25,6 +25,7 @@
   - module id 正则只在 `capability_map`，`module-insert` 选当前模块直接用 `module_stage.project_stage`；
   - 删除协作迁出后只剩测试在用的 `remove_codex_table`、`remove_claude_server`；
   - `docs/workflow.md` 的命令对照表补上 `cost-report` 与 `local-ticket-portability`，并由新检查器保证每个命令都在表里。
+  - 2026-10-03 对账报告里指向协作 Spec 的链接改指归档后的 `docs/retirements/collaboration-messaging/spec.md`。
 - **能力图只列现行模块**（审查第 6 组：F6、F14）：已迁到 agent-relay 的四个协作实现模块
   （`collaboration-messaging`、`collaboration-safe-defaults`、`authorized-session-delegation`、
   `host-native-session-routing`）从模块表与 Build order 中移除，其 Spec 与全部任务文件用 `git mv` 逐字归档到

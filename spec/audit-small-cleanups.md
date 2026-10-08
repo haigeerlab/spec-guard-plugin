@@ -32,6 +32,10 @@ Confirmed by the user on 2026-10-08:
 4. F17: delete the two helpers and their tests; keep `add_claude_server` (used by the ledger adapters).
 5. F18: add the two rows.
 6. No release of its own (combined release); CHANGELOG under `## [未发布]`.
+7. Forwarded by the user through 第二轮联调 after #249: the Markdown link to the collaboration Spec in
+   `docs/reports/2026-10-03-audit-reconciliation.md` broke when `collaboration-map-retirement` archived it; it points
+   to `docs/retirements/collaboration-messaging/spec.md`. Plain-text mentions of old paths in other history documents
+   stay as written. There is no link checker in the repository and none is added here.
 
 ## Requirements
 
@@ -44,7 +48,8 @@ Confirmed by the user on 2026-10-08:
    selection logic of its own. Existing suites unchanged.
 4. `remove_codex_table` and `remove_claude_server` no longer exist; nothing references them.
 5. The workflow table has one row per command in `plugins/spec-guard/commands/` (a check enforces it).
-6. Each new assertion is shown to go red by breaking the code by hand. CHANGELOG entry under `## [未发布]`.
+6. The 2026-10-03 reconciliation report's link to the collaboration Spec resolves to the archived file.
+7. Each new assertion is shown to go red by breaking the code by hand. CHANGELOG entry under `## [未发布]`.
 
 ## Commands
 
