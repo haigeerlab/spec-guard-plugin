@@ -151,6 +151,36 @@ Gamma is separate.
         self.assertNotEqual(result.review_map, "not the remote Proposal")
         self.assertEqual(dirty.read_text(encoding="utf-8"), "not the remote Proposal")
 
+    # remote-credential-redaction: the remote URL never appears in a git argv.
+
+    def argv_while_reading(self, project):
+        seen = []
+        real = proposal_publication._run
+
+        def recording(args, cwd=None):
+            seen.append(list(args))
+            return real(args, cwd=cwd)
+        with patch("proposal_publication._run", side_effect=recording):
+            result = read_published(project, "gamma")
+        return result, seen
+
+    def test_no_git_argv_carries_the_remote_url(self):
+        result, seen = self.argv_while_reading(self.consumer)
+        self.assertEqual(result.state, "published")
+        self.assertTrue(any("ls-remote" in args for args in seen))
+        self.assertTrue(any("fetch" in args for args in seen))
+        for args in seen:
+            self.assertFalse(any(str(self.remote) in arg for arg in args), args)
+
+    def test_a_remote_path_with_spaces_quotes_and_backslashes_still_snapshots(self):
+        odd = self.root / 'odd "remote" \\ dir.git'
+        shutil.copytree(self.remote, odd)
+        self.git(self.consumer, "remote", "set-url", "origin", str(odd))
+        result, seen = self.argv_while_reading(self.consumer)
+        self.assertEqual(result.state, "published")
+        for args in seen:
+            self.assertFalse(any(str(odd) in arg for arg in args), args)
+
     def test_missing_remote_proposal_is_absent(self):
         self.assertEqual(read_published(self.consumer, "missing").state, "absent")
 
@@ -443,6 +473,25 @@ class SnapshotProbeRetryTests(unittest.TestCase):
                 patch("proposal_publication.time.sleep", self.slept.append):
             with proposal_publication.fixed_snapshot(self.PROJECT, "origin", "sg-test-") as result:
                 return result
+
+    def test_a_credential_bearing_remote_url_never_reaches_a_git_argv(self):
+        secret = "https://user:SECRET@example.invalid/remote.git"
+        seen = []
+        inner = self.runner([self.head(self.A)], [self.OK], [self.tip(self.A)])
+
+        def run(args, cwd=None):
+            seen.append(list(args))
+            if "get-url" in args:
+                return SimpleNamespace(stdout=secret + "\n")
+            return inner(args, cwd)
+        with patch("proposal_publication._run", side_effect=run), \
+                patch("proposal_publication.time.sleep", lambda _: None):
+            with proposal_publication.fixed_snapshot(self.PROJECT, "origin", "sg-test-") as snapshot:
+                self.assertIsNone(snapshot.failure)
+                self.assertEqual(snapshot.commit, self.A)
+        self.assertTrue(seen)
+        for args in seen:
+            self.assertFalse(any("SECRET" in arg or "example.invalid" in arg for arg in args), args)
 
     def test_a_failed_fetch_is_retried_and_still_pins_the_observed_tip(self):
         snapshot = self.snapshot([self.head(self.A)], fetches=[None, self.OK])
