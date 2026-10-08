@@ -525,6 +525,37 @@ want fail "retire-scan: 同一允许清单文件里新增一条不同文本的�
   bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow-newhit"
 
 
+# ── check-digest-single-source.py ──
+# 审查 F13：spec-digest.py 是唯一指纹算法；复制一份实现必须被拦下。
+mkdigest() {  # $1=目录
+  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/hooks" "$1/scripts"
+  printf '%s\n' 'import hashlib' 'def _h(t): return hashlib.sha256(t.encode()).hexdigest()[:12]' \
+    > "$1/plugins/spec-guard/hooks/spec-digest.py"
+  printf '%s\n' 'import hashlib' 'def key(b): return hashlib.sha256(b).hexdigest()' \
+    > "$1/plugins/spec-guard/hooks/other.py"
+}
+mkdigest "$TMP/digestgood"
+want pass "digest-single-source: 只有 spec-digest.py 实现指纹，别处整文件哈希 → 放行" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestgood"
+mkdigest "$TMP/digestcopy"
+printf '%s\n' 'import hashlib' 'def row(r): return hashlib.sha256(r.normalized_row.encode()).hexdigest()' \
+  > "$TMP/digestcopy/plugins/spec-guard/hooks/copy.py"
+want fail "digest-single-source: 别处对 normalized_row 取哈希 → 报错" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestcopy"
+mkdigest "$TMP/digesttrunc"
+printf '%s\n' 'import hashlib' 'def h(t): return hashlib.sha256(t).hexdigest() [ :12]' \
+  > "$TMP/digesttrunc/scripts/trunc.py"
+want fail "digest-single-source: 别处做截断摘要 → 报错" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digesttrunc"
+mkdigest "$TMP/digesttest"
+printf '%s\n' 'import hashlib' 'EXPECTED = hashlib.sha256(b"x").hexdigest()[:12]' \
+  > "$TMP/digesttest/plugins/spec-guard/hooks/test_digest.py"
+want pass "digest-single-source: 测试文件里的期望值不算实现 → 放行" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digesttest"
+rm -rf "$TMP/digestempty"; mkdir -p "$TMP/digestempty/plugins/spec-guard/hooks"
+want fail "digest-single-source: 一个 Python 文件都没有 → 不算通过" \
+  python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestempty"
+
 # ── evals/dispatch-cost/grade.sh ──
 # 审查 F10：隐藏测试经 `| tail -3` 运行且没有 pipefail，失败时判分仍退出 0。
 # 用替身 PYTHON：unittest 按 GRADE_HIDDEN_RC 退出，成本报告恒成功（不跑付费评测）。
