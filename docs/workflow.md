@@ -242,4 +242,5 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 ## 移除
 
 `/spec-guard:teardown-convention` 删掉 `CLAUDE.md` 里的约定块（标记之外不动），并把 `.agent/state.json` 改名为
-`.agent/state.json.disabled`，阶段提示随之停止。能力图、Spec、Plan 都保留。先加 `--dry-run` 可以只看会改什么。
+`.agent/state.json.disabled`，阶段提示随之停止。能力图、Spec、Plan 都保留。先加 `--dry-run` 可以只看会改什么。块内本地段的行留在块原来的位置；
+本地段以外、不在现行模板里的行会在预览里列出，拆除前需要追加 `--accept-removals` 才会删掉，否则什么都不改。

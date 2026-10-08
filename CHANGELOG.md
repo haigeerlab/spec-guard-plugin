@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.54.2] - 2026-10-09
+
+### 修复
+
+- **`teardown-convention` 不再悄悄删掉项目写进约定块的行。** 0.54.1 只管了 `--replace`，teardown 仍把 BEGIN/END
+  之间整段删掉，本地段和其他手写行一起消失。现在本地段（`<!-- BEGIN:spec-guard-local -->` 与
+  `<!-- END:spec-guard-local -->` 之间）的行留在块原来的位置，只去掉这两行标记；本地段以外、又不属于现行模板或派活
+  规则段的行，`--dry-run` 逐行列出 `will remove:` 并标 `[needs --accept-removals]`，真正拆除不带 `--accept-removals`
+  时退出 1，指令文件与 `.agent/state.json` 都不改。本地段标记无效时拒绝；没有约定块时给出 `--accept-removals` 是用法
+  错误。没有手写行的 teardown 与原来逐字节相同。
+
 ## [0.54.1] - 2026-10-08
 
 ### 修复

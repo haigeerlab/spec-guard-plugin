@@ -71,6 +71,9 @@ setup 覆盖。
 `.agent/state.json.disabled`（这才是真正的「移除」——只删声明块留着 `state.json`，项目会变成
 零足迹模式而不是约定被移除）；脚本会实际跑一遍 `phase-guard.sh` 验证，而不是让人相信
 「无输出即为成功」这句话。不碰 `spec/`、`tasks/` 里的内容，也不碰远端 Issue 与本地事项账本。
+块内本地段（`<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间）的行留在块原来的位置；
+本地段以外、不在现行模板里的行，预览标 `[needs --accept-removals]`，真正拆除会拒绝且什么都不改，由用户决定移进
+本地段或同意删除后追加 `--accept-removals`。
 
 先 `--dry-run` 预览，原样转述输出：
 
