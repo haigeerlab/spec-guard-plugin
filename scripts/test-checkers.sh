@@ -314,6 +314,27 @@ printf -- '---\ndescription: d\n---\n运行 `hooks/uncovered.py` 完成检查。
 want fail "command-parity: 新命令引用的 hook 没有任何 skill 提供 → 报错" \
   python3 "$ROOT/scripts/check-command-parity.py" "$TMP/paritybad"
 
+# 参数级：命令传给脚本的 --flag（续行拼接后）必须出现在某个也引用该脚本的 skill 里。
+mkparity "$TMP/parityflaggood"
+printf -- '---\ndescription: d\n---\n```bash\npython3 "$ROOT/hooks/covered.py" \\\n  --prove --format json\n```\n' \
+  > "$TMP/parityflaggood/plugins/spec-guard/commands/covered.md"
+printf -- '---\nname: ops\n---\n```bash\npython3 "$ROOT/hooks/covered.py" --format json\n# 合并后加 --prove 做证明\n```\n' \
+  > "$TMP/parityflaggood/plugins/spec-guard/skills/ops/SKILL.md"
+want pass "command-parity: 命令的参数在引用同一脚本的 skill 里都出现 → 放行" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityflaggood"
+
+mkparity "$TMP/parityflagbad"
+printf -- '---\ndescription: d\n---\n```bash\npython3 "$ROOT/hooks/covered.py" \\\n  --prove --format json\n```\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/commands/covered.md"
+printf -- '---\nname: ops\n---\n```bash\npython3 "$ROOT/hooks/covered.py" --format json\n```\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/skills/ops/SKILL.md"
+# 另一个 skill 写了 --prove 但不引用该脚本：不算覆盖。
+mkdir -p "$TMP/parityflagbad/plugins/spec-guard/skills/other"
+printf -- '---\nname: other\n---\n别的脚本 `hooks/elsewhere.py` 才用 --prove。\n' \
+  > "$TMP/parityflagbad/plugins/spec-guard/skills/other/SKILL.md"
+want fail "command-parity: 续行上的 --prove 在引用该脚本的 skill 里缺失 → 报错" \
+  python3 "$ROOT/scripts/check-command-parity.py" "$TMP/parityflagbad"
+
 rm -rf "$TMP/parityempty"; mkdir -p "$TMP/parityempty/plugins/spec-guard/skills/ops"
 printf -- '---\nname: ops\n---\n什么都没有。\n' > "$TMP/parityempty/plugins/spec-guard/skills/ops/SKILL.md"
 want fail "command-parity: 零个命令文件 → 不算通过" \

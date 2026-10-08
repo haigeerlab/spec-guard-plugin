@@ -62,6 +62,13 @@ worktree. Tell the user that initialization creates a committed `.epiq/project.j
 using `--allow-epiq-push`, because upstream Epiq will attempt a normal/state-branch push. Do not
 infer `user-name`, `preferred-editor`, or `auto-sync`; collect the user's values.
 
+```bash
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
+  --confirm-initialize --user-name "<display name the user gave>" \
+  --preferred-editor "<editor command the user gave>" --auto-sync false --format json
+```
+
 Adapter inspection is read-only and available for either host:
 
 ```bash
