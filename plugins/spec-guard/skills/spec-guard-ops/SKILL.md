@@ -144,6 +144,30 @@ python3 -B "$ROOT/hooks/tracker_default.py" set --project "$PROJECT" \
 GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致。目标形状不合法时退出码 2
 且不写文件。
 
+## config
+
+项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
+行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence` 的生效值与来源，以及只在别处修改的
+`dispatch`（约定块标记，用 setup 的 `--dispatch`／`--no-dispatch`）和 `trackerDefault`（上一节）：
+
+```bash
+python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
+```
+
+- `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
+- `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
+
+设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
+
+```bash
+python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key artifactLanguage --value zh-CN
+python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key reviewCadence
+```
+
+取值不合法、键不认识或属于只读汇总的两项时，退出码 2 且不写文件。文件无效（JSON 坏、`version` 不是 1、
+未知键、非法取值）时所有项按默认处理、`set`／`unset` 拒绝写入，照问题代码报告，不替用户猜值；`show` 提示
+文件被 `.gitignore` 忽略时照实转述。
+
 ## add-module
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并

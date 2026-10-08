@@ -162,4 +162,5 @@ if [ "$DRY" = true ]; then
   echo '（dry-run; no files were changed）'
 else
   echo 'Next: review the capability map, then write module specs and local task lists.'
+  echo 'Optional: set the artifact language and review cadence with /spec-guard:config (Codex: spec-guard-ops config).'
 fi

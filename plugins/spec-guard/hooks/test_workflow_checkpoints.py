@@ -169,5 +169,19 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("`gate`", "`report`", "批量前置审", "UI 自验", "共享检查点规则"):
                     self.assertIn(phrase, template)
 
+    def test_review_cadence(self):
+        # project-config: separate stays the default; combined merges one module's Spec and Plan review.
+        cadence = self.section("## 评审节奏")
+        for phrase in ("`.agent/config.json`", "`reviewCadence`", "`separate`", "`combined`", "默认",
+                       "一次批准", "新决策", "范围不清", "高风险", "合并永远由用户"):
+            self.assertIn(phrase, cadence)
+
+    def test_templates_point_at_project_config(self):
+        for name in ("claude-block-local.md", "codex-block-local.md"):
+            template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                for phrase in ("`.agent/config.json`", "/spec-guard:config", "产物语言", "评审节奏"):
+                    self.assertIn(phrase, template)
+
 if __name__ == "__main__":
     unittest.main()
