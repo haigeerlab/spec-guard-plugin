@@ -4,5 +4,5 @@
 - [x] Task 2：脚本实现 — `scripts/verify-and-commit.sh`（`set -euo pipefail`，成败只看退出码，输出进临时日志）；登记进 `validate.sh`；9 例通过。变异均被抓到：失败后仍提交、改成看输出末行判断成败、去掉未暂存检查。实现中又踩到一次变量后接全角字符（`$LOG_DIR）`），已改为 `${LOG_DIR}`
 - [x] Task 3：文档 — `docs/maintainer-workflow.md` “提交前”、`CLAUDE.md` “最小验证”
 - [x] Checkpoint 1（report）：全部套件通过，ShellCheck 无告警；本模块自己的提交从这里起改用新脚本 — 本次提交即由新脚本完成
-- [ ] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #269 由用户合并于 8e63f1e
 - [ ] Task 4：0.55.0 统一发版时补证据
