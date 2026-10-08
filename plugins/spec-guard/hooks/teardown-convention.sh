@@ -13,23 +13,26 @@
 # 比移除前更黏。命令文里那句「无输出即为成功」也就成了假的。
 #
 # 用法:
-#   bash teardown-convention.sh [--dry-run] [--keep-state]
+#   bash teardown-convention.sh [--dry-run] [--keep-state] [--accept-removals]
 #
 #   --keep-state  保留 .agent/state.json 原名。**hook 会继续激活**（零足迹模式），
 #                 只在你确实想切到那个模式时才用。
+#   --accept-removals  块里有本地段以外、又不属于现行模板的行时，确认删掉它们。
+#                 本地段（<!-- BEGIN:spec-guard-local --> … END）的内容总是留在块原来的位置。
 #
 # 默认行为：把 state.json 改名为 state.json.disabled —— 既让 hook 真的停，
 # 又不丢模块状态与 activeModule（删了就找不回来）。
 # ─────────────────────────────────────────────────────────────
 set -uo pipefail
 
-DRY=false; KEEP=false; HOST=claude; SEEN=""; HOST_SET=false
+DRY=false; KEEP=false; ACCEPT=false; HOST=claude; SEEN=""; HOST_SET=false
 for a in "$@"; do
   case " $SEEN " in *" $a "*) echo "重复参数: $a" >&2; exit 2 ;; esac
   SEEN="$SEEN $a"
   case "$a" in
     --dry-run)    DRY=true ;;
     --keep-state) KEEP=true ;;
+    --accept-removals) ACCEPT=true ;;
     --host=claude) [ "$HOST_SET" = false ] || { echo "host 只能指定一次" >&2; exit 2; }; HOST=claude; HOST_SET=true ;;
     --host=codex)  [ "$HOST_SET" = false ] || { echo "host 只能指定一次" >&2; exit 2; }; HOST=codex; HOST_SET=true ;;
     --host=*)      echo "host 必须是 claude 或 codex"; exit 2 ;;
@@ -49,6 +52,8 @@ BLOCK_TOOL="$HERE/managed-block.py"
 
 case "$HOST" in
   claude)
+    TEMPLATE="$HERE/../templates/claude-block-local.md"
+    RULE="$HERE/../templates/claude-dispatch-rule.md"
     INSTRUCTIONS=CLAUDE.md
     MARK_B="<!-- BEGIN:agent-skills-convention -->"
     MARK_E="<!-- END:agent-skills-convention -->"
@@ -57,6 +62,8 @@ case "$HOST" in
     OTHER_MARK_B="<!-- BEGIN:spec-guard-codex-convention -->"
     ;;
   codex)
+    TEMPLATE="$HERE/../templates/codex-block-local.md"
+    RULE="$HERE/../templates/codex-dispatch-rule.md"
     INSTRUCTIONS=AGENTS.md
     MARK_B="<!-- BEGIN:spec-guard-codex-convention -->"
     MARK_E="<!-- END:spec-guard-codex-convention -->"
@@ -81,6 +88,9 @@ if [ -f "$INSTRUCTIONS" ]; then
 fi
 if [ "$HAS_TARGET_MARKER" = true ]; then
   python3 "$BLOCK_TOOL" validate "$INSTRUCTIONS" "$MARK_B" "$MARK_E" >/dev/null || exit 1
+elif [ "$ACCEPT" = true ]; then
+  echo "--accept-removals 只在 ${INSTRUCTIONS} 有约定块时可用" >&2
+  exit 2
 fi
 
 act()  { [ "$DRY" = true ] && printf '  [dry-run] %s\n' "$1" || printf '  ✅ %s\n' "$1"; }
@@ -98,12 +108,22 @@ fi
 
 # ── 1. 指令文件的声明块 ──
 if [ "$HAS_TARGET_MARKER" = true ]; then
+  #   teardown-local-section：本地段内容留在原位置；其余不在现行模板与派活规则段里的行要 --accept-removals，
+  #   否则在 state.json 之前就停下，什么都不改。
   if [ "$DRY" = true ]; then
     N=$(python3 "$BLOCK_TOOL" validate "$INSTRUCTIONS" "$MARK_B" "$MARK_E") || exit 1
+    PREVIEW="$(python3 "$BLOCK_TOOL" remove "$INSTRUCTIONS" "$MARK_B" "$MARK_E" --known "$TEMPLATE" --known "$RULE" --dry-run)" || exit 1
+    act "${INSTRUCTIONS} 声明块将移除（${N} 行，标记外一个字节不动）"
+    printf '%s\n' "$PREVIEW" | sed 's/^/    /'
   else
-    N=$(python3 "$BLOCK_TOOL" remove "$INSTRUCTIONS" "$MARK_B" "$MARK_E") || exit 1
+    ACCEPT_FLAG=""
+    [ "$ACCEPT" = true ] && ACCEPT_FLAG=--accept-removals
+    N=$(python3 "$BLOCK_TOOL" remove "$INSTRUCTIONS" "$MARK_B" "$MARK_E" --known "$TEMPLATE" --known "$RULE" \
+      ${ACCEPT_FLAG:+"$ACCEPT_FLAG"}) || { printf '  ❌ %s 未改动，.agent/state.json 也未改动\n' "$INSTRUCTIONS" >&2; exit 1; }
+    KEPT="${N#* }"; N="${N% *}"
+    act "${INSTRUCTIONS} 声明块已移除（${N} 行，标记外一个字节不动）"
+    [ "$KEPT" -gt 0 ] && note "本地段 ${KEPT} 行留在原位置（本地段标记已去掉）"
   fi
-  act "${INSTRUCTIONS} 声明块已移除（${N} 行，标记外一个字节不动）"
   DID=1
 else
   skip "${INSTRUCTIONS} 里没有声明块"
