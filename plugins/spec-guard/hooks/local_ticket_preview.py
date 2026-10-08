@@ -12,7 +12,7 @@ from urllib.parse import quote, urlparse
 
 from local_ledger_runtime import state_worktree_status
 from local_ticket_handoff import snapshot_issue
-from local_ticket_portability import InventoryError, worktree_roots
+from local_ticket_inventory import InventoryError, worktree_roots
 
 
 ISSUE_MARKER = "spec-guard-local-ticket:v1"

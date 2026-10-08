@@ -13,7 +13,7 @@ from local_ledger_runtime import (
     MCP_RELATIVE_PATH, node_status, runtime_status, mcp_tool_call,
 )
 from local_ticket_archive import verify_archive
-from local_ticket_portability import InventoryError, _event_lines
+from local_ticket_inventory import InventoryError, _event_lines
 from local_ticket_lock import acquire_lock
 
 

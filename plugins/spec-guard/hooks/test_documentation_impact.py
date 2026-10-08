@@ -41,6 +41,20 @@ PLAN = """# Plan: alpha
 """
 
 
+class SingleSourceTests(unittest.TestCase):
+    def test_module_id_pattern_is_the_capability_map_one(self):
+        # 2026-10-08 audit F16: one module id pattern, owned by capability_map.
+        # `re.compile` caches equal patterns, so an identity check cannot see a copy; read the source instead.
+        import ast
+        tree = ast.parse(Path(__file__).with_name("documentation_impact.py").read_text(encoding="utf-8"))
+        assigned = [target.id for node in ast.walk(tree) if isinstance(node, ast.Assign)
+                    for target in node.targets if isinstance(target, ast.Name)]
+        self.assertNotIn("MODULE_ID", assigned)
+        imported = [alias.name for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom) and node.module == "capability_map" for alias in node.names]
+        self.assertIn("MODULE_ID", imported)
+
+
 class DocumentationImpactTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-doc-impact-")

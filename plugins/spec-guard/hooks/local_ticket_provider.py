@@ -6,7 +6,7 @@ import re
 import subprocess
 from typing import Any, Callable
 
-from local_ticket_portability import InventoryError
+from local_ticket_inventory import InventoryError
 
 
 PAGE_SIZE = 100

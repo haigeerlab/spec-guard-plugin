@@ -29,15 +29,23 @@ cd "$ROOT" 2>/dev/null || exit 0
 # 的判据宽。代价有限：本 hook 只读文件并打印阶段，不写任何东西。
 # activeModule 是本插件写这个文件的唯一理由，所以它是准确的激活证据；此前判据用的
 # `tracker` 字段已随远端 tracker 模式退役（docs/retirements/state-tracker-field.md）。
+# 逐行匹配只用 bash 内建（不依赖 grep；审查 F12）：$2 是扩展正则，读不到文件即不匹配。
+file_has_line() {  # $1=文件 $2=正则
+  local line pattern="$2"
+  [ -r "$1" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    [[ $line =~ $pattern ]] && return 0
+  done < "$1"
+  return 1
+}
+
 has_block() {
-  if grep -Eq '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' CLAUDE.md 2>/dev/null; then
-    return 0
-  fi
-  grep -Eq '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$' AGENTS.md 2>/dev/null
+  file_has_line CLAUDE.md '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' ||
+    file_has_line AGENTS.md '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$'
 }
 
 has_state() {
-  grep -Eq '"activeModule"[[:space:]]*:' .agent/state.json 2>/dev/null
+  file_has_line .agent/state.json '"activeModule"[[:space:]]*:'
 }
 
 has_block || has_state || exit 0

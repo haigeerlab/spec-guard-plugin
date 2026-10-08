@@ -5,7 +5,7 @@ import json
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from local_ticket_portability import InventoryError
+from local_ticket_inventory import InventoryError
 from local_ticket_preview import target_facts
 from local_ticket_provider import PAGE_SIZE, pages, run_json
 

@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from local_ticket_portability import InventoryError
+from local_ticket_inventory import InventoryError
 from local_ticket_lock import acquire_lock
 
 

@@ -7,7 +7,7 @@ import stat
 import tempfile
 from pathlib import Path
 
-from local_ticket_portability import InventoryError
+from local_ticket_inventory import InventoryError
 
 
 MAGIC = b"spec-guard-flock-v1\n"

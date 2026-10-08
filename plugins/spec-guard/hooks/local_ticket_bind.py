@@ -20,7 +20,7 @@ from local_ticket_journal import (PARTITION_NAME, default_journal_root,
                                   entry_key, journal_path,
                                   read_journal, _prepare_parent)
 from local_ticket_lock import acquire_lock
-from local_ticket_portability import InventoryError, inventory_project, worktree_roots
+from local_ticket_inventory import InventoryError, inventory_project, worktree_roots
 
 
 def _sha(data: bytes) -> str:

@@ -17,6 +17,15 @@
 
 ### 维护
 
+- **审查第 7 组的小清理**（F12、F15、F16、F17、F18），行为不变：
+  - `phase-guard.sh` 的三处激活判定改用 bash 内建逐行匹配，不再依赖 `grep`，“只依赖 bash、git、python3”的不变量
+    名副其实；PATH 里没有 `grep` 时，已启用项目照常注入、无关项目照常静默；
+  - Local ticket 的盘点代码（`InventoryError`、`inventory_project` 等）移到 `local_ticket_inventory.py`，各 ticket
+    模块不再从顶层命令入口导入，导入环消失；入口仍转出这些名字；
+  - module id 正则只在 `capability_map`，`module-insert` 选当前模块直接用 `module_stage.project_stage`；
+  - 删除协作迁出后只剩测试在用的 `remove_codex_table`、`remove_claude_server`；
+  - `docs/workflow.md` 的命令对照表补上 `cost-report` 与 `local-ticket-portability`，并由新检查器保证每个命令都在表里。
+  - 2026-10-03 对账报告里指向协作 Spec 的链接改指归档后的 `docs/retirements/collaboration-messaging/spec.md`。
 - **能力图只列现行模块**（审查第 6 组：F6、F14）：已迁到 agent-relay 的四个协作实现模块
   （`collaboration-messaging`、`collaboration-safe-defaults`、`authorized-session-delegation`、
   `host-native-session-routing`）从模块表与 Build order 中移除，其 Spec 与全部任务文件用 `git mv` 逐字归档到

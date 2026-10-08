@@ -295,6 +295,18 @@ mkdir -p "$WORK/nopy"
 ln -sf "$(command -v grep)" "$WORK/nopy/grep"
 RUN_PATH="$WORK/nopy" injects "已启用但缺 python3 时注入诊断" "$local_project" "python3 不可用"
 [ -z "$(RUN_PATH="$WORK/nopy" run "$WORK/other-state")" ] || fail "缺 python3 时无关项目也必须静默"
+# 只依赖 bash、git、python3（审查 F12）：PATH 里没有 grep 时激活判定照旧。
+mkdir -p "$WORK/nogrep"
+ln -sf "$(command -v git)" "$WORK/nogrep/git"
+ln -sf "$(command -v python3)" "$WORK/nogrep/python3"
+env PATH="$WORK/nogrep" /bin/bash -c "command -v grep" >/dev/null 2>&1 && fail "测试 PATH 里不应有 grep"
+RUN_PATH="$WORK/nogrep" injects "没有 grep 时已启用项目照常注入" "$local_project" "当前阶段"
+RUN_PATH="$WORK/nogrep" injects "没有 grep 时 CRLF 声明块照常激活" "$WORK/crlf" "MAP_ONLY"
+RUN_PATH="$WORK/nogrep" injects "没有 grep 时 activeModule 照常激活" "$WORK/active-pointer" "MAP_ONLY"
+for quiet in other-state prose empty; do
+  [ -z "$(RUN_PATH="$WORK/nogrep" run "$WORK/$quiet")" ] || fail "没有 grep 时 $quiet 也必须静默"
+done
+echo "  ✅ 没有 grep 时无关项目照常静默"; PASS=$((PASS + 1))
 # python3 在 PATH 上却跑不起来：emit 本身失败，仍要输出手写的可诊断 JSON。
 mkdir -p "$WORK/brokenpy"
 printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/brokenpy/python3"
