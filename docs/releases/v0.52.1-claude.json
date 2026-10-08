@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.1;test:installed-plugin-upgrade-20261008b"
+      },
+      "observedAt": "2026-10-08T05:30:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.52.0 to 0.52.1 for scope user; the installed copy records gitCommitSha 721d7d4f7a590c8480fe7228e2716dc6ad36466c -- the v0.52.1 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-remote-credential-redaction",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.1;test:remote-credential-redaction-20261008"
+      },
+      "observedAt": "2026-10-08T05:30:00Z",
+      "evidence": [
+        "command:<claude installed copy>/hooks/local_ledger_runtime.py --project-dir <temp repo with origin https://user:SECRET@example.invalid/r.git> preflight --format json",
+        "result:state push-confirmation-required, origin https://***@example.invalid/r.git, originCredentialsRedacted true; SECRET absent from the output",
+        "command:<claude installed copy>/hooks/proposal_publication.py read_published on the same temp repo with every git argv recorded",
+        "result:no recorded argv contains SECRET; ls-remote runs as `git -C <project> ls-remote --symref origin HEAD`; the unreachable fake remote reads as unknown",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}
