@@ -3,7 +3,7 @@ description: 协作能力已移到独立插件 agent-relay：检查它是否可�
 allowed-tools: Bash
 ---
 
-本命令是过渡入口，保留一到两个版本。协作（本机信箱、会话路由、跨宿主委派）现在由独立插件 agent-relay 提供，
+本命令是过渡入口，将在 0.54.0 移除。协作（本机信箱、会话路由、跨宿主委派）现在由独立插件 agent-relay 提供，
 Spec Guard 不再执行任何协作操作。
 
 先只读检查 agent-relay：

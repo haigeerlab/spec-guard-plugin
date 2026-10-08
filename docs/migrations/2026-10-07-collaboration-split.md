@@ -20,7 +20,7 @@ Spec Guard 的工作流（Spec、计划、阶段提示、Proposal、事项账本
 | 运行时与信箱 `~/.spec-guard/native-collaboration/` | `~/.agent-relay/runtime/` |
 | 委派记录 `~/.spec-guard/session-delegation/` | `~/.agent-relay/delegation/` |
 
-`/spec-guard:collaboration` 还会保留一到两个版本：agent-relay 已安装时转交给它，未安装时提示安装和本文档。
+`/spec-guard:collaboration` 会保留到 0.53.x，0.54.0 移除：agent-relay 已安装时转交给它，未安装时提示安装和本文档。
 它按宿主的安装记录判断“已安装”（git worktree 的本地启用记录在主仓库的 `.claude/settings.local.json` 里，也会读取）；
 只用 `claude --plugin-dir` 临时加载的 agent-relay 没有安装记录，这时会显示未安装，协作入口改用 agent-relay 自己的命令。
 
