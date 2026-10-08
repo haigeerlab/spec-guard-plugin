@@ -87,7 +87,7 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --rep
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
   --confirm-initialize --user-name "用户提供的显示名" \
-  --preferred-editor "用户提供的编辑器命令" --auto-sync false --format json
+  --preferred-editor "用户提供的编辑器命令" --auto-sync "用户给的 true 或 false" --format json
 ```
 
 初始化或配置任一宿主都不是隐式动作。需要先显示无副作用的配置片段时运行：

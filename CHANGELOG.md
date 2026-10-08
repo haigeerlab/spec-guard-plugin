@@ -9,6 +9,12 @@
   `local-ticket-ledger-ops` skill 只用文字提到这几个值，没有可照抄的命令。现在 skill 带上 `preflight` 与 `initialize`
   两条命令，同样要求向用户索取实际值、不得猜测。
 
+- **Codex 的 skill 找插件根目录与命令一致。** 审查的 F5：`spec-guard-ops` 自带的解析片段遇到结构异常的插件列表
+  （如 `[]`）会抛 traceback。现在它用命令的同一段规范引导：查询失败、没有 codex、列表无法解析或没有已启用的
+  spec-guard 时以 2 退出并说明是定位失败；`local-ticket-ledger-ops` 写明两边宿主的 `ROOT` 来源。
+- **账本初始化示例不再替用户选 `auto-sync`。** Claude 命令与 Codex skill 的 `initialize` 示例原本写死
+  `--auto-sync false`，与旁边“不可猜测、向用户索取”的说明矛盾；现在两边都是用户给的 `true` 或 `false` 的占位符。
+
 ### 维护
 
 - **守门检查在被守的东西坏掉时真的会变红**（审查第 4 组：F7、F8、F9、F10、F13、F19）：

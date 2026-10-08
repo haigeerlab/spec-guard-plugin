@@ -88,6 +88,19 @@ for path in targets:
             bad.append(f"{rel}: 含 {needle!r}（{why}）")
     if re.search(r"\$CLAUDE_PLUGIN_ROOT\b", text) or re.search(r"`CLAUDE_PLUGIN_ROOT`", text):
         bad.append(f"{rel}: 让 Claude 读环境变量 CLAUDE_PLUGIN_ROOT（Bash 里为空），应写会被代入的 ${{CLAUDE_PLUGIN_ROOT}}")
+# skill 与命令同一套根解析（spec/codex-skill-root.md）：spec-guard-ops 逐字带规范引导段；其余用 $ROOT 的
+# skill 要么也带，要么写明 Codex 用 spec-guard-ops 的解析环境、Claude 用代入的 ROOT="${CLAUDE_PLUGIN_ROOT}"。
+ops = (plugin / "skills" / "spec-guard-ops" / "SKILL.md").read_text(encoding="utf-8")
+at = ops.find(canon)
+if at < 0 or ops.find("$ROOT") < at:
+    bad.append("skills/spec-guard-ops/SKILL.md: 第一次用 $ROOT 之前没有逐字的规范引导段")
+for path in sorted((plugin / "skills").glob("*/SKILL.md")):
+    text = path.read_text(encoding="utf-8")
+    if "$ROOT" not in text or canon in text:
+        continue
+    if "spec-guard-ops" not in text or 'ROOT="${CLAUDE_PLUGIN_ROOT}"' not in text:
+        bad.append(f"{path.relative_to(plugin)}: 用了 $ROOT 却没写明 Codex 用 spec-guard-ops 的解析环境、"
+                   f"Claude 用代入的 ROOT=\"${{CLAUDE_PLUGIN_ROOT}}\"")
 for name in ("ticket", "hosted-ticket-workflow"):
     text = (plugin / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
     if 'ROOT="${CLAUDE_PLUGIN_ROOT}"' not in text:
@@ -177,5 +190,39 @@ expect_fail "codex 输出不是对象" "或输出无法解析"
 
 run "$WORK/phase-raw.sh" "$BASEPATH" PLUGIN_ROOT="$WORK/missing"
 expect_fail "根目录不存在" "插件根目录不存在：$WORK/missing"
+
+# ── 运行时：spec-guard-ops 的「解析环境」段（审查 F5：结构异常的列表曾抛 traceback）──
+awk '/^## 解析环境/{section=1} section && /^```bash$/{capture=1; next} capture && /^```$/{exit} capture{print}' \
+  "$PLUGIN/skills/spec-guard-ops/SKILL.md" > "$WORK/ops-raw.sh"
+[ -s "$WORK/ops-raw.sh" ] || fail "spec-guard-ops 没有「解析环境」bash 段"
+printf '%s\n' 'printf "ROOT=%s\n" "$ROOT"' >> "$WORK/ops-raw.sh"
+python3 - "$WORK/ops-raw.sh" "$PLUGIN" > "$WORK/ops-claude.sh" <<'PY'
+import sys
+print(open(sys.argv[1], encoding="utf-8").read().replace("${CLAUDE_PLUGIN_ROOT}", sys.argv[2]), end="")
+PY
+expect_root() { # $1 = 用例名
+  [ "$RC" -eq 0 ] && grep -Fxq "ROOT=$PLUGIN" <<<"$OUT" || fail "$1（rc=${RC}）: $OUT"
+}
+no_traceback() { if grep -q 'Traceback' <<<"$OUT"; then fail "$1: 出现 traceback: $OUT"; fi; }
+
+fake_codex "$WORK/codex-trap" 9 "codex must not be called"
+run "$WORK/ops-claude.sh" "$WORK/codex-trap:$BASEPATH"
+expect_root "skill：Claude 代入后直接用代入的根目录，不调 codex"
+
+run "$WORK/ops-raw.sh" "$WORK/codex-ok:$BASEPATH"
+expect_root "skill：Codex 从已启用的插件列表解析根目录"
+
+for case in "codex-list|或输出无法解析|列表是 []" "codex-broken|查询失败（退出码 7）|查询失败" "codex-none|没有列出已启用且带路径的 spec-guard|未列出 spec-guard"; do
+  dir="${case%%|*}"; rest="${case#*|}"; reason="${rest%%|*}"; label="${rest#*|}"
+  run "$WORK/ops-raw.sh" "$WORK/$dir:$BASEPATH"
+  no_traceback "skill：$label"
+  expect_fail "skill：$label" "$reason"
+done
+fake_codex "$WORK/codex-text" 0 'not json at all'
+run "$WORK/ops-raw.sh" "$WORK/codex-text:$BASEPATH"
+no_traceback "skill：输出不是 JSON"
+expect_fail "skill：输出不是 JSON" "或输出无法解析"
+run "$WORK/ops-raw.sh" "$BASEPATH"
+expect_fail "skill：没有 codex" "也没有 codex 可查询"
 
 echo 'Command plugin-root regression passed'
