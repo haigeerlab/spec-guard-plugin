@@ -130,6 +130,18 @@ smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；�
 分支）或推 tag 时跳过检查，并打印跳过原因：这两种推送不带新内容，tag 打在已验证的合并提交上。只要同一次推送里
 有一个分支更新，就照常全跑，失败照常拦截。改了钩子文本后重新运行安装脚本，本机的 `.git/hooks/pre-push` 才会更新。
 
+提交走 `scripts/verify-and-commit.sh`，不要手写 `validate.sh ... && git commit`：
+
+```bash
+git add <要提交的文件>
+/bin/bash scripts/verify-and-commit.sh [--suite NAME]... -- -m "<提交信息>"
+```
+
+它只提交已暂存的内容（不做 `git add`）；已跟踪文件里还有未暂存改动、或没有暂存内容时拒绝。每次都跑 validate、
+phase-guard、verify-artifacts，并按已暂存路径自动加跑 setup/teardown 回归、pre-push 回归与 CI 同款 ShellCheck
+（`--suite` 可手动加跑）。每套输出写进临时日志，屏幕只留一行结果；成败只看各套自己的退出码，任一失败就列出失败项
+与日志路径、不提交并退出 1。手写的验证链曾因 `;`、写错日志路径、`| tail` 吞掉退出码而在校验失败后照样提交。
+
 提交前检查改动只包含当前目标、没有密钥，并运行与改动面对应的验证。不要把不相关重构、版本发布
 或消费者项目状态塞进同一个维护提交。
 
