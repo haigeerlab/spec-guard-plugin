@@ -141,3 +141,26 @@ smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；�
 若本次开发绑定了 Local 事项，创建 PR 后记录其地址与覆盖范围；合并后按
 `plugins/spec-guard/references/workflow-checkpoints.md` 核对合并提交、验证结果与事项剩余范围，
 满足关闭条件才关闭并读回。PR 合并本身不代表 Local 事项已关闭。
+
+## 自观测报告
+
+插件每次注入的阶段提示，宿主都记在本机会话记录里（Claude Code transcript、Codex rollout）。
+`scripts/self_report.py` 只读地读这些记录，列出疑似问题；它不随插件分发，只给维护者在本机用
+（[spec/self-observation-report.md](../spec/self-observation-report.md)）。
+
+```bash
+python3 -B scripts/self_report.py               # 最近 14 天
+python3 -B scripts/self_report.py --since 30d --json
+python3 -B scripts/self_report.py --reveal      # 额外输出项目哈希到本机路径的对照
+```
+
+- **何时跑**：发版前，或在自己的项目里用了一两周之后。
+- **怎么读**：S1「重复未变」是同一项目里阶段与建议行原文连续 ≥20 次不变、首末间隔 ≥24 小时，
+  说明提示要么没人照做（噪声），要么照做不了（没用）；S2「诊断态」是 `UNKNOWN`、`MAP_INVALID`、
+  无阶段行或 python3 故障，每次都报。hook 进程崩溃且无输出时两个宿主都不记录，报告看不到。
+- **怎么跟进**：挑出值得跟进的条目后，先用指纹（如 `F-1203`）在本地事项账本里查是否已记过；
+  没有才预览新事项，事项标题带上指纹。不想跟进的也记成事项并以「不修」关闭，之后以账本为准判断已处理，
+  脚本本身不读账本。
+- **脱敏**：报告只用 `project#<哈希>`；`--reveal` 的对照只在本机终端查看。真实项目名、路径与会话内容
+  不写进转出到 GitHub 的 Issue、本仓库文件、提交或 PR。
+- **之后**：事项按现有流程处理（插模块或修复、Spec、TDD、发版），报告不会自动改插件。
