@@ -295,6 +295,12 @@ mkdir -p "$WORK/nopy"
 ln -sf "$(command -v grep)" "$WORK/nopy/grep"
 RUN_PATH="$WORK/nopy" injects "已启用但缺 python3 时注入诊断" "$local_project" "python3 不可用"
 [ -z "$(RUN_PATH="$WORK/nopy" run "$WORK/other-state")" ] || fail "缺 python3 时无关项目也必须静默"
+# python3 在 PATH 上却跑不起来：emit 本身失败，仍要输出手写的可诊断 JSON。
+mkdir -p "$WORK/brokenpy"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/brokenpy/python3"
+RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来时注入诊断" "$local_project" "python3 无法运行"
+RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来不等于未启用" "$local_project" "这不是「未启用」"
+[ -z "$(RUN_PATH="$WORK/brokenpy:$PATH" run "$WORK/other-state")" ] || fail "python3 跑不起来时无关项目也必须静默"
 
 # 有 Plan 无 todo.md 的模块按已完成计；activeModule 指向它时给出提醒。
 notodo="$WORK/notodo"

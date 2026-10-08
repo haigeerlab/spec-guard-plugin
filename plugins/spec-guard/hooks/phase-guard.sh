@@ -48,14 +48,20 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 0
 fi
 
+# python3 在 PATH 上却跑不起来时 emit 自己也会失败；同样不能静默，退回一段手写转义的 JSON。
 emit() {
-  printf '%s' "$1" | python3 -c '
+  local out
+  out="$(printf '%s' "$1" | python3 -c '
 import json, sys
 print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "UserPromptSubmit",
     "additionalContext": sys.stdin.read(),
 }}))
-'
+' 2>/dev/null)" || out=""
+  case "$out" in
+    '{'*) printf '%s\n' "$out" ;;
+    *) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: 本项目已启用约定，但 python3 无法运行，本轮没有阶段注入。这不是「未启用」；修复 python3 后恢复。"}}' ;;
+  esac
 }
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
