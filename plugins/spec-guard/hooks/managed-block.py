@@ -48,6 +48,39 @@ def _text(lines):
     return [line.rstrip("\r\n") for line in lines if line.strip()]
 
 
+def _options(rest, action):
+    """[--known FILE]... [--accept-removals] [--dry-run] -> (known, accept, dry)."""
+    rest = list(rest)
+    known, accept, dry = [], False, False
+    while rest:
+        option = rest.pop(0)
+        if option == "--known" and rest:
+            known.append(rest.pop(0))
+        elif option == "--accept-removals":
+            accept = True
+        elif option == "--dry-run":
+            dry = True
+        else:
+            raise SystemExit("unknown %s option: %s" % (action, option))
+    return known, accept, dry
+
+
+def _known(names):
+    known_text = set()
+    for name in names:
+        with open(name, "r", encoding="utf-8", newline="") as handle:
+            known_text.update(_text(handle.readlines()))
+    return known_text
+
+
+def _refuse(lines):
+    print("these lines are not in the template and would be removed; move them into the local section "
+          "(%s ... %s) or re-run with --accept-removals:" % (LOCAL_BEGIN, LOCAL_END), file=sys.stderr)
+    for line in lines:
+        print("  - %s" % line, file=sys.stderr)
+    raise SystemExit(3)
+
+
 def atomic_write(path, content):
     directory = os.path.dirname(os.path.abspath(path)) or "."
     mode = os.stat(path).st_mode & 0o777
@@ -67,7 +100,7 @@ def atomic_write(path, content):
 
 def main(argv):
     if len(argv) < 5:
-        raise SystemExit("usage: managed-block.py <validate|replace|remove> <file> <begin> <end> [template [options]]")
+        raise SystemExit("usage: managed-block.py <validate|replace|remove> <file> <begin> <end> [template] [options]")
     action, path, begin, end = argv[1:5]
     lines, start, finish = locate(path, begin, end)
     if action == "validate":
@@ -77,20 +110,9 @@ def main(argv):
         # replace <file> <begin> <end> <body> [--known FILE]... [--accept-removals] [--dry-run]
         # convention-block-local-lines: the local section is carried over verbatim at the end of the new block;
         # removing any other line that is not in a --known template needs --accept-removals.
-        rest = argv[6:]
         if len(argv) < 6:
             raise SystemExit("replace requires a template path")
-        known, accept, dry = [], False, False
-        while rest:
-            option = rest.pop(0)
-            if option == "--known" and rest:
-                known.append(rest.pop(0))
-            elif option == "--accept-removals":
-                accept = True
-            elif option == "--dry-run":
-                dry = True
-            else:
-                raise SystemExit("unknown replace option: %s" % option)
+        known, accept, dry = _options(argv[6:], "replace")
         with open(argv[5], "r", encoding="utf-8", newline="") as handle:
             body = handle.readlines()
         if body and not body[-1].endswith(("\n", "\r")):
@@ -104,10 +126,7 @@ def main(argv):
         new_text, old_text = _text(body), _text(current)
         removed = [line for line in old_text if line not in new_text]
         added = [line for line in new_text if line not in old_text]
-        known_text = set()
-        for name in known:
-            with open(name, "r", encoding="utf-8", newline="") as handle:
-                known_text.update(_text(handle.readlines()))
+        known_text = _known(known)
         needs_accept = [line for line in removed if line not in known_text]
         if dry:
             for line in removed:
@@ -120,18 +139,33 @@ def main(argv):
                 print("keeps the local section (%d lines)" % len(local))
             return
         if needs_accept and not accept:
-            print("these lines are not in the template and would be removed; move them into the local section "
-                  "(%s ... %s) or re-run with --accept-removals:" % (LOCAL_BEGIN, LOCAL_END), file=sys.stderr)
-            for line in needs_accept:
-                print("  - %s" % line, file=sys.stderr)
-            raise SystemExit(3)
+            _refuse(needs_accept)
         atomic_write(path, "".join(lines[: start + 1] + body + local + lines[finish:]))
         print(finish - start - 1)
         return
     if action == "remove":
-        if len(argv) != 5:
-            raise SystemExit("remove does not accept a template")
-        output = lines[:start] + lines[finish + 1:]
+        # remove <file> <begin> <end> [--known FILE]... [--accept-removals] [--dry-run]
+        # teardown-local-section: the local section's lines stay where the block was (markers dropped);
+        # removing any other line that is not in a --known template needs --accept-removals.
+        known, accept, dry = _options(argv[5:], "remove")
+        block = lines[start + 1:finish]
+        section = local_section(block)
+        inner = block[section[0] + 1:section[1]] if section else []
+        current = block[:section[0]] + block[section[1] + 1:] if section else block
+        if inner and not inner[-1].endswith(("\n", "\r")):
+            inner[-1] += "\n"
+        known_text = _known(known)
+        removed = _text(current)
+        needs_accept = [line for line in removed if line not in known_text]
+        if dry:
+            for line in removed:
+                print("will remove: %s%s" % (line, "" if line in known_text else "   [needs --accept-removals]"))
+            if section:
+                print("keeps the local section in place (%d lines)" % len(_text(inner)))
+            return
+        if needs_accept and not accept:
+            _refuse(needs_accept)
+        output = lines[:start] + inner + lines[finish + 1:]
         # Retain the historical one-blank-line normalization, while rejecting
         # malformed input before touching any file.
         while len(output) > start > 0 and output[start - 1].strip() == "" and start < len(output) and output[start].strip() == "":
@@ -141,7 +175,8 @@ def main(argv):
         if start == len(output) and start > 0 and output[start - 1].strip() == "":
             del output[start - 1]
         atomic_write(path, "".join(output))
-        print(finish - start + 1)
+        # removed line count, then the number of local-section lines left in place
+        print("%d %d" % (finish - start + 1 - len(inner), len(_text(inner))))
         return
     raise SystemExit("unknown action: %s" % action)
 

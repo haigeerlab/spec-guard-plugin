@@ -259,6 +259,134 @@ run teardown-convention.sh --host=codex
 $OUT"
 ok "Codex 主机的 setup 与 teardown 往返"
 
+# teardown-local-section：本地段的内容留在原位置；其余手写行要 --accept-removals。
+add_local() {  # $1=文件 $2=END 标记 其余=本地段里的行
+  local file="$1" end="$2"; shift 2
+  python3 - "$file" "$end" "$@" <<'PY'
+import sys
+path, end, rows = sys.argv[1], sys.argv[2], sys.argv[3:]
+text = open(path, encoding="utf-8").read()
+local = "<!-- BEGIN:spec-guard-local -->\n" + "".join(r + "\n" for r in rows) + "<!-- END:spec-guard-local -->\n"
+open(path, "w", encoding="utf-8").write(text.replace(end, local + end, 1))
+PY
+}
+add_hand() {  # $1=文件 $2=BEGIN 标记 $3=手写行：放在块正文第一行
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, begin, row = sys.argv[1:4]
+text = open(path, encoding="utf-8").read()
+open(path, "w", encoding="utf-8").write(text.replace(begin + "\n", begin + "\n" + row + "\n", 1))
+PY
+}
+
+project teardown-local
+printf '# Mine\n' > "$P/CLAUDE.md"
+run setup-convention.sh local
+add_local "$P/CLAUDE.md" "$END" '- 本地规则一' '- 本地规则二'
+before="$(snapshot)"
+run teardown-convention.sh --dry-run
+[ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] || fail "本地段 teardown 预览应成功且不改文件
+$OUT"
+grep -F 'keeps the local section in place (2 lines)' >/dev/null <<<"$OUT" || fail "预览应说明本地段 2 行留在原位置
+$OUT"
+grep -F 'needs --accept-removals' >/dev/null <<<"$OUT" && fail "只有本地段时预览不应要求 --accept-removals
+$OUT"
+run teardown-convention.sh
+[ "$RC" -eq 0 ] || fail "只有本地段时 teardown 不需要 --accept-removals
+$OUT"
+[ "$(cat "$P/CLAUDE.md")" = "$(printf '# Mine\n\n- 本地规则一\n- 本地规则二')" ] || fail "本地段内容应留在块原位置、标记去掉，实际:
+$(cat "$P/CLAUDE.md")"
+[ -f "$P/.agent/state.json.disabled" ] || fail "本地段 teardown 仍应停用 state.json"
+grep -F '2' >/dev/null <<<"$(grep -F '本地段' <<<"$OUT")" || fail "完成提示应说明本地段留在原位置的行数
+$OUT"
+ok "teardown 把本地段内容留在原位置，去掉本地段标记"
+
+project teardown-hand
+printf '# Mine\n' > "$P/CLAUDE.md"
+run setup-convention.sh local
+add_local "$P/CLAUDE.md" "$END" '- 本地规则'
+add_hand "$P/CLAUDE.md" "$BEGIN" '- 一行手写规则'
+before="$(snapshot)"
+run teardown-convention.sh --dry-run
+[ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] || fail "有手写行时 teardown 预览也不改文件
+$OUT"
+grep -F 'will remove: - 一行手写规则   [needs --accept-removals]' >/dev/null <<<"$OUT" || fail "预览应逐行列出需接受的手写行
+$OUT"
+grep -F 'will remove: - 本地规则' >/dev/null <<<"$OUT" && fail "预览不应把本地段的行列为删除
+$OUT"
+run teardown-convention.sh
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] || fail "有手写行时 teardown 不带参数应退出 1，指令文件与 state 都不变（实际 ${RC}）
+$OUT"
+grep -F -- '- 一行手写规则' >/dev/null <<<"$OUT" && grep -F -- '--accept-removals' >/dev/null <<<"$OUT" || fail "拒绝时应列出手写行并提示 --accept-removals
+$OUT"
+run teardown-convention.sh --accept-removals
+[ "$RC" -eq 0 ] && [ "$(cat "$P/CLAUDE.md")" = "$(printf '# Mine\n\n- 本地规则')" ] && [ -f "$P/.agent/state.json.disabled" ] \
+  || fail "带 --accept-removals 后应移除手写行、保留本地段内容并停用 state
+$OUT
+$(cat "$P/CLAUDE.md")"
+ok "teardown 遇到手写行先拒绝，--accept-removals 后移除"
+
+for case in two reversed unpaired; do
+  project "teardown-local-$case"
+  printf '# Mine\n' > "$P/CLAUDE.md"
+  run setup-convention.sh local
+  case "$case" in
+    two) add_local "$P/CLAUDE.md" "$END" '- a'; add_local "$P/CLAUDE.md" "$END" '- b' ;;
+    reversed) python3 - "$P/CLAUDE.md" "$END" <<'PY'
+import sys
+p, end = sys.argv[1:3]
+t = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(t.replace(end, "<!-- END:spec-guard-local -->\n- a\n<!-- BEGIN:spec-guard-local -->\n" + end, 1))
+PY
+    ;;
+    unpaired) python3 - "$P/CLAUDE.md" "$END" <<'PY'
+import sys
+p, end = sys.argv[1:3]
+t = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(t.replace(end, "<!-- BEGIN:spec-guard-local -->\n- a\n" + end, 1))
+PY
+    ;;
+  esac
+  before="$(snapshot)"
+  run teardown-convention.sh --accept-removals
+  [ "$RC" -ne 0 ] && [ "$(snapshot)" = "$before" ] || fail "本地段标记损坏（${case}）时 teardown 应拒绝且不改任何文件
+$OUT"
+done
+ok "本地段标记损坏时 teardown 拒绝，state 保持原样"
+
+project teardown-accept-noblock
+mkdir -p "$P/.agent"
+printf '%s\n' '{"activeModule":""}' > "$P/.agent/state.json"
+before="$(snapshot)"
+run teardown-convention.sh --accept-removals
+[ "$RC" -eq 2 ] && [ "$(snapshot)" = "$before" ] || fail "没有约定块时 --accept-removals 应是用法错误（退出 2，实际 ${RC}）
+$OUT"
+ok "没有约定块时 --accept-removals 退出 2"
+
+project teardown-dispatch
+printf '# Mine\n' > "$P/CLAUDE.md"
+cp "$P/CLAUDE.md" "$WORK/dispatch-original"
+run setup-convention.sh local --dispatch
+run teardown-convention.sh
+[ "$RC" -eq 0 ] && cmp -s "$P/CLAUDE.md" "$WORK/dispatch-original" || fail "只有派活规则段时 teardown 不需要接受，且逐字节还原
+$OUT"
+ok "派活规则段属于已知行，teardown 不需要接受"
+
+project teardown-codex-local
+printf '# Agents\n' > "$P/AGENTS.md"
+run setup-convention.sh local --host=codex
+add_local "$P/AGENTS.md" '<!-- END:spec-guard-codex-convention -->' '- codex 本地规则'
+add_hand "$P/AGENTS.md" '<!-- BEGIN:spec-guard-codex-convention -->' '- codex 手写'
+before="$(snapshot)"
+run teardown-convention.sh --host=codex
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] || fail "Codex：有手写行时 teardown 应拒绝且不改文件
+$OUT"
+run teardown-convention.sh --host=codex --accept-removals
+[ "$RC" -eq 0 ] && [ "$(cat "$P/AGENTS.md")" = "$(printf '# Agents\n\n- codex 本地规则')" ] || fail "Codex：接受后应只留下本地段内容
+$OUT
+$(cat "$P/AGENTS.md")"
+ok "Codex 主机的 teardown 同样保留本地段、拒绝手写行"
+
 # 删掉声明块后仍只凭 state.json 的 activeModule 激活：激活信号不因删除 tracker 字段而减少。
 # 放在最后，避免改写 $P 影响前面依赖同一个项目的用例。
 project signal-only
