@@ -9,7 +9,7 @@ from local_ticket_journal import (
     active_journal, entry_key, publication_lock,
     read_journal, write_entry,
 )
-from local_ticket_portability import InventoryError
+from local_ticket_inventory import InventoryError
 from local_ticket_preview import EVENT_MARKER, ISSUE_MARKER, render_body
 from local_ticket_provider import ProviderRejected
 

@@ -13,7 +13,7 @@ from local_ledger_runtime import (
     MCP_RELATIVE_PATH, node_status, runtime_status, mcp_tool_call,
     state_worktree_status,
 )
-from local_ticket_portability import InventoryError, _event_lines, inventory_project
+from local_ticket_inventory import InventoryError, _event_lines, inventory_project
 
 
 def _digest(value: Any) -> str:

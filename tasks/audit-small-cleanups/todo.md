@@ -1,7 +1,7 @@
 # Todo: audit-small-cleanups
 
 - [x] Task 1: phase-guard without grep (F12, tests first) — `file_has_line` (bash `read` + `[[ =~ ]]`, last line without newline included) replaces the three `grep -Eq` activation checks, same patterns. New cases with a PATH of only git and python3: activated, CRLF-block and activeModule projects inject; other-state, prose and empty stay silent. Red before (no output), green after; phase-guard 166. Mutations caught: unanchored marker (prose activates), CLAUDE.md branch dropped (CRLF case red)
-- [ ] Task 2: local ticket inventory module (F15, test first)
+- [x] Task 2: local ticket inventory module (F15, test first) — new `test_local_ticket_imports.py` (in validate.sh): no `local_ticket_*` module imports the CLI (AST), importing each in a fresh interpreter leaves the CLI unloaded, the CLI still re-exports the four names. Red on 11 modules, then the inventory code (InventoryError, worktree_roots, _event_lines, inventory_project and helpers) moved to `local_ticket_inventory.py`, the 11 modules import from it, the CLI keeps only `main` plus re-exports; unused imports dropped on both sides. Ticket portability/publish/providers suites OK; restore acceptance skips without SPEC_GUARD_EPIQ_RUNTIME as before. Mutation caught: local_ticket_lock importing the CLI again
 - [ ] Task 3: single module id pattern and current-module selection (F16)
 - [ ] Task 4: remove dead host-config helpers (F17)
 - [ ] Task 5: complete command table with a check (F18)

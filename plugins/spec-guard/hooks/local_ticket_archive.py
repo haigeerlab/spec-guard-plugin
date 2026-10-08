@@ -16,7 +16,7 @@ from typing import Any
 from local_ledger_runtime import (
     PACKAGE_VERSION, STATE_BRANCH, project_status, state_worktree_status,
 )
-from local_ticket_portability import InventoryError, _event_lines, inventory_project, worktree_roots
+from local_ticket_inventory import InventoryError, _event_lines, inventory_project, worktree_roots
 from local_ticket_journal import (binding_chain_evidence, binding_checksum,
                                   read_journal)
 
