@@ -1,6 +1,6 @@
 ---
 description: 在当前项目落地本地多 Spec 目录约定
-argument-hint: "[local] [--dry-run] [--replace] [--dispatch|--no-dispatch]"
+argument-hint: "[local] [--dry-run] [--replace [--accept-removals]] [--dispatch|--no-dispatch]"
 allowed-tools: Bash
 ---
 
@@ -12,7 +12,11 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention.sh" $ARGUMENTS --dry-run
 
 原样转述预览输出，并等待用户明确确认后，才去掉 `--dry-run` 再运行一次；用户参数里已有 `--dry-run` 时只预览。
 缺省模式为 `local`。`--replace` 仅替换已有受管声明块；已有声明块的标记重复、缺失或顺序错误时，脚本拒绝并
-不改动任何文件。
+不改动任何文件。项目自己的规则写进块内的本地段：独占一行的 `<!-- BEGIN:spec-guard-local -->` 与
+`<!-- END:spec-guard-local -->` 之间的行在 `--replace` 后原样保留在新块末尾（本地段最多一个，标记无效时拒绝）。
+`--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或派活规则段里时标着
+`[needs --accept-removals]`，真正替换会拒绝并不改文件。原样转述这些行，让用户决定把它们移进本地段，还是明确同意
+删除后加 `--accept-removals` 重跑；从旧版模板升级时，旧模板的行同样需要这一步。
 **实验性**：省钱效果未经证明。对照实验里派活没有减少主会话轮次，opus 父代理加 sonnet 子代理仍比不派贵 15%–54%，所以规则默认由主代理自己做，只派预计要改动 3 个以上文件、验收明确的 task。
 `--dispatch` 在约定块的基础模板之后加一段可选规则：`/build` 把 todo 中非 Checkpoint 的 task 交给一个子代理做
 RED → GREEN → 回归 → 构建，交出完整任务块与 plan 的 Architecture Decisions，派活 prompt 带 tier-guard 档位标记；

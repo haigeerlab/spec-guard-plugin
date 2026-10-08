@@ -6,6 +6,7 @@ set -euo pipefail
 HOST="claude"
 DRY=false
 REPLACE=false
+ACCEPT_REMOVALS=false
 DISPATCH_ARG=""
 for arg in "$@"; do
   case "$arg" in
@@ -17,6 +18,7 @@ for arg in "$@"; do
     --host=codex) HOST=codex ;;
     --dry-run) DRY=true ;;
     --replace) REPLACE=true ;;
+    --accept-removals) ACCEPT_REMOVALS=true ;;
     --dispatch|--no-dispatch)
       want=on; [ "$arg" = --no-dispatch ] && want=off
       if [ -n "$DISPATCH_ARG" ] && [ "$DISPATCH_ARG" != "$want" ]; then
@@ -25,9 +27,13 @@ for arg in "$@"; do
       fi
       DISPATCH_ARG="$want"
       ;;
-    *) echo "usage: setup-convention.sh [local] [--host=codex] [--dry-run] [--replace] [--dispatch|--no-dispatch]" >&2; exit 2 ;;
+    *) echo "usage: setup-convention.sh [local] [--host=codex] [--dry-run] [--replace [--accept-removals]] [--dispatch|--no-dispatch]" >&2; exit 2 ;;
   esac
 done
+if [ "$ACCEPT_REMOVALS" = true ] && [ "$REPLACE" != true ]; then
+  echo "--accept-removals only applies together with --replace; no files were changed." >&2
+  exit 2
+fi
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -115,15 +121,28 @@ install_block() {
       [ -z "$DISPATCH_ARG" ] || printf '  ⏭ --dispatch/--no-dispatch only take effect together with --replace\n'
       return
     fi
-    if [ "$DRY" = true ]; then
-      printf '  • replace the convention block in %s\n' "$TARGET"
-      dispatch_status
-      return
-    fi
     BODY="$(mktemp)"
     trap 'rm -f "$BODY"' EXIT
     block_content > "$BODY"
-    python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" >/dev/null
+    # convention-block-local-lines：本地段原样保留；删除模板以外的行须 --accept-removals（managed-block.py 判定）。
+    if [ "$DRY" = true ]; then
+      printf '  • replace the convention block in %s\n' "$TARGET"
+      dispatch_status
+      PREVIEW="$(python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" --known "$TEMPLATE" --known "$RULE" --dry-run)" || exit 1
+      printf '%s\n' "$PREVIEW" | sed 's/^/    /'
+      return
+    fi
+    ACCEPT_FLAG=""
+    [ "$ACCEPT_REMOVALS" = true ] && ACCEPT_FLAG=--accept-removals
+    set +e
+    python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" --known "$TEMPLATE" --known "$RULE" \
+      ${ACCEPT_FLAG:+"$ACCEPT_FLAG"} >/dev/null
+    rc=$?
+    set -e
+    if [ "$rc" -ne 0 ]; then
+      printf '  ❌ %s was not changed\n' "$TARGET" >&2
+      exit 1
+    fi
     printf '  ✅ updated %s\n' "$TARGET"
     return
   fi

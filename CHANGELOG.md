@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.54.1] - 2026-10-08
+
+### 修复
+
+- **`setup-convention --replace` 不再悄悄删掉项目写进约定块的行。** 原来 `--replace` 把 BEGIN/END 之间整段换成模板，
+  `--dry-run` 只说一句“replace the convention block”。现在约定块里可以有一个本地段（独占一行的
+  `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->`），替换时原样放回新块末尾；标记不成对、颠倒或
+  出现多个时拒绝。`--replace --dry-run` 逐行列出 `will remove:` / `will add:`；真正替换若会删掉本地段以外、又不属于
+  现行模板或派活规则段的行，退出 1、列出这些行且不改文件，看过后加 `--accept-removals` 才执行。从旧模板升级时，旧模板
+  独有的行同样需要接受。首次安装、teardown 与没有手写行的替换行为不变。
+
 ## [0.54.0] - 2026-10-08
 
 ### 新增
