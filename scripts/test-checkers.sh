@@ -482,6 +482,8 @@ mkretire() {  # $1=目录：拼出让原有断言也能全绿的最小干净树
   printf '# AGENTS\n' > "$1/AGENTS.md"
   printf '# design\n' > "$1/docs/design.md"
   printf '# maintainer workflow\n' > "$1/docs/maintainer-workflow.md"
+  mkdir -p "$1/spec"
+  printf '| Module id | Responsibility | Depends on |\n| --- | --- | --- |\n| alpha | x | — |\n' > "$1/spec/CAPABILITY-MAP.md"
 }
 
 mkretire "$TMP/retiregood"
@@ -492,6 +494,11 @@ mkretire "$TMP/retirebad-ghissue"
 printf 'run `gh issue create --title x`\n' > "$TMP/retirebad-ghissue/plugins/spec-guard/commands/bad.md"
 want fail "retire-scan: 命令文件含 gh issue create → 报错" \
   bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retirebad-ghissue"
+
+mkretire "$TMP/retirebad-map"
+printf '| beta | user runs /spec-guard:handoff | — |\n' >> "$TMP/retirebad-map/spec/CAPABILITY-MAP.md"
+want fail "retire-scan: 能力图模块行描述已退役命令 → 报错" \
+  bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retirebad-map"
 
 mkretire "$TMP/retirebad-syncmap"
 printf '#!/usr/bin/env bash\necho "/sync-map"\n' > "$TMP/retirebad-syncmap/plugins/spec-guard/hooks/phase-guard.sh"

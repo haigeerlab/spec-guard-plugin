@@ -17,6 +17,12 @@
 
 ### 维护
 
+- **能力图只列现行模块**（审查第 6 组：F6、F14）：已迁到 agent-relay 的四个协作实现模块
+  （`collaboration-messaging`、`collaboration-safe-defaults`、`authorized-session-delegation`、
+  `host-native-session-routing`）从模块表与 Build order 中移除，其 Spec 与全部任务文件用 `git mv` 逐字归档到
+  `docs/retirements/<模块 id>/`，并新增退役说明 `docs/retirements/collaboration-implementation.md`；依赖它们的
+  `audit-remediation`、`collaboration-interface` 相应去掉这些依赖。`context-hint-no-paste` 一行不再描述已退役的交接
+  命令；退役扫描也覆盖能力图，模块行出现已退役命令名即失败。Proposal 扫描与评审结论不变。
 - **守门检查在被守的东西坏掉时真的会变红**（审查第 4 组：F7、F8、F9、F10、F13、F19）：
   - 命令插件根回归不再只要求“至少 15 个命令”：每个不在豁免名单（各附理由）里的命令都必须带逐字的规范引导段；
   - 双宿主一致性检查器在脚本级之外也核对参数：命令传给 `hooks/<脚本>` 的每个 `--参数`（续行拼接后）必须出现在
