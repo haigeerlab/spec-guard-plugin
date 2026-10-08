@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError
+from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError, public_result
 
 
 REQUEST_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{2,127}\Z")
@@ -69,7 +69,7 @@ def main() -> int:
         result = inspect_ticket(provider, args.visibility, args.request_id, args.title)
     except HostedTicketError as error:
         result = {"state": "unknown", "diagnostic": str(error)}
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    print(json.dumps(public_result(result), ensure_ascii=False, sort_keys=True))
     return 0
 
 
