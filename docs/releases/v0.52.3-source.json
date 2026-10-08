@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:aed26074f494aa4b00ab5d3c0ee87b26544cc82a"
+      },
+      "observedAt": "2026-10-08T06:04:00Z",
+      "evidence": [
+        "result:the v0.52.3 annotated tag and origin/main both resolve to merge commit aed26074f494aa4b00ab5d3c0ee87b26544cc82a; its tree equals release commit 374e1da's tree, on which the commands below ran; pull request #245 merged after its pull_request run passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 162, verify-artifacts 30 cases); ShellCheck 4.1.0 clean",
+        "result:the 16 new cases were red before the change; 7 hand mutations (OSError merged back into content errors, read failure reported with bad, bash readability check removed, OSError branch in describe removed, UnicodeError dropped from the invalid branch, reason unsanitised, fallback JSON removed) are each caught"
+      ]
+    }
+  ]
+}
