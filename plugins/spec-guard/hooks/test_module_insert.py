@@ -496,6 +496,17 @@ class ModuleInsertTests(unittest.TestCase):
         self.write("spec/CAPABILITY-MAP.md", MAP.replace("Build order: alpha, beta → gamma", ""))
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "—", "end"))
 
+    def test_non_separator_second_row_is_refused(self):
+        # The strict parser's separator rule had no negative test (2026-10-08 audit F9):
+        # an ordinary row under the header must not be accepted as the separator.
+        self.write("spec/CAPABILITY-MAP.md",
+                   MAP.replace("| --- | --- | --- |\n| alpha |", "| x | y | z |\n| alpha |"))
+        before = self.snapshot()
+        with self.assertRaises(InsertError) as caught:
+            preview(self.root, "delta", "Fourth", "—", "end")
+        self.assertIn("表头分隔行", str(caught.exception))
+        self.assertEqual(before, self.snapshot())
+
     def test_duplicate_id_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "beta", "Duplicate", "—", "end"))
 

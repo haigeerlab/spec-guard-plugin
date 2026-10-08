@@ -66,6 +66,17 @@ printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Respo
   '| --- | --- | --- |' '| alpha | x | missing |' > "$PROJECT/spec/CAPABILITY-MAP.md"
 check "无效能力图失败并给出解析原因" 1 "能力图无效: "
 
+# 表头下面一行若不是分隔行（审查 F9：此前没有反向断言），能力图无效。
+project no-separator
+python3 - "$PROJECT/spec/CAPABILITY-MAP.md" <<'PY'
+import sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+assert "| --- | --- | --- |" in text
+open(path, "w", encoding="utf-8").write(text.replace("| --- | --- | --- |", "| x | y | z |", 1))
+PY
+check "表头下面不是分隔行时能力图无效" 1 "模块表缺少有效的表头分隔行"
+
 # 能力图读不了是读取故障，不是内容无效：报“未验证”并附原因，不判失败。
 project unreadable-map
 chmod 000 "$PROJECT/spec/CAPABILITY-MAP.md"
