@@ -66,6 +66,10 @@ printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Respo
   '| --- | --- | --- |' '| alpha | x | missing |' > "$PROJECT/spec/CAPABILITY-MAP.md"
 check "无效能力图失败并给出解析原因" 1 "能力图无效: "
 
+# 两张模块表：报错指出两张表头所在行（map-table-count-diagnostic）。
+project two-module-tables '' '| Module id | Responsibility | Depends on |' '| --- | --- | --- |' '| beta | x | — |'
+check "两张模块表时报错列出表头行号" 1 "能力图无效: 必须恰好有一个模块表，找到 2 张：第 9、15 行"
+
 # 表头下面一行若不是分隔行（审查 F9：此前没有反向断言），能力图无效。
 project no-separator
 python3 - "$PROJECT/spec/CAPABILITY-MAP.md" <<'PY'

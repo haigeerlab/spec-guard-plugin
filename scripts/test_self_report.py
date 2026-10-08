@@ -46,9 +46,8 @@ class Fixture(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.claude = self.root / "claude"
         self.codex = self.root / "codex"
-        self.project = self.root / "work" / "secret-project"
-        self.project.mkdir(parents=True)
-        self.real = os.path.realpath(str(self.project))
+        # Not under a temp directory, and need not exist: temp-directory projects are excluded.
+        self.real = os.path.realpath("/sg-self-report-fixture/work/secret-project")
 
     def write_jsonl(self, path, rows):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -336,6 +335,32 @@ class CliTests(Fixture):
             with self.assertRaises(SystemExit) as raised:
                 sr.main(["--since", "two weeks"])
         self.assertEqual(raised.exception.code, 2)
+
+
+class TempProjectTests(Fixture):
+    run_cli = CliTests.run_cli
+    seed = CliTests.seed
+
+    def test_temp_directory_projects_are_excluded_and_counted(self):
+        temp_project = os.path.realpath(str(self.root / "badmap"))
+        self.claude_session("s2.jsonl", [
+            claude_attachment("2026-10-01T10:00:00Z", temp_project, "sess-tmp", [segment("UNKNOWN")]),
+        ])
+        self.seed()
+        code, out = self.run_cli()
+        self.assertEqual(code, 0)
+        self.assertIn("已排除临时目录中的 1 段", out)
+        self.assertIn("MAP_INVALID", out)
+        self.assertNotIn("UNKNOWN", out)
+        data = json.loads(self.run_cli("--json")[1])
+        self.assertEqual(data["excluded_temp"], 1)
+        self.assertEqual([f["stage"] for f in data["findings"]], ["MAP_INVALID"])
+
+    def test_temp_prefixes(self):
+        for path in ("/private/tmp/x", "/tmp/x", "/private/var/folders/ab/T/x", "/var/folders/ab/T/x"):
+            self.assertTrue(sr.is_temp(path), path)
+        for path in ("/home/fixture/work/x", "/tmpfoo/x", "/Users/someone/tmp/x"):
+            self.assertFalse(sr.is_temp(path), path)
 
 
 if __name__ == "__main__":

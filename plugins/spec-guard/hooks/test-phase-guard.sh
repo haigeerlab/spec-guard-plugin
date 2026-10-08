@@ -196,6 +196,10 @@ lacks "NEEDS_SPEC 没有模块完成行" "$stages" "Module boundary"
 printf '%s\n' '| alpha | x | — |' > "$stages/spec/CAPABILITY-MAP.md"
 injects "能力图无效时报告 MAP_INVALID" "$stages" "当前阶段: **MAP_INVALID**"
 lacks "MAP_INVALID 没有模块完成行" "$stages" "Module boundary"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
+  '| Module id | Responsibility | Depends on |' '|---|---|---|' '| beta | x | — |' '' 'Build order: alpha → beta' \
+  > "$stages/spec/CAPABILITY-MAP.md"
+injects "两张模块表时 MAP_INVALID 列出表头行号" "$stages" "必须恰好有一个模块表，找到 2 张：第 2、6 行"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
 printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
