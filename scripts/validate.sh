@@ -72,6 +72,7 @@ echo ""
 echo "═══ 校验器自身的回归 ═══"
 bash scripts/test-checkers.sh || F=1
 python3 -B scripts/test_pre_push_environment.py || F=1
+python3 -B scripts/test_verify_and_commit.py || F=1
 echo ""
 
 # 指纹算法供能力图与 Proposal 校验共用；免费，所以进这一层。
