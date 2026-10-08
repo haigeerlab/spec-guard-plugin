@@ -68,7 +68,7 @@ infer `user-name`, `preferred-editor`, or `auto-sync`; collect the user's values
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
   --confirm-initialize --user-name "<display name the user gave>" \
-  --preferred-editor "<editor command the user gave>" --auto-sync false --format json
+  --preferred-editor "<editor command the user gave>" --auto-sync "<true|false the user gave>" --format json
 ```
 
 Adapter inspection is read-only and available for either host:
