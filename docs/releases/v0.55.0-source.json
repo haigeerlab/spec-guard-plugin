@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.55.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:b4a7aacb03bd7b0b6ae96e32970bc6539c0d3190"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "result:the v0.55.0 annotated tag and origin/main both resolve to merge commit b4a7aacb03bd7b0b6ae96e32970bc6539c0d3190 (pull request #270, merged after its pull_request run passed)",
+        "result:the merge commit's tree equals release commit 52ead1a's tree; 0.55.0 combines #266 (self-observation-report), #267 (pre-push-ref-only-skip), #268 (map-table-count-diagnostic) and #269 (verify-and-commit), scope confirmed by the user",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.55.0 ...\"",
+        "result:the commit was made by verify-and-commit.sh after validate, phase-guard (190 cases) and verify-artifacts (40 cases) passed on macOS with /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}

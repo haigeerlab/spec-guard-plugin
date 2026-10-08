@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.55.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.55.0;test:installed-plugin-upgrade-20261009b"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.54.2 to 0.55.0 for scope user; the installed copy records gitCommitSha b4a7aacb03bd7b0b6ae96e32970bc6539c0d3190 -- the v0.55.0 tag commit",
+        "host:Claude Code 2.1.294"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.55.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.55.0;test:installed-copy-map-table-count-20261009"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "command:fresh git fixtures set up by the installed setup-convention, one spec file, and the capability map edited to hold two module tables or none",
+        "command:<installed>/hooks/phase-guard.sh and <installed>/hooks/verify-artifacts.sh on each fixture",
+        "result:two tables -> MAP_INVALID with `必须恰好有一个模块表，找到 2 张：第 16、40 行` in both the phase injection and verify-artifacts",
+        "result:no table -> MAP_INVALID with `没有模块表（需要恰好一张表头为 Module id 的表）` in both"
+      ]
+    }
+  ]
+}

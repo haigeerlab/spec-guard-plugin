@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.55.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.55.0;test:marketplace-ref-upgrade-20261009b"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.54.2 to v0.55.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.55.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.55.0;test:installed-plugin-smoke-20261009b"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.55.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.55.0;test:installed-copy-map-table-count-20261009"
+      },
+      "observedAt": "2026-10-08T18:33:50Z",
+      "evidence": [
+        "command:fresh git fixtures set up by the installed setup-convention, one spec file, and the capability map edited to hold two module tables or none",
+        "command:<installed>/hooks/phase-guard.sh and <installed>/hooks/verify-artifacts.sh on each fixture",
+        "result:two tables -> MAP_INVALID with `必须恰好有一个模块表，找到 2 张：第 16、40 行` in both the phase injection and verify-artifacts",
+        "result:no table -> MAP_INVALID with `没有模块表（需要恰好一张表头为 Module id 的表）` in both"
+      ]
+    }
+  ]
+}

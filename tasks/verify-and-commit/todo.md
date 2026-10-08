@@ -5,4 +5,4 @@
 - [x] Task 3：文档 — `docs/maintainer-workflow.md` “提交前”、`CLAUDE.md` “最小验证”
 - [x] Checkpoint 1（report）：全部套件通过，ShellCheck 无告警；本模块自己的提交从这里起改用新脚本 — 本次提交即由新脚本完成
 - [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #269 由用户合并于 8e63f1e
-- [ ] Task 4：0.55.0 统一发版时补证据
+- [x] Task 4：0.55.0 统一发版时补证据 — v0.55.0 的发版提交由本脚本完成（validate、phase-guard 190、verify-artifacts 40 通过）；记录见 `docs/releases/v0.55.0-*.json`

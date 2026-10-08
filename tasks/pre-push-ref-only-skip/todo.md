@@ -6,4 +6,4 @@
 - [x] Checkpoint 1（report）：validate 与 pre-push 回归通过，ShellCheck 无告警
 - [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #267 由用户合并于 0b0f470
 - [x] Task 4：重新安装本机钩子 — 合并后在主线上重装，安装内容与生成文本一致；真实删除 claude/pre-push-ref-only-skip 时打印“跳过检查（只有删除 …）”，推送 2 秒完成
-- [ ] Task 5：0.55.0 统一发版时补证据
+- [x] Task 5：0.55.0 统一发版时补证据 — v0.55.0 已发版（#270），推 v0.55.0 tag 时钩子打印“跳过检查（只有推 tag v0.55.0）”；记录见 `docs/releases/v0.55.0-*.json`
