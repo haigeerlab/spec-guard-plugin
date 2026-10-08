@@ -41,6 +41,25 @@ GIT_LOCAL_VARS="$(git rev-parse --local-env-vars)" || exit 1
 while IFS= read -r git_var; do
   [ -z "$git_var" ] || unset "$git_var" || exit 1
 done <<< "$GIT_LOCAL_VARS"
+# 只删远端引用、只推 tag 的推送验证不了任何新东西：tag 打在已验证的合并提交上，
+# 删除不带新内容。git 在 stdin 给出 `<local ref> <local sha> <remote ref> <remote sha>`；
+# 每行都是删除（local sha 全 0）或推 tag 时跳过。有一行更新分支、或清单为空，照常全跑。
+SEEN=false; BRANCH=false; WHY=""
+while read -r _ local_sha remote_ref _; do
+  SEEN=true
+  case "$local_sha" in *[!0]*|"") is_delete=false ;; *) is_delete=true ;; esac
+  if [ "$is_delete" = true ]; then
+    WHY="${WHY:+${WHY}、}删除 ${remote_ref}"
+  elif [ "${remote_ref#refs/tags/}" != "$remote_ref" ]; then
+    WHY="${WHY:+${WHY}、}推 tag ${remote_ref#refs/tags/}"
+  else
+    BRANCH=true
+  fi
+done
+if [ "$SEEN" = true ] && [ "$BRANCH" = false ]; then
+  echo "── pre-push: 跳过检查（只有${WHY}，没有分支更新）──"
+  exit 0
+fi
 echo "── pre-push: 跑不花钱的那几层 ──"
 F=0
 # 每样只跑**一遍**，输出留在变量里。跑两遍（一遍取输出一遍取退出码）
