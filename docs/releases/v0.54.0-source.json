@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:2f1e919b163c4f7b8ac7a799ee289a9719a01969"
+      },
+      "observedAt": "2026-10-08T14:07:20Z",
+      "evidence": [
+        "result:the v0.54.0 annotated tag and origin/main both resolve to merge commit 2f1e919b163c4f7b8ac7a799ee289a9719a01969 (pull request #258, merged after its pull_request run passed)",
+        "result:the merge commit's tree equals release commit 8f8560b's tree plus docs/releases/v0.53.0-*.json from evidence PR #254, which merged into main while #258 was open; the commands below ran on 8f8560b on macOS 15.7.3 with /bin/bash 3.2.57",
+        "result:0.54.0 combines module PRs #255 (project-config), #256 (module-suspend), #257 (runtime-state-layout) and #258 (collaboration-command-retirement plus the version bump)",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh",
+        "command:npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh evals/*.sh evals/*/*.sh",
+        "result:all passed in one && chain before the push; phase-guard 189 cases, verify-artifacts 39 cases"
+      ]
+    }
+  ]
+}

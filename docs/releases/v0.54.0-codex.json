@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.54.0;test:marketplace-ref-upgrade-20261008f"
+      },
+      "observedAt": "2026-10-08T14:07:20Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.53.0 to v0.54.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.54.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.54.0;test:installed-plugin-smoke-20261008f"
+      },
+      "observedAt": "2026-10-08T14:07:20Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    }
+  ]
+}
