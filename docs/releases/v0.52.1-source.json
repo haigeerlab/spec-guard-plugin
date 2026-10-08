@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:721d7d4f7a590c8480fe7228e2716dc6ad36466c"
+      },
+      "observedAt": "2026-10-08T05:30:00Z",
+      "evidence": [
+        "result:the v0.52.1 annotated tag and origin/main both resolve to merge commit 721d7d4f7a590c8480fe7228e2716dc6ad36466c; its tree equals release commit d0a3d6d's tree, on which the commands below ran; pull request #241 merged after its pull_request run passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 150, verify-artifacts 26 cases); ShellCheck 4.1.0 clean",
+        "result:the redaction and argv tests were red before the change; dropping the redaction and putting the URL back into fetch or ls-remote are each caught"
+      ]
+    }
+  ]
+}
