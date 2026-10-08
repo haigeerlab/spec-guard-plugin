@@ -1,7 +1,7 @@
 # Todo: unattended-run-hint
 
-- [ ] Task 1: end-to-end regressions (red first)
-- [ ] Task 2: the unattended fact and its use
-- [ ] Checkpoint 1 (report): full suites green, ShellCheck clean
-- [ ] Task 3: CHANGELOG under `## [未发布]` + macOS validation
-- [ ] Checkpoint 2 (gate): module review; push and PR authorized by Plan approval, merge by the user
+- [x] Task 1: end-to-end regressions (red first) — 9 new cases in `test-phase-guard.sh`: ATTENDED=0 (BUILDING 800k, DONE) and a Codex rollout whose first record is session_meta source "exec" drop the lines and otherwise equal the attended output byte for byte; ATTENDED=1, ATTENDED=yes, source "vscode", a non-string source, a malformed first record, and source "exec" only in a later record keep them. The harness now strips the runner's own CLAUDE_CODE_SESSION_ATTENDED so the suite gives the same result from any session. Red on the old hook
+- [x] Task 2: the unattended fact and its use — `session_context.unattended()` (env var exactly "0", or the transcript's first record only; never raises) printed as a fourth fact line; `phase-guard.sh` passes `--unattended`; `describe` blanks only the Session context and Module boundary lines. phase-guard 175. Mutations caught: missing transcript treated as unattended, any source accepted, Session context omission dropped, reading the last record instead of the first
+- [x] Checkpoint 1 (report): full suites green, ShellCheck clean — validate.sh pass, phase-guard 175, verify-artifacts 31, sanitization OK, CI ShellCheck glob clean
+- [x] Task 3: CHANGELOG under `## [未发布]` + macOS validation — entry under `## [未发布]` / 修复. macOS 15.7.3, `/bin/bash` 3.2.57: validate.sh pass (incl. Codex smoke selftest). Real `claude -p` / `codex exec` runs are left to the combined release
+- [x] Checkpoint 2 (gate): module review; push and PR authorized by Plan approval, merge by the user — branch pushed and the module PR opened for the user's review; ticked inside the PR (combined release)

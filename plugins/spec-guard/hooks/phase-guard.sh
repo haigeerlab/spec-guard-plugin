@@ -82,6 +82,10 @@ case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
 # 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
 WINDOW=""
 case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
+# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那两行。
+UNATTENDED=""
+case "$WINDOW" in *$'\n'unattended*) UNATTENDED=1 ;; esac
+WINDOW="${WINDOW%%$'\n'*}"
 case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
 # 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
@@ -135,7 +139,7 @@ Suggested next step: write the first reviewed module spec under \`spec/\`."
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} 2>/dev/null)"; then
   emit "${HEADER}
 
 ${STAGE}"

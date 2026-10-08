@@ -105,6 +105,27 @@ def context_usage(transcript_path) -> tuple | None:
     return None
 
 
+def unattended(transcript_path) -> bool:
+    """True only when the host says nobody attends this run (unattended-run-hint).
+
+    Claude Code sets CLAUDE_CODE_SESSION_ATTENDED=0 for `claude -p` (measured 2026-10-08, undocumented); a Codex
+    `codex exec` rollout starts with a session_meta record whose source is "exec". Anything else, including an
+    unreadable transcript, counts as attended, so an interactive session never loses its hints.
+    """
+    if os.environ.get("CLAUDE_CODE_SESSION_ATTENDED") == "0":
+        return True
+    if not isinstance(transcript_path, str) or not transcript_path:
+        return False
+    try:
+        with open(transcript_path, "rb") as handle:
+            first = handle.readline(65536)
+        record = json.loads(first)
+    except (OSError, ValueError):
+        return False
+    payload = record.get("payload") if isinstance(record, dict) and record.get("type") == "session_meta" else None
+    return isinstance(payload, dict) and payload.get("source") == "exec"
+
+
 def transcript_path_from_hook_input(text) -> str | None:
     try:
         data = json.loads(text)
@@ -193,9 +214,17 @@ def main() -> None:
         resolve_root_main(sys.argv[2])
         return
     try:
-        usage = context_usage(transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno())))
+        path = transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno()))
     except Exception:  # a hook helper must never break the stage injection
+        path = None
+    try:
+        usage = context_usage(path)
+    except Exception:
         usage = None
+    try:
+        nobody = unattended(path)
+    except Exception:
+        nobody = False
     tokens, window = usage if usage else (None, None)
     try:
         location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".")
@@ -204,6 +233,7 @@ def main() -> None:
     print("" if tokens is None else tokens)
     print(location or "")
     print("" if window is None else window)
+    print("unattended" if nobody else "")
 
 
 if __name__ == "__main__":

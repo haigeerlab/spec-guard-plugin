@@ -225,7 +225,8 @@ def unreadable_map(reason: str) -> str:
             "next prompt; this is a read failure, not a state of the map." % reason)
 
 
-def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None) -> str:
+def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
+             unattended: bool = False) -> str:
     root = Path(root)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
@@ -268,6 +269,8 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         boundary_note_line = boundary_line(context_tokens, boundary_note)
     else:
         boundary_note_line = ""
+    if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
+        context_note = boundary_note_line = ""
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` has a plan but no `tasks/%s/todo.md`, so it counts as done; "
@@ -346,5 +349,6 @@ if __name__ == "__main__":
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--context-tokens", type=int)
     parser.add_argument("--context-window", type=int)
+    parser.add_argument("--unattended", action="store_true")
     args = parser.parse_args()
-    print(describe(Path(args.root), args.context_tokens, args.context_window))
+    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended))
