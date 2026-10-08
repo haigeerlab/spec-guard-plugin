@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.54.2;test:marketplace-ref-upgrade-20261009"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.54.1 to v0.54.2",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.54.2, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.54.2;test:installed-plugin-smoke-20261009"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.54.2-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.54.2;test:installed-copy-teardown-local-section-20261009"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "command:<installed>/hooks/setup-convention.sh and teardown-convention.sh with --host=codex against the fixture AGENTS.md",
+        "command:a fresh git fixture; setup-convention local (first install), then a local section `<!-- BEGIN:spec-guard-local -->` with one line added before the block END marker",
+        "result:teardown-convention exited 0 without --accept-removals; the local line stayed where the block was, no spec-guard marker remained, and .agent/state.json became state.json.disabled",
+        "result:after a fresh install with one hand-written line outside the local section, teardown-convention exited 1, listed that line and mentioned --accept-removals; the instruction file hash and the .agent directory were unchanged",
+        "result:teardown-convention --accept-removals exited 0, removed the hand-written line, left the local line in place and disabled state.json"
+      ]
+    }
+  ]
+}

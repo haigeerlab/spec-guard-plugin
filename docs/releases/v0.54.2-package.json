@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.54.2;asset:spec-guard-v0.54.2.tar.gz;sha256:4fc1713124b01b83a19b3da93828eca5b2dd5f50c225c1302d00cd88ae352604"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.54.2",
+        "asset:spec-guard-v0.54.2.tar.gz;size:456336",
+        "source-tag:v0.54.2@b79b5d59512caf890afd09d430b78b5be21ed2f7",
+        "command:git archive --prefix=spec-guard-v0.54.2/ v0.54.2 .claude-plugin plugins/spec-guard",
+        "command:python3 scripts/release-package.py validate <dir> 0.54.2",
+        "result:built from the merge commit the tag points to; no `._*` entries; validated before packing and again after extracting; the asset downloaded from the Release has the same SHA-256"
+      ]
+    }
+  ]
+}

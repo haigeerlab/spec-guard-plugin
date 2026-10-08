@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.2;test:installed-plugin-upgrade-20261009"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.54.1 to 0.54.2 for scope user; the installed copy records gitCommitSha b79b5d59512caf890afd09d430b78b5be21ed2f7 -- the v0.54.2 tag commit",
+        "host:Claude Code 2.1.294"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.54.2-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.2;test:installed-copy-teardown-local-section-20261009"
+      },
+      "observedAt": "2026-10-08T16:24:04Z",
+      "evidence": [
+        "command:<installed>/hooks/setup-convention.sh and teardown-convention.sh (default Claude host) against the fixture CLAUDE.md",
+        "command:a fresh git fixture; setup-convention local (first install), then a local section `<!-- BEGIN:spec-guard-local -->` with one line added before the block END marker",
+        "result:teardown-convention exited 0 without --accept-removals; the local line stayed where the block was, no spec-guard marker remained, and .agent/state.json became state.json.disabled",
+        "result:after a fresh install with one hand-written line outside the local section, teardown-convention exited 1, listed that line and mentioned --accept-removals; the instruction file hash and the .agent directory were unchanged",
+        "result:teardown-convention --accept-removals exited 0, removed the hand-written line, left the local line in place and disabled state.json"
+      ]
+    }
+  ]
+}
