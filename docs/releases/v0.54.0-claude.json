@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.54.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.0;test:installed-plugin-upgrade-20261008f"
+      },
+      "observedAt": "2026-10-08T14:07:20Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.53.0 to 0.54.0 for scope user; the installed copy records gitCommitSha 2f1e919b163c4f7b8ac7a799ee289a9719a01969 -- the v0.54.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.54.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.54.0;test:installed-copy-checks-20261008"
+      },
+      "observedAt": "2026-10-08T14:07:20Z",
+      "evidence": [
+        "result:the installed copy carries commands/config.md, commands/module-suspend.md, hooks/project_config.py, hooks/module_suspend.py and hooks/state_paths.py, and no commands/collaboration.md",
+        "command:CLAUDE_PROJECT_DIR=<this repo> /bin/bash <installed>/hooks/phase-guard.sh",
+        "result:the injection carries the `Artifact language: zh-CN` and `Review cadence: combined` lines from this repository's .agent/config.json",
+        "command:python3 -B <installed>/hooks/project_config.py show --project <this repo>",
+        "result:reports machine state ~/.spec-guard and the two ~/.local/state/spec-guard directories still read as fallback"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-p-headless",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.54.0;test:headless-injection-20261008"
+      },
+      "reason": "`claude auth status --json` reports loggedIn false, so a headless `claude -p` run cannot reach the model; the installed hook output was checked directly above. Re-run after `/login` in an interactive `claude`."
+    }
+  ]
+}
