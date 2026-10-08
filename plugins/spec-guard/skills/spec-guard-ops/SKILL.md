@@ -59,7 +59,7 @@ PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local --host=codex --dry-run
 ```
 
-已有声明块要升级时追加 `--replace`。用户要求把 `/build` 的 task 交给子代理执行时加 `--dispatch`（实验性：规则默认由主代理自己做，只派预计改动 3 个以上文件、验收明确的 task；派出后 wait_agent 一次等到完成、不短间隔轮询；省钱效果未证明，预览时说明）
+已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。用户要求把 `/build` 的 task 交给子代理执行时加 `--dispatch`（实验性：规则默认由主代理自己做，只派预计改动 3 个以上文件、验收明确的 task；派出后 wait_agent 一次等到完成、不短间隔轮询；省钱效果未证明，预览时说明）
 （默认关闭；开关存在块里，`--replace` 会保留已开启的状态，关闭须 `--no-dispatch`；转述预览中的
 `build-task-dispatch rule:` 行）。Codex 段写明 tier-guard 在 Codex 上只作建议。workspace-write 沙箱不允许写 `.git`，开启后主代理每次提交都要申请提权，预览时提醒用户。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
