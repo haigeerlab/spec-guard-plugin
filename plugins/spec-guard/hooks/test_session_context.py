@@ -3,11 +3,13 @@
 Fixtures are built here; nothing reads this machine's real transcripts or rollouts.
 """
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import session_context
@@ -182,9 +184,12 @@ class CommandLine(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def run_cli(self, stdin_text):
+    def run_cli(self, stdin_text, attended=None):
+        env = {key: value for key, value in os.environ.items() if key != "CLAUDE_CODE_SESSION_ATTENDED"}
+        if attended is not None:
+            env["CLAUDE_CODE_SESSION_ATTENDED"] = attended
         done = subprocess.run([sys.executable, "-B", SCRIPT, self.tmp.name], input=stdin_text,
-                              capture_output=True, text=True, timeout=10)
+                              capture_output=True, text=True, timeout=10, env=env)
         self.assertEqual(done.returncode, 0, done.stderr)
         return done.stdout
 
@@ -192,7 +197,13 @@ class CommandLine(unittest.TestCase):
         out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
         self.assertEqual(out.split("\n")[0], "250610")
         self.assertEqual(out.split("\n")[2], "")  # Claude records carry no window
-        self.assertEqual(out.count("\n"), 3)
+        self.assertEqual(out.split("\n")[3], "")  # attended (unattended-run-hint)
+        self.assertEqual(out.count("\n"), 4)
+
+    def test_prints_unattended_as_the_fourth_line(self):
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}), attended="0")
+        self.assertEqual(out.split("\n")[3], "unattended")
+        self.assertEqual(out.split("\n")[0], "250610")  # the other facts are unchanged
 
     def test_prints_the_codex_window_as_the_third_line(self):
         self.transcript.write_text(json.dumps(codex_token_count(120000)) + "\n")
@@ -303,6 +314,45 @@ class Location(unittest.TestCase):
                               text=True, timeout=10)
         self.assertEqual(done.stdout.split("\n")[1], location_line(self.repo))
 
+
+
+class Unattended(unittest.TestCase):
+    """unattended-run-hint: only an explicit host signal means nobody is there."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "rollout.jsonl"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def check(self, first_line, expected, attended=None):
+        if first_line is not None:
+            self.path.write_text(first_line + "\n" + json.dumps(codex_token_count(1)) + "\n")
+        environment = {} if attended is None else {"CLAUDE_CODE_SESSION_ATTENDED": attended}
+        with mock.patch.dict(os.environ, environment, clear=False):
+            if attended is None:
+                os.environ.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+            self.assertIs(session_context.unattended(str(self.path)), expected)
+
+    def test_claude_unattended_variable(self):
+        self.check(None, True, attended="0")
+        self.check(None, False, attended="1")
+        self.check(None, False, attended="")
+
+    def test_codex_exec_first_record(self):
+        meta = '{"type":"session_meta","payload":{"originator":"codex_exec","source":"exec"}}'
+        self.check(meta, True)
+        self.check(meta.replace('"exec"}', '"vscode"}'), False)
+        self.check('{"type":"session_meta","payload":{"source":{"subagent":"x"}}}', False)
+        self.check('{"type":"event_msg","payload":{"source":"exec"}}', False)
+        self.check("not json", False)
+
+    def test_missing_or_absent_transcript_is_attended(self):
+        self.check(None, False)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
+            self.assertFalse(session_context.unattended(None))
 
 
 class RootFromHookInput(unittest.TestCase):

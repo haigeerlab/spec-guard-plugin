@@ -8,8 +8,9 @@ PASS=0
 
 fail() { echo "  ❌ $1" >&2; exit 1; }
 
+# 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（unattended-run-hint）；用例按需显式设置。
 run() {  # $1=项目目录；可用 RUN_PATH 替换 PATH
-  PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
+  env -u CLAUDE_CODE_SESSION_ATTENDED PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
 }
 
 silent() {  # $1=用例名 $2=项目目录
@@ -554,8 +555,12 @@ lacks "BUILDING 且领先时不建议先推送" "$um_build" "push this branch"
 lacks "BUILDING 且领先时没有模块完成行" "$um_build" "Module boundary"
 
 # 上下文行（fresh-session-hint 第 2、8、9 条）：经标准输入的 hook 输入读会话记录，超过 200k 才提示。
-run_input() {  # $1=项目目录 $2=标准输入文本
-  CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+run_input() {  # $1=项目目录 $2=标准输入文本；ATTENDED=<值> 时传给 hook，否则不设
+  if [ -n "${ATTENDED:-}" ]; then
+    env CLAUDE_CODE_SESSION_ATTENDED="$ATTENDED" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+  else
+    env -u CLAUDE_CODE_SESSION_ATTENDED CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+  fi
 }
 context_of() {  # 从 hook JSON 取 additionalContext
   python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
@@ -696,6 +701,57 @@ echo "  ✅ Codex BUILDING 达到窗口 80% 时有上下文行"; PASS=$((PASS + 
 codex_rollout "$T" 206719
 [ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "Codex BUILDING 低于窗口 80% 时不应提示"
 echo "  ✅ Codex BUILDING 低于窗口 80% 时不提示"; PASS=$((PASS + 1))
+
+# unattended-run-hint：没人在场的运行（claude -p 设 CLAUDE_CODE_SESSION_ATTENDED=0；codex exec 的会话记录首条
+# session_meta 写 source:"exec"）不出那两行「请告诉用户 /compact、/clear」，其余逐字相同；拿不准时照旧。
+codex_meta() {  # $1=文件 $2=source 的 JSON 值；之后追加一条会触发上下文行的 token_count
+  printf '{"type":"session_meta","payload":{"originator":"x","source":%s}}\n' "$2" > "$1"
+  printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":206720},"model_context_window":258400}}}' >> "$1"
+}
+same_as() {  # $1=用例名 $2=期望全文
+  [ "$out" = "$2" ] || fail "$1
+--- got
+$out
+--- want
+$2"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+has_ctx() {  # $1=用例名：仍有 Session context 行
+  grep -F -- "- Session context:" >/dev/null <<<"$out" || fail "$1: 有人在场时应保留上下文行
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+transcript "$T" 799999
+out="$(ATTENDED=0 run_input "$ctx" "$HOOK_INPUT" | context_of)"
+same_as "claude -p（ATTENDED=0）BUILDING 800k：去掉上下文行，其余逐字相同" "$plain_building"
+out="$(ATTENDED=1 run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "交互会话（ATTENDED=1）BUILDING 800k：照旧有上下文行"
+out="$(ATTENDED=yes run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "ATTENDED 不是 0 时按有人在场"
+codex_meta "$T" '"exec"'
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+same_as "codex exec（source=exec）BUILDING 80%：去掉上下文行，其余逐字相同" "$plain_building"
+codex_meta "$T" '"vscode"'
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "Codex 桌面（source=vscode）：照旧有上下文行"
+codex_meta "$T" '{"subagent":"x"}'
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "source 不是字符串 exec 时按有人在场"
+{ printf '%s\n' 'not json'; tail -1 "$T"; } > "$T.bad"; mv "$T.bad" "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "会话记录首条损坏时按有人在场"
+codex_meta "$T" '"vscode"'
+printf '%s\n' '{"type":"session_meta","payload":{"source":"exec"}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+has_ctx "只看首条记录：后面出现 source=exec 不算"
+printf '%s\n' '- [x] done' > "$ctx/tasks/alpha/todo.md"
+plain_done_unattended="$(ATTENDED=0 run_input "$ctx" "" | context_of)"
+out="$(run_input "$ctx" "" | context_of)"
+grep -F -- "$BOUNDARY" >/dev/null <<<"$out" || fail "DONE 有人在场应有 Module boundary 行"
+python3 -c 'import sys; t=sys.stdin.read(); b=sys.argv[1]; print(t.replace(b + "\n", "", 1), end="")' "$BOUNDARY" <<<"$out" > "$WORK/done-without-boundary"
+out="$plain_done_unattended"
+same_as "claude -p（ATTENDED=0）DONE：只去掉 Module boundary 行" "$(cat "$WORK/done-without-boundary")"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 
 # MODULE_DONE 与 DONE 同一规则。
 md="$WORK/ctx-module-done"

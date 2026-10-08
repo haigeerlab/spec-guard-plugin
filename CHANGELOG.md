@@ -12,6 +12,10 @@
 - **Codex 的 skill 找插件根目录与命令一致。** 审查的 F5：`spec-guard-ops` 自带的解析片段遇到结构异常的插件列表
   （如 `[]`）会抛 traceback。现在它用命令的同一段规范引导：查询失败、没有 codex、列表无法解析或没有已启用的
   spec-guard 时以 2 退出并说明是定位失败；`local-ticket-ledger-ops` 写明两边宿主的 `ROOT` 来源。
+- **没人在场的运行不再被要求“告诉用户 /compact 或 /clear”。** `codex exec`、`claude -p` 这类非交互运行的答复交给
+  另一个 agent，阶段提示却照样注入 Module boundary 与 Session context 两行，模型就把“后续可用 /compact…”写进了
+  答复。现在 Claude Code 标记为无人值守（`CLAUDE_CODE_SESSION_ATTENDED=0`）或 Codex 会话记录首条
+  `session_meta` 的 `source` 为 `exec` 时，只去掉这两行；阶段事实、位置行与所有判定不变，信号缺失或读不了时照旧。
 - **账本初始化示例不再替用户选 `auto-sync`。** Claude 命令与 Codex skill 的 `initialize` 示例原本写死
   `--auto-sync false`，与旁边“不可猜测、向用户索取”的说明矛盾；现在两边都是用户给的 `true` 或 `false` 的占位符。
 
