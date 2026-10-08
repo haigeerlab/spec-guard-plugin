@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""只读严格解析能力图：capability-map.py <map-path>，单个 JSON，失败非零。"""
+"""只读严格解析能力图：capability-map.py <map-path>，单个 JSON；内容无效退出 1，读不了退出 2（kind: unreadable）。"""
 import argparse
 import json
 import sys
@@ -20,7 +20,11 @@ def main(argv):
             "orderGroups": parsed.order_groups,
             "order": parsed.order,
         }
-    except (MapError, OSError, UnicodeError) as error:
+    except OSError as error:
+        # A file that cannot be read says nothing about the map's content; callers report it as unverified.
+        print(json.dumps({"ok": False, "kind": "unreadable", "error": str(error)}, ensure_ascii=False))
+        return 2
+    except (MapError, UnicodeError) as error:
         result = {"ok": False, "error": str(error)}
     print(json.dumps(result, ensure_ascii=False))
     return 0 if result["ok"] else 1

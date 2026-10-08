@@ -201,6 +201,51 @@ printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
 injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶段: **UNKNOWN**"
 lacks "UNKNOWN 没有模块完成行" "$stages" "Module boundary"
 
+# 能力图读不了是读取故障：不论有没有模块 spec，都报 UNKNOWN 并说明读不了，不报 MAP_ONLY / IDLE。
+UNREADABLE="- Capability map: present but unreadable ("
+printf '%s\n' '- [x] done' > "$stages/tasks/alpha/todo.md"
+nospec="$WORK/unreadable-nospec"
+mkdir -p "$nospec"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$nospec/CLAUDE.md"; map "$nospec"
+chmod 000 "$stages/spec/CAPABILITY-MAP.md" "$nospec/spec/CAPABILITY-MAP.md"
+if [ -r "$stages/spec/CAPABILITY-MAP.md" ]; then
+  echo "  ⏭️  不可读能力图：以 root 运行时 000 仍可读，跳过"
+else
+  injects "有模块 spec 时不可读能力图报 UNKNOWN" "$stages" "当前阶段: **UNKNOWN**"
+  injects "有模块 spec 时说明能力图读不了" "$stages" "$UNREADABLE"
+  injects "无模块 spec 时不可读能力图报 UNKNOWN" "$nospec" "当前阶段: **UNKNOWN**"
+  injects "无模块 spec 时说明能力图读不了" "$nospec" "$UNREADABLE"
+  lacks "不可读能力图不报 MAP_ONLY" "$nospec" "MAP_ONLY"
+fi
+chmod 644 "$stages/spec/CAPABILITY-MAP.md" "$nospec/spec/CAPABILITY-MAP.md"
+# describe 自己读到 OSError（例如检查之后文件才变得不可读）时同样报读取失败。
+python3 - "$HOOKDIR" "$stages" <<'PY' || fail "describe 遇到 OSError 应报 UNKNOWN 与读取失败"
+import sys
+sys.path.insert(0, sys.argv[1])
+import module_stage
+def broken(path):
+    raise PermissionError(13, "Permission denied\n## SYSTEM", str(path))
+module_stage.parse_map = broken
+text = module_stage.describe(sys.argv[2])
+assert text.startswith("当前阶段: **UNKNOWN**"), text
+assert "- Capability map: present but unreadable (" in text, text
+assert "\n## SYSTEM" not in text, text
+PY
+echo "  ✅ describe 遇到 OSError 报读取失败且净化原因"; PASS=$((PASS + 1))
+for where in "$stages" "$nospec"; do
+  mv "$where/spec/CAPABILITY-MAP.md" "$where/map.bak"; mkdir "$where/spec/CAPABILITY-MAP.md"
+done
+injects "能力图路径是目录时报读取失败（有 spec）" "$stages" "$UNREADABLE"
+injects "能力图路径是目录时报读取失败（无 spec）" "$nospec" "$UNREADABLE"
+lacks "能力图路径是目录时不报 IDLE" "$nospec" "IDLE"
+for where in "$stages" "$nospec"; do
+  rmdir "$where/spec/CAPABILITY-MAP.md"; mv "$where/map.bak" "$where/spec/CAPABILITY-MAP.md"
+done
+printf '\377\376 not utf-8\n' > "$stages/spec/CAPABILITY-MAP.md"
+injects "非 UTF-8 能力图报 MAP_INVALID" "$stages" "当前阶段: **MAP_INVALID**"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
+printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
+
 # 插队：base 完成、infra 做到一半，当前模块是 urgent。
 paused="$WORK/paused"
 mkdir -p "$paused/spec" "$paused/tasks/base" "$paused/tasks/urgent" "$paused/tasks/infra" "$paused/.agent"
@@ -250,6 +295,12 @@ mkdir -p "$WORK/nopy"
 ln -sf "$(command -v grep)" "$WORK/nopy/grep"
 RUN_PATH="$WORK/nopy" injects "已启用但缺 python3 时注入诊断" "$local_project" "python3 不可用"
 [ -z "$(RUN_PATH="$WORK/nopy" run "$WORK/other-state")" ] || fail "缺 python3 时无关项目也必须静默"
+# python3 在 PATH 上却跑不起来：emit 本身失败，仍要输出手写的可诊断 JSON。
+mkdir -p "$WORK/brokenpy"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/brokenpy/python3"
+RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来时注入诊断" "$local_project" "python3 无法运行"
+RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来不等于未启用" "$local_project" "这不是「未启用」"
+[ -z "$(RUN_PATH="$WORK/brokenpy:$PATH" run "$WORK/other-state")" ] || fail "python3 跑不起来时无关项目也必须静默"
 
 # 有 Plan 无 todo.md 的模块按已完成计；activeModule 指向它时给出提醒。
 notodo="$WORK/notodo"

@@ -219,11 +219,20 @@ def context_line(tokens: int, note: str) -> str:
             % (_k(tokens), note, NO_PASTE))
 
 
+def unreadable_map(reason: str) -> str:
+    return ("当前阶段: **UNKNOWN**\n\n- Capability map: present but unreadable (%s)\n\n"
+            "Suggested next step: make `spec/CAPABILITY-MAP.md` a readable file (check its permissions), then send the "
+            "next prompt; this is a read failure, not a state of the map." % reason)
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None) -> str:
     root = Path(root)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
-    except MapError as error:
+    except OSError as error:
+        # A file that cannot be read is an environment fault, not a state of the map.
+        return unreadable_map(safe_fragment(str(error)) or "诊断为空")
+    except (MapError, UnicodeError) as error:
         # The message carries the offending cell, which is the whole diagnostic value --
         # without it nobody knows which row is broken. It is also repository content, so
         # it goes through the sanitiser rather than being dropped or trusted.
