@@ -524,6 +524,21 @@ mkretire "$TMP/retireallow-newhit"
 want fail "retire-scan: 同一允许清单文件里新增一条不同文本的违规仍报错" \
   bash "$ROOT/plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh" "$TMP/retireallow-newhit"
 
+
+# ── evals/dispatch-cost/grade.sh ──
+# 审查 F10：隐藏测试经 `| tail -3` 运行且没有 pipefail，失败时判分仍退出 0。
+# 用替身 PYTHON：unittest 按 GRADE_HIDDEN_RC 退出，成本报告恒成功（不跑付费评测）。
+mkdir -p "$TMP/grade-run"
+printf '%s\n' '#!/bin/sh' 'case "$*" in *unittest*) echo "hidden: rc=${GRADE_HIDDEN_RC}"; exit "${GRADE_HIDDEN_RC}" ;; esac' \
+  'echo "cost: ok"' > "$TMP/grade-python"
+chmod +x "$TMP/grade-python"
+want pass "grade.sh: 隐藏测试通过 → 退出 0" \
+  env PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=0 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run"
+want fail "grade.sh: 隐藏测试失败 → 非零退出" \
+  env PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=1 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run"
+GRADE_OUT="$(PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=1 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run" 2>&1)"
+want pass "grade.sh: 隐藏测试失败时仍输出成本部分" grep -Fq "cost: ok" <<<"$GRADE_OUT"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1
