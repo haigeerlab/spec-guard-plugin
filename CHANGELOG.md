@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.52.1] - 2026-10-08
+
+### 修复
+
+- **Git 远端地址里的凭据不再外露。** 2026-10-08 架构审查的 F1、F2：远端地址写成 `https://user:token@host/...`
+  （或把 token 放在用户名位置）时，本地账本的 `preflight --format json` 会把它原样打印到终端和 agent 上下文；
+  Proposal 读取远端快照时又把这个地址放进 `git ls-remote` / `git fetch` 的命令参数，本机其他进程可见。现在
+  `preflight` 输出的 origin 把整段用户信息换成 `***`，并带 `originCredentialsRedacted: true`；scp 写法与不带
+  凭据的地址不变，是否需要确认推送的判定不变。Proposal 快照改为在项目里按远端名列出 HEAD，拉取时把地址写进临时
+  仓库自己的配置文件，再按远端名拉取，命令参数里不再出现地址；读到的提交与失败结果不变。
+
 ## [0.52.0] - 2026-10-08
 
 ### 修复
