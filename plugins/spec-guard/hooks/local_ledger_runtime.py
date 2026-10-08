@@ -255,6 +255,16 @@ def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
     return {"state": "foreign", "path": path, "owner": owner}
 
 
+# remote-credential-redaction: a scheme URL's userinfo (user:token@ or token@) never leaves this module.
+_URL_USERINFO = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@")
+
+
+def redact_url(url):
+    """(url with the userinfo of a scheme URL replaced by ***, whether anything was replaced)."""
+    redacted, count = _URL_USERINFO.subn(r"\1***@", url) if isinstance(url, str) else (url, 0)
+    return redacted, bool(count)
+
+
 def initialization_preflight(
     project_dir: Path, allow_epiq_push: bool = False,
 ) -> tuple[int, dict[str, Any]]:
@@ -273,18 +283,21 @@ def initialization_preflight(
     if origin is None:
         return 1, {"state": "invalid", "diagnostic": "unable to inspect Git origin"}
     if origin.returncode == 0:
-        origin_url = origin.stdout.strip()
+        origin_url, redacted = redact_url(origin.stdout.strip())
+        marker = {"originCredentialsRedacted": True} if redacted else {}
         if not allow_epiq_push:
             return 1, {
                 "state": "push-confirmation-required",
                 "projectDir": str(repository),
                 "origin": origin_url,
+                **marker,
                 "upstreamPush": "requires-explicit-confirmation",
             }
         return 0, {
             "state": "ready",
             "projectDir": str(repository),
             "origin": origin_url,
+            **marker,
             "upstreamPush": "permitted",
         }
     return 0, {

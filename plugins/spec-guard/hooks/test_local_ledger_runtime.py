@@ -165,6 +165,41 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "ready")
         self.assertEqual(payload["upstreamPush"], "permitted")
 
+    # remote-credential-redaction: credentials in the origin URL never reach the preflight output.
+
+    def test_redact_url_hides_the_whole_userinfo_of_a_scheme_url(self):
+        cases = {
+            "https://user:SECRET@example.invalid/repo.git": "https://***@example.invalid/repo.git",
+            "https://SECRET@example.invalid/repo.git": "https://***@example.invalid/repo.git",
+            "ssh://git:SECRET@example.invalid:2222/repo.git": "ssh://***@example.invalid:2222/repo.git",
+        }
+        for url, redacted in cases.items():
+            with self.subTest(url=url):
+                self.assertEqual(local_ledger_runtime.redact_url(url), (redacted, True))
+
+    def test_redact_url_leaves_urls_without_userinfo_unchanged(self):
+        for url in ("https://example.invalid/repo.git", "git@github.com:org/repo.git", "/srv/repo.git",
+                    "file:///srv/repo.git", "https://example.invalid/path@v1/repo.git", "", "::not a url::"):
+            with self.subTest(url=url):
+                self.assertEqual(local_ledger_runtime.redact_url(url), (url, False))
+
+    def test_initialization_preflight_never_prints_origin_credentials(self):
+        self.initialize_git_project(origin="https://user:SECRET@example.invalid/local-ledger.git")
+        for allow in (False, True):
+            with self.subTest(allow_epiq_push=allow):
+                code, payload = local_ledger_runtime.initialization_preflight(
+                    self.project_dir, allow_epiq_push=allow)
+                self.assertEqual((code, payload["state"]), (0, "ready") if allow else (1, "push-confirmation-required"))
+                self.assertNotIn("SECRET", json.dumps(payload))
+                self.assertEqual(payload["origin"], "https://***@example.invalid/local-ledger.git")
+                self.assertIs(payload["originCredentialsRedacted"], True)
+
+    def test_initialization_preflight_marks_nothing_when_origin_has_no_credentials(self):
+        self.initialize_git_project(origin="git@github.com:org/local-ledger.git")
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir)
+        self.assertEqual(payload["origin"], "git@github.com:org/local-ledger.git")
+        self.assertNotIn("originCredentialsRedacted", payload)
+
     def test_initialization_preflight_refuses_a_dirty_project_before_epiq_runs(self):
         self.initialize_git_project()
         (self.project_dir / "README.md").write_text("dirty\n", encoding="utf-8")
