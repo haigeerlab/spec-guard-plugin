@@ -16,11 +16,13 @@ from __future__ import annotations
 import argparse
 import difflib
 import json
+import os
 import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
+from state_paths import ENV as STATE_ENV, legacy_in_use, state_root
 from tracker_default import _write_atomic, read_default, read_text
 
 RELATIVE_PATH = Path(".agent") / "config.json"
@@ -138,6 +140,10 @@ def _show(root: Path, as_json: bool) -> int:
     if ignored:
         print("\nwarning: %s is matched by .gitignore, so the team does not share this configuration."
               % RELATIVE_PATH)
+    # runtime-state-layout: facts only; nothing here suggests deleting a directory that holds records.
+    print("\nmachine state: %s%s" % (state_root(), " (from %s)" % STATE_ENV if os.environ.get(STATE_ENV) else ""))
+    for legacy in legacy_in_use():
+        print("legacy directory still read: %s (until %s exists)" % (legacy, state_root() / legacy.name))
     return 0
 
 

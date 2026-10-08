@@ -4,6 +4,12 @@
 
 ### 新增
 
+- **本机状态只有一个根目录，文件布局写成规则。** 托管事项的写入意图与 Proposal 收尾日志原在 `~/.local/state/spec-guard/`，
+  账本运行时与交接日志在 `~/.spec-guard/`，没有一处说明什么放哪、谁能删。现在本机状态统一在 `~/.spec-guard/`（可用
+  `SPEC_GUARD_STATE_DIR` 改），由 `hooks/state_paths.py` 唯一给出；那两类记录在新目录不存在时继续整目录读旧位置，
+  不搬运、不删除，账本运行时与交接日志的默认路径不变。`docs/design.md` 新增 File layout（项目产物、历史归档、每个 checkout
+  的状态、本机状态四类），新检查器拦下布局以外的家目录路径，`/spec-guard:config` 列出根目录与仍在回退读取的旧位置。
+
 - **挂起在等外部条件的模块：`/spec-guard:module-suspend`。** 代码做完、只剩某天复核或发版后观察的模块会一直占着
   当前模块，项目到不了 DONE，`add-module` 也插不进新模块。现在可以挂起它：`todo.md` 里一行标记，选当前模块时跳过它、
   保留 Build order 原位，阶段提示列出“挂起中”，只剩挂起模块时 DONE 不再说成全部完成；它不算做到一半，加新模块不需要

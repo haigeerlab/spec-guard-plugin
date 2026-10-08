@@ -47,6 +47,9 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 `.agent/config.json`，**入库**，团队与 Claude／Codex 两边读同一份。没有这个文件表示什么都没配，
 插件行为与未引入配置时完全一致。`show` 发现它被 `.gitignore` 忽略时会警告：那样团队看不到这份配置。
 
+`show` 末尾还列出本机状态根目录（`~/.spec-guard`，或环境变量 `SPEC_GUARD_STATE_DIR` 指定的位置）；若某类记录仍在
+回退读取旧位置 `~/.local/state/spec-guard/…`，也逐行列出。只报告事实，不建议删除有内容的目录。
+
 ## 可配置项
 
 | 键 | 取值 | 默认 | 作用 |

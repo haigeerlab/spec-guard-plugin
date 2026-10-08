@@ -595,6 +595,31 @@ want fail "grade.sh: 隐藏测试失败 → 非零退出" \
 GRADE_OUT="$(PYTHON="$TMP/grade-python" GRADE_HIDDEN_RC=1 /bin/bash "$ROOT/evals/dispatch-cost/grade.sh" "$TMP/grade-run" 2>&1)"
 want pass "grade.sh: 隐藏测试失败时仍输出成本部分" grep -Fq "cost: ok" <<<"$GRADE_OUT"
 
+# ── check-state-paths.py ──
+# runtime-state-layout：本机状态只经 state_paths.py；hooks 里其他家目录用法必须在允许清单内（读宿主配置、epiq 自己的目录）。
+mkstate() {  # $1=目录
+  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/hooks"
+  printf '%s\n' 'from pathlib import Path' 'def state_root(): return Path.home() / ".spec-guard"' \
+    > "$1/plugins/spec-guard/hooks/state_paths.py"
+  printf '%s\n' 'from pathlib import Path' 'CLAUDE = Path.home() / ".claude" / "settings.json"' \
+    'import os' 'G = os.path.join(os.path.expanduser("~"), ".epiq-global")' > "$1/plugins/spec-guard/hooks/reader.py"
+  printf '%s\n' 'from pathlib import Path' 'X = Path.home() / ".anything"' > "$1/plugins/spec-guard/hooks/test_reader.py"
+}
+mkstate "$TMP/stategood"
+want pass "state-paths: 只有 state_paths 与允许清单用到家目录 → 放行" \
+  python3 "$ROOT/scripts/check-state-paths.py" "$TMP/stategood"
+mkstate "$TMP/statebad"
+printf '%s\n' 'from pathlib import Path' 'ROOT = Path.home() / ".local" / "state" / "other"' \
+  > "$TMP/statebad/plugins/spec-guard/hooks/rogue.py"
+STATE_OUT="$(python3 "$ROOT/scripts/check-state-paths.py" "$TMP/statebad" 2>&1)"
+want fail "state-paths: 新增家目录写入 → 报错" python3 "$ROOT/scripts/check-state-paths.py" "$TMP/statebad"
+want pass "state-paths: 报错给出文件与行号" grep -Fq "rogue.py:2" <<<"$STATE_OUT"
+mkstate "$TMP/stateexp"
+printf '%s\n' 'import os' 'D = os.path.expanduser("~/.cache/spec-guard")' > "$TMP/stateexp/plugins/spec-guard/hooks/rogue2.py"
+want fail "state-paths: expanduser 写法同样拦下" python3 "$ROOT/scripts/check-state-paths.py" "$TMP/stateexp"
+rm -rf "$TMP/stateempty"; mkdir -p "$TMP/stateempty"
+want fail "state-paths: 0 个文件是没找到，不是没问题" python3 "$ROOT/scripts/check-state-paths.py" "$TMP/stateempty"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1

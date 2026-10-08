@@ -66,6 +66,24 @@ of new spec, plan and todo prose; structural keywords never change) and
 Spec and Plan together).  The dispatch switch and the default tracker keep their
 own homes and are only summarized.
 
+## File layout
+
+Where spec-guard writes, and who may remove what.  `scripts/check-state-paths.py` keeps
+home-directory paths in the hooks to `hooks/state_paths.py` plus reads of the hosts' own
+configuration.
+
+| Kind | Path | Committed | Written by | Remove |
+|---|---|---|---|---|
+| Project artifacts | `spec/`, `tasks/<id>/`, the convention block in `CLAUDE.md`/`AGENTS.md`, `.agent/config.json`, `.agent/tracker.json`, `DOCUMENTATION-BASELINE.md`, `.epiq/project.json` | yes | commands after a preview and confirmation | through the commands; teardown keeps specs and plans |
+| History archive | `spec/history/`, `tasks/history/`, `.agent/history/`, `spec/CAPABILITY-HISTORY.json` | yes | only the one-time history migration | never: the ledger pins every file by hash |
+| Per-checkout state | `.agent/state.json` (active module); anything new goes under `$(git rev-parse --git-path spec-guard)` | no | the build flow; local locks | freely |
+| Machine state | `~/.spec-guard/` or `$SPEC_GUARD_STATE_DIR`: `local-ticket-ledger/runtime`, `local-ticket-portability`, `hosted-ticket-intents`, `proposal-closeout` | no | ledger install, handoff, hosted ticket writes, Proposal closeout | the runtime by reinstalling; journals and intents only when no write is pending, since they prevent duplicates |
+
+`~/.local/state/spec-guard/hosted-ticket-intents` and `.../proposal-closeout` are read as a
+whole-directory fallback while their new directory does not exist; nothing is moved or
+deleted.  `~/.spec-guard/native-collaboration`, `session-delegation` and `collaboration`
+belong to agent-relay, not to spec-guard.
+
 ## Retired boundary
 
 The v0.14-era mutable remote tracker bridge is not part of the product.  It is

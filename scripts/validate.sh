@@ -80,6 +80,11 @@ python3 plugins/spec-guard/hooks/spec-digest.py --selftest || F=1
 python3 scripts/check-digest-single-source.py || F=1
 echo ""
 
+# 本机状态只经 state_paths.py（runtime-state-layout）；免费，所以进这一层。
+echo "═══ 本机状态路径 ═══"
+python3 scripts/check-state-paths.py || F=1
+echo ""
+
 echo "═══ Proposal 与本地结构回归 ═══"
 /bin/bash evals/test-codex-command-roots.sh || F=1
 /bin/bash evals/test-codex-skill-teardown-history.sh || F=1
