@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.52.0;test:marketplace-ref-upgrade-20261008"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.51.3 to v0.52.0 (backup kept)",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.52.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.52.0;test:installed-plugin-smoke-20261008"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection (a first run started without </dev/null hung in codex exec on an inherited non-TTY stdin and was stopped; that is the invocation, not the plugin)",
+        "host:codex-cli 0.160.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-context-after-compact-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.52.0;test:context-after-compact-20261008"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "command:<codex installed copy>/hooks/phase-guard.sh on a DONE checkout with a real Claude transcript cut right after its compact_boundary (postTokens 13951; last usage 601430)",
+        "result:DONE with no Module boundary line (0.51.3 said about 601 k tokens and suggested a new session)",
+        "command:<codex installed copy>/hooks/session_context.py on a real Codex rollout cut after `compacted` and a zero token_count",
+        "result:context_usage (0, None); 0.51.3 read the pre-compaction 223005",
+        "result:commands/handoff.md and hooks/session_handoff.py are absent; a /spec-guard:handoff prompt gets the normal stage injection"
+      ]
+    }
+  ]
+}

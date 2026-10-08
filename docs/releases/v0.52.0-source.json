@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:db6f12ed1e69fe99b2304ead0a494f893a6d3327"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "result:the v0.52.0 annotated tag and origin/main both resolve to merge commit db6f12ed1e69fe99b2304ead0a494f893a6d3327; its tree equals release commit a4b80d1, on which the commands below ran; pull request #238 merged after its pull_request run passed",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --selftest",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 150, verify-artifacts 26 cases); ShellCheck 4.1.0 clean",
+        "result:the compaction tests were red before the change; dropping the compaction branch, reading preTokens, ignoring Codex compacted, re-offering the handoff command in a reference and re-adding an interception branch are each caught"
+      ]
+    }
+  ]
+}
