@@ -193,4 +193,15 @@ check "含 tracker 键时发退役字段告警" 0 "$LEGACY"
 rm -f "$PROJECT/.agent/state.json"
 check_absent "没有 state.json 时不发退役字段告警" "$LEGACY"
 
+# 项目配置只由 project_config.py 判定；没有配置文件时不输出这一项。
+project config-absent
+check_absent "没有配置文件时不报告项目配置" "项目配置"
+project config-valid; mkdir -p "$PROJECT/.agent"
+printf '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}\n' > "$PROJECT/.agent/config.json"
+check "合法的项目配置通过" 0 "项目配置有效"
+printf '{"version": 1, "reviewCadence": "both", "extra": 1}\n' > "$PROJECT/.agent/config.json"
+check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknown-key, reviewCadence-invalid"
+printf '{broken' > "$PROJECT/.agent/config.json"
+check "无法解析的项目配置失败" 1 "项目配置无效: not-json"
+
 echo "verify-artifacts regression passed ($PASS cases)"

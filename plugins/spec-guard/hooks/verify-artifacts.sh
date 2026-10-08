@@ -98,5 +98,22 @@ if grep -Eq '"tracker"[[:space:]]*:' .agent/state.json 2>/dev/null; then
   warn '检测到已退役的 tracker 字段；它不再被读取，可从 .agent/state.json 中删除'
 fi
 
+# 项目配置只由 project_config.py 判定（与阶段提示同一判据）；没有配置文件时不输出这一项。
+if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn '未验证：python3 不可用，没有检查 .agent/config.json'
+  else
+    CONFIG_OUT="$(python3 -B "$HOOKDIR/project_config.py" check --project . 2>/dev/null </dev/null)"
+    CONFIG_RC=$?
+    if [ "$CONFIG_RC" -eq 0 ]; then
+      ok '项目配置有效'
+    elif [ "$CONFIG_RC" -eq 1 ]; then
+      bad "项目配置无效: ${CONFIG_OUT#*invalid: }（用 /spec-guard:config 查看）"
+    else
+      warn '未验证：项目配置检查没有正常运行'
+    fi
+  fi
+fi
+
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"
 [ "$FAIL" -eq 0 ]
