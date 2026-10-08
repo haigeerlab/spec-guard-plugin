@@ -151,8 +151,9 @@ def _s1_runs(events, min_repeat):
         items.sort(key=lambda e: (e["time"], e["line"]))
         run = []
         for item in items + [None]:
-            key = None if item is None else (item["stage"], normalise(item["suggestion"]))
-            if run and key != (run[0]["stage"], normalise(run[0]["suggestion"])):
+            # Raw text, not normalised: a falling count or a new module id is progress, not repetition.
+            key = None if item is None else (item["stage"], item["suggestion"])
+            if run and key != (run[0]["stage"], run[0]["suggestion"]):
                 if len(run) >= min_repeat and run[-1]["time"].date() > run[0]["time"].date():
                     yield run
                 run = []

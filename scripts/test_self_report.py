@@ -216,6 +216,11 @@ class S1Tests(unittest.TestCase):
                                  for e in repeated(12)]
         self.assertEqual(by_signal(sr.findings(events), "S1"), [])
 
+    def test_progress_hidden_by_normalisation_still_resets_the_run(self):
+        events = [dict(e, suggestion="Suggested next step: continue `/build` on `alpha`: %d unchecked item(s)." % (30 - i))
+                  for i, e in enumerate(repeated(30))]
+        self.assertEqual(by_signal(sr.findings(events), "S1"), [])
+
     def test_events_are_ordered_by_time_before_counting(self):
         events = repeated(21)
         events.reverse()
