@@ -18,7 +18,9 @@ The ledger is not a local GitHub/GitLab replacement. Do not introduce project gr
 topology, role locks, assignments, scheduling, automatic claiming, routing rules, or automatic
 remote synchronization. Ticket fields are voluntary collaboration context, not access control.
 
-Resolve the installed plugin root and run only the side-effect-free status operation first:
+Resolve the installed plugin root first (`ROOT`: in Codex, `spec-guard-ops`'s 解析环境 block; in Claude, the
+substituted `ROOT="${CLAUDE_PLUGIN_ROOT}"` — the Bash environment has no such variable), then run only the
+side-effect-free status operation:
 
 ```bash
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json

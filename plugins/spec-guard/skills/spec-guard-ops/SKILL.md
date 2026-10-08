@@ -10,26 +10,46 @@ description: 在 Codex 中运行 Spec Guard 的本地约定、只读验证和文
 
 ## 解析环境
 
-从当前已启用的插件安装解析根目录，不猜测缓存版本：
+与命令共用同一段规范引导：Claude 加载时代入 `${CLAUDE_PLUGIN_ROOT}`，Codex 依次回退到 `PLUGIN_ROOT` 与已启用的
+插件列表。不猜测缓存版本：
 
 ```bash
-CODEX_PLUGINS="$(codex plugin list --available --json 2>/dev/null || true)"
-ROOT="$(printf '%s' "$CODEX_PLUGINS" | python3 -c '
+ROOT="${CLAUDE_PLUGIN_ROOT}"
+[ -n "$ROOT" ] || ROOT="${PLUGIN_ROOT:-}"
+WHY="宿主没有把插件根目录代入命令，环境里也没有 CLAUDE_PLUGIN_ROOT 或 PLUGIN_ROOT"
+if [ -z "$ROOT" ]; then
+  if ! command -v codex >/dev/null 2>&1; then
+    WHY="${WHY}；也没有 codex 可查询"
+  else
+    LIST="$(codex plugin list --available --json 2>/dev/null)"; RC=$?
+    ROOT="$(printf '%s' "$LIST" | python3 -c '
 import json, sys
 try:
     plugins = json.load(sys.stdin).get("installed", [])
-except (TypeError, ValueError):
-    plugins = []
+except (AttributeError, TypeError, ValueError):
+    sys.exit(3)
 for plugin in plugins:
-    if plugin.get("name") == "spec-guard" and plugin.get("installed") and plugin.get("enabled"):
-        print(plugin["source"]["path"])
-        break
+    if isinstance(plugin, dict) and plugin.get("name") == "spec-guard" and plugin.get("installed") and plugin.get("enabled"):
+        source = plugin.get("source")
+        path = source.get("path") if isinstance(source, dict) else None
+        if isinstance(path, str) and path:
+            print(path)
+            sys.exit(0)
+sys.exit(4)
 ')"
+    case $? in
+      0) ;;
+      4) WHY="${WHY}；codex plugin list 没有列出已启用且带路径的 spec-guard" ;;
+      *) WHY="${WHY}；codex plugin list 查询失败（退出码 ${RC}）或输出无法解析" ;;
+    esac
+  fi
+fi
+[ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
+[ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
 PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 ```
 
-`ROOT` 为空时停止：`CODEX_PLUGINS` 为空或不是合法 JSON 说明是 `codex plugin list` 查询失败，只报查询失败；
-能读到列表但没有已启用的 spec-guard 时，才说列表里没有已启用的 spec-guard。
+这段以退出码 2 停下时，按它给出的原因转述：那是定位失败，不代表插件未安装。
 
 ## setup
 
