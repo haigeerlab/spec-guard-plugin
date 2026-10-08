@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.3;test:installed-plugin-upgrade-20261008d"
+      },
+      "observedAt": "2026-10-08T06:04:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.52.2 to 0.52.3 for scope user; the installed copy records gitCommitSha aed26074f494aa4b00ab5d3c0ee87b26544cc82a -- the v0.52.3 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-map-read-failure",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.3;test:map-read-failure-20261008"
+      },
+      "observedAt": "2026-10-08T06:04:00Z",
+      "evidence": [
+        "command:a project activated by the convention block whose spec/CAPABILITY-MAP.md is mode 000, once with no module spec and once with one; phase-guard.sh and verify-artifacts.sh from the installed copy (<claude installed copy>/hooks)",
+        "result:both projects: the phase hint reports UNKNOWN with `- Capability map: present but unreadable (no read permission)` (never MAP_ONLY); verify-artifacts warns 未验证：能力图读取失败（[Errno 13] Permission denied…） with 0 failures and exits 0",
+        "result:with a python3 stub on PATH that exits 1, the installed phase-guard.sh prints valid JSON saying python3 无法运行 … 这不是「未启用」",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}
