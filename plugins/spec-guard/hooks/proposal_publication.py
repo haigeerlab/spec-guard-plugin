@@ -99,8 +99,13 @@ def _remote(project, name):
     return result.stdout.strip() if result and result.stdout.strip() else None
 
 
-def _head(url):
-    result = _run(["git", "ls-remote", "--symref", url, "HEAD"])
+# remote-credential-redaction: the remote URL may carry credentials, so it is never a git argument -- the head is
+# listed by remote name in the project, and the fetch goes through a remote written into the snapshot's own config.
+SNAPSHOT_REMOTE = "spec-guard-source"
+
+
+def _head(project, remote):
+    result = _run(["git", "-C", str(project), "ls-remote", "--symref", remote, "HEAD"])
     if not result:
         return None
     branch = None
@@ -148,10 +153,24 @@ def fixed_snapshot(project, remote, prefix):
     """
     url = _remote(Path(project), remote)
     with ExitStack() as stack:
-        yield _snapshot(stack, url, prefix) if url else Snapshot(HEAD_UNAVAILABLE)
+        yield _snapshot(stack, Path(project), remote, url, prefix) if url else Snapshot(HEAD_UNAVAILABLE)
 
 
-def _snapshot(stack, url, prefix):
+def _add_snapshot_remote(repo, url):
+    """Write the snapshot remote into the bare repository's config file, never onto a command line."""
+    if "\n" in url or "\r" in url or "\0" in url:
+        return False
+    value = url.replace("\\", "\\\\").replace('"', '\\"')
+    try:
+        repo.mkdir(parents=True, exist_ok=True)
+        with open(repo / "config", "a", encoding="utf-8") as config:
+            config.write('[remote "%s"]\n\turl = "%s"\n' % (SNAPSHOT_REMOTE, value))
+    except OSError:
+        return False
+    return True
+
+
+def _snapshot(stack, project, remote, url, prefix):
     """Observe and fetch the tip, retrying probe failures only (see fixed_snapshot).
 
     A successful snapshot's temporary directory is handed to `stack` so it outlives
@@ -162,7 +181,7 @@ def _snapshot(stack, url, prefix):
     for attempt in range(SNAPSHOT_ATTEMPTS):
         if attempt:
             time.sleep(SNAPSHOT_BACKOFF_SECONDS * attempt)
-        fresh = _head(url)
+        fresh = _head(project, remote)
         if not fresh:
             failure = HEAD_UNAVAILABLE
             continue
@@ -176,12 +195,12 @@ def _snapshot(stack, url, prefix):
             temp = Path(attempt_stack.enter_context(
                 tempfile.TemporaryDirectory(prefix=prefix)))
             repo = temp / "snapshot.git"
-            if not _run(["git", "init", "--bare", str(repo)]):
+            if not _run(["git", "init", "--bare", str(repo)]) or not _add_snapshot_remote(repo, url):
                 return Snapshot(SNAPSHOT_FAILED)
             # No auto-maintenance: fetch would detach a background `git maintenance`
             # that can still write into the snapshot while the temp dir is removed.
             fetched = _run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0",
-                            "-C", str(repo), "fetch", "--no-tags", url,
+                            "-C", str(repo), "fetch", "--no-tags", SNAPSHOT_REMOTE,
                             "refs/heads/%s" % branch])
             tip = _run(["git", "-C", str(repo), "rev-parse", "FETCH_HEAD"])
             if not fetched or not tip:
