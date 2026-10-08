@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError
+from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError, public_result
 from hosted_ticket_write import draft_preview, make_preview, publish_preview
 
 
@@ -54,7 +54,7 @@ def main() -> int:
     except (HostedTicketError, OSError, UnicodeError) as error:
         diagnostic = str(error) if isinstance(error, HostedTicketError) else "input-unavailable"
         result = {"state": "unknown", "diagnostic": diagnostic}
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    print(json.dumps(public_result(result), ensure_ascii=False, sort_keys=True))
     return 0
 
 
