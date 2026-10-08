@@ -1,6 +1,6 @@
 # Todo: checker-hardening
 
-- [ ] Task 1: command bootstrap for every non-exempt command (F7)
+- [x] Task 1: command bootstrap for every non-exempt command (F7) — `evals/test-codex-command-roots.sh` drops the `users < 15` floor: every command not in `EXEMPT` (setup/teardown-convention, ticket, local-ticket-portability, each with a reason) must carry the verbatim bootstrap before its first `$ROOT`; a missing exempted name and zero command files fail. Before the change, stripping cost-report.md of its whole bootstrap stayed green; after, it is red. Mutations caught: bootstrap removed (1 line), exemption for a non-existent command (1 line)
 - [ ] Task 2: flag parity and the ledger initialize command (F8)
 - [ ] Task 3: separator-row negative test (F9)
 - [ ] Task 4: grader propagates hidden-test failure (F10)
