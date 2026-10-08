@@ -507,6 +507,17 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertIn("表头分隔行", str(caught.exception))
         self.assertEqual(before, self.snapshot())
 
+    def test_current_module_selection_is_module_stage_project_stage(self):
+        # 2026-10-08 audit F16: module-insert must not carry its own "current module" rule.
+        import inspect
+        import module_stage
+        source = inspect.getsource(module_insert._current_module)
+        self.assertIn("project_stage(", source)
+        order = ["alpha", "beta", "gamma"]
+        states = [module_stage.module_state(self.root, module_id) for module_id in order]
+        expected = module_stage.project_stage(states, module_stage.active_module(self.root))[1]
+        self.assertEqual(module_insert._current_module(self.root, order)[0], expected)
+
     def test_duplicate_id_is_refused(self):
         self.assert_no_write(lambda: preview(self.root, "beta", "Duplicate", "—", "end"))
 

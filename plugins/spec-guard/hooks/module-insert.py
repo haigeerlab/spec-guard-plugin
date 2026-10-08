@@ -51,12 +51,11 @@ def _parse_depends_arg(raw):
 
 
 def _current_module(project, order):
+    # The phase hint's own rule (module_stage.project_stage), not a copy of it.
     states = [module_state(project, module_id) for module_id in order]
-    by_id = {state["id"]: state for state in states}
     active = active_module(project)
-    if active and active in by_id:
-        return by_id[active], active
-    return next((state for state in states if state["stage"] != "DONE"), None), active
+    _, current, _, _ = project_stage(states, active)
+    return current, active
 
 
 def _module_table_rows(lines):

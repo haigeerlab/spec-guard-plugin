@@ -1,14 +1,13 @@
 """Read explicit module documentation-impact decisions without inspecting code."""
 import argparse
 import json
-import re
 from pathlib import Path
 
+from capability_map import MODULE_ID
 from documentation_baseline import BaselineError, _visible_lines, parse_baseline
 
 
 DECISIONS = frozenset(("follow", "update", "create", "pending", "not-applicable"))
-MODULE_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 class ImpactError(ValueError):
