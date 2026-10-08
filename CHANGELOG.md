@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.52.3] - 2026-10-08
+
+### 修复
+
+- **能力图读不了时报“读取失败”，不再说成能力图的状态。** 2026-10-08 架构审查的 F4：`spec/CAPABILITY-MAP.md`
+  存在却读不了（例如权限 000、路径是目录）时，没有模块 spec 的项目被报成 `MAP_ONLY`、对读取故障只字不提；有模块
+  spec 时阶段提示只给笼统的 `UNKNOWN`，`verify-artifacts` 再把 `Permission denied` 报成“能力图无效”并判失败。
+  现在两边一致：阶段提示不论有没有模块 spec 都报 `UNKNOWN` 并写明 `present but unreadable (…)`（原因经阶段提示
+  的净化），`verify-artifacts` 报“未验证：能力图读取失败（…）”，不判失败。`capability-map.py` 读取失败时输出
+  `"kind": "unreadable"` 并以 2 退出；非 UTF-8 的能力图仍算内容无效，阶段提示也随之报 `MAP_INVALID`，不再落到
+  笼统的 `UNKNOWN`。能读的能力图，解析与阶段判定不变。
+- **python3 在却跑不起来时，阶段 hook 不再静默。** 审查的 F11：hook 用 `python3` 组装输出 JSON，python3 能被
+  找到但一运行就失败时，hook 什么也不输出，看起来和“未启用”一模一样。现在退回一段手写转义的 JSON，说明 python3
+  无法运行、本轮没有阶段注入、这不是「未启用」；无关项目仍然静默。
+
 ## [0.52.2] - 2026-10-08
 
 ### 修复
