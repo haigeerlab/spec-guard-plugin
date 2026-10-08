@@ -99,7 +99,7 @@ for path in sorted((plugin / "skills").glob("*/SKILL.md")):
     if "$ROOT" not in text or canon in text:
         continue
     if "spec-guard-ops" not in text or 'ROOT="${CLAUDE_PLUGIN_ROOT}"' not in text:
-        bad.append(f"{path.relative_to(plugin)}: 用了 $ROOT，却没写明 Codex 用 spec-guard-ops 的解析环境、"
+        bad.append(f"{path.relative_to(plugin)}: 用了 $ROOT 却没写明 Codex 用 spec-guard-ops 的解析环境、"
                    f"Claude 用代入的 ROOT=\"${{CLAUDE_PLUGIN_ROOT}}\"")
 for name in ("ticket", "hosted-ticket-workflow"):
     text = (plugin / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
