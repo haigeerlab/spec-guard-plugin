@@ -57,6 +57,22 @@
         "result:skills/local-ticket-ledger-ops/SKILL.md carries `--confirm-initialize` and the `--auto-sync \"<true|false the user gave>\"` placeholder",
         "host:Claude Code 2.1.291"
       ]
+    },
+    {
+      "subject": "spec-guard-unattended-claude-p-answer-recheck",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.54.0;test:unattended-run-hint-answer-recheck-20261008"
+      },
+      "observedAt": "2026-10-08T14:00:00Z",
+      "evidence": [
+        "result:supplements the not-verified spec-guard-unattended-claude-p-answer record above, which stays as written; the user had logged the Claude CLI in again",
+        "command:claude -p --model haiku --output-format json in the same git fixture at DONE (one module, plan and checked todo) activated by the Claude and the Codex convention block, with a clean environment, asking for a one-paragraph summary of the stage facts it was given",
+        "result:the run exited 0; the answer summarises the DONE facts and contains neither /compact nor /clear; the session transcript records the injection with `当前阶段: **DONE**` and no Module boundary line",
+        "result:observed on the installed spec-guard 0.54.0, released after 0.53.0 with the unattended-run-hint change unchanged; it confirms that change, not a 0.53.0 install",
+        "host:Claude Code 2.1.294"
+      ]
     }
   ]
 }
