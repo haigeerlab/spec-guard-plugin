@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.53.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.53.0;test:marketplace-ref-upgrade-20261008e"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.52.3 to v0.53.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.53.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.53.0;test:installed-plugin-smoke-20261008e"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
+        "host:codex-cli 0.160.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-unattended-codex-exec",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.53.0;test:unattended-run-hint-20261008"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:codex exec --sandbox read-only in a git fixture at DONE (one module, plan and checked todo) activated by both the Claude and the Codex convention block, asking for a one-paragraph summary of the stage facts it was given",
+        "result:the rollout's first record has source \"exec\" (23128 bytes); its developer injection carries `当前阶段: **DONE**` and no Module boundary line; the final answer summarises the DONE facts and contains neither /compact nor /clear",
+        "host:codex-cli 0.160.0"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.53.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.53.0;test:installed-copy-checks-20261008"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:<codex installed copy>/hooks/phase-guard.sh on the DONE fixture with CLAUDE_CODE_SESSION_ATTENDED unset and with it set to 0",
+        "result:unset -> DONE with the Module boundary line; 0 -> DONE without it",
+        "command:<codex installed copy>/hooks/phase-guard.sh and verify-artifacts.sh on a project whose capability map is mode 000",
+        "result:phase UNKNOWN with `present but unreadable (no read permission)`; verify-artifacts warns 未验证：能力图读取失败 with 0 failures",
+        "result:skills/local-ticket-ledger-ops/SKILL.md carries `--confirm-initialize` and the `--auto-sync \"<true|false the user gave>\"` placeholder"
+      ]
+    }
+  ]
+}
