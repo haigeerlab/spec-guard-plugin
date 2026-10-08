@@ -82,6 +82,20 @@ for spec in spec/*.md; do
   [ "${spec##*/}" = CAPABILITY-MAP.md ] || SPECS=$((SPECS + 1))
 done
 
+# 能力图存在却读不了是读取故障，不是能力图的状态：不论有没有模块 spec 都报 UNKNOWN（与 module_stage 同一行）。
+if [ -e spec/CAPABILITY-MAP.md ] && { [ ! -f spec/CAPABILITY-MAP.md ] || [ ! -r spec/CAPABILITY-MAP.md ]; }; then
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then REASON="not a regular file"; else REASON="no read permission"; fi
+  emit "${HEADER}
+
+当前阶段: **UNKNOWN**
+
+- Capability map: present but unreadable (${REASON})
+- Module specs: ${SPECS}
+
+Suggested next step: make \`spec/CAPABILITY-MAP.md\` a readable file (check its permissions), then send the next prompt; this is a read failure, not a state of the map."
+  exit 0
+fi
+
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
