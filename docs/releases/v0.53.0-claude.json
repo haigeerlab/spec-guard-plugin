@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.53.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.53.0;test:installed-plugin-upgrade-20261008e"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.52.3 to 0.53.0 for scope user; the installed copy records gitCommitSha 8af9bdf07a88c84ec08e405bb436e8bb383761a3 -- the v0.53.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-unattended-claude-p-injection",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.53.0;test:unattended-run-hint-20261008"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:claude -p --model haiku in a git fixture at DONE (one module, plan and checked todo) activated by both the Claude and the Codex convention block (once with a clean environment, once inheriting the desktop session's)",
+        "result:the session transcript records the UserPromptSubmit injection with `当前阶段: **DONE**` and no Module boundary line and no /compact; Claude Code set CLAUDE_CODE_SESSION_ATTENDED=0 for the run",
+        "host:Claude Code 2.1.291"
+      ]
+    },
+    {
+      "subject": "spec-guard-unattended-claude-p-answer",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.53.0;test:unattended-run-hint-answer-20261008"
+      },
+      "reason": "both claude -p runs stopped at model authentication (\"OAuth session expired and could not be refreshed\"), so no model answer exists to inspect; the injection itself was verified above. Re-run after `/login` in an interactive claude session."
+    },
+    {
+      "subject": "spec-guard-0.53.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.53.0;test:installed-copy-checks-20261008"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "command:<claude installed copy>/hooks/phase-guard.sh on the DONE fixture with CLAUDE_CODE_SESSION_ATTENDED unset and with it set to 0",
+        "result:unset -> DONE with the Module boundary line; 0 -> DONE without it",
+        "command:<claude installed copy>/hooks/phase-guard.sh and verify-artifacts.sh on a project whose capability map is mode 000",
+        "result:phase UNKNOWN with `present but unreadable (no read permission)`; verify-artifacts warns 未验证：能力图读取失败 with 0 failures",
+        "result:skills/local-ticket-ledger-ops/SKILL.md carries `--confirm-initialize` and the `--auto-sync \"<true|false the user gave>\"` placeholder",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}

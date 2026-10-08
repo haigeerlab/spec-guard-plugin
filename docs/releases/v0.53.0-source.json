@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.53.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:8af9bdf07a88c84ec08e405bb436e8bb383761a3"
+      },
+      "observedAt": "2026-10-08T12:00:00Z",
+      "evidence": [
+        "result:the v0.53.0 annotated tag and origin/main both resolve to merge commit 8af9bdf07a88c84ec08e405bb436e8bb383761a3; its tree equals release commit 0ca8167's tree, on which the commands below ran; pull request #253 merged after its pull_request run passed",
+        "result:0.53.0 combines module PRs #247-#252 (audit groups 4-7, unattended-run-hint, unattended-long-first-record), each merged with its own green suites and no version bump",
+        "command:/bin/bash scripts/validate.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-phase-guard.sh",
+        "command:/bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh",
+        "host:macOS 15.7.3 arm64 (Darwin 24.6.0), system /bin/bash 3.2.57; all of the above exited 0 (phase-guard 175, verify-artifacts 31 cases); ShellCheck 4.1.0 clean over plugins/spec-guard/hooks/*.sh scripts/*.sh evals/*.sh evals/*/*.sh"
+      ]
+    }
+  ]
+}
