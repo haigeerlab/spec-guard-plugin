@@ -90,7 +90,9 @@ FAILED=()
 for s in "${SUITES[@]}"; do
   log="$LOG_DIR/$s.log"
   if (run_suite "$s") >"$log" 2>&1 </dev/null; then
-    printf '  ✅ %s —— %s\n' "$s" "$(tail -n 1 "$log" | sed 's/^ *//')"
+    # ShellCheck 通过时不输出任何内容，日志末行只剩 npm 的提示，不能拿来当摘要
+    if [ "$s" = shellcheck ]; then summary="无告警"; else summary="$(tail -n 1 "$log" | sed 's/^ *//')"; fi
+    printf '  ✅ %s —— %s\n' "$s" "$summary"
   else
     printf '  ❌ %s（日志: %s）\n' "$s" "$log"
     { grep -E '❌|FAIL|Error|失败' "$log" || true; } | head -n 8 | sed 's/^/     /'

@@ -144,6 +144,7 @@ class VerifyAndCommitTests(unittest.TestCase):
         p, called = self.run_script('--', '-q', '-m', 'hook')
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(called, ['validate', 'phase-guard', 'verify-artifacts', 'pre-push', 'shellcheck'])
+        self.assertIn('✅ shellcheck —— 无告警', p.stdout)
 
     def test_manual_suite_runs_and_can_block(self):
         self.stage('notes.txt')
