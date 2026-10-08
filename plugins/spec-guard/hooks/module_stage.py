@@ -175,16 +175,19 @@ def unmerged_commits(root: Path) -> tuple | None:
     return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
 
 
-# context-hint-no-paste: the agent says one sentence; the handoff text is the user's to ask for.
-NO_PASTE = ("do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, "
-            "when they want it)")
+# context-hint-no-paste: the agent says one sentence and never pastes handoff text.
+NO_PASTE = "do not paste handoff text"
 
-MODULE_BOUNDARY = ("- Module boundary: a good point to /compact or start the next piece of work in a new session. "
-                   "Say so in one sentence; " + NO_PASTE + ". "
-                   "This stage summary carries over, the conversation does not need to.")
+# context-after-compact: free context in place -- /compact for related work, /clear for unrelated work (the
+# hosts' documented criterion); never suggest a new session, which loses the peers a session talks to.
+FREE_BOUNDARY = ("Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next "
+                 "work is unrelated; " + NO_PASTE + ". "
+                 "This stage summary carries over, the conversation does not need to.")
+
+MODULE_BOUNDARY = "- Module boundary: a good point to free context. " + FREE_BOUNDARY
 
 
-# context-hint-thresholds: a module boundary suggests a new session from half the context window, the middle of a
+# context-hint-thresholds: a module boundary suggests freeing context from half the context window, the middle of a
 # module only from 80% of it. Claude transcripts carry no window, so they use a 1M window's figures.
 BOUNDARY_SHARE, MID_SHARE = 0.5, 0.8
 DEFAULT_WINDOW = 1_000_000
@@ -205,14 +208,14 @@ def thresholds(window: int | None) -> tuple:
 
 
 def boundary_line(tokens: int, note: str) -> str:
-    return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to /compact or start "
-            "the next piece of work in a new session. Say so in one sentence; %s. "
-            "This stage summary carries over, the conversation does not need to." % (_k(tokens), note, NO_PASTE))
+    return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to free context. %s"
+            % (_k(tokens), note, FREE_BOUNDARY))
 
 
 def context_line(tokens: int, note: str) -> str:
     return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
-            "current task, then say in one sentence that the user can /compact or continue in a new session; %s."
+            "current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next "
+            "work is unrelated; %s."
             % (_k(tokens), note, NO_PASTE))
 
 

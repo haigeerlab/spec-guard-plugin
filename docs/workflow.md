@@ -115,8 +115,9 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 当前模块取 `.agent/state.json` 的 `activeModule`，没设置时按 Build order 取第一个没完成的模块。
 它必须是 kebab-case 的 module id；写成别的会被报为无效并回退到 Build order（hook 仍然激活）。
 注入文本里来自仓库的值都经过净化，详见[决策记录](decisions/2026-10-04-phase-context-sanitization.md)。
-随时想看完整状态，用 `/spec-guard:phase`。开新会话前用 `/spec-guard:handoff`（Codex 里输入 `spec-guard handoff`）
-拿一份可直接粘贴的交接文本；整条提示词恰好是这条命令时由 hook 本地作答，不调用模型。
+随时想看完整状态，用 `/spec-guard:phase`。上下文提示出现时不必开新会话：接着做相关工作就带重点 `/compact`，
+换到不相关工作就 `/clear`（两个宿主都有这两条命令）；刚压缩过时提示按压缩后的大小判断。`/clear` 会保留用 `/rename`
+起的会话名，别的会话仍能按名字联系它，但只在对话里说过的约定会丢，长期约定写进项目的 agent 说明或记忆。
 存在被暂停的模块（见「插队」）时，`NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`、`MODULE_DONE` 下会多一行 `Paused: …`。
 
 ## 已有项目：加新需求
@@ -225,7 +226,6 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
-| 会话交接文本 | `/spec-guard:handoff` | 输入 `spec-guard handoff`，或 `spec-guard-ops` skill 的 handoff 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |

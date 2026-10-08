@@ -46,7 +46,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: a good point to /compact or start the next piece of work in a new session. Say so in one sentence; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it). This stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"
@@ -503,15 +503,18 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
 # context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
 # 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
 mid_line() {  # $1=N k $2=阈值说明
-  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact or continue in a new session; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it).' "$1" "$2"
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
 }
 sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to /compact or start the next piece of work in a new session. Say so in one sentence; do not paste handoff text (the user runs /spec-guard:handoff, Codex: spec-guard handoff, when they want it). This stage summary carries over, the conversation does not need to." "$1" "$2"
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
 # context-hint-no-paste：任何注入都不得再要求 agent 贴交接文本（2026-10-07 用户在接近满窗时仍看到被贴出的交接文本）。
 for line in "$BOUNDARY" "$(mid_line 1 x)" "$(sized_boundary 1 x)"; do
   case "$line" in *paste-ready*|*"for paste"*) fail "上下文提示仍要求贴交接文本: $line" ;; esac
   case "$line" in *"do not paste handoff text"*) ;; *) fail "上下文提示缺少不贴交接文本的说明: $line" ;; esac
+  # context-after-compact：按相关性建议 /compact 或 /clear，不再建议开新会话，也不再提交接命令。
+  case "$line" in *"/clear if the next work is unrelated"*) ;; *) fail "上下文提示缺少 /clear 的建议: $line" ;; esac
+  case "$line" in *"new session"*|*"spec-guard handoff"*|*spec-guard:handoff*) fail "上下文提示不应建议新会话或交接命令: $line" ;; esac
 done
 codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
   printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
@@ -609,6 +612,19 @@ done_has_only "Codex DONE 达到窗口 50% 时出带大小的行" "$(sized_bound
 codex_rollout "$T" 129199
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "Codex DONE 低于窗口 50% 时不出行" ""
+# context-after-compact：压缩记录比最近一条读数新时，按压缩后的大小判断（2026-10-08 实测压缩后首轮仍报 601k）。
+transcript "$T" 601429
+printf '%s\n' '{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":601658,"postTokens":13951}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Claude 刚压缩完（601k → 14k）不出 Module boundary 行" ""
+codex_rollout "$T" 223005
+printf '%s\n' '{"type":"compacted","payload":{}}' \
+  '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":0},"model_context_window":258400}}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex 刚压缩完不出 Module boundary 行" ""
+printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":129200},"model_context_window":258400}}}' >> "$T"
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "压缩之后的新读数照常判断" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 codex_rollout "$T" 206720
 grep -F -- "$(mid_line 207 'at or over 80% of the 258 k window')" >/dev/null <<<"$(run_input "$ctx" "$HOOK_INPUT" | context_of)" \
@@ -713,47 +729,21 @@ echo "  ✅ cwd 为子目录、非 git、缺失或不可用时逐字不变"; PAS
 echo "  ✅ cwd 在未启用的仓库里时静默"; PASS=$((PASS + 1))
 
 
-# 交接命令本地作答（session-handoff 第 7、8、9 条）：整条提示词恰好是触发词时输出拦截 JSON，其余逐字不变。
+# context-after-compact：session-handoff 已退役，原来的触发词照常注入阶段，不再被本地作答拦截。
 ho="$WORK/handoff"
 mkdir -p "$ho/tasks/alpha"
 git -C "$ho" init -q -b main
 printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ho/CLAUDE.md"
 map "$ho"; printf '# alpha\n' > "$ho/spec/alpha.md"; printf '# Plan\n' > "$ho/tasks/alpha/plan.md"
 printf '%s\n' '- [ ] open' > "$ho/tasks/alpha/todo.md"
-want="$(python3 -B "$HOOKDIR/session_handoff.py" "$ho")"
-out="$(run_input "$ho" '{"prompt":"  /spec-guard:handoff\n"}')"
-python3 -c '
-import json, sys
-out = json.loads(sys.stdin.read())
-assert out == {"decision": "block", "reason": sys.argv[1], "hookSpecificOutput": {
-    "hookEventName": "UserPromptSubmit", "suppressOriginalPrompt": True}}, out
-' "$want" <<<"$out" || fail "Claude 触发词应输出带 suppressOriginalPrompt 的拦截 JSON
-$out"
-echo "  ✅ Claude 触发词本地作答"; PASS=$((PASS + 1))
-
-out="$(cd "$ho" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" <<<'{"prompt":"spec-guard handoff"}')"
-python3 -c '
-import json, sys
-out = json.loads(sys.stdin.read())
-assert out == {"decision": "block", "reason": sys.argv[1]}, out
-' "$want" <<<"$out" || fail "Codex 触发词的拦截 JSON 不得带 Claude 专用字段
-$out"
-echo "  ✅ Codex 触发词本地作答且无 Claude 专用字段"; PASS=$((PASS + 1))
-
 plain_ho="$(run "$ho" | context_of)"
-for prompt in '继续 /spec-guard:handoff' '/spec-guard:handoff now' '/spec-guard:phase' 'handoff'; do
-  [ "$(run_input "$ho" "{\"prompt\":\"$prompt\"}" | context_of)" = "$plain_ho" ] || fail "非触发词应与现在逐字相同: $prompt"
+grep -F "BUILDING" >/dev/null <<<"$plain_ho" || fail "夹具应为 BUILDING
+$plain_ho"
+for prompt in '/spec-guard:handoff' '  /spec-guard:handoff\n' 'spec-guard handoff'; do
+  [ "$(run_input "$ho" "{\"prompt\":\"$prompt\"}" | context_of)" = "$plain_ho" ] || fail "退役的交接触发词应照常注入阶段: $prompt"
 done
-echo "  ✅ 非触发词照常注入阶段"; PASS=$((PASS + 1))
-
-broken="$WORK/broken-hooks"
-cp -R "$HOOKDIR" "$broken"
-printf '%s\n' 'import sys' 'sys.exit(1)' > "$broken/session_handoff.py"
-[ "$(CLAUDE_PROJECT_DIR="$ho" /bin/bash "$broken/phase-guard.sh" <<<'{"prompt":"/spec-guard:handoff"}' | context_of)" = "$plain_ho" ] \
-  || fail "拼装失败时应放行并照常注入阶段"
-echo "  ✅ 拼装失败即放行"; PASS=$((PASS + 1))
-
-[ -z "$(run_input "$WORK/empty" '{"prompt":"/spec-guard:handoff"}')" ] || fail "未启用项目里触发词也应静默"
-echo "  ✅ 未启用项目里触发词静默"; PASS=$((PASS + 1))
+out="$(cd "$ho" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" <<<'{"prompt":"spec-guard handoff"}')"
+grep -F '"decision"' >/dev/null <<<"$out" && fail "Codex 的交接触发词不应再被拦截: $out"
+echo "  ✅ 退役的交接触发词照常注入阶段"; PASS=$((PASS + 1))
 
 echo "phase-guard regression passed (${PASS} cases)"

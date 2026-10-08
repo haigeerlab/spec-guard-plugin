@@ -58,19 +58,6 @@ print(json.dumps({"hookSpecificOutput": {
 '
 }
 
-# 交接命令本地作答（session_handoff.py --hook）：整条提示词恰好是触发词时输出拦截 JSON 并结束，不调用模型。
-# 先用字面过滤省掉无关提示词的 python 启动；拼装失败或没有答复时照常注入阶段。
-case "$HOOK_INPUT" in
-  *handoff*)
-    if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude; else HOST=codex; fi
-    ANSWER="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_handoff.py" --hook "$HOST" . 2>/dev/null)" || ANSWER=""
-    if [ -n "$ANSWER" ]; then
-      printf '%s\n' "$ANSWER"
-      exit 0
-    fi
-    ;;
-esac
-
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
 # hook 输入已在上面读过，这里转交那一行原文。
 FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""

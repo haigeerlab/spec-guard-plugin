@@ -54,7 +54,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 **Codex：**
 
 ```bash
-codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.51.3
+codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.52.0
 codex plugin add spec-guard@spec-guard-marketplace
 ```
 
@@ -75,7 +75,7 @@ codex plugin add spec-guard@spec-guard-marketplace
    ```
 
 4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`；模块做完但还有别的模块时显示 `MODULE_DONE`，`DONE` 表示全部模块都完成。
-   模块完成且上下文达到窗口一半、或模块进行中达到窗口 80% 时，提示会建议开新会话——需求、计划与进度都在文件里，新会话接得上；
+   模块完成且上下文达到窗口一半、或模块进行中达到窗口 80% 时，提示会建议 `/compact`（相关工作）或 `/clear`（不相关工作）——需求、计划与进度都在文件里，清空后也接得上；
    每轮提示还带当前分支与 worktree，agent 请你评审或确认时会说明代码在哪。
 
 项目做到一半来了新需求，在检查点（或显式插队）用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，

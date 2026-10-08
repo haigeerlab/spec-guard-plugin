@@ -45,6 +45,23 @@ def _usage(record) -> int | None:
     return None
 
 
+def _compacted(record) -> int | None:
+    """Context size right after a compaction record, 0 when it records none; None if the record is not one.
+
+    context-after-compact: Claude's compact_boundary carries postTokens; Codex's compacted record carries no size
+    and is followed by a zero token_count, so it counts as below every threshold.
+    """
+    if not isinstance(record, dict):
+        return None
+    if record.get("type") == "system" and record.get("subtype") == "compact_boundary":
+        meta = record.get("compactMetadata")
+        post = _count(meta.get("postTokens")) if isinstance(meta, dict) else None
+        return post if post is not None else 0
+    if record.get("type") == "compacted":
+        return 0
+    return None
+
+
 def _window(record) -> int | None:
     """Codex's model context window on a token_count record; Claude records carry none."""
     payload = record.get("payload") if isinstance(record, dict) else None
@@ -82,6 +99,9 @@ def context_usage(transcript_path) -> tuple | None:
         tokens = _usage(record)
         if tokens:  # zero is a synthetic record (e.g. after an interruption), not a reading
             return tokens, _window(record)
+        compacted = _compacted(record)
+        if compacted is not None:  # newer than any reading: the pre-compaction size no longer applies
+            return compacted, None
     return None
 
 

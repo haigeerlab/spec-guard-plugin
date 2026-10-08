@@ -124,12 +124,29 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_batch_review_and_continuous_build(self):
         batch = self.section("## 按需求批量前置审")
-        for phrase in ("批量批准", "activeModule", "Build order", "80%", "/spec-guard:handoff", "不自行开新会话"):
+        for phrase in ("批量批准", "activeModule", "Build order", "80%", "不自行开新会话", "`/clear`"):
             self.assertIn(phrase, batch)
         # context-hint-no-paste: one sentence, never the pasted handoff text.
         for phrase in ("/compact", "一句话", "不贴交接文本"):
             self.assertIn(phrase, batch)
         self.assertNotIn("给出 `/spec-guard:handoff` 的交接文本", batch)
+        # context-after-compact: /compact or /clear by relatedness; no new session, no handoff command.
+        self.assertIn("不建议用户开新会话", batch)
+        self.assertNotIn("换会话", batch)
+        self.assertNotIn("spec-guard:handoff", batch)
+
+    def test_session_handoff_is_retired_everywhere_it_could_be_offered(self):
+        # context-after-compact: no command, skill, reference or hint offers the retired handoff command.
+        self.assertFalse((self.plugin / "commands" / "handoff.md").exists())
+        self.assertFalse((self.plugin / "hooks" / "session_handoff.py").exists())
+        texts = [*(self.plugin / "commands").glob("*.md"), *(self.plugin / "skills").glob("*/SKILL.md"),
+                 *(self.plugin / "references").glob("*.md"), self.plugin / "hooks" / "module_stage.py",
+                 self.plugin / "hooks" / "phase-guard.sh", self.plugin.parent.parent / "docs" / "workflow.md",
+                 self.plugin.parent.parent / "README.md"]
+        for path in texts:
+            text = path.read_text(encoding="utf-8")
+            for needle in ("/spec-guard:handoff", "spec-guard handoff", "session_handoff"):
+                self.assertNotIn(needle, text, "%s still offers %s" % (path, needle))
         phase = (self.plugin / "commands" / "phase.md").read_text(encoding="utf-8")
         self.assertNotIn("生成可直接粘贴的交接文本", phase)
         self.assertIn("不贴交接文本", phase)
