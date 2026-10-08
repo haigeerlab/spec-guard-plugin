@@ -27,6 +27,7 @@ PYTHON3_PREFIX = "spec-guard: "
 PYTHON3_STAGE = "python3 故障"
 DIAGNOSTIC_STAGES = {"UNKNOWN", "MAP_INVALID", "?", PYTHON3_STAGE}
 EXAMPLES = 3
+MIN_SPAN = timedelta(hours=24)
 UNOBSERVABLE = (
     "hook 进程失败：两个宿主都不记录 hook 崩溃或无输出，看不到就不报，不等于没有。",
     "插件版本：注入文本不含版本号，只报首次与末次出现时间。",
@@ -142,7 +143,7 @@ def _fingerprint(signal, stage, suggestion):
 
 
 def _s1_runs(events, min_repeat):
-    """Runs of unchanged (stage, suggestion) per project, long enough and spanning two calendar days."""
+    """Runs of unchanged (stage, suggestion) per project, long enough and at least MIN_SPAN from first to last."""
     by_project = {}
     for item in events:
         if item["stage"] not in DIAGNOSTIC_STAGES:
@@ -154,7 +155,7 @@ def _s1_runs(events, min_repeat):
             # Raw text, not normalised: a falling count or a new module id is progress, not repetition.
             key = None if item is None else (item["stage"], item["suggestion"])
             if run and key != (run[0]["stage"], run[0]["suggestion"]):
-                if len(run) >= min_repeat and run[-1]["time"].date() > run[0]["time"].date():
+                if len(run) >= min_repeat and run[-1]["time"] - run[0]["time"] >= MIN_SPAN:
                     yield run
                 run = []
             if item is not None:

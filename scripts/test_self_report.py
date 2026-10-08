@@ -210,6 +210,16 @@ class S1Tests(unittest.TestCase):
     def test_all_on_one_day_is_not_a_finding(self):
         self.assertEqual(by_signal(sr.findings(repeated(21, days=1)), "S1"), [])
 
+    def test_crossing_midnight_within_hours_is_not_a_finding(self):
+        events = [event("2026-10-01T23:%02d:00Z" % i, "DONE", line=i + 1) for i in range(30)] + \
+                 [event("2026-10-02T00:%02d:00Z" % i, "DONE", line=31 + i) for i in range(30)]
+        self.assertEqual(by_signal(sr.findings(events), "S1"), [])
+
+    def test_exactly_twenty_four_hours_counts(self):
+        events = [event("2026-10-01T10:%02d:00Z" % i, "DONE", line=i + 1) for i in range(20)] + \
+                 [event("2026-10-02T10:00:00Z", "DONE", line=21)]
+        self.assertEqual(len(by_signal(sr.findings(events), "S1")), 1)
+
     def test_suggestion_change_resets_the_run(self):
         events = repeated(12) + [dict(e, time=e["time"].replace(day=e["time"].day + 2),
                                       suggestion="Suggested next step: something else.")
