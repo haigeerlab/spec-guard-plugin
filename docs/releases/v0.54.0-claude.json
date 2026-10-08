@@ -42,6 +42,22 @@
         "id": "claude-code:v0.54.0;test:headless-injection-20261008"
       },
       "reason": "`claude auth status --json` reports loggedIn false, so a headless `claude -p` run cannot reach the model; the installed hook output was checked directly above. Re-run after `/login` in an interactive `claude`."
+    },
+    {
+      "subject": "spec-guard-claude-p-headless-recheck",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.54.0;test:headless-injection-recheck-20261008"
+      },
+      "observedAt": "2026-10-08T14:00:00Z",
+      "evidence": [
+        "result:supplements the not-verified spec-guard-claude-p-headless record above, which stays as written; the user had logged the Claude CLI in again",
+        "command:claude -p --model haiku --output-format json in a git fixture at DONE (one module, plan and checked todo) activated by the Claude and the Codex convention block, with a clean environment, asking for a one-paragraph summary of the stage facts it was given",
+        "result:the run exited 0 on the installed spec-guard 0.54.0; the session transcript records the phase injection with `当前阶段: **DONE**` and no Module boundary line; the answer summarises those facts and contains neither /compact nor /clear",
+        "result:the same run is recorded in v0.53.0-claude.json as the re-check of that release's unattended-run-hint answer",
+        "host:Claude Code 2.1.294"
+      ]
     }
   ]
 }
