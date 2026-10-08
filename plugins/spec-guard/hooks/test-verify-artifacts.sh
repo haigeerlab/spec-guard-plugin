@@ -22,6 +22,15 @@ $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
 
+# $1=用例名 $2=不得出现的文本
+check_absent() {
+  local out
+  out="$(CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$HOOKDIR/verify-artifacts.sh" 2>&1)" || true
+  ! grep -F -- "$2" >/dev/null <<<"$out" || fail "$1: 输出不应包含「$2」
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
 # $1=目录 $2...=额外追加到能力图末尾的行
 project() {
   PROJECT="$WORK/$1"; shift
@@ -56,6 +65,22 @@ project no-build-order
 printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Responsibility | Depends on |' \
   '| --- | --- | --- |' '| alpha | x | missing |' > "$PROJECT/spec/CAPABILITY-MAP.md"
 check "无效能力图失败并给出解析原因" 1 "能力图无效: "
+
+# 能力图读不了是读取故障，不是内容无效：报“未验证”并附原因，不判失败。
+project unreadable-map
+chmod 000 "$PROJECT/spec/CAPABILITY-MAP.md"
+if [ -r "$PROJECT/spec/CAPABILITY-MAP.md" ]; then
+  echo "  ⏭️  不可读能力图：以 root 运行时 000 仍可读，跳过"
+else
+  check "不可读能力图报读取失败而非无效" 0 "未验证：能力图读取失败（"
+  check_absent "不可读能力图不报能力图无效" "能力图无效"
+fi
+project directory-map
+rm -f "$PROJECT/spec/CAPABILITY-MAP.md"; mkdir "$PROJECT/spec/CAPABILITY-MAP.md"
+check "能力图路径是目录时报读取失败" 0 "未验证：能力图读取失败（"
+project non-utf8-map
+printf '\377\376 not utf-8\n' > "$PROJECT/spec/CAPABILITY-MAP.md"
+check "非 UTF-8 能力图仍是内容无效" 1 "能力图无效: "
 
 # 环境故障只能报“未验证”，不能把合法 spec 判成违规。
 project orphan-without-python
@@ -107,14 +132,6 @@ many_modules() {
 }
 # $1=模块 id：只放 plan.md
 plan_only() { mkdir -p "$PROJECT/tasks/$1"; touch "$PROJECT/tasks/$1/plan.md"; }
-# $1=用例名 $2=不得出现的文本
-check_absent() {
-  local out
-  out="$(CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$HOOKDIR/verify-artifacts.sh" 2>&1)" || true
-  ! grep -F -- "$2" >/dev/null <<<"$out" || fail "$1: 输出不应包含「$2」
-$out"
-  echo "  ✅ $1"; PASS=$((PASS + 1))
-}
 
 many_modules no-todo-none 3
 plan_only m01; touch "$PROJECT/tasks/m01/todo.md"

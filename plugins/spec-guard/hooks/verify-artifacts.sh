@@ -13,7 +13,7 @@ ok() { printf '  ✅ %s\n' "$1"; PASS=$((PASS + 1)); }
 warn() { printf '  ⚠️  %s\n' "$1"; WARN=$((WARN + 1)); }
 bad() { printf '  ❌ %s\n' "$1"; FAIL=$((FAIL + 1)); }
 
-if [ ! -f spec/CAPABILITY-MAP.md ]; then
+if [ ! -e spec/CAPABILITY-MAP.md ]; then
   warn 'spec/CAPABILITY-MAP.md 不存在；单模块项目可忽略'
 else
   ok '能力图存在'
@@ -31,7 +31,7 @@ else
 fi
 
 # 能力图只用 capability-map.py 这一个严格解析器；解析器跑不起来是环境问题，报“未验证”而不是违规。
-if [ -f spec/CAPABILITY-MAP.md ]; then
+if [ -e spec/CAPABILITY-MAP.md ]; then
   if ! command -v python3 >/dev/null 2>&1; then
     warn '未验证：python3 不可用，没有检查能力图结构与模块 spec 的对应关系'
   else
@@ -46,7 +46,7 @@ if not isinstance(value, dict) or not isinstance(value.get("ok"), bool):
     raise SystemExit(4)
 if not value["ok"]:
     print(value.get("error") or "unknown parse error")
-    raise SystemExit(3)
+    raise SystemExit(5 if value.get("kind") == "unreadable" else 3)
 for module in value.get("modules", []):
     print(module["id"])
 ' 2>/dev/null)"
@@ -54,6 +54,9 @@ for module in value.get("modules", []):
     if [ "$MAP_RC" -eq 3 ]; then
       bad "能力图无效: ${MAP_OUT}"
       warn '能力图无效，未检查模块 spec 的对应关系'
+    elif [ "$MAP_RC" -eq 5 ]; then
+      # 读不了是环境故障，不是能力图内容的状态。
+      warn "未验证：能力图读取失败（${MAP_OUT}），没有检查能力图结构与模块 spec 的对应关系"
     elif [ "$MAP_RC" -ne 0 ]; then
       warn '未验证：能力图解析器没有正常运行，没有检查模块 spec 的对应关系'
     else
