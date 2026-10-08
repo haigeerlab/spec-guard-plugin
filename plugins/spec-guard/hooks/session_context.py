@@ -105,6 +105,11 @@ def context_usage(transcript_path) -> tuple | None:
     return None
 
 
+# A Codex rollout's first record carries the whole base instructions (19-24 KB measured on 2026-10-08); the read
+# stays bounded but leaves ample room (unattended-long-first-record).
+FIRST_RECORD_LIMIT = 1 << 20
+
+
 def unattended(transcript_path) -> bool:
     """True only when the host says nobody attends this run (unattended-run-hint).
 
@@ -118,7 +123,9 @@ def unattended(transcript_path) -> bool:
         return False
     try:
         with open(transcript_path, "rb") as handle:
-            first = handle.readline(65536)
+            first = handle.readline(FIRST_RECORD_LIMIT)
+        if not first.endswith(b"\n"):  # cut off at the limit (or no line end at all): not a whole record
+            return False
         record = json.loads(first)
     except (OSError, ValueError):
         return False

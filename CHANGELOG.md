@@ -16,6 +16,8 @@
   另一个 agent，阶段提示却照样注入 Module boundary 与 Session context 两行，模型就把“后续可用 /compact…”写进了
   答复。现在 Claude Code 标记为无人值守（`CLAUDE_CODE_SESSION_ATTENDED=0`）或 Codex 会话记录首条
   `session_meta` 的 `source` 为 `exec` 时，只去掉这两行；阶段事实、位置行与所有判定不变，信号缺失或读不了时照旧。
+  Codex 会话记录首条带着整段系统指令（本机实测 19–24 KB），读取上限因此从 64 KB 提到 1 MB；没读到完整一行
+  （超过上限或缺行尾）时仍按有人在场处理。
 - **账本初始化示例不再替用户选 `auto-sync`。** Claude 命令与 Codex skill 的 `initialize` 示例原本写死
   `--auto-sync false`，与旁边“不可猜测、向用户索取”的说明矛盾；现在两边都是用户给的 `true` 或 `false` 的占位符。
 
