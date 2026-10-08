@@ -204,4 +204,16 @@ check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknow
 printf '{broken' > "$PROJECT/.agent/config.json"
 check "无法解析的项目配置失败" 1 "项目配置无效: not-json"
 
+# module-suspend：挂起标记只在 todo.md 中计数；重复判失败，过期（没有未勾选项）只警告。
+SUSPEND_LINE='<!-- spec-guard: suspended -->'
+project suspend-ok; mkdir -p "$PROJECT/tasks/alpha"
+printf '%s\n' '- [x] a' '- [ ] b' "$SUSPEND_LINE" > "$PROJECT/tasks/alpha/todo.md"
+check "正常的挂起标记通过" 0 "挂起标记有效：alpha"
+printf '%s\n' '- [ ] b' "$SUSPEND_LINE" "$SUSPEND_LINE" > "$PROJECT/tasks/alpha/todo.md"
+check "重复的挂起标记失败" 1 "挂起标记重复：tasks/alpha/todo.md"
+printf '%s\n' '- [x] a' "$SUSPEND_LINE" > "$PROJECT/tasks/alpha/todo.md"
+check "过期的挂起标记只警告" 0 "挂起标记过期：alpha 已没有未勾选项"
+project suspend-none
+check_absent "没有挂起标记时不报告挂起" "挂起标记"
+
 echo "verify-artifacts regression passed ($PASS cases)"

@@ -484,6 +484,15 @@ class ModuleInsertTests(unittest.TestCase):
 
     # ---- negative cases: each must leave every file untouched ----
 
+    def test_suspended_module_does_not_block_insertion(self):
+        # module-suspend: a parked module is not "half done", so no --interrupt is needed.
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        self.write("tasks/gamma/todo.md", "- [x] one\n- [ ] two\n<!-- spec-guard: suspended -->\n")
+        result = preview(self.root, "delta", "Fourth", "—", "end")
+        self.assertIsNone(result["interrupted"])
+        self.assertEqual(result["new_current"], "delta")
+
     def test_current_module_half_done_is_refused(self):
         self.write("tasks/alpha/todo.md", "- [x] done\n- [ ] pending\n")
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "—", "end"))

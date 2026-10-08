@@ -227,6 +227,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
 | 查看或设置项目配置（产物语言、评审节奏） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
+| 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |

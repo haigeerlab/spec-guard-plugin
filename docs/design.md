@@ -48,6 +48,10 @@ modify the capability map, or write tracker state.
 The optional local convention stores module documents under `spec/` and
 `tasks/<module-id>/`.  Its state file can record a local active module, but is
 not a Proposal pool and is never read by Proposal code.
+A started module that is waiting on something outside the work can be suspended
+by one marker line in its `todo.md`: it keeps its Build order slot, is skipped when
+the current module is chosen, and returns only when the user resumes it.  The
+plugin stores no reason or date; a reminder, if any, lives in the host.
 
 ## Project configuration
 

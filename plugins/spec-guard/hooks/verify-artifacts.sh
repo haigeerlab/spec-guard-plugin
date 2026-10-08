@@ -115,5 +115,32 @@ if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
   fi
 fi
 
+# 挂起标记（module-suspend）：标记与“未勾选项”的判据来自 module_stage.py；没有标记时不输出这一项。
+if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then
+  if SUSPEND_OUT="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import SUSPEND_MARKER, UNCHECKED
+for todo in sorted(Path("tasks").glob("*/todo.md")):
+    text = todo.read_text(encoding="utf-8")
+    count = sum(line.strip() == SUSPEND_MARKER for line in text.splitlines())
+    if count > 1:
+        print("DUP %s" % todo.as_posix())
+    elif count == 1:
+        print(("OK %s" if UNCHECKED.search(text) else "STALE %s") % todo.parent.name)
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind item; do
+      case "$kind" in
+        OK) ok "挂起标记有效：${item}" ;;
+        DUP) bad "挂起标记重复：${item}（只能有一行）" ;;
+        STALE) warn "挂起标记过期：${item} 已没有未勾选项，按完成计；可用 /spec-guard:module-suspend --resume ${item} 去掉" ;;
+      esac
+    done <<<"$SUSPEND_OUT"
+  else
+    warn '未验证：挂起标记检查没有正常运行'
+  fi
+fi
+
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"
 [ "$FAIL" -eq 0 ]

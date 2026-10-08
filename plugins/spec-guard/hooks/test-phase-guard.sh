@@ -513,6 +513,11 @@ run "$um_done" >/dev/null
 [ "$refs_before" = "$(git -C "$um_done" for-each-ref)" ] && [ "$status_before" = "$(git -C "$um_done" status --porcelain)" ] \
   || fail "未合并提交检查必须只读"
 echo "  ✅ 未合并提交检查只读"; PASS=$((PASS + 1))
+# module-suspend：领先远端且只剩挂起模块时，同样不说成全部完成。
+printf '%s\n' '- [x] built' '- [ ] review' '<!-- spec-guard: suspended -->' > "$um_done/tasks/alpha/todo.md"
+lacks "DONE 领先且有挂起模块时不说全部完成" "$um_done" "every mapped module has a plan and no open todo item"
+injects "DONE 领先且有挂起模块时说明挂起并建议先推送" "$um_done" "every module that is not suspended is done; 1 suspended; $PUSHFIRST"
+git -C "$um_done" checkout -q -- tasks/alpha/todo.md
 # 没有 origin/HEAD 时回退到 origin/main。
 git -C "$um_done" symbolic-ref --delete refs/remotes/origin/HEAD
 injects "没有 origin/HEAD 时回退到 origin/main" "$um_done" "$HINT"
@@ -912,5 +917,64 @@ grep -F "IGNORE PREVIOUS" >/dev/null <<<"$out" && fail "无效配置的内容不
 $out"
 echo "  ✅ 无效配置的键名与取值不进入注入"; PASS=$((PASS + 1))
 rm -f "$pc/.agent/config.json"
+
+# module-suspend：挂起的模块让出当前位置、留在 Build order 原位，只报告“挂起中”；没有标记时逐字节不变。
+SUSPENDED='<!-- spec-guard: suspended -->'
+su="$WORK/suspend"; mkdir -p "$su/spec" "$su/tasks/alpha" "$su/tasks/beta" "$su/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$su/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$su/spec/CAPABILITY-MAP.md"
+touch "$su/spec/alpha.md" "$su/spec/beta.md"
+printf '# Plan\n' > "$su/tasks/alpha/plan.md"; printf '# Plan\n' > "$su/tasks/beta/plan.md"
+printf '%s\n' '- [x] built' '- [ ] review on a later date' > "$su/tasks/alpha/todo.md"
+printf '%s\n' '- [ ] start' > "$su/tasks/beta/todo.md"
+plain_su="$(run "$su" | context_of)"
+grep -F 'Current module: `alpha`' >/dev/null <<<"$plain_su" || fail "夹具应以 alpha 为当前模块
+$plain_su"
+printf '%s\n' '- [x] built' '- [ ] review on a later date' "$SUSPENDED" > "$su/tasks/alpha/todo.md"
+out="$(run "$su" | context_of)"
+grep -F 'Current module: `beta`' >/dev/null <<<"$out" || fail "挂起 alpha 后当前模块应为 beta
+$out"
+grep -F -- '- Suspended: `alpha` (1 unchecked item(s)); resume with `/spec-guard:module-suspend --resume alpha`' >/dev/null <<<"$out" || fail "应报告 alpha 挂起中
+$out"
+grep -F ' · Suspended 1' >/dev/null <<<"$out" || fail "计数行应带 Suspended 1
+$out"
+grep -F 'Paused' >/dev/null <<<"$out" && fail "挂起的模块不应同时报告为 Paused
+$out"
+echo "  ✅ 挂起做到一半的模块：当前模块让给下一个，单独报告挂起"; PASS=$((PASS + 1))
+
+printf '%s\n' '{"activeModule":"alpha"}' > "$su/.agent/state.json"
+out="$(run "$su" | context_of)"
+grep -F 'Current module: `beta`' >/dev/null <<<"$out" && grep -F 'activeModule `alpha` is suspended' >/dev/null <<<"$out" || \
+  fail "activeModule 指向挂起模块时应按 Build order 取并说明
+$out"
+echo "  ✅ activeModule 指向挂起模块时按 Build order 取并说明"; PASS=$((PASS + 1))
+rm -f "$su/.agent/state.json"
+
+printf '%s\n' '- [x] start' > "$su/tasks/beta/todo.md"
+out="$(run "$su" | context_of)"
+grep -F '当前阶段: **DONE**' >/dev/null <<<"$out" || fail "只剩挂起模块时应为 DONE
+$out"
+grep -F 'every mapped module has a plan and no open todo item' >/dev/null <<<"$out" && fail "有挂起模块时不应说全部完成
+$out"
+grep -F 'every module that is not suspended is done; 1 suspended' >/dev/null <<<"$out" || fail "DONE 建议应说明挂起
+$out"
+echo "  ✅ 只剩挂起模块：DONE，但不说成全部完成"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] built' '- [x] reviewed' "$SUSPENDED" > "$su/tasks/alpha/todo.md"
+out="$(run "$su" | context_of)"
+grep -F 'Suspended' >/dev/null <<<"$out" && fail "标记还在但已全部勾完，应按完成计、不报挂起
+$out"
+echo "  ✅ 过期标记（无未勾选项）按完成计"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] built' '- [ ] review on a later date' "  $SUSPENDED (not exact)" > "$su/tasks/alpha/todo.md"
+printf '%s\n' '- [ ] start' > "$su/tasks/beta/todo.md"
+out="$(run "$su" | context_of)"
+[ "$out" = "$plain_su" ] || fail "标记行不完全相等时不算挂起，输出应与无标记时一致
+--- got
+$out
+--- plain
+$plain_su"
+echo "  ✅ 只有完全相等的一行才算挂起标记"; PASS=$((PASS + 1))
 
 echo "phase-guard regression passed (${PASS} cases)"
