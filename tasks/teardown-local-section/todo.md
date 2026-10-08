@@ -5,5 +5,5 @@
 - [x] Task 3：文档 — 命令 `teardown-convention.md`（含 argument-hint）、Codex skill teardown 一节、`docs/workflow.md`
 - [x] Checkpoint 1（report）：全部套件通过，ShellCheck 无告警
 - [x] Task 4：CHANGELOG + 0.54.2 + macOS 校验
-- [ ] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行
-- [ ] Task 5：发版后证据
+- [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #264 由用户合并于 b79b5d5
+- [x] Task 5：发版后证据 — v0.54.2 已发版；两份安装副本均验证：本地段内容留在原位、手写行被拒绝且指令文件与 state 不变、加 `--accept-removals` 后移除；记录见 `docs/releases/v0.54.2-*.json`
