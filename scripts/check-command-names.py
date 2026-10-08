@@ -43,8 +43,8 @@ BUILTIN = {
     "plugin", "reload-plugins", "config", "permissions", "hooks", "help", "clear", "compact",
 }
 
-# 其他插件里、本插件文字明确会提到的命令：协作拆成 agent-relay 后，过渡期的
-# /spec-guard:collaboration 要把用户转交到它（collaboration-dependency）。只登记真实存在的
+# 其他插件里、本插件文字可能提到的命令：协作拆成 agent-relay 后，用户文字会指向它的命令
+# （collaboration-dependency；当时的过渡转交命令已于 0.54.0 移除）。只登记真实存在的
 # 那一条，取自 agent-relay `plugins/agent-relay/commands/*.md` 的文件名（2026-10-07 核对）；
 # 写错名字（/agent-relay:collab 之类）照样报错。
 EXTERNAL_COMMANDS = {"agent-relay": {"collaboration"}}

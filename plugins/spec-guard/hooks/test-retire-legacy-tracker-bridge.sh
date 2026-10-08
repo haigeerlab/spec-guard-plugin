@@ -73,7 +73,7 @@ absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|gitlab_tracker|works
   "$PLUGIN/hooks/proposal_promotion_proof.py"
 
 # 当前能力图只描述现行能力：已退役命令的名字不得出现在任何模块行里（2026-10-08 审查 F14）。
-absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|workspace_binding|spec-guard:handoff|spec-guard handoff|session_handoff' \
+absent_from 'spec-github-bridge|spec-gitlab-bridge|sync-map|workspace_binding|spec-guard:handoff|spec-guard handoff|session_handoff|spec-guard:collaboration' \
   "$ROOT/spec/CAPABILITY-MAP.md"
 
 # ── broadened scan: every non-test file under plugins/spec-guard (R6) ──────
@@ -136,7 +136,8 @@ allowed_index() {
   return 1
 }
 
-RETIRED_PATTERN='sync-map|spec-github-bridge|spec-gitlab-bridge|workspace_binding|bind-workspace'
+# spec-guard:collaboration：转交到 agent-relay 的过渡命令，0.54.0 按 0.53.0 的预告移除（collaboration-command-retirement）。
+RETIRED_PATTERN='sync-map|spec-github-bridge|spec-gitlab-bridge|workspace_binding|bind-workspace|spec-guard:collaboration'
 ISSUE_WRITE_PATTERN='gh issue (create|edit)|glab issue (create|update)'
 # `.agent/state.json` 的 `tracker` 字段随远端 tracker 模式一同退役
 # （docs/retirements/state-tracker-field.md）：没有任何代码再写它、读它，或据它改变判断。

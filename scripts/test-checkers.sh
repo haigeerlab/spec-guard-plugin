@@ -440,7 +440,7 @@ cb_fixture() {  # 每个用例一棵干净的夹具树：一份迁走清单（�
   printf '# removed\nplugins/spec-guard/hooks/moved_impl.py\n' > "$CB/scripts/collaboration-owned.txt"
   printf '通过 agent-relay 的协作信箱发 mailbox 消息；legacy_bridge_marker 不是工具名。\n' \
     > "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
-  printf '# 项目\n协作已移到 agent-relay，过渡期运行 /spec-guard:collaboration 转交。\n' > "$CB/README.md"
+  printf '# 项目\n协作已移到 agent-relay，安装后运行 /agent-relay:collaboration。\n' > "$CB/README.md"
 }
 cb_plant() {  # $1=用例名 $2=违规行
   cb_fixture; printf '%s\n' "$2" >> "$CB/plugins/spec-guard/skills/ticket/SKILL.md"
