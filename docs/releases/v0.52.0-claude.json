@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.52.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.0;test:installed-plugin-upgrade-20261008"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.51.3 to 0.52.0 for scope user; the installed copy records gitCommitSha db6f12ed1e69fe99b2304ead0a494f893a6d3327 -- the v0.52.0 tag commit"
+      ]
+    },
+    {
+      "subject": "spec-guard-context-after-compact",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.52.0;test:context-after-compact-20261008"
+      },
+      "observedAt": "2026-10-08T01:50:00Z",
+      "evidence": [
+        "command:<claude installed copy>/hooks/phase-guard.sh on a DONE checkout with a real Claude transcript cut right after its compact_boundary (postTokens 13951; last usage 601430)",
+        "result:DONE with no Module boundary line (0.51.3 said about 601 k tokens and suggested a new session)",
+        "command:<claude installed copy>/hooks/session_context.py on a real Codex rollout cut after `compacted` and a zero token_count",
+        "result:context_usage (0, None)",
+        "result:commands/handoff.md and hooks/session_handoff.py are absent; a /spec-guard:handoff prompt gets the normal stage injection",
+        "host:Claude Code 2.1.291"
+      ]
+    }
+  ]
+}
