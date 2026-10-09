@@ -342,7 +342,8 @@ class TempProjectTests(Fixture):
     seed = CliTests.seed
 
     def test_temp_directory_projects_are_excluded_and_counted(self):
-        temp_project = os.path.realpath(str(self.root / "badmap"))
+        # A fixed temp-prefix path like self.real, not tempfile's: the caller's TMPDIR must not decide this test.
+        temp_project = os.path.realpath("/tmp/sg-self-report-fixture/badmap")
         self.claude_session("s2.jsonl", [
             claude_attachment("2026-10-01T10:00:00Z", temp_project, "sess-tmp", [segment("UNKNOWN")]),
         ])

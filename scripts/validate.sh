@@ -96,6 +96,13 @@ python3 -B plugins/spec-guard/hooks/test_proposal_contract.py || F=1
 python3 -B plugins/spec-guard/hooks/test_module_cost_report.py || F=1
 python3 -B plugins/spec-guard/hooks/test_capability_map.py || F=1
 python3 -B scripts/test_self_report.py || F=1
+# 外部 TMPDIR 不在临时前缀下时结果也必须一样：目录建在 git 目录里（不在 /tmp、/var/folders 下），用完即删。
+# 只删 mktemp 刚建、带固定前缀的那个目录；mktemp 失败时变量为空，不删任何东西。
+SR_TMP="$(mktemp -d "$(git rev-parse --absolute-git-dir)/sg-self-report-tmpdir.XXXXXX")" || { SR_TMP=""; F=1; }
+if [ -n "${SR_TMP}" ]; then
+  TMPDIR="${SR_TMP}" python3 -B scripts/test_self_report.py || F=1
+  case "${SR_TMP}" in */sg-self-report-tmpdir.??????) rm -rf -- "${SR_TMP}" ;; esac
+fi
 python3 -B plugins/spec-guard/hooks/test_session_context.py || F=1
 python3 -B plugins/spec-guard/hooks/test_ticket_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py || F=1
