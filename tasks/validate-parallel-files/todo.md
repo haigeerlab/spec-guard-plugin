@@ -1,0 +1,22 @@
+# Todo: validate-parallel-files
+
+- [x] Task 1：并行步骤运行器 `scripts/run_steps_parallel.py` 与其回归，变异证明，登记进 `validate.sh` — `scripts/test_run_steps_parallel.py` 10 例：
+  - 覆盖：全过、某步失败并在末尾列出、被杀的步骤、原顺序输出（含错误输出）、段落标题位置、`SG_VALIDATE_JOBS=1` 串行、`SG_VALIDATE_JOBS=2` 同时跑、非法并行数、空步骤、没有步骤；
+  - 运行器不存在时 10 例全红（"用法错误"三例起初因 Python 找不到脚本也退出 2 而误绿，已加"错误输出含'用法'"的断言）；
+  - 变异全部变红并已还原：忽略退出码（失败与被杀两例红）、按结束先后打印（顺序与标题两例红）、空步骤静默跳过、忽略 `SG_VALIDATE_JOBS`；
+  - 系统 Python 3.9.6 通过。
+- [x] Task 2：`validate.sh` 回归段接入运行器，核对步骤数与段落标题，草稿副本上的失败证明：
+  - 回归段 51 步 = 改前 50 步（含换 TMPDIR 的那一遍）+ 新运行器自己的回归；`═══` 段落标题仍 25 处，输出里 29 个标题行与改前一致；
+  - "指纹算法自检""本机状态路径"两段（`--quick` 也跑，每条不到 1 秒）挪到回归段之前，回归段连成一次调用；
+  - TMPDIR 那一遍成为一步，`mktemp` 失败时这一步本身报错失败，删除仍按固定前缀守卫；
+  - `test_validate_quick.py` 通过；`SG_VALIDATE_JOBS=1` 全套通过；ShellCheck（CI 同版本）无告警；
+  - 草稿副本里在 `test_tracker_default.py` 开头加一行 `raise SystemExit` → `validate.sh` 退出 1，该步原位标"这一步失败"，末尾"失败的步骤"列出它。（第一次把这行加在文件末尾，`unittest.main()` 先退出、校验照常通过——改法错了，不是运行器的问题。）
+- [x] Task 3：并行连跑 5 遍的共享状态对比，系统 Python 3.9，改后计时对照 100 秒目标 — 本机 8 核，`/usr/bin/time -p`，CPU 为 user+sys：
+  - 改前：墙钟 200.7s，CPU 235.2s（119.3+115.9），负载 15→18；
+  - 改后 `SG_VALIDATE_JOBS=1`：墙钟 161.2s，CPU 203.1s，负载 10→13；
+  - 改后并行 5 遍（8 个并行）：墙钟 55.9、58.9、69.7、71.1、68.7s；CPU 224.9、225.1、233.8、237.0、230.8s；负载从 13 升到 50，主要是背靠背连跑自身造成；
+  - **达到"100 秒以内"**；CPU 总量与改前持平，没有因为多层并行暴涨；
+  - 6 遍（串行 1 + 并行 5）全部通过；每遍前后对比仓库 `git status --porcelain --ignored`、本 worktree 的 git 目录、公共 git 目录顶层与 `spec-guard/`、`~/.spec-guard`、`~/.local/state/spec-guard`，均无变化。
+- [ ] 补测三层并行叠加（用户 2026-10-09 选 A：先不改代码，补测后再定是否加进程数上限）：verify-and-commit 全档提交时的墙钟与 CPU；CI 改前、改后的用时
+- [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行
+- [ ] Task 4：下次发版时写进 CHANGELOG 的"维护者工具"
