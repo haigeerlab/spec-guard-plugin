@@ -68,6 +68,49 @@ map() {  # $1=项目目录
     '| alpha | x | — |' '' 'Build order: alpha' > "$1/spec/CAPABILITY-MAP.md"
 }
 
+# 下面这些辅助函数被不止一段用到，所以放在公共部分（原样从各自段落挪上来）。
+run_from() {  # $1=工作目录；不设 CLAUDE_PROJECT_DIR，模拟 Codex
+  (cd "$1" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)
+}
+run_input() {  # $1=项目目录 $2=标准输入文本；ATTENDED=<值> 时传给 hook，否则不设
+  if [ -n "${ATTENDED:-}" ]; then
+    env CLAUDE_CODE_SESSION_ATTENDED="$ATTENDED" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+  else
+    env -u CLAUDE_CODE_SESSION_ATTENDED CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+  fi
+}
+context_of() {  # 从 hook JSON 取 additionalContext
+  python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
+}
+transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
+  printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
+}
+# context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
+# 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
+mid_line() {  # $1=N k $2=阈值说明
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
+}
+sized_boundary() {  # $1=N k $2=阈值说明
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
+}
+done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
+  python3 -c '
+import sys
+t, want = sys.stdin.read(), sys.argv[1]
+assert "Session context" not in t, t
+if want:
+    assert t.count(want) == 1 and t.count("Module boundary") == 1, t
+    assert t.index(want) < t.index("Suggested next step"), t
+else:
+    assert "Module boundary" not in t, t
+' "$2" <<<"$out" || fail "$1
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
+# 用例按段落分成 part_1…part_N，原顺序不变；各段互不共享夹具，由文件末尾的调度同时跑。
+
+part_1() {
 mkdir -p "$WORK/empty"
 silent "无激活信号的目录静默" "$WORK/empty"
 
@@ -118,7 +161,9 @@ injects "指出当前模块" "$local_project" 'Current module: `alpha` (next in 
 if grep -Eqi 'sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$local_project")"; then
   fail "legacy tracker advice leaked into local phase output"
 fi
+}
 
+part_2() {
 # 按模块判断：plan 与 todo 决定 BUILDING／DONE，activeModule 决定当前模块。
 stages="$WORK/stages"
 mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
@@ -162,6 +207,19 @@ mkdir -p "$activation_only/.agent"
 printf '%s\n' '{"activeModule":"NOT A VALID ID"}' > "$activation_only/.agent/state.json"
 injects "activeModule 值无效时激活信号仍然触发" "$activation_only" "IDLE"
 lacks "IDLE 没有模块完成行" "$activation_only" "Module boundary"
+}
+
+part_3() {
+# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
+stages="$WORK/stages"
+mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
+touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
+printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+printf '%s\n' '- [x] done' '- [X] one' > "$stages/tasks/alpha/todo.md"
+
 # 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "activeModule 已完成但项目未完成时报告 MODULE_DONE" "$stages" "当前阶段: **MODULE_DONE**"
@@ -205,6 +263,22 @@ printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '
 printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
 injects "阶段无法计算时注入诊断而不是静默" "$stages" "当前阶段: **UNKNOWN**"
 lacks "UNKNOWN 没有模块完成行" "$stages" "Module boundary"
+}
+
+part_4() {
+# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
+stages="$WORK/stages"
+mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
+touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
+printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+printf '# Plan\n' > "$stages/tasks/beta/plan.md"
+printf '{"activeModule":""}\n' > "$stages/.agent/state.json"
+rm "$stages/spec/beta.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
 
 # 能力图读不了是读取故障：不论有没有模块 spec，都报 UNKNOWN 并说明读不了，不报 MAP_ONLY / IDLE。
 UNREADABLE="- Capability map: present but unreadable ("
@@ -250,6 +324,26 @@ injects "非 UTF-8 能力图报 MAP_INVALID" "$stages" "当前阶段: **MAP_INVA
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '' 'Build order: alpha' > "$stages/spec/CAPABILITY-MAP.md"
 printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
+}
+
+part_5() {
+# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
+mkdir -p "$WORK/empty"
+mkdir -p "$WORK/other-state/.agent"
+printf '%s\n' '{"session":"x"}' > "$WORK/other-state/.agent/state.json"
+mkdir -p "$WORK/prose"
+printf '%s\n' '本项目不用 `<!-- BEGIN:agent-skills-convention -->` 这个块。' > "$WORK/prose/CLAUDE.md"
+mkdir -p "$WORK/active-pointer/.agent"
+printf '%s\n' '{"activeModule":"alpha"}' > "$WORK/active-pointer/.agent/state.json"
+map "$WORK/active-pointer"
+mkdir -p "$WORK/crlf"
+printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
+map "$WORK/crlf"
+local_project="$WORK/local"
+mkdir -p "$local_project"
+printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGENTS.md"
+map "$local_project"
+touch "$local_project/spec/alpha.md"
 
 # 插队：base 完成、infra 做到一半，当前模块是 urgent。
 paused="$WORK/paused"
@@ -318,7 +412,9 @@ printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/b
 RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来时注入诊断" "$local_project" "python3 无法运行"
 RUN_PATH="$WORK/brokenpy:$PATH" injects "python3 跑不起来不等于未启用" "$local_project" "这不是「未启用」"
 [ -z "$(RUN_PATH="$WORK/brokenpy:$PATH" run "$WORK/other-state")" ] || fail "python3 跑不起来时无关项目也必须静默"
+}
 
+part_6() {
 # 有 Plan 无 todo.md 的模块按已完成计；activeModule 指向它时给出提醒。
 notodo="$WORK/notodo"
 mkdir -p "$notodo/spec" "$notodo/tasks/base" "$notodo/tasks/alpha" "$notodo/tasks/beta" "$notodo/.agent"
@@ -379,7 +475,9 @@ injects "自由文本的登记说明不算声明" "$notodo" "$NOTODO_NOTE"
 printf '%s\n' '# Plan' 'x <!-- spec-guard: no-todo -->' > "$notodo/tasks/alpha/plan.md"
 injects "同一行有别的文字时不算声明" "$notodo" "Plan without todo: 1 module(s) counted as done"
 printf '# Plan\n' > "$notodo/tasks/alpha/plan.md"
+}
 
+part_7() {
 # 注入点 2：能力图里的坏 module id 会被 MapError 原样带进注入文本。原文要留（否则用户
 # 不知道哪一行坏了），但不能让它伪造出代码块或段落。
 badmap="$WORK/bad-map"
@@ -443,9 +541,6 @@ echo "  ✅ module-insert 的终端输出仍带原文"; PASS=$((PASS + 1))
 
 # Codex 不提供 CLAUDE_PROJECT_DIR，hook 在会话目录里运行（2026-09-28 真实 Codex 核实）。
 # 从仓库子目录启动时，必须按 git 仓库根目录判断激活，而不是只看当前目录。
-run_from() {  # $1=工作目录；不设 CLAUDE_PROJECT_DIR，模拟 Codex
-  (cd "$1" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)
-}
 git_project="$WORK/git-project"
 mkdir -p "$git_project/src/deep"
 git -C "$git_project" init -q
@@ -471,7 +566,9 @@ import json, sys
 assert "当前阶段: **IDLE**" in json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
 ' <<<"$(run_from "$plain")" || fail "非 git 目录应退回当前目录判断"
 echo "  ✅ 非 git 目录退回当前目录"; PASS=$((PASS + 1))
+}
 
+part_8() {
 # DONE／MODULE_DONE 时提示当前分支尚未进入本地已知远端默认分支的提交（只读、不联网）。
 g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false "$@"; }
 unmerged_fixture() {  # $1=克隆目录 $2=alpha 的 todo 内容；创建 bare 远端并推送基线，origin/HEAD 指向 main
@@ -562,29 +659,10 @@ injects "BUILDING 仍报告 BUILDING" "$um_build" "当前阶段: **BUILDING**"
 lacks "BUILDING 且领先时不提示未合并提交" "$um_build" "not yet in"
 lacks "BUILDING 且领先时不建议先推送" "$um_build" "push this branch"
 lacks "BUILDING 且领先时没有模块完成行" "$um_build" "Module boundary"
+}
 
+part_9() {
 # 上下文行（fresh-session-hint 第 2、8、9 条）：经标准输入的 hook 输入读会话记录，超过 200k 才提示。
-run_input() {  # $1=项目目录 $2=标准输入文本；ATTENDED=<值> 时传给 hook，否则不设
-  if [ -n "${ATTENDED:-}" ]; then
-    env CLAUDE_CODE_SESSION_ATTENDED="$ATTENDED" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
-  else
-    env -u CLAUDE_CODE_SESSION_ATTENDED CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
-  fi
-}
-context_of() {  # 从 hook JSON 取 additionalContext
-  python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
-}
-transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
-  printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
-}
-# context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
-# 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
-mid_line() {  # $1=N k $2=阈值说明
-  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
-}
-sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
-}
 # context-hint-no-paste：任何注入都不得再要求 agent 贴交接文本（2026-10-07 用户在接近满窗时仍看到被贴出的交接文本）。
 for line in "$BOUNDARY" "$(mid_line 1 x)" "$(sized_boundary 1 x)"; do
   case "$line" in *paste-ready*|*"for paste"*) fail "上下文提示仍要求贴交接文本: $line" ;; esac
@@ -657,20 +735,6 @@ before="$(snap)"; run_input "$ctx" "$HOOK_INPUT" >/dev/null; [ "$before" = "$(sn
 echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
 
 printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
-done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
-  python3 -c '
-import sys
-t, want = sys.stdin.read(), sys.argv[1]
-assert "Session context" not in t, t
-if want:
-    assert t.count(want) == 1 and t.count("Module boundary") == 1, t
-    assert t.index(want) < t.index("Suggested next step"), t
-else:
-    assert "Module boundary" not in t, t
-' "$2" <<<"$out" || fail "$1
-$out"
-  echo "  ✅ $1"; PASS=$((PASS + 1))
-}
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "DONE 且 800k 时只出带大小的 Module boundary 行" "$(sized_boundary 800 'at or over 500 k')"
 transcript "$T" 499999
@@ -710,6 +774,22 @@ echo "  ✅ Codex BUILDING 达到窗口 80% 时有上下文行"; PASS=$((PASS + 
 codex_rollout "$T" 206719
 [ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "Codex BUILDING 低于窗口 80% 时不应提示"
 echo "  ✅ Codex BUILDING 低于窗口 80% 时不提示"; PASS=$((PASS + 1))
+}
+
+part_10() {
+# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
+git_project="$WORK/git-project"
+mkdir -p "$git_project/src/deep"
+git -C "$git_project" init -q
+printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$git_project/AGENTS.md"
+ctx="$WORK/ctx"
+mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
+map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+T="$WORK/ctx-transcript.jsonl"
+HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
+plain_building="$(run "$ctx" | context_of)"
 
 # unattended-run-hint：没人在场的运行（claude -p 设 CLAUDE_CODE_SESSION_ATTENDED=0；codex exec 的会话记录首条
 # session_meta 写 source:"exec"）不出那两行「请告诉用户 /compact、/clear」，其余逐字相同；拿不准时照旧。
@@ -820,7 +900,14 @@ lacks "非 git 目录没有位置行" "$ctx" "Location:"
 grep -F "worktree \`$(git -C "$git_project" rev-parse --show-toplevel)\`." >/dev/null <<<"$(run_from "$git_project/src/deep")" \
   || fail "Codex 从仓库子目录启动时位置行应报告仓库根目录"
 echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PASS=$((PASS + 1))
+}
 
+part_11() {
+# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
+mkdir -p "$WORK/empty"
+unrelated="$WORK/unrelated-git"
+mkdir -p "$unrelated/sub"
+git -C "$unrelated" init -q
 
 # 项目根以 hook 输入的 cwd 为准（session-handoff 第 12 条）：宿主把 CLAUDE_PROJECT_DIR 指向主检出目录、会话却在
 # linked worktree 里时，阶段与位置都应来自 worktree。
@@ -980,5 +1067,34 @@ $out
 --- plain
 $plain_su"
 echo "  ✅ 只有完全相等的一行才算挂起标记"; PASS=$((PASS + 1))
+}
 
+# 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
+# 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
+PARTS=11
+PIDS=()
+for n in $(seq 1 "$PARTS"); do
+  (
+    WORK="$WORK/part-$n"; mkdir -p "$WORK"; PASS=0
+    "part_$n"
+    echo "$PASS" > "$WORK/../pass-$n"
+  ) >"$WORK/log-$n" 2>&1 </dev/null &
+  PIDS+=($!)
+  if [ "${SG_VALIDATE_JOBS:-}" = 1 ]; then wait "$!" || true; fi
+done
+FAILED=()
+for n in $(seq 1 "$PARTS"); do
+  status=0
+  wait "${PIDS[$((n - 1))]}" || status=$?
+  cat "$WORK/log-$n"
+  if [ "$status" -eq 0 ] && [ -f "$WORK/pass-$n" ]; then
+    PASS=$((PASS + $(cat "$WORK/pass-$n")))
+  else
+    FAILED+=("$n")
+  fi
+done
+if [ "${#FAILED[@]}" -gt 0 ]; then
+  echo "  ❌ phase-guard regression: 第 ${FAILED[*]} 段失败（共 $PARTS 段；失败的用例见上方该段输出）" >&2
+  exit 1
+fi
 echo "phase-guard regression passed (${PASS} cases)"
