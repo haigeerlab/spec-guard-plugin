@@ -80,6 +80,21 @@ class RunTestsParallelTests(unittest.TestCase):
         p = self.run_runner(self.write(), '--jobs', '3')
         self.assertIn('3 个进程', p.stdout)
 
+    def test_a_big_single_class_is_split_by_method(self):
+        # One class with many tests (like test_local_ticket_portability) still spreads across processes.
+        path = self.write()
+        body = 'import unittest\n\nclass OnlyTests(unittest.TestCase):\n' + ''.join(
+            '    def test_%d(self):\n        self.assertTrue(True)\n' % i for i in range(9))
+        path.write_text(body)
+        p = self.run_runner(path, '--jobs', '3')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn('3 个进程', p.stdout)
+        self.assertIn('9 个用例', p.stdout)
+        path.write_text(body.replace('range(9)', 'range(9)').replace('self.assertTrue(True)\n', 'self.assertTrue(True)\n', 1)
+                        + '    def test_bad(self):\n        self.fail("x")\n')
+        p = self.run_runner(path, '--jobs', '3')
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+
     def test_zero_discovered_tests_is_not_a_pass(self):
         path = self.write()
         path.write_text('import unittest\n')

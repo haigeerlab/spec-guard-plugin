@@ -4,7 +4,7 @@
     run_tests_parallel.py <test file> [--jobs N]
 
 Each worker imports the file (its directory goes first on sys.path, as when the file is run directly), runs only its
-share of the classes, and reports how many tests ran.  The run fails when any worker fails, when no test was discovered,
+share of the classes (a class bigger than a fair share is cut into method chunks), and reports how many tests ran.  The run fails when any worker fails, when no test was discovered,
 or when the workers together ran fewer tests than discovery found -- a lost test is never a pass.  Standard library
 only; works on the macOS system Python 3.9.
 """
@@ -34,25 +34,42 @@ def load_module(path):
 
 
 def discover(module):
-    """[(class name, test count)] for every TestCase class defined in the module, in definition order."""
+    """[(class name, [test method names])] for every TestCase class defined in the module, in definition order."""
     loader = unittest.defaultTestLoader
     found = []
     for name, value in vars(module).items():
         if (isinstance(value, type) and issubclass(value, unittest.TestCase)
                 and value.__module__ == module.__name__):
-            count = loader.loadTestsFromTestCase(value).countTestCases()
-            if count:
-                found.append((name, count))
+            methods = list(loader.getTestCaseNames(value))
+            if methods:
+                found.append((name, methods))
     return found
 
 
-def split(classes, jobs):
-    """Greedy balance by test count: largest class first into the lightest bucket."""
+def units(classes, jobs):
+    """Work units: whole classes, except that a class bigger than a fair share is cut into method chunks.
+
+    A cut class runs its setUpClass once per chunk, which is correct but repeats that setup."""
+    total = sum(len(methods) for _, methods in classes)
+    share = max(1, -(-total // jobs))
+    result = []
+    for name, methods in classes:
+        if len(methods) <= share:
+            result.append((name, None, len(methods)))
+            continue
+        for start in range(0, len(methods), share):
+            chunk = methods[start:start + share]
+            result.append((name, chunk, len(chunk)))
+    return result
+
+
+def split(work, jobs):
+    """Greedy balance by test count: largest unit first into the lightest bucket."""
     buckets = [[] for _ in range(jobs)]
     weights = [0] * jobs
-    for name, count in sorted(classes, key=lambda item: -item[1]):
+    for name, methods, count in sorted(work, key=lambda item: -item[2]):
         index = weights.index(min(weights))
-        buckets[index].append(name)
+        buckets[index].append(name if methods is None else "%s=%s" % (name, ",".join(methods)))
         weights[index] += count
     return [bucket for bucket in buckets if bucket]
 
@@ -61,9 +78,14 @@ def worker(path, names):
     os.environ["SG_PARALLEL_WORKER"] = "1"
     module = load_module(path)
     suite = unittest.TestSuite()
-    for name in names:
+    for spec in names:
+        name, _, methods = spec.partition("=")
         cls = getattr(module, name, None)
-        if cls is not None:
+        if cls is None:
+            continue
+        if methods:
+            suite.addTests(cls(method) for method in methods.split(","))
+        else:
             suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(cls))
     stream = io.StringIO()
     began = time.time()
@@ -95,15 +117,17 @@ def main(argv):
         return 2
     path = args[0]
     classes = discover(load_module(path))
-    total = sum(count for _, count in classes)
+    total = sum(len(methods) for _, methods in classes)
     if not total:
         print("  ❌ %s 里没有发现任何用例 —— 这是没找到，不是通过" % path)
         return 1
-    jobs = min(jobs or os.cpu_count() or 1, len(classes))
+    jobs = jobs or os.cpu_count() or 1
+    work = units(classes, jobs)
+    jobs = min(jobs, len(work))
     began = time.time()
     procs = [subprocess.Popen([sys.executable, "-B", os.path.abspath(__file__), WORKER_FLAG, path] + bucket,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-             for bucket in split(classes, jobs)]
+             for bucket in split(work, jobs)]
     ran, failed, ok = 0, [], True
     print("── %s：%d 个用例，%d 个类，%d 个进程 ──" % (os.path.basename(path), total, len(classes), len(procs)))
     for number, proc in enumerate(procs, 1):
