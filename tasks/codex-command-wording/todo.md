@@ -24,4 +24,4 @@
   - Codex 0.160.1（`codex exec --dangerously-bypass-hook-trust`，临时项目的 `.codex/hooks.json`，`-c` 关闭已安装的 spec-guard）：hook 输入带 `turn_id`，注入为 "continue `$incremental-implementation` on `alpha`"，不含斜杠写法；agent 回答先说"下一步用 `/build`"、再说"在 Codex 中可使用 `$incremental-implementation`"——`/build` 不在本插件注入里，很可能来自 Codex 里启用的 agent-skills 的技能说明（其中几份写着 `/build`），本模块管不到。`codex exec` 写入 `~/.codex/config.toml` 的临时项目信任记录已按段删除，与运行前逐字一致。
   - 用户做最终确认。
 - [x] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警、真实宿主核验通过，Plan 获批即授权推送与开 PR，合并由用户进行 — PR #285 由用户合并于 0cbb026
-- [ ] Task 6：随下次发版发出（CHANGELOG"修复"、两边安装副本各看一次注入）
+- [x] Task 6：随下次发版发出（CHANGELOG"修复"、两边安装副本各看一次注入）— 0.56.0：Codex 安装副本的真实会话注入 "continue `$incremental-implementation` on `alpha`"、不含 `/build` 与 `/spec-guard:`，回答也用 `$incremental-implementation`；Claude 安装副本的模块完成行要求单独代码块里的 `/compact` 加填好的聚焦说明（docs/releases/v0.56.0-codex.json、-claude.json）
