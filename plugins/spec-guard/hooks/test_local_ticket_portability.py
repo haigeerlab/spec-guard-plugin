@@ -79,6 +79,10 @@ class SourceInventoryTests(unittest.TestCase):
         state_root = base / "global" / "worktrees" / PROJECT_ID
         state_root.parent.mkdir(parents=True)
         git(root, "init", "-q")
+        # No background maintenance: a maintenance.lock appearing and vanishing while copytree walks the
+        # template made the copy fail now and then.  The setting is copied into every test repository too.
+        git(root, "config", "gc.auto", "0")
+        git(root, "config", "maintenance.auto", "false")
         git(root, "config", "user.email", "test@example.invalid")
         git(root, "config", "user.name", "Test")
         config = root / ".epiq" / "project.json"
@@ -109,8 +113,9 @@ class SourceInventoryTests(unittest.TestCase):
         self.root = Path(temporary.name) / "repo"
         self.global_dir = Path(temporary.name) / "global"
         self.state_root = self.global_dir / "worktrees" / PROJECT_ID
-        shutil.copytree(template / "repo", self.root, symlinks=True)
-        shutil.copytree(template / "global", self.global_dir, symlinks=True)
+        transient = shutil.ignore_patterns("*.lock")
+        shutil.copytree(template / "repo", self.root, symlinks=True, ignore=transient)
+        shutil.copytree(template / "global", self.global_dir, symlinks=True, ignore=transient)
         git(self.root, "worktree", "repair", str(self.state_root))
         environment = patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.global_dir)})
         environment.start()
