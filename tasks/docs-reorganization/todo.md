@@ -4,10 +4,15 @@
 - [x] Task 2：删除文档并清理现行引用 — 删除 47 个文件；现行引用改了 `docs/release-process.md` 与 `docs/reports/README.md` 两处；`docs/releases/*.json`（已发布证据）、`docs/retirements/`（退役记录）、`spec/`、`tasks/`、`CHANGELOG.md` 里的历史引用不改；全部发布记录仍通过 `release-evidence.py validate`
 - [x] Task 3：约定块移到 `docs/convention-block.md`，改 `check-readme-sync.py` 与其回归 — readme-sync 用例 9 条（含“SYNC 区只在 README 里 → 报错”“英文 README 的 --ref 落后 → 报错”），现有检查器上 4 条红；变异（检查器读回 README）4 条变红；`docs/release-process.md` 改为中英两份 README 同步改 `--ref`
 - [x] Checkpoint 1（gate）：第一批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行 — 一次性脚本核对全部站内链接：现行文档里的 15 个失效链接都在 `docs/retirements/`，指向早已退役的模块 Spec，本模块之前就存在，退役记录原样保留；`spec/`、`tasks/`、`CHANGELOG.md` 的 16 个按决定不改
-- [ ] Task 4：中文 README（按大纲重写，命令逐条对照）
-- [ ] Task 5：英文 README（章节一一对应，语言切换行）
-- [ ] Task 6：CONTRIBUTING 报 bug 与双语规则、maintainer-workflow 同步、核对 bug.yml
-- [ ] Checkpoint 2（gate）：第二批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行
+- [x] Task 4：中文 README（按大纲重写，命令逐条对照）— 按 12 节大纲重写；撤掉旧迁移说明的链接（文件保留在 `docs/migrations/`）。命令对照：
+  - `setup-convention` 的 `--replace`、`--dry-run`，`teardown-convention` 的 `--dry-run`：对照 `plugins/spec-guard/commands/*.md` 的 argument-hint
+  - `phase`、`verify-artifacts`、`add-module`、`config`：对照命令文件的 description
+  - Claude 更新与卸载（`claude plugin marketplace update`、`claude plugin update`、`claude plugin uninstall`）、Codex 的 `codex plugin remove`、`codex plugin marketplace upgrade`/`remove`、`codex plugin list`：对照本机 CLI 的 `--help`
+  - Codex 的 `ref` 改 `~/.codex/config.toml` 后 `marketplace upgrade`：历次发版的实际做法
+  - python3 故障提示原文（“python3 不可用”“python3 无法运行”）：对照 `phase-guard.sh` 第 55、71 行
+- [x] Task 5：英文 README（章节一一对应，语言切换行）— `README.en.md` 13 节与中文版一一对应，另加一句“除 README 外链接的文档为中文”；两份顶部有语言切换行
+- [x] Task 6：CONTRIBUTING 报 bug 与双语规则、maintainer-workflow 同步、核对 bug.yml — `bug.yml` 去掉已退役的 tracker 字段与错误的 hook 路径，改为用 `/spec-guard:phase`、`verify-artifacts` 的输出；`check-readme-sync.py` 的 `--ref` 正则改为在反引号处结束（README 表格里命令写在行内代码中），先加用例在旧检查器上为红；Spec 补写 `docs/releases/0.9.0-local-candidate.json` 的 2 处历史链接
+- [x] Checkpoint 2（gate）：第二批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行 — 链接核对：除 `docs/retirements/` 原有的 15 个外没有新的失效链接；README 用到的 `docs/workflow.md#命令对照` 锚点存在
 - [ ] Task 7：`docs/commands.md`（从 workflow 拆出）
 - [ ] Task 8：`docs/troubleshooting.md`
 - [ ] Task 9：`docs/design.md` 中文架构说明，文档导航标明维护者文档

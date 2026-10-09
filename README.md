@@ -1,107 +1,170 @@
 # spec-guard
 
+简体中文 | [English](README.en.md)
+
 spec-guard 是 [agent-skills](https://github.com/addyosmani/agent-skills) 的配套插件，支持 Claude Code 和 Codex。
-agent-skills 默认一个项目只有一份 Spec 和一份 plan；项目一旦拆成多个模块，就会出三类问题。spec-guard 补的就是这三处：
+agent-skills 默认一个项目只有一份 Spec 和一份 plan；spec-guard 让同一个项目可以拆成多个模块，每个模块各有自己的
+Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个模块、做到了哪一步。
+
+## 使用场景与边界
+
+**适合**：已经在用 agent-skills，项目会拆成多个模块，或者有多个 agent、多个 worktree 并行开发。
+
+**不太需要**：单文件脚本或一次性小改动，agent-skills 自带的单 Spec 流程就够了。
+
+它解决三个问题：
 
 | 问题 | spec-guard 的做法 |
 |---|---|
-| 多个模块共用一份 `tasks/plan.md` 和 `todo.md`：上游没有模块概念，第二个模块起要么被打断确认覆盖，要么靠人盯住 | 多模块目录约定：一张能力图，每个模块各自的 Spec、Plan、todo |
+| 多个模块共用一份 `tasks/plan.md`，第二个模块起互相覆盖 | 多模块目录约定：一张能力图，每个模块各自的 Spec、Plan、todo |
 | agent 不知道现在该做哪个模块、做到哪一步 | 每轮对话开头自动注入当前阶段，例如「`NEEDS_PLAN`：去给 `billing` 写 plan」 |
-| 做到一半冒出新需求，不知道插在哪，手改能力图容易改坏 | 快速插入：在检查点（或显式插队）提出新模块，校验、预览后经你确认插进能力图；需要留痕时改走 Proposal |
+| 做到一半冒出新需求，手改能力图容易改坏 | 快速插入：在检查点提出新模块，校验、预览、经你确认后插进能力图 |
 
-阶段 hook 只报告事实、给出建议；Local 事项写入需要明确使用 `ticket` 入口，
-能力图插入也须预览确认。设计原因见[设计理念与术语](docs/concepts.md)。
+边界：
 
-## 功能一览
+- 安装后**不会自动生效**，只在运行过 setup 的项目里工作；其他项目完全静默。
+- 阶段提示只报告事实、给出建议，不写文件、不改远端。
+- 写能力图、建事项、改 GitHub/GitLab 之类的操作都先预览，经你明确确认才执行。
 
-| 功能 | 解决什么问题 | 入口（Claude Code） | 是否默认生效 |
-|---|---|---|---|
-| 多模块约定 | 模块产物互不覆盖，`/build` 只从当前模块取任务 | `/spec-guard:setup-convention` | 运行 setup 后生效 |
-| 阶段提示 | agent 每轮都知道当前模块和下一步 | 自动；`/spec-guard:phase` 查看 | 运行 setup 后生效 |
-| 产物校验 | 能力图格式、模块与 Spec 的对应关系是否正确 | `/spec-guard:verify-artifacts` | 按需运行 |
-| 快速插入 | 新需求校验后插进能力图，不改坏依赖和顺序 | `/spec-guard:add-module` | 按需运行 |
-| 项目审查交接 | 限定审查批次，整理发现并转入事项和修复 | 项目约定与共享检查点 | 安装约定后按需使用 |
-| Proposal 流程 | 需要留痕时，新需求按提交、接受、晋级、收尾四步加进能力图（`proposal-submit` 补全并校验草稿） | `/spec-guard:proposal-*` | 可选；需要一次性准备 |
-| 会话协作（已移到 agent-relay） | 同一台 Mac 上的会话互相传话、按名字联系、跨宿主委派，现在由独立插件 agent-relay 提供 | 安装 agent-relay，用 `/agent-relay:collaboration` | 见[迁移说明](docs/migrations/2026-10-07-collaboration-split.md) |
-| 本地事项账本 | 明确选择 Local 时在本地记 bug 和需求 | `/spec-guard:local-ticket-ledger` | 需单独启用 |
-| 托管日常事项 | 明确选择 GitHub/GitLab 后逐项查重、授权创建并在交付后对账 | `/spec-guard:ticket`、`hosted-ticket-workflow` skill | 需登录对应 CLI；外部写入逐次授权 |
-| 文档治理 | 声明哪些文档是依据、每个模块改了哪些 | `/spec-guard:documentation-*` | 没有文档基线就不生效 |
-| 能力历史 | 核验旧版本归档下来的能力图没被改动 | `/spec-guard:history-integrity` | 只对有归档的项目有用 |
+## 核心概念
 
-Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用，对照表见[使用流程](docs/workflow.md#命令对照)。
+- **能力图** `spec/CAPABILITY-MAP.md`：一张表列出全部模块、职责与依赖，外加一行 Build order（构建顺序）。
+- **模块**：能力图里的一行。每个模块有 `spec/<模块>.md`（Spec）和 `tasks/<模块>/plan.md`、`todo.md`。
+- **阶段**：spec-guard 根据这些文件推断当前进度，例如 `MAP_ONLY`（只有能力图）、`NEEDS_PLAN`、`BUILDING`、
+  `MODULE_DONE`、`DONE`，每轮注入给 agent。
+- **快速插入与 Proposal**：做到一半加需求，可以在检查点直接插入模块；需要留痕、评审时走 Proposal 流程。
 
-## 适合谁
+术语和设计理由见[设计理念与术语](docs/concepts.md)。
 
-- **适合**：已经在用 agent-skills，项目会拆成多个模块，或者有多个 agent、多个 worktree 并行开发。
-- **不太需要**：单文件脚本或一次性小改动。agent-skills 自带的单 Spec 流程就够了。
+## 前置条件
 
-## 安装
-
-**前置条件：**
-
-- 已安装 agent-skills；
+- 已安装 [agent-skills](https://github.com/addyosmani/agent-skills) 插件；
 - `bash`、`git`、`python3`（3.9 及以上，macOS 自带的即可）；
-- 用 Proposal 或托管日常事项流程时，需要登录 `gh`（GitHub）或 `glab`（GitLab）；
-- 用本地事项账本时，需要 macOS 和 Node.js。
+- 宿主：Claude Code，或 Codex（CLI 或桌面 App）；
+- 可选：用 Proposal 或托管日常事项时需要登录 `gh`（GitHub）或 `glab`（GitLab）；用本地事项账本时需要 macOS 和
+  Node.js。
 
-**Claude Code：**
+## 快速开始
+
+**1. 安装插件**
+
+| Claude Code | Codex |
+|---|---|
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.55.0` |
+| `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
+| 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook | 开新会话即可 |
+
+Codex 的 `--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
+
+**2. 在项目里启用**
+
+| Claude Code | Codex |
+|---|---|
+| 运行 `/spec-guard:setup-convention`，看预览，确认后写入 | 对 agent 说“用 spec-guard-ops 在这个项目里安装约定”，看预览，确认后写入 |
+
+setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）里写入一段[约定块](docs/convention-block.md)。
+
+**3. 开始一个多模块项目**
+
+用 agent-skills 的 `/spec` 写能力图，然后逐个模块写 Spec、用 `/plan` 生成计划、用 `/build` 实现。每一步该做什么，
+阶段提示会告诉 agent。
+
+**最短路径**：装插件 → 在项目里运行一次 setup → 正常和 agent 对话，跟着阶段提示走。
+
+完整流程、每个阶段的含义和两种加需求的方式见[使用流程](docs/workflow.md)。
+
+## 常用命令
+
+| 命令（Claude Code） | 作用 |
+|---|---|
+| `/spec-guard:setup-convention` | 在项目里安装多模块约定；`--replace` 升级约定块，`--dry-run` 只预览 |
+| `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
+| `/spec-guard:verify-artifacts` | 校验能力图格式、模块与 Spec 的对应关系 |
+| `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
+| `/spec-guard:config` | 查看或设置项目配置：产物语言、评审节奏 |
+| `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
+
+Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令和 Codex 对照见
+[使用流程 · 命令对照](docs/workflow.md#命令对照)。
+
+## 运行效果与自检
+
+启用后，发一句话给 agent，它会在上下文里看到类似这样的阶段提示：
 
 ```text
-/plugin marketplace add haigeerlab/spec-guard-plugin
-/plugin install spec-guard@spec-guard-marketplace
+## spec-guard local workflow
+
+当前阶段: **NEEDS_PLAN**
+
+- Capability map: present
+- Current module: `billing` (next in Build order)
+
+Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` (for example with `/plan`).
 ```
 
-**Codex：**
+自检：
 
-```bash
-codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.55.0
-codex plugin add spec-guard@spec-guard-marketplace
-```
+- 运行 `/spec-guard:phase`，能看到同样的阶段信息；
+- 运行 `/spec-guard:verify-artifacts`，结果应为全部通过；
+- 在没运行过 setup 的项目里，hook 什么都不输出，这是正常的。
 
-`--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
-装好后开一个新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook。
+## 更新与卸载
 
-**装好之后不会自动生效。** 没有运行过 setup 的项目，hook 完全静默。要在哪个项目用，就在哪个项目里运行一次 setup。
+**更新**
 
-## 5 分钟上手
-
-1. 在项目里运行 `/spec-guard:setup-convention`，看预览，确认后写入。
-2. 用 `/spec` 写能力图 `spec/CAPABILITY-MAP.md`：列出模块，写一行 Build order，人工评审。
-3. 发一句话给 agent，它会看到类似下面的提示：
-
-   ```text
-   当前阶段: **MAP_ONLY**
-   Suggested next step: write the first reviewed module spec under `spec/`.
-   ```
-
-4. 按提示逐个模块推进：写 Spec，用 `/plan` 生成 plan，用 `/build` 实现。阶段会依次变为 `NEEDS_PLAN`、`BUILDING`、`DONE`；模块做完但还有别的模块时显示 `MODULE_DONE`，`DONE` 表示全部模块都完成。
-   模块完成且上下文达到窗口一半、或模块进行中达到窗口 80% 时，提示会建议 `/compact`（相关工作）或 `/clear`（不相关工作）——需求、计划与进度都在文件里，清空后也接得上；
-   每轮提示还带当前分支与 worktree，agent 请你评审或确认时会说明代码在哪。
-
-项目做到一半来了新需求，在检查点（或显式插队）用 `/spec-guard:add-module` 插进能力图。完整流程、每个阶段的含义和两种加需求的方式，
-见[使用流程](docs/workflow.md)。
-
-## 文档
-
-| 文档 | 内容 |
+| Claude Code | Codex |
 |---|---|
-| [使用流程](docs/workflow.md) | 新项目从零到交付、快速插入与 Proposal 两种加需求方式、能力图规则、Claude 与 Codex 命令对照 |
-| [设计理念与术语](docs/concepts.md) | 为什么这样设计，以及能力图、Proposal、revision 等术语的含义 |
-| [可选能力](docs/optional-features.md) | 本地事项账本、文档治理、能力历史：各自解决什么、怎么启用；会话协作已移到 agent-relay |
-| [更新日志](CHANGELOG.md) | 每个版本改了什么 |
+| `claude plugin marketplace update spec-guard-marketplace` | 把 `~/.codex/config.toml` 里 `[marketplaces.spec-guard-marketplace]` 的 `ref` 改成新版本 |
+| `claude plugin update spec-guard@spec-guard-marketplace`，然后重开会话 | `codex plugin marketplace upgrade`，然后开新会话 |
 
-## 约定块
+已经装过旧版约定块的项目，更新插件后先预览 `/spec-guard:setup-convention --replace --dry-run`，确认后再替换。
+块里自己写的规则放进本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`），替换时会保留。
 
-setup 写进 `CLAUDE.md`／`AGENTS.md` 的约定块全文与说明见 [docs/convention-block.md](docs/convention-block.md)。
+**卸载**
 
-## 升级与迁移
+1. 先在每个用过的项目里运行 `/spec-guard:teardown-convention`（先 `--dry-run` 预览），移除约定块并停用阶段提示；
+   你的 `spec/`、`tasks/` 会保留。
+2. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
+   `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
+   `codex plugin marketplace remove spec-guard-marketplace`。
 
-- 仓库已从 `yizhongkaimail-collab/spec-guard-plugin` 迁到 `haigeerlab/spec-guard-plugin`。旧安装仍能运行，但要重新添加
-  marketplace 才能收到更新，见[仓库迁移说明](docs/migrations/2026-09-27-repository-copy.md)。
-- v0.14 之后，可写的 GitHub/GitLab tracker 桥已退役，见[迁移指南](docs/migrations/v0.15-legacy-tracker-retirement.md)。
-- Proposal v1 升级到 v2，见 [Proposal v2 迁移](docs/migrations/proposal-mainline-review-v2.md)。
+## 故障排查
 
-## 参与开发
+| 现象 | 先检查 |
+|---|---|
+| 阶段提示没有出现 | 这个项目运行过 setup 吗？Claude Code 里在 `/hooks` 信任 hook 了吗？装好插件后开新会话了吗？ |
+| 阶段是 `MAP_INVALID` | 运行 `/spec-guard:verify-artifacts`，它会指出能力图哪里不对，例如模块表多于一张时列出每张表头的行号 |
+| 提示说“python3 不可用”或“python3 无法运行” | 确认 `python3 --version` 是 3.9 以上，且宿主启动时的 PATH 里能找到它；修好后下一轮自动恢复 |
+| Codex 里没有 spec-guard | 运行 `codex plugin list`，确认 spec-guard 已安装且启用；改了 `ref` 后要 `codex plugin marketplace upgrade` |
 
-维护者的工作方式、验证命令和发布流程见 [docs/maintainer-workflow.md](docs/maintainer-workflow.md) 与
-[docs/release-process.md](docs/release-process.md)。
+更多情况见[使用流程](docs/workflow.md)。
+
+## 架构与文档导航
+
+**使用者**
+
+- [使用流程](docs/workflow.md)：从零到交付、两种加需求的方式、命令对照
+- [设计理念与术语](docs/concepts.md)
+- [可选能力](docs/optional-features.md)：本地事项账本、文档治理、能力历史；会话协作已移到独立插件 agent-relay
+- [约定块](docs/convention-block.md)：setup 写进 `CLAUDE.md`／`AGENTS.md` 的内容
+- [迁移说明](docs/migrations/)、[更新日志](CHANGELOG.md)
+
+**开发者**
+
+- [设计与架构](docs/design.md)
+- [贡献指南](CONTRIBUTING.md)
+- [设计决定](docs/decisions/)
+
+本仓库也用 spec-guard 管理自己的开发：根目录的 `spec/`、`tasks/` 是本仓库自用的模块记录，不是给使用者复制的模板。
+
+## 开发、贡献与反馈
+
+- 发现 bug 或想提需求：在 [GitHub Issues](https://github.com/haigeerlab/spec-guard-plugin/issues) 用对应模板提交，
+  怎么写得清楚见[贡献指南](CONTRIBUTING.md)。
+- 想改代码：先读[贡献指南](CONTRIBUTING.md)和[设计与架构](docs/design.md)。
+- 维护者的工作方式与发版流程：[docs/maintainer-workflow.md](docs/maintainer-workflow.md)、
+  [docs/release-process.md](docs/release-process.md)。
+
+## 许可
+
+[MIT](LICENSE)

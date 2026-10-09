@@ -19,7 +19,9 @@
    维护规则写进 `CONTRIBUTING.md` 与 `docs/maintainer-workflow.md`：改 README 时同一个 PR 里两份一起改。不加中英
    同步检查器。
 3. 删除就是从仓库删掉，git 历史里还在，不另建归档目录。`spec/`、`tasks/`（含 `spec/history/`）里指向被删文档的链接
-   不改：它们是过去模块的记录，链接内容可在 git 历史中找到（冲突 1 选 A）。
+   不改：它们是过去模块的记录，链接内容可在 git 历史中找到（冲突 1 选 A）。同理不改的还有已发布的证据
+   `docs/releases/0.9.0-local-candidate.json`：它有 2 处指向 `docs/research/0.9.0-local-candidate/` 下的证据文件
+   （`regressions.json`、`package-results.json`），删除后只能在 git 历史中查看（第二轮联调审查 #275 时指出）。
 4. 不在范围内：`spec/`、`tasks/`；`plugins/` 下的 commands、skills、references（只核对 README 与它们说法一致，不改它们）。
 5. 被检查器或插件引用的文档保留：`docs/lenses.md`、`docs/decisions/`、`docs/retirements/`、`docs/releases/`、
    `docs/collaboration-interface.md`、`docs/baselines/collaboration-pre-split.md`（`scripts/collaboration-owned.txt`

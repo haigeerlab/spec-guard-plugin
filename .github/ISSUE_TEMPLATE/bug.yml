@@ -1,27 +1,33 @@
 name: Bug 报告
-description: phase-guard 误报、命令失效、安装问题
+description: 阶段提示不对、命令失效、安装或升级出问题
 labels: [bug]
 body:
   - type: textarea
     id: what
     attributes:
       label: 现象
-      description: 特别是「误报断链」这类，请贴出 hook 的原始输出
+      description: 你做了什么、期望看到什么、实际看到什么。阶段提示不对时，请贴出 agent 收到的原始提示。
     validations: { required: true }
   - type: textarea
     id: env
     attributes:
       label: 环境
       value: |
-        - OS:
-        - gh --version:
-        - git remote: (github / gitlab / 无)
-        - .agent/state.json 的 tracker 字段:
+        - 系统:
+        - 宿主及版本（Claude Code / Codex）:
+        - spec-guard 版本:
+        - python3 --version:
     validations: { required: true }
   - type: textarea
     id: hookout
     attributes:
-      label: hook 输出
+      label: 阶段与校验输出
       description: |
-        CLAUDE_PROJECT_DIR=$(pwd) bash ~/.claude/plugins/spec-guard/hooks/phase-guard.sh
+        在 Claude Code 里运行 /spec-guard:phase 与 /spec-guard:verify-artifacts，贴出输出；Codex 用 spec-guard-ops 的
+        phase、verify。请不要贴密钥、令牌或私有仓库的内容。
       render: shell
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 能复现问题的最小步骤。

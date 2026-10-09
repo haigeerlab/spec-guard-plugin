@@ -1,5 +1,21 @@
 # 贡献指南
 
+## 报 bug
+
+在 [GitHub Issues](https://github.com/haigeerlab/spec-guard-plugin/issues) 选“Bug 报告”模板，写清楚：
+
+1. **现象**：你做了什么、期望看到什么、实际看到什么。阶段提示不对时，贴出 agent 收到的原始提示，或在 Claude Code
+   里运行 `/spec-guard:phase` 的输出。
+2. **环境**：系统、宿主及版本（Claude Code 或 Codex）、spec-guard 版本、`python3 --version`。
+3. **能复现的最小步骤**：能力图有问题时，附上 `/spec-guard:verify-artifacts` 的输出。
+
+请不要贴密钥、令牌或私有仓库的内容。想提需求用“需求”模板。
+
+## 改 README
+
+`README.md`（中文，默认入口）和 `README.en.md`（英文）章节一一对应。**改 README 时，同一个 PR 里两份一起改**；
+英文版里链到中文文档即可，只有 README 做双语。
+
 ## 提 PR 前
 
 ```bash
@@ -42,7 +58,7 @@
 
 1. `plugins/spec-guard/commands/<name>.md`
 2. 必须有 frontmatter（`validate.sh` 会检查）
-3. 在 README 的命令表里补一行
+3. 若是常用命令，在中英两份 README 的“常用命令”表里各补一行
 4. 在 Codex 侧接一条路由，通常在 `plugins/spec-guard/skills/spec-guard-ops/SKILL.md`（Codex 只读 skill，不读 command）
 5. 在 `docs/workflow.md` 的命令对照里补一行
 6. `scripts/check-command-parity.py` 会校验 command 与 skill 路由是否对得上
