@@ -83,6 +83,7 @@ bash scripts/test-checkers.sh || F=1
 python3 -B scripts/test_pre_push_environment.py || F=1
 python3 -B scripts/test_verify_and_commit.py || F=1
 python3 -B scripts/test_validate_quick.py || F=1
+python3 -B scripts/test_run_tests_parallel.py || F=1
 echo ""
 fi
 
