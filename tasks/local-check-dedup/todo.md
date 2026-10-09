@@ -7,5 +7,7 @@
 - [x] Task 4：本仓库改回分开审与文档 — `.agent/config.json` 去掉 `reviewCadence`；`docs/maintainer-workflow.md`“提交前”、`CLAUDE.md`“最小验证”
 - [x] Checkpoint 1（report）：全部回归通过，ShellCheck 无告警；本模块的提交用改进后的脚本
 - [ ] Task 5：实测验收（纯文档与脚本改动各走一遍提交 → 推送并计时）
+  - 脚本改动提交（5ce6124，全套并行 + ShellCheck）：252 秒，validate 自身 251 秒、phase-guard 62 秒同时进行；原来串行约 334 秒。未达 4 分钟目标，瓶颈是 validate 里的三个慢测试（下一个模块 slow-test-speedup）
+  - 首次推送本分支：220 秒，照常全跑——钩子指出 3eb9710（旧脚本提交、无记录）没有可用的检查记录，符合规则
 - [ ] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR、合并后重装本机钩子，合并由用户进行
 - [ ] Task 6：下次发版时补证据
