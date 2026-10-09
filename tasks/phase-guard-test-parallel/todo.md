@@ -19,5 +19,6 @@
   - 跨段夹具不再复制：`empty`、`other-state`、`prose`、`active-pointer`、`crlf`、`local`、`stages`、`git-project`、`unrelated`、`ctx` 的建法集中到公共部分的 `build_fixture`（内容为原行，只改缩进），原段落与第 3、4、5、10、11 段开头都调用它；段内后续的状态改动（如 135、173、189 行）仍留在原处；
   - 文件末尾补上换行；
   - 重跑：并行 11.95s、串行，两者 `✅` 行都与基线逐行相同；ShellCheck 无告警；原三项变异照旧报第 1／11／9 10 11 段；新增变异"改 `build_fixture` 里 stages 的建法（不建 beta.md）" → 第 2 3 4 段一起变红，说明建法只有一份。
-- [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行
+- [x] CI（`ubuntu-latest` 4 核）：phase-guard 回归步骤改前约 44s（#282 时的 run），改后 17s（run 37930137116，提交 e850a56）；整个 job 约 1:53 → 1:25。
+- [x] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行 — PR #284 由用户合并于 042a66e
 - [ ] Task 5：下次发版时在安装副本上跑一遍，CHANGELOG 的"维护者工具"写一条

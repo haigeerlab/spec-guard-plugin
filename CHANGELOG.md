@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.56.0] - 2026-10-09
+
+本版合并 0.55.1 之后的五个模块（#282–#285 与本版 PR）。插件包里有两处行为变化：阶段提示的命令写法、agent-relay
+接口的兼容范围；其余是测试与本仓库维护者用的脚本。
+
+### 修复
+
+- **Codex 里的阶段提示不再给出 Claude Code 的斜杠命令。** Codex 的插件只提供技能、没有斜杠命令，原来注入的
+  "continue `/build` on …"、`/spec-guard:add-module` 在 Codex 里不存在，`/plan` 还是 Codex 自己的 Plan 模式。现在按宿主
+  给写法：Codex 下是 `` `$spec-guard-ops` `` 加动作（add-module、verify-artifacts、config、module-suspend --resume）、
+  `` `$incremental-implementation` ``、`` `$planning-and-task-breakdown` ``。宿主依次按 `SPEC_GUARD_HOST`（`codex`／`claude`）、
+  hook 输入（Codex 的 `turn_id`，或会话记录首条为 `session_meta`）、环境（`CLAUDE_PROJECT_DIR` 为 Claude Code，否则
+  `PLUGIN_ROOT` 为 Codex）判断；都判断不了时与改前逐字相同。（#285）
+- **清理上下文时给出可直接复制的整行命令。** 模块完成行与上下文行改为让 agent 把命令单独放进代码块：Claude Code 里是
+  `/compact` 加 agent 填好的一句聚焦说明；Codex 的 `/compact` 不能带参数，只给 `/compact`；换到无关工作时是 `/clear`。
+  Claude Code 下其余提示文字不变。（#285）
+
+### 兼容
+
+- **接受 agent-relay 接口 2.x。** `agent_relay_probe.py` 的接受范围从 `>=1.0,<2.0` 放宽到 `>=1.0,<3.0`，agent-relay 0.6.0
+  （接口 2.0）发布后仍判为可用。接口 2.0 的破坏性改动都在信箱工具与委派上，不改 Spec Guard 读取的 `interface.json`
+  与 `status` 命令（agent-relay 负责方确认）。3.0 及以上仍判为不兼容。
+
+### 维护者工具（插件包里只有测试脚本变化）
+
+- **`validate.sh` 的回归段并行跑。** 新增 `scripts/run_steps_parallel.py`，51 步回归按原顺序完整打印、任一步失败整体失败
+  并报出是哪一步；`SG_VALIDATE_JOBS=1` 时逐步串行。本机约 200 秒降到 56–71 秒，CI 的 validate 步骤 66–79 秒降到 49 秒。（#282）
+- **`verify-and-commit.sh` 跑检查前警告未跟踪文件。** 检查读工作区、提交只含暂存区，漏了 `git add` 的新文件本地通过、
+  推上去 CI 才失败；现在先列出未被忽略的未跟踪文件（最多 10 个）并提醒，仍照常检查与提交。（#283）
+- **phase-guard 回归按段并行跑。** `test-phase-guard.sh` 的用例按原顺序分段同时跑，跨段夹具由 `build_fixture` 一处定义；
+  用例与断言不变，本机约 60 秒降到约 14 秒，CI 约 44 秒降到 17 秒，全档提交不再被它拖住。（#284）
+
 ## [0.55.1] - 2026-10-09
 
 本版合并 0.55.0 之后的 #272–#279。**插件行为不变**：插件包里只有两个测试文件的夹具有变化；其余是本仓库维护者用的

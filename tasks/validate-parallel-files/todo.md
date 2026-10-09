@@ -23,5 +23,5 @@
   - verify-and-commit 全档提交 3968ab3（validate 与 phase-guard、verify-artifacts 同时跑）：墙钟 80.4s，CPU 291.6s（164.6+126.9），负载 28→43；此前同类提交约 252–275s；
   - CI（`ubuntu-latest` 4 核）：validate 步骤改前 66–79s（run 37898474437、37898805494、37900735126），改后 49s（run 37907072860，4 个并行，运行器自报 36.3s），整个 job 约 2:05–2:25 → 1:53；
   - 两处都没有变慢或偶发失败，按 A 不加进程数上限。CI 里剩下最慢的是 phase-guard 回归（约 44s），可作以后的候选。
-- [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行
-- [ ] Task 4：下次发版时写进 CHANGELOG 的"维护者工具"
+- [x] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行 — PR #282 由用户合并于 66b573e
+- [x] Task 4：下次发版时写进 CHANGELOG 的"维护者工具" — 写进 0.56.0

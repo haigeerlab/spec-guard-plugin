@@ -12,7 +12,7 @@ contract; the full text as it stood at the split is in this file's git history (
   `agent-relay:<skill>`. `scripts/check-collaboration-boundary.py` fails if any
   path that moved to agent-relay (or was retired with the handoff command) comes back or if Spec Guard names collaboration internals.
 - **Probe.** `agent_relay_probe.py --host claude|codex` prints one JSON object
-  `{"state", "interface", "required": ">=1.0,<2.0", "message"}`. It reads the host's plugin record and agent-relay's
+  `{"state", "interface", "required": ">=1.0,<3.0", "message"}`. It reads the host's plugin record and agent-relay's
   `interface.json` (interface `1.0`, optional `status` command), writes nothing, and reports a failed check as
   `unknown`, never `not-installed`.
 - **Degradation.** No Spec Guard command, hook, or check fails because agent-relay is absent; phase injection never

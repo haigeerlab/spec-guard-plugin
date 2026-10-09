@@ -59,7 +59,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stderr)
         report = json.loads(done.stdout)
         self.assertEqual(set(report), {"state", "interface", "required", "message"})
-        self.assertEqual(report["required"], ">=1.0,<2.0")
+        self.assertEqual(report["required"], ">=1.0,<3.0")
         return report
 
     # ── Claude ──
@@ -75,6 +75,16 @@ class ProbeTests(unittest.TestCase):
         self.interface({"interface": "1.3"})
         report = self.run_probe()
         self.assertEqual((report["state"], report["interface"]), ("ready", "1.3"))
+
+    def test_interface_2x_is_ready(self):
+        # agent-relay-interface-2: interface 2.0 changes only mailbox and delegation tools, not interface.json or
+        # the status command this probe reads (confirmed by agent-relay's owner on 2026-10-09).
+        self.install_claude()
+        for found in ("2.0", "2.4"):
+            with self.subTest(found=found):
+                self.interface({"interface": found})
+                report = self.run_probe()
+                self.assertEqual((report["state"], report["interface"]), ("ready", found))
 
     def test_claude_disabled_plugin_is_not_installed(self):
         self.install_claude(enabled=False)
@@ -132,13 +142,13 @@ class ProbeTests(unittest.TestCase):
 
     def test_interface_outside_the_range_is_incompatible(self):
         self.install_claude()
-        for found in ("0.9", "2.0"):
+        for found in ("0.9", "3.0", "3.1"):
             with self.subTest(found=found):
                 self.interface({"interface": found})
                 report = self.run_probe()
                 self.assertEqual((report["state"], report["interface"]), ("incompatible", found))
                 self.assertIn(found, report["message"])
-                self.assertIn(">=1.0,<2.0", report["message"])
+                self.assertIn(">=1.0,<3.0", report["message"])
 
     def test_missing_or_malformed_interface_is_incompatible_not_ready(self):
         self.install_claude()
