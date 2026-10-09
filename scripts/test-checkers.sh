@@ -257,11 +257,13 @@ for c in check-bash32 check-grep-pipe check-gh-json-fields; do
 done
 
 # ── check-readme-sync.py ──
-mkr() {  # $1=目录 $2=README 内嵌块要不要跟模板一致(same|drift)
-  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/templates"
+# docs-reorganization：约定块从 README 移到 docs/convention-block.md；--ref 检查覆盖中英两份 README。
+mkr() {  # $1=目录 $2=docs/convention-block.md 内嵌块要不要跟模板一致(same|drift)
+  rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/templates" "$1/docs"
   printf '## 约定\n\n- 本地模式\n' > "$1/plugins/spec-guard/templates/claude-block-local.md"
+  printf '# README\n\n约定块见 docs/convention-block.md\n' > "$1/README.md"
   {
-    echo "# README"; echo
+    echo "# 约定块"; echo
     echo "<!-- SYNC:claude-block-local BEGIN -->"
     echo '````markdown'
     echo "<!-- BEGIN:agent-skills-convention -->"
@@ -270,28 +272,39 @@ mkr() {  # $1=目录 $2=README 内嵌块要不要跟模板一致(same|drift)
     echo "<!-- END:agent-skills-convention -->"
     echo '````'
     echo "<!-- SYNC:claude-block-local END -->"
-  } > "$1/README.md"
+  } > "$1/docs/convention-block.md"
 }
 mkr "$TMP/rsbad" drift
 mkr "$TMP/rsgood" same
-want fail "readme-sync: README 与模板分叉 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsbad"
-want pass "readme-sync: 逐字节一致 → 放行"       python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsgood"
-rm -rf "$TMP/rsmissing"; mkdir -p "$TMP/rsmissing/plugins/spec-guard/templates"
-printf 'x\n' > "$TMP/rsmissing/plugins/spec-guard/templates/claude-block-github.md"
-printf 'z\n' > "$TMP/rsmissing/plugins/spec-guard/templates/claude-block-gitlab.md"
+want fail "readme-sync: 约定块文档与模板分叉 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsbad"
+want pass "readme-sync: 逐字节一致 → 放行"           python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsgood"
+rm -rf "$TMP/rsmissing"; mkdir -p "$TMP/rsmissing/plugins/spec-guard/templates" "$TMP/rsmissing/docs"
 printf 'y\n' > "$TMP/rsmissing/plugins/spec-guard/templates/claude-block-local.md"
-printf '# README\n没有 SYNC 标记\n' > "$TMP/rsmissing/README.md"
-want fail "readme-sync: README 里缺 SYNC 标记 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsmissing"
-mkrref() {  # $1=目录 $2=README 里写的 --ref 版本；清单固定为 1.2.3
+printf '# README\n' > "$TMP/rsmissing/README.md"
+printf '# 约定块\n没有 SYNC 标记\n' > "$TMP/rsmissing/docs/convention-block.md"
+want fail "readme-sync: 约定块文档里缺 SYNC 标记 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsmissing"
+mkr "$TMP/rsnodoc" same; rm "$TMP/rsnodoc/docs/convention-block.md"
+want fail "readme-sync: 没有 docs/convention-block.md → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsnodoc"
+# SYNC 区只留在 README、约定块文档里没有：说明检查器读的是新位置，不是 README
+mkr "$TMP/rsreadmeonly" same
+cp "$TMP/rsreadmeonly/docs/convention-block.md" "$TMP/rsreadmeonly/README.md"
+printf '# 约定块\n' > "$TMP/rsreadmeonly/docs/convention-block.md"
+want fail "readme-sync: SYNC 区只在 README 里 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsreadmeonly"
+mkrref() {  # $1=目录 $2=README 里写的 --ref 版本 $3=README.en.md 里写的版本（可省略，省略则不建英文版）；清单固定为 1.2.3
   mkr "$1" same
   mkdir -p "$1/plugins/spec-guard/.claude-plugin"
   printf '{"name":"spec-guard","version":"1.2.3"}\n' > "$1/plugins/spec-guard/.claude-plugin/plugin.json"
   printf 'codex plugin marketplace add o/r --ref v%s\n' "$2" >> "$1/README.md"
+  if [ -n "${3:-}" ]; then printf 'codex plugin marketplace add o/r --ref v%s\n' "$3" > "$1/README.en.md"; fi
 }
 mkrref "$TMP/rsrefbad" 1.2.2
 mkrref "$TMP/rsrefgood" 1.2.3
 want fail "readme-sync: 安装命令的 --ref 落后于清单版本 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefbad"
 want pass "readme-sync: 安装命令的 --ref 等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefgood"
+mkrref "$TMP/rsrefenbad" 1.2.3 1.2.2
+mkrref "$TMP/rsrefengood" 1.2.3 1.2.3
+want fail "readme-sync: 英文 README 的 --ref 落后于清单版本 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefenbad"
+want pass "readme-sync: 中英 README 的 --ref 都等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefengood"
 
 # ── check-command-parity.py ──
 # Task 8 / R4 后半：commands/*.md 引用的每个 hooks/<脚本> 都要在至少一个

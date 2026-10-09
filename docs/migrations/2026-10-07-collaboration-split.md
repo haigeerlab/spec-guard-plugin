@@ -20,13 +20,22 @@ Spec Guard 的工作流（Spec、计划、阶段提示、Proposal、事项账本
 | 运行时与信箱 `~/.spec-guard/native-collaboration/` | `~/.agent-relay/runtime/` |
 | 委派记录 `~/.spec-guard/session-delegation/` | `~/.agent-relay/delegation/` |
 
-`/spec-guard:collaboration` 会保留到 0.53.x，0.54.0 移除：agent-relay 已安装时转交给它，未安装时提示安装和本文档。
-它按宿主的安装记录判断“已安装”（git worktree 的本地启用记录在主仓库的 `.claude/settings.local.json` 里，也会读取）；
-只用 `claude --plugin-dir` 临时加载的 agent-relay 没有安装记录，这时会显示未安装，协作入口改用 agent-relay 自己的命令。
+`/spec-guard:collaboration` 在 0.50.0–0.53.x 期间作为转交入口保留，0.54.0 已移除；协作入口一律用 agent-relay
+自己的命令。
+
+## 版本与兼容
+
+- Spec Guard 0.50.0 起不再自带协作能力，只通过只读的 `agent_relay_probe.py` 检测 agent-relay，接受接口
+  `>=1.0,<2.0`；检测失败报 `unknown`，不当作“未安装”。
+- 两者版本互不依赖：接口 1.x 内，各自升级即可。
+- 发布顺序是 agent-relay 0.1.0（平移版，行为与拆分前 Spec Guard 0.49.0 一致）→ Spec Guard 0.50.0 → agent-relay
+  0.2.0（加固版，信箱 schema 2 → 5）。agent-relay 自身的升级步骤（例如 0.1.0 → 0.2.0 要先关掉用信箱的会话、
+  `upgrade --confirm`、两个宿主同时更新插件，运行时与插件一起升级或一起回滚）以 agent-relay 的 CHANGELOG 为准。
+- 以后接口要升到 2.0 时，先发 Spec Guard 放宽 `agent_relay_probe.py` 的范围，再发 agent-relay。
 
 ## 迁移步骤
 
-1. **安装 agent-relay。**
+1. **安装 agent-relay**（Codex 的 `--ref` 请换成 agent-relay README 里写的当前版本）。
 
    ```bash
    claude plugin marketplace add haigeerlab/agent-relay
@@ -78,5 +87,5 @@ Spec Guard 的工作流（Spec、计划、阶段提示、Proposal、事项账本
 ## 参考
 
 - agent-relay 的 README 与接口文档（`docs/collaboration-interface.md`，以 agent-relay 仓库里的那份为准）。
-- 拆分记录：[`docs/collaboration-split-brief.md`](../collaboration-split-brief.md)、
-  [`docs/baselines/collaboration-pre-split.md`](../baselines/collaboration-pre-split.md)。
+- 拆分前基线：[`docs/baselines/collaboration-pre-split.md`](../baselines/collaboration-pre-split.md)。拆分过程的
+  简报与总结已从仓库删除，可在 git 历史中查看（删除于 docs-reorganization 模块）。
