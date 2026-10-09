@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.55.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.55.1;test:marketplace-ref-upgrade-20261009c"
+      },
+      "observedAt": "2026-10-09T07:23:34Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.55.0 to v0.55.1",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.55.1, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.55.1;test:installed-plugin-smoke-20261009c"
+      },
+      "observedAt": "2026-10-09T07:23:34Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.55.1-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.55.1;test:installed-copy-changed-tests-20261009"
+      },
+      "observedAt": "2026-10-09T07:23:34Z",
+      "evidence": [
+        "command:python3 -B scripts/run_tests_parallel.py <installed>/hooks/test_local_ticket_portability.py",
+        "command:python3 -B scripts/run_tests_parallel.py <installed>/hooks/test_module_cost_report.py",
+        "result:both changed test files run green from the installed copy: 52 and 149 tests, every discovered test ran"
+      ]
+    }
+  ]
+}
