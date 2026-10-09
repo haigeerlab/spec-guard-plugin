@@ -128,7 +128,8 @@ smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；�
 
 它在每次推送前跑 `validate.sh`、phase-guard 与 verify-artifacts 三套检查。推送里只有删除远端引用（如删已合并
 分支）或推 tag 时跳过检查，并打印跳过原因：这两种推送不带新内容，tag 打在已验证的合并提交上。只要同一次推送里
-有一个分支更新，就照常全跑，失败照常拦截。改了钩子文本后重新运行安装脚本，本机的 `.git/hooks/pre-push` 才会更新。
+有一个分支更新，就照常全跑，失败照常拦截。要推的每个提交都已由 `verify-and-commit.sh` 检查过时也跳过，见下文。
+改了钩子文本后重新运行安装脚本，本机的 `.git/hooks/pre-push` 才会更新。
 
 提交走 `scripts/verify-and-commit.sh`，不要手写 `validate.sh ... && git commit`：
 
@@ -137,10 +138,22 @@ git add <要提交的文件>
 /bin/bash scripts/verify-and-commit.sh [--suite NAME]... -- -m "<提交信息>"
 ```
 
-它只提交已暂存的内容（不做 `git add`）；已跟踪文件里还有未暂存改动、或没有暂存内容时拒绝。每次都跑 validate、
-phase-guard、verify-artifacts，并按已暂存路径自动加跑 setup/teardown 回归、pre-push 回归与 CI 同款 ShellCheck
-（`--suite` 可手动加跑）。每套输出写进临时日志，屏幕只留一行结果；成败只看各套自己的退出码，任一失败就列出失败项
-与日志路径、不提交并退出 1。手写的验证链曾因 `;`、写错日志路径、`| tail` 吞掉退出码而在校验失败后照样提交。
+它只提交已暂存的内容（不做 `git add`）；已跟踪文件里还有未暂存改动、或没有暂存内容时拒绝。按已暂存路径分两档：
+
+- **快档**：暂存的全是 `spec/`、`tasks/`、`docs/` 下的文件，或 `plugins/`、`.github/` 以外的 `*.md`。跑
+  `validate.sh --quick`（只有结构检查与发布证据回归，不跑回归套件）、verify-artifacts 回归，以及对本仓库本身的
+  `verify-artifacts.sh`。
+- **全套**：其余任何情况。validate、phase-guard、verify-artifacts 回归与本仓库 `verify-artifacts.sh` 并行跑，暂存了
+  `.sh` 时再加 CI 同款 ShellCheck。validate 已包含 setup/teardown 与 pre-push 回归，不再另跑。
+
+`--suite` 可手动加跑。每套输出写进各自的临时日志，屏幕只留一行结果与耗时；成败只看各套自己的退出码，任一失败就列出
+失败项与日志路径、不提交并退出 1。手写的验证链曾因 `;`、写错日志路径、`| tail` 吞掉退出码而在校验失败后照样提交。
+
+提交成功后，`scripts/verified_trees.py` 把这次提交的 tree 与档位记进 git 共用目录的 `spec-guard/verified-trees`
+（所有 worktree 共用）。工作区有未跟踪文件（不含被忽略的）时不写记录，因为检查看到的内容可能和提交不同。推送时
+pre-push 逐个核对要推的提交：tree 记为全套的算已检查；记为快档的，只有一个父提交、相对父提交只改了快档路径、且父提交
+已在远端或已检查，才算已检查。全部已检查、已跟踪文件没有未提交改动时跳过并打印依据；任何一项对不上都照常全跑。
+CI 仍是合并前的必需检查。
 
 提交前检查改动只包含当前目标、没有密钥，并运行与改动面对应的验证。不要把不相关重构、版本发布
 或消费者项目状态塞进同一个维护提交。

@@ -44,9 +44,11 @@ done <<< "$GIT_LOCAL_VARS"
 # 只删远端引用、只推 tag 的推送验证不了任何新东西：tag 打在已验证的合并提交上，
 # 删除不带新内容。git 在 stdin 给出 `<local ref> <local sha> <remote ref> <remote sha>`；
 # 每行都是删除（local sha 全 0）或推 tag 时跳过。有一行更新分支、或清单为空，照常全跑。
-SEEN=false; BRANCH=false; WHY=""
-while read -r _ local_sha remote_ref _; do
+SEEN=false; BRANCH=false; WHY=""; REFS=""
+while read -r local_ref local_sha remote_ref remote_sha; do
   SEEN=true
+  REFS="${REFS}${local_ref} ${local_sha} ${remote_ref} ${remote_sha}
+"
   case "$local_sha" in *[!0]*|"") is_delete=false ;; *) is_delete=true ;; esac
   if [ "$is_delete" = true ]; then
     WHY="${WHY:+${WHY}、}删除 ${remote_ref}"
@@ -58,6 +60,12 @@ while read -r _ local_sha remote_ref _; do
 done
 if [ "$SEEN" = true ] && [ "$BRANCH" = false ]; then
   echo "── pre-push: 跳过检查（只有${WHY}，没有分支更新）──"
+  exit 0
+fi
+# 要推的每个提交都已由 scripts/verify-and-commit.sh 检查过（记录在 git 共用目录）且已跟踪文件干净时跳过；
+# 判断在 scripts/verified_trees.py，任何对不上的情况都照常全跑。
+if [ "$SEEN" = true ] && [ -f "$R/scripts/verified_trees.py" ] \
+  && printf '%s' "$REFS" | python3 "$R/scripts/verified_trees.py" check; then
   exit 0
 fi
 echo "── pre-push: 跑不花钱的那几层 ──"
@@ -91,4 +99,5 @@ echo "✅ 全绿，继续 push"
 PRE
 chmod +x "${HOOK}"
 echo "✅ 已装 ${HOOK}"
-echo "   它会跑 validate.sh + 两套 hook 断言（约 50 秒）。绕过: git push --no-verify"
+echo "   它会跑 validate.sh + 两套 hook 断言（本机约 4–5 分钟）；只删引用、只推 tag，或要推的提交都已由"
+echo "   scripts/verify-and-commit.sh 检查过时跳过。绕过: git push --no-verify"

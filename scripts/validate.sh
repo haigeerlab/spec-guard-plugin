@@ -2,6 +2,14 @@
 # 仓库完整性校验。CI 和本地共用。
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
+# --quick: only the structural checks (each well under a second); no regression suites. Used by
+# verify-and-commit for docs-only commits; CI and pre-push run the full set.
+QUICK=false
+case "${1:-}" in
+  "") ;;
+  --quick) QUICK=true ;;
+  *) echo "用法: validate.sh [--quick]" >&2; exit 2 ;;
+esac
 F=0
 say(){ printf "  %s %s\n" "$1" "$2"; }
 # 仅扫描本 checkout 的跟踪文件及未忽略的新文件，不穿透嵌套 Git checkout。
@@ -69,11 +77,14 @@ python3 scripts/check-decision-supersession.py || F=1
 python3 scripts/check-collaboration-boundary.py || F=1
 
 echo ""
+if [ "$QUICK" = false ]; then
 echo "═══ 校验器自身的回归 ═══"
 bash scripts/test-checkers.sh || F=1
 python3 -B scripts/test_pre_push_environment.py || F=1
 python3 -B scripts/test_verify_and_commit.py || F=1
+python3 -B scripts/test_validate_quick.py || F=1
 echo ""
+fi
 
 # 指纹算法供能力图与 Proposal 校验共用；免费，所以进这一层。
 echo "═══ 指纹算法自检 ═══"
@@ -86,6 +97,7 @@ echo "═══ 本机状态路径 ═══"
 python3 scripts/check-state-paths.py || F=1
 echo ""
 
+if [ "$QUICK" = false ]; then
 echo "═══ Proposal 与本地结构回归 ═══"
 /bin/bash evals/test-codex-command-roots.sh || F=1
 /bin/bash evals/test-codex-skill-teardown-history.sh || F=1
@@ -163,6 +175,7 @@ echo "═══ Codex 真实宿主 smoke 判决器自检（不调用 Codex）═
 /bin/bash evals/codex-plugin-smoke.sh --selftest || F=1
 /bin/bash evals/module-namespace.sh --selftest || F=1
 echo ""
+fi
 
 echo "═══ 发布证据记录回归 ═══"
 /bin/bash evals/test-release-evidence.sh || F=1

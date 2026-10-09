@@ -5,10 +5,10 @@
 
 ## Task List
 
-### Task 0：本机准备（不入库）
+### Task 0：`.gitignore` 忽略 `.agent/state.json`
 
-把 `.agent/state.json` 加进共用的 `.git/info/exclude`。它是本机的当前模块书签；不忽略的话按假设 7，本仓库每次提交都
-不会写记录。只改本机 git 配置，不改仓库文件。
+它是本机的当前模块书签，按约定不提交；不忽略的话按假设 7，本仓库每次提交都不会写记录。用户 2026-10-09 选 A：改仓库的
+`.gitignore`（所有 clone 与 worktree 生效），不改本机 `.git/info/exclude`。
 
 ### Task 1：`validate.sh --quick`
 
