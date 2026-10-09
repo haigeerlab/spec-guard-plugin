@@ -83,6 +83,7 @@ bash scripts/test-checkers.sh || F=1
 python3 -B scripts/test_pre_push_environment.py || F=1
 python3 -B scripts/test_verify_and_commit.py || F=1
 python3 -B scripts/test_validate_quick.py || F=1
+python3 -B scripts/test_run_tests_parallel.py || F=1
 echo ""
 fi
 
@@ -105,7 +106,8 @@ python3 -B plugins/spec-guard/hooks/test_documentation_baseline.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_impact.py || F=1
 python3 -B plugins/spec-guard/hooks/test_documentation_verification.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_contract.py || F=1
-python3 -B plugins/spec-guard/hooks/test_module_cost_report.py || F=1
+# 三个最慢的测试按测试类分进程并行跑（slow-test-speedup）；少跑一个用例也算失败。
+python3 -B scripts/run_tests_parallel.py plugins/spec-guard/hooks/test_module_cost_report.py || F=1
 python3 -B plugins/spec-guard/hooks/test_capability_map.py || F=1
 python3 -B scripts/test_self_report.py || F=1
 # 外部 TMPDIR 不在临时前缀下时结果也必须一样：目录建在 git 目录里（不在 /tmp、/var/folders 下），用完即删。
@@ -120,7 +122,7 @@ python3 -B plugins/spec-guard/hooks/test_ticket_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ledger_runtime.py || F=1
-python3 -B plugins/spec-guard/hooks/test_local_ticket_portability.py || F=1
+python3 -B scripts/run_tests_parallel.py plugins/spec-guard/hooks/test_local_ticket_portability.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ticket_publish.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ticket_providers.py || F=1
 python3 -B plugins/spec-guard/hooks/test_local_ticket_imports.py || F=1
@@ -133,7 +135,7 @@ python3 -B plugins/spec-guard/hooks/test_proposal_publication.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_submit.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_tracker_read.py || F=1
 python3 -B plugins/spec-guard/hooks/test_proposal_review.py || F=1
-python3 -B plugins/spec-guard/hooks/test_proposal_promotion_proof.py || F=1
+python3 -B scripts/run_tests_parallel.py plugins/spec-guard/hooks/test_proposal_promotion_proof.py || F=1
 python3 -B plugins/spec-guard/hooks/test_module_insert.py || F=1
 python3 -B plugins/spec-guard/hooks/test_module_stage_sanitization.py || F=1
 python3 -B plugins/spec-guard/hooks/test_tracker_default.py || F=1

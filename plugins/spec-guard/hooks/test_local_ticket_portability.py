@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -67,37 +68,53 @@ class SourceInventoryTests(unittest.TestCase):
         source["events"][0]["payload"]["id"] = "I2"
         self.assertNotEqual(_source_digest(source["events"]), digest)
 
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory(prefix="sg-portability-source-")
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name) / "repo"
-        self.root.mkdir()
-        self.global_dir = Path(temporary.name) / "global"
-        self.state_root = self.global_dir / "worktrees" / PROJECT_ID
-        self.state_root.parent.mkdir(parents=True)
-        environment = patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.global_dir)})
-        environment.start()
-        self.addCleanup(environment.stop)
-        git(self.root, "init", "-q")
-        git(self.root, "config", "user.email", "test@example.invalid")
-        git(self.root, "config", "user.name", "Test")
-        config = self.root / ".epiq" / "project.json"
+    @classmethod
+    def setUpClass(cls):
+        # Build the repository and its state worktree once; every test copies it and repairs the worktree links.
+        # This replaces eight git calls per test with one.
+        cls._template = tempfile.TemporaryDirectory(prefix="sg-portability-template-")
+        base = Path(cls._template.name)
+        root = base / "repo"
+        root.mkdir()
+        state_root = base / "global" / "worktrees" / PROJECT_ID
+        state_root.parent.mkdir(parents=True)
+        git(root, "init", "-q")
+        git(root, "config", "user.email", "test@example.invalid")
+        git(root, "config", "user.name", "Test")
+        config = root / ".epiq" / "project.json"
         config.parent.mkdir()
         config.write_text(json.dumps({
             "projectId": PROJECT_ID,
             "stateBranch": "__epiq_state__",
             "createdAt": "2026-10-01T00:00:00.000Z",
         }), encoding="utf-8")
-        (self.root / "README.md").write_text("fixture source\n", encoding="utf-8")
-        git(self.root, "add", ".epiq/project.json", "README.md")
-        git(self.root, "commit", "-qm", "initialize fixture")
-        git(self.root, "worktree", "add", "-q", "--orphan", "-b", "__epiq_state__",
-            str(self.state_root))
-        state_config = self.state_root / ".epiq" / "project.json"
+        (root / "README.md").write_text("fixture source\n", encoding="utf-8")
+        git(root, "add", ".epiq/project.json", "README.md")
+        git(root, "commit", "-qm", "initialize fixture")
+        git(root, "worktree", "add", "-q", "--orphan", "-b", "__epiq_state__", str(state_root))
+        state_config = state_root / ".epiq" / "project.json"
         state_config.parent.mkdir()
         state_config.write_bytes(config.read_bytes())
-        git(self.state_root, "add", ".epiq/project.json")
-        git(self.state_root, "commit", "-qm", "state genesis")
+        git(state_root, "add", ".epiq/project.json")
+        git(state_root, "commit", "-qm", "state genesis")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._template.cleanup()
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="sg-portability-source-")
+        self.addCleanup(temporary.cleanup)
+        template = Path(self._template.name)
+        self.root = Path(temporary.name) / "repo"
+        self.global_dir = Path(temporary.name) / "global"
+        self.state_root = self.global_dir / "worktrees" / PROJECT_ID
+        shutil.copytree(template / "repo", self.root, symlinks=True)
+        shutil.copytree(template / "global", self.global_dir, symlinks=True)
+        git(self.root, "worktree", "repair", str(self.state_root))
+        environment = patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.global_dir)})
+        environment.start()
+        self.addCleanup(environment.stop)
         self.events = self.state_root / ".epiq" / "events"
         self.media = self.state_root / ".epiq" / "media"
         self.events.mkdir(parents=True)

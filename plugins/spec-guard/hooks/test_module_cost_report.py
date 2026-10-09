@@ -14,6 +14,11 @@ MODULE = "demo"
 TODO = Path("tasks") / MODULE / "todo.md"
 
 
+# Committer identity via the environment instead of two `git config` calls per throwaway repo.
+IDENTITY = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.invalid",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.invalid"}
+
+
 def utc(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(timezone.utc)
 
@@ -24,11 +29,9 @@ class Repo:
     def __init__(self, root):
         self.root = Path(root)
         self.git("init", "-q")
-        self.git("config", "user.email", "t@example.invalid")
-        self.git("config", "user.name", "t")
 
     def git(self, *args, when=None):
-        env = dict(os.environ)
+        env = dict(os.environ, **IDENTITY)
         if when:
             env["GIT_AUTHOR_DATE"] = env["GIT_COMMITTER_DATE"] = when
         return subprocess.run(["git", "-C", str(self.root), *args], check=True,
@@ -658,7 +661,8 @@ class ReviewFixTests(unittest.TestCase):
         path = self.repo.root / TODO
         path.write_text("# Todo: demo\n\n- [x] Task 1：a\n", encoding="utf-8")
         self.repo.git("add", "-A")
-        env = dict(os.environ, GIT_AUTHOR_DATE="2026-10-05T10:20:00Z", GIT_COMMITTER_DATE="2026-10-05T11:59:00Z")
+        env = dict(os.environ, GIT_AUTHOR_DATE="2026-10-05T10:20:00Z", GIT_COMMITTER_DATE="2026-10-05T11:59:00Z",
+                   **IDENTITY)
         subprocess.run(["git", "-C", str(self.repo.root), "commit", "-qm", "tick"], check=True, env=env)
         self.assertEqual(self.windows()[0]["end"], utc("2026-10-05T10:20:00Z"))
 
