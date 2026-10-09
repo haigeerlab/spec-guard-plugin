@@ -108,18 +108,83 @@ $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
 
+# 被不止一段用到的夹具：建法只写在这里，原段落和要重建它的段都调用（ctx 还会算出 BUILDING 时的基准输出）。
+build_fixture() {  # $@=夹具名；在当前 $WORK 下建好，并设好同名变量（local_project、stages、ctx 等）
+  local name
+  for name in "$@"; do
+    case "$name" in
+      empty)
+        mkdir -p "$WORK/empty"
+        ;;
+      other-state)
+        mkdir -p "$WORK/other-state/.agent"
+        printf '%s\n' '{"session":"x"}' > "$WORK/other-state/.agent/state.json"
+        ;;
+      prose)
+        mkdir -p "$WORK/prose"
+        printf '%s\n' '本项目不用 `<!-- BEGIN:agent-skills-convention -->` 这个块。' > "$WORK/prose/CLAUDE.md"
+        ;;
+      active-pointer)
+        mkdir -p "$WORK/active-pointer/.agent"
+        printf '%s\n' '{"activeModule":"alpha"}' > "$WORK/active-pointer/.agent/state.json"
+        map "$WORK/active-pointer"
+        ;;
+      crlf)
+        mkdir -p "$WORK/crlf"
+        printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
+        map "$WORK/crlf"
+        ;;
+      local)
+        local_project="$WORK/local"
+        mkdir -p "$local_project"
+        printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGENTS.md"
+        map "$local_project"
+        ;;
+      stages)
+        stages="$WORK/stages"
+        mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
+        printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
+        printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+          '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
+        touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
+        printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+        ;;
+      git-project)
+        git_project="$WORK/git-project"
+        mkdir -p "$git_project/src/deep"
+        git -C "$git_project" init -q
+        printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$git_project/AGENTS.md"
+        ;;
+      unrelated)
+        unrelated="$WORK/unrelated-git"
+        mkdir -p "$unrelated/sub"
+        git -C "$unrelated" init -q
+        ;;
+      ctx)
+        ctx="$WORK/ctx"
+        mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
+        printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
+        map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
+        printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+        T="$WORK/ctx-transcript.jsonl"
+        HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
+        plain_building="$(run "$ctx" | context_of)"
+        ;;
+      *) fail "build_fixture: 未知夹具 $name" ;;
+    esac
+  done
+}
+
 # 用例按段落分成 part_1…part_N，原顺序不变；各段互不共享夹具，由文件末尾的调度同时跑。
 
 part_1() {
-mkdir -p "$WORK/empty"
+build_fixture empty
 silent "无激活信号的目录静默" "$WORK/empty"
 
-mkdir -p "$WORK/other-state/.agent"
-printf '%s\n' '{"session":"x"}' > "$WORK/other-state/.agent/state.json"
+build_fixture other-state
 silent "别的工具的 .agent/state.json 不激活" "$WORK/other-state"
 
-mkdir -p "$WORK/prose"
-printf '%s\n' '本项目不用 `<!-- BEGIN:agent-skills-convention -->` 这个块。' > "$WORK/prose/CLAUDE.md"
+build_fixture prose
 silent "正文里提到标记不激活" "$WORK/prose"
 
 mkdir -p "$WORK/idle/.agent"
@@ -139,21 +204,14 @@ mkdir -p "$WORK/tracker-github/.agent"
 printf '%s\n' '{"tracker":"github","modules":{}}' > "$WORK/tracker-github/.agent/state.json"
 silent "只有 tracker github 不激活" "$WORK/tracker-github"
 
-mkdir -p "$WORK/active-pointer/.agent"
-printf '%s\n' '{"activeModule":"alpha"}' > "$WORK/active-pointer/.agent/state.json"
-map "$WORK/active-pointer"
+build_fixture active-pointer
 injects "有值的 activeModule 同样激活" "$WORK/active-pointer" "MAP_ONLY"
 
-mkdir -p "$WORK/crlf"
-printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
-map "$WORK/crlf"
+build_fixture crlf
 injects "CRLF 声明块激活并报告 MAP_ONLY" "$WORK/crlf" "MAP_ONLY"
 lacks "MAP_ONLY 没有模块完成行" "$WORK/crlf" "Module boundary"
 
-local_project="$WORK/local"
-mkdir -p "$local_project"
-printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGENTS.md"
-map "$local_project"
+build_fixture local
 injects "Codex 声明块激活并提示首个 spec" "$local_project" 'spec/'
 touch "$local_project/spec/alpha.md"
 injects "有 spec 没 plan 时报告 NEEDS_PLAN" "$local_project" "当前阶段: **NEEDS_PLAN**"
@@ -165,13 +223,7 @@ fi
 
 part_2() {
 # 按模块判断：plan 与 todo 决定 BUILDING／DONE，activeModule 决定当前模块。
-stages="$WORK/stages"
-mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
-printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
-  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
-touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
-printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+build_fixture stages
 printf '%s\n' '- [x] done' '- [ ] one' '* [ ] two' > "$stages/tasks/alpha/todo.md"
 injects "todo 有未勾选项时报告 BUILDING" "$stages" "当前阶段: **BUILDING**"
 injects "BUILDING 给出剩余项数" "$stages" "2 unchecked item(s) in \`tasks/alpha/todo.md\`"
@@ -210,14 +262,8 @@ lacks "IDLE 没有模块完成行" "$activation_only" "Module boundary"
 }
 
 part_3() {
-# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
-stages="$WORK/stages"
-mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
-printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
-  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
-touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
-printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+# 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
+build_fixture stages
 printf '%s\n' '- [x] done' '- [X] one' > "$stages/tasks/alpha/todo.md"
 
 # 模块完成而项目未完成：activeModule 指向已完成模块，beta 还没有 plan。
@@ -266,14 +312,8 @@ lacks "UNKNOWN 没有模块完成行" "$stages" "Module boundary"
 }
 
 part_4() {
-# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
-stages="$WORK/stages"
-mkdir -p "$stages/spec" "$stages/tasks/alpha" "$stages/tasks/beta" "$stages/.agent"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$stages/CLAUDE.md"
-printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
-  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$stages/spec/CAPABILITY-MAP.md"
-touch "$stages/spec/alpha.md" "$stages/spec/beta.md"
-printf '# Plan\n' > "$stages/tasks/alpha/plan.md"
+# 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
+build_fixture stages
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 printf '{"activeModule":""}\n' > "$stages/.agent/state.json"
 rm "$stages/spec/beta.md"
@@ -327,22 +367,8 @@ printf '\377\376 not utf-8\n' > "$stages/tasks/alpha/todo.md"
 }
 
 part_5() {
-# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
-mkdir -p "$WORK/empty"
-mkdir -p "$WORK/other-state/.agent"
-printf '%s\n' '{"session":"x"}' > "$WORK/other-state/.agent/state.json"
-mkdir -p "$WORK/prose"
-printf '%s\n' '本项目不用 `<!-- BEGIN:agent-skills-convention -->` 这个块。' > "$WORK/prose/CLAUDE.md"
-mkdir -p "$WORK/active-pointer/.agent"
-printf '%s\n' '{"activeModule":"alpha"}' > "$WORK/active-pointer/.agent/state.json"
-map "$WORK/active-pointer"
-mkdir -p "$WORK/crlf"
-printf '%s\r\n' '<!-- BEGIN:agent-skills-convention -->' '<!-- END:agent-skills-convention -->' > "$WORK/crlf/CLAUDE.md"
-map "$WORK/crlf"
-local_project="$WORK/local"
-mkdir -p "$local_project"
-printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$local_project/AGENTS.md"
-map "$local_project"
+# 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
+build_fixture empty other-state prose active-pointer crlf local
 touch "$local_project/spec/alpha.md"
 
 # 插队：base 完成、infra 做到一半，当前模块是 urgent。
@@ -541,10 +567,7 @@ echo "  ✅ module-insert 的终端输出仍带原文"; PASS=$((PASS + 1))
 
 # Codex 不提供 CLAUDE_PROJECT_DIR，hook 在会话目录里运行（2026-09-28 真实 Codex 核实）。
 # 从仓库子目录启动时，必须按 git 仓库根目录判断激活，而不是只看当前目录。
-git_project="$WORK/git-project"
-mkdir -p "$git_project/src/deep"
-git -C "$git_project" init -q
-printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$git_project/AGENTS.md"
+build_fixture git-project
 out="$(run_from "$git_project/src/deep")"
 python3 -c '
 import json, sys
@@ -553,9 +576,7 @@ assert "当前阶段: **IDLE**" in text, text
 ' <<<"$out" || fail "Codex 从仓库子目录启动时应按仓库根目录注入阶段
 $out"
 echo "  ✅ Codex 从仓库子目录启动时按仓库根目录注入"; PASS=$((PASS + 1))
-unrelated="$WORK/unrelated-git"
-mkdir -p "$unrelated/sub"
-git -C "$unrelated" init -q
+build_fixture unrelated
 [ -z "$(run_from "$unrelated/sub")" ] || fail "无激活信号的仓库子目录必须静默"
 echo "  ✅ 无激活信号的仓库子目录静默"; PASS=$((PASS + 1))
 plain="$WORK/not-git"
@@ -675,14 +696,7 @@ codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400�
   printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
 }
 CTX_LINE="$(mid_line 800 'at or over 800 k')"
-ctx="$WORK/ctx"
-mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
-map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
-printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
-T="$WORK/ctx-transcript.jsonl"
-HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
-plain_building="$(run "$ctx" | context_of)"
+build_fixture ctx
 
 transcript "$T" 799999
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
@@ -777,19 +791,8 @@ echo "  ✅ Codex BUILDING 低于窗口 80% 时不提示"; PASS=$((PASS + 1))
 }
 
 part_10() {
-# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
-git_project="$WORK/git-project"
-mkdir -p "$git_project/src/deep"
-git -C "$git_project" init -q
-printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$git_project/AGENTS.md"
-ctx="$WORK/ctx"
-mkdir -p "$ctx/spec" "$ctx/tasks/alpha"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ctx/CLAUDE.md"
-map "$ctx"; touch "$ctx/spec/alpha.md"; printf '# Plan\n' > "$ctx/tasks/alpha/plan.md"
-printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
-T="$WORK/ctx-transcript.jsonl"
-HOOK_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
-plain_building="$(run "$ctx" | context_of)"
+# 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
+build_fixture git-project ctx
 
 # unattended-run-hint：没人在场的运行（claude -p 设 CLAUDE_CODE_SESSION_ATTENDED=0；codex exec 的会话记录首条
 # session_meta 写 source:"exec"）不出那两行「请告诉用户 /compact、/clear」，其余逐字相同；拿不准时照旧。
@@ -903,11 +906,8 @@ echo "  ✅ Codex 从仓库子目录启动时位置行报告仓库根目录"; PA
 }
 
 part_11() {
-# 本段用到前面段落建的夹具：各段在自己的目录里跑，这里按原来的建法再建一份（只复制建夹具的行）。
-mkdir -p "$WORK/empty"
-unrelated="$WORK/unrelated-git"
-mkdir -p "$unrelated/sub"
-git -C "$unrelated" init -q
+# 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
+build_fixture empty unrelated
 
 # 项目根以 hook 输入的 cwd 为准（session-handoff 第 12 条）：宿主把 CLAUDE_PROJECT_DIR 指向主检出目录、会话却在
 # linked worktree 里时，阶段与位置都应来自 worktree。
