@@ -48,6 +48,14 @@ if git diff --cached --quiet; then
   echo "❌ 没有已暂存的改动，没有可提交的内容" >&2
   exit 1
 fi
+# 检查读的是工作区，提交的只有暂存区：漏了 git add 的新文件本地照样通过，推上去 CI 才失败。只警告，不拒绝。
+UNTRACKED=()
+while IFS= read -r f; do [ -n "$f" ] && UNTRACKED+=("$f"); done < <(git ls-files --others --exclude-standard)
+if [ "${#UNTRACKED[@]}" -gt 0 ]; then
+  echo "⚠️  工作区有 ${#UNTRACKED[@]} 个未跟踪文件：检查会读到它们，提交里却没有；如果是漏了 git add，CI 会失败："
+  for f in "${UNTRACKED[@]:0:10}"; do echo "     $f"; done
+  [ "${#UNTRACKED[@]}" -le 10 ] || echo "     … 另有 $(( ${#UNTRACKED[@]} - 10 )) 个"
+fi
 
 # ── 选档位与套件 ──
 #   快档：暂存的全是 spec/、tasks/、docs/ 与 plugins/、.github/ 以外的 *.md（判断在 verified_trees.py）。
