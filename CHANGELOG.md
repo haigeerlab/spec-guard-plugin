@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.55.1] - 2026-10-09
+
+本版合并 0.55.0 之后的 #272–#279。**插件行为不变**：插件包里只有两个测试文件的夹具有变化；其余是本仓库维护者用的
+脚本与文档，不随插件分发。
+
+### 插件包内（仅测试）
+
+- `test_local_ticket_portability.py`：每个测试类只建一次仓库与 state worktree，用例里复制后 `git worktree repair`；
+  模板仓库关掉 git 自动维护、复制时忽略锁文件，避免偶发的复制失败。（#278、#279）
+- `test_module_cost_report.py`：提交者身份改用环境变量，不再每个仓库调两次 `git config`。（#278）
+
+### 维护者工具（不进插件包）
+
+- **本机检查去重提速。** `scripts/verify-and-commit.sh` 按暂存路径分快档（只改 `spec/`、`tasks/`、`docs/` 与其他文档类
+  `*.md`，跑 `validate.sh --quick` 与 verify-artifacts）和全套（各套件并行）；提交后把检查过的 tree 记进 git 共用目录，
+  只有提交的 tree 等于检查过的暂存区时才记；pre-push 在要推的提交都已检查过时跳过重复检查。`.agent/state.json`
+  加进 `.gitignore`。纯文档提交加推送从约 4–5 分钟降到约 15 秒。（#273、#274）
+- **慢测试并行。** 新增 `scripts/run_tests_parallel.py`，把一个测试文件按测试类（类太大时按方法）分进程跑，任一进程
+  失败、少跑一个用例或漏掉导入的测试类都算失败；`validate.sh` 用它跑最慢的三个测试，三者合计墙钟 117 秒降到约 57 秒，
+  CI 约 2 分 20 秒降到 1 分 43 秒。（#278、#279）
+- `scripts/test_self_report.py` 的临时目录用例不再依赖外部 `TMPDIR`，`validate.sh` 另在外部 `TMPDIR` 下再跑一遍。（#272）
+
+### 文档
+
+- README 改为面向第一次接触的开发者，中文 `README.md` 为默认入口，另有章节一一对应的英文 `README.en.md`。（#276）
+- 新增[命令参考](docs/commands.md)（21 条命令的参数、输出与 Codex 对照）、[故障排查](docs/troubleshooting.md)、
+  [约定块](docs/convention-block.md)；[设计与架构](docs/design.md)改写为中文。（#275、#277）
+- 删除已无用的研究笔记、验收记录与早期报告；协作拆分总结并入[迁移说明](docs/migrations/2026-10-07-collaboration-split.md)。（#275）
+
 ## [0.55.0] - 2026-10-09
 
 本版合并 0.54.2 之后的四个模块（#266–#269）。插件包里只有能力图报错文案变化；其余三项是本仓库维护者用的脚本，
