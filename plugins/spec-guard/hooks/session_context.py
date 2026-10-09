@@ -119,18 +119,42 @@ def unattended(transcript_path) -> bool:
     """
     if os.environ.get("CLAUDE_CODE_SESSION_ATTENDED") == "0":
         return True
+    record = _first_record(transcript_path)
+    payload = record.get("payload") if isinstance(record, dict) and record.get("type") == "session_meta" else None
+    return isinstance(payload, dict) and payload.get("source") == "exec"
+
+
+def _first_record(transcript_path):
+    """The transcript's first record, or None when it is missing, cut off or not JSON."""
     if not isinstance(transcript_path, str) or not transcript_path:
-        return False
+        return None
     try:
         with open(transcript_path, "rb") as handle:
             first = handle.readline(FIRST_RECORD_LIMIT)
         if not first.endswith(b"\n"):  # cut off at the limit (or no line end at all): not a whole record
-            return False
-        record = json.loads(first)
+            return None
+        return json.loads(first)
     except (OSError, ValueError):
-        return False
-    payload = record.get("payload") if isinstance(record, dict) and record.get("type") == "session_meta" else None
-    return isinstance(payload, dict) and payload.get("source") == "exec"
+        return None
+
+
+def host_from_hook_input(text, transcript_path) -> str | None:
+    """"codex" when the hook input itself says so (codex-command-wording), else None.
+
+    Codex's UserPromptSubmit input carries its own `turn_id` extension (codex-rs/hooks/src/schema.rs) and a Codex
+    rollout starts with a session_meta record; Claude Code's input has neither (measured 2026-10-09). The input
+    never proves Claude, so phase-guard.sh decides the rest from the environment.
+    """
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        data = None
+    if isinstance(data, dict) and "turn_id" in data:
+        return "codex"
+    record = _first_record(transcript_path)
+    if isinstance(record, dict) and record.get("type") == "session_meta":
+        return "codex"
+    return None
 
 
 def transcript_path_from_hook_input(text) -> str | None:
@@ -221,9 +245,10 @@ def main() -> None:
         resolve_root_main(sys.argv[2])
         return
     try:
-        path = transcript_path_from_hook_input(read_hook_input(sys.stdin.fileno()))
+        text = read_hook_input(sys.stdin.fileno())
+        path = transcript_path_from_hook_input(text)
     except Exception:  # a hook helper must never break the stage injection
-        path = None
+        text, path = "", None
     try:
         usage = context_usage(path)
     except Exception:
@@ -241,6 +266,11 @@ def main() -> None:
     print(location or "")
     print("" if window is None else window)
     print("unattended" if nobody else "")
+    try:
+        host = host_from_hook_input(text, path)
+    except Exception:
+        host = None
+    print(host or "")
 
 
 if __name__ == "__main__":

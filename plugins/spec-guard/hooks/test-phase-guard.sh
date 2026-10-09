@@ -9,8 +9,9 @@ PASS=0
 fail() { echo "  ❌ $1" >&2; exit 1; }
 
 # 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（unattended-run-hint）；用例按需显式设置。
+# 宿主信号（codex-command-wording）：跑测试的宿主自己的 PLUGIN_ROOT／SPEC_GUARD_HOST 不得漏进被测 hook；用例要指定宿主时设 SG_HOST。
 run() {  # $1=项目目录；可用 RUN_PATH 替换 PATH
-  env -u CLAUDE_CODE_SESSION_ATTENDED PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
 }
 
 silent() {  # $1=用例名 $2=项目目录
@@ -47,7 +48,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"
@@ -70,13 +71,13 @@ map() {  # $1=项目目录
 
 # 下面这些辅助函数被不止一段用到，所以放在公共部分（原样从各自段落挪上来）。
 run_from() {  # $1=工作目录；不设 CLAUDE_PROJECT_DIR，模拟 Codex
-  (cd "$1" && env -u CLAUDE_PROJECT_DIR /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)
+  (cd "$1" && env -u CLAUDE_PROJECT_DIR -u PLUGIN_ROOT -u SPEC_GUARD_HOST /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)
 }
 run_input() {  # $1=项目目录 $2=标准输入文本；ATTENDED=<值> 时传给 hook，否则不设
   if [ -n "${ATTENDED:-}" ]; then
-    env CLAUDE_CODE_SESSION_ATTENDED="$ATTENDED" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+    env -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_CODE_SESSION_ATTENDED="$ATTENDED" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
   else
-    env -u CLAUDE_CODE_SESSION_ATTENDED CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
+    env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
   fi
 }
 context_of() {  # 从 hook JSON 取 additionalContext
@@ -88,10 +89,10 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
 # context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
 # 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
 mid_line() {  # $1=N k $2=阈值说明
-  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
 }
 sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
 done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
   python3 -c '
@@ -106,6 +107,10 @@ else:
 ' "$2" <<<"$out" || fail "$1
 $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
+codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
+  printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
 }
 
 # 被不止一段用到的夹具：建法只写在这里，原段落和要重建它的段都调用（ctx 还会算出 BUILDING 时的基准输出）。
@@ -692,9 +697,6 @@ for line in "$BOUNDARY" "$(mid_line 1 x)" "$(sized_boundary 1 x)"; do
   case "$line" in *"/clear if the next work is unrelated"*) ;; *) fail "上下文提示缺少 /clear 的建议: $line" ;; esac
   case "$line" in *"new session"*|*"spec-guard handoff"*|*spec-guard:handoff*) fail "上下文提示不应建议新会话或交接命令: $line" ;; esac
 done
-codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
-  printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
-}
 CTX_LINE="$(mid_line 800 'at or over 800 k')"
 build_fixture ctx
 
@@ -822,7 +824,7 @@ out="$(ATTENDED=yes run_input "$ctx" "$HOOK_INPUT" | context_of)"
 has_ctx "ATTENDED 不是 0 时按有人在场"
 codex_meta "$T" '"exec"'
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-same_as "codex exec（source=exec）BUILDING 80%：去掉上下文行，其余逐字相同" "$plain_building"
+same_as "codex exec（source=exec）BUILDING 80%：去掉上下文行，其余逐字相同" "$(SG_HOST=codex run "$ctx" | context_of)"
 codex_meta "$T" '"vscode"'
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 has_ctx "Codex 桌面（source=vscode）：照旧有上下文行"
@@ -1069,9 +1071,94 @@ $plain_su"
 echo "  ✅ 只有完全相等的一行才算挂起标记"; PASS=$((PASS + 1))
 }
 
+part_12() {
+# codex-command-wording：命令提示按宿主给写法。宿主按 SPEC_GUARD_HOST → hook 输入（turn_id、会话记录首条 session_meta）
+# → 环境（CLAUDE_PROJECT_DIR 为 claude，否则 PLUGIN_ROOT 为 codex）判断；都判断不了时与改前逐字相同。
+cw="$WORK/cw"; mkdir -p "$cw/spec" "$cw/tasks/alpha" "$cw/tasks/beta"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$cw/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$cw/spec/CAPABILITY-MAP.md"
+touch "$cw/spec/alpha.md" "$cw/spec/beta.md"
+printf '# Plan\n' > "$cw/tasks/alpha/plan.md"; printf '%s\n' '- [ ] open' > "$cw/tasks/alpha/todo.md"
+codex_text() {  # $1=用例名：Codex 写法，且没有任何斜杠写法的插件命令
+  case "$out" in *'/spec-guard:'*|*'`/build`'*|*'`/plan`'*|*'(Codex:'*) fail "$1: Codex 下不应出现斜杠写法或 (Codex: …) 括注
+$out" ;; esac
+}
+expect() {  # $1=用例名 $2=应包含的文本
+  grep -F -- "$2" >/dev/null <<<"$out" || fail "$1: 缺少「$2」
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
+out="$(run "$cw" | context_of)"; claude_building="$out"
+expect "Claude（有 CLAUDE_PROJECT_DIR）：BUILDING 仍是 /build" 'continue `/build` on `alpha`'
+out="$(run_input "$cw" '{"session_id":"s","turn_id":"t1","prompt":"p"}' | context_of)"; codex_text "turn_id"
+expect "hook 输入带 turn_id：按 Codex 写 \$incremental-implementation" 'continue `$incremental-implementation` on `alpha`'
+codex_rollout "$WORK/cw-rollout.jsonl" 1; printf '%s\n' '{"type":"session_meta","payload":{"source":"vscode"}}' > "$WORK/cw-meta.jsonl"
+cat "$WORK/cw-rollout.jsonl" >> "$WORK/cw-meta.jsonl"
+out="$(run_input "$cw" "{\"session_id\":\"s\",\"transcript_path\":\"$WORK/cw-meta.jsonl\"}" | context_of)"; codex_text "session_meta"
+expect "会话记录首条是 session_meta：按 Codex 写" '`$incremental-implementation`'
+out="$(cd "$cw" && env -u CLAUDE_PROJECT_DIR -u SPEC_GUARD_HOST PLUGIN_ROOT=/x /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null | context_of)"
+codex_text "PLUGIN_ROOT"
+expect "没有 CLAUDE_PROJECT_DIR、有 PLUGIN_ROOT：按 Codex 写" '`$incremental-implementation`'
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "SPEC_GUARD_HOST=codex"
+expect "SPEC_GUARD_HOST=codex 优先于 CLAUDE_PROJECT_DIR" '`$incremental-implementation`'
+out="$(env -u PLUGIN_ROOT SPEC_GUARD_HOST=claude CLAUDE_PROJECT_DIR="$cw" /bin/bash "$HOOKDIR/phase-guard.sh" <<<'{"turn_id":"t1"}' | context_of)"
+[ "$out" = "$claude_building" ] || fail "SPEC_GUARD_HOST=claude 应优先于 turn_id
+$out"
+echo "  ✅ SPEC_GUARD_HOST=claude 优先于 hook 输入"; PASS=$((PASS + 1))
+out="$(run_from "$cw" | context_of)"
+[ "$out" = "$claude_building" ] || fail "判断不了宿主时应与改前（Claude 写法）逐字相同
+--- got
+$out
+--- claude
+$claude_building"
+echo "  ✅ 判断不了宿主时与改前逐字相同"; PASS=$((PASS + 1))
+
+# Codex 下各行的写法
+printf '%s\n' '- [x] open' > "$cw/tasks/alpha/todo.md"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "NEEDS_PLAN"
+expect "Codex NEEDS_PLAN：\$planning-and-task-breakdown" '(for example with `$planning-and-task-breakdown`)'
+printf '# Plan\n' > "$cw/tasks/beta/plan.md"; printf '%s\n' '- [x] b' > "$cw/tasks/beta/todo.md"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "DONE"
+expect "Codex DONE：\$spec-guard-ops add-module" 'insert a module with `$spec-guard-ops` add-module at this checkpoint'
+expect "Codex 模块完成行：/compact 不带聚焦说明" "/compact (Codex's /compact takes no focus text), or /clear if the next work is unrelated"
+out="$(run_from "$cw" | context_of)"
+expect "判断不了宿主时模块完成行仍是改前原文" '- Module boundary: a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text.'
+grep -F 'followed by a one-sentence focus' >/dev/null <<<"$out" && fail "Codex 的 /compact 不应要求聚焦说明
+$out"
+printf '%s\n' '- [x] built' '- [ ] review' '<!-- spec-guard: suspended -->' > "$cw/tasks/alpha/todo.md"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "挂起"
+expect "Codex 挂起行：\$spec-guard-ops module-suspend --resume" 'resume with `$spec-guard-ops` module-suspend --resume alpha.'
+printf '%s\n' '- [x] built' > "$cw/tasks/alpha/todo.md"; rm "$cw/tasks/beta/todo.md"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "缺 todo"
+expect "Codex 缺 todo 汇总：\$spec-guard-ops verify-artifacts" 'run `$spec-guard-ops` verify-artifacts to review'
+mkdir -p "$cw/.agent"; printf '%s\n' '{"version": 1, "x": 1}' > "$cw/.agent/config.json"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "配置无效"
+expect "Codex 配置无效行：\$spec-guard-ops config" '— run `$spec-guard-ops` config.'
+rm "$cw/.agent/config.json"
+cp "$cw/spec/CAPABILITY-MAP.md" "$WORK/cw-map.bak"; printf '%s\n' '| alpha | x | — |' > "$cw/spec/CAPABILITY-MAP.md"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "MAP_INVALID"
+expect "Codex MAP_INVALID：\$spec-guard-ops verify-artifacts" 'run `$spec-guard-ops` verify-artifacts and fix the capability map'
+cp "$WORK/cw-map.bak" "$cw/spec/CAPABILITY-MAP.md"
+printf '%s\n' '- [ ] open' > "$cw/tasks/alpha/todo.md"
+codex_rollout "$WORK/cw-rollout.jsonl" 206720
+out="$(env -u PLUGIN_ROOT SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$cw" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"{\"transcript_path\":\"$WORK/cw-rollout.jsonl\"}" | context_of)"
+codex_text "上下文行"
+expect "Codex 上下文行：/compact 不带聚焦说明" "then give the user one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), or /clear"
+# phase-guard.sh 自己的兜底行：module_stage 算不出阶段时
+mkdir -p "$WORK/stagefail"; real_py="$(command -v python3)"
+printf '%s\n' '#!/bin/bash' 'case "$1" in *module_stage.py) exit 1 ;; esac' "exec \"$real_py\" \"\$@\"" > "$WORK/stagefail/python3"
+chmod +x "$WORK/stagefail/python3"
+out="$(SG_HOST=codex RUN_PATH="$WORK/stagefail:$PATH" run "$cw" | context_of)"; codex_text "兜底行"
+expect "Codex 兜底行：\$spec-guard-ops verify-artifacts" 'run `$spec-guard-ops` verify-artifacts for details'
+out="$(RUN_PATH="$WORK/stagefail:$PATH" run "$cw" | context_of)"
+expect "Claude 兜底行仍是 /spec-guard:verify-artifacts" 'run `/spec-guard:verify-artifacts` for details'
+}
+
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=11
+PARTS=12
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

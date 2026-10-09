@@ -95,9 +95,12 @@ CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/teardown-convention.sh" --h
 两者均为只读：
 
 ```bash
-CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/phase-guard.sh"
+SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/phase-guard.sh"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/verify-artifacts.sh"
 ```
+
+`SPEC_GUARD_HOST=codex` 让 phase 的命令提示用 Codex 写法（`` `$spec-guard-ops` `` 加动作等）；不带它时，带着
+`CLAUDE_PROJECT_DIR` 的手动运行会被当作 Claude Code。
 
 激活信号是两个：`CLAUDE.md`／`AGENTS.md` 里独占一行的声明块，或含 `activeModule` 的
 `.agent/state.json`。旧 remote-tracker state 若带 `activeModule` 仍按本地约定报告阶段；phase 不认证、

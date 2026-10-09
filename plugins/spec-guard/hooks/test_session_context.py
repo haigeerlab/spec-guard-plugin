@@ -198,7 +198,23 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(out.split("\n")[0], "250610")
         self.assertEqual(out.split("\n")[2], "")  # Claude records carry no window
         self.assertEqual(out.split("\n")[3], "")  # attended (unattended-run-hint)
-        self.assertEqual(out.count("\n"), 4)
+        self.assertEqual(out.split("\n")[4], "")  # the input does not say Codex (codex-command-wording)
+        self.assertEqual(out.count("\n"), 5)
+
+    def test_prints_codex_as_the_fifth_line_for_a_turn_id(self):
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript), "turn_id": "t1"}))
+        self.assertEqual(out.split("\n")[4], "codex")
+        self.assertEqual(out.split("\n")[0], "250610")  # the other facts are unchanged
+
+    def test_prints_codex_as_the_fifth_line_for_a_session_meta_rollout(self):
+        self.transcript.write_text(json.dumps({"type": "session_meta", "payload": {"source": "vscode"}}) + "\n"
+                                   + json.dumps(codex_token_count(120000)) + "\n")
+        out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}))
+        self.assertEqual(out.split("\n")[4], "codex")
+
+    def test_unusable_input_does_not_say_codex(self):
+        for text in ("not json", "[]", json.dumps({"transcript_path": 3})):
+            self.assertEqual(self.run_cli(text).split("\n")[4], "", text)
 
     def test_prints_unattended_as_the_fourth_line(self):
         out = self.run_cli(json.dumps({"transcript_path": str(self.transcript)}), attended="0")

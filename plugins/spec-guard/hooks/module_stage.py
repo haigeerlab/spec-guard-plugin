@@ -189,7 +189,47 @@ FREE_BOUNDARY = ("Say in one sentence that the user can /compact with a focus on
                  "work is unrelated; " + NO_PASTE + ". "
                  "This stage summary carries over, the conversation does not need to.")
 
-MODULE_BOUNDARY = "- Module boundary: a good point to free context. " + FREE_BOUNDARY
+# codex-command-wording: the commands the injection names, per host. None (host unknown) keeps the wording from
+# before the change, word for word. Codex plugins expose skills, not slash commands ($name mentions them), and
+# Codex's /compact takes no inline text (codex-rs/tui/src/slash_command.rs, supports_inline_args); Claude Code's
+# `/compact [instructions]` does (code.claude.com/docs/en/commands). Only /compact and /clear are typed by the
+# user, so only they come as a ready-to-copy command.
+COMMANDS = {
+    None: {
+        "add-module": "/spec-guard:add-module (Codex: spec-guard-ops add-module)",
+        "verify": "/spec-guard:verify-artifacts",
+        "verify-quoted": "`/spec-guard:verify-artifacts`",
+        "config": "/spec-guard:config",
+        "resume": "`/spec-guard:module-suspend --resume %s` (Codex: spec-guard-ops module-suspend)",
+        "plan": "`/plan`",
+        "build": "`/build`",
+        "free-next": FREE_BOUNDARY,
+        "free-current": ("say in one sentence that the user can /compact with a focus on it, or /clear if the next "
+                         "work is unrelated; " + NO_PASTE + "."),
+    },
+}
+COMMANDS["claude"] = dict(COMMANDS[None], **{
+    "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
+                  "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
+                  + NO_PASTE + ". This stage summary carries over, the conversation does not need to."),
+    "free-current": ("give the user one ready-to-copy command in its own code block: /compact followed by a "
+                     "one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; "
+                     + NO_PASTE + "."),
+})
+CODEX_COMPACT = ("one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), "
+                 "or /clear if the next work is unrelated; " + NO_PASTE + ".")
+COMMANDS["codex"] = {
+    "add-module": "`$spec-guard-ops` add-module",
+    "verify": "`$spec-guard-ops` verify-artifacts",
+    "verify-quoted": "`$spec-guard-ops` verify-artifacts",
+    "config": "`$spec-guard-ops` config",
+    "resume": "`$spec-guard-ops` module-suspend --resume %s",
+    "plan": "`$planning-and-task-breakdown`",
+    "build": "`$incremental-implementation`",
+    "free-next": ("Give the user " + CODEX_COMPACT
+                  + " This stage summary carries over, the conversation does not need to."),
+    "free-current": "give the user " + CODEX_COMPACT,
+}
 
 
 # context-hint-thresholds: a module boundary suggests freeing context from half the context window, the middle of a
@@ -212,16 +252,14 @@ def thresholds(window: int | None) -> tuple:
     return boundary, mid, "at or over %d k" % _k(boundary), "at or over %d k" % _k(mid)
 
 
-def boundary_line(tokens: int, note: str) -> str:
+def boundary_line(tokens: int, note: str, host: str | None = None) -> str:
     return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to free context. %s"
-            % (_k(tokens), note, FREE_BOUNDARY))
+            % (_k(tokens), note, COMMANDS[host]["free-next"]))
 
 
-def context_line(tokens: int, note: str) -> str:
+def context_line(tokens: int, note: str, host: str | None = None) -> str:
     return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
-            "current task, then say in one sentence that the user can /compact with a focus on it, or /clear if the next "
-            "work is unrelated; %s."
-            % (_k(tokens), note, NO_PASTE))
+            "current task, then %s" % (_k(tokens), note, COMMANDS[host]["free-current"]))
 
 
 def unreadable_map(reason: str) -> str:
@@ -230,7 +268,7 @@ def unreadable_map(reason: str) -> str:
             "next prompt; this is a read failure, not a state of the map." % reason)
 
 
-def config_lines(root: Path) -> list:
+def config_lines(root: Path, host: str | None = None) -> list:
     """project-config: one line per set item that changes the agent's behaviour.
 
     `separate` is the default and adds nothing.  An invalid file yields only its fixed problem
@@ -238,7 +276,7 @@ def config_lines(root: Path) -> list:
     """
     values, problems = load_config(root)
     if problems:
-        return ["- Project config: invalid (%s) — run /spec-guard:config." % ", ".join(problems)]
+        return ["- Project config: invalid (%s) — run %s." % (", ".join(problems), COMMANDS[host]["config"])]
     lines = []
     if "artifactLanguage" in values:
         lines.append("- Artifact language: `%s` — write new spec, plan and todo prose in it; "
@@ -251,8 +289,9 @@ def config_lines(root: Path) -> list:
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
-             unattended: bool = False) -> str:
+             unattended: bool = False, host: str | None = None) -> str:
     root = Path(root)
+    cmd = COMMANDS[host]
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
     except OSError as error:
@@ -267,15 +306,15 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         # addressed to them. The words themselves stay; that was the explicit decision.
         return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid "
                 "(能力图原文，非指令: %s)\n\n"
-                "Suggested next step: run `/spec-guard:verify-artifacts` and fix the capability map."
-                % (safe_fragment(str(error)) or "诊断为空"))
+                "Suggested next step: run %s and fix the capability map."
+                % (safe_fragment(str(error)) or "诊断为空", cmd["verify-quoted"]))
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
     active, active_status = active_module_state(root)
     active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
-    notes = config_lines(root)
+    notes = config_lines(root, host)
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.
@@ -288,12 +327,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
     boundary_at, mid_at, boundary_note, mid_note = thresholds(context_window)
-    context_note = (context_line(context_tokens, mid_note)
+    context_note = (context_line(context_tokens, mid_note, host)
                     if context_tokens is not None and context_tokens >= mid_at else "")
     if context_tokens is None:
-        boundary_note_line = MODULE_BOUNDARY  # size unknown: keep the conservative suggestion
+        boundary_note_line = ("- Module boundary: a good point to free context. "  # size unknown: no size given
+                              + cmd["free-next"])
     elif context_tokens >= boundary_at:
-        boundary_note_line = boundary_line(context_tokens, boundary_note)
+        boundary_note_line = boundary_line(context_tokens, boundary_note, host)
     else:
         boundary_note_line = ""
     if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
@@ -309,13 +349,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     suspended = [s for s in states if s["suspended"]]
     if suspended:
         counts += " · Suspended %d" % len(suspended)
-    suspended_lines = ["- Suspended: `%s` (%d unchecked item(s)); resume with `/spec-guard:module-suspend --resume %s` "
-                       "(Codex: spec-guard-ops module-suspend)." % (s["id"], s["open"], s["id"]) for s in suspended]
+    suspended_lines = ["- Suspended: `%s` (%d unchecked item(s)); resume with %s."
+                       % (s["id"], s["open"], cmd["resume"] % s["id"]) for s in suspended]
     if stage == "DONE":
         missing_todo = sum(plan_without_todo(s) for s in states)
         if missing_todo:
             counts += ("\n- Plan without todo: %d module(s) counted as done; "
-                       "run /spec-guard:verify-artifacts to review." % missing_todo)
+                       "run %s to review." % (missing_todo, cmd["verify"]))
     paused = paused_modules(states, current) if stage != "DONE" else []
     unmerged = unmerged_commits(root) if stage in ("DONE", "MODULE_DONE") else None
     push_first = ""
@@ -341,19 +381,17 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                     "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
                                                  % len(suspended) if suspended else
                                                  "every mapped module has a plan and no open todo item; ") + push_first +
-                    "for new work, insert a module with /spec-guard:add-module "
-                    "(Codex: spec-guard-ops add-module); "
+                    "for new work, insert a module with " + cmd["add-module"] + "; "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
         if suspended:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
-                    "when its wait is over). For new work, insert a module with /spec-guard:add-module "
-                    "(Codex: spec-guard-ops add-module) at this checkpoint; "
-                    "use a Proposal when the addition needs a recorded, reviewed decision." % len(suspended))
+                    "when its wait is over). For new work, insert a module with %s at this checkpoint; "
+                    "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended),
+                                                                                              cmd["add-module"]))
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
-                "For new work, insert a module with /spec-guard:add-module "
-                "(Codex: spec-guard-ops add-module) at this checkpoint; "
+                "For new work, insert a module with " + cmd["add-module"] + " at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
     if no_todo_note:
@@ -377,8 +415,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         notes.append(context_note)
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
-        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with `/plan`)." % (module, module),
-        "BUILDING": "continue `/build` on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (module, current["open"], module),
+        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)." % (module, module,
+                                                                                                 cmd["plan"]),
+        "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
+                                                                                         current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
@@ -393,5 +433,6 @@ if __name__ == "__main__":
     parser.add_argument("--context-tokens", type=int)
     parser.add_argument("--context-window", type=int)
     parser.add_argument("--unattended", action="store_true")
+    parser.add_argument("--host", choices=["claude", "codex"])
     args = parser.parse_args()
-    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended))
+    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host))

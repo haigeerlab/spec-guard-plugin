@@ -88,6 +88,21 @@ case "$WINDOW" in *$'\n'unattended*) UNATTENDED=1 ;; esac
 WINDOW="${WINDOW%%$'\n'*}"
 case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
+# 宿主（codex-command-wording）：命令提示按宿主给写法。显式的 SPEC_GUARD_HOST 优先（Codex 的 spec-guard-ops 手动
+# 运行时会带 CLAUDE_PROJECT_DIR）；其次是第五行，hook 输入本身说明是 Codex（turn_id 或 session_meta）；再看环境：
+# Claude Code 给 hook 设 CLAUDE_PROJECT_DIR，Codex 只设 PLUGIN_ROOT（两边都设的 CLAUDE_PLUGIN_ROOT 不能用）。
+# 都判断不了时 HOST 为空，输出与改前逐字相同。
+case "${SPEC_GUARD_HOST:-}" in
+  codex|claude) HOST="$SPEC_GUARD_HOST" ;;
+  *)
+    case "$FACTS" in
+      *$'\n'codex) HOST=codex ;;
+      *) if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude
+         elif [ -n "${PLUGIN_ROOT:-}" ]; then HOST=codex
+         else HOST=""; fi ;;
+    esac ;;
+esac
+if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
 # 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
 [ -z "$LOCATION" ] || HEADER="${HEADER}
@@ -139,7 +154,7 @@ Suggested next step: write the first reviewed module spec under \`spec/\`."
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
   emit "${HEADER}
 
 ${STAGE}"
@@ -149,5 +164,5 @@ else
 当前阶段: **UNKNOWN**
 
 - Module specs: ${SPECS}
-- The module stage could not be computed; run \`/spec-guard:verify-artifacts\` for details."
+- The module stage could not be computed; run ${VERIFY_CMD} for details."
 fi

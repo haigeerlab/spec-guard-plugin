@@ -63,10 +63,16 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 
 上下文提醒以模块为单位，按最近一轮主会话上下文分两档（宿主在 hook 输入里给出会话记录 `transcript_path` 时才读得到）：
 
-- `MODULE_DONE` / `DONE`：达到窗口 50% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，让 agent 用一句话
-  提示接着做相关工作时可以带重点 `/compact`、换到不相关工作时可以 `/clear`；低于 50% 时没有这一行；读不到大小时保留不带大小的 `- Module boundary: …`。
+- `MODULE_DONE` / `DONE`：达到窗口 50% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，让 agent 把一条可直接复制的
+  命令单独放进代码块：接着做相关工作时是 `/compact`，换到不相关工作时是 `/clear`；低于 50% 时没有这一行；读不到大小时保留不带大小的 `- Module boundary: …`。
 - `NEEDS_SPEC`、`NEEDS_PLAN`、`BUILDING`：只在达到窗口 80% 时多一行 `- Session context: about N k tokens …`，
-  让 agent 做完或记下当前 task 后用一句话提示同样的 `/compact` 或 `/clear`。
+  让 agent 做完或记下当前 task 后同样给出可直接复制的 `/compact` 或 `/clear`。
+
+命令写法按宿主给（codex-command-wording）：Claude Code 里 `/compact` 后面带 agent 填好的一句聚焦说明，插件命令写作
+`/spec-guard:add-module` 这类斜杠命令和 `/build`、`/plan`；Codex 的 `/compact` 不能带参数，只给 `/compact`，插件命令写作 `` `$spec-guard-ops` ``
+加动作、`` `$incremental-implementation` ``、`` `$planning-and-task-breakdown` ``。宿主按 `SPEC_GUARD_HOST`（`codex`／`claude`）、
+hook 输入（带 `turn_id` 或会话记录首条为 `session_meta` 即 Codex）、环境（有 `CLAUDE_PROJECT_DIR` 为 Claude，否则有
+`PLUGIN_ROOT` 为 Codex）依次判断；都判断不了时沿用改前的写法。
 
 两行都要求 agent 不贴交接文本，也不建议开新会话。刚压缩过时按压缩后的大小判断：Claude 取压缩记录里压缩后的 token 数，
 Codex 的压缩记录没有大小，按低于阈值处理；压缩后已有新读数时用新读数。
