@@ -62,8 +62,10 @@ class RunStepsParallelTests(unittest.TestCase):
         self.assertIn('1 个并行', p.stdout)
 
     def test_jobs_runs_steps_side_by_side(self):
-        marker = Path(self.tmpdir()) / 'done'
-        p = run('sleep 1; touch %s' % marker, 'test ! -f %s' % marker, jobs='2')
+        # Handshake instead of timing: the first step only succeeds if the second one runs while it is still waiting.
+        marker = Path(self.tmpdir()) / 'second-started'
+        wait = 'for i in $(seq 300); do [ -f %s ] && exit 0; sleep 0.1; done; exit 1' % marker
+        p = run(wait, 'touch %s' % marker, jobs='2')
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
 
     def test_bad_jobs_is_a_usage_error(self):

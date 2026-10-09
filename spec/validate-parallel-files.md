@@ -100,6 +100,8 @@ SG_VALIDATE_JOBS=1 /bin/bash scripts/validate.sh
 - Always：每条命令的输出完整、按原顺序；任一条失败即整体失败。
 - Ask first：推送、PR；改任何测试或被测代码，包括发现共享状态需要改测试的时候。
 - Never：为提速跳过、合并或删除步骤；吞掉某一步的输出或退出码。
+- 不保证：运行器被 Ctrl-C 打断时，正在跑的子进程与换 TMPDIR 那一步的临时目录（git 目录下的
+  `sg-self-report-tmpdir.*`）不一定清理，可能残留，需要手动删除（2026-10-09 审查补记）。
 
 ## Success criteria
 
