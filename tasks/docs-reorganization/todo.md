@@ -17,4 +17,4 @@
 - [x] Task 8：`docs/troubleshooting.md` — 阶段提示不出现、MAP_INVALID（报错原文取自 `capability_map.py`，含模块表数量）、UNKNOWN、python3 故障（原文取自 `phase-guard.sh`）、Codex 不加载、其他提示（activeModule 无效、Project config invalid、Paused、Suspended 等）
 - [x] Task 9：`docs/design.md` 中文架构说明，文档导航标明维护者文档 — 部件、数据流、两个宿主的差异、不变量，保留 Proposal／本地边界、项目配置、文件布局（File layout，插件与检查器注释仍按此名引用）与退役边界；`CLAUDE.md` 的描述同步；两份 README 的常用命令、故障排查改链到新文档，示例补上计数行（第二轮联调审查 #276 指出），导航加“维护者”一组
 - [x] Checkpoint 3（gate）：第三批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行 — 链接核对除 `docs/retirements/` 原有 15 个外无新增；新文档的锚点都存在；退役名称扫描通过
-- [ ] Task 10：下次发版时补证据
+- [x] Task 10：下次发版时补证据 — v0.55.1 已发版（#280），验证记录见 `docs/releases/v0.55.1-*.json`

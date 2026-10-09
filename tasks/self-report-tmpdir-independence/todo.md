@@ -4,4 +4,4 @@
 - [x] Task 2：修正用例 — 改用固定路径 `/tmp/sg-self-report-fixture/badmap`；外部与默认 TMPDIR 下 36 例均通过；改回 `self.root` 推导时外部 TMPDIR 下重新变红
 - [x] Checkpoint 1（report）：validate 全部通过；用 `scripts/verify-and-commit.sh` 提交
 - [x] Checkpoint 2（gate）：模块评审；Plan 获批即授权推送与开 PR，合并由用户进行 — PR #272 由用户合并于 e9c8e03
-- [ ] Task 3：下次发版时补证据
+- [x] Task 3：下次发版时补证据 — v0.55.1 已发版（#280），验证记录见 `docs/releases/v0.55.1-*.json`
