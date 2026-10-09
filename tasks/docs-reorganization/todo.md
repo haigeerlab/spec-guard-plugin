@@ -13,8 +13,8 @@
 - [x] Task 5：英文 README（章节一一对应，语言切换行）— `README.en.md` 13 节与中文版一一对应，另加一句“除 README 外链接的文档为中文”；两份顶部有语言切换行
 - [x] Task 6：CONTRIBUTING 报 bug 与双语规则、maintainer-workflow 同步、核对 bug.yml — `bug.yml` 去掉已退役的 tracker 字段与错误的 hook 路径，改为用 `/spec-guard:phase`、`verify-artifacts` 的输出；`check-readme-sync.py` 的 `--ref` 正则改为在反引号处结束（README 表格里命令写在行内代码中），先加用例在旧检查器上为红；Spec 补写 `docs/releases/0.9.0-local-candidate.json` 的 2 处历史链接
 - [x] Checkpoint 2（gate）：第二批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行 — 链接核对：除 `docs/retirements/` 原有的 15 个外没有新的失效链接；README 用到的 `docs/workflow.md#命令对照` 锚点存在
-- [ ] Task 7：`docs/commands.md`（从 workflow 拆出）
-- [ ] Task 8：`docs/troubleshooting.md`
-- [ ] Task 9：`docs/design.md` 中文架构说明，文档导航标明维护者文档
-- [ ] Checkpoint 3（gate）：第三批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行
+- [x] Task 7：`docs/commands.md`（从 workflow 拆出）— 21 条命令按用途分组写参数、作用、输出与退出码，逐份对照 `plugins/spec-guard/commands/*.md`；命令对照表从 `docs/workflow.md` 搬来，workflow 那一节只留链接。`scripts/check-command-table.py` 改核对 `docs/commands.md`，新用例“表只在 docs/workflow.md 里 → 报错”与“每个命令都在表里”在旧检查器上为红
+- [x] Task 8：`docs/troubleshooting.md` — 阶段提示不出现、MAP_INVALID（报错原文取自 `capability_map.py`，含模块表数量）、UNKNOWN、python3 故障（原文取自 `phase-guard.sh`）、Codex 不加载、其他提示（activeModule 无效、Project config invalid、Paused、Suspended 等）
+- [x] Task 9：`docs/design.md` 中文架构说明，文档导航标明维护者文档 — 部件、数据流、两个宿主的差异、不变量，保留 Proposal／本地边界、项目配置、文件布局（File layout，插件与检查器注释仍按此名引用）与退役边界；`CLAUDE.md` 的描述同步；两份 README 的常用命令、故障排查改链到新文档，示例补上计数行（第二轮联调审查 #276 指出），导航加“维护者”一组
+- [x] Checkpoint 3（gate）：第三批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行 — 链接核对除 `docs/retirements/` 原有 15 个外无新增；新文档的锚点都存在；退役名称扫描通过
 - [ ] Task 10：下次发版时补证据

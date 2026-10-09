@@ -583,11 +583,12 @@ want fail "digest-single-source: 一个 Python 文件都没有 → 不算通过"
   python3 "$ROOT/scripts/check-digest-single-source.py" "$TMP/digestempty"
 
 # ── check-command-table.py ──
-# 审查 F18：docs/workflow.md 的命令对照表要列出每个命令（前缀可省，允许 `documentation-*` 这样的通配）。
+# 审查 F18：命令对照表要列出每个命令（前缀可省，允许 `documentation-*` 这样的通配）。
+# docs-reorganization 起这张表在 docs/commands.md，docs/workflow.md 只链过去。
 mktable() {  # $1=目录 $2=对照表正文
   rm -rf "$1"; mkdir -p "$1/plugins/spec-guard/commands" "$1/docs"
   for c in phase documentation-impact documentation-baseline; do printf 'x\n' > "$1/plugins/spec-guard/commands/$c.md"; done
-  printf '# Workflow\n\n## 命令对照\n\n%s\n\n## 移除\n\n`cost-report` 在别的节里不算。\n' "$2" > "$1/docs/workflow.md"
+  printf '# 命令参考\n\n## 命令对照\n\n%s\n\n## 其他\n\n`cost-report` 在别的节里不算。\n' "$2" > "$1/docs/commands.md"
 }
 mktable "$TMP/tablegood" '| 查看阶段 | `/spec-guard:phase` | x |
 | 文档 | `/spec-guard:documentation-*` 两条 | x |'
@@ -599,6 +600,11 @@ want fail "command-table: 漏了命令（只在别的节出现） → 报错" py
 mktable "$TMP/tablenone" '| 查看阶段 | `/spec-guard:phase` | x |'
 rm -f "$TMP/tablenone/plugins/spec-guard/commands/"*.md
 want fail "command-table: 零个命令文件 → 不算通过" python3 "$ROOT/scripts/check-command-table.py" "$TMP/tablenone"
+# 表只留在 docs/workflow.md、docs/commands.md 里没有：说明检查器读的是新位置
+mktable "$TMP/tableold" '| 查看阶段 | `/spec-guard:phase` | x |
+| 文档 | `/spec-guard:documentation-*` 两条 | x |'
+mv "$TMP/tableold/docs/commands.md" "$TMP/tableold/docs/workflow.md"
+want fail "command-table: 表只在 docs/workflow.md 里 → 报错" python3 "$ROOT/scripts/check-command-table.py" "$TMP/tableold"
 
 # ── evals/dispatch-cost/grade.sh ──
 # 审查 F10：隐藏测试经 `| tail -3` 运行且没有 pipefail，失败时判分仍退出 0。

@@ -94,7 +94,8 @@ The full flow, what each stage means, and the two ways to add requirements: [wor
 | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 
 Codex does not load slash commands; the same features are reached through skills in plain language (mainly
-`spec-guard-ops`). All commands and the Codex mapping: [workflow · command mapping](docs/workflow.md#命令对照) (Chinese).
+`spec-guard-ops`). Arguments and output of all 21 commands, and the Codex mapping: [command reference](docs/commands.md)
+(Chinese).
 
 ## What it looks like, and a self-check
 
@@ -107,6 +108,7 @@ Once enabled, send the agent any message and it sees a stage hint like this in i
 
 - Capability map: present
 - Current module: `billing` (next in Build order)
+- Modules 3 · Specs 2 · Plans 1 · In progress 0 · Done 1
 
 Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` (for example with `/plan`).
 ```
@@ -147,13 +149,16 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
 | The hint says python3 is unavailable or cannot run | Check that `python3 --version` is 3.9 or later and on the PATH the host starts with; the hint returns on the next turn once fixed |
 | spec-guard is missing in Codex | Run `codex plugin list` and check spec-guard is installed and enabled; after changing `ref`, run `codex plugin marketplace upgrade` |
 
-More cases: [workflow](docs/workflow.md) (Chinese).
+More cases (what `UNKNOWN`, `Paused`, `Suspended` and other hints mean): [troubleshooting](docs/troubleshooting.md)
+(Chinese).
 
 ## Architecture and documentation
 
 **Users**
 
-- [Workflow](docs/workflow.md): from nothing to delivery, two ways to add requirements, command mapping
+- [Workflow](docs/workflow.md): from nothing to delivery, two ways to add requirements
+- [Command reference](docs/commands.md): arguments and output of every command, and the Codex mapping
+- [Troubleshooting](docs/troubleshooting.md)
 - [Concepts](docs/concepts.md)
 - [Optional features](docs/optional-features.md): local ticket ledger, documentation governance, capability history;
   session collaboration has moved to the separate agent-relay plugin
@@ -166,6 +171,10 @@ More cases: [workflow](docs/workflow.md) (Chinese).
 - [Contributing](CONTRIBUTING.md)
 - [Decisions](docs/decisions/)
 
+**Maintainers** (releases and repository upkeep; not needed to use the plugin):
+[maintainer workflow](docs/maintainer-workflow.md), [release process](docs/release-process.md),
+[failure modes and review lenses](docs/lenses.md), [upstream analysis](docs/upstream-analysis.md).
+
 This repository manages its own development with spec-guard: the root `spec/` and `tasks/` are this repository's
 module records, not templates for users to copy.
 
@@ -174,8 +183,7 @@ module records, not templates for users to copy.
 - Found a bug or want something: open a [GitHub issue](https://github.com/haigeerlab/spec-guard-plugin/issues) with
   the matching template; [contributing](CONTRIBUTING.md) says what to include.
 - Want to change code: read [contributing](CONTRIBUTING.md) and [design and architecture](docs/design.md) first.
-- Maintainer workflow and releases: [docs/maintainer-workflow.md](docs/maintainer-workflow.md),
-  [docs/release-process.md](docs/release-process.md).
+- Maintainer documents: see the "Maintainers" group above.
 
 ## License
 

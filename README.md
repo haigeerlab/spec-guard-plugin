@@ -84,8 +84,8 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | `/spec-guard:config` | 查看或设置项目配置：产物语言、评审节奏 |
 | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 
-Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令和 Codex 对照见
-[使用流程 · 命令对照](docs/workflow.md#命令对照)。
+Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部 21 条命令的参数、
+输出和 Codex 对照见[命令参考](docs/commands.md)。
 
 ## 运行效果与自检
 
@@ -98,6 +98,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 
 - Capability map: present
 - Current module: `billing` (next in Build order)
+- Modules 3 · Specs 2 · Plans 1 · In progress 0 · Done 1
 
 Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` (for example with `/plan`).
 ```
@@ -137,13 +138,15 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 | 提示说“python3 不可用”或“python3 无法运行” | 确认 `python3 --version` 是 3.9 以上，且宿主启动时的 PATH 里能找到它；修好后下一轮自动恢复 |
 | Codex 里没有 spec-guard | 运行 `codex plugin list`，确认 spec-guard 已安装且启用；改了 `ref` 后要 `codex plugin marketplace upgrade` |
 
-更多情况见[使用流程](docs/workflow.md)。
+更多情况（`UNKNOWN`、`Paused`、`Suspended` 等提示的含义）见[故障排查](docs/troubleshooting.md)。
 
 ## 架构与文档导航
 
 **使用者**
 
-- [使用流程](docs/workflow.md)：从零到交付、两种加需求的方式、命令对照
+- [使用流程](docs/workflow.md)：从零到交付、两种加需求的方式
+- [命令参考](docs/commands.md)：全部命令的参数、输出与 Codex 对照
+- [故障排查](docs/troubleshooting.md)
 - [设计理念与术语](docs/concepts.md)
 - [可选能力](docs/optional-features.md)：本地事项账本、文档治理、能力历史；会话协作已移到独立插件 agent-relay
 - [约定块](docs/convention-block.md)：setup 写进 `CLAUDE.md`／`AGENTS.md` 的内容
@@ -155,6 +158,9 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 - [贡献指南](CONTRIBUTING.md)
 - [设计决定](docs/decisions/)
 
+**维护者**（发版与仓库维护，使用插件不需要读）：[维护者工作方式](docs/maintainer-workflow.md)、
+[发版流程](docs/release-process.md)、[故障模式与审查方法](docs/lenses.md)、[上游分析](docs/upstream-analysis.md)。
+
 本仓库也用 spec-guard 管理自己的开发：根目录的 `spec/`、`tasks/` 是本仓库自用的模块记录，不是给使用者复制的模板。
 
 ## 开发、贡献与反馈
@@ -162,8 +168,7 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 - 发现 bug 或想提需求：在 [GitHub Issues](https://github.com/haigeerlab/spec-guard-plugin/issues) 用对应模板提交，
   怎么写得清楚见[贡献指南](CONTRIBUTING.md)。
 - 想改代码：先读[贡献指南](CONTRIBUTING.md)和[设计与架构](docs/design.md)。
-- 维护者的工作方式与发版流程：[docs/maintainer-workflow.md](docs/maintainer-workflow.md)、
-  [docs/release-process.md](docs/release-process.md)。
+- 维护者文档见上面的“维护者”一组。
 
 ## 许可
 
