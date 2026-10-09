@@ -184,9 +184,10 @@ class VerifyAndCommitTests(unittest.TestCase):
                 self.assertIn(self.head_tree() + ' full', self.records())
 
     def test_tier_classifier(self):
-        quick = ['spec/x.md', 'tasks/m/plan.md', 'docs/releases/v1-source.json', 'README.md', 'CHANGELOG.md',
-                 'evals/notes.md']
-        full = ['plugins/spec-guard/commands/x.md', '.github/ISSUE_TEMPLATE/bug.md', 'scripts/a.sh',
+        quick = ['spec/x.md', 'tasks/m/plan.md', 'docs/releases/v1-source.json', 'README.md', 'CHANGELOG.md']
+        # evals/ markdown is eval input, not documentation
+        full = ['plugins/spec-guard/commands/x.md', '.github/ISSUE_TEMPLATE/bug.md', 'evals/dispatch-cost/task.md',
+                'scripts/a.sh',
                 'scripts/readme.txt', '.gitignore', 'spec', 'docsx/a.md.txt']
         tool = SCRIPT.with_name('verified_trees.py')
         def tier(paths):
@@ -198,6 +199,16 @@ class VerifyAndCommitTests(unittest.TestCase):
             self.assertEqual(tier([path]), 'full', path)
         self.assertEqual(tier(quick + full[:1]), 'full')
         self.assertEqual(tier([]), 'full')
+
+    def test_partial_commit_writes_no_record(self):
+        # `-- -m x <path>` commits only part of what was checked: HEAD's tree is not the verified tree.
+        self.stage('notes.txt')
+        self.stage('docs/guide.md', 'v-partial\n')
+        p, _ = self.run_script('--', '-q', '-m', 'partial', 'notes.txt')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.git('show', '--name-only', '--format=', 'HEAD'), 'notes.txt')
+        self.assertEqual([r for r in self.records() if r], [])
+        self.assertIn('未写入检查记录', p.stdout)
 
     def test_failed_run_writes_no_record(self):
         self.stage('notes.txt')

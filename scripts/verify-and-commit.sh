@@ -7,7 +7,7 @@
 # 记得规则防不住新写法；这里成败只看每套检查自己的退出码，输出一律进日志。
 #
 # 用法: bash scripts/verify-and-commit.sh [--suite NAME]... -- <git commit 参数>
-#   快档（只改文档类路径）: validate --quick、verify-artifacts 回归、本仓库 verify-artifacts
+#   快档（只改文档类路径，evals/ 下的 .md 不算）: validate --quick、verify-artifacts 回归、本仓库 verify-artifacts
 #   全套: validate、phase-guard、verify-artifacts 回归、本仓库 verify-artifacts（暂存了 .sh 时加 shellcheck），并行跑
 #   --suite 可再加: validate-quick setup-teardown pre-push shellcheck 等
 #   提交成功后把 tree 与档位记进 git 共用目录，供 pre-push 跳过重复检查（scripts/verified_trees.py）
@@ -85,6 +85,8 @@ run_suite() {  # $1=套件名
   esac
 }
 
+# 检查的是这一刻的暂存区；只有最后提交的 tree 与它相同才写记录（git commit 带路径时只提交一部分）。
+CHECKED_TREE="$(git write-tree)"
 LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/verify-and-commit.XXXXXX")"
 if [ "$TIER" = quick ]; then label="快档（只改了文档类路径）"; else label="全套"; fi
 echo "── verify-and-commit: ${label}: ${SUITES[*]} ──"
@@ -123,4 +125,4 @@ fi
 echo "✅ 全部通过，提交已暂存的内容（日志目录: ${LOG_DIR}）"
 git commit "$@"
 # 记下这次通过检查的 tree，推送时 pre-push 据此跳过重复检查；写不进去只提醒，不影响已完成的提交。
-python3 scripts/verified_trees.py record "$TIER" || true
+python3 scripts/verified_trees.py record "$TIER" "$CHECKED_TREE" || true

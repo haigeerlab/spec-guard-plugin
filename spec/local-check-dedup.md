@@ -24,7 +24,7 @@ pre-push 回归；只改 Spec 或文档的提交也要跑全套。以 `self-repo
    所有提交都已检查、且已跟踪文件没有未提交改动时，跳过三套检查并打印原因；否则照常全跑，失败照常拦截。记录文件缺失
    或读不了时照常全跑。只删引用、只推 tag 的推送维持现有跳过规则。
 4. `verify-and-commit` 按已暂存路径分档。全部路径都在快档范围内才走快档：`spec/`、`tasks/`、`docs/` 下的文件，以及
-   `plugins/` 与 `.github/` 以外的 `*.md`（如 `README.md`、`CHANGELOG.md`、`CLAUDE.md`、`AGENTS.md`）。其余任何路径，
+   `plugins/`、`.github/`、`evals/`（评测输入）以外的 `*.md`（如 `README.md`、`CHANGELOG.md`、`CLAUDE.md`、`AGENTS.md`）。其余任何路径，
    包括拿不准的，一律走全套。
 5. 快档：`validate.sh --quick`（只跑结构检查，不跑任何回归套件）+ verify-artifacts 回归 + 对本仓库本身跑一次
    `verify-artifacts.sh`（Spec、Plan 的结构问题由它直接发现）。`--quick` 的范围按实测（2026-10-09，本机）定为
@@ -36,7 +36,8 @@ pre-push 回归；只改 Spec 或文档的提交也要跑全套。以 `self-repo
    逐项判定，任一失败不提交。不再按路径加跑 setup-teardown 与 pre-push 回归（validate 第 74、151 行已包含）；
    `--suite` 仍可手动加跑。
 7. 检查时工作区里有未跟踪文件（不含被忽略的）就不写记录，打印原因与文件清单，提交照常进行；推送时这个提交因此照常
-   全跑。原因：检查的是工作区、提交的是暂存区，未暂存的新文件参与检查后，记成通过的 tree 会让推送跳过，缺文件要到 CI
+   全跑；提交的 tree 与检查前 `git write-tree` 得到的暂存区 tree 不同（如 `-- -m x <路径>` 只提交了一部分）时同样不写。
+   原因：检查的是工作区、提交的是暂存区，未暂存的新文件参与检查后，记成通过的 tree 会让推送跳过，缺文件要到 CI
    才发现。本仓库 `.gitignore` 加上 `.agent/state.json`（本机的当前模块书签，按约定不提交）；否则它常驻工作区，本仓库
    每次提交都不会写记录（用户 2026-10-09 选 A）。
 8. pre-push 安装提示里的“约 50 秒”改成实测值。
