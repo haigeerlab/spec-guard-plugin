@@ -1,0 +1,24 @@
+# Todo: codex-command-wording
+
+- [x] Task 1：两边真实宿主给 hook 的环境变量名与会话记录首条类型，选定环境兜底变量：
+  - Claude Code 2.1.295（`claude -p` 加临时 settings 里的 UserPromptSubmit hook，只记变量名）：设了 `CLAUDE_PROJECT_DIR`；hook 输入字段为 `cwd`、`hook_event_name`、`permission_mode`、`prompt`、`prompt_id`、`scratchpad_dir`、`session_id`、`transcript_path`，没有 `turn_id`；会话记录首条类型为 `queue-operation`。（从本会话里起的子进程，`CLAUDE_CODE_*` 多为继承，不作判据。）
+  - Codex（源码 `codex-rs/hooks/src/engine/discovery.rs`、`schema.rs`，context7 查得）：插件 hook 同时设 `PLUGIN_ROOT` 与兼容别名 `CLAUDE_PLUGIN_ROOT`，不设 `CLAUDE_PROJECT_DIR`；UserPromptSubmit 输入带 Codex 扩展字段 `turn_id`，`transcript_path` 可为 null。真实 Codex 会话里的实测放到 Task 5。
+  - 选定判据：输入带 `turn_id` 或会话记录首条为 `session_meta` → codex；否则有 `CLAUDE_PROJECT_DIR` → claude；否则有 `PLUGIN_ROOT` → codex；都不满足 → 拿不准（输出逐字不变）。`CLAUDE_PLUGIN_ROOT` 两边都设，不用。
+  - 补一个显式覆盖 `SPEC_GUARD_HOST=codex|claude`：Codex 的 `spec-guard-ops` 手动跑 phase 时会带 `CLAUDE_PROJECT_DIR`，不加覆盖会被判成 claude；在 `spec-guard-ops` 的命令里带上 `SPEC_GUARD_HOST=codex`。
+- [x] Task 2：判断宿主（回归先行、两项变异）：
+  - `session_context.py` 多输出第五行：hook 输入带 `turn_id` 或会话记录首条为 `session_meta` 时为 `codex`，否则为空（读首条的代码与 unattended 共用 `_first_record`）；`test_session_context.py` 原"4 行"断言改为 5 行，新增 turn_id、session_meta、不可用输入三例；
+  - `phase-guard.sh` 依次按 `SPEC_GUARD_HOST`、第五行、`CLAUDE_PROJECT_DIR`（claude）、`PLUGIN_ROOT`（codex）判断，以 `--host` 传给 `module_stage.py`；
+  - 测试辅助函数 `run`／`run_from`／`run_input` 清掉 `PLUGIN_ROOT` 与 `SPEC_GUARD_HOST`，用例要指定宿主时设 `SG_HOST`；
+  - 变异全部变红并已还原：hook 输入判为 codex 时误判成 claude、去掉 `PLUGIN_ROOT` 兜底、不看 `turn_id`。
+- [x] Task 3：按宿主写命令（Codex `$` 写法、Claude 可复制的 `/compact …`、拿不准时逐字不变；回归先行、三项变异）：
+  - `module_stage.py` 的命令写法集中到 `COMMANDS[None|claude|codex]`；`None` 即改前原文；`phase-guard.sh` 兜底行同样按宿主；`MODULE_BOUNDARY` 常量被替代后删除；
+  - `test-phase-guard.sh` 新增第 12 段 18 例（宿主判断 7 例、Codex 各行写法 9 例、两边兜底行 2 例），被两段用到的 `codex_rollout` 挪到公共部分；Claude 两种 `/compact` 行的期望文本（`BOUNDARY`、`mid_line`、`sized_boundary`）改为新写法；"codex exec（source=exec）"那例的会话记录是 Codex，对照基准改为 Codex 下的 BUILDING 输出；共 208 例通过；
+  - 新旧差分（改前 `HEAD` 的 hooks 与改后，9 个夹具 × 有无会话记录 × 两种宿主，共 36 次）：拿不准宿主 18 次逐字相同；Claude 18 次中 6 次逐字相同、12 次只差 `/compact` 行；其余差异 0；
+  - 变异全部变红并已还原：Codex 漏改一处（config 写回 `/spec-guard:config`）、Codex 的 `/compact` 带上聚焦说明、Claude 的 `/build` 行改动一处。
+- [x] Task 4：文档；三条最小验证、ShellCheck、全档提交：
+  - `commands/phase.md` 说明可复制的命令与按宿主的写法、判断顺序；`spec-guard-ops` 的 phase 命令带 `SPEC_GUARD_HOST=codex`；
+  - validate 起初红在命令名检查器（`phase.md` 里写了 `` `/spec-guard:…` ``，已改为具体命令名）与 `test_session_context.py` 的行数断言（已更新）；
+  - ShellCheck 4.1.0 无告警；系统 Python 3.9 导入与 `test_session_context.py` 通过；全档提交结果见下一条记录。
+- [ ] Task 5：真实宿主核验（Claude Code 与 Codex 各一次）
+- [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警、真实宿主核验通过，Plan 获批即授权推送与开 PR，合并由用户进行
+- [ ] Task 6：随下次发版发出（CHANGELOG"修复"、两边安装副本各看一次注入）
