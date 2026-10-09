@@ -38,7 +38,7 @@ plugins/spec-guard/
 ├── hooks/                               ← hook、共享脚本与回归测试
 ├── skills/                              ← tracker / 本地操作技能
 └── templates/                           ← 写入消费者项目的模板
-docs/design.md                           ← 设计与对象模型
+docs/design.md                           ← 设计与架构（部件、数据流、两个宿主的差异、不变量）
 scripts/validate.sh                      ← 仓库完整性校验
 ```
 

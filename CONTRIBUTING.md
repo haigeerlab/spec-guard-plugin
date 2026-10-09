@@ -60,7 +60,7 @@
 2. 必须有 frontmatter（`validate.sh` 会检查）
 3. 若是常用命令，在中英两份 README 的“常用命令”表里各补一行
 4. 在 Codex 侧接一条路由，通常在 `plugins/spec-guard/skills/spec-guard-ops/SKILL.md`（Codex 只读 skill，不读 command）
-5. 在 `docs/workflow.md` 的命令对照里补一行
+5. 在 `docs/commands.md` 补上这条命令的说明，并在“命令对照”表里补一行（`scripts/check-command-table.py` 会检查）
 6. `scripts/check-command-parity.py` 会校验 command 与 skill 路由是否对得上
 
 ## 发版
