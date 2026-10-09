@@ -62,6 +62,8 @@ python3 -B scripts/test_verify_and_commit.py
 - Always：警告只增加输出，不改检查、提交与退出码。
 - Ask first：推送、PR；把警告升级为拒绝；改 `verified_trees.py` 的记录判据（本模块只改提示文字）。
 - Never：替用户 `git add`；为消掉警告而忽略 `.gitignore` 规则以外的文件。
+- 不保证：检查过程中才新出现的未跟踪文件（例如测试残留）不在开头的警告里，提交后的"（见上方警告）"指不到它们；
+  这时照样不写检查记录、推送时照常全跑，只是提示不完整（2026-10-09 审查补记，按已知边界处理，未改代码）。
 
 ## Success criteria
 
