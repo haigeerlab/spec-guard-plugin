@@ -82,7 +82,8 @@ if MANIFEST.exists():
     import json
     version = json.loads(MANIFEST.read_text(encoding="utf-8")).get("version")
     for readme in READMES:
-        for ref in re.findall(r"--ref v(\S+)", readme.read_text(encoding="utf-8")):
+        # 版本号到空白或反引号为止：README 的表格里命令写在行内代码中，紧跟一个反引号。
+        for ref in re.findall(r"--ref v([^\s`]+)", readme.read_text(encoding="utf-8")):
             if ref == version:
                 print(f"  ✅ {readme.name} 的安装命令指向当前版本 v{version}")
             else:

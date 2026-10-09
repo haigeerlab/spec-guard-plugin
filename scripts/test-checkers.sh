@@ -305,6 +305,12 @@ mkrref "$TMP/rsrefenbad" 1.2.3 1.2.2
 mkrref "$TMP/rsrefengood" 1.2.3 1.2.3
 want fail "readme-sync: 英文 README 的 --ref 落后于清单版本 → 报错" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefenbad"
 want pass "readme-sync: 中英 README 的 --ref 都等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefengood"
+# 表格里的行内代码：版本号后紧跟反引号，不能算进版本号
+mkr "$TMP/rsrefinline" same
+mkdir -p "$TMP/rsrefinline/plugins/spec-guard/.claude-plugin"
+printf '{"name":"spec-guard","version":"1.2.3"}\n' > "$TMP/rsrefinline/plugins/spec-guard/.claude-plugin/plugin.json"
+printf '| `codex plugin marketplace add o/r --ref v1.2.3` |\n' >> "$TMP/rsrefinline/README.md"
+want pass "readme-sync: 行内代码里的 --ref 等于清单版本 → 放行" python3 "$ROOT/scripts/check-readme-sync.py" "$TMP/rsrefinline"
 
 # ── check-command-parity.py ──
 # Task 8 / R4 后半：commands/*.md 引用的每个 hooks/<脚本> 都要在至少一个
