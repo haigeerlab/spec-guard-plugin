@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.56.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:891b0b22e41ff4a38262ea3fdcea4d9a67048bb9"
+      },
+      "observedAt": "2026-10-09T14:10:02Z",
+      "evidence": [
+        "result:the v0.56.0 annotated tag and origin/main both resolve to merge commit 891b0b22e41ff4a38262ea3fdcea4d9a67048bb9 (pull request #286, merged after its pull_request run passed; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head ec0b243's tree; 0.56.0 covers #282-#286; inside the plugin package the phase hint's command wording (module_stage.py, phase-guard.sh, session_context.py), the agent-relay interface range (agent_relay_probe.py), spec-guard-ops and phase.md, and tests changed",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -q -m \"release: 0.56.0 ...\"",
+        "result:the release commit was made by verify-and-commit.sh after validate, phase-guard (208 cases) and verify-artifacts (40 cases) passed under macOS /bin/bash 3.2.57; evals/codex-plugin-smoke.sh --selftest passed"
+      ]
+    }
+  ]
+}

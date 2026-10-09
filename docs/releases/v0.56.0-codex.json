@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.56.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.56.0;test:marketplace-ref-upgrade-20261009d"
+      },
+      "observedAt": "2026-10-09T14:10:02Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.55.1 to v0.56.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.56.0, installed and enabled"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.56.0;test:installed-plugin-smoke-20261009d"
+      },
+      "observedAt": "2026-10-09T14:10:02Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.56.0-codex-command-wording",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.56.0;test:installed-command-wording-20261009"
+      },
+      "observedAt": "2026-10-09T14:10:02Z",
+      "evidence": [
+        "command:codex exec in a temporary BUILDING project with the installed plugin (no hook-trust bypass)",
+        "result:the rollout's injection reads \"continue `$incremental-implementation` on `alpha`\" and contains neither `/build` nor `/spec-guard:`; the answer named `$incremental-implementation`",
+        "result:the temporary project's trust entry that codex exec wrote to ~/.codex/config.toml was removed; the file equals its state before the run"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.56.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.56.0;test:installed-copy-changed-tests-20261009"
+      },
+      "observedAt": "2026-10-09T14:10:02Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:python3 -B <installed>/hooks/test_agent_relay_probe.py",
+        "result:both run green from the installed copy (phase-guard 208 cases, probe 22 tests); the installed probe accepts >=1.0,<3.0"
+      ]
+    }
+  ]
+}
