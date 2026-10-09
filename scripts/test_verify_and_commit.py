@@ -223,8 +223,9 @@ class VerifyAndCommitTests(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(self.commits(), before + 1)
         self.assertEqual([r for r in self.records() if r], [])
-        self.assertIn('未写入检查记录', p.stdout)
-        self.assertIn('forgotten.py', p.stdout)
+        self.assertIn('未写入检查记录：工作区有未跟踪文件（见上方警告）', p.stdout)
+        # listed once, in the warning before the checks; the post-commit note points back to it
+        self.assertEqual(p.stdout.count('forgotten.py'), 1, p.stdout)
 
     def test_ignored_state_file_does_not_block_the_record(self):
         (self.repo / '.agent').mkdir()
@@ -249,6 +250,48 @@ class VerifyAndCommitTests(unittest.TestCase):
         self.assertIn('shellcheck', called)
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertEqual(self.commits(), before)
+
+    def test_untracked_files_are_warned_about_before_the_checks(self):
+        self.stage('notes.txt')
+        (self.repo / 'forgotten.py').write_text('print(1)\n')
+        before = self.commits()
+        p, _ = self.run_script('--', '-q', '-m', 'x')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.commits(), before + 1)
+        header = p.stdout.index('── verify-and-commit:')
+        warning = p.stdout.find('⚠️  工作区有 1 个未跟踪文件')
+        self.assertTrue(0 <= warning < header, p.stdout)
+        self.assertTrue(0 <= p.stdout.find('forgotten.py') < header, p.stdout)
+        self.assertIn('git add', p.stdout[warning:header])
+
+    def test_no_warning_without_untracked_or_with_only_ignored_files(self):
+        (self.repo / '.agent').mkdir()
+        (self.repo / '.agent/state.json').write_text('{"activeModule":"m"}\n')
+        self.stage('notes.txt')
+        p, _ = self.run_script('--', '-q', '-m', 'x')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertNotIn('未跟踪文件', p.stdout + p.stderr)
+
+    def test_warning_still_shows_when_a_check_fails(self):
+        self.stage('notes.txt')
+        (self.repo / 'forgotten.py').write_text('print(1)\n')
+        before = self.commits()
+        p, _ = self.run_script('--', '-q', '-m', 'x', SG_FAIL='validate')
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        self.assertEqual(self.commits(), before)
+        self.assertIn('⚠️  工作区有 1 个未跟踪文件', p.stdout)
+
+    def test_long_untracked_list_is_truncated(self):
+        self.stage('notes.txt')
+        names = ['new-%02d.txt' % i for i in range(12)]
+        for name in names:
+            (self.repo / name).write_text('x\n')
+        p, _ = self.run_script('--', '-q', '-m', 'x')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn('⚠️  工作区有 12 个未跟踪文件', p.stdout)
+        listed = [n for n in names if n in p.stdout]
+        self.assertEqual(listed, names[:10], p.stdout)
+        self.assertIn('… 另有 2 个', p.stdout)
 
 
 if __name__ == '__main__':

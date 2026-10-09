@@ -65,11 +65,9 @@ def cmd_record(tier, checked):
         print("record: tier must be full or quick", file=sys.stderr)
         return 2
     untracked = git("ls-files", "--others", "--exclude-standard").stdout.split("\n")
-    untracked = [u for u in untracked if u]
-    if untracked:
-        print("  ℹ  未写入检查记录：工作区有未跟踪文件，检查看到的内容可能和提交不同；推送时会照常全跑：")
-        for name in untracked[:10]:
-            print("     " + name)
+    if any(untracked):
+        # verify-and-commit.sh already listed them in its warning before the checks
+        print("  ℹ  未写入检查记录：工作区有未跟踪文件（见上方警告）；推送时会照常全跑")
         return 0
     tree = git("rev-parse", "HEAD^{tree}")
     path = record_file()
