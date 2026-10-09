@@ -95,6 +95,17 @@ class RunTestsParallelTests(unittest.TestCase):
         p = self.run_runner(path, '--jobs', '3')
         self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
 
+    def test_an_imported_test_class_is_not_silently_dropped(self):
+        # Running the file directly runs an imported TestCase too; the runner must not quietly skip it.
+        path = self.write()
+        (path.parent / 'shared_cases.py').write_text(
+            'import unittest\n\nclass SharedTests(unittest.TestCase):\n'
+            '    def test_shared(self):\n        self.assertTrue(True)\n')
+        path.write_text(path.read_text() + '\nfrom shared_cases import SharedTests\n')
+        p = self.run_runner(path)
+        self.assertNotEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn('SharedTests', p.stdout + p.stderr)
+
     def test_zero_discovered_tests_is_not_a_pass(self):
         path = self.write()
         path.write_text('import unittest\n')

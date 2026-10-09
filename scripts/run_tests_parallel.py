@@ -16,6 +16,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
@@ -116,22 +117,41 @@ def main(argv):
         print("用法: run_tests_parallel.py <test file> [--jobs N]", file=sys.stderr)
         return 2
     path = args[0]
-    classes = discover(load_module(path))
+    module = load_module(path)
+    classes = discover(module)
     total = sum(len(methods) for _, methods in classes)
     if not total:
         print("  ❌ %s 里没有发现任何用例 —— 这是没找到，不是通过" % path)
+        return 1
+    # discover() only splits classes defined in the file; running the file directly would also run any TestCase it
+    # imports.  Count the whole module the way unittest does, so an imported class is never silently dropped.
+    whole = unittest.defaultTestLoader.loadTestsFromModule(module).countTestCases()
+    if whole != total:
+        own = {name for name, _ in classes}
+        imported = sorted(name for name, value in vars(module).items()
+                          if isinstance(value, type) and issubclass(value, unittest.TestCase) and name not in own
+                          and unittest.defaultTestLoader.loadTestsFromTestCase(value).countTestCases())
+        print("  ❌ 用例数对不上：整个模块有 %d 个用例，本文件定义的类只有 %d 个；导入的测试类不会被并行运行器跑到：%s"
+              % (whole, total, "、".join(imported) or "（未识别）"))
         return 1
     jobs = jobs or os.cpu_count() or 1
     work = units(classes, jobs)
     jobs = min(jobs, len(work))
     began = time.time()
-    procs = [subprocess.Popen([sys.executable, "-B", os.path.abspath(__file__), WORKER_FLAG, path] + bucket,
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
-             for bucket in split(work, jobs)]
+    # Worker stderr goes to temp files: reading the workers one by one, a full stderr pipe would stall the later ones.
+    errs = []
+    procs = []
+    for bucket in split(work, jobs):
+        errs.append(tempfile.TemporaryFile(mode="w+"))
+        procs.append(subprocess.Popen([sys.executable, "-B", os.path.abspath(__file__), WORKER_FLAG, path] + bucket,
+                                      stdout=subprocess.PIPE, stderr=errs[-1], universal_newlines=True))
     ran, failed, ok = 0, [], True
     print("── %s：%d 个用例，%d 个类，%d 个进程 ──" % (os.path.basename(path), total, len(classes), len(procs)))
     for number, proc in enumerate(procs, 1):
-        out, err = proc.communicate()
+        out, _ = proc.communicate()
+        errs[number - 1].seek(0)
+        err = errs[number - 1].read()
+        errs[number - 1].close()
         try:
             report = json.loads(out.strip().splitlines()[-1])
         except (IndexError, ValueError):
