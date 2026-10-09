@@ -2,7 +2,8 @@
 """Record trees that passed verify-and-commit, and let pre-push skip pushes made only of recorded trees.
 
     verified_trees.py tier            staged paths on stdin -> prints "quick" or "full"
-    verified_trees.py record TIER     append HEAD's tree with TIER (skipped while untracked files exist)
+    verified_trees.py record TIER TREE  append TREE (the index tree that was checked) with TIER, only when it is
+                                      HEAD's tree and no untracked files exist
     verified_trees.py check           pre-push ref lines on stdin -> exit 0 when every pushed commit is covered
 
 Records live in the git common dir, shared by every worktree: <common-dir>/spec-guard/verified-trees,
@@ -16,7 +17,7 @@ import sys
 
 ZERO = set("0")
 QUICK_DIRS = ("spec/", "tasks/", "docs/")
-NOT_QUICK_DIRS = ("plugins/", ".github/")
+NOT_QUICK_DIRS = ("plugins/", ".github/", "evals/")
 
 
 def git(*args):
@@ -24,7 +25,8 @@ def git(*args):
 
 
 def is_quick_path(path):
-    """Docs-only paths: spec/, tasks/, docs/, and *.md outside plugins/ and .github/. Anything else is full."""
+    """Docs-only paths: spec/, tasks/, docs/, and *.md outside plugins/, .github/ and evals/ (eval inputs).
+    Anything else is full."""
     if path.startswith(QUICK_DIRS):
         return True
     return path.endswith(".md") and not path.startswith(NOT_QUICK_DIRS)
@@ -58,7 +60,7 @@ def cmd_tier():
     return 0
 
 
-def cmd_record(tier):
+def cmd_record(tier, checked):
     if tier not in ("full", "quick"):
         print("record: tier must be full or quick", file=sys.stderr)
         return 2
@@ -73,6 +75,10 @@ def cmd_record(tier):
     path = record_file()
     if tree.returncode != 0 or not path:
         print("  ⚠️  未写入检查记录：读不到 HEAD 的 tree 或 git 目录", file=sys.stderr)
+        return 0
+    if tree.stdout.strip() != checked:
+        # e.g. `git commit <path>` committed only part of the checked index
+        print("  ℹ  未写入检查记录：提交的内容和检查过的暂存区不同（例如只提交了部分路径）；推送时会照常全跑")
         return 0
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -152,11 +158,11 @@ def commit_basis(commit, records):
 def main(argv):
     if len(argv) >= 2 and argv[1] == "tier":
         return cmd_tier()
-    if len(argv) == 3 and argv[1] == "record":
-        return cmd_record(argv[2])
+    if len(argv) == 4 and argv[1] == "record":
+        return cmd_record(argv[2], argv[3])
     if len(argv) == 2 and argv[1] == "check":
         return cmd_check()
-    print("usage: verified_trees.py tier | record full|quick | check", file=sys.stderr)
+    print("usage: verified_trees.py tier | record full|quick TREE | check", file=sys.stderr)
     return 2
 
 
