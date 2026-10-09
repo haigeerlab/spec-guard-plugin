@@ -14,6 +14,6 @@
 - [x] Task 4：连跑 5 遍全绿、仓库无变化；计时对照 20 秒目标；全档提交里与 validate 的耗时对比 — 本机 8 核，`/usr/bin/time -p`：
   - 改后 5 遍墙钟 14.05、14.40、14.71、14.87、14.04s；CPU 55.4–56.7s；负载从 22 升到 31（比基线时高得多）；每遍前后仓库 `git status --porcelain --ignored` 不变，`✅` 行与基线相同；
   - **达到"20 秒以内"**（60.7s → 约 14s）；CPU 比基线多约 5s（各段重建夹具与子 shell 开销）；
-  - 全档提交的分项耗时见下一条记录。
+  - 全档提交 dab5dee：phase-guard 16s、validate 72s、verify-artifacts 12s、本仓库 verify-artifacts 2s、ShellCheck 41s，全部通过；改前同类全档提交 phase-guard 105s、validate 82s，phase-guard 已不再是全档提交的瓶颈。
 - [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警，Plan 获批即授权推送与开 PR，合并由用户进行
 - [ ] Task 5：下次发版时在安装副本上跑一遍，CHANGELOG 的"维护者工具"写一条
