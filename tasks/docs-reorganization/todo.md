@@ -1,7 +1,7 @@
 # Todo: docs-reorganization
 
-- [ ] Task 1：合并协作拆分总结到迁移说明
-- [ ] Task 2：删除文档并清理现行引用
+- [x] Task 1：合并协作拆分总结到迁移说明 — 并入“版本与兼容”一节（接口 1.x、发布顺序、升级以 agent-relay CHANGELOG 为准、接口 2.0 的发布顺序）；修正过时的“保留到 0.53.x”与安装命令的 `--ref` 说明
+- [x] Task 2：删除文档并清理现行引用 — 删除 47 个文件；现行引用改了 `docs/release-process.md` 与 `docs/reports/README.md` 两处；`docs/releases/*.json`（已发布证据）、`docs/retirements/`（退役记录）、`spec/`、`tasks/`、`CHANGELOG.md` 里的历史引用不改；全部发布记录仍通过 `release-evidence.py validate`
 - [ ] Task 3：约定块移到 `docs/convention-block.md`，改 `check-readme-sync.py` 与其回归
 - [ ] Checkpoint 1（gate）：第一批评审；链接核对、validate 通过，推送并开 PR，合并由用户进行
 - [ ] Task 4：中文 README（按大纲重写，命令逐条对照）
