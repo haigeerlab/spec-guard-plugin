@@ -6,7 +6,7 @@ section 11). It reads the host's own plugin record and agent-relay's `interface.
 content, writes nothing, never touches the network, and always exits 0 with one JSON object:
 
     {"state": "ready" | "not-installed" | "incompatible" | "runtime-not-ready" | "unknown",
-     "interface": "<x.y>" | null, "required": ">=1.0,<2.0", "message": "<user-facing text>"}
+     "interface": "<x.y>" | null, "required": ">=1.0,<3.0", "message": "<user-facing text>"}
 
 A probe that cannot read its sources reports `unknown`, never `not-installed`: a failed check is not
 evidence about the plugin. Phase injection never calls this script.
@@ -19,8 +19,8 @@ import sys
 from pathlib import Path
 
 PLUGIN = "agent-relay"
-REQUIRED = ">=1.0,<2.0"
-MIN_VERSION, MAX_VERSION = (1, 0), (2, 0)
+REQUIRED = ">=1.0,<3.0"
+MIN_VERSION, MAX_VERSION = (1, 0), (3, 0)
 TIMEOUT_SECONDS = 10
 NOT_INSTALLED = (
     "协作能力已移到独立插件 agent-relay，当前未安装。工作流不受影响。安装与旧状态迁移见\n"

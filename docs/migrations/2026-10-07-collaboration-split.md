@@ -26,8 +26,8 @@ Spec Guard 的工作流（Spec、计划、阶段提示、Proposal、事项账本
 ## 版本与兼容
 
 - Spec Guard 0.50.0 起不再自带协作能力，只通过只读的 `agent_relay_probe.py` 检测 agent-relay，接受接口
-  `>=1.0,<2.0`；检测失败报 `unknown`，不当作“未安装”。
-- 两者版本互不依赖：接口 1.x 内，各自升级即可。
+  `>=1.0,<3.0`（0.56.0 起；此前为 `>=1.0,<2.0`）；检测失败报 `unknown`，不当作“未安装”。
+- 两者版本互不依赖：接口 1.x、2.x 内，各自升级即可。
 - 发布顺序是 agent-relay 0.1.0（平移版，行为与拆分前 Spec Guard 0.49.0 一致）→ Spec Guard 0.50.0 → agent-relay
   0.2.0（加固版，信箱 schema 2 → 5）。agent-relay 自身的升级步骤（例如 0.1.0 → 0.2.0 要先关掉用信箱的会话、
   `upgrade --confirm`、两个宿主同时更新插件，运行时与插件一起升级或一起回滚）以 agent-relay 的 CHANGELOG 为准。

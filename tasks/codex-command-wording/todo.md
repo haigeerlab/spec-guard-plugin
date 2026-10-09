@@ -23,5 +23,5 @@
   - Claude Code 2.1.295（`claude -p --settings`，hook 不传标准输入以便读不到大小时出模块完成行，并去掉 `claude -p` 的无人值守标记）：注入为新的 Claude 写法；agent 回答里单独给出代码块 `` /compact 进入下一个模块 beta：把 activeModule 设为 beta，然后用 /plan 根据 beta 的 spec 拆出任务计划 ``，聚焦说明由它填好。
   - Codex 0.160.1（`codex exec --dangerously-bypass-hook-trust`，临时项目的 `.codex/hooks.json`，`-c` 关闭已安装的 spec-guard）：hook 输入带 `turn_id`，注入为 "continue `$incremental-implementation` on `alpha`"，不含斜杠写法；agent 回答先说"下一步用 `/build`"、再说"在 Codex 中可使用 `$incremental-implementation`"——`/build` 不在本插件注入里，很可能来自 Codex 里启用的 agent-skills 的技能说明（其中几份写着 `/build`），本模块管不到。`codex exec` 写入 `~/.codex/config.toml` 的临时项目信任记录已按段删除，与运行前逐字一致。
   - 用户做最终确认。
-- [ ] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警、真实宿主核验通过，Plan 获批即授权推送与开 PR，合并由用户进行
+- [x] Checkpoint 1（gate）：模块评审；全部回归通过、ShellCheck 无告警、真实宿主核验通过，Plan 获批即授权推送与开 PR，合并由用户进行 — PR #285 由用户合并于 0cbb026
 - [ ] Task 6：随下次发版发出（CHANGELOG"修复"、两边安装副本各看一次注入）
