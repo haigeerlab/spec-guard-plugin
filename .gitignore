@@ -9,3 +9,6 @@ __pycache__/
 # [epiq]: local hydrated state is never committed
 .epiq/events/
 .epiq/log/
+
+# spec-guard: the active-module bookmark is per checkout and never committed
+.agent/state.json

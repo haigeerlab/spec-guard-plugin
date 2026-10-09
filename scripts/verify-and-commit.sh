@@ -7,8 +7,10 @@
 # 记得规则防不住新写法；这里成败只看每套检查自己的退出码，输出一律进日志。
 #
 # 用法: bash scripts/verify-and-commit.sh [--suite NAME]... -- <git commit 参数>
-#   套件: validate phase-guard verify-artifacts（每次都跑）
-#         setup-teardown pre-push shellcheck（按已暂存路径自动加跑，或用 --suite 指定）
+#   快档（只改文档类路径）: validate --quick、verify-artifacts 回归、本仓库 verify-artifacts
+#   全套: validate、phase-guard、verify-artifacts 回归、本仓库 verify-artifacts（暂存了 .sh 时加 shellcheck），并行跑
+#   --suite 可再加: validate-quick setup-teardown pre-push shellcheck 等
+#   提交成功后把 tree 与档位记进 git 共用目录，供 pre-push 跳过重复检查（scripts/verified_trees.py）
 #   只提交已暂存的内容，不做 git add、不推送。退出码: 0 已提交 · 1 拒绝或检查失败 · 2 用法错误
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -16,7 +18,7 @@ set -euo pipefail
 usage() { echo "用法: verify-and-commit.sh [--suite NAME]... -- <git commit 参数>" >&2; exit 2; }
 
 known_suite() {
-  case "$1" in validate|phase-guard|verify-artifacts|setup-teardown|pre-push|shellcheck) return 0 ;; esac
+  case "$1" in validate|validate-quick|phase-guard|verify-artifacts|repo-artifacts|setup-teardown|pre-push|shellcheck) return 0 ;; esac
   return 1
 }
 
@@ -47,32 +49,31 @@ if git diff --cached --quiet; then
   exit 1
 fi
 
-# ── 选套件：基础三套 + 按已暂存路径 + --suite ──
-SUITES=(validate phase-guard verify-artifacts)
+# ── 选档位与套件 ──
+#   快档：暂存的全是 spec/、tasks/、docs/ 与 plugins/、.github/ 以外的 *.md（判断在 verified_trees.py）。
+#   全套：其余任何情况。validate.sh 已包含 setup/teardown 与 pre-push 回归，不再按路径加跑。
+TIER="$(git diff --cached --name-only | python3 scripts/verified_trees.py tier)"
+if [ "$TIER" = quick ]; then
+  SUITES=(validate-quick verify-artifacts repo-artifacts)
+else
+  TIER=full
+  SUITES=(validate phase-guard verify-artifacts repo-artifacts)
+  if git diff --cached --name-only | grep '\.sh$' >/dev/null; then SUITES+=(shellcheck); fi
+fi
 add_suite() {
   local s
   for s in "${SUITES[@]}"; do [ "$s" = "$1" ] && return 0; done
   SUITES+=("$1")
 }
-while IFS= read -r path; do
-  case "$path" in
-    plugins/spec-guard/hooks/setup-convention.sh|plugins/spec-guard/hooks/teardown-convention.sh|\
-    plugins/spec-guard/hooks/managed-block.py|plugins/spec-guard/hooks/test-setup-teardown.sh|\
-    plugins/spec-guard/templates/*)
-      add_suite setup-teardown ;;
-  esac
-  case "$path" in
-    scripts/install-git-hooks.sh|scripts/test_pre_push_environment.py) add_suite pre-push ;;
-  esac
-  case "$path" in *.sh) add_suite shellcheck ;; esac
-done < <(git diff --cached --name-only)
 for s in ${EXTRA[@]+"${EXTRA[@]}"}; do add_suite "$s"; done
 
-run_suite() {  # $1=套件名；在当前 shell 里运行，输出进日志
+run_suite() {  # $1=套件名
   case "$1" in
     validate)         /bin/bash scripts/validate.sh ;;
+    validate-quick)   /bin/bash scripts/validate.sh --quick ;;
     phase-guard)      /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh ;;
     verify-artifacts) /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh ;;
+    repo-artifacts)   CLAUDE_PROJECT_DIR="$ROOT" /bin/bash plugins/spec-guard/hooks/verify-artifacts.sh ;;
     setup-teardown)   /bin/bash plugins/spec-guard/hooks/test-setup-teardown.sh ;;
     pre-push)         python3 -B scripts/test_pre_push_environment.py ;;
     shellcheck)
@@ -85,19 +86,34 @@ run_suite() {  # $1=套件名；在当前 shell 里运行，输出进日志
 }
 
 LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/verify-and-commit.XXXXXX")"
-echo "── verify-and-commit: ${SUITES[*]} ──"
+if [ "$TIER" = quick ]; then label="快档（只改了文档类路径）"; else label="全套"; fi
+echo "── verify-and-commit: ${label}: ${SUITES[*]} ──"
+# 各套件并行跑：每套一个子进程、一份日志、一个退出码，逐项等待、逐项判定。
+PIDS=()
+for s in "${SUITES[@]}"; do
+  (
+    began=$(date +%s)
+    run_suite "$s" >"$LOG_DIR/$s.log" 2>&1 </dev/null
+    rc=$?
+    echo $(( $(date +%s) - began )) >"$LOG_DIR/$s.seconds"
+    exit "$rc"
+  ) &
+  PIDS+=($!)
+done
 FAILED=()
+i=0
 for s in "${SUITES[@]}"; do
   log="$LOG_DIR/$s.log"
-  if (run_suite "$s") >"$log" 2>&1 </dev/null; then
+  if wait "${PIDS[$i]}"; then
     # ShellCheck 通过时不输出任何内容，日志末行只剩 npm 的提示，不能拿来当摘要
     if [ "$s" = shellcheck ]; then summary="无告警"; else summary="$(tail -n 1 "$log" | sed 's/^ *//')"; fi
-    printf '  ✅ %s —— %s\n' "$s" "$summary"
+    printf '  ✅ %s（%ss）—— %s\n' "$s" "$(cat "$LOG_DIR/$s.seconds" 2>/dev/null || echo '?')" "$summary"
   else
     printf '  ❌ %s（日志: %s）\n' "$s" "$log"
     { grep -E '❌|FAIL|Error|失败' "$log" || true; } | head -n 8 | sed 's/^/     /'
     FAILED+=("$s")
   fi
+  i=$((i + 1))
 done
 
 if [ "${#FAILED[@]}" -gt 0 ]; then
@@ -106,3 +122,5 @@ if [ "${#FAILED[@]}" -gt 0 ]; then
 fi
 echo "✅ 全部通过，提交已暂存的内容（日志目录: ${LOG_DIR}）"
 git commit "$@"
+# 记下这次通过检查的 tree，推送时 pre-push 据此跳过重复检查；写不进去只提醒，不影响已完成的提交。
+python3 scripts/verified_trees.py record "$TIER" || true

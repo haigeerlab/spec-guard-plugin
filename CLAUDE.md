@@ -61,8 +61,9 @@ scripts/validate.sh                      ← 仓库完整性校验
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
 ```
 
-提交一律走 `/bin/bash scripts/verify-and-commit.sh -- -m "<信息>"`：上面三条（按改动面再加 setup/teardown、
-pre-push 回归与 ShellCheck）全部通过才提交已暂存的内容。
+提交一律走 `/bin/bash scripts/verify-and-commit.sh -- -m "<信息>"`：只改文档类路径时跑快档（`validate.sh --quick`
+与 verify-artifacts），其余跑上面三条（并行，暂存了 `.sh` 时加 ShellCheck），全部通过才提交已暂存的内容，并记下
+tree 供 pre-push 跳过重复检查。
 
 这三条与预推送 hook 一致；`validate.sh` 已包含清单一致性、检查器回归、退役扫描与 Codex smoke 判决器自检。
 

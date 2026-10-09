@@ -13,14 +13,18 @@ SUITES = {
     'verify-artifacts': 'plugins/spec-guard/hooks/test-verify-artifacts.sh',
     'setup-teardown': 'plugins/spec-guard/hooks/test-setup-teardown.sh',
     'pre-push': 'scripts/test_pre_push_environment.py',
+    'repo-artifacts': 'plugins/spec-guard/hooks/verify-artifacts.sh',
 }
+FULL = {'validate', 'phase-guard', 'verify-artifacts', 'repo-artifacts'}
+QUICK = {'validate-quick', 'verify-artifacts', 'repo-artifacts'}
 # Every stub prints a success-looking last line even when it fails: a check that
 # reads the output instead of the exit code would be fooled.
 STUB = '''#!/bin/bash
-printf '%s\\n' "{name}" >> "$SG_CALLS"
+n="{name}"; [ "${1:-}" = --quick ] && n="$n-quick"
+printf '%s\\n' "$n" >> "$SG_CALLS"
 for i in 1 2 3; do echo "noise $i"; done
-case ",$SG_FAIL," in *,{name},*) echo "  ❌ {name} broke"; echo "校验通过 ✅"; exit 1 ;; esac
-echo "{name} passed"
+case ",$SG_FAIL," in *,"$n",*) echo "  ❌ $n broke"; echo "校验通过 ✅"; exit 1 ;; esac
+echo "$n passed"
 '''
 PY_STUB = '''import os, sys
 open(os.environ["SG_CALLS"], "a").write("{name}\\n")
@@ -56,6 +60,11 @@ class VerifyAndCommitTests(unittest.TestCase):
         self.git('config', 'user.email', 'owner@example.invalid')
         (self.repo / 'scripts').mkdir()
         shutil.copy2(SCRIPT, self.repo / 'scripts/verify-and-commit.sh')
+        shutil.copy2(SCRIPT.with_name('verified_trees.py'), self.repo / 'scripts/verified_trees.py')
+        (self.repo / '.gitignore').write_text('.agent/state.json\n')
+        for rel in ['docs/guide.md', 'spec/a.md', 'README.md', 'plugins/spec-guard/commands/x.md']:
+            (self.repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.repo / rel).write_text('v1\n')
         for name, rel in SUITES.items():
             p = self.repo / rel
             p.parent.mkdir(parents=True, exist_ok=True)
@@ -82,15 +91,22 @@ class VerifyAndCommitTests(unittest.TestCase):
             self.calls.unlink()
         p = subprocess.run(['/bin/bash', 'scripts/verify-and-commit.sh', *args], cwd=self.repo,
                            env=dict(self.env, **env), text=True, capture_output=True)
-        called = self.calls.read_text().split() if self.calls.exists() else []
+        called = set(self.calls.read_text().split()) if self.calls.exists() else set()
         return p, called
+
+    def records(self):
+        path = self.repo / '.git/spec-guard/verified-trees'
+        return path.read_text().split('\n') if path.exists() else []
+
+    def head_tree(self):
+        return self.git('rev-parse', 'HEAD^{tree}')
 
     def test_all_pass_commits_the_staged_content(self):
         self.stage('notes.txt')
         before = self.commits()
         p, called = self.run_script('--', '-q', '-m', 'change notes')
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(called, ['validate', 'phase-guard', 'verify-artifacts'])
+        self.assertEqual(called, FULL)
         self.assertEqual(self.commits(), before + 1)
         self.assertEqual(self.git('log', '-1', '--format=%s'), 'change notes')
         self.assertEqual(self.git('show', '--name-only', '--format=', 'HEAD'), 'notes.txt')
@@ -121,11 +137,11 @@ class VerifyAndCommitTests(unittest.TestCase):
         before = self.commits()
         p, called = self.run_script('--', '-q', '-m', 'x')
         self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
-        self.assertEqual((self.commits(), called), (before, []))
+        self.assertEqual((self.commits(), called), (before, set()))
 
     def test_refuses_when_nothing_is_staged(self):
         p, called = self.run_script('--', '-q', '-m', 'x')
-        self.assertEqual((p.returncode, called), (1, []), p.stdout + p.stderr)
+        self.assertEqual((p.returncode, called), (1, set()), p.stdout + p.stderr)
 
     def test_usage_errors_exit_2(self):
         self.stage('notes.txt')
@@ -133,18 +149,79 @@ class VerifyAndCommitTests(unittest.TestCase):
             with self.subTest(args=args):
                 before = self.commits()
                 p, called = self.run_script(*args)
-                self.assertEqual((p.returncode, called, self.commits()), (2, [], before), p.stdout + p.stderr)
+                self.assertEqual((p.returncode, called, self.commits()), (2, set(), before), p.stdout + p.stderr)
 
-    def test_staged_paths_select_extra_suites(self):
+    def test_staged_paths_no_longer_add_suites_validate_already_runs(self):
+        # validate.sh already runs the setup/teardown and pre-push regressions.
         self.stage('plugins/spec-guard/hooks/managed-block.py')
         p, called = self.run_script('--', '-q', '-m', 'block')
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(called, ['validate', 'phase-guard', 'verify-artifacts', 'setup-teardown'])
+        self.assertEqual(called, FULL)
         self.stage('scripts/install-git-hooks.sh')
         p, called = self.run_script('--', '-q', '-m', 'hook')
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
-        self.assertEqual(called, ['validate', 'phase-guard', 'verify-artifacts', 'pre-push', 'shellcheck'])
-        self.assertIn('✅ shellcheck —— 无告警', p.stdout)
+        self.assertEqual(called, FULL | {'shellcheck'})
+        self.assertRegex(p.stdout, r'✅ shellcheck（\d+s）—— 无告警')
+
+    def test_docs_only_commit_runs_the_quick_tier(self):
+        for rel in ['docs/guide.md', 'spec/a.md', 'README.md']:
+            with self.subTest(rel=rel):
+                self.stage(rel, 'v-%s\n' % rel)
+                p, called = self.run_script('--', '-q', '-m', 'docs')
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertEqual(called, QUICK)
+                self.assertIn('快档', p.stdout)
+                self.assertIn(self.head_tree() + ' quick', self.records())
+
+    def test_paths_outside_the_quick_set_run_everything(self):
+        for rel in ['plugins/spec-guard/commands/x.md', 'notes.txt']:
+            with self.subTest(rel=rel):
+                self.stage(rel, 'v-%s\n' % rel)
+                self.stage('docs/guide.md', 'v-mixed-%s\n' % rel)
+                p, called = self.run_script('--', '-q', '-m', 'mixed')
+                self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+                self.assertEqual(called, FULL)
+                self.assertIn(self.head_tree() + ' full', self.records())
+
+    def test_tier_classifier(self):
+        quick = ['spec/x.md', 'tasks/m/plan.md', 'docs/releases/v1-source.json', 'README.md', 'CHANGELOG.md',
+                 'evals/notes.md']
+        full = ['plugins/spec-guard/commands/x.md', '.github/ISSUE_TEMPLATE/bug.md', 'scripts/a.sh',
+                'scripts/readme.txt', '.gitignore', 'spec', 'docsx/a.md.txt']
+        tool = SCRIPT.with_name('verified_trees.py')
+        def tier(paths):
+            return subprocess.run(['python3', str(tool), 'tier'], input='\n'.join(paths), text=True,
+                                  capture_output=True, check=True).stdout.strip()
+        for path in quick:
+            self.assertEqual(tier([path]), 'quick', path)
+        for path in full:
+            self.assertEqual(tier([path]), 'full', path)
+        self.assertEqual(tier(quick + full[:1]), 'full')
+        self.assertEqual(tier([]), 'full')
+
+    def test_failed_run_writes_no_record(self):
+        self.stage('notes.txt')
+        self.run_script('--', '-q', '-m', 'x', SG_FAIL='phase-guard')
+        self.assertEqual([r for r in self.records() if r], [])
+
+    def test_untracked_files_skip_the_record_but_not_the_commit(self):
+        self.stage('notes.txt')
+        (self.repo / 'forgotten.py').write_text('print(1)\n')
+        before = self.commits()
+        p, _ = self.run_script('--', '-q', '-m', 'x')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertEqual(self.commits(), before + 1)
+        self.assertEqual([r for r in self.records() if r], [])
+        self.assertIn('未写入检查记录', p.stdout)
+        self.assertIn('forgotten.py', p.stdout)
+
+    def test_ignored_state_file_does_not_block_the_record(self):
+        (self.repo / '.agent').mkdir()
+        (self.repo / '.agent/state.json').write_text('{"activeModule":"m"}\n')
+        self.stage('notes.txt')
+        p, _ = self.run_script('--', '-q', '-m', 'x')
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn(self.head_tree() + ' full', self.records())
 
     def test_manual_suite_runs_and_can_block(self):
         self.stage('notes.txt')
