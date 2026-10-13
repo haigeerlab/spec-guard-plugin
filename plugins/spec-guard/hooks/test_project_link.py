@@ -301,6 +301,95 @@ class Command(unittest.TestCase):
         self.assertEqual(shown, str(deep).replace("`", ""))       # whole, minus what could forge Markdown
         self.assertEqual(session, str(self.dirs.session))
 
+    def second_project(self):
+        second = self.dirs.project.parent / "second"
+        second.mkdir()
+        (second / "AGENTS.md").write_text("<!-- BEGIN:spec-guard-codex-convention -->\n", encoding="utf-8")
+        return second
+
+    def stored(self):
+        return json.loads(self.file.read_text(encoding="utf-8"))
+
+    def test_a_session_entry_is_previewed_then_written_without_a_directory_link(self):
+        code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a")
+        self.assertEqual(code, 0, out)
+        self.assertFalse(self.file.exists())
+        for phrase in ("session sess-a only", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "preview only"):
+            self.assertIn(phrase, out)
+        self.assertNotIn("applies to every session", out)
+        code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), {"version": 2, "sessions": {"sess-a": str(self.dirs.project)}})
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-a"]), ("ok", self.dirs.project, "session"))
+        self.assertEqual(resolve(self.dirs.session), ("none", None))
+        code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        self.assertEqual((code, "already" in out), (0, True), out)
+
+    def test_session_entries_and_the_directory_link_live_side_by_side(self):
+        second = self.second_project()
+        self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        self.run_cmd("set", "--project", str(second), "--session", "sess-b", "--confirm")
+        code, out = self.run_cmd("set", "--project", str(second), "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), {"version": 2, "project": str(second),
+                                         "sessions": {"sess-a": str(self.dirs.project), "sess-b": str(second)}})
+        code, out = self.run_cmd("show", "--session", "sess-a")
+        self.assertEqual(code, 0, out)
+        for phrase in ("sess-a", "sess-b", str(self.dirs.project), str(second), "this session uses its own entry"):
+            self.assertIn(phrase, out)
+        code, out = self.run_cmd("show", "--session", "sess-x")
+        self.assertIn("this session has no entry and uses the directory-level link", out)
+        code, out = self.run_cmd("show")
+        self.assertIn("2 session entries", out)
+
+    def test_unset_of_one_session_keeps_the_rest_and_shrinks_the_file(self):
+        second = self.second_project()
+        self.run_cmd("set", "--project", str(second), "--confirm")
+        self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-b", "--confirm")
+        code, out = self.run_cmd("unset", "--session", "sess-a")
+        self.assertEqual(code, 0, out)
+        self.assertIn("sess-a", self.stored()["sessions"])              # preview only
+        code, out = self.run_cmd("unset", "--session", "sess-a", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), {"version": 2, "project": str(second),
+                                         "sessions": {"sess-b": str(self.dirs.project)}})
+        self.run_cmd("unset", "--session", "sess-b", "--confirm")
+        self.assertEqual(self.stored(), {"version": 1, "project": str(second)})   # back to the plain form
+        code, out = self.run_cmd("unset", "--session", "sess-b", "--confirm")
+        self.assertEqual((code, "no-session-link" in out), (2, True), out)
+
+    def test_unsetting_the_last_session_entry_removes_the_file(self):
+        self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        code, out = self.run_cmd("unset", "--session", "sess-a", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertFalse(self.file.exists())
+        self.assertTrue(self.file.parent.is_dir())
+
+    def test_unset_without_a_session_only_drops_the_directory_link(self):
+        second = self.second_project()
+        self.run_cmd("set", "--project", str(self.dirs.project), "--session", "sess-a", "--confirm")
+        code, out = self.run_cmd("unset", "--confirm")
+        self.assertEqual((code, "no-directory-link" in out), (2, True), out)
+        self.run_cmd("set", "--project", str(second), "--confirm")
+        code, out = self.run_cmd("unset", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stored(), {"version": 2, "sessions": {"sess-a": str(self.dirs.project)}})
+
+    def test_session_refusals(self):
+        for bad in ("has space", "a/b", "x" * 129, ""):
+            code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--session", bad, "--confirm")
+            self.assertEqual((code, "session-id-invalid" in out), (2, True), (bad, out))
+            self.assertFalse(self.file.exists())
+        bare = self.dirs.project.parent / "bare"
+        bare.mkdir()
+        code, out = self.run_cmd("set", "--project", str(bare), "--session", "sess-a", "--confirm")
+        self.assertEqual((code, "target-not-enabled" in out), (2, True), out)
+        self.dirs.link("{broken")
+        code, out = self.run_cmd("unset", "--session", "sess-a", "--confirm")
+        self.assertEqual((code, "link-invalid" in out), (2, True), out)
+        self.assertEqual(self.file.read_text(encoding="utf-8"), "{broken")
+
     def test_the_command_and_the_hook_agree_on_what_counts_as_enabled(self):
         from project_link import enabled
         hook = str(Path(__file__).with_name("phase-guard.sh"))

@@ -142,14 +142,6 @@ def enabled(root) -> bool:
             or any(_STATE.search(line) for line in _lines(root / ".agent" / "state.json")))
 
 
-def status(session_root) -> tuple:
-    """`resolve`, with `ok` split into `ok` and `not-enabled`."""
-    state, target = resolve(session_root)
-    if state == "ok" and not enabled(target):
-        state = "not-enabled"
-    return state, target
-
-
 def _phase(target: Path) -> str:
     """The phase line the hook gives for `target`, or "" when it cannot be had."""
     env = {key: value for key, value in os.environ.items()
@@ -169,44 +161,110 @@ SHARED = ("The link applies to every session that runs in this directory. When s
           "different projects, do not link: open each session in its own project directory, or pass the project path "
           "explicitly.")
 
-WHY = {"invalid": "the file is not a JSON object with exactly `version` (1) and `project` (a path)",
+WHY = {"invalid": "the file is neither `{version: 1, project}` nor `{version: 2, sessions, project?}` with valid paths and "
+                  "session ids",
        "missing": "the directory it names does not exist or is not a directory",
        "not-enabled": "the directory it names has no spec-guard convention (no convention block, no "
                       "`.agent/state.json` with activeModule)"}
 
 
-def _show(session: Path) -> int:
-    state, target = status(session)
+ONE_SESSION = ("This entry applies to session %s only; other sessions in the directory are not affected. Take the id "
+               "from CLAUDE_CODE_SESSION_ID in Claude Code or CODEX_THREAD_ID in Codex, and pass it explicitly.")
+
+
+def _serialise(link: dict) -> str | None:
+    """File content for a link, or None when nothing is left to store.  No session entries: the plain version 1 form."""
+    if not link["sessions"]:
+        if link["project"] is None:
+            return None
+        data = {"version": 1, "project": link["project"]}
+    else:
+        data = {"version": 2}
+        if link["project"] is not None:
+            data["project"] = link["project"]
+        data["sessions"] = link["sessions"]
+    return json.dumps(data, ensure_ascii=False) + "\n"
+
+
+def _judge(session: Path, value: str) -> tuple:
+    """(`ok` | `missing` | `not-enabled`, target) for one stored path."""
+    target = _target(session, value)
+    if not target.is_dir():
+        return "missing", target
+    return ("ok" if enabled(target) else "not-enabled"), target
+
+
+def _show(session: Path, session_id: str | None) -> int:
     where = session / LINK_PATH
+    state, link = read_link(session)
     if state == "none":
         print("no link: %s does not exist" % where)
-    elif state == "ok":
-        print("link valid: %s -> %s" % (where, target))
-        print(SHARED)
-        phase = _phase(target)
-        if phase:
-            print(phase)
-    else:
-        print("link %s: %s%s" % (state, WHY[state], " (%s)" % target if target is not None else ""))
+        return 0
+    if state == "invalid":
+        print("link invalid: %s" % WHY["invalid"])
         print("fix it with `set --project <path>` after `unset`, or remove it with `unset`.")
+        return 0
+    if link["project"] is None:
+        print("no directory-level link in %s" % where)
+    else:
+        verdict, target = _judge(session, link["project"])
+        if verdict == "ok":
+            print("link valid: %s -> %s" % (where, target))
+            print(SHARED)
+            phase = _phase(target)
+            if phase:
+                print(phase)
+        else:
+            print("link %s: %s (%s)" % (verdict, WHY[verdict], target))
+            print("fix it with `set --project <path>` after `unset`, or remove it with `unset`.")
+    if link["sessions"]:
+        print("%d session entr%s:" % (len(link["sessions"]), "y" if len(link["sessions"]) == 1 else "ies"))
+        for key, value in link["sessions"].items():
+            verdict, target = _judge(session, value)
+            print("  %s -> %s (%s)" % (key, target, "valid" if verdict == "ok" else verdict))
+    if session_id is not None:
+        if session_id in link["sessions"]:
+            print("session %s: this session uses its own entry." % session_id)
+        elif link["project"] is not None:
+            print("session %s: this session has no entry and uses the directory-level link." % session_id)
+        else:
+            print("session %s: this session has no entry and there is no directory-level link, so the hook stays "
+                  "silent for it." % session_id)
     return 0
 
 
-def _set(session: Path, project: str, confirm: bool) -> int:
+def _write(session: Path, content: str | None) -> bool:
     from tracker_default import _write_atomic
 
+    path = session / LINK_PATH
+    try:
+        if content is None:
+            path.unlink()
+        else:
+            path.parent.mkdir(exist_ok=True)
+            _write_atomic(path, content)
+    except OSError:
+        print("link-unwritable: %s could not be written" % path)
+        return False
+    return True
+
+
+def _set(session: Path, project: str, confirm: bool, session_id: str | None) -> int:
+    if session_id is not None and not SESSION_ID.fullmatch(session_id):
+        print("session-id-invalid: use the host's session id (letters, digits, - and _, at most 128 characters)")
+        return 2
     if enabled(session):
         print("session-enabled: %s has the convention itself, so its own phase is reported; a link is not needed"
               % session)
         return 2
-    if resolve(session)[0] == "invalid":
+    state, link = read_link(session)
+    if state == "invalid":
         print("link-invalid: the existing %s is malformed; remove it with `unset --confirm` first" % LINK_PATH)
         return 2
-    if not project.strip() or "\n" in project or "\r" in project or "\0" in project:
+    if not _path_ok(project):
         print("target-missing: give the project directory as one path")
         return 2
-    target = Path(project)
-    target = (target if target.is_absolute() else session / target).resolve()
+    target = _target(session, project)
     if not target.is_dir():
         print("target-missing: %s does not exist or is not a directory" % target)
         return 2
@@ -216,7 +274,12 @@ def _set(session: Path, project: str, confirm: bool) -> int:
     if not enabled(target):
         print("target-not-enabled: %s has no spec-guard convention; run setup-convention there first" % target)
         return 2
-    content = json.dumps({"version": 1, "project": project}, ensure_ascii=False) + "\n"
+    link = link or {"project": None, "sessions": {}}
+    if session_id is None:
+        link["project"] = project
+    else:
+        link["sessions"][session_id] = project
+    content = _serialise(link)
     path = session / LINK_PATH
     try:
         current = path.read_text(encoding="utf-8") if path.is_file() else None
@@ -228,7 +291,7 @@ def _set(session: Path, project: str, confirm: bool) -> int:
     phase = _phase(target)
     if phase:
         print("its phase: %s" % phase)
-    print(SHARED)
+    print(SHARED if session_id is None else ONE_SESSION % session_id)
     if current == content:
         print("\nalready linked to this project; nothing to change.")
         return 0
@@ -237,20 +300,17 @@ def _set(session: Path, project: str, confirm: bool) -> int:
     if not confirm:
         print("\npreview only; nothing was written. Re-run with --confirm to apply.")
         return 0
-    try:
-        path.parent.mkdir(exist_ok=True)
-        _write_atomic(path, content)
-    except OSError:
-        print("link-unwritable: %s could not be written" % path)
+    if not _write(session, content):
         return 2
-    if status(session) != ("ok", target):
+    wanted = ("ok", target, "session" if session_id is not None else "directory")
+    if resolve_for(session, [session_id] if session_id is not None else []) != wanted:
         print("readback-mismatch: %s does not read back as a valid link to %s" % (path, target))
         return 2
-    print("\nlinked %s -> %s" % (session, target))
+    print("\nlinked %s -> %s" % (session if session_id is None else "session %s" % session_id, target))
     return 0
 
 
-def _unset(session: Path, confirm: bool) -> int:
+def _unset(session: Path, confirm: bool, session_id: str | None) -> int:
     path = session / LINK_PATH
     if not path.exists() and not path.is_symlink():
         print("no-link: %s does not exist" % path)
@@ -258,16 +318,36 @@ def _unset(session: Path, confirm: bool) -> int:
     if path.is_dir() and not path.is_symlink():
         print("link-unwritable: %s is a directory; remove it by hand" % path)
         return 2
-    print("will remove: %s" % path)
+    state, link = read_link(session)
+    if state == "invalid":
+        if session_id is not None:
+            print("link-invalid: the existing %s is malformed; remove it whole with `unset --confirm` (no --session)"
+                  % LINK_PATH)
+            return 2
+        content = None                       # a malformed file can only be removed whole
+    elif session_id is None:
+        if link["project"] is None:
+            print("no-directory-link: %s holds session entries only; name one with --session" % path)
+            return 2
+        link["project"] = None
+        content = _serialise(link)
+    else:
+        if session_id not in link["sessions"]:
+            print("no-session-link: %s has no entry for session %s" % (path, session_id))
+            return 2
+        del link["sessions"][session_id]
+        content = _serialise(link)
+    if content is None:
+        print("will remove: %s" % path)
+    else:
+        print("will rewrite %s as: %s" % (path, content.strip()))
     if not confirm:
         print("\npreview only; nothing was removed. Re-run with --confirm to apply.")
         return 0
-    try:
-        path.unlink()
-    except OSError:
-        print("link-unwritable: %s could not be removed" % path)
+    if not _write(session, content):
         return 2
-    print("\nunlinked %s (the `.agent` directory is left in place)" % session)
+    what = "session %s" % session_id if session_id is not None else str(session)
+    print("\nunlinked %s (the `.agent` directory is left in place)" % what)
     return 0
 
 
@@ -287,6 +367,8 @@ def main(argv=None) -> int:
         command.add_argument("--from", dest="session", default=".")
     for command in (setter, unsetter):
         command.add_argument("--confirm", action="store_true")
+    for command in (show, setter, unsetter):
+        command.add_argument("--session", dest="session_id", help="act on this session's own entry (the host's session id)")
     args = parser.parse_args(argv)
     session = Path(args.session).resolve()
     if args.action == "resolve":
@@ -304,10 +386,10 @@ def main(argv=None) -> int:
         print("session-missing: %s is not a directory" % session)
         return 2
     if args.action == "show":
-        return _show(session)
+        return _show(session, args.session_id)
     if args.action == "set":
-        return _set(session, args.project, args.confirm)
-    return _unset(session, args.confirm)
+        return _set(session, args.project, args.confirm, args.session_id)
+    return _unset(session, args.confirm, args.session_id)
 
 
 if __name__ == "__main__":
