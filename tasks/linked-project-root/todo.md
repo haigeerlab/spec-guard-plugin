@@ -7,6 +7,6 @@
 - [x] Task 4：`show`／`set`／`unset`（先红） — `test_project_link.py` 再加 11 例（`show` 的各种状态、`set` 预览不写文件并显示目标阶段、`--confirm` 写入读回且可重复、相对路径原样保存、替换已有指向、`unset` 保留 `.agent` 与其中别的文件、解除损坏的指向、六种拒绝、钩子与命令对“已启用”的判据在六种目录上结论一致、长路径完整输出），先 8 例失败 2 例报错。实现后 18 例全绿。临时目录实跑：建立前静默 → 预览 → 确认后钩子输出被指向项目的阶段与 `Linked project` 行 → 解除后恢复静默。实跑中发现并修掉一个问题：注入里的路径沿用了诊断文字的 200 字符上限，长路径被截断，改为 1024 并加测试（先红）。已知局限：路径里的反引号在显示时会被去掉（防伪造），这种路径下显示的文字与真实路径不同。
 - [x] Task 5：命令文件与 Codex 路由 — 新增 `commands/link-project.md`；`spec-guard-ops` 新增 link-project 一节，写明有指向时其他命令的 `--project` 要换成被指向的项目路径、也可手动运行钩子读一次阶段；`docs/commands.md` 登记说明与对照表；`validate.sh` 登记 `test_project_link.py`。`test-checkers.sh` 与 `validate.sh --quick` 通过。
 - [x] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告 — 随 Task 2–5 的提交跑 `verify-and-commit.sh` 全档。未验证：两边真实宿主（发版后做）。
-- [ ] Task 6：文档
-- [ ] Task 7：版本号
+- [x] Task 6：文档 — `docs/troubleshooting.md`「阶段提示没有出现」加一条原因与解决办法、「其他提示」加四行；`docs/design.md` 的激活判断与不变量各补一段；`docs/workflow.md` 一段；CHANGELOG `[0.58.0]`。
+- [x] Task 7：版本号 — 两份 `plugin.json` 改为 0.58.0，中英 README 的 `--ref` 改为 v0.58.0，CHANGELOG 标题 `[0.58.0] - 2026-10-13`。纯文档与清单改动，与 Task 6 同一个提交。
 - [ ] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行

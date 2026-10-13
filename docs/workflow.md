@@ -56,6 +56,10 @@ PR 合并后核对合并提交与验证结果并写回；只有事项全部范�
 Build order 连续构建；涉及 UI 的检查点由 agent 先用浏览器或电脑操作自验，你做最后兜底（Claude 桌面应用自身的显示只能由你看）。
 细则见[共享检查点规则](../plugins/spec-guard/references/workflow-checkpoints.md)。
 
+**会话不在项目目录里时。** 阶段提示只看会话所在的目录。如果你把会话开在需求文档之类的目录、让 agent 去改别处的仓库，
+它在那个会话里收不到任何阶段提示。运行一次 `/spec-guard:link-project`，把会话目录指向那个项目（先预览、确认后写入
+`.agent/spec-guard-link.json`），之后每轮都会收到该项目的阶段提示。更简单的做法仍然是直接在项目目录里开会话。
+
 **批准要留下记录。** agent 把 Spec 或 Plan 交给你审核时，在文件里标一行 `<!-- spec-guard: review pending -->`；这期间
 阶段提示报告“等待用户审核”，不会建议它写 Plan 或继续实现。你明确批准后，它用 `/spec-guard:review-mark` 把标记改成
 已批准（先给你看预览）。Spec 的批准标记带内容指纹：批准后 Spec 又被改过，阶段提示和 `verify-artifacts` 会指出
