@@ -105,6 +105,13 @@ def main() -> int:
         print("%s has no review marker; this records the Plan's approval only and leaves the Spec as it is."
               % relative["spec"])
     if args.state == "approved":
+        # review-handoff-content: an approval only means something if the user saw what they approved.  This cannot
+        # be checked here, so it is a reminder and never a refusal.
+        for kind in kinds:
+            print("%s: %d line(s)" % (relative[kind], len(before[kind].splitlines())))
+        print("Before --confirm, make sure the user has seen the content of %s in the conversation -- its points, or "
+              "the whole text when it is short. If they were given only a link or a one-line summary, that is not a "
+              "review: show the content first and ask again." % " and ".join(relative[kind] for kind in kinds))
         print("`approved` records an approval the user gave in this conversation. Do not write it to clear a "
               "phase hint; the marker is a record for later sessions, not a source of authority.")
     if not changed:
