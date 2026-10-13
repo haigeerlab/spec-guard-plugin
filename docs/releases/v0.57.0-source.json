@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:5a18239f22b6b912fdb859c4ab0b1f298cd8e39b"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "result:the v0.57.0 annotated tag and origin/main both resolve to merge commit 5a18239f22b6b912fdb859c4ab0b1f298cd8e39b (pull request #288, merged after its pull_request run passed; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head 90a495f's tree; 0.57.0 is one module, review-approval-marker; inside the plugin package module_stage.py, spec-digest.py, verify-artifacts.sh, the new review_mark.py and commands/review-mark.md, spec-guard-ops, the shared checkpoint contract, both convention-block templates and tests changed",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"docs: 评审标记规则补一条 ...\"",
+        "result:the last commit of the pull request was made by verify-and-commit.sh after validate, phase-guard (249 cases), verify-artifacts (52 cases) and ShellCheck passed under macOS /bin/bash 3.2.57; validate includes test_review_marker.py (20 tests) and evals/codex-plugin-smoke.sh --selftest"
+      ]
+    }
+  ]
+}

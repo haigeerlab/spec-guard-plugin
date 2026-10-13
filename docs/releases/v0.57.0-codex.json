@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.57.0;test:marketplace-ref-upgrade-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.56.0 to v0.57.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.57.0, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.57.0;test:installed-plugin-smoke-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.57.0;test:installed-copy-changed-tests-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_review_marker.py",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:all run green from the installed copy (phase-guard 249 cases, verify-artifacts 52 cases, review marker 20 tests, checkpoint contract 16 tests); spec-digest.py --selftest passes",
+        "command:SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/phase-guard.sh </dev/null",
+        "result:in a temporary project, the same three states on the installed 0.56.0 and 0.57.0 copies: Spec pending without a Plan -- 0.56.0 suggests creating the Plan, 0.57.0 prints the Review line and \"wait for the user to review\"; Plan pending with open todo items -- 0.56.0 suggests continuing the build, 0.57.0 prints the Review line and \"do not continue the build\"; both approved -- 0.57.0 adds the Next gate line naming the first unchecked gate checkpoint and skipping the report one; under Codex the record hint reads \"`$spec-guard-ops` review-mark\" and the build hint \"`$incremental-implementation`\""
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.0-codex-review-hint",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.57.0;test:installed-review-hint-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:codex exec in a temporary BUILDING project whose Spec was edited after approval, with the installed plugin (no hook-trust bypass)",
+        "result:exit 0; the session copied its injection verbatim: \"- Review: Spec `spec/alpha.md` was edited after it was approved.\" and \"Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build. When the user approves it, record that with `$spec-guard-ops` review-mark.\"",
+        "result:~/.codex/config.toml is byte-identical before and after the run"
+      ]
+    }
+  ]
+}
