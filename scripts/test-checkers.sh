@@ -645,6 +645,93 @@ want fail "state-paths: expanduser 写法同样拦下" python3 "$ROOT/scripts/ch
 rm -rf "$TMP/stateempty"; mkdir -p "$TMP/stateempty"
 want fail "state-paths: 0 个文件是没找到，不是没问题" python3 "$ROOT/scripts/check-state-paths.py" "$TMP/stateempty"
 
+# ── check-tests-registered.py ──
+# 2026-10-13：三个单测加入后五天没被任何检查运行过，因为 validate.sh 的列表是手写的，漏一行什么都不报。
+# 最关键的是反例：注释掉的步骤、只写文件名、只登记了同前缀的另一个文件，都必须算没登记 ——
+# 只要“文件名出现过”就放行的版本，会被这三种情况喂饱而永远绿（docs/lenses.md A3「太宽」）。
+REG="$ROOT/scripts/check-tests-registered.py"
+mkreg() {  # $1=目录；一个已登记的 python 测试和一个已登记的 shell 测试
+  rm -rf "$1"
+  mkdir -p "$1/plugins/spec-guard/hooks" "$1/scripts" "$1/.github/workflows"
+  printf '# test\n' > "$1/plugins/spec-guard/hooks/test_demo.py"
+  printf '# test\n' > "$1/scripts/test-demo.sh"
+  printf '%s\n' '#!/usr/bin/env bash' \
+    "python3 -B scripts/run_steps_parallel.py \\" \
+    "  'python3 -B plugins/spec-guard/hooks/test_demo.py' \\" \
+    "  '/bin/bash scripts/test-demo.sh'" > "$1/scripts/validate.sh"
+}
+
+mkreg "$TMP/regok"
+want pass "tests-registered: 全部已登记 → 放行" python3 "$REG" "$TMP/regok"
+
+mkreg "$TMP/regmiss"
+printf '# test\n' > "$TMP/regmiss/plugins/spec-guard/hooks/test_orphan.py"
+want fail "tests-registered: 有一个没登记 → 报错" python3 "$REG" "$TMP/regmiss"
+REG_OUT="$(python3 "$REG" "$TMP/regmiss" 2>&1)"
+want pass "tests-registered: 报错里有没登记文件的完整路径" \
+  grep -qF -- "plugins/spec-guard/hooks/test_orphan.py" <<<"$REG_OUT"
+
+mkreg "$TMP/regcomment"
+printf '# test\n' > "$TMP/regcomment/plugins/spec-guard/hooks/test_orphan.py"
+printf "  # 'python3 -B plugins/spec-guard/hooks/test_orphan.py'\n" >> "$TMP/regcomment/scripts/validate.sh"
+want fail "tests-registered: 只在注释行里出现 → 报错" python3 "$REG" "$TMP/regcomment"
+
+mkreg "$TMP/regname"
+printf '# test\n' > "$TMP/regname/plugins/spec-guard/hooks/test_orphan.py"
+printf 'echo test_orphan.py\n' >> "$TMP/regname/scripts/validate.sh"
+want fail "tests-registered: 只写文件名、不是完整路径 → 报错" python3 "$REG" "$TMP/regname"
+
+mkreg "$TMP/regprefix"
+printf '# test\n' > "$TMP/regprefix/plugins/spec-guard/hooks/test_demo_extra.py"
+printf '# test\n' > "$TMP/regprefix/plugins/spec-guard/hooks/test_demo.pyx.py"
+printf '%s\n' '#!/usr/bin/env bash' \
+  "python3 -B plugins/spec-guard/hooks/test_demo_extra.py" \
+  "python3 -B plugins/spec-guard/hooks/test_demo.pyx.py" \
+  "/bin/bash scripts/test-demo.sh" > "$TMP/regprefix/scripts/validate.sh"
+want fail "tests-registered: 只登记了名字更长的同前缀文件 → 报错" python3 "$REG" "$TMP/regprefix"
+
+mkreg "$TMP/regdir"
+printf '%s\n' '#!/usr/bin/env bash' \
+  "python3 -B old/plugins/spec-guard/hooks/test_demo.py" \
+  "/bin/bash scripts/test-demo.sh" > "$TMP/regdir/scripts/validate.sh"
+want fail "tests-registered: 只登记了更长目录前缀下的同名文件 → 报错" python3 "$REG" "$TMP/regdir"
+
+mkreg "$TMP/regci"
+printf '# test\n' > "$TMP/regci/plugins/spec-guard/hooks/test-ci-only.sh"
+printf '%s\n' 'jobs:' '  validate:' '    steps:' \
+  '      - run: /bin/bash plugins/spec-guard/hooks/test-ci-only.sh' > "$TMP/regci/.github/workflows/ci.yml"
+want pass "tests-registered: 只在 CI 工作流里登记 → 放行" python3 "$REG" "$TMP/regci"
+
+mkreg "$TMP/regvac"
+printf '# test\n' > "$TMP/regvac/plugins/spec-guard/hooks/test_orphan.py"
+printf '%s\n' '#!/usr/bin/env bash' 'python3 -B plugins/spec-guard/hooks/test_orphan.py' \
+  > "$TMP/regvac/scripts/verify-and-commit.sh"
+want fail "tests-registered: 只在 verify-and-commit.sh 里点名（CI 不跑）→ 报错" python3 "$REG" "$TMP/regvac"
+
+mkreg "$TMP/regacc"
+printf '# acceptance\n' > "$TMP/regacc/plugins/spec-guard/hooks/test_demo_acceptance.py"
+want pass "tests-registered: 没登记的验收测试归 acceptance-wired 管 → 不报错" python3 "$REG" "$TMP/regacc"
+
+mkreg "$TMP/regexempt"
+mkdir -p "$TMP/regexempt/evals/dispatch-cost/seed/tests" "$TMP/regexempt/scripts/__pycache__"
+printf '# material\n' > "$TMP/regexempt/evals/dispatch-cost/seed/tests/test_cli.py"
+printf '# cache\n' > "$TMP/regexempt/scripts/__pycache__/test_cached.py"
+want pass "tests-registered: 评测素材目录与缓存目录里的测试 → 不报错" python3 "$REG" "$TMP/regexempt"
+mkdir -p "$TMP/regexempt/evals/other/tests"
+printf '# test\n' > "$TMP/regexempt/evals/other/tests/test_deep.py"
+want fail "tests-registered: 其他子目录里没登记的测试照样查 → 报错" python3 "$REG" "$TMP/regexempt"
+
+mkreg "$TMP/regnone"
+rm "$TMP/regnone/plugins/spec-guard/hooks/test_demo.py" "$TMP/regnone/scripts/test-demo.sh"
+want fail "tests-registered: 0 个测试文件是没找到，不是没问题" python3 "$REG" "$TMP/regnone"
+
+mkreg "$TMP/regnorunner"
+rm "$TMP/regnorunner/scripts/validate.sh"
+want fail "tests-registered: 读不到任何运行器 → 不算通过" python3 "$REG" "$TMP/regnorunner"
+REG_OUT="$(python3 "$REG" "$TMP/regnorunner" 2>&1)"
+want pass "tests-registered: 读不到运行器时说的是没找到，不是把每个文件报成没登记" \
+  grep -qF -- "读不到任何运行器" <<<"$REG_OUT"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1
