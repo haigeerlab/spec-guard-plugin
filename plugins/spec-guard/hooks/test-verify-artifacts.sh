@@ -220,4 +220,53 @@ check "过期的挂起标记只警告" 0 "挂起标记过期：alpha 已没有�
 project suspend-none
 check_absent "没有挂起标记时不报告挂起" "挂起标记"
 
+# review-approval-marker：评审标记写法无效判失败；待审核却已有勾选项、Spec 批准后被改只警告；没有标记时不输出。
+RV_PENDING='<!-- spec-guard: review pending -->'
+rv_project() {  # $1=目录：alpha 有 Spec、Plan 与一份带勾选项的 todo
+  project "$1"; mkdir -p "$PROJECT/tasks/alpha"
+  printf '# Spec: alpha\n\n正文\n' > "$PROJECT/spec/alpha.md"
+  printf '# Plan\n' > "$PROJECT/tasks/alpha/plan.md"
+  printf '%s\n' '- [x] a' '- [ ] b' > "$PROJECT/tasks/alpha/todo.md"
+}
+rv_approve() {  # 把 Spec 标为带当前指纹的 approved
+  python3 -B "$HOOKDIR/review_mark.py" --project "$PROJECT" --module alpha --target "$1" --state approved --confirm >/dev/null
+}
+rv_project review-none
+check_absent "没有评审标记时不报告评审" "评审"
+rv_project review-ok; rv_approve both
+check "评审标记有效时通过并汇总" 0 "评审标记有效：2 个文件"
+check_absent "评审标记有效时没有评审警告" "待审核"
+rv_project review-pending-clean; printf '%s\n' '- [ ] b' > "$PROJECT/tasks/alpha/todo.md"
+printf '# Plan\n\n%s\n' "$RV_PENDING" > "$PROJECT/tasks/alpha/plan.md"
+check "待审核且没有勾选项不警告" 0 "评审标记有效：1 个文件"
+check_absent "待审核且没有勾选项时没有矛盾警告" "已有勾选项"
+rv_project review-invalid
+printf '# Spec: alpha\n\n%s\n%s\n' "$RV_PENDING" "$RV_PENDING" > "$PROJECT/spec/alpha.md"
+check "重复的评审标记失败" 1 "评审标记无效：spec/alpha.md"
+printf '# Spec: alpha\n\n正文\n' > "$PROJECT/spec/alpha.md"
+printf '# Plan\n\n%s\n' '<!-- spec-guard: review approved 0123456789ab -->' > "$PROJECT/tasks/alpha/plan.md"
+check "Plan 的批准标记带指纹判无效" 1 "评审标记无效：tasks/alpha/plan.md"
+rv_project review-plan-built
+printf '# Plan\n\n%s\n' "$RV_PENDING" > "$PROJECT/tasks/alpha/plan.md"
+check "Plan 待审核却已有勾选项只警告" 0 "tasks/alpha/plan.md 待审核，但 tasks/alpha/todo.md 已有勾选项"
+rv_project review-spec-built
+printf '# Spec: alpha\n\n%s\n\n正文\n' "$RV_PENDING" > "$PROJECT/spec/alpha.md"
+check "Spec 待审核却已有勾选项只警告" 0 "spec/alpha.md 待审核，但 tasks/alpha/todo.md 已有勾选项"
+rv_project review-revised; rv_approve spec
+printf '补一条\n' >> "$PROJECT/spec/alpha.md"
+check "Spec 批准后被改只警告" 0 "spec/alpha.md 在批准后已修订，需要用户复审"
+rv_project review-fenced
+printf '# Spec: alpha\n\n```text\n%s\n%s\n```\n' "$RV_PENDING" "$RV_PENDING" > "$PROJECT/spec/alpha.md"
+check_absent "围栏代码块里的示例不算标记" "评审"
+rv_project review-helper-fails; rv_approve both
+mkdir -p "$WORK/review-fails"
+cat > "$WORK/review-fails/python3" <<'SH'
+#!/bin/sh
+case "$*" in *file_review_state*) exit 29 ;; esac
+exec "$SPEC_GUARD_TEST_REAL_PYTHON" "$@"
+SH
+chmod +x "$WORK/review-fails/python3"
+SPEC_GUARD_TEST_REAL_PYTHON="$(command -v python3)" RUN_PATH="$WORK/review-fails:$PATH" \
+  check "评审标记检查没有正常运行时报未验证" 0 "未验证：评审标记检查没有正常运行"
+
 echo "verify-artifacts regression passed ($PASS cases)"

@@ -142,5 +142,43 @@ for todo in sorted(Path("tasks").glob("*/todo.md")):
   fi
 fi
 
+# 评审标记（review-approval-marker）：状态判据来自 module_stage.py，与阶段提示同一份；没有标记时不输出这一项。
+if command -v python3 >/dev/null 2>&1 && { [ -d spec ] || [ -d tasks ]; }; then
+  if REVIEW_OUT="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import CHECKED, file_review_state
+files = [(path, "spec", path.stem) for path in sorted(Path("spec").glob("*.md")) if path.name != "CAPABILITY-MAP.md"]
+files += [(path, "plan", path.parent.name) for path in sorted(Path("tasks").glob("*/plan.md"))]
+valid = 0
+for path, kind, module in files:
+    state = file_review_state(path, kind)
+    if state == "none":
+        continue
+    if state in ("invalid", "unreadable", "revised"):
+        print("%s %s" % (state.upper(), path.as_posix()))
+        continue
+    valid += 1
+    todo = Path("tasks") / module / "todo.md"
+    if state == "pending" and todo.is_file() and CHECKED.search(todo.read_text(encoding="utf-8")):
+        print("BUILT %s %s" % (path.as_posix(), todo.as_posix()))
+if valid:
+    print("VALID %d" % valid)
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind item extra; do
+      case "$kind" in
+        VALID) ok "评审标记有效：${item} 个文件" ;;
+        INVALID) bad "评审标记无效：${item}（每个文件至多一行，写法见共享检查点规则「评审状态标记」）" ;;
+        REVISED) warn "${item} 在批准后已修订，需要用户复审；复审通过后用 /spec-guard:review-mark 重新记录" ;;
+        BUILT) warn "${item} 待审核，但 ${extra} 已有勾选项；确认用户是否已批准，批准后用 /spec-guard:review-mark 记录" ;;
+        UNREADABLE) warn "未验证：${item} 读取失败，没有检查它的评审标记" ;;
+      esac
+    done <<<"$REVIEW_OUT"
+  else
+    warn '未验证：评审标记检查没有正常运行'
+  fi
+fi
+
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"
 [ "$FAIL" -eq 0 ]

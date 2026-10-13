@@ -85,6 +85,13 @@ spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠�
 `--suspend <id>`／`--resume <id>`，先预览、`--confirm` 才改 `tasks/<id>/todo.md` 的一行标记。永不自动恢复。
 拒绝时退出 2、不写文件。挂起后可以按你说的时间和内容设一个提醒，插件不保存提醒。
 
+### `/spec-guard:review-mark`
+
+记录模块 Spec 或 Plan 的评审状态：`--module <id> --target <spec|plan|both> --state <pending|approved>`，先预览、
+`--confirm` 才改文件里的一行标记。当前模块待审核时阶段提示报告等待审核、不建议写 Plan 或继续 build；Spec 的批准标记
+带内容指纹，批准后被改会报告“批准后已修订”。`approved` 只在你明确批准之后写。没有标记的文件判定照旧。
+拒绝时退出 2、不写文件。
+
 ## 加需求
 
 ### `/spec-guard:add-module`
@@ -148,6 +155,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
 | 查看或设置项目配置（产物语言、评审节奏） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
+| 记录 Spec 或 Plan 的评审状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |

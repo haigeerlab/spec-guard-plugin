@@ -6,9 +6,9 @@
 - [x] Task 4：下一个 gate（先红） — 第 13 段再加 11 例：跳过已勾选项与 `report`、只剩 `report` 不输出、未标注按 `gate`、标题不以 Checkpoint 开头或不是清单项不输出、标题清洗并截到 80 字、Plan 待审核与 NEEDS_PLAN 时不输出；先变红，`module_stage.py` 新增 `next_gate` 后 249 例全绿。Spec「Success criteria」原文说无标记项目只多半句，与 Next gate 对所有 BUILDING 项目生效相矛盾，已改为如实写出这一行，Checkpoint 3 请用户过目。
 - [x] Checkpoint 1（report）：判定与阶段提示回归全绿，ShellCheck 无警告 — 随 Task 4 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`、phase-guard 249 例、verify-artifacts 40 例、ShellCheck 无告警。未验证：两边宿主对新增行的实际呈现（发版后做）。
 - [x] Task 5：`review_mark.py`（先红） — `test_review_marker.py` 再加 9 例（预览不写文件、插在标题后且其余逐字不变、原地替换且可重复执行、修订后重新批准取新指纹、`both`、Spec 未批准时拒绝批准 Plan、四种拒绝、无标题文件、围栏示例不动），脚本不存在时 9 例失败，实现后 20 例全绿。`module_stage.py` 新增 `review_marker_lines` 供脚本定位标记行。临时项目实跑：待审核 → 预览批准 → 确认批准 → 改 Spec，阶段提示依次为等待审核、照常建议写 Plan、批准后已修订。Spec「写标记的命令」两处措辞按实现改准：预览输出的是 diff、指纹与写入后的评审状态（不是阶段提示要点）；无标题文件把标记放最前。
-- [ ] Task 6：`verify-artifacts`（先红）
-- [ ] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告
-- [ ] Task 7：命令文件与 Codex 路由
+- [x] Task 6：`verify-artifacts`（先红） — `test-verify-artifacts.sh` 新增 12 例：无标记不输出、有效汇总、待审核无勾选项不警告、重复标记失败、Plan 批准带指纹失败、Plan／Spec 待审核却已有勾选项各警告、Spec 批准后被改警告、围栏示例不算、检查未正常运行报未验证；先在“有效汇总”变红，实现后 52 例全绿。状态判据取自 `module_stage.file_review_state`，勾选判据取自 `CHECKED`。
+- [x] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告 — 随 Task 6 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`（含 `test_review_marker.py` 20 例）、phase-guard 249 例、verify-artifacts 52 例、ShellCheck 无告警。未验证：两边宿主的实际呈现（发版后做）。
+- [x] Task 7：命令文件与 Codex 路由 — 新增 `commands/review-mark.md`（规范引导段与 module-suspend 相同；写明 `approved` 只在用户明确批准后写、含糊的“继续”不算）；`spec-guard-ops` 新增 review-mark 一节；`docs/commands.md` 登记说明与对照表。顺序调整：Task 6 的提交被 command-names 检查器拦下（`verify-artifacts.sh` 的提示引用了尚不存在的 `/spec-guard:review-mark`），所以本任务提前做完并与 Task 6 同一个提交；Checkpoint 2 的验证链以这次提交为准。`test-checkers.sh` 与 `validate.sh --quick` 通过。
 - [ ] Task 8：规则文本、模板与文档（先红）
 - [ ] Task 9：版本号与自用
 - [ ] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
