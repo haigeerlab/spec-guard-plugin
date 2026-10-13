@@ -192,6 +192,23 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module
 挂起确认后问用户要不要设提醒：时间和内容由用户说；宿主有持久的提醒或自动化能力且支持这个时间就用并读回，
 否则请用户自己设。不从对话推断日期，插件不保存提醒，提醒失败不影响挂起。
 
+## review-mark
+
+记录模块 Spec 或 Plan 的评审状态（Claude 侧为 `/spec-guard:review-mark`）：在 `spec/<id>.md` 或 `tasks/<id>/plan.md` 写一行
+`<!-- spec-guard: review pending -->`、`<!-- spec-guard: review approved <digest> -->`（Spec，带批准时的内容指纹）或
+`<!-- spec-guard: review approved -->`（Plan）。当前模块待审核时阶段提示报告等待用户审核、不建议写 Plan 或继续构建；
+Spec 批准后内容有变即判为批准后已修订，需复审后重新记录；没有标记的文件判定照旧。默认只预览，把预览给用户看过并
+确认后才加 `--confirm`，只改这一行并读回：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|plan|both> --state <pending|approved>
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state approved --confirm
+```
+
+`pending` 在把 Spec 或 Plan 交给用户审核时写，也可以写文件时直接带上这一行。`approved` 只在用户于当前对话明确批准之后写；
+含糊的“继续”不算，先问清楚；获批后先写标记再动代码或写 Plan；不得为消除阶段提示自行批准，标记是给后续会话的记录，不是授权来源。合并审一次批准
+两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 未批准时单独批准 Plan。
+
 ## add-module
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并

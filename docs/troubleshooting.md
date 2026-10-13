@@ -107,6 +107,10 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `` `.agent/state.json` 的 activeModule 不是有效的 module id `` | `activeModule` 的值不是能力图里的模块 id；按 Build order 取当前模块。改成正确的 id，或清空 |
 | `Project config: invalid (…)` | `.agent/config.json` 不可用，所有配置按默认处理；运行 `/spec-guard:config` 看问题代码 |
 | `Paused: <模块>` | 有模块因插队被暂停，做完当前模块会回到它 |
+| `Review: Spec … is awaiting the user's review` | 当前模块的 Spec 或 Plan 标着待审核；你批准后让 agent 运行 `/spec-guard:review-mark` 记录 |
+| `Review: Spec … was edited after it was approved` | Spec 在批准后被改过；看过修订内容并批准后，重新运行 `/spec-guard:review-mark` |
+| `Review: the review marker in … is invalid` | 该文件的评审标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
+| `Next gate: …` | 实现阶段下一个要停下等你确认的检查点；在它之前的 task 与 `report` 检查点不停 |
 | `Suspended: <模块>` | 模块被挂起，不会自动恢复；用 `/spec-guard:module-suspend` 恢复 |
 | `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块 |
 | 有 Plan 却没有 todo 的提醒 | 这类模块按已完成计；还有活就补 `tasks/<id>/todo.md`，确已交付可在 `plan.md` 加 `<!-- spec-guard: no-todo -->` |

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Stable capability-map digests for read-only Proposal validation.
+"""Stable capability-map digests for read-only Proposal validation, and the text digest of one file.
 
 Usage:
   spec-digest.py compute <map>
+  spec-digest.py text <file>
   spec-digest.py --selftest
 
 The script only parses a capability map and emits deterministic JSON.  A map
@@ -39,6 +40,11 @@ def compute(path):
     }
 
 
+def text_digest(text):
+    """Digest of a text as given: the caller decides which lines belong to it."""
+    return _h(text)
+
+
 def _selftest():
     import os
     import tempfile
@@ -57,6 +63,23 @@ def _selftest():
         if missing.returncode != 1 or missing.stdout or "cannot digest" not in missing.stderr:
             print("spec-digest self-test failed: an unreadable map must exit 1 without JSON")
             return 1
+        text_path = os.path.join(directory, "spec.md")
+        with open(text_path, "w", encoding="utf-8") as handle:
+            handle.write("# Spec\n\n正文\n")
+        first = text_digest("# Spec\n\n正文\n")
+        if (len(first) != DIGEST_LEN or first != text_digest("# Spec\n\n正文\n")
+                or first == text_digest("# Spec\n\n正文。\n")):
+            print("spec-digest self-test failed: text digest must be stable, fixed-length and content-sensitive")
+            return 1
+        shown = subprocess.run([sys.executable, __file__, "text", text_path], capture_output=True, text=True)
+        if shown.returncode != 0 or shown.stdout.strip() != first:
+            print("spec-digest self-test failed: `text <file>` must print the digest of the file's text")
+            return 1
+        absent = subprocess.run([sys.executable, __file__, "text", os.path.join(directory, "absent.md")],
+                                capture_output=True, text=True)
+        if absent.returncode != 1 or absent.stdout or "cannot digest" not in absent.stderr:
+            print("spec-digest self-test failed: an unreadable text file must exit 1 without output")
+            return 1
     print("spec-digest self-test passed")
     return 0
 
@@ -70,6 +93,14 @@ def main():
             print(json.dumps(compute(argv[1]), ensure_ascii=False))
             return 0
         except Exception as error:
+            print("spec-digest: cannot digest %s: %s" % (argv[1], error), file=sys.stderr)
+            return 1
+    if len(argv) == 2 and argv[0] == "text":
+        try:
+            with open(argv[1], encoding="utf-8") as handle:
+                print(text_digest(handle.read()))
+            return 0
+        except (OSError, UnicodeError) as error:
             print("spec-digest: cannot digest %s: %s" % (argv[1], error), file=sys.stderr)
             return 1
     print(__doc__)

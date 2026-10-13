@@ -23,6 +23,73 @@ CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
 # module-suspend: one exact line in todo.md parks a started module until the user resumes it.
 SUSPEND_MARKER = "<!-- spec-guard: suspended -->"
+# review-approval-marker: one exact line in spec/<id>.md or tasks/<id>/plan.md records where its review stands.
+# A Spec approval carries the digest of the Spec's text, so an edit after approval shows up as `revised`.
+REVIEW_PREFIX = "<!-- spec-guard: review"
+REVIEW_PENDING = "<!-- spec-guard: review pending -->"
+REVIEW_APPROVED = "<!-- spec-guard: review approved -->"
+REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]{12}) -->")
+FENCES = ("```", "~~~")
+_DIGEST_MODULE = None
+
+
+def review_approved_line(digest: str) -> str:
+    return "<!-- spec-guard: review approved %s -->" % digest
+
+
+def review_marker_lines(text: str) -> list:
+    """Indexes (into `splitlines(keepends=True)`) of the marker lines.  A fenced code block holds examples, not markers."""
+    found, fence = [], None
+    for index, line in enumerate(text.splitlines(keepends=True)):
+        stripped = line.strip()
+        opener = stripped[:3] if stripped[:3] in FENCES else None
+        if fence:
+            if opener == fence:
+                fence = None
+        elif opener:
+            fence = opener
+        elif stripped.startswith(REVIEW_PREFIX):
+            found.append(index)
+    return found
+
+
+def _review_split(text: str) -> tuple:
+    """(marker lines, text without them)."""
+    lines, marked = text.splitlines(keepends=True), set(review_marker_lines(text))
+    return ([lines[index].strip() for index in sorted(marked)],
+            "".join(line for index, line in enumerate(lines) if index not in marked))
+
+
+def review_body(text: str) -> str:
+    return _review_split(text)[1]
+
+
+def review_digest(text: str) -> str:
+    """Digest of the text without its marker line; the algorithm lives in spec-digest.py only."""
+    global _DIGEST_MODULE
+    if _DIGEST_MODULE is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("spec_guard_digest", Path(__file__).with_name("spec-digest.py"))
+        _DIGEST_MODULE = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DIGEST_MODULE)
+    return _DIGEST_MODULE.text_digest(review_body(text))
+
+
+def review_state(text: str, kind: str) -> str:
+    """`none`, `pending`, `approved`, `revised` (Spec only) or `invalid`; `kind` is `spec` or `plan`."""
+    markers = _review_split(text)[0]
+    if not markers:
+        return "none"
+    if len(markers) > 1:
+        return "invalid"
+    if markers[0] == REVIEW_PENDING:
+        return "pending"
+    if kind == "plan":
+        return "approved" if markers[0] == REVIEW_APPROVED else "invalid"
+    match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0])
+    if not match:
+        return "invalid"
+    return "approved" if match.group(1) == review_digest(text) else "revised"
 
 
 def module_state(root: Path, module_id: str) -> dict:
@@ -201,6 +268,7 @@ COMMANDS = {
         "verify-quoted": "`/spec-guard:verify-artifacts`",
         "config": "/spec-guard:config",
         "resume": "`/spec-guard:module-suspend --resume %s` (Codex: spec-guard-ops module-suspend)",
+        "review-mark": "`/spec-guard:review-mark` (Codex: spec-guard-ops review-mark)",
         "plan": "`/plan`",
         "build": "`/build`",
         "free-next": FREE_BOUNDARY,
@@ -224,6 +292,7 @@ COMMANDS["codex"] = {
     "verify-quoted": "`$spec-guard-ops` verify-artifacts",
     "config": "`$spec-guard-ops` config",
     "resume": "`$spec-guard-ops` module-suspend --resume %s",
+    "review-mark": "`$spec-guard-ops` review-mark",
     "plan": "`$planning-and-task-breakdown`",
     "build": "`$incremental-implementation`",
     "free-next": ("Give the user " + CODEX_COMPACT
@@ -286,6 +355,79 @@ def config_lines(root: Path, host: str | None = None) -> list:
                      "and the Plan together for one approval; split them when a new decision, unclear "
                      "scope or a high-risk change appears.")
     return lines
+
+
+OPEN_CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[ \]\s+(Checkpoint(?![A-Za-z]).*)$")
+CHECKPOINT_TIER = re.compile(r"[（(]\s*(gate|report)\s*[）)]", re.IGNORECASE)
+GATE_TITLE_LIMIT = 80
+
+
+def next_gate(root: Path, module: str) -> str:
+    """Title of the first unchecked `gate` checkpoint in the module's todo.md, or "" when there is none.
+
+    The tier is read from the part before the first colon; a checkpoint with no tier is a gate.
+    Anything that cannot be read or recognised yields "": the line is a convenience, not a verdict.
+    """
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    for line in text.splitlines():
+        match = OPEN_CHECKPOINT.match(line)
+        if not match:
+            continue
+        tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(1), maxsplit=1)[0])
+        if tier and tier.group(1).lower() == "report":
+            continue
+        return safe_fragment(match.group(1), GATE_TITLE_LIMIT)
+    return ""
+
+
+def file_review_state(path: Path, kind: str) -> str:
+    """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
+    if not path.is_file():
+        return "none"
+    try:
+        return review_state(path.read_text(encoding="utf-8"), kind)
+    except (OSError, UnicodeError):
+        return "unreadable"
+
+
+def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
+    """(Review line, replacement next step, Spec state) for the current module; empty strings when nothing to say.
+
+    Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
+    the validated module id only -- never text from the files.
+    """
+    if stage not in ("NEEDS_PLAN", "BUILDING"):
+        return "", "", "none"
+    spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
+    spec = file_review_state(root / spec_path, "spec")
+    plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
+    for state, path in ((spec, spec_path), (plan, plan_path)):
+        if state == "invalid":
+            return ("- Review: the review marker in `%s` is invalid." % path,
+                    "run %s to see what is wrong with the marker; the review state is unknown, so do not "
+                    "continue until it is fixed." % cmd["verify"], spec)
+        if state == "unreadable":
+            return ("- Review: `%s` could not be read, so its review state is unknown (a read failure, "
+                    "not a review state)." % path, "", spec)
+    hold = "do not write the Plan yet" if stage == "NEEDS_PLAN" else "do not continue the build"
+    record = " When the user approves it, record that with %s." % cmd["review-mark"]
+    if spec == "pending":
+        line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
+        values, problems = load_config(root)
+        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+            return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
+                    "together for one approval.%s" % (module, module, record), spec)
+        return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec
+    if spec == "revised":
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec)
+    if plan == "pending":
+        return ("- Review: Plan `%s` is awaiting the user's review." % plan_path,
+                "wait for the user to review `%s`; %s.%s" % (plan_path, hold, record), spec)
+    return "", "", spec
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
@@ -413,14 +555,24 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(boundary_note_line)
     elif context_note:
         notes.append(context_note)
+    review_line, review_step, spec_review = review_hint(root, module, stage, cmd)
+    if review_line:
+        counts += "\n" + review_line
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
-        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)." % (module, module,
-                                                                                                 cmd["plan"]),
+        # No marker says nothing about approval either way, so the suggestion names the condition.
+        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
+            module, module, cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else ""),
         "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
                                                                                          current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
+    if stage == "BUILDING" and not review_step:
+        gate = next_gate(root, module)
+        if gate:
+            counts += ("\n- Next gate: %s — keep going until it; a `report` checkpoint is recorded in the todo "
+                       "and passed without stopping." % gate)
+    next_step = review_step or next_step
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,
                                           "".join(n + "\n" for n in notes), next_step))
