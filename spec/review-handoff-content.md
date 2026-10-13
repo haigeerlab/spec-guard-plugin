@@ -1,6 +1,6 @@
 # Spec: review-handoff-content
 
-<!-- spec-guard: review approved 55cd6cb400c2 -->
+<!-- spec-guard: review approved b99018b17056 -->
 
 ## Objective
 
@@ -53,8 +53,9 @@
 同一文件的「评审节奏」一节新增：`separate` 节奏下，agent 在一个会话里第一次交审时说明一次——这个项目也可以改为 `combined`
 （Spec 与 Plan 一起审、一次批准），用 `/spec-guard:config` 设置；之后不再重复。
 
-两份约定块模板（`claude-block-local.md`、`codex-block-local.md`）里讲评审标记的那一行补半句：交审时在对话里呈现内容要点，
-只给链接不算交审。`docs/convention-block.md` 同步。
+两份约定块模板（`claude-block-local.md`、`codex-block-local.md`）各新增一行：交审时在对话里呈现内容要点并写明这次批准
+授权什么，只给链接不算交审。原有讲评审标记的那一行不动——改写已有的行会让每个升级的项目在 `setup-convention --replace`
+时被要求确认删除旧行，另加一行则升级时只有新增。`docs/convention-block.md` 同步。
 
 ### `review_mark.py`
 

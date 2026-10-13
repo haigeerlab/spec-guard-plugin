@@ -5,4 +5,4 @@
 - [x] Task 3：接入完成时的输出（先红） — `test-setup-teardown.sh` 新增 1 例（输出含 `Review cadence:`、`separate` (default)、`combined`、one approval、config 命令与 artifact language），先失败；`setup-convention.sh` 的 `Optional:` 一行拆成产物语言一行加评审节奏两行。57 例全绿。
 - [x] Checkpoint 1（report）：三套核心回归与上述测试全绿，ShellCheck 无警告 — 随 Task 3 的提交跑 `verify-and-commit.sh` 全档。未验证：真实会话里 agent 的交审正文（发版后做）。
 - [x] Task 4：命令文件、技能、文档与版本号 — `commands/review-mark.md` 加“交审要让用户看到内容”一条并说明批准时的提醒；`spec-guard-ops` 的 review-mark 一节补要点；`docs/commands.md` 一句、`docs/workflow.md` 一段；CHANGELOG `[0.58.1] - 2026-10-13`；两份 `plugin.json` 改为 0.58.1，中英 README 的 `--ref` 改为 v0.58.1。
-- [ ] Checkpoint 2（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行 — 2026-10-13 在对话里展示全部验证结果、未验证项、那次误记与更正，以及与 Spec 的一处出入（约定块模板另加一行而不是改写原有的行），用户确认。确认后把 Spec「规则文字」里那一句改成实际做法：`verify-artifacts` 随即报“批准后已修订”，用 `review-mark` 重新记录批准后恢复有效。验证链（`verify-and-commit.sh` 全档，macOS `/bin/bash`）：`validate.sh` 通过、phase-guard 284 例、verify-artifacts 52 例、setup/teardown 57 例、`test_review_marker.py` 25 例、ShellCheck 无告警。未验证：真实会话里 agent 的交审正文（发版后做）；未做独立代码评审。
