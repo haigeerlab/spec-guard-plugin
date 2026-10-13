@@ -107,7 +107,7 @@ if [ -n "$LINKED" ]; then
     missing) LINK_BAD="${LINK_WHICH}指向的目录不存在或不是目录（${LINK_SHOWN}）" ;;
     # 文件里只有别的会话的登记、没有目录级指向：对本会话等于没有指向，照旧静默。
     none) exit 0 ;;
-    invalid) LINK_BAD="它的格式无效（应为只含 version 与 project 两个键的 JSON 对象）" ;;
+    invalid) LINK_BAD="它的格式无效（应为 JSON 对象：版本 1 只含 version 与 project；版本 2 含 version、sessions，可选 project）" ;;
     *) LINK_BAD="没能读取它（检查没有正常运行）" ;;
   esac
   if [ -n "$LINK_BAD" ]; then

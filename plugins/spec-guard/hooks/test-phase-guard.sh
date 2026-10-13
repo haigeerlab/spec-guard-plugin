@@ -1406,7 +1406,7 @@ FIX='用 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 
 link "$ses" "$WORK/gone"
 injects "目标不存在的诊断文字" "$ses" "但它指向的目录不存在或不是目录（$(cd "$WORK" && pwd -P)/gone），本轮没有阶段注入。${FIX}"
 printf '%s\n' '{"version": 1, "project": "x", "SECRET-KEY": "do not echo"}' > "$ses/.agent/spec-guard-link.json"
-injects "格式无效的诊断文字" "$ses" "但它的格式无效（应为只含 version 与 project 两个键的 JSON 对象），本轮没有阶段注入。${FIX}"
+injects "格式无效的诊断文字" "$ses" "但它的格式无效（应为 JSON 对象：版本 1 只含 version 与 project；版本 2 含 version、sessions，可选 project），本轮没有阶段注入。${FIX}"
 lacks "格式无效时不回显文件内容" "$ses" 'SECRET-KEY'
 lacks "格式无效时不回显文件里的值" "$ses" 'do not echo'
 rm "$other/.agent/spec-guard-link.json"; link "$ses" "$other"
