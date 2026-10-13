@@ -181,5 +181,7 @@ if [ "$DRY" = true ]; then
   echo '（dry-run; no files were changed）'
 else
   echo 'Next: review the capability map, then write module specs and local task lists.'
-  echo 'Optional: set the artifact language and review cadence with /spec-guard:config (Codex: spec-guard-ops config).'
+  echo 'Optional: set the artifact language with /spec-guard:config (Codex: spec-guard-ops config).'
+  echo 'Review cadence: `separate` (default) reviews the Spec, then the Plan, one approval each -- for work with many decisions or high risk;'
+  echo '  `combined` presents the Spec and the Plan together for one approval -- for small, fast steps. Set it with the same config command.'
 fi
