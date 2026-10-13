@@ -227,7 +227,9 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state approved --confirm
 ```
 
-`pending` 在把 Spec 或 Plan 交给用户审核时写，也可以写文件时直接带上这一行。`approved` 只在用户于当前对话明确批准之后写；
+`pending` 在把 Spec 或 Plan 交给用户审核时写，也可以写文件时直接带上这一行。交审时在对话正文里呈现内容要点（Spec：目标、范围内与范围外、
+关键决策与取舍、假设、验收标准、未决问题；Plan：任务与验证方式、检查点及其类型、影响面、风险；短文件可贴全文），并写明这次
+批准授权什么；只给链接或一句概述不算交审。`approved` 只在用户于当前对话明确批准之后写；
 含糊的“继续”不算，先问清楚；获批后先写标记再动代码或写 Plan；不得为消除阶段提示自行批准，标记是给后续会话的记录，不是授权来源。合并审一次批准
 两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 标着待审核／已修订／无效时单独批准 Plan
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
