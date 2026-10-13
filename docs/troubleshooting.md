@@ -121,6 +121,7 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `本目录有指向文件 … 但它的格式无效` | 指向文件不是只含 `version` 与 `project` 的 JSON 对象；`link-project unset --confirm` 后重新 `set` |
 | `本目录有指向文件 … 但它指向的目录不存在或不是目录` | 项目被移动或删除了；重新 `set --project <新路径>`，或 `unset` 解除 |
 | `本目录有指向文件 … 但它指向的目录没有启用 spec-guard` | 目标里没有约定块，也没有带 `activeModule` 的 `.agent/state.json`；在那个项目里运行 `/spec-guard:setup-convention`，或改指向别处 |
+| `tasks/<模块>/<文件> 有 N 个未勾选项，它们不计入阶段` | `verify-artifacts` 发现任务目录下 `plan.md`、`todo.md` 之外的文件里有没勾的清单项。阶段判定只数 `todo.md`，所以这些项没做完也会显示模块已完成。把仍要做的项移进该模块的 `todo.md`；已经不需要的勾掉或删掉。只是警告，不影响校验结果 |
 | `Suspended: <模块>` | 模块被挂起，不会自动恢复；用 `/spec-guard:module-suspend` 恢复 |
 | `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块 |
 | 有 Plan 却没有 todo 的提醒 | 这类模块按已完成计；还有活就补 `tasks/<id>/todo.md`，确已交付可在 `plan.md` 加 `<!-- spec-guard: no-todo -->` |
