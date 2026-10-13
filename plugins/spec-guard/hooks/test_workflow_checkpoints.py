@@ -189,6 +189,21 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("评审状态标记", "review-mark", "共享检查点规则"):
                     self.assertIn(phrase, text)
 
+    def test_a_review_handoff_shows_the_content(self):
+        section = self.section("## 评审状态标记")
+        for phrase in ("交审要让用户看到内容", "目标", "范围内与范围外", "关键决策与取舍", "假设", "验收标准", "未决问题",
+                       "验证方式", "检查点及其类型", "影响面", "风险", "只给链接", "不算交审", "授权什么",
+                       "同时批准 Spec 与 Plan", "不记为 `approved`", "不能替代内容"):
+            self.assertIn(phrase, section)
+        cadence = self.section("## 评审节奏")
+        for phrase in ("第一次交审时说明一次", "之后不再重复", "/spec-guard:config"):
+            self.assertIn(phrase, cadence)
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("在对话里呈现内容要点", "只给链接不算交审"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")
