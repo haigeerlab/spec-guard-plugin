@@ -180,5 +180,34 @@ if valid:
   fi
 fi
 
+# 旁路清单（rework-in-place）：阶段判定只数 todo.md，所以 tasks/<id>/ 下别的清单文件里没做完的项没人看得见。
+# 只看直接子文件里的 *.md；判据是 module_stage.py 的 UNCHECKED。没有可报告的内容时不输出这一项。
+if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then
+  if SIDE_OUT="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import UNCHECKED
+side_checklists = sorted(path for path in Path("tasks").glob("*/*.md") if path.name not in ("plan.md", "todo.md"))
+for path in side_checklists:
+    try:
+        count = len(UNCHECKED.findall(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeError):
+        print("UNREADABLE 0 %s" % path.as_posix())
+        continue
+    if count:
+        print("OPEN %d %s" % (count, path.as_posix()))
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind count item; do
+      case "$kind" in
+        OPEN) warn "${item} 有 ${count} 个未勾选项，它们不计入阶段（阶段判定只数 todo.md）；返工或修订请写进该模块的 todo.md" ;;
+        UNREADABLE) warn "未验证：${item} 读取失败，没有检查它的清单项" ;;
+      esac
+    done <<<"$SIDE_OUT"
+  else
+    warn '未验证：旁路清单检查没有正常运行'
+  fi
+fi
+
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -240,6 +240,10 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 
 ## add-module
 
+先判断是不是该开新模块（细则见共享检查点规则「返工与小模块」）：返工或修订已完成的模块不开新模块，在它的 `todo.md` 追加任务、
+`plan.md` 补一节并把 Plan 的评审标记改回待审核；只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或
+与同类模块一次批量交审。
+
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并
 说明先完成它（显式 `--interrupt` 插队除外，见下）。先读 `spec/CAPABILITY-MAP.md`，根据用户给的需求上下文提出 id（kebab-case、语义稳定）、单行
 responsibility、depends-on（既有模块 id，逗号分隔，没有填 `—`）、anchor（`after:<既有模块 id>` 或 `end`），
