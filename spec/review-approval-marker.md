@@ -1,5 +1,7 @@
 # Spec: review-approval-marker
 
+<!-- spec-guard: review approved ecf4338a4006 -->
+
 ## Objective
 
 阶段判定只看文件在不在：`spec/<id>.md` 一存在就建议写 Plan，`tasks/<id>/plan.md` 一存在就建议继续 build，哪怕这份 Spec

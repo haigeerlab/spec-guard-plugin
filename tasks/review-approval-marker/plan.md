@@ -1,5 +1,7 @@
 # Plan: review-approval-marker
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/review-approval-marker.md`](../../spec/review-approval-marker.md)（2026-10-13 用户评审通过）。本仓库评审节奏为
 分开审：本 Plan 单独评审。分支 `claude/current-plugin-owner-aa5b98`，worktree
 `.claude/worktrees/current-plugin-owner-aa5b98`，从 `d2506cd`（v0.56.0 验证记录合并）开出。
