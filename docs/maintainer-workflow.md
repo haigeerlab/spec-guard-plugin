@@ -21,6 +21,12 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
 ```
 
+`validate.sh` 的回归段是一张手写的列表，不按文件名发现测试。新增 `test_*.py` 或 `test-*.sh` 时，要在
+`scripts/validate.sh`（或 CI 工作流）里按完整路径加一步；加进并行组的测试不得与其他步骤共享状态
+（见 [spec/validate-parallel-files.md](../spec/validate-parallel-files.md)）。`scripts/check-tests-registered.py` 在快档
+里看守这一点：漏登记、只写文件名或把那一步注释掉，校验都会失败并列出文件。需要外部运行时的测试按下文的
+验收测试命名（文件名含 `acceptance`），不进这张列表。
+
 下列改动还必须运行相应聚焦检查：
 
 | 改动范围 | 必跑检查 |

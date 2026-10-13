@@ -1,5 +1,17 @@
 # Changelog
 
+## [未发布]
+
+### 维护者工具（不进插件包）
+
+- **补登记三个从未运行过的单测。** `test_module_suspend.py`、`test_project_config.py`、`test_state_paths.py` 自
+  2026-10-08 加入起就不在 `scripts/validate.sh` 的列表里，CI、pre-push 与 verify-and-commit 都没跑过它们；现已加进
+  回归段的并行组。（#295）
+- **测试文件漏登记会让校验失败。** 新检查器 `scripts/check-tests-registered.py`：`plugins/`、`scripts/`、`evals/` 下每个
+  `test_*`／`test-*` 的 `.py` 与 `.sh` 都必须按完整路径出现在 `scripts/validate.sh` 或 CI 工作流的非注释行里。文件名含
+  `acceptance` 的验收测试仍由 `check-acceptance-wired.py` 看守，`evals/dispatch-cost/` 的评测素材不查。它在
+  `validate.sh` 的快档里运行，只改文档的提交也会查。
+
 ## [0.58.0] - 2026-10-13
 
 本版一个模块：`linked-project-root`。会话开在不是项目的目录里时，可以显式声明它对应哪个项目。
