@@ -394,13 +394,13 @@ def file_review_state(path: Path, kind: str) -> str:
 
 
 def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
-    """(Review line, replacement next step, Spec state) for the current module; empty strings when nothing to say.
+    """(Review line, replacement next step, Spec state, Plan state) for the current module; empty strings when nothing to say.
 
     Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
     the validated module id only -- never text from the files.
     """
     if stage not in ("NEEDS_PLAN", "BUILDING"):
-        return "", "", "none"
+        return "", "", "none", "none"
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
     spec = file_review_state(root / spec_path, "spec")
     plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
@@ -408,10 +408,10 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
         if state == "invalid":
             return ("- Review: the review marker in `%s` is invalid." % path,
                     "run %s to see what is wrong with the marker; the review state is unknown, so do not "
-                    "continue until it is fixed." % cmd["verify"], spec)
+                    "continue until it is fixed." % cmd["verify"], spec, plan)
         if state == "unreadable":
             return ("- Review: `%s` could not be read, so its review state is unknown (a read failure, "
-                    "not a review state)." % path, "", spec)
+                    "not a review state)." % path, "", spec, plan)
     hold = "do not write the Plan yet" if stage == "NEEDS_PLAN" else "do not continue the build"
     record = " When the user approves it, record that with %s." % cmd["review-mark"]
     if spec == "pending":
@@ -419,15 +419,15 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
         values, problems = load_config(root)
         if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
-                    "together for one approval.%s" % (module, module, record), spec)
-        return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec
+                    "together for one approval.%s" % (module, module, record), spec, plan)
+        return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
     if spec == "revised":
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
-                "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec)
+                "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec, plan)
     if plan == "pending":
         return ("- Review: Plan `%s` is awaiting the user's review." % plan_path,
-                "wait for the user to review `%s`; %s.%s" % (plan_path, hold, record), spec)
-    return "", "", spec
+                "wait for the user to review `%s`; %s.%s" % (plan_path, hold, record), spec, plan)
+    return "", "", spec, plan
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
@@ -555,7 +555,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(boundary_note_line)
     elif context_note:
         notes.append(context_note)
-    review_line, review_step, spec_review = review_hint(root, module, stage, cmd)
+    review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd)
     if review_line:
         counts += "\n" + review_line
     next_step = {
@@ -569,9 +569,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     }[stage]
     if stage == "BUILDING" and not review_step:
         gate = next_gate(root, module)
-        if gate:
+        # A Plan with no marker may still be waiting for the user, so only an approved one is told to keep going.
+        if gate and plan_review == "approved":
             counts += ("\n- Next gate: %s — keep going until it; a `report` checkpoint is recorded in the todo "
                        "and passed without stopping." % gate)
+        elif gate and plan_review == "none":
+            counts += ("\n- Next gate: %s — the first unchecked `gate` checkpoint in the todo. The Plan has no review "
+                       "marker: if the user has not approved it yet, wait for that approval before building." % gate)
     next_step = review_step or next_step
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,
