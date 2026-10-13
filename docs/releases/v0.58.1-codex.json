@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.1;test:marketplace-ref-upgrade-20261013d"
+      },
+      "observedAt": "2026-10-13T07:58:54Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.58.0 to v0.58.1",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.58.1, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.58.1;test:installed-plugin-smoke-20261013d"
+      },
+      "observedAt": "2026-10-13T07:58:54Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.1-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.1;test:installed-copy-changed-tests-20261013d"
+      },
+      "observedAt": "2026-10-13T07:58:54Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:/bin/bash <installed>/hooks/test-setup-teardown.sh",
+        "command:python3 -B <installed>/hooks/test_review_marker.py",
+        "result:all run green from the installed copy (phase-guard 284 cases, verify-artifacts 52 cases, setup/teardown 57 cases, review marker 25 tests)"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.1-codex-handoff-session",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.58.1;test:review-handoff-content-20261013"
+      },
+      "observedAt": "2026-10-13T07:58:54Z",
+      "evidence": [
+        "command:<installed>/hooks/setup-convention.sh local --host=codex in a temporary git project, then codex exec -s workspace-write with a prompt asking the agent to write the Spec of the one mapped module and hand it over for review, no Plan and no code",
+        "result:exit 0; the answer (about 1480 characters) carried the goal and scope with what is out of scope, the proposed contract, assumptions and trade-offs, acceptance, open questions, what the approval authorizes, how to approve, and that the project can switch to combined review; it was not a one-line summary with a link",
+        "result:one run of one small module, so this shows the rule reaches a Codex agent and can be followed, not that every handoff will follow it",
+        "result:codex exec wrote a trust entry for the temporary project into ~/.codex/config.toml; it was the only difference and was removed, and the file equals its state before the run"
+      ]
+    }
+  ]
+}
