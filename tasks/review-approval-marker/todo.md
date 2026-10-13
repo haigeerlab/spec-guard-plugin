@@ -1,6 +1,6 @@
 # Todo: review-approval-marker
 
-- [ ] Task 1：文本指纹入口（先红）
+- [x] Task 1：文本指纹入口（先红） — `spec-digest.py` 新增 `text_digest` 与 `text <file>` 子命令，复用 `_h`；自测先加 3 组断言（稳定／定长／随内容变、子命令输出、读不了退出 1），在旧代码上因 `text_digest` 未定义失败，实现后通过；`test-checkers.sh` 的 digest-single-source 5 例仍通过。
 - [ ] Task 2：标记解析与评审状态（先红）
 - [ ] Task 3：阶段提示的 Review 行与建议语（先红）
 - [ ] Task 4：下一个 gate（先红）
