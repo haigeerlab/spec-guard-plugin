@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.2;test:marketplace-ref-upgrade-20261013e"
+      },
+      "observedAt": "2026-10-13T08:46:11Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.58.1 to v0.58.2",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.58.2, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.58.2;test:installed-plugin-smoke-20261013e"
+      },
+      "observedAt": "2026-10-13T08:46:11Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.2-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.2;test:installed-copy-changed-tests-20261013e"
+      },
+      "observedAt": "2026-10-13T08:46:11Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_project_link.py",
+        "result:all run green from the installed copy (phase-guard 284 cases, verify-artifacts 52 cases, project link 19 tests)",
+        "command:<installed>/hooks/project_link.py set / show and <installed>/hooks/phase-guard.sh",
+        "result:in a temporary layout (a session directory with no convention, an enabled project beside it): the `set` preview and `show` on a valid link each print that the link applies to every session that runs in the directory and that sessions sharing it for different projects should not link; the hook, run from the session directory, prints exactly one Linked project line ending with the same note",
+        "result:the wording is fixed text, so no separate agent session was run for this release"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:a346b36bebe53966db5365f67d320f697bfbcdc5"
+      },
+      "observedAt": "2026-10-13T08:46:11Z",
+      "evidence": [
+        "result:the v0.58.2 annotated tag and origin/main both resolve to merge commit a346b36bebe53966db5365f67d320f697bfbcdc5 (pull request #299, merged after its pull_request run passed; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head 5b96aa6's tree; 0.58.2 is one module, link-shared-directory-note, wording only; inside the plugin package one line of phase-guard.sh, two outputs of project_link.py, commands/link-project.md, spec-guard-ops and tests changed",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.58.2 ...\"",
+        "result:the release commit was made by verify-and-commit.sh after validate (including test_project_link.py, 19 tests), phase-guard (284 cases), verify-artifacts (52 cases) and ShellCheck passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
