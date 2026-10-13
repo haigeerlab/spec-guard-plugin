@@ -1156,9 +1156,134 @@ out="$(RUN_PATH="$WORK/stagefail:$PATH" run "$cw" | context_of)"
 expect "Claude 兜底行仍是 /spec-guard:verify-artifacts" 'run `/spec-guard:verify-artifacts` for details'
 }
 
+part_13() {
+# review-approval-marker：Spec／Plan 的评审标记只改当前模块的 Review 行与建议语；没有标记时输出照旧。
+rv="$WORK/review"
+mkdir -p "$rv/spec" "$rv/tasks/alpha" "$rv/tasks/beta" "$rv/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$rv/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$rv/spec/CAPABILITY-MAP.md"
+PENDING='<!-- spec-guard: review pending -->'
+spec_file() {  # $1=模块 $2=标记行（空=无标记）$3=正文
+  printf '# Spec: %s\n\n%s\n%s\n' "$1" "$2" "${3:-正文}" > "$rv/spec/$1.md"
+}
+approve_spec() {  # $1=模块：把 pending 换成带当前指纹的 approved
+  python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import REVIEW_PENDING, review_approved_line, review_digest
+path = Path(sys.argv[2]); text = path.read_text(encoding="utf-8")
+path.write_text(text.replace(REVIEW_PENDING, review_approved_line(review_digest(text))), encoding="utf-8")
+' "$HOOKDIR" "$rv/spec/$1.md"
+}
+plan_file() {  # $1=模块 $2=标记行（空=无标记）
+  printf '# Plan\n\n%s\n' "$2" > "$rv/tasks/$1/plan.md"
+}
+ctx_of() { run "$rv" | context_of; }
+is() {  # $1=用例名 $2=应包含
+  case "$out" in *"$2"*) ;; *) fail "$1: 缺少「$2」
+$out" ;; esac
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+isnt() {  # $1=用例名 $2=不得包含
+  case "$out" in *"$2"*) fail "$1: 不该出现「$2」
+$out" ;; esac
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+same() {  # $1=用例名 $2=期望全文
+  [ "$out" = "$2" ] || fail "$1: 输出与期望全文不同
+--- 期望
+$2
+--- 实际
+$out"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+
+# NEEDS_PLAN
+spec_file alpha ''
+out="$(ctx_of)"
+is "无标记 NEEDS_PLAN：建议语带上获批条件" 'Suggested next step: create `tasks/alpha/plan.md` and `tasks/alpha/todo.md` (for example with `/plan`) once the Spec is approved by the user.'
+isnt "无标记 NEEDS_PLAN：没有 Review 行" '- Review:'
+spec_file alpha "$PENDING"
+out="$(ctx_of)"
+is "Spec 待审核：Review 行" '- Review: Spec `spec/alpha.md` is awaiting the user'"'"'s review.'
+is "Spec 待审核：不建议写 Plan" 'Suggested next step: wait for the user to review `spec/alpha.md`; do not write the Plan yet.'
+isnt "Spec 待审核：不再给出写 Plan 的建议" 'create `tasks/alpha/plan.md`'
+is "Spec 待审核：阶段名不变" '当前阶段: **NEEDS_PLAN**'
+printf '%s\n' '{"version": 1, "reviewCadence": "combined"}' > "$rv/.agent/config.json"
+out="$(ctx_of)"
+is "合并审 + Spec 待审核：写出 Plan 一起交审" 'Suggested next step: write `tasks/alpha/plan.md` and `tasks/alpha/todo.md`, then present the Spec and the Plan together for one approval.'
+rm "$rv/.agent/config.json"
+approve_spec alpha
+out="$(ctx_of)"
+is "Spec 已批准：建议语与现行相同" 'Suggested next step: create `tasks/alpha/plan.md` and `tasks/alpha/todo.md` (for example with `/plan`).'
+isnt "Spec 已批准：没有 Review 行" '- Review:'
+printf '%s\n' '补一条' >> "$rv/spec/alpha.md"
+out="$(ctx_of)"
+is "Spec 批准后被改：Review 行" '- Review: Spec `spec/alpha.md` was edited after it was approved.'
+is "Spec 批准后被改：要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not write the Plan yet.'
+printf '%s\n' "$PENDING" >> "$rv/spec/alpha.md"
+out="$(ctx_of)"
+is "标记无效：Review 行指出文件" '- Review: the review marker in `spec/alpha.md` is invalid.'
+is "标记无效：不建议继续" 'the review state is unknown, so do not continue until it is fixed.'
+
+# BUILDING
+spec_file alpha ''; plan_file alpha ''
+printf '%s\n' '- [ ] open' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+same "无标记 BUILDING：输出逐字不变" '## spec-guard local workflow
+
+当前阶段: **BUILDING**
+
+- Capability map: present
+- Current module: `alpha` (next in Build order)
+- Modules 2 · Specs 1 · Plans 1 · In progress 1 · Done 0
+
+Suggested next step: continue `/build` on `alpha`: 1 unchecked item(s) in `tasks/alpha/todo.md`.'
+plan_file alpha "$PENDING"
+out="$(ctx_of)"
+is "Plan 待审核：Review 行" '- Review: Plan `tasks/alpha/plan.md` is awaiting the user'"'"'s review.'
+is "Plan 待审核：不建议继续 build" 'Suggested next step: wait for the user to review `tasks/alpha/plan.md`; do not continue the build.'
+isnt "Plan 待审核：不再催 build" 'continue `/build`'
+is "Plan 待审核：阶段名不变" '当前阶段: **BUILDING**'
+spec_file alpha "$PENDING"
+out="$(ctx_of)"
+is "BUILDING 时 Spec 待审核优先于 Plan" 'Suggested next step: wait for the user to review `spec/alpha.md`; do not continue the build.'
+approve_spec alpha; plan_file alpha '<!-- spec-guard: review approved -->'
+out="$(ctx_of)"
+is "两份都已批准：建议语与现行相同" 'Suggested next step: continue `/build` on `alpha`: 1 unchecked item(s) in `tasks/alpha/todo.md`.'
+isnt "两份都已批准：没有 Review 行" '- Review:'
+printf '%s\n' '补一条' >> "$rv/spec/alpha.md"
+out="$(ctx_of)"
+is "BUILDING 时 Spec 批准后被改：要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+plan_file alpha '<!-- spec-guard: review approved 0123456789ab -->'
+spec_file alpha ''
+out="$(ctx_of)"
+is "Plan 的 approved 带指纹：标记无效" '- Review: the review marker in `tasks/alpha/plan.md` is invalid.'
+
+# 只看当前模块；MODULE_DONE、DONE、NEEDS_SPEC 不变
+plan_file alpha ''
+spec_file beta "$PENDING"
+out="$(ctx_of)"
+isnt "非当前模块的标记不影响输出" '- Review:'
+is "非当前模块的标记不影响建议语" 'Suggested next step: continue `/build` on `alpha`'
+printf '%s\n' '- [x] done' > "$rv/tasks/alpha/todo.md"
+printf '%s\n' '{"activeModule":"alpha"}' > "$rv/.agent/state.json"
+plan_file alpha "$PENDING"
+out="$(ctx_of)"
+is "MODULE_DONE 不受已完成模块的标记影响" '当前阶段: **MODULE_DONE**'
+isnt "MODULE_DONE 没有 Review 行" '- Review:'
+rm "$rv/.agent/state.json" "$rv/spec/beta.md"
+out="$(ctx_of)"
+is "NEEDS_SPEC 不变" 'Suggested next step: write and review `spec/beta.md`.'
+isnt "NEEDS_SPEC 没有 Review 行" '- Review:'
+injects "带标记时注入仍是宿主接受的 JSON" "$rv" "当前阶段: **NEEDS_SPEC**"
+}
+
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=12
+PARTS=13
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

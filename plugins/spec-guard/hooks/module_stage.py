@@ -263,6 +263,7 @@ COMMANDS = {
         "verify-quoted": "`/spec-guard:verify-artifacts`",
         "config": "/spec-guard:config",
         "resume": "`/spec-guard:module-suspend --resume %s` (Codex: spec-guard-ops module-suspend)",
+        "review-mark": "`/spec-guard:review-mark` (Codex: spec-guard-ops review-mark)",
         "plan": "`/plan`",
         "build": "`/build`",
         "free-next": FREE_BOUNDARY,
@@ -286,6 +287,7 @@ COMMANDS["codex"] = {
     "verify-quoted": "`$spec-guard-ops` verify-artifacts",
     "config": "`$spec-guard-ops` config",
     "resume": "`$spec-guard-ops` module-suspend --resume %s",
+    "review-mark": "`$spec-guard-ops` review-mark",
     "plan": "`$planning-and-task-breakdown`",
     "build": "`$incremental-implementation`",
     "free-next": ("Give the user " + CODEX_COMPACT
@@ -348,6 +350,53 @@ def config_lines(root: Path, host: str | None = None) -> list:
                      "and the Plan together for one approval; split them when a new decision, unclear "
                      "scope or a high-risk change appears.")
     return lines
+
+
+def file_review_state(path: Path, kind: str) -> str:
+    """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
+    if not path.is_file():
+        return "none"
+    try:
+        return review_state(path.read_text(encoding="utf-8"), kind)
+    except (OSError, UnicodeError):
+        return "unreadable"
+
+
+def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
+    """(Review line, replacement next step, Spec state) for the current module; empty strings when nothing to say.
+
+    Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
+    the validated module id only -- never text from the files.
+    """
+    if stage not in ("NEEDS_PLAN", "BUILDING"):
+        return "", "", "none"
+    spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
+    spec = file_review_state(root / spec_path, "spec")
+    plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
+    for state, path in ((spec, spec_path), (plan, plan_path)):
+        if state == "invalid":
+            return ("- Review: the review marker in `%s` is invalid." % path,
+                    "run %s to see what is wrong with the marker; the review state is unknown, so do not "
+                    "continue until it is fixed." % cmd["verify"], spec)
+        if state == "unreadable":
+            return ("- Review: `%s` could not be read, so its review state is unknown (a read failure, "
+                    "not a review state)." % path, "", spec)
+    hold = "do not write the Plan yet" if stage == "NEEDS_PLAN" else "do not continue the build"
+    record = " When the user approves it, record that with %s." % cmd["review-mark"]
+    if spec == "pending":
+        line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
+        values, problems = load_config(root)
+        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+            return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
+                    "together for one approval.%s" % (module, module, record), spec)
+        return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec
+    if spec == "revised":
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec)
+    if plan == "pending":
+        return ("- Review: Plan `%s` is awaiting the user's review." % plan_path,
+                "wait for the user to review `%s`; %s.%s" % (plan_path, hold, record), spec)
+    return "", "", spec
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
@@ -475,14 +524,19 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(boundary_note_line)
     elif context_note:
         notes.append(context_note)
+    review_line, review_step, spec_review = review_hint(root, module, stage, cmd)
+    if review_line:
+        counts += "\n" + review_line
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
-        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)." % (module, module,
-                                                                                                 cmd["plan"]),
+        # No marker says nothing about approval either way, so the suggestion names the condition.
+        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
+            module, module, cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else ""),
         "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
                                                                                          current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
+    next_step = review_step or next_step
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,
                                           "".join(n + "\n" for n in notes), next_step))
