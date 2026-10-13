@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 LINK_PATH = Path(".agent") / "spec-guard-link.json"
@@ -83,6 +84,36 @@ def resolve_for(session_root, session_ids=()) -> tuple:
         return "none", None, None
     target = _target(root, link["project"])
     return ("ok" if target.is_dir() else "missing"), target, "directory"
+
+
+_TRAILING_UUID = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
+
+
+def session_ids_from_hook_input(text: str) -> list:
+    """Candidate ids of the session a hook input belongs to; [] when it says nothing usable.
+
+    Both hosts name the transcript after the session: Claude Code uses the id as the file name, Codex ends
+    the rollout file name with it.  `session_id` is taken too when the input carries one.
+    """
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    found = []
+    session_id = data.get("session_id")
+    if isinstance(session_id, str):
+        found.append(session_id)
+    transcript = data.get("transcript_path")
+    if isinstance(transcript, str) and transcript:
+        stem = Path(transcript).name
+        stem = stem[:-len(".jsonl")] if stem.endswith(".jsonl") else stem
+        found.append(stem)
+        tail = _TRAILING_UUID.search(stem)
+        if tail:
+            found.append(tail.group(0))
+    return [value for value in dict.fromkeys(found) if SESSION_ID.fullmatch(value)]
 
 
 def resolve(session_root) -> tuple:
@@ -251,6 +282,7 @@ def main(argv=None) -> int:
     setter = sub.add_parser("set", help="write the link (preview unless --confirm)")
     setter.add_argument("--project", required=True)
     unsetter = sub.add_parser("unset", help="remove the link (preview unless --confirm)")
+    probe.add_argument("--hook-input", action="store_true", help="read the hook input (JSON) from stdin for the session id")
     for command in (probe, show, setter, unsetter):
         command.add_argument("--from", dest="session", default=".")
     for command in (setter, unsetter):
@@ -258,13 +290,15 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     session = Path(args.session).resolve()
     if args.action == "resolve":
-        state, target = resolve(session)
+        ids = session_ids_from_hook_input(sys.stdin.read()) if args.hook_input else []
+        state, target, source = resolve_for(session, ids)
         print(state)
         print(target if state == "ok" else "")
         # The agent is told to pass this path on, so it must arrive whole: bound it by the path limit, not by the
         # 200 characters meant for diagnostics.
         print(safe_fragment(str(target), PATH_SHOWN) if target is not None else "")
         print(safe_fragment(str(session), PATH_SHOWN))
+        print(source or "")
         return 0
     if not session.is_dir():
         print("session-missing: %s is not a directory" % session)
