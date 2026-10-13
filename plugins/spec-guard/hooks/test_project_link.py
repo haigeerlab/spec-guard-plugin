@@ -140,6 +140,22 @@ class Command(unittest.TestCase):
         self.assertIn("valid", out)
         self.assertIn(str(self.dirs.project), out)
 
+    def test_set_and_show_say_the_link_covers_every_session_in_the_directory(self):
+        note = "applies to every session that runs in this directory"
+        code, out = self.run_cmd("show")
+        self.assertNotIn(note, out)                      # no link: nothing to warn about
+        code, out = self.run_cmd("set", "--project", str(self.dirs.project))
+        self.assertEqual(code, 0, out)
+        self.assertIn(note, out)
+        self.assertIn("do not link", out)
+        code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertIn(note, out)
+        code, out = self.run_cmd("show")
+        self.assertIn(note, out)
+        self.dirs.link({"version": 1, "project": str(self.dirs.project / "gone")})
+        self.assertNotIn(note, self.run_cmd("show")[1])  # a broken link reports why it is broken instead
+
     def test_a_relative_path_is_stored_as_given_and_resolved_from_the_session_directory(self):
         code, out = self.run_cmd("set", "--project", "../the project", "--confirm", cwd=str(self.dirs.project))
         self.assertEqual(code, 0, out)

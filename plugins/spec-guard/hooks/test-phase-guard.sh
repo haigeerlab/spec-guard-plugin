@@ -1385,7 +1385,9 @@ text, project, session = sys.argv[1], os.path.realpath(sys.argv[2]), os.path.rea
 lines = [line for line in text.splitlines() if line.startswith("Linked project:")]
 assert len(lines) == 1, lines
 expected = ("Linked project: `%s` — this session's directory `%s` points to it through `.agent/spec-guard-link.json`. "
-            "Pass this path as the project when you run spec-guard commands." % (project, session))
+            "Pass this path as the project when you run spec-guard commands. The link applies to every session that "
+            "runs in that directory; if this session works on a different project, ignore this stage and pass your own "
+            "project path." % (project, session))
 assert lines[0] == expected, (lines[0], expected)
 location = [line for line in text.splitlines() if line.startswith("Location:")]
 assert len(location) == 1 and project in location[0], location
