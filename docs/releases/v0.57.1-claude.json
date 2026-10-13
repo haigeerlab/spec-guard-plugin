@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.57.1;test:installed-plugin-upgrade-20261013b"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.57.0 to 0.57.1 for scope user; the installed copy records gitCommitSha 61a2aec8d34edfcea55e3259a9be4feadbfb54bc -- the v0.57.1 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.1-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.57.1;test:installed-copy-changed-tests-20261013b"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_review_marker.py",
+        "result:all run green from the installed copy (phase-guard 258 cases, verify-artifacts 52 cases, review marker 23 tests)",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:13 of 17 pass, including both tests added in 0.57.1; the same 4 as on 0.56.0 and 0.57.0 error because they read repository files outside the plugin package, which Claude's installed layout does not carry",
+        "command:CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/phase-guard.sh </dev/null",
+        "result:in a temporary project, installed 0.57.0 against installed 0.57.1: with no review marker on the Plan the Next gate line no longer says \"keep going until it\" and instead names the first unchecked gate checkpoint and says to wait for approval; after the Plan alone is marked approved (Spec unmarked, Spec file unchanged, the output says it records the Plan's approval only) the line is the 0.57.0 wording again; approving the Plan while the Spec is pending is refused with exit 2 and the message that the Spec needs its own explicit approval; the Module boundary line now carries the slash-command note (not a shell command, no shell language tag on the code block, send it in the message box)"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.1-claude-slash-block-wording",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.57.1;test:slash-block-wording-20261013"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:claude -p with a prompt carrying the installed hook's Module boundary injection as text plus the desktop app's instruction to put shell commands in a bash-tagged block; twice with the 0.57.0 injection and twice with the 0.57.1 injection",
+        "result:with the 0.57.1 wording both answers put /compact in a block tagged `text` and first said to send it in the chat input box, not in a terminal; with the 0.57.0 wording both answers used a block with no language tag, so the bash-tagged block the user met was not reproduced in two runs -- the old wording allowed it, the new wording rules it out",
+        "result:this checks what the wording makes an agent write; the injection reached the model as prompt text, not through the hook, because `claude -p` is an unattended run and the hook leaves this line out of it by design (confirmed: such a run answered that it had no Module boundary line)"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.1-claude-desktop-run-button",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-desktop:v0.57.1;test:compact-block-has-no-run-button"
+      },
+      "reason": "whether the Claude desktop app still shows a Run button next to the /compact block can only be seen in the app by the user; computer use is not allowed on the Claude desktop app itself, so the agent did not observe it"
+    }
+  ]
+}

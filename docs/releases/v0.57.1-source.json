@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:61a2aec8d34edfcea55e3259a9be4feadbfb54bc"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "result:the v0.57.1 annotated tag and origin/main both resolve to merge commit 61a2aec8d34edfcea55e3259a9be4feadbfb54bc (pull request #291, merged after its pull_request run passed; the push run on main passed before tagging)",
+        "result:0.57.1 covers two modules: review-marker-legacy-projects (#290, merged first without a version bump) and slash-command-code-block (#291, carries the version); the merge commit's parents are #290's merge commit and #291's head 6863a52, so its tree is that head plus the v0.57.0 evidence files from #289, not the head's tree alone",
+        "result:inside the plugin package module_stage.py, review_mark.py, commands/review-mark.md, spec-guard-ops, the shared checkpoint contract and tests changed",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.57.1 ...\"",
+        "result:the release commit was made by verify-and-commit.sh after validate, phase-guard (258 cases), verify-artifacts (52 cases) and ShellCheck passed under macOS /bin/bash 3.2.57; one earlier attempt was stopped by a phase-guard case with a 3-second limit while the machine's load average was 37, and passed on standalone reruns and on retry"
+      ]
+    }
+  ]
+}
