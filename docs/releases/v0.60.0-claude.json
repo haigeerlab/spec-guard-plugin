@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.0;test:installed-plugin-upgrade-20261013g"
+      },
+      "observedAt": "2026-10-13T10:24:26Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.59.0 to 0.60.0 for scope user; the installed copy records gitCommitSha 7476d9cc5ca92c5edb640cfc072535604415ed1b -- the v0.60.0 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.0;test:installed-copy-changed-tests-20261013g"
+      },
+      "observedAt": "2026-10-13T10:24:26Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:python3 -B <installed>/hooks/test_project_link.py",
+        "result:both run green from the installed copy (phase-guard 298 cases, project link 32 cases)",
+        "command:claude -p --session-id <uuid> / claude -p --resume <uuid>, run in the shared session directory",
+        "result:in a temporary layout (two enabled projects and one shared session directory that is not enabled) two real sessions were each registered to a different project with `link-project set --session`; resumed, each quoted a `Linked project` paragraph naming its own project and saying the session is linked by its own entry; a third, unregistered session in the same directory answered that there was no spec-guard context",
+        "result:the session ids were chosen up front with --session-id and the registrations were written with the installed copy's project_link.py; the hook received the same id as session_id and the resumed sessions kept it"
+      ]
+    }
+  ]
+}

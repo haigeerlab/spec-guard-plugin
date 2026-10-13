@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.0;test:marketplace-upgrade-and-smoke-20261013g"
+      },
+      "observedAt": "2026-10-13T10:24:26Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.59.0 to v0.60.0; upgrade exited 0; the installed manifest reads 0.60.0; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.0;test:installed-copy-changed-tests-20261013g"
+      },
+      "observedAt": "2026-10-13T10:24:26Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:python3 -B <installed>/hooks/test_project_link.py",
+        "result:both run green from the installed copy (phase-guard 298 cases, project link 32 cases)",
+        "command:codex exec -s workspace-write (each session registers itself with \"$CODEX_THREAD_ID\") / codex exec resume <thread id>, run in the shared session directory",
+        "result:in a temporary layout (two enabled projects and one shared session directory that is not enabled) two real sessions were each registered to a different project with `link-project set --session`; resumed, each quoted a `Linked project` paragraph naming its own project and saying the session is linked by its own entry; a third, unregistered session in the same directory answered that there was no spec-guard context",
+        "result:each session registered itself by passing its own CODEX_THREAD_ID; the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was the only difference and was removed afterwards"
+      ]
+    }
+  ]
+}
