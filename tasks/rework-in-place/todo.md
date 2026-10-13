@@ -5,3 +5,4 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — 随 Task 2 的提交跑 `verify-and-commit.sh` 全档。未验证：安装副本上的实际输出（发版后看）。
 - [x] Task 3：文档、CHANGELOG 与版本号 — `docs/workflow.md` 两段（返工、模块太小）；`docs/troubleshooting.md` 一行（新警告的含义与处理）；CHANGELOG `[0.59.0] - 2026-10-13`；两份 `plugin.json` 改为 0.59.0，中英 README 的 `--ref` 改为 v0.59.0。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-13 在对话里展示验证结果、未验证项与任务 2 里的一次偏差，用户确认推送与开 PR。验证链（`verify-and-commit.sh` 全档，macOS `/bin/bash`）：`validate.sh` 通过、phase-guard 284 例（未改）、verify-artifacts 60 例、`test_workflow_checkpoints.py` 19 例、ShellCheck 无告警；本仓库实跑 `verify-artifacts` 5 通过 0 警告。Spec 批准后未改动。未验证：安装副本上的实际输出（发版后看）；未做独立代码评审。同日收到一个实地用例（已完成模块里做“第二批”新增操作，agent 改写原文件并自建归档目录）：按本模块的规则属于新能力、应另开模块，未因此增加规则。
+- [x] 发版后的验证（2026-10-13，v0.59.0） — 两份安装副本上跑改过的测试全绿；带旁路清单的临时项目上，两份副本的 `verify-artifacts` 都给出一条警告（文件与项数），汇总 3 通过 1 警告 0 失败，退出码 0；安装副本的检查点规则里有「返工与小模块」一节。固定文字与固定输出，未另做真实 agent 会话。记录见 `docs/releases/v0.59.0-*.json`。
