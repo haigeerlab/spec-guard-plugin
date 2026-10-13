@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:ba4f7cab3cdc1fbeb78641469d5f91f6815fe609"
+      },
+      "observedAt": "2026-10-13T10:49:12Z",
+      "evidence": [
+        "result:the v0.60.1 annotated tag and origin/main both resolve to merge commit ba4f7cab3cdc1fbeb78641469d5f91f6815fe609 (pull request #305; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head fb95861's tree; 0.60.1 is one module, changed-files-at-acceptance; inside the plugin package the shared checkpoint contract, the two convention-block templates and test_workflow_checkpoints.py changed -- rule text only",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.60.1 ...\"",
+        "result:the release commit was made by verify-and-commit.sh after validate, phase-guard (298 cases) and verify-artifacts (60 cases) passed under macOS /bin/bash 3.2.57; no .sh file changed, so ShellCheck was not run"
+      ]
+    }
+  ]
+}

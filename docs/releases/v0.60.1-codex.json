@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.1;test:marketplace-upgrade-and-smoke-20261013h"
+      },
+      "observedAt": "2026-10-13T10:49:12Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.60.0 to v0.60.1; the upgrade reported both marketplaces upgraded; the installed manifest reads 0.60.1; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.1-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.1;test:final-gate-lists-changed-files-20261013h"
+      },
+      "observedAt": "2026-10-13T10:49:12Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-setup-teardown.sh",
+        "result:the installed checkpoint contract carries the rule on listing the changed files at the final gate, both installed templates carry the new line, and test-setup-teardown.sh runs green from the installed copy (57 cases)",
+        "command:codex exec -s workspace-write \"<keep building to the next checkpoint>\"",
+        "result:a temporary project was set up with the installed copy (so its convention block carries the new line) holding one approved module with two tasks and a final gate, committed as a baseline; the session was asked only to keep building to the next checkpoint that needs confirmation -- the prompt did not mention files",
+        "result:one run: the session finished both tasks with one commit each, stopped at the final gate and listed the changed files as taken from the repository (3 files; two added and one modified with line counts; deleted: none; beyond the plan: none) and gave each task's file count and commit id",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was the only difference and was removed afterwards"
+      ]
+    }
+  ]
+}

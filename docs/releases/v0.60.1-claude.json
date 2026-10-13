@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.1;test:installed-plugin-upgrade-20261013h"
+      },
+      "observedAt": "2026-10-13T10:49:12Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.60.0 to 0.60.1 for scope user; the installed copy records gitCommitSha ba4f7cab3cdc1fbeb78641469d5f91f6815fe609 -- the v0.60.1 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.1-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.1;test:final-gate-lists-changed-files-20261013h"
+      },
+      "observedAt": "2026-10-13T10:49:12Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-setup-teardown.sh",
+        "result:the installed checkpoint contract carries the rule on listing the changed files at the final gate, both installed templates carry the new line, and test-setup-teardown.sh runs green from the installed copy (57 cases)",
+        "command:claude -p \"<keep building to the next checkpoint>\" --permission-mode acceptEdits --allowedTools ...",
+        "result:a temporary project was set up with the installed copy (so its convention block carries the new line) holding one approved module with two tasks and a final gate, committed as a baseline; the session was asked only to keep building to the next checkpoint that needs confirmation -- the prompt did not mention files",
+        "result:one run: the session finished both tasks with one commit each, stopped at the final gate and listed the changed files from the commit range (3 files, +16/-2; two added, one modified, with line counts) and both commit ids; it did not write an explicit line for deleted files or for files beyond the Plan's footprint, so the rule was followed in substance but not in every item"
+      ]
+    }
+  ]
+}
