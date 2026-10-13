@@ -172,7 +172,9 @@ class CheckpointContractTests(unittest.TestCase):
     def test_review_markers(self):
         section = self.section("## 评审状态标记")
         for phrase in ("<!-- spec-guard: review pending -->", "<!-- spec-guard: review approved", "不是授权来源",
-                       "修订后须复审", "明确批准", "review-mark", "没有标记", "先于任何代码改动"):
+                       "修订后须复审", "明确批准", "review-mark", "没有标记", "先于任何代码改动",
+                       "“继续”不会被记为批准", "不要等用户说了“继续”再解释", "不得依据此前含糊的答复补记",
+                       "不妨碍单独记录 Plan 的批准"):
             self.assertIn(phrase, section)
         self.assertNotIn("自动批准", section)
         self.assertIn("连续执行到下一个 `gate`", self.section("## Plan 检查点分级"))

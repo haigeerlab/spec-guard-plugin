@@ -3,6 +3,6 @@
 - [x] Task 1：Next gate 的中性措辞（先红） — `test-phase-guard.sh` 第 13 段：三条现有用例的期望改为中性措辞，新增 Plan 无标记时不含“keep going”、Plan 已批准时与 0.57.0 逐字相同、已批准时没有无标记说明，共多 3 例；先在第一条变红。`review_hint` 一并返回 Plan 的评审状态，`describe` 只对 `approved` 说 keep going，对 `none` 给中性说明。252 例全绿。
 - [x] Task 2：Spec 没有标记时允许单独批准 Plan（先红） — `test_review_marker.py`：原“Spec 未批准即拒绝”一例拆成四例（Spec 无标记允许且 Spec 文件逐字未变、Spec 文件不存在允许、待审核／已修订／无效各拒绝且拒绝信息含单独确认的要求、Spec 已批准照常），先 3 例失败，改 `review_mark.py` 后 23 例全绿；Spec 状态改用 `file_review_state` 判。临时项目实跑：都没有标记时 Next gate 是中性措辞，单独批准 Plan 成功、Spec 未动，之后 Next gate 变回 keep going。与 Task 1 同一个提交（提交脚本不允许留未暂存的改动）。
 - [x] Checkpoint 1（report）：三套核心回归与单测全绿，ShellCheck 无警告 — 随 Task 1、2 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`（含 `test_review_marker.py` 23 例）、phase-guard 252 例、verify-artifacts 52 例（未改）、ShellCheck 无告警。未验证：两边宿主的实际呈现（发版后做）。
-- [ ] Task 3：规则文本、命令与文档（先红）
-- [ ] Task 4：版本号
+- [x] Task 3：规则文本、命令与文档（先红） — `test_workflow_checkpoints.py` 的评审标记断言加四个关键词（“继续”不会被记为批准、不要等用户说了“继续”再解释、不得依据此前含糊的答复补记、不妨碍单独记录 Plan 的批准），先失败后通过。改动：共享检查点规则三条（交审时说明、没有标记时 Next gate 的说法、既有项目补标记）；`commands/review-mark.md` 两条加拒绝条件；`spec-guard-ops` 一段；`docs/commands.md`、`docs/troubleshooting.md` 各一处；CHANGELOG `[0.57.1]`。约定块模板未改。
+- [x] Task 4：版本号 — 两份 `plugin.json` 改为 0.57.1，中英 README 的 `--ref` 改为 v0.57.1，CHANGELOG 标题 `[0.57.1] - 2026-10-13`。与 Task 3 同一个提交。
 - [ ] Checkpoint 2（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
