@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.58.0;test:installed-plugin-upgrade-20261013c"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.57.1 to 0.58.0 for scope user; the installed copy records gitCommitSha 03a87eb62b6ca867d0acf235a073665119f4ccd3 -- the v0.58.0 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.58.0;test:installed-copy-changed-tests-20261013c"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_project_link.py",
+        "result:all run green from the installed copy (phase-guard 284 cases, verify-artifacts 52 cases, project link 18 tests)"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.0-claude-linked-session",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.58.0;test:linked-project-session-20261013"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:claude -p from the session directory of a temporary layout: a session directory with no convention (its name carries a space) and an enabled project beside it, before any link exists",
+        "result:the session answered that it had no spec-guard injection",
+        "command:python3 -B <installed>/hooks/project_link.py set --from <session dir> --project ../code-repo --confirm, then claude -p again",
+        "result:exit 0; the session copied its injection verbatim: the Linked project line naming the project and the session directory, and \"当前阶段: **NEEDS_PLAN**\" -- the linked project's stage"
+      ]
+    }
+  ]
+}
