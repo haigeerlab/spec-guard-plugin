@@ -141,8 +141,11 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B scripts/run_tests_parallel.py plugins/spec-guard/hooks/test_proposal_promotion_proof.py' \
   'python3 -B plugins/spec-guard/hooks/test_module_insert.py' \
   'python3 -B plugins/spec-guard/hooks/test_module_stage_sanitization.py' \
+  'python3 -B plugins/spec-guard/hooks/test_module_suspend.py' \
   'python3 -B plugins/spec-guard/hooks/test_review_marker.py' \
   'python3 -B plugins/spec-guard/hooks/test_tracker_default.py' \
+  'python3 -B plugins/spec-guard/hooks/test_project_config.py' \
+  'python3 -B plugins/spec-guard/hooks/test_state_paths.py' \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout.py' \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout_providers.py' \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout_local.py' \
