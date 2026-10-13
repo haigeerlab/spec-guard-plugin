@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.57.1;test:marketplace-ref-upgrade-20261013b"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.57.0 to v0.57.1",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.57.1, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.57.1;test:installed-plugin-smoke-20261013b"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.1-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.57.1;test:installed-copy-changed-tests-20261013b"
+      },
+      "observedAt": "2026-10-13T06:26:46Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_review_marker.py",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:all run green from the installed copy (phase-guard 258 cases, verify-artifacts 52 cases, review marker 23 tests, checkpoint contract 17 tests)",
+        "command:SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/phase-guard.sh </dev/null",
+        "result:in a temporary project, installed 0.57.0 against installed 0.57.1: with no review marker on the Plan the Next gate line no longer says \"keep going until it\" and instead names the first unchecked gate checkpoint and says to wait for approval; after the Plan alone is marked approved (Spec unmarked, Spec file unchanged, the output says it records the Plan's approval only) the line is the 0.57.0 wording again; approving the Plan while the Spec is pending is refused with exit 2 and the message that the Spec needs its own explicit approval; the Module boundary line now carries the slash-command note (not a shell command, no shell language tag on the code block, send it in the message box); under Codex the boundary line keeps \"/compact (Codex's /compact takes no focus text)\" and adds the same note"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.1-codex-slash-block-session",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex:v0.57.1;test:slash-block-agent-output"
+      },
+      "reason": "the Module boundary and Session context lines are left out of unattended runs by design, and `codex exec` is one, so a headless Codex session never receives the line; whether a Codex agent in an attended session writes the /compact block without a shell language tag was not observed"
+    }
+  ]
+}
