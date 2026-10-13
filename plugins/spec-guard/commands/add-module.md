@@ -105,5 +105,8 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 不因同 PR 而跳过。预检已内嵌于本命令，通常无需另跑独立 preflight。
 不带 `--proposal` 时行为不变。
 
+先判断是不是该开新模块（细则见 `spec-guard-ops` 的共享检查点规则「返工与小模块」）：返工或修订已完成的模块，不开新模块，在它的 `todo.md` 追加任务；
+只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或与同类模块一次批量交审。
+
 如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
 已接受的 Proposal 用上面的 `--proposal` 晋级。

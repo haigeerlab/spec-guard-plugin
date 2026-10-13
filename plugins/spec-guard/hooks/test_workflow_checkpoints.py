@@ -204,6 +204,18 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("在对话里呈现内容要点", "只给链接不算交审"):
                     self.assertIn(phrase, text)
 
+    def test_rework_goes_back_into_the_module(self):
+        section = self.section("## 返工与小模块")
+        for phrase in ("`tasks/<id>/todo.md` 追加", "`plan.md` 补一节", "不在 `tasks/<id>/` 下另建带清单的文件",
+                       "改回 `pending`", "另开模块", "下一个模块的第一个任务", "不新增行为", "并成相邻模块的一个任务",
+                       "按需求批量前置审", "只留最后一个 `gate`"):
+            self.assertIn(phrase, section)
+        for relative in ("commands/add-module.md", "skills/spec-guard-ops/SKILL.md"):
+            with self.subTest(path=relative):
+                text = (self.plugin / relative).read_text(encoding="utf-8")
+                for phrase in ("返工", "不新增行为"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")
