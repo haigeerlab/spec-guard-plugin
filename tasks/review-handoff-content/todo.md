@@ -1,6 +1,6 @@
 # Todo: review-handoff-content
 
-- [x] Task 1：规则文字与约定块模板（先红） — `test_workflow_checkpoints.py` 新增 1 例（「评审状态标记」含 Spec 六个要点、Plan 四个要点、“只给链接…不算交审”“授权什么”“同时批准 Spec 与 Plan”“不记为 approved”“不能替代内容”；「评审节奏」含“第一次交审时说明一次”“之后不再重复”与 config 命令；两份模板各含“在对话里呈现内容要点”“只给链接不算交审”），先失败后通过。共享检查点规则新增“交审要让用户看到内容”一条、改写“请求审核时说明怎么批准”一条、「评审节奏」补一段；两份模板与 `docs/convention-block.md` 各改一行。本仓库 `AGENTS.md` 的约定块用工作区源码 `setup-convention.sh local --host=codex --replace` 先 dry-run（换掉一行、保留本地段、无需确认的删除）后写入。
+- [x] Task 1：规则文字与约定块模板（先红） — `test_workflow_checkpoints.py` 新增 1 例（「评审状态标记」含 Spec 六个要点、Plan 四个要点、“只给链接…不算交审”“授权什么”“同时批准 Spec 与 Plan”“不记为 approved”“不能替代内容”；「评审节奏」含“第一次交审时说明一次”“之后不再重复”与 config 命令；两份模板各含“在对话里呈现内容要点”“只给链接不算交审”），先失败后通过。共享检查点规则新增“交审要让用户看到内容”一条、改写“请求审核时说明怎么批准”一条、「评审节奏」补一段；两份模板与 `docs/convention-block.md` 各改一行。更正：上一句提交时写的“约定块已写入”不属实——那次 `--replace` 被拒绝了（改写了模板里已有的一行，旧行不在新模板里，工具要求 `--accept-removals`），`AGENTS.md` 当时没有变，是我没看完整输出就记了结果。随后改了做法：模板里原有的那一行保持不动，另加一行“交审 Spec 或 Plan 时在对话里呈现内容要点并写明这次批准授权什么，只给链接不算交审”。这样既有项目升级后 `--replace` 只有新增、不会被拒绝。改后重新运行，输出 `updated AGENTS.md`，并核对约定块里确有新行。与 Spec 的出入：Spec 写的是“那一行补半句”，实现是另加一行；Spec 未改，留到 Checkpoint 2 请用户确认后再改。
 - [ ] Task 2：`review_mark.py` 的提醒（先红）
 - [ ] Task 3：接入完成时的输出（先红）
 - [ ] Checkpoint 1（report）：三套核心回归与上述测试全绿，ShellCheck 无警告
