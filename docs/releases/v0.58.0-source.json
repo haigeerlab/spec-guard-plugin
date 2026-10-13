@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:03a87eb62b6ca867d0acf235a073665119f4ccd3"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "result:the v0.58.0 annotated tag and origin/main both resolve to merge commit 03a87eb62b6ca867d0acf235a073665119f4ccd3 (pull request #293, merged after its pull_request run passed)",
+        "result:the push run on main first failed in the ShellCheck step because downloading the ShellCheck binary returned 403 rate limit exceeded -- the check itself never ran; the failed job was re-run and passed before tagging",
+        "result:the merge commit's tree equals the pull request head ce3fad8's tree; 0.58.0 is one module, linked-project-root; inside the plugin package phase-guard.sh, the new project_link.py and commands/link-project.md, spec-guard-ops and tests changed",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.58.0 ...\"",
+        "result:the release commit was made by verify-and-commit.sh after validate (including test_project_link.py, 18 tests), phase-guard (284 cases), verify-artifacts (52 cases) and ShellCheck passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
