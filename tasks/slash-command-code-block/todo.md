@@ -1,0 +1,7 @@
+# Todo: slash-command-code-block
+
+- [x] Task 1：三句提示加斜杠命令说明（先红） — `test-phase-guard.sh`：三处硬编码的 Claude 行期望（模块完成行、带大小的模块完成行、上下文行）加上说明；Codex 的模块完成行与上下文行各加三条要点断言，模块完成行另断言说明恰好一处；判断不了宿主时断言不出现说明。先在四条模块完成行用例变红。`module_stage.py` 新增常量 `SLASH_BLOCK`，接进 `free-next`、`free-current` 与 `CODEX_COMPACT`，放在 `do not paste handoff text` 之前。实现后第 9、10 段仍红，查明是测试自己的问题：带大小的那一行期望写在双引号字符串里，新文字的反引号被 bash 当成命令替换，转义后 258 例全绿，实现未动。
+- [x] Task 2：规则与文档（先红） — `test_workflow_checkpoints.py` 新增 1 例（「按需求批量前置审」含“不带 shell 语言标签的代码块”“发到消息输入框”“不是终端命令”），先失败后通过。共享检查点规则讲 80% 提示的那句补一句；`docs/troubleshooting.md` 加一行；CHANGELOG 补上本模块的修复条目。
+- [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — 随 Task 2、3 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`（自观测报告与 Codex smoke 判决器自检照常通过，没有脚本依赖这几行的原文）、phase-guard 258 例、verify-artifacts 52 例、ShellCheck 无告警。Task 1 的第一次提交被 phase-guard 第 9 段一条带 3 秒时限的用例拦下，当时机器负载均值 37；单独重跑两次与重试提交均通过，判为负载导致的偶发超时，与本模块无关。未验证：两边宿主的实际输出与桌面应用的显示（发版后做）。
+- [x] Task 3：版本号 — 两份 `plugin.json` 改为 0.57.1，中英 README 的 `--ref` 改为 v0.57.1，CHANGELOG `[未发布]` 改为 `[0.57.1] - 2026-10-13` 并在概述写明本版两个模块。与 Task 2 同一个提交。
+- [x] Checkpoint 2（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行 — 2026-10-13 展示全部验证结果与未验证项，用户确认。验证链（`verify-and-commit.sh` 全档，macOS `/bin/bash`）：`validate.sh` 通过、phase-guard 258 例、verify-artifacts 52 例、ShellCheck 无告警。Spec 批准后未再改动。与 Plan 不一致：Task 2、3 一个提交。#290 已先合并，本 PR 直接对 `main` 开。未验证：两边真实宿主里 agent 的实际输出、Claude 桌面应用里“运行”按钮是否消失（后者由用户查看），发版后做；未做独立代码评审。

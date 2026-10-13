@@ -111,6 +111,7 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Review: Spec … was edited after it was approved` | Spec 在批准后被改过；看过修订内容并批准后，重新运行 `/spec-guard:review-mark` |
 | `Review: the review marker in … is invalid` | 该文件的评审标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有评审标记时只指出这个检查点，并提醒尚未批准就先等批准 |
+| 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
 | `Suspended: <模块>` | 模块被挂起，不会自动恢复；用 `/spec-guard:module-suspend` 恢复 |
 | `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块 |
 | 有 Plan 却没有 todo 的提醒 | 这类模块按已完成计；还有活就补 `tasks/<id>/todo.md`，确已交付可在 `plan.md` 加 `<!-- spec-guard: no-todo -->` |

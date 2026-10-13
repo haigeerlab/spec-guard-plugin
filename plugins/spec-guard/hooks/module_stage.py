@@ -249,6 +249,11 @@ def unmerged_commits(root: Path) -> tuple | None:
 
 # context-hint-no-paste: the agent says one sentence and never pastes handoff text.
 NO_PASTE = "do not paste handoff text"
+# slash-command-code-block: a host that adds a Run button to shell-tagged code blocks sends `/compact` to a
+# terminal, so the block must not carry a shell language tag and the user is told where the command goes.
+SLASH_BLOCK = ("it is a slash command for the chat message box, not a shell command, so give the code block no "
+               "language tag or `text` (never bash, sh, zsh or shell) and tell the user in one sentence to send it "
+               "in the message box, not to run it in a terminal")
 
 # context-after-compact: free context in place -- /compact for related work, /clear for unrelated work (the
 # hosts' documented criterion); never suggest a new session, which loses the peers a session talks to.
@@ -279,13 +284,14 @@ COMMANDS = {
 COMMANDS["claude"] = dict(COMMANDS[None], **{
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
-                  + NO_PASTE + ". This stage summary carries over, the conversation does not need to."),
+                  + SLASH_BLOCK + "; " + NO_PASTE
+                  + ". This stage summary carries over, the conversation does not need to."),
     "free-current": ("give the user one ready-to-copy command in its own code block: /compact followed by a "
                      "one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; "
-                     + NO_PASTE + "."),
+                     + SLASH_BLOCK + "; " + NO_PASTE + "."),
 })
 CODEX_COMPACT = ("one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), "
-                 "or /clear if the next work is unrelated; " + NO_PASTE + ".")
+                 "or /clear if the next work is unrelated; " + SLASH_BLOCK + "; " + NO_PASTE + ".")
 COMMANDS["codex"] = {
     "add-module": "`$spec-guard-ops` add-module",
     "verify": "`$spec-guard-ops` verify-artifacts",

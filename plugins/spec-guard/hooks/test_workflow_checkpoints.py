@@ -169,6 +169,11 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("`gate`", "`report`", "批量前置审", "UI 自验", "共享检查点规则"):
                     self.assertIn(phrase, template)
 
+    def test_slash_commands_are_not_shell_commands(self):
+        section = self.section("## 按需求批量前置审")
+        for phrase in ("不带 shell 语言标签的代码块", "发到消息输入框", "不是终端命令"):
+            self.assertIn(phrase, section)
+
     def test_review_markers(self):
         section = self.section("## 评审状态标记")
         for phrase in ("<!-- spec-guard: review pending -->", "<!-- spec-guard: review approved", "不是授权来源",
