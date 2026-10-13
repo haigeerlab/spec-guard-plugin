@@ -196,7 +196,10 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module
 
 会话目录不是项目目录时（Claude 侧为 `/spec-guard:link-project`）：在会话目录写 `.agent/spec-guard-link.json`，声明这里的工作
 对应别处哪个已启用 spec-guard 的项目。阶段钩子只看会话目录，没有这个文件时在这种会话里每轮都静默；有了它，钩子改读
-被指向的项目，注入多一行 `Linked project`。会话目录自己已启用时不需要也不读指向；钩子不推断项目。这里 `$PROJECT` 是会话目录：
+被指向的项目，注入多一行 `Linked project`。会话目录自己已启用时不需要也不读指向；钩子不推断项目。
+指向按目录生效：在这个目录里运行的每个会话都会收到同一个项目的阶段提示，所以多个会话共用一个目录、各做不同项目时不要
+建立指向（把会话开在各自的项目目录里，或显式带项目路径）；`Linked project` 行里的项目不是本会话在做的项目时，忽略那段
+阶段提示。这里 `$PROJECT` 是会话目录：
 
 ```bash
 python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT"

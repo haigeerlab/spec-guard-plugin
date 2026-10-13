@@ -117,7 +117,7 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Review: the review marker in … is invalid` | 该文件的评审标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有评审标记时只指出这个检查点，并提醒尚未批准就先等批准 |
 | 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
-| `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的 |
+| `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。如果这个会话做的是别的项目，这段提示不适用——多个会话共用一个目录、各做不同项目时不要建立指向，用 `/spec-guard:link-project` 的 `unset` 解除，或把会话开在各自的项目目录里 |
 | `本目录有指向文件 … 但它的格式无效` | 指向文件不是只含 `version` 与 `project` 的 JSON 对象；`link-project unset --confirm` 后重新 `set` |
 | `本目录有指向文件 … 但它指向的目录不存在或不是目录` | 项目被移动或删除了；重新 `set --project <新路径>`，或 `unset` 解除 |
 | `本目录有指向文件 … 但它指向的目录没有启用 spec-guard` | 目标里没有约定块，也没有带 `activeModule` 的 `.agent/state.json`；在那个项目里运行 `/spec-guard:setup-convention`，或改指向别处 |

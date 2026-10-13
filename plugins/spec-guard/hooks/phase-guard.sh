@@ -150,7 +150,7 @@ ${LOCATION}"
 # 跟随指向时写明项目在哪：阶段是那个项目的，位置行也是它的；路径已在 project_link.py 里清洗。
 [ -z "$LINKED" ] || HEADER="${HEADER}
 
-Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands."
+Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and pass your own project path."
 
 SPECS=0
 for spec in spec/*.md; do

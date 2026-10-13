@@ -87,6 +87,11 @@ def _phase(target: Path) -> str:
     return next((line for line in text.splitlines() if line.startswith("当前阶段")), "")
 
 
+# link-shared-directory-note: the link is keyed by directory, so every session there follows it.
+SHARED = ("The link applies to every session that runs in this directory. When several sessions share it and work on "
+          "different projects, do not link: open each session in its own project directory, or pass the project path "
+          "explicitly.")
+
 WHY = {"invalid": "the file is not a JSON object with exactly `version` (1) and `project` (a path)",
        "missing": "the directory it names does not exist or is not a directory",
        "not-enabled": "the directory it names has no spec-guard convention (no convention block, no "
@@ -100,6 +105,7 @@ def _show(session: Path) -> int:
         print("no link: %s does not exist" % where)
     elif state == "ok":
         print("link valid: %s -> %s" % (where, target))
+        print(SHARED)
         phase = _phase(target)
         if phase:
             print(phase)
@@ -145,6 +151,7 @@ def _set(session: Path, project: str, confirm: bool) -> int:
     phase = _phase(target)
     if phase:
         print("its phase: %s" % phase)
+    print(SHARED)
     if current == content:
         print("\nalready linked to this project; nothing to change.")
         return 0
