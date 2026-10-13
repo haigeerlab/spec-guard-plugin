@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.59.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.59.0;test:marketplace-ref-upgrade-20261013f"
+      },
+      "observedAt": "2026-10-13T09:11:10Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.58.2 to v0.59.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.59.0, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.59.0;test:installed-plugin-smoke-20261013f"
+      },
+      "observedAt": "2026-10-13T09:11:10Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.59.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.59.0;test:installed-copy-changed-tests-20261013f"
+      },
+      "observedAt": "2026-10-13T09:11:10Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "result:both run green from the installed copy (phase-guard 284 cases, verify-artifacts 60 cases)",
+        "command:CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/verify-artifacts.sh",
+        "result:in a temporary project whose finished module has a side file with two unchecked items next to plan.md and todo.md, the output carries one warning naming the file and the count and saying the items do not count toward the stage; the summary reads 3 passed, 1 warning, 0 failed and the exit code is 0",
+        "result:the installed checkpoint contract carries the new section on rework and small modules; the wording is fixed text, so no separate agent session was run for this release"
+      ]
+    }
+  ]
+}
