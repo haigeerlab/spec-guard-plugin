@@ -4,5 +4,5 @@
 - [x] Task 2：`review_mark.py` 的提醒（先红） — `test_review_marker.py` 新增 2 例：`approved` 的预览与写入输出含每个目标文件的行数、那句提醒与 Spec 指纹，且照常写入（提醒不是闸门）；`pending` 的输出不含。先失败；实现后其中一条仍红，是断言里的句子与输出措辞不一致，改了断言。25 例全绿，原有 23 例未改。
 - [x] Task 3：接入完成时的输出（先红） — `test-setup-teardown.sh` 新增 1 例（输出含 `Review cadence:`、`separate` (default)、`combined`、one approval、config 命令与 artifact language），先失败；`setup-convention.sh` 的 `Optional:` 一行拆成产物语言一行加评审节奏两行。57 例全绿。
 - [x] Checkpoint 1（report）：三套核心回归与上述测试全绿，ShellCheck 无警告 — 随 Task 3 的提交跑 `verify-and-commit.sh` 全档。未验证：真实会话里 agent 的交审正文（发版后做）。
-- [ ] Task 4：命令文件、技能、文档与版本号
+- [x] Task 4：命令文件、技能、文档与版本号 — `commands/review-mark.md` 加“交审要让用户看到内容”一条并说明批准时的提醒；`spec-guard-ops` 的 review-mark 一节补要点；`docs/commands.md` 一句、`docs/workflow.md` 一段；CHANGELOG `[0.58.1] - 2026-10-13`；两份 `plugin.json` 改为 0.58.1，中英 README 的 `--ref` 改为 v0.58.1。
 - [ ] Checkpoint 2（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
