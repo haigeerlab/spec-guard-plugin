@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.57.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.57.0;test:installed-plugin-upgrade-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.56.0 to 0.57.0 for scope user; the installed copy records gitCommitSha 5a18239f22b6b912fdb859c4ab0b1f298cd8e39b -- the v0.57.0 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.57.0-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.57.0;test:installed-copy-changed-tests-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_review_marker.py",
+        "result:all run green from the installed copy (phase-guard 249 cases, verify-artifacts 52 cases, review marker 20 tests); spec-digest.py --selftest passes",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:12 of 16 pass, including the new review-marker test; the other 4 error because they read repository files outside the plugin package (docs/workflow.md, .github/pull_request_template.md), which Claude's installed layout does not carry -- the installed 0.56.0 copy gives the same 4 errors, so this is not a change in 0.57.0",
+        "command:CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/phase-guard.sh </dev/null",
+        "result:in a temporary project, the same three states on the installed 0.56.0 and 0.57.0 copies: Spec pending without a Plan -- 0.56.0 suggests creating the Plan, 0.57.0 prints the Review line and \"wait for the user to review\"; Plan pending with open todo items -- 0.56.0 suggests continuing the build, 0.57.0 prints the Review line and \"do not continue the build\"; both approved -- 0.57.0 adds the Next gate line naming the first unchecked gate checkpoint and skipping the report one",
+        "command:CLAUDE_PROJECT_DIR=<temp project> /bin/bash <installed>/hooks/verify-artifacts.sh",
+        "result:after the approved Spec was edited, the installed verify-artifacts warns that the Spec was revised after approval and exits without a failure"
+      ]
+    },
+    {
+      "subject": "spec-guard-claude-code-cli-session",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code:v0.57.0;test:installed-review-hint-20261013"
+      },
+      "observedAt": "2026-10-13T05:16:06Z",
+      "evidence": [
+        "command:claude -p in a temporary BUILDING project whose Spec was edited after approval, with the installed plugin",
+        "result:exit 0; the session copied its injection verbatim: \"- Review: Spec `spec/alpha.md` was edited after it was approved.\" and \"Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build. When the user approves it, record that with `/spec-guard:review-mark` (Codex: spec-guard-ops review-mark).\""
+      ]
+    }
+  ]
+}
