@@ -1329,9 +1329,104 @@ out="$(ctx_of)"
 isnt "NEEDS_PLAN 不输出 Next gate" 'Next gate'
 }
 
+part_14() {
+# linked-project-root：会话目录自己没有激活信号时，只有 .agent/spec-guard-link.json 才让 hook 改读被指向的项目。
+ses="$WORK/需求 文档"; prj="$WORK/the project"; other="$WORK/other project"
+mkdir -p "$ses" "$prj/spec" "$other/spec"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$prj/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$prj/spec/CAPABILITY-MAP.md"
+printf '# Spec: alpha\n' > "$prj/spec/alpha.md"
+link() {  # $1=目录 $2=project 的值（原样写进 JSON 字符串）
+  mkdir -p "$1/.agent"; printf '{"version": 1, "project": "%s"}\n' "$2" > "$1/.agent/spec-guard-link.json"
+}
+silent "会话目录没有激活信号也没有指向文件时静默" "$ses"
+mkdir -p "$ses/.agent"
+silent "只有空的 .agent 目录时仍然静默" "$ses"
+link "$ses" "$prj"
+injects "有效指向：输出被指向项目的阶段" "$ses" '当前阶段: **NEEDS_PLAN**'
+injects "有效指向：当前模块来自被指向的项目" "$ses" 'Current module: `alpha`'
+link "$ses" "../the project"
+injects "相对路径按会话目录解析" "$ses" '当前阶段: **NEEDS_PLAN**'
+
+# 自己已启用的项目不读指向文件：有无指向文件输出逐字相同。
+own="$WORK/own"; mkdir -p "$own"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$own/CLAUDE.md"
+before="$(run "$own")"
+link "$own" "$prj"
+[ "$(run "$own")" = "$before" ] || fail "自己已启用的项目不应读指向文件
+$(run "$own")"
+echo "  ✅ 自己已启用时有无指向文件输出逐字相同"; PASS=$((PASS + 1))
+lacks "自己已启用时不出现被指向项目的模块" "$own" 'Current module: `alpha`'
+
+# 失效的指向不静默，也不输出阶段。
+link "$ses" "$WORK/gone"
+lacks "目标不存在：不输出阶段" "$ses" '当前阶段'
+injects "目标不存在：给出诊断" "$ses" 'spec-guard'
+printf '%s\n' '{broken' > "$ses/.agent/spec-guard-link.json"
+lacks "格式无效：不输出阶段" "$ses" '当前阶段'
+link "$ses" "$other"
+lacks "目标未启用：不输出阶段" "$ses" '当前阶段'
+injects "目标未启用：给出诊断" "$ses" 'spec-guard'
+
+# 不连环跟随：目标自己没启用、只有另一份指向文件时，按目标未启用处理。
+link "$other" "$prj"; link "$ses" "$other"
+lacks "不连环跟随：不输出最终项目的阶段" "$ses" '当前阶段'
+lacks "不连环跟随：不出现最终项目的模块" "$ses" 'Current module: `alpha`'
+
+# Linked project 行：恰好一行，写明目标与会话目录；位置行是目标项目的。
+git -C "$prj" init -q; git -C "$prj" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false commit -q --allow-empty -m init
+link "$ses" "$prj"
+out="$(run "$ses" | context_of)"
+python3 - "$out" "$prj" "$ses" <<'PY' || fail "Linked project 行缺失、重复或内容不对
+$out"
+import os, sys
+text, project, session = sys.argv[1], os.path.realpath(sys.argv[2]), os.path.realpath(sys.argv[3])
+lines = [line for line in text.splitlines() if line.startswith("Linked project:")]
+assert len(lines) == 1, lines
+expected = ("Linked project: `%s` — this session's directory `%s` points to it through `.agent/spec-guard-link.json`. "
+            "Pass this path as the project when you run spec-guard commands." % (project, session))
+assert lines[0] == expected, (lines[0], expected)
+location = [line for line in text.splitlines() if line.startswith("Location:")]
+assert len(location) == 1 and project in location[0], location
+assert text.index("Location:") < text.index("Linked project:") < text.index("当前阶段"), text
+PY
+echo "  ✅ Linked project 行恰好一行、内容与位置正确，位置行是目标项目的"; PASS=$((PASS + 1))
+out="$(SG_HOST=codex run "$ses" | context_of)"
+case "$out" in *'Linked project: `'*'(for example with `$planning-and-task-breakdown`)'*) ;; *) fail "Codex 下应有 Linked project 行并用 Codex 写法
+$out" ;; esac
+echo "  ✅ Codex 下同样跟随指向并用 Codex 的命令写法"; PASS=$((PASS + 1))
+lacks "自己已启用的项目没有 Linked project 行" "$own" 'Linked project'
+lacks "被指向的项目自己的会话没有 Linked project 行" "$prj" 'Linked project'
+
+# 三种失效的固定文字；指向文件的原文不进注入。
+FIX='用 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 一节）查看、重新建立或解除指向。这是指向失效，不是「未启用」。'
+link "$ses" "$WORK/gone"
+injects "目标不存在的诊断文字" "$ses" "但它指向的目录不存在或不是目录（$(cd "$WORK" && pwd -P)/gone），本轮没有阶段注入。${FIX}"
+printf '%s\n' '{"version": 1, "project": "x", "SECRET-KEY": "do not echo"}' > "$ses/.agent/spec-guard-link.json"
+injects "格式无效的诊断文字" "$ses" "但它的格式无效（应为只含 version 与 project 两个键的 JSON 对象），本轮没有阶段注入。${FIX}"
+lacks "格式无效时不回显文件内容" "$ses" 'SECRET-KEY'
+lacks "格式无效时不回显文件里的值" "$ses" 'do not echo'
+rm "$other/.agent/spec-guard-link.json"; link "$ses" "$other"
+injects "目标未启用的诊断文字" "$ses" "但它指向的目录没有启用 spec-guard（$(cd "$other" && pwd -P)）：那里没有约定块，也没有带 activeModule 的 \`.agent/state.json\`，本轮没有阶段注入。${FIX}"
+lacks "失效诊断里没有 Linked project 行" "$ses" 'Linked project'
+
+# 有指向文件而 python3 不可用：不静默。
+mkdir -p "$WORK/nopy14"
+for tool in bash git; do ln -s "$(command -v "$tool")" "$WORK/nopy14/$tool"; done
+link "$ses" "$prj"
+out="$(RUN_PATH="$WORK/nopy14" run "$ses")"
+case "$out" in *'python3 不可用'*) ;; *) fail "有指向文件而缺 python3 时应给出非静默提示
+$out" ;; esac
+echo "  ✅ 有指向文件而缺 python3 时不静默"; PASS=$((PASS + 1))
+rm "$ses/.agent/spec-guard-link.json"
+[ -z "$(RUN_PATH="$WORK/nopy14" run "$ses")" ] || fail "没有指向文件时缺 python3 也应静默"
+echo "  ✅ 没有指向文件时缺 python3 仍静默"; PASS=$((PASS + 1))
+}
+
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=13
+PARTS=14
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

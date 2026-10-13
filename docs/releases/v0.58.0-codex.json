@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.58.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.0;test:marketplace-ref-upgrade-20261013c"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.57.1 to v0.58.0",
+        "command:codex plugin marketplace upgrade",
+        "result:the upgrade exited 0 and `codex plugin list --json` reports spec-guard 0.58.0, installed and enabled; the only difference in config.toml is the ref line",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-codex-cli-smoke",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.58.0;test:installed-plugin-smoke-20261013c"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:exit 0; the Codex session's machine record contains a valid spec-guard phase injection"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.0-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.58.0;test:installed-copy-changed-tests-20261013c"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "command:/bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "command:python3 -B <installed>/hooks/test_project_link.py",
+        "result:all run green from the installed copy (phase-guard 284 cases, verify-artifacts 52 cases, project link 18 tests)",
+        "command:PLUGIN_ROOT=x /bin/bash <installed>/hooks/phase-guard.sh </dev/null, run from a session directory whose link names a directory without the convention",
+        "result:one diagnostic line says the linked directory has not enabled spec-guard and points to link-project; no stage is printed"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.58.0-codex-linked-session",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:v0.58.0;test:linked-project-session-20261013"
+      },
+      "observedAt": "2026-10-13T07:17:56Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/project_link.py set --from <session dir> --project ../code-repo --confirm, in a temporary layout: a session directory with no convention (its name carries a space) and an enabled project beside it",
+        "command:codex exec --skip-git-repo-check from the session directory, with the installed plugin (no hook-trust bypass)",
+        "result:exit 0; the session copied its injection verbatim: the Linked project line naming the project and the session directory, and \"当前阶段: **NEEDS_PLAN**\" -- the linked project's stage",
+        "command:python3 -B <installed>/hooks/project_link.py unset --from <session dir> --confirm, then codex exec again",
+        "result:the session answered that it had no spec-guard injection; ~/.codex/config.toml is byte-identical before and after the runs"
+      ]
+    }
+  ]
+}

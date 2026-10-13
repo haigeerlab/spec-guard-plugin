@@ -48,7 +48,13 @@ has_state() {
   file_has_line .agent/state.json '"activeModule"[[:space:]]*:'
 }
 
-has_block || has_state || exit 0
+# linked-project-root：会话目录自己没有激活信号时，只有本插件写下的指向文件算数（.agent/spec-guard-link.json，声明
+# 这里的工作对应别处的哪个项目）。没有它就照旧静默，而且在启动任何 python3 之前就退出；自己已启用时不看指向文件。
+LINKED=""
+if ! has_block && ! has_state; then
+  [ -e .agent/spec-guard-link.json ] || [ -L .agent/spec-guard-link.json ] || exit 0
+  LINKED=1
+fi
 
 # 已启用却缺 python3 时不能静默：静默会被当成“未启用”。这段 JSON 手写转义，不依赖 python3。
 if ! command -v python3 >/dev/null 2>&1; then
@@ -71,6 +77,39 @@ print(json.dumps({"hookSpecificOutput": {
     *) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: 本项目已启用约定，但 python3 无法运行，本轮没有阶段注入。这不是「未启用」；修复 python3 后恢复。"}}' ;;
   esac
 }
+
+# 跟随指向：判定在 project_link.py；目标是否已启用仍用上面的 has_block／has_state（cd 过去后重用）。不连环跟随：
+# 只看目标自己的激活信号，不读目标里的指向文件。失效不是「未启用」，所以给诊断而不静默。
+if [ -n "$LINKED" ]; then
+  LINK_OUT="$(python3 -B "$HOOKDIR/project_link.py" resolve --from . 2>/dev/null)" || LINK_OUT=""
+  LINK_STATUS="${LINK_OUT%%$'\n'*}"
+  LINK_REST=""
+  case "$LINK_OUT" in *$'\n'*) LINK_REST="${LINK_OUT#*$'\n'}" ;; esac
+  LINK_TARGET="${LINK_REST%%$'\n'*}"
+  LINK_SHOWN=""; LINK_FROM=""
+  case "$LINK_REST" in *$'\n'*) LINK_SHOWN="${LINK_REST#*$'\n'}" ;; esac
+  case "$LINK_SHOWN" in *$'\n'*) LINK_FROM="${LINK_SHOWN#*$'\n'}"; LINK_FROM="${LINK_FROM%%$'\n'*}" ;; esac
+  LINK_SHOWN="${LINK_SHOWN%%$'\n'*}"
+  LINK_FIX='用 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 一节）查看、重新建立或解除指向。这是指向失效，不是「未启用」。'
+  LINK_BAD=""
+  case "$LINK_STATUS" in
+    ok)
+      if ! cd "$LINK_TARGET" 2>/dev/null; then
+        LINK_BAD="它指向的目录进不去（${LINK_SHOWN}）"
+      elif ! has_block && ! has_state; then
+        LINK_BAD="它指向的目录没有启用 spec-guard（${LINK_SHOWN}）：那里没有约定块，也没有带 activeModule 的 \`.agent/state.json\`"
+      fi ;;
+    missing) LINK_BAD="它指向的目录不存在或不是目录（${LINK_SHOWN}）" ;;
+    invalid) LINK_BAD="它的格式无效（应为只含 version 与 project 两个键的 JSON 对象）" ;;
+    *) LINK_BAD="没能读取它（检查没有正常运行）" ;;
+  esac
+  if [ -n "$LINK_BAD" ]; then
+    emit "## spec-guard local workflow
+
+spec-guard: 本目录有指向文件 \`.agent/spec-guard-link.json\`，但${LINK_BAD}，本轮没有阶段注入。${LINK_FIX}"
+    exit 0
+  fi
+fi
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
 # hook 输入已在上面读过，这里转交那一行原文。
@@ -108,6 +147,10 @@ HEADER="## spec-guard local workflow"
 [ -z "$LOCATION" ] || HEADER="${HEADER}
 
 ${LOCATION}"
+# 跟随指向时写明项目在哪：阶段是那个项目的，位置行也是它的；路径已在 project_link.py 里清洗。
+[ -z "$LINKED" ] || HEADER="${HEADER}
+
+Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands."
 
 SPECS=0
 for spec in spec/*.md; do

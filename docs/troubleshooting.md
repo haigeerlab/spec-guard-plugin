@@ -13,9 +13,11 @@
    - `CLAUDE.md` 或 `AGENTS.md` 里有独占一行的约定块开始标记（`<!-- BEGIN:agent-skills-convention -->` 或
      `<!-- BEGIN:spec-guard-codex-convention -->`）。正文里提到标记不算；
    - `.agent/state.json` 里有 `activeModule`。
-2. 运行过 teardown：`.agent/state.json` 被改名成了 `state.json.disabled`，约定块也删了。
-3. Claude Code 里还没信任 hook，或装好插件后没开新会话。
-4. Codex 里插件没安装或没启用（见下文“Codex 里没有 spec-guard”）。
+2. 会话开在一个不是项目的目录里（比如需求文档目录），实际开发在别处的仓库。hook 只看会话目录，不推断你在改哪个
+   目录，所以每一轮都静默。Codex 里最容易遇到：它的 hook 在会话目录运行。
+3. 运行过 teardown：`.agent/state.json` 被改名成了 `state.json.disabled`，约定块也删了。
+4. Claude Code 里还没信任 hook，或装好插件后没开新会话。
+5. Codex 里插件没安装或没启用（见下文“Codex 里没有 spec-guard”）。
 
 **检查**：
 
@@ -27,6 +29,9 @@ ls .agent/
 **解决**：
 
 - 没有激活信号：运行 `/spec-guard:setup-convention`（先 `--dry-run` 预览）。
+- 会话目录不是项目目录：在会话里运行 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 一节），
+  `set --project <项目路径>` 先预览、确认后写入 `.agent/spec-guard-link.json`。之后每轮都会收到那个项目的阶段提示，
+  多一行 `Linked project`。其他命令目前不自动跟随指向，要显式带上项目路径。
 - 有 `state.json.disabled`：确认要恢复后，把它改回 `.agent/state.json`。setup 在这种情况下会拒绝新建空状态，
   免得覆盖原来的 `activeModule`。
 - Claude Code：在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
@@ -112,6 +117,10 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Review: the review marker in … is invalid` | 该文件的评审标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有评审标记时只指出这个检查点，并提醒尚未批准就先等批准 |
 | 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
+| `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的 |
+| `本目录有指向文件 … 但它的格式无效` | 指向文件不是只含 `version` 与 `project` 的 JSON 对象；`link-project unset --confirm` 后重新 `set` |
+| `本目录有指向文件 … 但它指向的目录不存在或不是目录` | 项目被移动或删除了；重新 `set --project <新路径>`，或 `unset` 解除 |
+| `本目录有指向文件 … 但它指向的目录没有启用 spec-guard` | 目标里没有约定块，也没有带 `activeModule` 的 `.agent/state.json`；在那个项目里运行 `/spec-guard:setup-convention`，或改指向别处 |
 | `Suspended: <模块>` | 模块被挂起，不会自动恢复；用 `/spec-guard:module-suspend` 恢复 |
 | `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块 |
 | 有 Plan 却没有 todo 的提醒 | 这类模块按已完成计；还有活就补 `tasks/<id>/todo.md`，确已交付可在 `plan.md` 加 `<!-- spec-guard: no-todo -->` |
