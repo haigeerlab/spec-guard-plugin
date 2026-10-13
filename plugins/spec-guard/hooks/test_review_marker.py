@@ -212,6 +212,29 @@ class Mark(unittest.TestCase):
             self.assertEqual(project.states(), ("approved", "approved"))
             self.assertNotIn("has no review marker", out)
 
+    def test_approving_reminds_that_the_user_must_have_seen_the_content(self):
+        with Project() as project:
+            reminder = "Before --confirm, make sure the user has seen the content of"
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "approved")
+            self.assertEqual(code, 0, out)
+            self.assertIn("spec/alpha.md: %d line(s)" % len(SPEC.splitlines()), out)
+            self.assertIn("tasks/alpha/plan.md: 3 line(s)", out)
+            self.assertIn(reminder, out)
+            self.assertIn("only a link or a one-line summary, that is not a review", out)
+            self.assertIn("Spec digest: ", out)
+            self.assertEqual(project.states(), ("none", "none"))          # still only a preview
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertIn(reminder, out)
+            self.assertEqual(project.states(), ("approved", "approved"))  # a reminder, not a gate
+
+    def test_marking_pending_carries_no_reminder(self):
+        with Project() as project:
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "pending", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertNotIn("line(s)", out)
+            self.assertNotIn("has seen the content", out)
+
     def test_refusals(self):
         with Project() as project:
             code, out = project.run("--module", "gamma", "--target", "spec", "--state", "pending", "--confirm")
