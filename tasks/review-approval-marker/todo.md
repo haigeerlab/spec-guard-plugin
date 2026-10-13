@@ -1,7 +1,7 @@
 # Todo: review-approval-marker
 
 - [x] Task 1：文本指纹入口（先红） — `spec-digest.py` 新增 `text_digest` 与 `text <file>` 子命令，复用 `_h`；自测先加 3 组断言（稳定／定长／随内容变、子命令输出、读不了退出 1），在旧代码上因 `text_digest` 未定义失败，实现后通过；`test-checkers.sh` 的 digest-single-source 5 例仍通过。
-- [ ] Task 2：标记解析与评审状态（先红）
+- [x] Task 2：标记解析与评审状态（先红） — 新增 `test_review_marker.py` 11 例（五种状态、七种无效写法、正文提及与围栏代码块里的示例不算、指纹不受标记行影响而受其余字符影响），先因导入失败变红；`module_stage.py` 新增 `review_state`／`review_digest`／`review_body`，指纹经 `importlib` 调 `spec-digest.py`。变异三处（包含即可、指纹不排除标记行、`revised` 判成 `approved`）各有断言变红。实现中补定一条：围栏代码块里的行不算标记（否则本模块自己的 Spec 会因示例被判无效），已写回 Spec「标记」一节，Checkpoint 3 请用户过目。单测已登记进 `validate.sh`。
 - [ ] Task 3：阶段提示的 Review 行与建议语（先红）
 - [ ] Task 4：下一个 gate（先红）
 - [ ] Checkpoint 1（report）：判定与阶段提示回归全绿，ShellCheck 无警告

@@ -23,6 +23,68 @@ CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
 # module-suspend: one exact line in todo.md parks a started module until the user resumes it.
 SUSPEND_MARKER = "<!-- spec-guard: suspended -->"
+# review-approval-marker: one exact line in spec/<id>.md or tasks/<id>/plan.md records where its review stands.
+# A Spec approval carries the digest of the Spec's text, so an edit after approval shows up as `revised`.
+REVIEW_PREFIX = "<!-- spec-guard: review"
+REVIEW_PENDING = "<!-- spec-guard: review pending -->"
+REVIEW_APPROVED = "<!-- spec-guard: review approved -->"
+REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]{12}) -->")
+FENCES = ("```", "~~~")
+_DIGEST_MODULE = None
+
+
+def review_approved_line(digest: str) -> str:
+    return "<!-- spec-guard: review approved %s -->" % digest
+
+
+def _review_split(text: str) -> tuple:
+    """(marker lines, text without them).  Lines inside a fenced code block are examples, not markers."""
+    markers, body, fence = [], [], None
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        opener = stripped[:3] if stripped[:3] in FENCES else None
+        if fence:
+            if opener == fence:
+                fence = None
+        elif opener:
+            fence = opener
+        elif stripped.startswith(REVIEW_PREFIX):
+            markers.append(stripped)
+            continue
+        body.append(line)
+    return markers, "".join(body)
+
+
+def review_body(text: str) -> str:
+    return _review_split(text)[1]
+
+
+def review_digest(text: str) -> str:
+    """Digest of the text without its marker line; the algorithm lives in spec-digest.py only."""
+    global _DIGEST_MODULE
+    if _DIGEST_MODULE is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("spec_guard_digest", Path(__file__).with_name("spec-digest.py"))
+        _DIGEST_MODULE = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_DIGEST_MODULE)
+    return _DIGEST_MODULE.text_digest(review_body(text))
+
+
+def review_state(text: str, kind: str) -> str:
+    """`none`, `pending`, `approved`, `revised` (Spec only) or `invalid`; `kind` is `spec` or `plan`."""
+    markers = _review_split(text)[0]
+    if not markers:
+        return "none"
+    if len(markers) > 1:
+        return "invalid"
+    if markers[0] == REVIEW_PENDING:
+        return "pending"
+    if kind == "plan":
+        return "approved" if markers[0] == REVIEW_APPROVED else "invalid"
+    match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0])
+    if not match:
+        return "invalid"
+    return "approved" if match.group(1) == review_digest(text) else "revised"
 
 
 def module_state(root: Path, module_id: str) -> dict:
