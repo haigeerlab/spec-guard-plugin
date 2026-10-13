@@ -89,7 +89,9 @@ spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠�
 
 会话开在一个不是项目的目录里（比如需求文档目录），实际开发在别处的仓库时用：`set --project <路径>` 在会话目录写
 `.agent/spec-guard-link.json`，之后阶段钩子改读被指向的项目，注入多一行 `Linked project`。`show` 查看，`unset` 解除；
-`set`／`unset` 先预览、`--confirm` 才写，只动这一个文件。会话目录自己已启用 spec-guard 时不需要指向；没有指向文件的
+`set`／`unset` 先预览、`--confirm` 才写，只动这一个文件。多个会话共用一个目录、各做不同项目时，三个动作都加
+`--session <会话标识>`（Claude Code 传 `"$CLAUDE_CODE_SESSION_ID"`，Codex 传 `"$CODEX_THREAD_ID"`），登记只对那一个会话生效；
+钩子先用本会话的登记，其次目录级指向，都没有则静默。会话目录自己已启用 spec-guard 时不需要指向；没有指向文件的
 无关目录照旧静默。其他命令目前不自动跟随指向，要显式带上项目路径。拒绝时退出 2、不写文件。
 
 ### `/spec-guard:review-mark`

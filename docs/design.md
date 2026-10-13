@@ -58,7 +58,9 @@ plugins/spec-guard/
    `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`：没有就静默退出 0
    （这一步只用 bash 内建，不启动 python3）；有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行
    `Linked project`；有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
-   也不连环跟随。hook 不从宿主的工作区设置或会话记录推断项目。
+   也不连环跟随。hook 不从宿主的工作区设置或会话记录推断项目。指向文件可以按会话登记（版本 2 的 `sessions`）：hook 从输入里取
+   会话标识（`session_id`，以及 `transcript_path` 文件名——两个宿主都用会话标识命名会话记录），先用本会话的登记，其次目录级
+   指向，都没有则静默。标识只用来查表，不读会话记录的内容。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
    交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。
 4. 输出 `hookSpecificOutput.additionalContext`。来自仓库的值在注入前净化（折叠空白、去掉反引号与反斜杠、剥掉

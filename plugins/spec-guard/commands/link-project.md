@@ -57,13 +57,27 @@ python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT"
 
 钩子不推断：不看宿主的工作区设置，也不从会话记录猜你在改哪个目录。只认这个文件。
 
-**指向按目录生效，不按会话。** 在这个目录里运行的每一个会话都会跟随它，收到同一个项目的阶段提示。多个会话共用一个目录、
-各做不同项目时不要建立指向：把会话开在各自的项目目录里，或者不建立指向、运行命令时显式带上项目路径。已经建立了的，
-做别的项目的会话应忽略这段阶段提示；`unset` 可以解除。
+**目录级指向对同目录的所有会话生效。** 不带 `--session` 建立的指向，在这个目录里运行的每一个会话都会跟随它。
+
+**多个会话共用一个目录、各做不同项目时，各自登记。** 给 `set`、`unset`、`show` 加 `--session <会话标识>`，登记只对那一个
+会话生效，同目录的其他会话不受影响。会话标识由调用方显式传入，命令不猜：Claude Code 里传 `"$CLAUDE_CODE_SESSION_ID"`，
+Codex 里传 `"$CODEX_THREAD_ID"`。钩子的查找顺序是：本会话的登记 → 目录级指向 → 都没有则静默。没登记的会话不会收到
+“尚未登记”的提示。登记不会自动清理：会话结束后它还留在文件里，`show` 列得出来，`unset --session` 删除。
 
 **有指向时，本插件的其他命令要显式带上被指向的项目路径**（各命令的 `--project`），它们目前不会自动跟随指向。
 
 ## 建立与解除
+
+按会话登记（共用目录时用这一种）：
+
+```bash
+python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径> --session <会话标识>
+python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径> --session <会话标识> --confirm
+python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --session <会话标识> --confirm
+python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT" --session <会话标识>
+```
+
+目录级指向（整个目录只对应一个项目时用这一种）：
 
 默认只预览：打印将写入的文件与内容、解析后的项目路径和它当前的阶段。把预览给用户看过并确认后，才加 `--confirm`：
 
