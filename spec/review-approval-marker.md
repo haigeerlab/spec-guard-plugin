@@ -95,8 +95,9 @@ BUILDING 且建议语为"继续 build"时，多输出一行 `- Next gate: <标�
 review_mark.py --project <root> --module <id> --target <spec|plan|both> --state <pending|approved> [--confirm]
 ```
 
-- 默认只预览：输出将写入的文件、标记行、Spec 的当前指纹，以及写入后的阶段提示要点；带 `--confirm` 才写入并读回。
-- 只增删改标记这一行：已有标记行原地替换，没有则插在第一行标题之后；文件其余内容逐字不变。
+- 默认只预览：输出每个文件的 diff、Spec 的当前指纹，以及写入后各文件的评审状态；带 `--confirm` 才写入并读回。
+  目标已是所求状态时说明无需改动并正常退出。
+- 只增改标记这一行：已有标记行原地替换，没有则插在第一行标题之后（文件不以标题开头时放在最前）；其余内容逐字不变。
 - 拒绝并说明原因：模块不在能力图上；目标文件不存在；标记 `invalid`；把 Plan 标为 `approved` 而 Spec 不是 `approved`。
 - 不执行 Git 或远端操作，不改 `.agent/state.json`、todo.md 或能力图。
 - 命令文本写明：`approved` 只在用户于当前对话明确批准该 Spec 或 Plan 之后才写；agent 不得为了消除阶段提示而自行批准。

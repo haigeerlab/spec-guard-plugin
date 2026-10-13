@@ -5,7 +5,7 @@
 - [x] Task 3：阶段提示的 Review 行与建议语（先红） — `test-phase-guard.sh` 新增第 13 段 30 例：Spec「阶段提示」表逐行、无标记 BUILDING 全文逐字相同、非当前模块的标记不生效、MODULE_DONE／NEEDS_SPEC 不变、注入仍是合法 JSON；先在首例变红。`module_stage.py` 新增 `review_hint`／`file_review_state`，`describe` 只在有话可说时加 Review 行并替换建议语。既有 208 例期望值一处未改，全套 238 例通过。补定两点：待审核与已修订的建议语末尾带一句“用户批准后用 review-mark 记录”；文件读不了时只报一行读取失败、建议语不变（读取失败不是评审状态）。
 - [x] Task 4：下一个 gate（先红） — 第 13 段再加 11 例：跳过已勾选项与 `report`、只剩 `report` 不输出、未标注按 `gate`、标题不以 Checkpoint 开头或不是清单项不输出、标题清洗并截到 80 字、Plan 待审核与 NEEDS_PLAN 时不输出；先变红，`module_stage.py` 新增 `next_gate` 后 249 例全绿。Spec「Success criteria」原文说无标记项目只多半句，与 Next gate 对所有 BUILDING 项目生效相矛盾，已改为如实写出这一行，Checkpoint 3 请用户过目。
 - [x] Checkpoint 1（report）：判定与阶段提示回归全绿，ShellCheck 无警告 — 随 Task 4 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`、phase-guard 249 例、verify-artifacts 40 例、ShellCheck 无告警。未验证：两边宿主对新增行的实际呈现（发版后做）。
-- [ ] Task 5：`review_mark.py`（先红）
+- [x] Task 5：`review_mark.py`（先红） — `test_review_marker.py` 再加 9 例（预览不写文件、插在标题后且其余逐字不变、原地替换且可重复执行、修订后重新批准取新指纹、`both`、Spec 未批准时拒绝批准 Plan、四种拒绝、无标题文件、围栏示例不动），脚本不存在时 9 例失败，实现后 20 例全绿。`module_stage.py` 新增 `review_marker_lines` 供脚本定位标记行。临时项目实跑：待审核 → 预览批准 → 确认批准 → 改 Spec，阶段提示依次为等待审核、照常建议写 Plan、批准后已修订。Spec「写标记的命令」两处措辞按实现改准：预览输出的是 diff、指纹与写入后的评审状态（不是阶段提示要点）；无标题文件把标记放最前。
 - [ ] Task 6：`verify-artifacts`（先红）
 - [ ] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告
 - [ ] Task 7：命令文件与 Codex 路由

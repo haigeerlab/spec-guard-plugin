@@ -37,10 +37,10 @@ def review_approved_line(digest: str) -> str:
     return "<!-- spec-guard: review approved %s -->" % digest
 
 
-def _review_split(text: str) -> tuple:
-    """(marker lines, text without them).  Lines inside a fenced code block are examples, not markers."""
-    markers, body, fence = [], [], None
-    for line in text.splitlines(keepends=True):
+def review_marker_lines(text: str) -> list:
+    """Indexes (into `splitlines(keepends=True)`) of the marker lines.  A fenced code block holds examples, not markers."""
+    found, fence = [], None
+    for index, line in enumerate(text.splitlines(keepends=True)):
         stripped = line.strip()
         opener = stripped[:3] if stripped[:3] in FENCES else None
         if fence:
@@ -49,10 +49,15 @@ def _review_split(text: str) -> tuple:
         elif opener:
             fence = opener
         elif stripped.startswith(REVIEW_PREFIX):
-            markers.append(stripped)
-            continue
-        body.append(line)
-    return markers, "".join(body)
+            found.append(index)
+    return found
+
+
+def _review_split(text: str) -> tuple:
+    """(marker lines, text without them)."""
+    lines, marked = text.splitlines(keepends=True), set(review_marker_lines(text))
+    return ([lines[index].strip() for index in sorted(marked)],
+            "".join(line for index, line in enumerate(lines) if index not in marked))
 
 
 def review_body(text: str) -> str:
