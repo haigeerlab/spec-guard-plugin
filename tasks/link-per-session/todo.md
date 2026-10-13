@@ -1,6 +1,6 @@
 # Todo: link-per-session
 
-- [ ] Task 1：实测会话标识的稳定性
+- [x] Task 1：实测会话标识的稳定性 — 结论：标识在恢复与压缩后都不变，设计可继续。Claude Code 2.1.296：本会话当天重启过一次，`CLAUDE_CODE_SESSION_ID` 与最初工作目录路径里的标识相同；一份压缩过一次的会话记录，压缩后的 760 条记录仍写在同一文件，文件内只有一个 sessionId 且等于文件名。codex-cli 0.162.1：`codex exec` 取到 `CODEX_THREAD_ID` 后用 `codex exec resume <id>` 恢复，再取到的值相同；一份压缩过一次的会话记录，压缩后的 49 条记录仍写在同一文件，首条 `session_meta` 的 `id` 是文件名的结尾。未实测：两边 hook 输入里的 `session_id` 字段（设计以 `transcript_path` 的文件名为准，另认该字段作为补充）；压缩后的标识是由“记录仍写在同一文件”推出的，不是在压缩后直接读环境变量。
 - [ ] Task 2：解析支持会话登记（先红）
 - [ ] Task 3：钩子按会话查找（先红）
 - [ ] Checkpoint 1（report）：核心回归全绿，ShellCheck 无警告
