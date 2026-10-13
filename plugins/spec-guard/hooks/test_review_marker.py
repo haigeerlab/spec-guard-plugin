@@ -165,19 +165,52 @@ class Mark(unittest.TestCase):
             self.assertEqual(project.states(), ("approved", "approved"))
             self.assertIn(REVIEW_APPROVED + "\n", project.plan.read_text(encoding="utf-8"))
 
-    def test_plan_cannot_be_approved_before_the_spec(self):
+    def test_a_plan_can_be_approved_when_the_spec_has_no_marker(self):
         with Project() as project:
-            for prepare in ((), ("--state", "pending")):
-                if prepare:
-                    project.run("--module", "alpha", "--target", "spec", *prepare, "--confirm")
+            before = project.spec.read_text(encoding="utf-8")
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.states(), ("none", "approved"))
+            self.assertEqual(project.spec.read_text(encoding="utf-8"), before)
+            self.assertIn("has no review marker; this records the Plan's approval only", out)
+
+    def test_a_plan_can_be_approved_when_there_is_no_spec_file(self):
+        with Project() as project:
+            project.spec.unlink()
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(review_state(project.plan.read_text(encoding="utf-8"), "plan"), "approved")
+
+    def test_plan_cannot_be_approved_while_the_spec_is_pending_revised_or_invalid(self):
+        def pending(project):
+            project.run("--module", "alpha", "--target", "spec", "--state", "pending", "--confirm")
+
+        def revised(project):
+            project.run("--module", "alpha", "--target", "spec", "--state", "approved", "--confirm")
+            project.spec.write_text(project.spec.read_text(encoding="utf-8") + "补一条\n", encoding="utf-8")
+
+        def invalid(project):
+            project.spec.write_text(with_marker(REVIEW_PENDING + "\n" + REVIEW_PENDING), encoding="utf-8")
+
+        for prepare, state in ((pending, "pending"), (revised, "revised"), (invalid, "invalid")):
+            with Project() as project:
+                prepare(project)
+                spec_before = project.spec.read_text(encoding="utf-8")
                 code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
                 self.assertEqual(code, 2, out)
                 self.assertIn("spec-not-approved", out)
-                self.assertEqual(project.states()[1], "none")
+                self.assertIn("reads as %s" % state, out)
+                self.assertIn("needs the user's own explicit approval of that Spec", out)
+                self.assertEqual(review_state(project.plan.read_text(encoding="utf-8"), "plan"), "none")
+                self.assertEqual(project.spec.read_text(encoding="utf-8"), spec_before)
+
+    def test_plan_is_approved_normally_after_the_spec(self):
+        with Project() as project:
             project.run("--module", "alpha", "--target", "spec", "--state", "approved", "--confirm")
             code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
             self.assertEqual(code, 0, out)
             self.assertEqual(project.states(), ("approved", "approved"))
+            self.assertNotIn("has no review marker", out)
 
     def test_refusals(self):
         with Project() as project:

@@ -13,8 +13,8 @@ import difflib
 from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, review_approved_line, review_digest, review_marker_lines,
-                          review_state)
+from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, file_review_state, review_approved_line, review_digest,
+                          review_marker_lines, review_state)
 from tracker_default import _write_atomic
 
 
@@ -77,14 +77,16 @@ def main() -> int:
             print("marker-invalid: %s has more than one review marker or a malformed one; fix it by hand "
                   "(run /spec-guard:verify-artifacts to see it)" % relative[kind])
             return 2
+    unmarked_spec = False
     if args.state == "approved" and kinds == ["plan"]:
-        try:
-            spec_state = review_state((root / relative["spec"]).read_text(encoding="utf-8"), "spec")
-        except (OSError, UnicodeError):
-            spec_state = "unreadable"
-        if spec_state != "approved":
-            print("spec-not-approved: %s reads as %s; a Plan is approved only after its Spec "
-                  "(use --target both when the user approved both together)" % (relative["spec"], spec_state))
+        # No marker means the Spec is not tracked, which must not block anything; a Spec that is
+        # tracked and not approved does.
+        spec_state = file_review_state(root / relative["spec"], "spec")
+        unmarked_spec = spec_state == "none"
+        if spec_state not in ("approved", "none"):
+            print("spec-not-approved: %s reads as %s. Approving a Spec needs the user's own explicit approval of "
+                  "that Spec; the Plan's approval or an earlier \"continue\" does not cover it. Show the user the "
+                  "Spec first, then use --target both if they approve both." % (relative["spec"], spec_state))
             return 2
     after = {kind: _marked(before[kind], kind, args.state) for kind in kinds}
     changed = [kind for kind in kinds if after[kind] != before[kind]]
@@ -99,6 +101,9 @@ def main() -> int:
         print("Spec digest: %s (text of %s without the marker line)" % (review_digest(after["spec"]), relative["spec"]))
     print("review state after: " + ", ".join("%s %s" % (relative[kind], review_state(after[kind], kind))
                                              for kind in kinds))
+    if unmarked_spec:
+        print("%s has no review marker; this records the Plan's approval only and leaves the Spec as it is."
+              % relative["spec"])
     if args.state == "approved":
         print("`approved` records an approval the user gave in this conversation. Do not write it to clear a "
               "phase hint; the marker is a record for later sessions, not a source of authority.")

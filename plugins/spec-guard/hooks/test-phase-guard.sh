@@ -1286,7 +1286,14 @@ todo() { printf '%s\n' "$@" > "$rv/tasks/alpha/todo.md"; }
 todo '- [x] Task 1' '- [x] Checkpoint 1（gate）：已过' '- [ ] Task 2' '- [ ] Checkpoint 2（report）：回归全绿' \
   '- [ ] Task 3' '- [ ] Checkpoint 3（gate）：模块评审；批准即授权推送' '- [ ] Checkpoint 4（gate）：收尾'
 out="$(ctx_of)"
-is "Next gate：跳过已勾选的与 report，取第一个未勾选的 gate" '- Next gate: Checkpoint 3（gate）：模块评审；批准即授权推送 — keep going until it; a `report` checkpoint is recorded in the todo and passed without stopping.'
+is "Next gate：跳过已勾选的与 report，取第一个未勾选的 gate" '- Next gate: Checkpoint 3（gate）：模块评审；批准即授权推送 — the first unchecked `gate` checkpoint in the todo. The Plan has no review marker: if the user has not approved it yet, wait for that approval before building.'
+isnt "Plan 无标记：Next gate 不说 keep going" 'keep going'
+plan_file alpha '<!-- spec-guard: review approved -->'
+out="$(ctx_of)"
+is "Plan 已批准：Next gate 与 0.57.0 逐字相同" '- Next gate: Checkpoint 3（gate）：模块评审；批准即授权推送 — keep going until it; a `report` checkpoint is recorded in the todo and passed without stopping.'
+isnt "Plan 已批准：没有无标记说明" 'no review marker'
+plan_file alpha ''
+out="$(ctx_of)"
 isnt "Next gate：不提 report 检查点" 'Next gate: Checkpoint 2'
 is "Next gate：建议语仍是继续 build" 'Suggested next step: continue `/build` on `alpha`: 5 unchecked item(s)'
 todo '- [ ] Task 2' '- [ ] Checkpoint 2（report）：回归全绿' '- [ ] Checkpoint 3 (REPORT): also a report'
@@ -1294,7 +1301,7 @@ out="$(ctx_of)"
 isnt "只剩 report 检查点：不输出" 'Next gate'
 todo '- [ ] Task 2' '* [ ] Checkpoint: 评审'
 out="$(ctx_of)"
-is "未标注级别按 gate" '- Next gate: Checkpoint: 评审 — keep going until it'
+is "未标注级别按 gate" '- Next gate: Checkpoint: 评审 — the first unchecked `gate` checkpoint in the todo.'
 todo '- [ ] Task 2' '- [ ] 检查点 3（gate）：标题不以 Checkpoint 开头' 'Checkpoint 9（gate）：不是清单项'
 out="$(ctx_of)"
 isnt "没有可识别的检查点：不输出" 'Next gate'
@@ -1302,7 +1309,7 @@ todo '- [ ] Task 2' "- [ ] Checkpoint 5（gate）：带 \`反引号\` 的标题 
 out="$(ctx_of)"
 is "标题清洗并截断" '- Next gate: Checkpoint 5（gate）：带 反引号 的标题 xxxx'
 isnt "标题不带反引号原文" '带 `反引号`'
-is "截断处有省略号" 'x… — keep going until it'
+is "截断处有省略号" 'x… — the first unchecked'
 todo '- [ ] Task 2' '- [ ] Checkpoint 3（gate）：模块评审'
 plan_file alpha "$PENDING"
 out="$(ctx_of)"

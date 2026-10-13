@@ -89,8 +89,8 @@ spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠�
 
 记录模块 Spec 或 Plan 的评审状态：`--module <id> --target <spec|plan|both> --state <pending|approved>`，先预览、
 `--confirm` 才改文件里的一行标记。当前模块待审核时阶段提示报告等待审核、不建议写 Plan 或继续 build；Spec 的批准标记
-带内容指纹，批准后被改会报告“批准后已修订”。`approved` 只在你明确批准之后写。没有标记的文件判定照旧。
-拒绝时退出 2、不写文件。
+带内容指纹，批准后被改会报告“批准后已修订”。`approved` 只在你明确批准之后写（回复“批准”即可，“继续”不算）。没有标记的
+文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待审核或已修订时不行。拒绝时退出 2、不写文件。
 
 ## 加需求
 

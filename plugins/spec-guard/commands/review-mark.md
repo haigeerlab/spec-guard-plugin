@@ -58,12 +58,15 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 
 ## 什么时候写
 
-- **`pending`**：写出一份 Spec 或 Plan 交给用户审核时。可以用本命令，也可以在写文件时直接带上这一行。
+- **`pending`**：写出一份 Spec 或 Plan 交给用户审核时。可以用本命令，也可以在写文件时直接带上这一行。交审的同时告诉用户：
+  回复“批准”即可，“继续”不会被记为批准；不要等用户说了“继续”再解释。
 - **`approved`**：**只在用户于当前对话明确批准这份 Spec 或 Plan 之后**。“看起来可以”“继续”这类含糊的话不算，
   先问清楚。不得为了消除阶段提示而自行批准；标记只是让后续会话读得到的记录，不是授权来源，用户的批准原话以对话为准。
 - 用户批准后，写入 `approved` 是第一个动作，先于任何代码改动、写 Plan 或勾选 todo。
 - Spec 被修订后先把修订内容交用户复审，批准后重新运行 `--state approved`，标记会带上新指纹。
 - 合并审（`reviewCadence` 为 `combined`）下用户一次批准两份时用 `--target both`。
+- 既有项目里没有标记的 Spec 或 Plan 不必补标记。Spec 没有标记时可以单独记录 Plan 的批准，预览会说明本次只记录 Plan；
+  要给旧的 Spec 补 `approved`，先向用户单独确认一次，不得依据此前含糊的答复补记。
 
 ## 预览与确认
 
@@ -75,5 +78,6 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 ```
 
 目标已是所求状态时说明无需改动并正常退出。拒绝（退出码 2、不写文件）：不是有效 module id、不在能力图上、目标文件
-不存在或读不了、标记无效（多于一行或写法不符，需手工改正）、Spec 不是已批准时单独把 Plan 标为已批准。
+不存在或读不了、标记无效（多于一行或写法不符，需手工改正）、Spec 标着待审核、已修订或标记无效时单独把 Plan 标为已批准
+（Spec 的批准需要用户针对这份 Spec 单独明确确认；Spec 没有标记时不拒绝）。
 不执行任何 Git 或远端操作，不改 `.agent/state.json`、todo.md 或能力图。
