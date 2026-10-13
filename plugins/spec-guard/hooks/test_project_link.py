@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_link import LINK_PATH, resolve
+from project_link import LINK_PATH, resolve, resolve_for
 
 SCRIPT = str(Path(__file__).with_name("project_link.py"))
 
@@ -90,6 +90,71 @@ class Resolve(unittest.TestCase):
             file_target.write_text("x", encoding="utf-8")
             dirs.link({"version": 1, "project": str(file_target)})
             self.assertEqual(resolve(dirs.session)[0], "missing")
+
+
+class ResolveForSession(unittest.TestCase):
+    """link-per-session: a session's own entry first, then the directory-level link, else nothing."""
+
+    def setUp(self):
+        self.dirs = Dirs().__enter__()
+        self.addCleanup(self.dirs.__exit__)
+        self.other = self.dirs.project.parent / "other project"
+        self.other.mkdir()
+
+    def link2(self, sessions, project=None):
+        data = {"version": 2, "sessions": sessions}
+        if project is not None:
+            data["project"] = project
+        self.dirs.link(data)
+
+    def test_a_sessions_own_entry_wins_over_the_directory_link(self):
+        self.link2({"sess-a": str(self.other)}, project=str(self.dirs.project))
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-a"]), ("ok", self.other, "session"))
+        self.assertEqual(resolve_for(self.dirs.session, ["nope", "sess-a"]), ("ok", self.other, "session"))
+
+    def test_an_unregistered_session_falls_back_to_the_directory_link(self):
+        self.link2({"sess-a": str(self.other)}, project=str(self.dirs.project))
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-b"]), ("ok", self.dirs.project, "directory"))
+        self.assertEqual(resolve_for(self.dirs.session, []), ("ok", self.dirs.project, "directory"))
+        self.assertEqual(resolve(self.dirs.session), ("ok", self.dirs.project))
+
+    def test_only_other_sessions_entries_means_nothing_for_this_session(self):
+        self.link2({"sess-a": str(self.other)})
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-b"]), ("none", None, None))
+        self.assertEqual(resolve_for(self.dirs.session, []), ("none", None, None))
+        self.assertEqual(resolve(self.dirs.session), ("none", None))
+
+    def test_a_relative_session_path_and_a_missing_session_target(self):
+        self.link2({"sess-a": "../other project", "sess-b": "../gone"})
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-a"]), ("ok", self.other, "session"))
+        state, target, source = resolve_for(self.dirs.session, ["sess-b"])
+        self.assertEqual((state, source), ("missing", "session"))
+
+    def test_version_1_ignores_session_ids(self):
+        self.dirs.link({"version": 1, "project": str(self.dirs.project)})
+        self.assertEqual(resolve_for(self.dirs.session, ["sess-a"]), ("ok", self.dirs.project, "directory"))
+
+    def test_invalid_version_2_forms(self):
+        good = str(self.dirs.project)
+        for content in ({"version": 2, "project": good},                       # sessions is required
+                        {"version": 2, "sessions": {}},                        # nothing to point at
+                        {"version": 2, "sessions": []},
+                        {"version": 2, "sessions": {"a": good}, "extra": 1},
+                        {"version": 2, "sessions": {"": good}},
+                        {"version": 2, "sessions": {"has space": good}},
+                        {"version": 2, "sessions": {"a/b": good}},
+                        {"version": 2, "sessions": {"x" * 129: good}},
+                        {"version": 2, "sessions": {"a": ""}},
+                        {"version": 2, "sessions": {"a": 3}},
+                        {"version": 2, "sessions": {"a": good}, "project": ""},
+                        {"version": 1, "project": good, "sessions": {"a": good}},  # version 1 has no sessions
+                        {"version": 3, "sessions": {"a": good}}):
+            self.dirs.link(content)
+            self.assertEqual(resolve_for(self.dirs.session, ["a"]), ("invalid", None, None), content)
+
+    def test_an_empty_sessions_table_is_fine_beside_a_directory_link(self):
+        self.link2({}, project=str(self.dirs.project))
+        self.assertEqual(resolve_for(self.dirs.session, ["a"]), ("ok", self.dirs.project, "directory"))
 
 
 BLOCK = "<!-- BEGIN:agent-skills-convention -->\n"

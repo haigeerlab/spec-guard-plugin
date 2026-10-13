@@ -18,30 +18,76 @@ LINK_PATH = Path(".agent") / "spec-guard-link.json"
 PATH_SHOWN = 1024
 
 
-def resolve(session_root) -> tuple:
-    """(`none`, None), (`ok`, target), (`invalid`, None) or (`missing`, target) for the link under `session_root`.
+SESSION_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
-    `invalid` is about the file itself; `missing` means the file is fine and the directory it names is
-    not there.  Whether the target has the convention enabled is the caller's question.
+
+def _path_ok(value) -> bool:
+    return isinstance(value, str) and bool(value.strip()) and not any(c in value for c in "\n\r\0")
+
+
+def read_link(session_root) -> tuple:
+    """(`none`, None), (`invalid`, None) or (`ok`, {"project": str | None, "sessions": {id: path}}).
+
+    Version 1 holds one directory-level `project`.  Version 2 (link-per-session) adds `sessions`: one
+    project per session id, for sessions that share a directory and work on different projects.
     """
-    root = Path(session_root).resolve()
-    path = root / LINK_PATH
+    path = Path(session_root).resolve() / LINK_PATH
     if not path.exists() and not path.is_symlink():
         return "none", None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return "invalid", None
-    if not isinstance(data, dict) or set(data) != {"version", "project"}:
+    if not isinstance(data, dict) or isinstance(data.get("version"), bool):
         return "invalid", None
-    version, project = data["version"], data["project"]
-    if version != 1 or isinstance(version, bool):
+    if data.get("version") == 1:
+        if set(data) != {"version", "project"} or not _path_ok(data["project"]):
+            return "invalid", None
+        return "ok", {"project": data["project"], "sessions": {}}
+    if data.get("version") != 2 or not set(data) <= {"version", "project", "sessions"}:
         return "invalid", None
-    if not isinstance(project, str) or not project.strip() or "\n" in project or "\r" in project or "\0" in project:
+    sessions = data.get("sessions")
+    if not isinstance(sessions, dict):
         return "invalid", None
-    target = Path(project)
-    target = (target if target.is_absolute() else root / target).resolve()
-    return ("ok" if target.is_dir() else "missing"), target
+    if "project" in data and not _path_ok(data["project"]):
+        return "invalid", None
+    if not sessions and "project" not in data:
+        return "invalid", None
+    for key, value in sessions.items():
+        if not isinstance(key, str) or not SESSION_ID.fullmatch(key) or not _path_ok(value):
+            return "invalid", None
+    return "ok", {"project": data.get("project"), "sessions": dict(sessions)}
+
+
+def _target(root: Path, value: str) -> Path:
+    target = Path(value)
+    return (target if target.is_absolute() else root / target).resolve()
+
+
+def resolve_for(session_root, session_ids=()) -> tuple:
+    """(state, target, source): this session's own entry first, then the directory-level link, else `none`.
+
+    `source` is `session` or `directory`, None when there is no target.  `invalid` is about the file;
+    `missing` means the file is fine and the directory it names is not there.  Whether the target has
+    the convention enabled is the caller's question.
+    """
+    root = Path(session_root).resolve()
+    state, link = read_link(root)
+    if state != "ok":
+        return state, None, None
+    for session_id in session_ids:
+        if session_id in link["sessions"]:
+            target = _target(root, link["sessions"][session_id])
+            return ("ok" if target.is_dir() else "missing"), target, "session"
+    if link["project"] is None:
+        return "none", None, None
+    target = _target(root, link["project"])
+    return ("ok" if target.is_dir() else "missing"), target, "directory"
+
+
+def resolve(session_root) -> tuple:
+    """The directory-level link only: (`none`, None), (`ok`, target), (`invalid`, None) or (`missing`, target)."""
+    return resolve_for(session_root)[:2]
 
 
 # The activation signals, as phase-guard.sh reads them (has_block / has_state); the two are held together
