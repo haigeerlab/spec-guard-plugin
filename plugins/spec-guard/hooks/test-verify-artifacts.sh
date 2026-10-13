@@ -269,4 +269,43 @@ chmod +x "$WORK/review-fails/python3"
 SPEC_GUARD_TEST_REAL_PYTHON="$(command -v python3)" RUN_PATH="$WORK/review-fails:$PATH" \
   check "评审标记检查没有正常运行时报未验证" 0 "未验证：评审标记检查没有正常运行"
 
+# rework-in-place：tasks/<id>/ 下 plan.md、todo.md 之外的清单文件里有未勾选项时警告——阶段判定只数 todo.md。
+side_project() {  # $1=目录：alpha 已完成（plan 与全勾的 todo）
+  project "$1"; mkdir -p "$PROJECT/tasks/alpha"
+  printf '# Plan\n' > "$PROJECT/tasks/alpha/plan.md"
+  printf '%s\n' '- [x] a' > "$PROJECT/tasks/alpha/todo.md"
+}
+side_project side-open
+printf '%s\n' '# 修正' '- [x] 已做' '- [ ] 没做一' '* [ ] 没做二' > "$PROJECT/tasks/alpha/review-remediation.md"
+check "旁路清单有未勾选项时警告并给出路径与项数" 0 "tasks/alpha/review-remediation.md 有 2 个未勾选项"
+check "旁路清单的警告说明这些项不计入阶段" 0 "不计入阶段"
+side_project side-done
+printf '%s\n' '- [x] 已做' > "$PROJECT/tasks/alpha/review-remediation.md"
+check_absent "旁路清单全部勾选时不输出" "未勾选项"
+side_project side-prose
+printf '%s\n' '# 验收记录' '没有清单。' > "$PROJECT/tasks/alpha/acceptance.md"
+check_absent "没有清单项的旁路文件不输出" "未勾选项"
+side_project side-own
+printf '%s\n' '- [ ] a' '- [x] b' > "$PROJECT/tasks/alpha/todo.md"
+printf '# Plan\n\n- [ ] 计划里的清单\n' > "$PROJECT/tasks/alpha/plan.md"
+check_absent "plan.md 与 todo.md 自己的未勾选项不触发" "未勾选项"
+side_project side-nested
+mkdir -p "$PROJECT/tasks/alpha/browser-acceptance"
+printf '%s\n' '- [ ] 子目录里的' > "$PROJECT/tasks/alpha/browser-acceptance/notes.md"
+printf '%s\n' '- [ ] 不是 md' > "$PROJECT/tasks/alpha/notes.txt"
+check_absent "子目录里的文件与非 md 文件不看" "未勾选项"
+project side-no-tasks
+check_absent "没有 tasks 目录时不报告旁路清单" "未勾选项"
+side_project side-helper-fails
+printf '%s\n' '- [ ] 没做' > "$PROJECT/tasks/alpha/extra.md"
+mkdir -p "$WORK/side-fails"
+cat > "$WORK/side-fails/python3" <<'SH'
+#!/bin/sh
+case "$*" in *side_checklists*) exit 29 ;; esac
+exec "$SPEC_GUARD_TEST_REAL_PYTHON" "$@"
+SH
+chmod +x "$WORK/side-fails/python3"
+SPEC_GUARD_TEST_REAL_PYTHON="$(command -v python3)" RUN_PATH="$WORK/side-fails:$PATH" \
+  check "旁路清单检查没有正常运行时报未验证" 0 "未验证：旁路清单检查没有正常运行"
+
 echo "verify-artifacts regression passed ($PASS cases)"
