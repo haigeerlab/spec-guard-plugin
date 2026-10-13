@@ -9,4 +9,4 @@
 - [x] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告 — 随 Task 2–5 的提交跑 `verify-and-commit.sh` 全档。未验证：两边真实宿主（发版后做）。
 - [x] Task 6：文档 — `docs/troubleshooting.md`「阶段提示没有出现」加一条原因与解决办法、「其他提示」加四行；`docs/design.md` 的激活判断与不变量各补一段；`docs/workflow.md` 一段；CHANGELOG `[0.58.0]`。
 - [x] Task 7：版本号 — 两份 `plugin.json` 改为 0.58.0，中英 README 的 `--ref` 改为 v0.58.0，CHANGELOG 标题 `[0.58.0] - 2026-10-13`。纯文档与清单改动，与 Task 6 同一个提交。
-- [ ] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
+- [x] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行 — 2026-10-13 展示全部验证结果与未验证项，用户确认。验证链（`verify-and-commit.sh` 全档，macOS `/bin/bash`）：`validate.sh` 通过（含 `test_project_link.py` 18 例）、phase-guard 284 例、verify-artifacts 52 例、ShellCheck 无告警；三处变异被抓到；临时目录实跑通过。Spec 批准后未再改动。与 Plan 不一致：Task 2–5 一个提交、Task 6–7 一个提交；`module_stage.py` 未改。未验证：两边真实宿主（发版后做）；未做独立代码评审。
