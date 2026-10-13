@@ -22,7 +22,7 @@
 
 - **没有标记的项目只有两处输出变化**：NEEDS_PLAN 的建议语末尾多一句 “once the Spec is approved by the user”；BUILDING
   阶段可能多出上面的 `Next gate` 一行。其余阶段提示与 `verify-artifacts` 输出逐字不变，既有项目不必补标记。
-- 共享检查点规则新增「评审状态标记」一节，「Plan 检查点分级」补一条“Plan 获批后连续执行到下一个 `gate`”；两份约定块
+- 共享检查点规则新增「评审状态标记」一节（含“获批后先记录、再动手”：写入 `approved` 先于任何代码改动），「Plan 检查点分级」补一条“Plan 获批后连续执行到下一个 `gate`”；两份约定块
   模板各加一行。既有项目重新运行 `setup-convention --replace` 后拿到新文字。
 
 ## [0.56.0] - 2026-10-09

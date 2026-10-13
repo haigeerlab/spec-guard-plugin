@@ -61,6 +61,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 - **`pending`**：写出一份 Spec 或 Plan 交给用户审核时。可以用本命令，也可以在写文件时直接带上这一行。
 - **`approved`**：**只在用户于当前对话明确批准这份 Spec 或 Plan 之后**。“看起来可以”“继续”这类含糊的话不算，
   先问清楚。不得为了消除阶段提示而自行批准；标记只是让后续会话读得到的记录，不是授权来源，用户的批准原话以对话为准。
+- 用户批准后，写入 `approved` 是第一个动作，先于任何代码改动、写 Plan 或勾选 todo。
 - Spec 被修订后先把修订内容交用户复审，批准后重新运行 `--state approved`，标记会带上新指纹。
 - 合并审（`reviewCadence` 为 `combined`）下用户一次批准两份时用 `--target both`。
 
