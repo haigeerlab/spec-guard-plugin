@@ -192,6 +192,28 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module
 挂起确认后问用户要不要设提醒：时间和内容由用户说；宿主有持久的提醒或自动化能力且支持这个时间就用并读回，
 否则请用户自己设。不从对话推断日期，插件不保存提醒，提醒失败不影响挂起。
 
+## link-project
+
+会话目录不是项目目录时（Claude 侧为 `/spec-guard:link-project`）：在会话目录写 `.agent/spec-guard-link.json`，声明这里的工作
+对应别处哪个已启用 spec-guard 的项目。阶段钩子只看会话目录，没有这个文件时在这种会话里每轮都静默；有了它，钩子改读
+被指向的项目，注入多一行 `Linked project`。会话目录自己已启用时不需要也不读指向；钩子不推断项目。这里 `$PROJECT` 是会话目录：
+
+```bash
+python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT"
+python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径>
+python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径> --confirm
+python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
+```
+
+`set`／`unset` 默认只预览，把预览给用户看过并确认后才加 `--confirm`；只写这一个文件，不动被指向的项目。路径可以是
+绝对路径或相对于会话目录的相对路径；文件含本机路径，除非是打算共享的相对路径，否则不入库。拒绝时退出码 2 且不写文件：
+项目不存在、那里没启用 spec-guard、会话目录自己已启用、项目就是会话目录、已有指向文件格式无效、解除时没有指向文件。
+指向失效时钩子每轮给一行诊断，用 `show` 看原因。
+
+**有指向时，本 skill 其他各节命令里的 `--project "$PROJECT"` 要换成被指向的项目路径**（`Linked project` 行给出的那个），
+它们不会自动跟随指向。在那个项目的阶段交接前，也可以手动运行 `SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR=<项目路径> bash
+"$ROOT/hooks/phase-guard.sh" </dev/null` 读一次它的阶段。
+
 ## review-mark
 
 记录模块 Spec 或 Plan 的评审状态（Claude 侧为 `/spec-guard:review-mark`）：在 `spec/<id>.md` 或 `tasks/<id>/plan.md` 写一行

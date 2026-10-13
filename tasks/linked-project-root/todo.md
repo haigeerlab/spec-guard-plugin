@@ -1,12 +1,12 @@
 # Todo: linked-project-root
 
 - [x] Task 1：指向文件的解析与校验（先红） — 新增 `test_project_link.py` 7 例（没有文件、绝对路径、相对路径按会话目录解析且与进程 cwd 无关、软链目标取真实路径、13 种无效写法、指向文件本身不是可读文件、目标不存在或不是目录），夹具目录名带空格与中文；先因模块不存在失败。`project_link.py` 提供 `resolve(session_root)`，返回 `none`／`ok`／`invalid`／`missing` 与目标；目标是否已启用不在这里判。
-- [ ] Task 2：钩子跟随指向（先红）
-- [ ] Task 3：`Linked project` 行与失效诊断（先红）
-- [ ] Checkpoint 1（report）：钩子回归全绿，ShellCheck 无警告
-- [ ] Task 4：`show`／`set`／`unset`（先红）
-- [ ] Task 5：命令文件与 Codex 路由
-- [ ] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告
+- [x] Task 2：钩子跟随指向（先红） — `test-phase-guard.sh` 新增第 14 段 14 例：无指向文件静默、只有空 `.agent` 仍静默、有效指向输出被指向项目的阶段与模块、相对路径、自己已启用时有无指向文件输出逐字相同、目标不存在／格式无效／目标未启用各不输出阶段且不静默、不连环跟随；先在“有效指向”变红。`phase-guard.sh`：没有激活信号时先用 bash 内建看指向文件在不在，不在就照旧退出、不启动 python3；在则调 `project_link.py resolve`，`cd` 到目标后重用 `has_block`／`has_state`，失效时输出固定文字的诊断。272 例全绿。变异三处（自己已启用时也读指向、目标未启用也放行、连环跟随）各有断言变红。单独提交被 command-names 检查器拦下：诊断文字引用了 `/spec-guard:link-project`，命令文件排在 Task 5——任务顺序排错了（同样的事在 review-approval-marker 发生过）。于是 Task 2–5 做完后合成一个提交。
+- [x] Task 3：`Linked project` 行与失效诊断（先红） — 第 14 段再加 12 例：`Linked project` 行恰好一行、内容逐字、位于位置行与阶段之间，位置行是目标项目的；Codex 下同样跟随并用 Codex 的命令写法；自己已启用的项目与被指向项目自己的会话都没有这一行；三种失效的固定文字逐字、格式无效时不回显文件内容；有指向文件而缺 python3 时不静默、没有指向文件时仍静默。先在第一例变红，`phase-guard.sh` 在标题部分加这一行后 284 例全绿。`module_stage.py` 未改（这一行在 bash 里拼进标题即可）。
+- [x] Checkpoint 1（report）：钩子回归全绿，ShellCheck 无警告 — phase-guard 284 例；ShellCheck 随 Task 2–5 的提交跑，无告警。
+- [x] Task 4：`show`／`set`／`unset`（先红） — `test_project_link.py` 再加 11 例（`show` 的各种状态、`set` 预览不写文件并显示目标阶段、`--confirm` 写入读回且可重复、相对路径原样保存、替换已有指向、`unset` 保留 `.agent` 与其中别的文件、解除损坏的指向、六种拒绝、钩子与命令对“已启用”的判据在六种目录上结论一致、长路径完整输出），先 8 例失败 2 例报错。实现后 18 例全绿。临时目录实跑：建立前静默 → 预览 → 确认后钩子输出被指向项目的阶段与 `Linked project` 行 → 解除后恢复静默。实跑中发现并修掉一个问题：注入里的路径沿用了诊断文字的 200 字符上限，长路径被截断，改为 1024 并加测试（先红）。已知局限：路径里的反引号在显示时会被去掉（防伪造），这种路径下显示的文字与真实路径不同。
+- [x] Task 5：命令文件与 Codex 路由 — 新增 `commands/link-project.md`；`spec-guard-ops` 新增 link-project 一节，写明有指向时其他命令的 `--project` 要换成被指向的项目路径、也可手动运行钩子读一次阶段；`docs/commands.md` 登记说明与对照表；`validate.sh` 登记 `test_project_link.py`。`test-checkers.sh` 与 `validate.sh --quick` 通过。
+- [x] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告 — 随 Task 2–5 的提交跑 `verify-and-commit.sh` 全档。未验证：两边真实宿主（发版后做）。
 - [ ] Task 6：文档
 - [ ] Task 7：版本号
 - [ ] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
