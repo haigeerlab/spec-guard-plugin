@@ -189,6 +189,17 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("评审状态标记", "review-mark", "共享检查点规则"):
                     self.assertIn(phrase, text)
 
+    def test_the_final_gate_lists_the_changed_files(self):
+        section = self.section("## Plan 检查点分级")
+        for phrase in ("最终验收列出实际改动的文件", "最后一个 `gate`", "新增、修改、删除", "差异统计", "不凭记忆",
+                       "超出 Plan 预计影响面", "未提交改动", "不算", "文件数与提交号", "不展开清单"):
+            self.assertIn(phrase, section)
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("最终验收", "实际改动的文件"):
+                    self.assertIn(phrase, text)
+
     def test_a_review_handoff_shows_the_content(self):
         section = self.section("## 评审状态标记")
         for phrase in ("交审要让用户看到内容", "目标", "范围内与范围外", "关键决策与取舍", "假设", "验收标准", "未决问题",

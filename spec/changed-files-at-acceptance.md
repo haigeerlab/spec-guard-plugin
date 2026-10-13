@@ -1,6 +1,6 @@
 # Spec: changed-files-at-acceptance
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved fcf58afe5e1f -->
 
 ## Objective
 

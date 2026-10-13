@@ -1,6 +1,6 @@
 # Plan: changed-files-at-acceptance
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/changed-files-at-acceptance.md`](../../spec/changed-files-at-acceptance.md)。合并审：Spec 与本 Plan 一起评审、一次批准。
 分支 `claude/changed-files-at-acceptance`，worktree `.claude/worktrees/current-plugin-owner-aa5b98`，从 `8d015d8`（v0.60.0 验证记录
