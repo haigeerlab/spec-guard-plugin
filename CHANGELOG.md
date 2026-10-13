@@ -1,5 +1,28 @@
 # Changelog
 
+## [未发布]
+
+### 新增
+
+- **评审状态标记。** `spec/<id>.md` 与 `tasks/<id>/plan.md` 各可带一行标记：`<!-- spec-guard: review pending -->`（待审核）、
+  `<!-- spec-guard: review approved <digest> -->`（Spec 已批准，带批准时的内容指纹）、`<!-- spec-guard: review approved -->`
+  （Plan 已批准）。当前模块待审核时，阶段提示多一行 `Review:` 并把建议语换成“等待用户审核”，不再建议写 Plan 或继续
+  build；Spec 在批准后被改过会报告“批准后已修订”并要求复审。阶段名与完成判据不变；`combined` 节奏下 Spec 待审核时
+  仍建议写出 Plan 一起交审。
+- **`/spec-guard:review-mark`**（Codex：`spec-guard-ops` 的 review-mark 一节）：预览并写入上面的标记，`--confirm` 才写，
+  只改这一行。`approved` 只应在用户明确批准之后写；标记是给后续会话的记录，不是授权来源。
+- **BUILDING 阶段写明下一个 gate。** todo 里有未勾选的 `gate` 检查点（未标注按 `gate`）时，阶段提示多一行
+  `Next gate: <检查点标题>`，说明在它之前的 task 与 `report` 检查点不停。
+- **`verify-artifacts` 检查评审标记。** 标记多于一行或写法不符判失败；待审核却已有勾选项、Spec 批准后被改报警告；
+  检查没有正常运行时报未验证。
+
+### 变化
+
+- **没有标记的项目只有两处输出变化**：NEEDS_PLAN 的建议语末尾多一句 “once the Spec is approved by the user”；BUILDING
+  阶段可能多出上面的 `Next gate` 一行。其余阶段提示与 `verify-artifacts` 输出逐字不变，既有项目不必补标记。
+- 共享检查点规则新增「评审状态标记」一节，「Plan 检查点分级」补一条“Plan 获批后连续执行到下一个 `gate`”；两份约定块
+  模板各加一行。既有项目重新运行 `setup-convention --replace` 后拿到新文字。
+
 ## [0.56.0] - 2026-10-09
 
 本版合并 0.55.1 之后的五个模块（#282–#285 与本版 PR）。插件包里有两处行为变化：阶段提示的命令写法、agent-relay

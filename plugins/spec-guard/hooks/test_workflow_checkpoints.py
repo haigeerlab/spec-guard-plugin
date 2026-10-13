@@ -169,6 +169,19 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("`gate`", "`report`", "批量前置审", "UI 自验", "共享检查点规则"):
                     self.assertIn(phrase, template)
 
+    def test_review_markers(self):
+        section = self.section("## 评审状态标记")
+        for phrase in ("<!-- spec-guard: review pending -->", "<!-- spec-guard: review approved", "不是授权来源",
+                       "修订后须复审", "明确批准", "review-mark", "没有标记"):
+            self.assertIn(phrase, section)
+        self.assertNotIn("自动批准", section)
+        self.assertIn("连续执行到下一个 `gate`", self.section("## Plan 检查点分级"))
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("评审状态标记", "review-mark", "共享检查点规则"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")

@@ -9,6 +9,6 @@
 - [x] Task 6：`verify-artifacts`（先红） — `test-verify-artifacts.sh` 新增 12 例：无标记不输出、有效汇总、待审核无勾选项不警告、重复标记失败、Plan 批准带指纹失败、Plan／Spec 待审核却已有勾选项各警告、Spec 批准后被改警告、围栏示例不算、检查未正常运行报未验证；先在“有效汇总”变红，实现后 52 例全绿。状态判据取自 `module_stage.file_review_state`，勾选判据取自 `CHECKED`。
 - [x] Checkpoint 2（report）：三套核心回归与新单测全绿，ShellCheck 无警告 — 随 Task 6 的提交跑 `verify-and-commit.sh` 全档：`validate.sh`（含 `test_review_marker.py` 20 例）、phase-guard 249 例、verify-artifacts 52 例、ShellCheck 无告警。未验证：两边宿主的实际呈现（发版后做）。
 - [x] Task 7：命令文件与 Codex 路由 — 新增 `commands/review-mark.md`（规范引导段与 module-suspend 相同；写明 `approved` 只在用户明确批准后写、含糊的“继续”不算）；`spec-guard-ops` 新增 review-mark 一节；`docs/commands.md` 登记说明与对照表。顺序调整：Task 6 的提交被 command-names 检查器拦下（`verify-artifacts.sh` 的提示引用了尚不存在的 `/spec-guard:review-mark`），所以本任务提前做完并与 Task 6 同一个提交；Checkpoint 2 的验证链以这次提交为准。`test-checkers.sh` 与 `validate.sh --quick` 通过。
-- [ ] Task 8：规则文本、模板与文档（先红）
+- [x] Task 8：规则文本、模板与文档（先红） — `test_workflow_checkpoints.py` 新增 1 例（「评审状态标记」一节的七个关键词、不含“自动批准”、「Plan 检查点分级」含“连续执行到下一个 `gate`”、两份约定块模板各指向它），先失败后通过（16 例）。改动：共享检查点规则新增一节并补一条；两份模板与 `docs/convention-block.md` 各加一行；`docs/workflow.md` 一段、`docs/design.md` 一句、`docs/troubleshooting.md` 四行提示、CHANGELOG `[未发布]`。本仓库只有 `AGENTS.md` 带约定块（`CLAUDE.md` 没有），用工作区源码 `setup-convention.sh local --host=codex --replace` 先 dry-run（只新增两行、保留本地段 7 行、无删除）后写入。
 - [ ] Task 9：版本号与自用
 - [ ] Checkpoint 3（gate）：模块评审；批准 Plan 即授权推送和开 PR，合并由用户进行
