@@ -157,7 +157,8 @@ python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py
 - 当前模块的 Spec 或 Plan 标为待审核时，阶段提示报告等待审核，不再建议写 Plan 或继续 build。
 - Spec 在批准后被改动，阶段提示与 `verify-artifacts` 都能指出，无需 agent 手动改标记。
 - BUILDING 阶段的注入写明下一个 `gate` 检查点。
-- 没有任何标记的既有项目：除 NEEDS_PLAN 建议语多出的半句外，阶段提示与 `verify-artifacts` 输出逐字不变。
+- 没有任何标记的既有项目：除 NEEDS_PLAN 建议语多出的半句、BUILDING 阶段在 todo 有未勾选 `gate` 检查点时多出的
+  Next gate 一行外，阶段提示与 `verify-artifacts` 输出逐字不变。
 - 写 `approved` 只有一个入口，先预览后确认，只改标记行。
 - 三条最小验证与 ShellCheck 全部通过。
 

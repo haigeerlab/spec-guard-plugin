@@ -352,6 +352,32 @@ def config_lines(root: Path, host: str | None = None) -> list:
     return lines
 
 
+OPEN_CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[ \]\s+(Checkpoint(?![A-Za-z]).*)$")
+CHECKPOINT_TIER = re.compile(r"[（(]\s*(gate|report)\s*[）)]", re.IGNORECASE)
+GATE_TITLE_LIMIT = 80
+
+
+def next_gate(root: Path, module: str) -> str:
+    """Title of the first unchecked `gate` checkpoint in the module's todo.md, or "" when there is none.
+
+    The tier is read from the part before the first colon; a checkpoint with no tier is a gate.
+    Anything that cannot be read or recognised yields "": the line is a convenience, not a verdict.
+    """
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    for line in text.splitlines():
+        match = OPEN_CHECKPOINT.match(line)
+        if not match:
+            continue
+        tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(1), maxsplit=1)[0])
+        if tier and tier.group(1).lower() == "report":
+            continue
+        return safe_fragment(match.group(1), GATE_TITLE_LIMIT)
+    return ""
+
+
 def file_review_state(path: Path, kind: str) -> str:
     """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
     if not path.is_file():
@@ -536,6 +562,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                                                                                          current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
+    if stage == "BUILDING" and not review_step:
+        gate = next_gate(root, module)
+        if gate:
+            counts += ("\n- Next gate: %s — keep going until it; a `report` checkpoint is recorded in the todo "
+                       "and passed without stopping." % gate)
     next_step = review_step or next_step
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,

@@ -1279,6 +1279,37 @@ out="$(ctx_of)"
 is "NEEDS_SPEC 不变" 'Suggested next step: write and review `spec/beta.md`.'
 isnt "NEEDS_SPEC 没有 Review 行" '- Review:'
 injects "带标记时注入仍是宿主接受的 JSON" "$rv" "当前阶段: **NEEDS_SPEC**"
+
+# 下一个 gate：BUILDING 且建议继续 build 时，写明 todo 里第一个未勾选的 gate 检查点（未标注按 gate）。
+spec_file beta ''; spec_file alpha ''; plan_file alpha ''
+todo() { printf '%s\n' "$@" > "$rv/tasks/alpha/todo.md"; }
+todo '- [x] Task 1' '- [x] Checkpoint 1（gate）：已过' '- [ ] Task 2' '- [ ] Checkpoint 2（report）：回归全绿' \
+  '- [ ] Task 3' '- [ ] Checkpoint 3（gate）：模块评审；批准即授权推送' '- [ ] Checkpoint 4（gate）：收尾'
+out="$(ctx_of)"
+is "Next gate：跳过已勾选的与 report，取第一个未勾选的 gate" '- Next gate: Checkpoint 3（gate）：模块评审；批准即授权推送 — keep going until it; a `report` checkpoint is recorded in the todo and passed without stopping.'
+isnt "Next gate：不提 report 检查点" 'Next gate: Checkpoint 2'
+is "Next gate：建议语仍是继续 build" 'Suggested next step: continue `/build` on `alpha`: 5 unchecked item(s)'
+todo '- [ ] Task 2' '- [ ] Checkpoint 2（report）：回归全绿' '- [ ] Checkpoint 3 (REPORT): also a report'
+out="$(ctx_of)"
+isnt "只剩 report 检查点：不输出" 'Next gate'
+todo '- [ ] Task 2' '* [ ] Checkpoint: 评审'
+out="$(ctx_of)"
+is "未标注级别按 gate" '- Next gate: Checkpoint: 评审 — keep going until it'
+todo '- [ ] Task 2' '- [ ] 检查点 3（gate）：标题不以 Checkpoint 开头' 'Checkpoint 9（gate）：不是清单项'
+out="$(ctx_of)"
+isnt "没有可识别的检查点：不输出" 'Next gate'
+todo '- [ ] Task 2' "- [ ] Checkpoint 5（gate）：带 \`反引号\` 的标题 $(printf 'x%.0s' $(seq 1 200))"
+out="$(ctx_of)"
+is "标题清洗并截断" '- Next gate: Checkpoint 5（gate）：带 反引号 的标题 xxxx'
+isnt "标题不带反引号原文" '带 `反引号`'
+is "截断处有省略号" 'x… — keep going until it'
+todo '- [ ] Task 2' '- [ ] Checkpoint 3（gate）：模块评审'
+plan_file alpha "$PENDING"
+out="$(ctx_of)"
+isnt "Plan 待审核时不输出 Next gate" 'Next gate'
+plan_file alpha ''; rm "$rv/tasks/alpha/plan.md"
+out="$(ctx_of)"
+isnt "NEEDS_PLAN 不输出 Next gate" 'Next gate'
 }
 
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
