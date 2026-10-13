@@ -81,7 +81,8 @@ print(json.dumps({"hookSpecificOutput": {
 # 跟随指向：判定在 project_link.py；目标是否已启用仍用上面的 has_block／has_state（cd 过去后重用）。不连环跟随：
 # 只看目标自己的激活信号，不读目标里的指向文件。失效不是「未启用」，所以给诊断而不静默。
 if [ -n "$LINKED" ]; then
-  LINK_OUT="$(python3 -B "$HOOKDIR/project_link.py" resolve --from . 2>/dev/null)" || LINK_OUT=""
+  # link-per-session：把 hook 输入转交过去，由它取会话标识；本会话的登记优先，其次目录级指向。
+  LINK_OUT="$(printf '%s' "$HOOK_INPUT" | python3 -B "$HOOKDIR/project_link.py" resolve --from . --hook-input 2>/dev/null)" || LINK_OUT=""
   LINK_STATUS="${LINK_OUT%%$'\n'*}"
   LINK_REST=""
   case "$LINK_OUT" in *$'\n'*) LINK_REST="${LINK_OUT#*$'\n'}" ;; esac
@@ -90,17 +91,23 @@ if [ -n "$LINKED" ]; then
   case "$LINK_REST" in *$'\n'*) LINK_SHOWN="${LINK_REST#*$'\n'}" ;; esac
   case "$LINK_SHOWN" in *$'\n'*) LINK_FROM="${LINK_SHOWN#*$'\n'}"; LINK_FROM="${LINK_FROM%%$'\n'*}" ;; esac
   LINK_SHOWN="${LINK_SHOWN%%$'\n'*}"
+  # 第五行是来源：session（本会话自己的登记）或 directory（目录级指向）。
+  LINK_SOURCE=""
+  case "$LINK_OUT" in *$'\n'session) LINK_SOURCE=session ;; esac
+  if [ "$LINK_SOURCE" = session ]; then LINK_WHICH="其中本会话的登记"; else LINK_WHICH="它"; fi
   LINK_FIX='用 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 一节）查看、重新建立或解除指向。这是指向失效，不是「未启用」。'
   LINK_BAD=""
   case "$LINK_STATUS" in
     ok)
       if ! cd "$LINK_TARGET" 2>/dev/null; then
-        LINK_BAD="它指向的目录进不去（${LINK_SHOWN}）"
+        LINK_BAD="${LINK_WHICH}指向的目录进不去（${LINK_SHOWN}）"
       elif ! has_block && ! has_state; then
-        LINK_BAD="它指向的目录没有启用 spec-guard（${LINK_SHOWN}）：那里没有约定块，也没有带 activeModule 的 \`.agent/state.json\`"
+        LINK_BAD="${LINK_WHICH}指向的目录没有启用 spec-guard（${LINK_SHOWN}）：那里没有约定块，也没有带 activeModule 的 \`.agent/state.json\`"
       fi ;;
-    missing) LINK_BAD="它指向的目录不存在或不是目录（${LINK_SHOWN}）" ;;
-    invalid) LINK_BAD="它的格式无效（应为只含 version 与 project 两个键的 JSON 对象）" ;;
+    missing) LINK_BAD="${LINK_WHICH}指向的目录不存在或不是目录（${LINK_SHOWN}）" ;;
+    # 文件里只有别的会话的登记、没有目录级指向：对本会话等于没有指向，照旧静默。
+    none) exit 0 ;;
+    invalid) LINK_BAD="它的格式无效（应为 JSON 对象：版本 1 只含 version 与 project；版本 2 含 version、sessions，可选 project）" ;;
     *) LINK_BAD="没能读取它（检查没有正常运行）" ;;
   esac
   if [ -n "$LINK_BAD" ]; then
@@ -148,9 +155,15 @@ HEADER="## spec-guard local workflow"
 
 ${LOCATION}"
 # 跟随指向时写明项目在哪：阶段是那个项目的，位置行也是它的；路径已在 project_link.py 里清洗。
-[ -z "$LINKED" ] || HEADER="${HEADER}
+if [ -n "$LINKED" ] && [ "$LINK_SOURCE" = session ]; then
+  HEADER="${HEADER}
+
+Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. Pass this path as the project when you run spec-guard commands."
+elif [ -n "$LINKED" ]; then
+  HEADER="${HEADER}
 
 Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and pass your own project path."
+fi
 
 SPECS=0
 for spec in spec/*.md; do

@@ -1406,7 +1406,7 @@ FIX='用 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 
 link "$ses" "$WORK/gone"
 injects "目标不存在的诊断文字" "$ses" "但它指向的目录不存在或不是目录（$(cd "$WORK" && pwd -P)/gone），本轮没有阶段注入。${FIX}"
 printf '%s\n' '{"version": 1, "project": "x", "SECRET-KEY": "do not echo"}' > "$ses/.agent/spec-guard-link.json"
-injects "格式无效的诊断文字" "$ses" "但它的格式无效（应为只含 version 与 project 两个键的 JSON 对象），本轮没有阶段注入。${FIX}"
+injects "格式无效的诊断文字" "$ses" "但它的格式无效（应为 JSON 对象：版本 1 只含 version 与 project；版本 2 含 version、sessions，可选 project），本轮没有阶段注入。${FIX}"
 lacks "格式无效时不回显文件内容" "$ses" 'SECRET-KEY'
 lacks "格式无效时不回显文件里的值" "$ses" 'do not echo'
 rm "$other/.agent/spec-guard-link.json"; link "$ses" "$other"
@@ -1424,6 +1424,63 @@ echo "  ✅ 有指向文件而缺 python3 时不静默"; PASS=$((PASS + 1))
 rm "$ses/.agent/spec-guard-link.json"
 [ -z "$(RUN_PATH="$WORK/nopy14" run "$ses")" ] || fail "没有指向文件时缺 python3 也应静默"
 echo "  ✅ 没有指向文件时缺 python3 仍静默"; PASS=$((PASS + 1))
+
+# link-per-session：同一目录的会话各自登记自己的项目；本会话的登记优先，其次目录级指向，都没有则静默。
+prj2="$WORK/second project"; mkdir -p "$prj2/spec"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$prj2/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| beta | y | — |' '' 'Build order: beta' > "$prj2/spec/CAPABILITY-MAP.md"
+printf '# Spec: beta\n' > "$prj2/spec/beta.md"
+UUID='01a13492-c161-7abc-8def-0123456789ab'
+link2() {  # $1=sessions 的 JSON 对象 $2=project 的值（空=不写目录级指向）
+  mkdir -p "$ses/.agent"
+  if [ -n "${2:-}" ]; then printf '{"version": 2, "project": "%s", "sessions": %s}\n' "$2" "$1" > "$ses/.agent/spec-guard-link.json"
+  else printf '{"version": 2, "sessions": %s}\n' "$1" > "$ses/.agent/spec-guard-link.json"; fi
+}
+as() {  # $1=hook 输入的 JSON；取注入正文，静默时为空
+  local raw; raw="$(run_input "$ses" "$1")"
+  if [ -z "$raw" ]; then out=""; else out="$(context_of <<<"$raw")"; fi
+}
+has() { case "$out" in *"$2"*) ;; *) fail "$1: 缺少「$2」
+$out" ;; esac; echo "  ✅ $1"; PASS=$((PASS + 1)); }
+hasnt() { case "$out" in *"$2"*) fail "$1: 不该出现「$2」
+$out" ;; esac; echo "  ✅ $1"; PASS=$((PASS + 1)); }
+quiet() { [ -z "$out" ] || fail "$1: 应当静默
+$out"; echo "  ✅ $1"; PASS=$((PASS + 1)); }
+
+link2 "{\"sess-a\": \"$prj\", \"sess-b\": \"$prj2\", \"$UUID\": \"$prj2\"}" ""
+as '{"session_id":"sess-a"}';  has "会话 a 得到自己登记的项目" 'Current module: `alpha`'
+as '{"session_id":"sess-b"}';  has "会话 b 得到自己登记的项目" 'Current module: `beta`'
+hasnt "会话 b 不会看到会话 a 的项目" 'Current module: `alpha`'
+as '{"session_id":"sess-x"}';  quiet "没登记的会话在没有目录级指向时静默"
+out="$(run "$ses")";           quiet "hook 输入取不到会话标识且没有目录级指向时静默"
+as '{"transcript_path":"/nowhere/sess-a.jsonl"}'; has "会话标识取自记录文件名（整段）" 'Current module: `alpha`'
+as "{\"transcript_path\":\"/nowhere/rollout-2026-10-13T17-23-15-${UUID}.jsonl\"}"; has "会话标识取自记录文件名结尾的标识" 'Current module: `beta`'
+as '{"session_id":"sess-a"}'
+python3 - "$out" "$prj" "$ses" <<'PY' || fail "会话登记的 Linked project 行缺失、重复或内容不对
+$out"
+import os, sys
+text, project, session = sys.argv[1], os.path.realpath(sys.argv[2]), os.path.realpath(sys.argv[3])
+lines = [line for line in text.splitlines() if line.startswith("Linked project:")]
+assert len(lines) == 1, lines
+expected = ("Linked project: `%s` — this session is linked to it by its own entry in `.agent/spec-guard-link.json` under "
+            "`%s`; other sessions in that directory are not affected. Pass this path as the project when you run "
+            "spec-guard commands." % (project, session))
+assert lines[0] == expected, (lines[0], expected)
+PY
+echo "  ✅ 会话登记的 Linked project 行恰好一行、内容正确"; PASS=$((PASS + 1))
+
+link2 "{\"sess-a\": \"$prj2\"}" "$prj"
+as '{"session_id":"sess-a"}';  has "本会话的登记优先于目录级指向" 'Current module: `beta`'
+as '{"session_id":"sess-x"}';  has "没登记的会话跟随目录级指向" 'Current module: `alpha`'
+has "跟随目录级指向时 Linked project 行与 0.58.2 相同" 'points to it through `.agent/spec-guard-link.json`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory;'
+hasnt "跟随目录级指向时不说是本会话的登记" 'by its own entry'
+
+link2 "{\"sess-a\": \"$other\"}" "$prj"
+rm -f "$other/.agent/spec-guard-link.json"
+as '{"session_id":"sess-a"}'
+has "本会话的登记指向未启用的目录：诊断说明是本会话的登记" '但其中本会话的登记指向的目录没有启用 spec-guard'
+hasnt "本会话的登记失效时不输出阶段" '当前阶段'
 }
 
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
