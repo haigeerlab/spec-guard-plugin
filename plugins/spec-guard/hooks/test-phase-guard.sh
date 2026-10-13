@@ -48,7 +48,7 @@ $out"
 }
 
 # 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-BOUNDARY='- Module boundary: a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
+BOUNDARY='- Module boundary: a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or `text` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text. This stage summary carries over, the conversation does not need to.'
 boundary() {  # $1=用例名 $2=项目目录
   local out
   out="$(run "$2")"
@@ -89,10 +89,10 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
 # context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
 # 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
 mid_line() {  # $1=N k $2=阈值说明
-  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; do not paste handoff text.' "$1" "$2"
+  printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or `text` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text.' "$1" "$2"
 }
 sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
+  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or \`text\` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
 done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
   python3 -c '
@@ -1123,7 +1123,14 @@ printf '# Plan\n' > "$cw/tasks/beta/plan.md"; printf '%s\n' '- [x] b' > "$cw/tas
 out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "DONE"
 expect "Codex DONE：\$spec-guard-ops add-module" 'insert a module with `$spec-guard-ops` add-module at this checkpoint'
 expect "Codex 模块完成行：/compact 不带聚焦说明" "/compact (Codex's /compact takes no focus text), or /clear if the next work is unrelated"
+expect "Codex 模块完成行：斜杠命令不是 shell 命令" 'it is a slash command for the chat message box, not a shell command'
+expect "Codex 模块完成行：代码块不带 shell 语言标签" 'give the code block no language tag or `text` (never bash, sh, zsh or shell)'
+expect "Codex 模块完成行：发到消息输入框而不是终端" 'send it in the message box, not to run it in a terminal'
+[ "$(grep -c 'it is a slash command' <<<"$out")" = 1 ] || fail "Codex 模块完成行的斜杠命令说明应恰好一处
+$out"
 out="$(run_from "$cw" | context_of)"
+grep -F 'slash command' >/dev/null <<<"$out" && fail "判断不了宿主时不应出现斜杠命令说明
+$out"
 expect "判断不了宿主时模块完成行仍是改前原文" '- Module boundary: a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text.'
 grep -F 'followed by a one-sentence focus' >/dev/null <<<"$out" && fail "Codex 的 /compact 不应要求聚焦说明
 $out"
@@ -1146,6 +1153,9 @@ codex_rollout "$WORK/cw-rollout.jsonl" 206720
 out="$(env -u PLUGIN_ROOT SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$cw" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"{\"transcript_path\":\"$WORK/cw-rollout.jsonl\"}" | context_of)"
 codex_text "上下文行"
 expect "Codex 上下文行：/compact 不带聚焦说明" "then give the user one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), or /clear"
+expect "Codex 上下文行：斜杠命令不是 shell 命令" 'it is a slash command for the chat message box, not a shell command'
+expect "Codex 上下文行：代码块不带 shell 语言标签" 'give the code block no language tag or `text` (never bash, sh, zsh or shell)'
+expect "Codex 上下文行：发到消息输入框而不是终端" 'send it in the message box, not to run it in a terminal'
 # phase-guard.sh 自己的兜底行：module_stage 算不出阶段时
 mkdir -p "$WORK/stagefail"; real_py="$(command -v python3)"
 printf '%s\n' '#!/bin/bash' 'case "$1" in *module_stage.py) exit 1 ;; esac' "exec \"$real_py\" \"\$@\"" > "$WORK/stagefail/python3"
