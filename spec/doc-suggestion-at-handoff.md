@@ -32,7 +32,7 @@
 7. 版本 0.60.2，一个 PR。
 
 写说明时核对代码得到的一处更正：影响表里没有 `update`、`create` 时直接得到 `valid`，这包括 `follow`、`pending`、
-`not-applicable` 三种决定（需求原文只写了前两种之外的 `follow` 与 `not-applicable`）。另外，Plan 不存在、是符号链接或
+`not-applicable` 三种决定（需求原文只写了 `follow` 与 `not-applicable`）。另外，Plan 不存在、是符号链接或
 不是普通文件时报的是同一句错误，说明里要区分预期与异常。
 
 ## Contract
