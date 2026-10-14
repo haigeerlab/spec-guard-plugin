@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.3;test:marketplace-upgrade-and-smoke-20261015a"
+      },
+      "observedAt": "2026-10-14T16:20:09Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.60.2 to v0.60.3; the upgrade reported both marketplaces upgraded; the installed manifest reads 0.60.3; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.3-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.3;test:ui-verify-and-close-out-20261015a"
+      },
+      "observedAt": "2026-10-14T16:20:09Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "command:/bin/bash <installed>/hooks/test-setup-teardown.sh",
+        "result:the installed checkpoint contract carries the rewritten UI self-verify section, both installed templates carry the UI line and the documentation-suggestion line, the UI self-verify and documentation-suggestion test cases pass from the installed copy, and test-setup-teardown.sh runs green (57 cases)",
+        "command:codex exec -s workspace-write \"<keep building to the next checkpoint>\"",
+        "result:a temporary project was set up with the installed copy (its convention block carries both new lines) holding a static page with a form, and one approved module -- the only, therefore last, module -- whose single task changes the submit button text; neither the Plan nor the prompt mentioned UI verification or documents",
+        "result:one run: the session verified the page in Chrome and reported what it saw (the button reads the new text, clicking still shows the thank-you line, layout normal); it did not mention the console; at the final gate it listed the changed files and the commit and gave a close-out documentation suggestion with a README stance (none needed)",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was the only difference and was removed afterwards"
+      ]
+    }
+  ]
+}

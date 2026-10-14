@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.3;test:installed-plugin-upgrade-20261015a"
+      },
+      "observedAt": "2026-10-14T16:20:09Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.60.2 to 0.60.3 for scope user; the installed copy records gitCommitSha b681cd02555918f4309cdbb8fc5a685ea84c7916 -- the v0.60.3 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.3-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.3;test:ui-verify-and-close-out-20261015a"
+      },
+      "observedAt": "2026-10-14T16:20:09Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "command:/bin/bash <installed>/hooks/test-setup-teardown.sh",
+        "result:the installed checkpoint contract carries the rewritten UI self-verify section, both installed templates carry the UI line and the documentation-suggestion line, the UI self-verify and documentation-suggestion test cases pass from the installed copy, and test-setup-teardown.sh runs green (57 cases)",
+        "result:the same 4 errors as since 0.56.0 remain in test_workflow_checkpoints (cases that read repository files outside the package)",
+        "command:claude -p \"<keep building to the next checkpoint>\" --permission-mode acceptEdits --allowedTools ...",
+        "result:a temporary project was set up with the installed copy (its convention block carries both new lines) holding a static page with a form, and one approved module -- the only, therefore last, module -- whose single task changes the submit button text; neither the Plan nor the prompt mentioned UI verification or documents",
+        "result:one run: inside the task the session opened the page in headless Chrome, checked both Spec criteria one by one (the button reads the new text; clicking still shows the thank-you line), reported no console errors and that it looked at a screenshot; at the final gate it listed the changed files and the commit, and gave a close-out documentation suggestion with an explicit README stance (no README needed for a one-file static page; other documents: none)"
+      ]
+    }
+  ]
+}
