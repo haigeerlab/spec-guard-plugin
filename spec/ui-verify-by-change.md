@@ -1,6 +1,6 @@
 # Spec: ui-verify-by-change
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 5ed32cb6ae00 -->
 
 ## Objective
 

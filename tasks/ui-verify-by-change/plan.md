@@ -1,6 +1,6 @@
 # Plan: ui-verify-by-change
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/ui-verify-by-change.md`](../../spec/ui-verify-by-change.md)。合并审：Spec 与本 Plan 一起评审、一次批准。
 分支 `claude/ui-verify-by-change`，worktree `.claude/worktrees/current-plugin-owner-aa5b98`，从 `9f9642d`（#309 合并）开出。
