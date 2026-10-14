@@ -118,6 +118,30 @@ class DocumentationImpactTests(unittest.TestCase):
         with self.assertRaisesRegex(ImpactError, "rationale"):
             parse_impact(self.root, "alpha")
 
+    def test_spec_stage_without_plan(self):
+        # Before the Plan exists, an update/create decision stops at the delivery check; the docs call this expected.
+        self.write("docs/DOCUMENTATION-BASELINE.md", BASELINE)
+        self.write("spec/alpha.md", SPEC)
+        with self.assertRaisesRegex(ImpactError, "^module plan must be a regular file$"):
+            parse_impact(self.root, "alpha")
+        no_delivery = SPEC.replace("| update |", "| pending |").replace("| create |", "| not-applicable |")
+        self.write("spec/alpha.md", no_delivery)
+        self.assertEqual(parse_impact(self.root, "alpha").state, "valid")
+        # A Plan that exists but is not a regular file reports the same line: that one is a real fault.
+        self.write("spec/alpha.md", SPEC)
+        self.write("elsewhere.md", PLAN)
+        (self.root / "tasks" / "alpha").mkdir(parents=True)
+        (self.root / "tasks" / "alpha" / "plan.md").symlink_to(self.root / "elsewhere.md")
+        with self.assertRaisesRegex(ImpactError, "^module plan must be a regular file$"):
+            parse_impact(self.root, "alpha")
+        plugin = Path(__file__).resolve().parents[1]
+        for path in (plugin / "references" / "documentation-impact.md", plugin / "commands" / "documentation-impact.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("module plan must be a regular file", "预期结果", "不能当作完整的 `valid`",
+                               "`follow`、`pending` 或 `not-applicable`", "再跑一次", "才是异常"):
+                    self.assertIn(phrase, text)
+
     def test_fenced_example_tables_are_ignored(self):
         self.valid_project()
         self.write("spec/alpha.md", SPEC + """

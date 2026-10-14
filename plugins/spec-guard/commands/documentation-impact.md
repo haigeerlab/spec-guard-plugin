@@ -50,4 +50,6 @@ python3 -B "$ROOT/hooks/documentation_impact.py" \
 - `valid`：展示每项决定及 `update`/`create` 的计划交付物。`pending` 和 `not-applicable` 都是未被隐去的决定，不代表交付完成。
 - `invalid`：原样说明错误与协议路径 `references/documentation-impact.md`；先展示依据用户提供事实形成的 Spec/Plan 草稿。
 
+在 Spec 阶段、Plan 还没写时，影响表里只要有 `update` 或 `create`，检查就会报 `module plan must be a regular file`。这是预期结果：报到这一句说明 Spec 里的影响表已通过校验，只是 Plan 交付还没检查，不能当作完整的 `valid`。影响表里没有 `update`、`create`（全部为 `follow`、`pending` 或 `not-applicable`）时直接得到 `valid`。Plan 获批后要再跑一次，必须得到完整的 `valid`。Plan 已经写了还报这一句（例如它是符号链接），才是异常。
+
 只有用户明确确认后，才把草稿写入或修改 `spec/<module-id>.md` 与 `tasks/<module-id>/plan.md`。先保留既有 Spec、Plan、业务文档和目录惯例；不得扫描代码、Git diff、文件时间或文档正文来推断文档是否过期、已更新或已被实现。不要自动创建 ADR、使用手册或接入文档；`update`/`create` 仅表示计划交付物，实际交付由后续核验处理。
