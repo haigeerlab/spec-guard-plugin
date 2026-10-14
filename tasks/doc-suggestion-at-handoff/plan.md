@@ -10,12 +10,13 @@
 
 ## Overview
 
-只改文字：共享检查点规则两处、命令文件两份、技能一处、协议说明一处、文档与版本号。没有新命令，也没有会被检查器拦下的
-新引用，按任务逐个提交。
+只改文字：共享检查点规则新增一节并改两处、命令文件两份、技能一处、协议说明一处、文档与版本号。没有新命令，也没有会被
+检查器拦下的新引用，按任务逐个提交。
 
 ## Architecture Decisions
 
-- **规则只有一个出处。** 文档建议的写法写在共享检查点规则；命令文件与技能只列这一项并指向它。
+- **规则只有一个出处。** 文档建议的位置、范围与写法写在共享检查点规则的新一节；命令文件与技能只列这一项并指向它。
+- **给思路，不给清单。** 范围靠三个问题和文档基线已有的类别，不按项目类型列文档。
 - **说明跟着代码走。** 影响检查的说明以实跑结果为准，不凭阅读代码下结论。
 - **静态测试不冒充行为验收。** agent 是否照做，由发版后的真实会话观察。
 
@@ -23,8 +24,8 @@
 
 ### Task 1：文档建议与 ADR 询问（先红）
 
-`test_workflow_checkpoints.py` 加一例并确认失败；再改 `references/workflow-checkpoints.md` 的 Spec 交审清单与说明、异常停点，
-`commands/review-mark.md` 与 `spec-guard-ops` 的交审内容，`docs/workflow.md` 的停点。
+`test_workflow_checkpoints.py` 加一例并确认失败；再改 `references/workflow-checkpoints.md`（新增「文档建议」一节、Spec 交审清单、
+异常停点），`commands/review-mark.md` 与 `spec-guard-ops` 的交审内容，`docs/workflow.md`。
 
 - 验收：新断言先失败后通过；三处清单措辞一致。
 - 验证：`python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py`；`/bin/bash scripts/validate.sh --quick`。
@@ -35,10 +36,9 @@
 
 先在临时项目里实跑两种情况，确认说明要写的行为；再加断言并确认失败，然后改两处说明。
 
-- 验收：断言先失败后通过；实跑结果与说明一致（有 `create` 且 Plan 不存在时报那句错误；只有 `follow`、`pending`、
-  `not-applicable` 时得到 `valid`）。
-- 验证：`python3 -B plugins/spec-guard/hooks/test_documentation_impact.py`（或断言所在的测试文件）；实跑命令记入 todo。
-- 文件：`references/documentation-impact.md`、`commands/documentation-impact.md`、一个测试文件。
+- 验收：断言先失败后通过；实跑结果与说明一致。
+- 验证：`python3 -B plugins/spec-guard/hooks/test_documentation_impact.py`；实跑命令与结果记入 todo。
+- 文件：`references/documentation-impact.md`、`commands/documentation-impact.md`、`hooks/test_documentation_impact.py`。
 
 ### Task 3：CHANGELOG 与版本号
 
@@ -53,5 +53,6 @@
 
 ## Risks
 
-- 交审内容又多一项。允许写“无”、只挂在 Spec 交审一处，控制住噪音。
+- 交审内容又多一项、规则多一节。允许写“无”，每个层次只问一次，拒绝后不再重复，以此控制噪音。
+- 能力图评审那一处的真实会话验证成本高，可能只能记为未验证。
 - 发版后的真实会话可能不给建议。那是规则文字的效果问题，如实记录，不靠加机制补。
