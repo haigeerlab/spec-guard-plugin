@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.2;test:marketplace-upgrade-and-smoke-20261014a"
+      },
+      "observedAt": "2026-10-14T15:29:01Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.60.1 to v0.60.2; the upgrade reported both marketplaces upgraded; the installed manifest reads 0.60.2; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.2-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.2;test:documentation-suggestions-20261014a"
+      },
+      "observedAt": "2026-10-14T15:29:01Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_documentation_impact.py",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:both run green from the installed copy (10 and 21 cases)",
+        "command:codex exec -s workspace-write \"<write the Spec and hand it over>\" / \"<keep building to the next checkpoint>\"",
+        "result:two temporary projects were set up with the installed copy: one whose only module still needs a Spec, one whose only (and therefore last) module has an approved Plan with one task and a final gate; the prompts did not mention documents",
+        "result:Spec handoff: the handoff carried a documentation-suggestion item (a short README with prerequisites and usage, to be adopted or not at review)",
+        "result:last module's final gate: the session stopped at the gate (commit blocked by the missing author, reported) and ended with a README stance (\"no new README needed, usage is in the Spec\") -- the close-out point was followed only for the README, not as a full close-out suggestion",
+        "result:the capability-map review point was not exercised; not verified. The trust entries codex exec added to ~/.codex/config.toml for the temporary directories were the only differences and were removed afterwards"
+      ]
+    }
+  ]
+}
