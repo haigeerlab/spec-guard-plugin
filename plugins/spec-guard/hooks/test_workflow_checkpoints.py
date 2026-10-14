@@ -155,6 +155,14 @@ class CheckpointContractTests(unittest.TestCase):
         ui = self.section("## UI 自验")
         for phrase in ("浏览器", "电脑操作", "缺失", "提前提醒", "兜底", "Claude 桌面应用"):
             self.assertIn(phrase, ui)
+        for phrase in ("不论 Plan 是否预计到", "实际改动", "在任务里验证", "开发服务", "对照", "控制台", "看到了什么",
+                       "只写“已验证”不算", "UI 未验证"):
+            self.assertIn(phrase, ui)
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("不论 Plan 是否预计到", "UI 未验证"):
+                    self.assertIn(phrase, text)
 
     def test_no_remote_write_is_authorized_by_default(self):
         text = self.target.read_text(encoding="utf-8")
