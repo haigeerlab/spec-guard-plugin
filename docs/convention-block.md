@@ -37,6 +37,8 @@
   `spec-guard:spec-guard-ops` 的共享检查点规则
 - 模块最终验收时在对话里列出实际改动的文件（新增、修改、删除与行数，取自版本库），任务做完的结果带文件数与提交号；
   细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 能力图评审、每个模块的 Spec 交审、能力图全部完成时各提一次文档建议（README 默认在候选里），没有就写“无”；
+  细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 写出 Spec 或 Plan 交审时在文件里标评审状态标记 `pending`；用户明确批准后才用 `/spec-guard:review-mark` 记为 `approved`，
   Spec 修订后须复审，细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 产物语言与评审节奏以 `.agent/config.json` 为准（`/spec-guard:config` 查看）；新写的 spec、plan、todo 正文用配置的

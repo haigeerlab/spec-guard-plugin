@@ -1,6 +1,6 @@
 # Spec: doc-suggestion-template-line
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 5a2f96d3144f -->
 
 ## Objective
 
