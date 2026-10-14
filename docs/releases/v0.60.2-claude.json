@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.2;test:installed-plugin-upgrade-20261014a"
+      },
+      "observedAt": "2026-10-14T15:29:01Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.60.1 to 0.60.2 for scope user; the installed copy records gitCommitSha faf3c820884da9febea5bbf74ee570e54e64b622 -- the v0.60.2 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.2-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.2;test:documentation-suggestions-20261014a"
+      },
+      "observedAt": "2026-10-14T15:29:01Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_documentation_impact.py",
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:test_documentation_impact passes (10 cases); test_workflow_checkpoints passes the new documentation-suggestion case, with the same 4 errors as since 0.56.0 (cases that read repository files outside the package)",
+        "command:claude -p \"<write the Spec and hand it over>\" / claude -p \"<keep building to the next checkpoint>\" --permission-mode acceptEdits --allowedTools ...",
+        "result:two temporary projects were set up with the installed copy: one whose only module still needs a Spec, one whose only (and therefore last) module has an approved Plan with one task and a final gate; the prompts did not mention documents",
+        "result:Spec handoff: the handoff carried a documentation-suggestion item (\"none; usage is covered by --help; whether to write a README is decided when the whole map is done\")",
+        "result:last module's final gate: the first run stopped before the gate because the temporary repository had no commit author; rerun with a repository-local author, the session stopped at the final gate and listed the changed files and the commit, but gave no close-out documentation suggestion and said nothing about the README -- the close-out point was NOT followed in this run",
+        "result:the capability-map review point was not exercised (it runs inside agent-skills' /spec flow); not verified"
+      ]
+    }
+  ]
+}
