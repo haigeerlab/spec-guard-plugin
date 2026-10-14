@@ -200,6 +200,11 @@ class CheckpointContractTests(unittest.TestCase):
         for path in (self.plugin / "commands" / "review-mark.md", self.plugin / "skills" / "spec-guard-ops" / "SKILL.md"):
             with self.subTest(path=path):
                 self.assertIn("文档建议", path.read_text(encoding="utf-8"))
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("文档建议", "能力图全部完成", "README"):
+                    self.assertIn(phrase, text)
 
     def test_the_final_gate_lists_the_changed_files(self):
         section = self.section("## Plan 检查点分级")
