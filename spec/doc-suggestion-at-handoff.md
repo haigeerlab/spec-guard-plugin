@@ -1,6 +1,6 @@
 # Spec: doc-suggestion-at-handoff
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 0da4b8764338 -->
 
 ## Objective
 

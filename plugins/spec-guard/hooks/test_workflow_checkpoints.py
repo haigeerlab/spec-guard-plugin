@@ -189,6 +189,18 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("评审状态标记", "review-mark", "共享检查点规则"):
                     self.assertIn(phrase, text)
 
+    def test_documentation_suggestions(self):
+        section = self.section("## 文档建议")
+        for phrase in ("能力图评审", "Spec 交审", "能力图全部完成", "跨模块", "收尾", "是什么、给谁用", "使用者和维护者",
+                       "文档基线", "会因这次的工作过时", "README", "写什么、为什么现在写", "“无”", "另开一个收尾模块",
+                       "不再就同一层次重复提", "不卡验收"):
+            self.assertIn(phrase, section)
+        self.assertIn("文档建议", self.section("## 评审状态标记"))
+        self.assertIn("问是否记一份 ADR", self.section("## Plan 检查点分级"))
+        for path in (self.plugin / "commands" / "review-mark.md", self.plugin / "skills" / "spec-guard-ops" / "SKILL.md"):
+            with self.subTest(path=path):
+                self.assertIn("文档建议", path.read_text(encoding="utf-8"))
+
     def test_the_final_gate_lists_the_changed_files(self):
         section = self.section("## Plan 检查点分级")
         for phrase in ("最终验收列出实际改动的文件", "最后一个 `gate`", "新增、修改、删除", "差异统计", "不凭记忆",
