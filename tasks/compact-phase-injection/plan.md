@@ -1,6 +1,6 @@
 # Plan: compact-phase-injection
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/compact-phase-injection.md`](../../spec/compact-phase-injection.md)（2026-10-15 已批准）。本模块按分开审：Spec 已单独批准，
 本 Plan 单独审。分支 `claude/compact-phase-injection`，worktree `.claude/worktrees/current-plugin-owner-aa5b98`，从 `589c77e`（v0.60.4 验证记录
