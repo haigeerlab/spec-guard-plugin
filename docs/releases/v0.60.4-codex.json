@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.4;test:marketplace-upgrade-and-smoke-20261015b"
+      },
+      "observedAt": "2026-10-15T08:05:38Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.60.3 to v0.60.4; the upgrade reported both marketplaces upgraded; the installed manifest reads 0.60.4; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.4-codex-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.60.4;test:gate-tick-in-commit-20261015b"
+      },
+      "observedAt": "2026-10-15T08:05:38Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:the installed checkpoint contract carries the new rule and its test case passes from the installed copy",
+        "command:codex exec -s workspace-write \"<build to the next checkpoint>\" / codex exec resume <thread id> \"<accept and approve the commit>\"",
+        "result:a temporary project was set up with the installed copy holding one approved module whose Plan says commits are made only after the user approves an exact file list at the final gate; turn one asked to build to the next checkpoint needing confirmation, turn two (resumed) approved the acceptance and the commit of the listed files",
+        "result:at the gate the session said that after approval it would tick the final gate and check the state record before committing; after approval the single commit holds the ticked gate and the working tree is clean; it left .agent/state.json as it was (activeModule empty before and after), so no stale state was left behind",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was removed by restoring the pre-run copy"
+      ]
+    }
+  ]
+}

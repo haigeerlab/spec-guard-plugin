@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.60.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.4;test:installed-plugin-upgrade-20261015b"
+      },
+      "observedAt": "2026-10-15T08:05:38Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.60.3 to 0.60.4 for scope user; the installed copy records gitCommitSha a9758fb2c3500f6981534c547164b121a327376b -- the v0.60.4 tag commit",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.60.4-claude-copy",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.60.4;test:gate-tick-in-commit-20261015b"
+      },
+      "observedAt": "2026-10-15T08:05:38Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py",
+        "result:the installed checkpoint contract carries the new rule and its test case passes from the installed copy (the same 4 errors as since 0.56.0 remain: cases that read repository files outside the package)",
+        "command:claude -p \"<build to the next checkpoint>\" --session-id <uuid> / claude -p \"<accept and approve the commit>\" --resume <uuid>",
+        "result:a temporary project was set up with the installed copy holding one approved module whose Plan says commits are made only after the user approves an exact file list at the final gate; turn one asked to build to the next checkpoint needing confirmation, turn two (resumed) approved the acceptance and the commit of the listed files",
+        "result:at the gate the session listed the files to commit including .agent/state.json and said it would tick Checkpoint 1 first and commit it with them; after approval the single commit holds the ticked gate and the updated state, and the working tree is clean"
+      ]
+    }
+  ]
+}
