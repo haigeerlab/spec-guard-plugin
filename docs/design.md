@@ -35,7 +35,7 @@ plugins/spec-guard/
 
 | 部件 | 职责 |
 |---|---|
-| `hooks.json` → `phase-guard.sh` | `UserPromptSubmit` hook：判断项目是否激活，读本地文件，输出阶段注入 |
+| `hooks.json` → `phase-guard.sh` | `UserPromptSubmit` hook 与只在上下文压缩后触发的 `SessionStart`（matcher `compact`）hook：判断项目是否激活，读本地文件，输出阶段注入 |
 | `module_stage.py` | 按模块计算阶段、当前模块、计数、Paused／Suspended 与上下文提醒 |
 | `capability_map.py` | 能力图的唯一严格解析器；阶段提示、`verify-artifacts`、`add-module`、Proposal 共用 |
 | `spec-digest.py` | 唯一的指纹算法，能力图与 Proposal 校验共用 |
@@ -54,6 +54,11 @@ plugins/spec-guard/
 
 1. 宿主在用户发言后触发 `UserPromptSubmit`，`hooks.json` 用宿主给的插件根目录（`PLUGIN_ROOT` 或
    `CLAUDE_PLUGIN_ROOT`）调用 `phase-guard.sh`。根目录缺失或脚本失败时也输出一条可诊断的 JSON，不静默。
+   上下文压缩后（手动 `/compact` 或一轮中途的自动压缩）宿主触发 `SessionStart`，matcher `compact`；`hooks.json` 用同样的
+   命令调用 `phase-guard.sh SessionStart`。脚本据参数输出事件名，并在注入末尾加一句核对提醒（压缩摘要里较早的请求可能已做完，
+   重做前先核对 todo 与状态记录）；其余内容与 `UserPromptSubmit` 相同。由其他会话的消息或唤醒触发的轮次不经过
+   `UserPromptSubmit`，压缩后的这一次注入是它们唯一的阶段提示。Codex 按项记录 hook 信任，新增这一项不影响原有一项的信任，
+   但新的一项要用户单独信任一次。
 2. `phase-guard.sh` 判断激活信号：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的
    `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`：没有就静默退出 0
    （这一步只用 bash 内建，不启动 python3）；有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行

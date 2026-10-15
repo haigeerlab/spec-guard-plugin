@@ -1483,9 +1483,84 @@ has "本会话的登记指向未启用的目录：诊断说明是本会话的登
 hasnt "本会话的登记失效时不输出阶段" '当前阶段'
 }
 
+# compact-phase-injection：hooks.json 的 SessionStart(compact) 一项调用 `phase-guard.sh SessionStart`；事件名按参数给出，
+# 末尾多一句压缩后的核对提醒；不带参数时与改前逐字相同。
+part_15() {
+build_fixture empty other-state prose local
+touch "$local_project/spec/alpha.md"
+REMIND='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything.'
+run_ev() {  # $1=项目目录 $2=参数（空=不带）；可用 RUN_PATH 替换 PATH
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" \
+    /bin/bash "$HOOKDIR/phase-guard.sh" ${2:+"$2"} </dev/null
+}
+event_is() {  # $1=用例名 $2=项目目录 $3=参数 $4=期望的事件名 $5=正文必须包含的文本
+  python3 -c '
+import json, sys
+output = json.loads(sys.stdin.read())["hookSpecificOutput"]
+assert output["hookEventName"] == sys.argv[1], output["hookEventName"]
+assert sys.argv[2] in output["additionalContext"], output["additionalContext"]
+' "$4" "$5" <<<"$(run_ev "$2" "$3")" || fail "$1: 事件名或正文不对
+$(run_ev "$2" "$3")"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+event_is "带 SessionStart 参数时事件名为 SessionStart" "$local_project" SessionStart SessionStart "当前阶段"
+event_is "带 SessionStart 参数时末尾有压缩后的核对提醒" "$local_project" SessionStart SessionStart "$REMIND"
+plain="$(run_ev "$local_project" "")"
+compact="$(run_ev "$local_project" SessionStart)"
+python3 -c '
+import json, sys
+a = json.loads(sys.argv[1])["hookSpecificOutput"]["additionalContext"]
+b = json.loads(sys.argv[2])["hookSpecificOutput"]["additionalContext"]
+assert b == a + "\n\n" + sys.argv[3], (a, b)
+assert b.endswith(sys.argv[3])
+' "$plain" "$compact" "$REMIND" || fail "带参数时除末尾一句外应与不带参数时逐字相同"
+echo "  ✅ 带参数时除末尾一句外与不带参数时逐字相同"; PASS=$((PASS + 1))
+[ "$(run_ev "$local_project" UserPromptSubmit)" = "$plain" ] || fail "显式 UserPromptSubmit 参数应与不带参数逐字相同"
+echo "  ✅ 显式 UserPromptSubmit 参数与不带参数逐字相同"; PASS=$((PASS + 1))
+[ "$(run_ev "$local_project" Bogus)" = "$plain" ] || fail "未知参数应按 UserPromptSubmit 处理"
+echo "  ✅ 未知参数按 UserPromptSubmit 处理"; PASS=$((PASS + 1))
+for quiet in empty other-state prose; do
+  [ -z "$(run_ev "$WORK/$quiet" SessionStart)" ] || fail "带 SessionStart 参数时 $quiet 也必须静默"
+done
+echo "  ✅ 带 SessionStart 参数时无关项目照常静默"; PASS=$((PASS + 1))
+mkdir -p "$WORK/nopy"
+ln -sf "$(command -v grep)" "$WORK/nopy/grep"
+RUN_PATH="$WORK/nopy" event_is "缺 python3 时的诊断也用 SessionStart 事件名" "$local_project" SessionStart SessionStart "python3 不可用"
+mkdir -p "$WORK/brokenpy"
+printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/brokenpy/python3"
+RUN_PATH="$WORK/brokenpy:$PATH" event_is "python3 跑不起来时的诊断也用 SessionStart 事件名" "$local_project" SessionStart SessionStart "python3 无法运行"
+# hooks.json：两项都在；SessionStart 只在压缩后触发并带参数；兜底的事件名与所在项一致；UserPromptSubmit 一项逐字不变。
+python3 - "$HOOKDIR/hooks.json" <<'PY' || fail "hooks.json 的结构不对"
+import json, sys
+hooks = json.load(open(sys.argv[1]))["hooks"]
+assert sorted(hooks) == ["SessionStart", "UserPromptSubmit"], sorted(hooks)
+ups = hooks["UserPromptSubmit"]
+assert len(ups) == 1 and "matcher" not in ups[0], ups
+ss = hooks["SessionStart"]
+assert len(ss) == 1 and ss[0].get("matcher") == "compact", ss
+for event, entries in hooks.items():
+    command = entries[0]["hooks"][0]["command"]
+    assert command.count('"hookEventName":"%s"' % event) == 2, (event, command)
+    other = "UserPromptSubmit" if event == "SessionStart" else "SessionStart"
+    assert other not in command, (event, command)
+assert 'bash "$SCRIPT" SessionStart ||' in ss[0]["hooks"][0]["command"], ss
+assert 'bash "$SCRIPT" ||' in ups[0]["hooks"][0]["command"], ups
+PY
+echo "  ✅ hooks.json 两项齐全，SessionStart 只在压缩后触发并带参数，兜底事件名一致"; PASS=$((PASS + 1))
+if base="$(git -C "$HOOKDIR" show origin/main:plugins/spec-guard/hooks/hooks.json 2>/dev/null)"; then
+  python3 -c '
+import json, sys
+old = json.loads(sys.argv[1])["hooks"]["UserPromptSubmit"]
+new = json.load(open(sys.argv[2]))["hooks"]["UserPromptSubmit"]
+assert old == new
+' "$base" "$HOOKDIR/hooks.json" || fail "UserPromptSubmit 一项应与 origin/main 上逐字相同（Codex 按项记录信任）"
+  echo "  ✅ UserPromptSubmit 一项与 origin/main 逐字相同"; PASS=$((PASS + 1))
+fi
+}
+
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=14
+PARTS=15
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

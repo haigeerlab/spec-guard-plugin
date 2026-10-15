@@ -2,6 +2,13 @@
 # Read-only guidance for the local multi-spec convention.
 set -u
 
+# 触发事件由 hooks.json 的注册处用参数告诉本脚本（compact-phase-injection）：SessionStart 一项只在上下文压缩后触发；
+# 不带参数或其他值一律按 UserPromptSubmit，输出与改前逐字相同。
+case "${1:-}" in
+  SessionStart) EVENT=SessionStart ;;
+  *) EVENT=UserPromptSubmit ;;
+esac
+
 # 只用 bash 内建取脚本目录：本 hook 只能依赖 bash、git 与 python3。
 case "${BASH_SOURCE[0]}" in */*) HOOKDIR="${BASH_SOURCE[0]%/*}" ;; *) HOOKDIR=. ;; esac
 HOOKDIR="$(cd "$HOOKDIR" && pwd)"
@@ -58,23 +65,28 @@ fi
 
 # 已启用却缺 python3 时不能静默：静默会被当成“未启用”。这段 JSON 手写转义，不依赖 python3。
 if ! command -v python3 >/dev/null 2>&1; then
-  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: 本项目已启用约定，但 python3 不可用，本轮没有阶段注入。这不是「未启用」；安装 python3 后恢复。"}}'
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"'"$EVENT"'","additionalContext":"spec-guard: 本项目已启用约定，但 python3 不可用，本轮没有阶段注入。这不是「未启用」；安装 python3 后恢复。"}}'
   exit 0
 fi
 
 # python3 在 PATH 上却跑不起来时 emit 自己也会失败；同样不能静默，退回一段手写转义的 JSON。
+# 压缩后（SessionStart）多一句核对提醒：摘要里较早的请求可能已做完；不说“旧指令不是新任务”，压缩前刚下的指令也可能还没进 todo。
+COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything.'
 emit() {
-  local out
-  out="$(printf '%s' "$1" | python3 -c '
+  local out text="$1"
+  [ "$EVENT" != SessionStart ] || text="${text}
+
+${COMPACT_NOTE}"
+  out="$(printf '%s' "$text" | python3 -c '
 import json, sys
 print(json.dumps({"hookSpecificOutput": {
-    "hookEventName": "UserPromptSubmit",
+    "hookEventName": sys.argv[1],
     "additionalContext": sys.stdin.read(),
 }}))
-' 2>/dev/null)" || out=""
+' "$EVENT" 2>/dev/null)" || out=""
   case "$out" in
     '{'*) printf '%s\n' "$out" ;;
-    *) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"spec-guard: 本项目已启用约定，但 python3 无法运行，本轮没有阶段注入。这不是「未启用」；修复 python3 后恢复。"}}' ;;
+    *) printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"'"$EVENT"'","additionalContext":"spec-guard: 本项目已启用约定，但 python3 无法运行，本轮没有阶段注入。这不是「未启用」；修复 python3 后恢复。"}}' ;;
   esac
 }
 
