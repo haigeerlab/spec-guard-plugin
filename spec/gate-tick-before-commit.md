@@ -1,6 +1,6 @@
 # Spec: gate-tick-before-commit
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 4f972ea42788 -->
 
 ## Objective
 

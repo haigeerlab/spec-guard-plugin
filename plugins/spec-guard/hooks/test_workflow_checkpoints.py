@@ -219,6 +219,9 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("最终验收列出实际改动的文件", "最后一个 `gate`", "新增、修改、删除", "差异统计", "不凭记忆",
                        "超出 Plan 预计影响面", "未提交改动", "不算", "文件数与提交号", "不展开清单"):
             self.assertIn(phrase, section)
+        for phrase in ("最终验收的提交包含勾选与状态记录", "先勾上这个 gate", "`.agent/state.json`", "列进待批准的提交清单",
+                       "批准不含提交时"):
+            self.assertIn(phrase, section)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")

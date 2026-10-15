@@ -1,6 +1,6 @@
 # Plan: gate-tick-before-commit
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/gate-tick-before-commit.md`](../../spec/gate-tick-before-commit.md)。合并审：Spec 与本 Plan 一起评审、一次批准。
 分支 `claude/gate-tick-before-commit`，worktree `.claude/worktrees/current-plugin-owner-aa5b98`，从 `78ea9c9`（v0.60.3 验证记录合并）
