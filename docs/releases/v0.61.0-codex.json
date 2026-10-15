@@ -23,8 +23,8 @@
       "subject": "spec-guard-0.61.0-codex-trust",
       "status": "host-verified",
       "target": {
-        "kind": "installed-session",
-        "id": "codex:v0.61.0;test:hook-trust-after-upgrade-20261015c"
+        "kind": "host-session",
+        "id": "codex-host:v0.61.0;test:hook-trust-after-upgrade-20261015c"
       },
       "observedAt": "2026-10-15T09:04:10Z",
       "evidence": [
@@ -38,8 +38,8 @@
       "subject": "spec-guard-0.61.0-codex-copy",
       "status": "host-verified",
       "target": {
-        "kind": "installed-session",
-        "id": "codex:v0.61.0;test:compact-injection-20261015c"
+        "kind": "host-session",
+        "id": "codex-host:v0.61.0;test:compact-injection-20261015c"
       },
       "observedAt": "2026-10-15T09:04:10Z",
       "evidence": [
