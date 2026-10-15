@@ -32,6 +32,8 @@
   在临时项目里逼一次中途压缩（`-c model_auto_compact_token_limit=…`），看 `SessionStart(compact)` 是否触发、注入是否进对话。
 - **Claude Code**：`claude -p --plugin-dir <副本>`，看插件钩子是否需要 `/hooks` 信任；`/compact` 后是否触发；尽量逼出一次一轮中途的
   自动压缩，测不出就记为未验证。
+- **两边都测手动压缩**：手动 `/compact` 后是否触发；钩子输入能否区分手动与自动压缩（例如 Claude Code 输入里的 `trigger`）。手动压缩后
+  用户的下一条消息还会触发现有注入，所以手动时会重复注入一次；能区分时在 todo 里记下，是否只在自动压缩时注入交用户在检查点决定。
 - 结果记入 todo。**停下条件**：已有的 `UserPromptSubmit` 会因新增一项而失效或需要重新信任——停下交用户决定，不进入 Task 2。
 - 验证：事前事后 `shasum ~/.codex/config.toml`；实测命令与观察写入 todo。
 - 文件：只在临时目录；仓库不改。
