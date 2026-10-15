@@ -1,6 +1,6 @@
 # Spec: compact-phase-injection
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 146897658dd0 -->
 
 ## Objective
 
