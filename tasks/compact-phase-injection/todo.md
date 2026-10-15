@@ -1,11 +1,11 @@
 # Todo: compact-phase-injection
 
-- [ ] Task 1：动手前的宿主实测（Spec Assumptions 8、9） — 2026-10-15 实测（未勾：Codex 一项有 Spec 没预料到的结果，停下交用户决定）。
+- [x] Task 1：动手前的宿主实测（Spec Assumptions 8、9） — 2026-10-15 实测。Codex 一项有 Spec 没预料到的结果，停下交用户；用户选方案 A：照 Plan 实现，Codex 的新一项在发版后走真实升级、由用户在交互界面信任一次后再验证，说明与 CHANGELOG 不提前承诺 Codex 的效果。
   - Claude Code（2.1.296，`claude -p --plugin-dir` 加载只带探针的临时插件）：手动 `/compact` 后插件的 `SessionStart(compact)` 触发，注入的标记被模型原样读到；用 `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=3` 逼出一轮中途的自动压缩，同一轮压缩 3 次、钩子跟着触发 3 次。钩子输入只有 `source: "compact"`，没有区分手动与自动的字段。`-p` 运行不需要先在 `/hooks` 信任；交互会话是否要信任未测。
   - Codex（0.162.1，临时改动已安装副本的 `hooks.json`，只在末尾追加一项，原有一项逐字不变）：已有的 `user_prompt_submit` 信任记录不受影响，阶段提示照常注入；新增的插件 `SessionStart` 一项在一轮里压缩 4 次都没有运行，绕过信任（`--dangerously-bypass-hook-trust`）、再加一条 `enabled = true` 的状态记录、去掉 matcher 让它在启动时运行，都没有运行。对照：写在配置里的 `SessionStart(compact)` 钩子在中途压缩后运行了（复现观测会话的结果）。推测是 Codex 在安装插件时登记插件钩子，原地改文件不会被读到——未证实。`codex exec` 里的 `/compact` 被当作普通提示，手动压缩未测成。
   - 恢复：两份插件副本与 `~/.codex/config.toml` 都已从备份恢复，SHA-256 与实测前一致。
-- [ ] Task 2：测试先行（先红）
-- [ ] Task 3：实现
-- [ ] Checkpoint 1（report）：钩子回归全绿，ShellCheck 无告警
+- [x] Task 2：测试先行（先红） — `test-phase-guard.sh` 新增第 15 段 10 例：带 `SessionStart` 参数时事件名、末尾核对提醒、其余逐字相同；显式 `UserPromptSubmit` 与未知参数都与不带参数逐字相同；无关项目带参数照旧静默；缺 python3 与 python3 跑不起来两种诊断的事件名；`hooks.json` 结构（两项、matcher、命令带参数、兜底事件名一致）；`UserPromptSubmit` 一项与 `origin/main` 逐字相同（拿不到 `origin/main` 时跳过）。在旧代码上首例即失败。
+- [x] Task 3：实现 — `phase-guard.sh` 开头按第一个参数定 `EVENT`（只有 `SessionStart` 改变行为）；三处输出的事件名用它；`emit` 在 `SessionStart` 时于末尾加核对提醒。`hooks.json` 只在末尾追加 `SessionStart` 一项（matcher `compact`，命令与原有一项相同、只多参数，兜底事件名为 `SessionStart`），原有一项逐字不变。回归 308 例全绿，原有 298 例期望值未改；两处变异（去掉参数分支、提醒加到每次注入）各有断言变红（后者还让第 13 段的“输出逐字不变”变红）。
+- [x] Checkpoint 1（report）：钩子回归全绿，ShellCheck 无告警 — 随本次提交跑 `verify-and-commit.sh` 全档（暂存了 `.sh`，含 ShellCheck）。
 - [ ] Task 4：文档、CHANGELOG 与版本号
 - [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
