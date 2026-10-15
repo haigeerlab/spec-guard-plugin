@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.61.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.61.0;test:installed-plugin-upgrade-20261015c"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.60.4 to 0.61.0 for scope user; the installed copy records gitCommitSha 8ac56133b9e1514413c8acf691a261fa3de6ea88 -- the v0.61.0 tag commit; its hooks.json carries both entries",
+        "host:Claude Code 2.1.296"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.61.0-claude-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-host:v0.61.0;test:compact-injection-20261015c"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "result:green from the installed copy (307 cases; the case that compares hooks.json with origin/main is skipped there because the copy has no git history)",
+        "command:claude -p \"/compact\" --resume <id>, then a resumed prompt asking for the reminder sentence, in an enabled temporary project",
+        "result:after a manual /compact the session quoted the reminder sentence verbatim",
+        "command:CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=3 claude -p \"<read eight files>\" --allowedTools Read",
+        "result:three compactions in one turn; the session transcript holds the SessionStart:compact hook output with the reminder after each one; the run then stopped on Claude Code's own thrashing guard, which is unrelated to the plugin",
+        "result:headless runs needed no /hooks trust; whether an interactive session asks for trust of the new entry was not checked"
+      ]
+    }
+  ]
+}

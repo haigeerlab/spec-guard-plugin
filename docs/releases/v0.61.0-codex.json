@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.61.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.61.0;test:marketplace-upgrade-and-smoke-20261015c"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.60.4 to v0.61.0; the installed manifest reads 0.61.0 and its hooks.json carries both entries; the smoke run exited 0",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.61.0-codex-trust",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-host:v0.61.0;test:hook-trust-after-upgrade-20261015c"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "command:codex exec with model_auto_compact_token_limit=40000 in an enabled temporary project, before trust",
+        "result:before trust: the existing user_prompt_submit trust record was unchanged and the stage hint was injected as before; four compactions happened and the new SessionStart entry did not run (only other plugins' SessionStart hooks ran); nothing failed",
+        "command:codex (interactive), run by the user in the Terminal panel",
+        "result:Codex showed \"Hooks need review -- 1 hook is new or changed\"; the user trusted it; ~/.codex/config.toml gained exactly one record, [hooks.state.\"spec-guard@spec-guard-marketplace:hooks/hooks.json:session_start:0:0\"] with a trusted_hash, and the user_prompt_submit record stayed as it was"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.61.0-codex-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-host:v0.61.0;test:compact-injection-20261015c"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "result:green from the installed copy (308 cases)",
+        "command:codex exec -s workspace-write -c model_auto_compact_token_limit=40000 \"<cat eight files, then quote the reminder>\", after trust",
+        "result:four compactions in one turn; after each one the rollout holds a developer message with the spec-guard stage hint ending in the reminder sentence; the session quoted the sentence verbatim",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was removed by restoring the copy taken right after the user's trust"
+      ]
+    }
+  ]
+}
