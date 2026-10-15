@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.61.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:8ac56133b9e1514413c8acf691a261fa3de6ea88"
+      },
+      "observedAt": "2026-10-15T09:04:10Z",
+      "evidence": [
+        "result:the v0.61.0 annotated tag and origin/main both resolve to merge commit 8ac56133b9e1514413c8acf691a261fa3de6ea88 (pull request #314; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head a91737c's tree; 0.61.0 is one module, compact-phase-injection; inside the plugin package hooks.json gained a SessionStart entry (matcher compact) and phase-guard.sh takes the event as an optional argument; the UserPromptSubmit entry is byte-identical to 0.60.4",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"release: 0.61.0 ...\"",
+        "result:the commits were made by verify-and-commit.sh after validate, phase-guard (308 cases), verify-artifacts (60 cases) and ShellCheck passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
