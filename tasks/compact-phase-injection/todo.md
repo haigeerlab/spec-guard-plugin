@@ -7,5 +7,5 @@
 - [x] Task 2：测试先行（先红） — `test-phase-guard.sh` 新增第 15 段 10 例：带 `SessionStart` 参数时事件名、末尾核对提醒、其余逐字相同；显式 `UserPromptSubmit` 与未知参数都与不带参数逐字相同；无关项目带参数照旧静默；缺 python3 与 python3 跑不起来两种诊断的事件名；`hooks.json` 结构（两项、matcher、命令带参数、兜底事件名一致）；`UserPromptSubmit` 一项与 `origin/main` 逐字相同（拿不到 `origin/main` 时跳过）。在旧代码上首例即失败。
 - [x] Task 3：实现 — `phase-guard.sh` 开头按第一个参数定 `EVENT`（只有 `SessionStart` 改变行为）；三处输出的事件名用它；`emit` 在 `SessionStart` 时于末尾加核对提醒。`hooks.json` 只在末尾追加 `SessionStart` 一项（matcher `compact`，命令与原有一项相同、只多参数，兜底事件名为 `SessionStart`），原有一项逐字不变。回归 308 例全绿，原有 298 例期望值未改；两处变异（去掉参数分支、提醒加到每次注入）各有断言变红（后者还让第 13 段的“输出逐字不变”变红）。
 - [x] Checkpoint 1（report）：钩子回归全绿，ShellCheck 无告警 — 随本次提交跑 `verify-and-commit.sh` 全档（暂存了 `.sh`，含 ShellCheck）。
-- [ ] Task 4：文档、CHANGELOG 与版本号
+- [x] Task 4：文档、CHANGELOG 与版本号 — `docs/design.md` 的部件表与数据流写明两个触发点、核对提醒与按项信任；`docs/troubleshooting.md` 加“压缩后没有阶段注入”三条（Codex 信任新一项、按会话登记、todo 做完就勾）；中英 README 安装表那一行写两项 hook，Codex 一栏写升级后要信任新一项，`--ref` 改为 v0.61.0；CHANGELOG 新增 `[0.61.0] - 2026-10-15`，Codex 的效果写为发版后实测、不提前承诺；两份 `plugin.json` 改为 0.61.0。`commands/link-project.md` 没有合适的位置，未改：前提已写在排障文档与 CHANGELOG。
 - [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行

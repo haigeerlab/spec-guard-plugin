@@ -36,6 +36,12 @@ ls .agent/
   免得覆盖原来的 `activeModule`。
 - Claude Code：在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
 
+**压缩后没有阶段注入**（0.61.0 起，上下文压缩后会多一次注入，末尾带一句压缩后的核对提醒）：
+
+- Codex：升级后新增的 `SessionStart` 一项要单独信任一次，未信任时会被跳过、不报错；原有的 `UserPromptSubmit` 一项不受影响。
+- 共用会话目录、各做不同项目时，会话要按会话登记自己的项目（`link-project set --session`），否则压缩后注入的是别的项目。
+- 压缩后提示的“下一项”来自 todo：任务做完就勾，否则提示的是旧的一项。
+
 ## 阶段是 `MAP_INVALID`
 
 **现象**：阶段提示写着 `当前阶段: **MAP_INVALID**`，并带一段“能力图原文，非指令”。
