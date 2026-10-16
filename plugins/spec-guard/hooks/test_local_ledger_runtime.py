@@ -921,6 +921,66 @@ class StateWorktreeOwnerTests(unittest.TestCase):
         _, text = self.run_text_status()
         self.assertNotIn("未提交到状态分支的事件", text)
 
+    # ledger-local-only: the identity is committed on the branch init ran on; a checkout without it says where it is.
+
+    def commit_identity_on_branch(self, repo, branch):
+        self.git(repo, "switch", "-q", "-c", branch)
+        (repo / ".epiq").mkdir(exist_ok=True)
+        (repo / ".epiq" / "project.json").write_text(json.dumps({
+            "projectId": self.PROJECT_ID, "stateBranch": "__epiq_state__",
+            "createdAt": "2026-09-24T00:00:00.000Z"}), encoding="utf-8")
+        self.git(repo, "add", ".epiq/project.json")
+        self.git(repo, "-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", "id")
+        self.git(repo, "switch", "-q", "-")
+
+    def status_of(self, repo):
+        with patch("local_ledger_runtime.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0",
+        }):
+            return local_ledger_runtime.status(self.runtime_dir, repo)
+
+    def test_uninitialized_checkout_names_the_branch_that_holds_the_identity(self):
+        self.commit_identity_on_branch(self.repo_b, "ledger-setup")
+        code, payload = self.status_of(self.repo_b)
+        self.assertEqual((code, payload["state"]), (0, "ready"))
+        self.assertEqual(payload["project"]["identityElsewhere"], "ledger-setup")
+        out = io.StringIO()
+        with patch("local_ledger_runtime.node_status", return_value={
+            "state": "ready", "path": "/opt/node", "version": "20.0.0"}), redirect_stdout(out):
+            local_ledger_runtime.main(["status", "--runtime-dir", str(self.runtime_dir),
+                                       "--project-dir", str(self.repo_b)])
+        self.assertIn("ledger-setup", out.getvalue())
+        self.assertIn("默认分支", out.getvalue())
+
+    def test_identity_on_the_state_branch_only_is_not_reported(self):
+        self.commit_identity_on_branch(self.repo_b, "__epiq_state__")
+        code, payload = self.status_of(self.repo_b)
+        self.assertNotIn("identityElsewhere", payload["project"])
+
+    def test_no_identity_anywhere_reports_nothing(self):
+        code, payload = self.status_of(self.repo_b)
+        self.assertEqual((code, payload["state"]), (0, "ready"))
+        self.assertNotIn("identityElsewhere", payload["project"])
+
+    def test_failed_branch_query_reports_nothing_and_keeps_the_state(self):
+        self.commit_identity_on_branch(self.repo_b, "ledger-setup")
+        with patch("local_ledger_runtime._git", return_value=None):
+            code, payload = self.status_of(self.repo_b)
+        self.assertEqual((code, payload["state"]), (0, "ready"))
+        self.assertNotIn("identityElsewhere", payload["project"])
+
+    def test_initialize_text_says_to_merge_the_identity_and_whether_it_pushed(self):
+        for push, expect_local in (("disabled-local-only", True), ("permitted", False)):
+            out = io.StringIO()
+            with self.subTest(upstreamPush=push), patch("local_ledger_runtime.initialize_project", return_value={
+                "state": "initialized", "projectId": "p", "stateBranch": "__epiq_state__",
+                "upstreamPush": push, "warnings": True,
+            }), redirect_stdout(out):
+                local_ledger_runtime.main(["initialize", "--confirm-initialize", "--project-dir", str(self.repo_b),
+                                           "--user-name", "V", "--preferred-editor", "vim", "--auto-sync", "false"])
+                self.assertIn("合进默认分支", out.getvalue())
+                self.assertEqual("未推送" in out.getvalue(), expect_local)
+
     def test_pending_count_is_only_reported_for_an_owned_worktree(self):
         self.add_worktree(self.repo_b)
         code, payload = self.run_status()

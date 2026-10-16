@@ -257,6 +257,22 @@ def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
     return {"state": "foreign", "path": path, "owner": owner}
 
 
+def identity_elsewhere(project_dir: Path) -> str | None:
+    """First local or remote-tracking branch, other than the state branch, that commits the project identity."""
+    refs = _git(project_dir, "for-each-ref", "--format=%(refname)%09%(refname:short)",
+                "refs/heads", "refs/remotes")
+    if refs is None or refs.returncode != 0:
+        return None
+    for line in refs.stdout.splitlines():
+        full, _, short = line.partition("\t")
+        if not short or full.endswith("/HEAD") or full.rsplit("/", 1)[-1] == STATE_BRANCH:
+            continue
+        found = _git(project_dir, "cat-file", "-e", full + ":" + PROJECT_RELATIVE_PATH.as_posix())
+        if found is not None and found.returncode == 0:
+            return short
+    return None
+
+
 def pending_event_count(worktree_path: str) -> int | None:
     """Count non-empty lines in the state worktree's ~pending event files; None when they cannot be read."""
     events = os.path.join(worktree_path, ".epiq", "events")
@@ -680,6 +696,9 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
         payload["state"] = "invalid"
         return 1, payload
     if project["state"] == "uninitialized":
+        elsewhere = identity_elsewhere(Path(project_dir))
+        if elsewhere:
+            project["identityElsewhere"] = elsewhere
         payload["state"] = "ready"
         return 0, payload
     worktree = state_worktree_status(project_dir, project["projectId"])
@@ -775,8 +794,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本运行时已安装：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     elif args.command == "initialize" and payload["state"] == "initialized":
         print("本地事项账本项目已初始化：" + payload["projectId"])
+        if payload.get("upstreamPush") == "disabled-local-only":
+            print("按 --local-only 未推送：账本只在本机。")
+        print("请把含 .epiq/project.json 的这次提交合进默认分支，其他工作树和从默认分支开的会话才能找到这个账本。")
     else:
         print("本地事项账本状态：" + payload["state"])
+        if payload.get("project", {}).get("identityElsewhere"):
+            print("当前检出没有 .epiq/project.json，分支 %s 上有：把它合进默认分支，或从那个分支开工作树。"
+                  % payload["project"]["identityElsewhere"])
         if payload["state"] == "conflict":
             worktree = payload["project"]["stateWorktree"]
             print("状态 worktree：" + worktree["path"])
