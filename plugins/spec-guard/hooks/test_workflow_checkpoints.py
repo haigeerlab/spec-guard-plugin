@@ -228,6 +228,21 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("最终验收", "实际改动的文件"):
                     self.assertIn(phrase, text)
 
+    def test_the_final_gate_can_carry_the_spec_revision(self):
+        section = self.section("## Plan 检查点分级")
+        for phrase in ("Spec 的改动差异", "同时批准修订后的 Spec", "先用 `review-mark`", "不算 Spec 复审", "当场停下复审"):
+            self.assertIn(phrase, section)
+
+    def test_the_next_spec_follows_an_accepted_module(self):
+        section = self.section("## 阶段交接")
+        for phrase in ("接着写", "已在能力图里", "/compact", "新插入能力图"):
+            self.assertIn(phrase, section)
+
+    def test_review_content_comes_before_a_turn_ending_box(self):
+        section = self.section("## 评审状态标记")
+        for phrase in ("结束本轮的确认框", "确认框摘要", "本轮的对话正文"):
+            self.assertIn(phrase, section)
+
     def test_an_external_blocker_goes_back_to_the_user(self):
         section = self.section("## Plan 检查点分级")
         for phrase in ("同一个 gate 因外部原因", "再次挡住", "挂起", "接受风险", "换方案", "代价", "不按默认推荐继续重试"):
