@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.63.3;test:installed-plugin-upgrade-20261016"
+      },
+      "observedAt": "2026-10-16T11:48:20Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.63.2 to 0.63.3 for scope user; the installed copy records gitCommitSha f26fed0 -- the v0.63.3 tag commit",
+        "host:Claude Code 2.1.299"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.3-claude-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-host:v0.63.3;test:final-gate-20261016"
+      },
+      "observedAt": "2026-10-16T11:48:20Z",
+      "evidence": [
+        "command:python3 <installed>/hooks/test_workflow_checkpoints.py",
+        "result:the three new cases pass from the Claude cache; 5 errors are the known class of cases that read repository docs the cache does not carry",
+        "command:claude -p --model sonnet --permission-mode acceptEdits (with and without --add-dir <installed plugin>) in the same kind of temporary project",
+        "result:the new rule was NOT applied: the first run was denied reading references/workflow-checkpoints.md (outside the project) and the second never tried to read it; both relied on the convention block in CLAUDE.md, which does not mention the new passages, and asked for a separate Spec re-review instead of one approval with the diff",
+        "result:the follow-up turn could not finish because review_mark.py needed a Bash approval that a headless run cannot give, so the next-Spec step was not observed on Claude Code",
+        "not-verified:Claude Code following the new rules in an interactive session; finding: rule text alone is not seen unless the agent reads the rules file -- the convention block may need a pointer line"
+      ]
+    }
+  ]
+}

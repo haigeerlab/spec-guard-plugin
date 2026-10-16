@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:0.162.1;test:v0.63.3-final-gate-20261016"
+      },
+      "observedAt": "2026-10-16T11:48:20Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.63.2 to v0.63.3; upgrade exited 0; codex plugin list reports 0.63.3 enabled; hooks.json is unchanged, so no new hook trust was needed; the smoke run exited 0 and left the config unchanged",
+        "command:python3 <installed>/hooks/test_workflow_checkpoints.py",
+        "result:26 cases passed from the Codex copy",
+        "command:codex exec, then codex exec resume --last, in a temporary project (alpha: Spec approved, then revised during the build and committed; only the final gate left; beta already in the map)",
+        "result:turn 1 read the shared checkpoint rules, showed the Spec diff verbatim (including the change-log line it added), stated that approving the acceptance also approves the revised Spec, announced that it would draft the beta Spec next, and stopped; it did not mention /compact",
+        "result:turn 2 (reply: 批准) recorded the Spec approval with review-mark (new digest), ticked the final gate, moved activeModule to beta, committed, then drafted spec/beta.md and presented its points in the reply body before stopping for review"
+      ]
+    }
+  ]
+}
