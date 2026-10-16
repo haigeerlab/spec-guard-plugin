@@ -43,6 +43,7 @@ plugins/spec-guard/
 | `setup-convention.sh`、`teardown-convention.sh`、`managed-block.py` | 安装、升级、移除约定块；`managed-block.py` 负责标记校验、本地段与原子写入 |
 | `verify-artifacts.sh` | 按需校验已落地的产物 |
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
+| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
 | `proposal_*.py` | Proposal 契约、发布、读 Issue、评审、晋级证明、收尾 |

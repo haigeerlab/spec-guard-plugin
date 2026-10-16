@@ -1,7 +1,8 @@
 """Suspend or resume a started module by one marker line in its todo.md (module-suspend).
 
-Suspending only records that the module is parked: no reason, date or condition, and
-nothing ever resumes it except an explicit `--resume`.  Whether it is suspended is decided
+Suspending records that the module is parked and, with `--reason`, one line saying why in
+the user's words (map-view shows it); no date or condition, and nothing ever resumes it except
+an explicit `--resume`.  Whether it is suspended is decided
 by `module_stage` alone; this script only adds or removes the marker, previews the effect
 on the current module, and writes only with `--confirm`.
 """
@@ -14,6 +15,34 @@ from pathlib import Path
 from capability_map import MODULE_ID, MapError, parse_map
 from module_stage import SUSPEND_MARKER, active_module, module_state, project_stage
 from tracker_default import _write_atomic
+
+# map-view: an optional reason sits on its own line right after the marker, so versions that only
+# know the marker still read the module as suspended and simply ignore this line.
+REASON_PREFIX = "<!-- spec-guard: suspended-reason: "
+REASON_SUFFIX = " -->"
+REASON_LIMIT = 120
+
+
+def reason_line(reason: str) -> str:
+    return REASON_PREFIX + reason + REASON_SUFFIX
+
+
+def _drop_marker(text: str, keep_marker: bool) -> str:
+    """Remove the reason line that follows the marker, and the marker too unless kept."""
+    lines = text.splitlines(keepends=True)
+    out = []
+    skip_reason = False
+    for line in lines:
+        if skip_reason and line.strip().startswith(REASON_PREFIX):
+            skip_reason = False
+            continue
+        skip_reason = False
+        if line.strip() == SUSPEND_MARKER:
+            skip_reason = True
+            if not keep_marker:
+                continue
+        out.append(line)
+    return "".join(out)
 
 
 def _states(root: Path) -> list:
@@ -33,11 +62,21 @@ def main() -> int:
     parser.add_argument("--project", default=".")
     parser.add_argument("--suspend", metavar="MODULE")
     parser.add_argument("--resume", metavar="MODULE")
+    parser.add_argument("--reason", help="one line in the user's words; only with --suspend")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args()
     if (args.suspend is None) == (args.resume is None):
         print("usage: give exactly one of --suspend MODULE or --resume MODULE")
         return 2
+    reason = None
+    if args.reason is not None:
+        if args.resume is not None:
+            print("usage: --reason only goes with --suspend")
+            return 2
+        reason = args.reason.strip()
+        if not reason or "\n" in reason or "\r" in reason or "-->" in reason or len(reason) > REASON_LIMIT:
+            print("bad-reason: one non-empty line of at most %d characters, without -->" % REASON_LIMIT)
+            return 2
     suspending = args.suspend is not None
     module_id = args.suspend if suspending else args.resume
     root = Path(args.project)
@@ -63,15 +102,24 @@ def main() -> int:
         if not state["open"]:
             print("nothing-open: %s has no unchecked item; it already counts as done" % module_id)
             return 2
-        if marked:
+        if marked and reason is None:
             print("already-suspended: %s already carries the marker" % module_id)
             return 2
-        after = before + ("" if before.endswith("\n") or not before else "\n") + SUSPEND_MARKER + "\n"
+        if marked:
+            lines = _drop_marker(before, keep_marker=True).splitlines(keepends=True)
+            at = next(i for i, line in enumerate(lines) if line.strip() == SUSPEND_MARKER)
+            if not lines[at].endswith("\n"):
+                lines[at] += "\n"
+            lines.insert(at + 1, reason_line(reason) + "\n")
+            after = "".join(lines)
+        else:
+            after = (before + ("" if before.endswith("\n") or not before else "\n") + SUSPEND_MARKER + "\n"
+                     + (reason_line(reason) + "\n" if reason is not None else ""))
     else:
         if not marked:
             print("not-suspended: %s carries no suspend marker" % module_id)
             return 2
-        after = "".join(line for line in before.splitlines(keepends=True) if line.strip() != SUSPEND_MARKER)
+        after = _drop_marker(before, keep_marker=False)
     relative = "tasks/%s/todo.md" % module_id
     print("".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
                                        fromfile=relative + " (current)", tofile=relative + " (proposed)")))

@@ -49,7 +49,8 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <modul
 - 选当前模块时跳过它，接着做 Build order 里下一个；它**留在原来的位置**，不移动；
 - 阶段提示每轮列出 `Suspended: <id>`，只报告这个事实；
 - 它不算"做到一半"，所以随后 `/spec-guard:add-module` 不需要 `--interrupt`；
-- **永远不会自动恢复。** 插件不记录原因、日期或条件，也不判断该不该回来。
+- **永远不会自动恢复。** 插件不记录日期或条件，也不判断该不该回来。用户说了原因时可以记一行（见下），只用于
+  `/spec-guard:map` 的显示。
 
 只能挂起已开工的模块（有 Plan 和 todo，且至少一项未勾选）。还没开工的模块不需要挂起，调整顺序即可。临时插一件急事、
 做完就回来，用 `add-module --interrupt`（插队），不是挂起。
@@ -57,16 +58,22 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <modul
 ## 挂起与恢复
 
 默认只预览：打印 `tasks/<id>/todo.md` 的改前改后，以及挂起或恢复后的当前模块。用户确认后加 `--confirm`，
-只改这一个文件的一行 `<!-- spec-guard: suspended -->` 并读回核对：
+只改这一个文件的一行 `<!-- spec-guard: suspended -->`（带原因时多一行）并读回核对：
 
 ```bash
 python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <module-id> --confirm
+python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <module-id> --reason "上游漏洞，等修复" --confirm
 python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module-id> --confirm
 ```
 
-恢复只去掉标记，不改 `.agent/state.json`；模块回到 Build order 原位。另一个模块正做到一半时，预览会说明恢复后
+**原因（可选）**：用户说了为什么挂起时，加 `--reason "<一行>"`，写在标记的下一行
+`<!-- spec-guard: suspended-reason: … -->`，`/spec-guard:map` 的状态列与关键卡点会显示它。只按用户说的写，不从对话里推断；
+用户没说就不加。给已挂起的模块带 `--reason` 只替换原因行。原因要是一行、不为空、不含 `-->`、不超过 120 个字符，否则拒绝。
+旧版本插件只认标记那一行，照常识别挂起。
+
+恢复去掉标记和原因行，不改 `.agent/state.json`；模块回到 Build order 原位。另一个模块正做到一半时，预览会说明恢复后
 它显示为 Paused、等那个模块做完再回来（与插队相同）。拒绝（退出码 2、不写文件）：不是有效 module id、不在能力图上、
-没有 Plan 或 todo、没有未勾选项、已挂起（挂起时）或未挂起（恢复时）。
+没有 Plan 或 todo、没有未勾选项、已挂起且没给 `--reason`（挂起时）或未挂起（恢复时）、原因不合格、恢复时给了 `--reason`。
 
 ## 提醒（可选）
 

@@ -118,6 +118,20 @@ python3 -B "$ROOT/hooks/module_cost_report.py" --project "$PROJECT" <module-id> 
 原样转述输出与「无法统计的部分」。退出码 2 是「无法归属」（todo.md 没有提交历史），不是用量为 0；金额只在用户给了
 价格文件时出现，缺价标「未定价」，不替用户补价格；多模块对照只能看趋势，不下因果结论。
 
+## map
+
+只读的模块进度表（Claude 侧为 `/spec-guard:map`）：按开发顺序列出每个模块的状态（✅ 已完成／🔨 进行中／⏸ 挂起（原因）／
+⛔ 阻塞：等被挂起的模块／🟢 可以开始／○ 未就绪：缺哪个依赖）、Spec 与 Plan 的审查状态，表头给合计、关键卡点、待审核、
+下一个 gate 与未合入／未推送的提交数：
+
+```bash
+python3 -B "$ROOT/hooks/map_view.py" --project "$PROJECT" [--all] [--json]
+```
+
+把表格原样给用户，不改写成段落。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量、不折叠的结果
+（`schemaVersion` 1，字段与稳定性承诺见 `spec/map-view.md`），供其他插件读取。退出码 3 是没有能力图，4 是能力图或
+模块文件读不出，2 是参数或路径错误。"阻塞"只指被挂起的模块挡住，外部等待这里看不到。
+
 ## tracker default
 
 项目默认的事项后端与精确目标，存在 `.agent/tracker.json`。读取只读：
@@ -180,15 +194,17 @@ python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key revi
 
 挂起一个在等外部条件的已开工模块（Claude 侧为 `/spec-guard:module-suspend`）：在 `tasks/<id>/todo.md` 写一行
 `<!-- spec-guard: suspended -->`。选当前模块时跳过它、保留 Build order 原位，阶段提示列出 `Suspended: <id>`；
-它不算做到一半，随后 add-module 不需要 `--interrupt`；永不自动恢复，插件不记录原因或日期。默认只预览，用户确认后
-才加 `--confirm`，只改这一行并读回：
+它不算做到一半，随后 add-module 不需要 `--interrupt`；永不自动恢复，插件不记录日期或条件，也不判断该不该回来。
+用户说了原因时加 `--reason "<一行>"`，在标记下一行记下原因（map 表里显示），只按用户说的写，不从上下文推断；
+给已挂起的模块带 `--reason` 只替换原因行。默认只预览，用户确认后才加 `--confirm`，只改这一两行并读回：
 
 ```bash
-python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <module-id>
+python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --suspend <module-id> [--reason "<一行>"]
 python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module-id> --confirm
 ```
 
-只能挂起有 Plan、todo 且至少一项未勾选的模块；拒绝时退出码 2 且不写文件。恢复只去掉标记、不改 `.agent/state.json`。
+只能挂起有 Plan、todo 且至少一项未勾选的模块；拒绝时退出码 2 且不写文件（原因为空、多行、含 `-->` 或超过 120 个字符
+也拒绝）。恢复去掉标记和原因行、不改 `.agent/state.json`。
 挂起确认后问用户要不要设提醒：时间和内容由用户说；宿主有持久的提醒或自动化能力且支持这个时间就用并读回，
 否则请用户自己设。不从对话推断日期，插件不保存提醒，提醒失败不影响挂起。
 
