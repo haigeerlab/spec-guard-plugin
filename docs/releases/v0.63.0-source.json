@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:84686d591ce96981902ffd67fc774eec5796ae5d"
+      },
+      "observedAt": "2026-10-16T07:24:45Z",
+      "evidence": [
+        "result:the v0.63.0 annotated tag and origin/main both resolve to merge commit 84686d591ce96981902ffd67fc774eec5796ae5d (pull request #319; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head 1e250ff's tree; 0.63.0 is one module, stall-signals: map_view.py reads committed todo history once with git log and adds lastTickAt, firstTickAt, tickCommits, suspendedAt and a top-level history to the JSON (schemaVersion stays 1); the shared checkpoint rules gained a stop for a gate blocked again by an external cause, with one line in each convention-block template; hooks.json and phase-guard.sh are unchanged",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"<module commits>\"",
+        "result:the commits were made by verify-and-commit.sh after validate, phase-guard (308 cases), verify-artifacts (60 cases) and ShellCheck passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
