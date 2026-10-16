@@ -1560,7 +1560,38 @@ fi
 
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=15
+# phase-hint-gaps：D6 压缩后那一次（SessionStart）不读记录文件里的用量，按刚压缩处理；D5 没开工的当前模块（NEEDS_SPEC）
+# 达到边界档也给模块边界行；D1 IDLE 与 MAP_ONLY 也带项目配置行。
+part_16() {
+build_fixture ctx
+run_start() {  # $1=项目目录 $2=标准输入文本：以 SessionStart 运行
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" \
+    /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$2"
+}
+no_size() {  # $1=用例名 $2=正文：没有上下文行与边界行
+  case "$2" in *"Session context"*|*"Module boundary"*) fail "$1
+$2" ;; esac
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+# D6：记录文件末尾仍是压缩前的大读数（compact_boundary 尚未写入）。
+transcript "$T" 899999
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+grep -F -- "$(mid_line 900 'at or over 800 k')" >/dev/null <<<"$out" || fail "对照：UserPromptSubmit BUILDING 900k 应有上下文行
+$out"
+echo "  ✅ 对照：UserPromptSubmit 照旧报 900k"; PASS=$((PASS + 1))
+out="$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+no_size "SessionStart BUILDING 900k：不报压缩前的大小" "$out"
+grep -F "Context was just compacted" >/dev/null <<<"$out" || fail "SessionStart 仍应有压缩后的核对提醒"
+echo "  ✅ SessionStart 仍有压缩后的核对提醒"; PASS=$((PASS + 1))
+printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
+no_size "SessionStart DONE 900k：不出边界行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+codex_rollout "$T" 250000
+no_size "SessionStart Codex DONE 250k：不出边界行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+no_size "SessionStart Codex BUILDING 250k：不出上下文行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+}
+
+PARTS=16
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

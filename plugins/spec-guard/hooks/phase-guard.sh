@@ -135,6 +135,9 @@ fi
 FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""
 TOKENS="${FACTS%%$'\n'*}"
 case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
+# phase-hint-gaps：压缩后那一次（SessionStart）宿主还没把压缩记录写进会话记录，读到的是压缩前最后一轮的用量；
+# 刚压缩完大小必然已降，按 0 处理，不出上下文行与边界行。下一轮 UserPromptSubmit 照常读。
+[ "$EVENT" != SessionStart ] || TOKENS=0
 LOCATION=""
 case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
 # 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
