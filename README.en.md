@@ -94,7 +94,7 @@ The full flow, what each stage means, and the two ways to add requirements: [wor
 | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 
 Codex does not load slash commands; the same features are reached through skills in plain language (mainly
-`spec-guard-ops`). Arguments and output of all 21 commands, and the Codex mapping: [command reference](docs/commands.md)
+`spec-guard-ops`). Arguments and output of every command, and the Codex mapping: [command reference](docs/commands.md)
 (Chinese).
 
 ## What it looks like, and a self-check
@@ -140,6 +140,26 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
+## Data and privacy
+
+- **What it reads**: at the start of every turn the hook reads only this project's capability map, module Specs,
+  plans, todos, the settings under `.agent/` and local git refs (it never fetches). From the session transcript the
+  host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
+  the conversation.
+- **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
+  `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
+  goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).
+- **When it goes online**: only when you explicitly use one of these. Proposal commands, `ticket` with GitHub/GitLab,
+  and archiving, restoring or handing over local tickets reach GitHub／GitLab through your local `gh`／`glab` and
+  `git ls-remote`／`git fetch`, using the logins those tools already have; enabling the local ticket ledger installs
+  its runtime with `npm ci` from the lock files shipped in the package. The hook and every other command, such as
+  `map`, `phase`, `verify-artifacts`, `review-mark` and `cost-report`, stay offline.
+- **Usage statistics and uploads**: `cost-report` reads the local Claude Code (`~/.claude/projects/`) and Codex
+  (`~/.codex/sessions/`) session transcripts offline, counts only tokens and turns, and prints the result to the
+  terminal. The plugin has no telemetry and reports nothing anywhere.
+
+Details: [design and architecture](docs/design.md) (Chinese).
+
 ## Troubleshooting
 
 | Symptom | Check first |
@@ -182,6 +202,8 @@ module records, not templates for users to copy.
 
 - Found a bug or want something: open a [GitHub issue](https://github.com/haigeerlab/spec-guard-plugin/issues) with
   the matching template; [contributing](CONTRIBUTING.md) says what to include.
+- Found a security vulnerability: do not open a public issue; report it privately as described in the
+  [security policy](SECURITY.md) (Chinese).
 - Want to change code: read [contributing](CONTRIBUTING.md) and [design and architecture](docs/design.md) first.
 - Maintainer documents: see the "Maintainers" group above.
 

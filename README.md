@@ -84,7 +84,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | `/spec-guard:config` | 查看或设置项目配置：产物语言、评审节奏 |
 | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 
-Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部 21 条命令的参数、
+Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令的参数、
 输出和 Codex 对照见[命令参考](docs/commands.md)。
 
 ## 运行效果与自检
@@ -129,6 +129,21 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
    `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
    `codex plugin marketplace remove spec-guard-marketplace`。
 
+## 数据与隐私
+
+- **读什么**：每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用
+  （不 fetch）。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。
+- **写什么**：钩子不写任何文件。命令在你看过预览、明确确认后才写：项目里的 `spec/`、`tasks/`、`.agent/` 和
+  `CLAUDE.md`／`AGENTS.md` 的约定块；本机状态写在 `~/.spec-guard/`（可用 `SPEC_GUARD_STATE_DIR` 改位置）。
+- **什么时候联网**：只在你明确调用下面这些功能时。Proposal 相关命令、选了 GitHub/GitLab 的 `ticket`、本地事项的
+  归档、恢复与交接，通过本机的 `gh`／`glab` 和 `git ls-remote`／`git fetch` 访问 GitHub／GitLab，用的是它们已有的登录；
+  启用本地事项账本时，用 `npm ci` 按随包的锁文件安装运行时。钩子和 `map`、`phase`、`verify-artifacts`、`review-mark`、
+  `cost-report` 等其余命令不联网。
+- **统计与上传**：`cost-report` 离线读本机 Claude Code（`~/.claude/projects/`）和 Codex（`~/.codex/sessions/`）的会话
+  记录，只统计 token 与轮次，结果只打印在终端。插件没有遥测，不向任何地方上报数据。
+
+细节见[设计与架构](docs/design.md)。
+
 ## 故障排查
 
 | 现象 | 先检查 |
@@ -167,6 +182,7 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 
 - 发现 bug 或想提需求：在 [GitHub Issues](https://github.com/haigeerlab/spec-guard-plugin/issues) 用对应模板提交，
   怎么写得清楚见[贡献指南](CONTRIBUTING.md)。
+- 发现安全漏洞：不要公开提 issue，按[安全策略](SECURITY.md)私密报告。
 - 想改代码：先读[贡献指南](CONTRIBUTING.md)和[设计与架构](docs/design.md)。
 - 维护者文档见上面的“维护者”一组。
 

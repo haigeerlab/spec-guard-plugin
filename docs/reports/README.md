@@ -22,6 +22,8 @@
 ## 当前报告
 
 - [多维度架构审查（2026-10-08）](2026-10-08-architecture-audit.md)：v0.52.0 基线上的六维只读审查（Codex 扫描、主会话核验），20 条发现与按模块归组的修复顺序；[审查计划](2026-10-08-architecture-audit-plan.md)。
+- [Native-only 协作收尾（2026-10-04）](2026-10-04-native-only-collaboration-closeout.md)：把兼容传输从现行产品面退役时的源码与单台 Mac 宿主证据（英文）。
+- [A10 native 转正就绪对账（2026-10-04）](2026-10-04-a10-native-promotion-readiness.md)：对照 xats 退役决策与 A10 单机门槛修订，判定 native 尚未达到提出“成为默认传输”Proposal 的门槛。
 - [v0.40.0 发布后收尾审查（2026-10-04）](2026-10-04-v0.40.0-release-closeout-audit.md)：核对公开发布、安装副本、native-only 工具面与同机双向重复唤醒，并记录验收器首次误判和纠偏结果。
 - [发布后项目级审查收尾（2026-10-03）](2026-10-03-post-release-closeout-audit.md)：以最新 `origin/main`、v0.38.3 发布记录和实际宿主结果重核 A01–A13，并列出仍需补证与无需重复处理的事项。
 - [项目级审查发现对账（2026-10-03）](2026-10-03-audit-reconciliation.md)：对本轮功能审查的修复、设计决定和未验证边界逐项收口。

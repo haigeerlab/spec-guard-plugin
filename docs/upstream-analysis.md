@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| 末次核对 | **2026-09-30** |
-| 上游 commit | **`2686b62`**（0.6.11，2026-09-25） |
-| 扫描范围 | 207 个文件全量 |
+| 末次核对 | **2026-10-16** |
+| 上游 commit | **`aeac41d`**（0.6.13，2026-10-13） |
+| 扫描范围 | 216 个文件全量 |
 
 > **最低上游版本：commit `5a5ea45`（2026-08-21）或更新。**
 > 本插件依赖的两处上游结构 —— `spec-driven-development` 的 **Phase 0** 和
@@ -83,7 +83,7 @@ agents/    commands/  docs/  evals/  hooks/  references/  scripts/  skills/
 
 顺带确认了 `docs/SPEC.md` 和 `spec/*` 是上游认可的合法位置。
 
-### 3.3 多模块 Phase 0 —— `skills/spec-driven-development/SKILL.md:38-65`
+### 3.3 多模块 Phase 0 —— `skills/spec-driven-development/SKILL.md:34-65`
 
 **触发条件**：
 
@@ -287,10 +287,30 @@ other shapes.* —— **输出格式错了会被宿主拒绝，且失败是静�
 ```bash
 M=~/.claude/plugins/marketplaces/addy-agent-skills
 git -C "$M" log -1 --format='%h %ad' --date=short
-find "$M" -type f -not -path '*/.git/*' | wc -l    # 应为 207 上下（0.6.11）
+find "$M" -type f -not -path '*/.git/*' | wc -l    # 应为 216 上下（0.6.13）
 ```
 
-### 末次核对结果（2026-09-30 · commit `2686b62` · 0.6.11）
+### 末次核对结果（2026-10-16 · commit `aeac41d` · 0.6.13）
+
+上游当前 HEAD 浅克隆后逐条执行下面「逐条怎么验」的命令。本机安装副本当时是 `1401c8b`（2026-10-03），比上游落后，
+核对以上游 HEAD 为准。
+
+| # | 核对项 | 结果 | 结论 |
+|---|---|---|---|
+| 1 | `build.toml:30` 仍是那三条路径 | ✅ 逐字未变（clean baseline 在 :31，也未变） | 缺口 A 成立 |
+| 2 | `Task List Target` 章节还在 | ✅ 在（行号仍为 157） | GitHub 集成的地基存在 |
+| 3 | 激活条件仍是「CLAUDE.md/AGENTS.md 或用户指定 tracker」 | ✅ 原文未变（:162） | 声明块确为「接上游接口」 |
+| 4 | planning skill 有了 module 概念？ | ❌ 仍 0 命中 | **缺口 B 仍成立** |
+| 5 | 新增了 gh 调用？ | ❌ 无 | **缺口 E 仍成立** |
+| 6 | 能力图有了固定文件名？ | ❌ 仍只说 "at the project root"（:65） | **已知限制 3 仍成立** |
+| 7 | 命令与 skill 的名字有没有变？ | ✅ 未变：9 个命令、24 个 skill 与 `check-command-names.py` 快照逐一相同 | 快照仍有效 |
+| 8 | 新增了自动推进机制？ | ❌ 无 `hooks/hooks.json`，零注册 | **缺口 F 仍成立**，且不冲突 |
+
+另：Phase 0 一节起点从 :38 前移到 :34，触发条件与能力图格式原文未变。
+
+**五个缺口仍无一被上游补掉，插件整体成立。**
+
+### 上一次核对结果（2026-09-30 · commit `2686b62` · 0.6.11）
 
 | # | 核对项 | 结果 | 结论 |
 |---|---|---|---|
@@ -304,21 +324,6 @@ find "$M" -type f -not -path '*/.git/*' | wc -l    # 应为 207 上下（0.6.11�
 | 8 | 新增了自动推进机制？ | ❌ 反而更少：`hooks.json` 已删除，零注册 | **缺口 F 仍成立**，且不冲突 |
 
 **五个缺口仍无一被上游补掉，插件整体成立。**
-
-### 上一次核对结果（2026-08-26 · commit `5a5ea45`）
-
-| # | 核对项 | 结果 | 结论 |
-|---|---|---|---|
-| 1 | `build.toml:30` 仍是那三条路径 | ✅ 逐字未变 | 缺口 A 成立 |
-| 2 | `Task List Target` 章节还在 | ✅ 在（行号 155→**150**） | GitHub 集成的地基存在 |
-| 3 | 激活条件仍是「CLAUDE.md/AGENTS.md 或用户指定 tracker」 | ✅ 原文未变 | 声明块确为「接上游接口」 |
-| 4 | planning skill 有了 module 概念？ | ❌ 仍 0 命中 | **缺口 B 仍成立** |
-| 5 | 新增了 gh 调用？ | ❌ 无 | **缺口 E 仍成立** |
-| 6 | 能力图有了固定文件名？ | ❌ 仍只说 "at the project root" | **已知限制 3 仍成立** |
-| 7 | 命令与 skill 的名字有没有变？ | ✅ 未变 | `check-command-names.py` 的快照仍有效 |
-| 8 | 新增了自动推进机制？ | ❌ `hooks.json` 仍只注册 1 个 SessionStart | **缺口 F 仍成立**，且不冲突 |
-
-**五个缺口一个都没被上游补掉，插件整体成立。**
 
 ### 逐条怎么验
 
