@@ -3,6 +3,8 @@ description: 查看或按明确确认启用本地事项账本，并连接 Claude
 allowed-tools: Bash, Read
 ---
 
+本地使用不需要任何推送：仓库有 `origin` 时用 `--local-only` 初始化，账本只留在本机。
+
 这是一个可选的、同机同仓库 linked worktree 共享的持久事项账本入口。它不替代 agent-relay 协作信箱，不是
 GitHub/GitLab 的本地克隆，也不包含项目组、角色、派单、排期或自动同步。
 
@@ -79,13 +81,19 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --rep
 替换后需重启 Claude Code／Codex 会话（或其 MCP 服务器），账本 MCP 进程才会使用新运行时。
 
 只有用户明确要求初始化当前仓库时，先运行 `preflight`，说明它会提交 `.epiq/project.json`、创建
-`__epiq_state__` 分支；工作树不干净时不得继续。发现 `origin` 时，必须另行向用户解释 Epiq 上游会尝试
-推送，并且仅在用户明确许可这一次推送尝试后才追加 `--allow-epiq-push`。`user-name`、
+`__epiq_state__` 分支；工作树不干净时不得继续。发现 `origin` 时，向用户说明两种选择：默认推荐
+`--local-only`（只对这一次 Epiq 调用屏蔽推送，账本只在本机，不改任何 git 配置）；只有用户明确要把账本推到
+`origin` 时，才在许可这一次推送尝试后改用 `--allow-epiq-push`。两者不能同时给。`user-name`、
 `preferred-editor`、`auto-sync` 不可猜测：向用户索取实际值。
+
+初始化后把含 `.epiq/project.json` 的提交合进默认分支，否则从默认分支开的工作树和会话找不到账本；
+`status` 在当前检出没有标识、但别的分支有时会指出是哪个分支。`auto-sync` 为 false 时，事项事件只作为
+状态 worktree 里未提交的 `~pending` 文件存在，没有 git 历史；`status` 会报告这类事件的条数，大于 0 时
+用 `/spec-guard:local-ticket-portability` 的离线归档备份。
 
 ```bash
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
   --confirm-initialize --user-name "用户提供的显示名" \
   --preferred-editor "用户提供的编辑器命令" --auto-sync "用户给的 true 或 false" --format json
 ```

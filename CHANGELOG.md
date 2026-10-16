@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.64.0] - 2026-10-16
+
+本版一个模块：`ledger-local-only`，让本地事项账本可以纯本地启用，并把数据风险说清楚（来自一份真实使用报告）。
+
+### 新增
+
+- **`--local-only` 初始化。** 仓库有 `origin` 时，`preflight` / `initialize` 加 `--local-only` 即可初始化而不推送：只对这一次 Epiq
+  子进程把 `remote.origin.pushurl` 指向不存在的本地路径，Epiq 的推送在本机失败、按上游设计记为警告；不改任何 git 配置。与
+  `--allow-epiq-push` 互斥。不带时预检多给 `localOnly: available` 并在文本里列出两种选择。
+- **status 报告未提交事件数。** Epiq 只在同步时提交事件（同步会推送），`auto-sync` 关闭时事件一直是状态 worktree 里未跟踪的
+  `~pending` 文件。status 现在报告这类事件的条数（`project.pendingEvents`），大于 0 时提醒用离线归档备份。
+- **标识在别的分支上时给出诊断。** 当前检出没有 `.epiq/project.json`、别的本地或远端跟踪分支有时，status 报告分支名
+  （`project.identityElsewhere`）；初始化成功后提示把这次提交合进默认分支。
+
+### 文档
+
+- 账本入口开头写明本地使用不需要任何推送；ticket 入口写明 Claude 调用 Epiq 工具要传 `repoRoot`，建事项要选非只读泳道。
+
 ## [0.63.5] - 2026-10-16
 
 本版一个模块：`boundary-hint-70`，放宽模块边界的释放上下文提示。

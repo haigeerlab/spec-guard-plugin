@@ -155,6 +155,8 @@ npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
 ## Initialization preflight
 
+本地使用不需要任何推送：仓库有 `origin` 时用 `--local-only` 初始化，账本只留在本机。
+
 Epiq 的上游 `epiq_project_init` 会尝试推送普通分支和其状态分支。Spec Guard 因此先提供只读预检：
 
 ```bash
@@ -165,8 +167,13 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 
 - `ready` + `origin: null`：Git 工作树干净且没有 `origin`。后续显式初始化可以继续；Epiq 仍会尝试
   `origin` 推送，但会作为本地可用的警告失败。
-- `push-confirmation-required`：发现 `origin`。不会启动 Epiq；必须让用户为本次初始化单独确认其上游
-  推送行为。`--allow-epiq-push` 仅表达该确认给后续显式初始化操作，单独运行预检不会写入或推送。
+- `push-confirmation-required`（带 `localOnly: available`）：发现 `origin`。不会启动 Epiq；让用户在两种做法中选：
+  `--local-only`（推荐）或单独确认其上游推送行为后用 `--allow-epiq-push`。后者仅表达该确认给后续显式
+  初始化操作，单独运行预检不会写入或推送。两者同给时预检返回 `invalid`。
+- `ready` + `upstreamPush: disabled-local-only`：带 `--local-only` 且有 `origin`。初始化时 Spec Guard 只对这一次
+  Epiq 子进程追加 `GIT_CONFIG_*` 环境变量，把 `remote.origin.pushurl` 指向不存在的本地路径
+  （`/nonexistent/spec-guard-local-only`），Epiq 的 `git push -u origin HEAD` 在本机失败、按上游设计记为警告；
+  仓库与用户的 git 配置都不改，已有的 `GIT_CONFIG_COUNT` 条目保留在前。
 - `dirty`：工作树含改动，拒绝初始化。
 - `not-git` 或 `invalid`：无法取得安全预检所需的 Git 事实。
 
@@ -176,7 +183,7 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 预检通过、运行时已安装后，才可由用户显式初始化：
 
 ```bash
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
   --confirm-initialize \
   --user-name "你的显示名" \
   --preferred-editor "code --wait" \
@@ -185,11 +192,21 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize \
 ```
 
 `user-name`、`preferred-editor` 和 `auto-sync` 是 Epiq 首次在当前 macOS 用户下保存的偏好；Spec Guard
-不会猜测或代填它们。若预检显示已有 `origin`，还必须明确增加 `--allow-epiq-push`。该标记只允许本次
+不会猜测或代填它们。若预检显示已有 `origin`，还必须明确增加 `--local-only` 或 `--allow-epiq-push` 之一。该标记只允许本次
 Epiq 上游初始化尝试推送，不能表示远端操作已经成功；输出只报告是否有警告，不回显上游原始 Git 错误。
 
 成功后 Epiq 会提交 `.epiq/project.json`、创建 `__epiq_state__` 状态分支，并在同一 macOS 用户的 linked
 worktree 间共享状态。它不会安装 Claude/Codex MCP 配置；那是独立的后续明确操作。
+
+`.epiq/project.json` 只提交在初始化时所在的分支上：把这次提交合进默认分支，从默认分支开的工作树与会话
+才能找到账本。当前检出没有标识时，`status` 只读地查本地与远端跟踪分支（不含状态分支、不联网），找到就在
+`project.identityElsewhere` 报告分支名。
+
+Epiq 只在同步时把 `~pending` 事件提交进 `__epiq_state__`，同步同时推送；`auto-sync` 为 false 且不手动同步时，
+事项事件一直是状态 worktree 里的未跟踪文件，没有 git 历史。`status` 在状态 worktree 归本仓库时报告
+`project.pendingEvents`（这些文件的非空行数，只计数、不解析；读不了为 `null`），文本输出大于 0 时提醒用
+`local_ticket_portability.py archive --output <目录>` 做离线归档，归档会原样保存 `~pending` 文件。Spec Guard
+不替 Epiq 提交或推送状态分支。
 
 ## Explicit host MCP adapters
 

@@ -26,7 +26,8 @@ process.
   `absent`. A non-empty invalid runtime is never overwritten or deleted.
 - A repository's identity is the committed `.epiq/project.json` with state branch `__epiq_state__`.
   Initialization requires a clean worktree. When `origin` exists, Epiq's upstream push requires a
-  separate explicit confirmation before Epiq runs.
+  separate explicit confirmation before Epiq runs, or `--local-only`, which disables the push for that
+  one Epiq process (see `spec/ledger-local-only.md`).
 - Status, contract, and preflight commands are read-only. Installation, initialization, and host
   configuration are explicit operator actions gated by `--confirm-install` or the equivalent
   confirmation; plugin installation, hooks, and the daily entry perform none of them.
@@ -139,3 +140,7 @@ plugins/spec-guard/references/local-ticket-ledger-runtime.md -> runtime and safe
   confirmation rule remains.
 - Migrating ledger records to GitHub/GitLab Issues once they are available again is a separate
   capability and needs its own Proposal.
+
+## Change log
+
+- 2026-10-16: the push-confirmation rule gained a third choice, `--local-only`, which initializes with an `origin` without pushing. Reason: real use showed users who only want a local ledger were forced to push to a public remote. Source: the ledger-local-only module, from a report relayed by another session and accepted by the user.
