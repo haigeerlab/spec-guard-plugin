@@ -1,5 +1,5 @@
 {
   "version": 1,
   "artifactLanguage": "zh-CN",
-  "reviewCadence": "combined"
+  "reviewCadence": "separate"
 }
