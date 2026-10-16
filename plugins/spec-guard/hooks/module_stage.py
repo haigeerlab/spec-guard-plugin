@@ -307,9 +307,9 @@ COMMANDS["codex"] = {
 }
 
 
-# context-hint-thresholds: a module boundary suggests freeing context from half the context window, the middle of a
+# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window, the middle of a
 # module only from 80% of it. Claude transcripts carry no window, so they use a 1M window's figures.
-BOUNDARY_SHARE, MID_SHARE = 0.5, 0.8
+BOUNDARY_SHARE, MID_SHARE = 0.7, 0.8
 DEFAULT_WINDOW = 1_000_000
 
 
@@ -320,8 +320,8 @@ def _k(tokens: int) -> int:
 def thresholds(window: int | None) -> tuple:
     """(boundary tokens, mid-module tokens, boundary note, mid note) for a context window or the Claude default."""
     if window:
-        boundary, mid = -(-window * 5 // 10), -(-window * 8 // 10)  # ceil, in integers
-        return (boundary, mid, "at or over 50%% of the %d k window" % _k(window),
+        boundary, mid = -(-window * 7 // 10), -(-window * 8 // 10)  # ceil, in integers
+        return (boundary, mid, "at or over 70%% of the %d k window" % _k(window),
                 "at or over 80%% of the %d k window" % _k(window))
     boundary, mid = int(DEFAULT_WINDOW * BOUNDARY_SHARE), int(DEFAULT_WINDOW * MID_SHARE)
     return boundary, mid, "at or over %d k" % _k(boundary), "at or over %d k" % _k(mid)

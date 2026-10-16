@@ -86,7 +86,7 @@ context_of() {  # 从 hook JSON 取 additionalContext
 transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
   printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
 }
-# context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 50%（500k）
+# context-hint-thresholds：模块进行中达到窗口 80%（Claude 无窗口时 800k）才出上下文行；模块完成时达到 70%（700k）
 # 才出带大小的 Module boundary 行，低于不出，读不到大小时保持现行文字。transcript 写入的总量 = 第二个参数 + 1。
 mid_line() {  # $1=N k $2=阈值说明
   printf -- '- Session context: about %s k tokens in the last turn (%s); every turn re-reads it. Finish or record the current task, then give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or `text` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text.' "$1" "$2"
@@ -752,23 +752,29 @@ echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
 
 printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 且 800k 时只出带大小的 Module boundary 行" "$(sized_boundary 800 'at or over 500 k')"
+done_has_only "DONE 且 800k 时只出带大小的 Module boundary 行" "$(sized_boundary 800 'at or over 700 k')"
+transcript "$T" 699999
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "DONE 恰好 700k 时出带大小的 Module boundary 行" "$(sized_boundary 700 'at or over 700 k')"
+transcript "$T" 699998
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "DONE 低于 700k（699,999）时不出 Module boundary 行" ""
 transcript "$T" 499999
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 恰好 500k 时出带大小的 Module boundary 行" "$(sized_boundary 500 'at or over 500 k')"
-transcript "$T" 499998
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 低于 500k 时不出 Module boundary 行" ""
+done_has_only "boundary-hint-70：DONE 500k 不再出 Module boundary 行" ""
 out="$(run "$ctx" | context_of)"
 done_has_only "DONE 读不到大小时保持现行 Module boundary 行" "$BOUNDARY"
 
-# Codex：窗口取自同一条 token_count（258400）；DONE 50% = 129200，BUILDING 80% = 206720。
+# Codex：窗口取自同一条 token_count（258400）；DONE 70% = 180880，BUILDING 80% = 206720。
+codex_rollout "$T" 180880
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex DONE 达到窗口 70% 时出带大小的行" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
+codex_rollout "$T" 180879
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex DONE 低于窗口 70% 时不出行" ""
 codex_rollout "$T" 129200
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex DONE 达到窗口 50% 时出带大小的行" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
-codex_rollout "$T" 129199
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex DONE 低于窗口 50% 时不出行" ""
+done_has_only "boundary-hint-70：Codex DONE 窗口 50% 不再出行" ""
 # context-after-compact：压缩记录比最近一条读数新时，按压缩后的大小判断（2026-10-08 实测压缩后首轮仍报 601k）。
 transcript "$T" 601429
 printf '%s\n' '{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":601658,"postTokens":13951}}' >> "$T"
@@ -779,9 +785,9 @@ printf '%s\n' '{"type":"compacted","payload":{}}' \
   '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":0},"model_context_window":258400}}}' >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "Codex 刚压缩完不出 Module boundary 行" ""
-printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":129200},"model_context_window":258400}}}' >> "$T"
+printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":180880},"model_context_window":258400}}}' >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "压缩之后的新读数照常判断" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
+done_has_only "压缩之后的新读数照常判断" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 codex_rollout "$T" 206720
 grep -F -- "$(mid_line 207 'at or over 80% of the 258 k window')" >/dev/null <<<"$(run_input "$ctx" "$HOOK_INPUT" | context_of)" \
@@ -855,14 +861,14 @@ printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '
   '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$md/spec/CAPABILITY-MAP.md"
 touch "$md/spec/alpha.md"; printf '# Plan\n' > "$md/tasks/alpha/plan.md"; printf '%s\n' '- [x] open' > "$md/tasks/alpha/todo.md"
 printf '%s\n' '{"activeModule":"alpha"}' > "$md/.agent/state.json"
-transcript "$T" 599999
+transcript "$T" 699999
 out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
 grep -F "MODULE_DONE" >/dev/null <<<"$out" || fail "夹具应为 MODULE_DONE
 $out"
-done_has_only "MODULE_DONE 达到 500k 时出带大小的行" "$(sized_boundary 600 'at or over 500 k')"
-transcript "$T" 100000
+done_has_only "MODULE_DONE 达到 700k 时出带大小的行" "$(sized_boundary 700 'at or over 700 k')"
+transcript "$T" 599999
 out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
-done_has_only "MODULE_DONE 低于 500k 时不出行" ""
+done_has_only "MODULE_DONE 600k（低于 700k）时不出行" ""
 
 idle_ctx="$WORK/idle-ctx"
 mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle_ctx/CLAUDE.md"
@@ -1616,25 +1622,28 @@ printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$two/CLAUDE.md"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$two/spec/CAPABILITY-MAP.md"
 touch "$two/spec/alpha.md"; printf '# Plan\n' > "$two/tasks/alpha/plan.md"; printf '%s\n' '- [x] done' > "$two/tasks/alpha/todo.md"
-transcript "$T" 599999
+transcript "$T" 699999
 out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
 grep -F "**NEEDS_SPEC**" >/dev/null <<<"$out" || fail "夹具应为 NEEDS_SPEC
 $out"
-done_has_only "NEEDS_SPEC 600k：出带大小的边界行" "$(sized_boundary 600 'at or over 500 k')"
+done_has_only "NEEDS_SPEC 700k：出带大小的边界行" "$(sized_boundary 700 'at or over 700 k')"
+transcript "$T" 599999
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "NEEDS_SPEC 600k（低于 700k）：都不出" ""
 transcript "$T" 849999
 out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 850k：只出边界行，不另出上下文行" "$(sized_boundary 850 'at or over 500 k')"
+done_has_only "NEEDS_SPEC 850k：只出边界行，不另出上下文行" "$(sized_boundary 850 'at or over 700 k')"
 transcript "$T" 99999
 out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
 done_has_only "NEEDS_SPEC 100k：都不出" ""
 out="$(run "$two" | context_of)"
 done_has_only "NEEDS_SPEC 读不到大小：都不出" ""
-transcript "$T" 599999
+transcript "$T" 699999
 out="$(ATTENDED=0 run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 600k 无人值守：都不出" ""
-codex_rollout "$T" 129200
+done_has_only "NEEDS_SPEC 700k 无人值守：都不出" ""
+codex_rollout "$T" 180880
 out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex NEEDS_SPEC 达到窗口 50%：出带大小的边界行" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
+done_has_only "Codex NEEDS_SPEC 达到窗口 70%：出带大小的边界行" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
 transcript "$T" 599999
 touch "$two/spec/beta.md"
 out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
