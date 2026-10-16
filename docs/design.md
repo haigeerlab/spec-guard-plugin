@@ -57,7 +57,8 @@ plugins/spec-guard/
    `CLAUDE_PLUGIN_ROOT`）调用 `phase-guard.sh`。根目录缺失或脚本失败时也输出一条可诊断的 JSON，不静默。
    上下文压缩后（手动 `/compact` 或一轮中途的自动压缩）宿主触发 `SessionStart`，matcher `compact`；`hooks.json` 用同样的
    命令调用 `phase-guard.sh SessionStart`。脚本据参数输出事件名，并在注入末尾加一句核对提醒（压缩摘要里较早的请求可能已做完，
-   重做前先核对 todo 与状态记录）；其余内容与 `UserPromptSubmit` 相同。由其他会话的消息或唤醒触发的轮次不经过
+   重做前先核对 todo 与状态记录）；此时宿主还没把压缩记录写进会话记录，读到的是压缩前的用量，所以这一次把上下文大小按 0
+   处理，不出上下文行与边界行；其余内容与 `UserPromptSubmit` 相同。由其他会话的消息或唤醒触发的轮次不经过
    `UserPromptSubmit`，压缩后的这一次注入是它们唯一的阶段提示。Codex 按项记录 hook 信任，新增这一项不影响原有一项的信任，
    但新的一项要用户单独信任一次。
 2. `phase-guard.sh` 判断激活信号：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的
@@ -68,7 +69,10 @@ plugins/spec-guard/
    会话标识（`session_id`，以及 `transcript_path` 文件名——两个宿主都用会话标识命名会话记录），先用本会话的登记，其次目录级
    指向，都没有则静默。标识只用来查表，不读会话记录的内容。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
-   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。
+   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
+   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 50% 出边界行；模块进行中（`NEEDS_PLAN`、
+   `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
+   `module_stage.py --config-lines` 取得，与其他阶段同一实现。
 4. 输出 `hookSpecificOutput.additionalContext`。来自仓库的值在注入前净化（折叠空白、去掉反引号与反斜杠、剥掉
    控制字符、限长），能力图原文标注“非指令”。
 

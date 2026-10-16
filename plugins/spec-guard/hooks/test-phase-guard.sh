@@ -1560,7 +1560,116 @@ fi
 
 # 调度：每段一个子 shell、一个目录、一份日志，同时跑；按段的顺序逐个等待并打印，所以输出顺序与串行时相同。
 # 任一段失败（fail 退出非零）就整体失败并报出是第几段；其余段照常跑完、照常打印。SG_VALIDATE_JOBS=1 时逐段串行。
-PARTS=15
+# phase-hint-gaps：D6 压缩后那一次（SessionStart）不读记录文件里的用量，按刚压缩处理；D5 没开工的当前模块（NEEDS_SPEC）
+# 达到边界档也给模块边界行；D1 IDLE 与 MAP_ONLY 也带项目配置行。
+part_16() {
+build_fixture ctx
+LANG_LINE='- Artifact language: `zh-CN`'
+CADENCE_LINE='- Review cadence: combined'
+INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
+run_start() {  # $1=项目目录 $2=标准输入文本：以 SessionStart 运行
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" \
+    /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$2"
+}
+no_size() {  # $1=用例名 $2=正文：没有上下文行与边界行
+  case "$2" in *"Session context"*|*"Module boundary"*) fail "$1
+$2" ;; esac
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+# D6：记录文件末尾仍是压缩前的大读数（compact_boundary 尚未写入）。
+transcript "$T" 899999
+out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+grep -F -- "$(mid_line 900 'at or over 800 k')" >/dev/null <<<"$out" || fail "对照：UserPromptSubmit BUILDING 900k 应有上下文行
+$out"
+echo "  ✅ 对照：UserPromptSubmit 照旧报 900k"; PASS=$((PASS + 1))
+out="$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+no_size "SessionStart BUILDING 900k：不报压缩前的大小" "$out"
+grep -F "Context was just compacted" >/dev/null <<<"$out" || fail "SessionStart 仍应有压缩后的核对提醒"
+echo "  ✅ SessionStart 仍有压缩后的核对提醒"; PASS=$((PASS + 1))
+printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
+no_size "SessionStart DONE 900k：不出边界行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+codex_rollout "$T" 250000
+no_size "SessionStart Codex DONE 250k：不出边界行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
+no_size "SessionStart Codex BUILDING 250k：不出上下文行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
+
+# D5：alpha 已完成、beta 还没有 Spec（NEEDS_SPEC）——验收提交同时切换 activeModule 后的下一轮就是这样。
+two="$WORK/two"
+mkdir -p "$two/spec" "$two/tasks/alpha"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$two/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$two/spec/CAPABILITY-MAP.md"
+touch "$two/spec/alpha.md"; printf '# Plan\n' > "$two/tasks/alpha/plan.md"; printf '%s\n' '- [x] done' > "$two/tasks/alpha/todo.md"
+transcript "$T" 599999
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+grep -F "**NEEDS_SPEC**" >/dev/null <<<"$out" || fail "夹具应为 NEEDS_SPEC
+$out"
+done_has_only "NEEDS_SPEC 600k：出带大小的边界行" "$(sized_boundary 600 'at or over 500 k')"
+transcript "$T" 849999
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "NEEDS_SPEC 850k：只出边界行，不另出上下文行" "$(sized_boundary 850 'at or over 500 k')"
+transcript "$T" 99999
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "NEEDS_SPEC 100k：都不出" ""
+out="$(run "$two" | context_of)"
+done_has_only "NEEDS_SPEC 读不到大小：都不出" ""
+transcript "$T" 599999
+out="$(ATTENDED=0 run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "NEEDS_SPEC 600k 无人值守：都不出" ""
+codex_rollout "$T" 129200
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "Codex NEEDS_SPEC 达到窗口 50%：出带大小的边界行" "$(sized_boundary 129 'at or over 50% of the 258 k window')"
+transcript "$T" 599999
+touch "$two/spec/beta.md"
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "NEEDS_PLAN 600k：都不出" ""
+mkdir -p "$two/tasks/beta"; printf '# Plan\n' > "$two/tasks/beta/plan.md"; printf '%s\n' '- [ ] open' > "$two/tasks/beta/todo.md"
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+done_has_only "BUILDING 600k：都不出" ""
+transcript "$T" 849999
+out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
+grep -F -- "$(mid_line 850 'at or over 800 k')" >/dev/null <<<"$out" && ! grep -F "Module boundary" >/dev/null <<<"$out" \
+  || fail "BUILDING 850k 应照旧只有上下文行
+$out"
+echo "  ✅ BUILDING 850k：上下文行照旧"; PASS=$((PASS + 1))
+
+# D1：IDLE（没有能力图）与 MAP_ONLY（有能力图、没有模块 Spec）也带项目配置行，放在建议之前；没配置时逐字不变。
+for kind in IDLE MAP_ONLY; do
+  early="$WORK/early-$kind"
+  mkdir -p "$early/.agent"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$early/CLAUDE.md"
+  [ "$kind" = IDLE ] || map "$early"
+  plain_early="$(run "$early" | context_of)"
+  grep -F "**${kind}**" >/dev/null <<<"$plain_early" || fail "夹具应为 $kind
+$plain_early"
+  early_case() {  # $1=用例名 $2=config.json 内容 $3...=期望多出的行（前缀）
+    local name="$1" body="$2" line rest; shift 2
+    printf '%s\n' "$body" > "$early/.agent/config.json"
+    out="$(run "$early" | context_of)"
+    for line in "$@"; do
+      python3 -c 'import sys; t, l = sys.argv[1], sys.argv[2]; assert l in t and t.index(l) < t.index("Suggested next step"), t' \
+        "$out" "$line" || fail "$name: 缺少「${line}」或不在建议之前
+$out"
+    done
+    rest="$(python3 -c 'import sys; t, e = sys.argv[1], sys.argv[2:]; print("\n".join(l for l in t.split("\n") if not l.startswith(tuple(e))), end="")' "$out" "$@")"
+    [ "$rest" = "$plain_early" ] || fail "$name: 除配置行外输出应与无配置时一致
+--- got
+$out
+--- plain
+$plain_early"
+    echo "  ✅ $name"; PASS=$((PASS + 1))
+  }
+  early_case "$kind 设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "zh-CN"}' "$LANG_LINE"
+  early_case "$kind combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
+  early_case "$kind 无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
+    "$INVALID_LINE"
+  printf '%s\n' '{"version": 1, "reviewCadence": "separate"}' > "$early/.agent/config.json"
+  [ "$(run "$early" | context_of)" = "$plain_early" ] || fail "$kind separate 不应注入任何内容"
+  echo "  ✅ $kind separate：输出逐字不变"; PASS=$((PASS + 1))
+done
+}
+
+PARTS=16
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

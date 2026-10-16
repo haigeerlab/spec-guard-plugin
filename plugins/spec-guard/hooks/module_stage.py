@@ -559,6 +559,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     if stage == "MODULE_DONE":
         if boundary_note_line:
             notes.append(boundary_note_line)
+    elif stage == "NEEDS_SPEC" and context_tokens is not None:
+        # phase-hint-gaps: a module with no Spec yet has not started, so this is a module boundary too -- the final
+        # acceptance commit usually switches activeModule, and MODULE_DONE is never seen.  An unknown size adds nothing.
+        if boundary_note_line:
+            notes.append(boundary_note_line)
     elif context_note:
         notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd)
@@ -596,5 +601,11 @@ if __name__ == "__main__":
     parser.add_argument("--context-window", type=int)
     parser.add_argument("--unattended", action="store_true")
     parser.add_argument("--host", choices=["claude", "codex"])
+    # phase-hint-gaps: IDLE and MAP_ONLY are answered by phase-guard.sh itself; it asks for the project-config lines
+    # here so they come from the one implementation.
+    parser.add_argument("--config-lines", action="store_true")
     args = parser.parse_args()
+    if args.config_lines:
+        print("\n".join(config_lines(Path(args.root), args.host)))
+        raise SystemExit(0)
     print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host))
