@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.64.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.64.0;test:installed-plugin-upgrade-20261016"
+      },
+      "observedAt": "2026-10-16T15:27:24Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.63.5 to 0.64.0 for scope user; the installed copy records gitCommitSha f211d60 -- the v0.64.0 tag commit; it passes test_local_ledger_runtime.py and 338 phase-guard cases (one repository-file case is the known class)",
+        "host:Claude Code 2.1.299"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.64.0-local-ledger",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "epiq:1.11.0;test:local-only-bare-origin-20261016"
+      },
+      "observedAt": "2026-10-16T15:27:24Z",
+      "evidence": [
+        "command:the installed copy's local_ledger_runtime.py preflight/initialize --local-only in a temporary repository whose origin is a bare repository on this Mac, with EPIQ_GLOBAL_DIR pointed at a temporary directory",
+        "result:preflight returned ready / disabled-local-only; initialize exited 0 and said nothing was pushed; the bare origin holds 0 refs, main has no upstream, and the repository config has no pushurl",
+        "result:after switching to a branch without .epiq/project.json, status named main as the branch holding the identity",
+        "result:a read-only status on this repository's real ledger reported 222 uncommitted events with the offline-archive reminder, matching the field report (232 events, 10 committed)",
+        "not-verified:a live Claude Code or Codex session using the ticket entry with repoRoot; the documentation change is the whole fix for that item"
+      ]
+    }
+  ]
+}
