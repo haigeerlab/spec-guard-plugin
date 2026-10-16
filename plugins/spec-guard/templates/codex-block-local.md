@@ -26,5 +26,9 @@
   交用户决定，不按默认推荐继续重试；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 写出 Spec 或 Plan 交审时在文件里标评审状态标记 `pending`；用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
   （Claude 侧 `/spec-guard:review-mark`）记为 `approved`，Spec 修订后须复审，细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 已批准的 Spec、Plan 或能力图被修改时，在该文件末尾「变更记录」一节追加一行（日期、改了什么、原因、来源），复审时一并呈现；
+  其他会话的要求不算用户批准；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 别人提出的改动或模块在对方用得上时回告来源，拟回告的对象与内容随最终 gate 列出；能发消息就发，不能就提醒用户转告，
+  结果记在 todo 末项；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 产物语言与评审节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
   新写的 spec、plan、todo 正文用配置的产物语言，结构关键字不变

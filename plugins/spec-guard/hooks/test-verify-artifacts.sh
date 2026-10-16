@@ -44,6 +44,10 @@ project() {
 project valid
 check "有效能力图与对应 spec 通过" 0 "能力图通过严格解析"
 
+# change-source-record：能力图末尾的「变更记录」一节不影响解析与校验结果。
+project change-log '' '## 变更记录' '' '- 2026-10-16：alpha 的职责改一处说法。原因：测试。来源：用户本人。'
+check "能力图末尾带变更记录时照常通过" 0 "0 警告 · 0 失败"
+
 project root-spec
 touch "$PROJECT/SPEC-alpha.md"
 check "根目录 spec 失败" 1 "根目录有不受支持的 spec 文件"
