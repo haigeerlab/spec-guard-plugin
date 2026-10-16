@@ -877,10 +877,54 @@ class StateWorktreeOwnerTests(unittest.TestCase):
                             for line in lines), lines)
         self.assertTrue(any("local-ticket-ledger-runtime.md" in line for line in lines), lines)
 
-    def test_text_status_without_conflict_keeps_one_line(self):
+    def test_text_status_without_conflict_adds_only_the_pending_count_line(self):
         self.add_worktree(self.repo_a)
         code, text = self.run_text_status()
-        self.assertEqual((code, text), (0, "本地事项账本状态：initialized\n"))
+        self.assertEqual((code, text), (0, "本地事项账本状态：initialized\n未提交到状态分支的事件：0 条\n"))
+
+    # ledger-local-only: with autoSync off Epiq leaves events as untracked ~pending files; status counts them.
+
+    def write_events(self, name, text):
+        events = self.worktree / ".epiq" / "events"
+        events.mkdir(parents=True, exist_ok=True)
+        (events / name).write_text(text, encoding="utf-8")
+        return events
+
+    def test_status_counts_non_empty_lines_of_pending_event_files(self):
+        self.add_worktree(self.repo_a)
+        self.write_events("a.jsonl", '{"committed":1}\n')
+        self.write_events("a~pending.jsonl", '{"e":1}\n{"e":2}\n\n')
+        self.write_events("b~pending-x1.jsonl", '{"e":3}')
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertEqual(payload["project"]["pendingEvents"], 3)
+        _, text = self.run_text_status()
+        self.assertIn("未提交到状态分支的事件：3 条", text)
+        self.assertIn("离线归档", text)
+
+    def test_status_reports_zero_pending_events_without_a_reminder(self):
+        self.add_worktree(self.repo_a)
+        self.write_events("a.jsonl", '{"committed":1}\n')
+        code, payload = self.run_status()
+        self.assertEqual(payload["project"]["pendingEvents"], 0)
+        _, text = self.run_text_status()
+        self.assertNotIn("离线归档", text)
+
+    def test_unreadable_events_directory_reports_null_and_keeps_the_state(self):
+        self.add_worktree(self.repo_a)
+        events = self.write_events("a~pending.jsonl", '{"e":1}\n')
+        events.chmod(0)
+        self.addCleanup(events.chmod, 0o700)
+        code, payload = self.run_status()
+        self.assertEqual((code, payload["state"]), (0, "initialized"))
+        self.assertIsNone(payload["project"]["pendingEvents"])
+        _, text = self.run_text_status()
+        self.assertNotIn("未提交到状态分支的事件", text)
+
+    def test_pending_count_is_only_reported_for_an_owned_worktree(self):
+        self.add_worktree(self.repo_b)
+        code, payload = self.run_status()
+        self.assertNotIn("pendingEvents", payload["project"])
 
     def test_worktree_owned_by_this_repository_keeps_the_initialized_result(self):
         self.add_worktree(self.repo_a)

@@ -257,6 +257,26 @@ def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
     return {"state": "foreign", "path": path, "owner": owner}
 
 
+def pending_event_count(worktree_path: str) -> int | None:
+    """Count non-empty lines in the state worktree's ~pending event files; None when they cannot be read."""
+    events = os.path.join(worktree_path, ".epiq", "events")
+    try:
+        if not os.path.lexists(events):
+            return 0
+        names = os.listdir(events)
+        count = 0
+        for name in names:
+            path = os.path.join(events, name)
+            if "~pending" not in name or not name.endswith(".jsonl") or not os.path.isfile(path) \
+                    or os.path.islink(path):
+                continue
+            with open(path, "rb") as handle:
+                count += sum(1 for line in handle if line.strip())
+        return count
+    except OSError:
+        return None
+
+
 # remote-credential-redaction: a scheme URL's userinfo (user:token@ or token@) never leaves this module.
 _URL_USERINFO = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@")
 
@@ -668,6 +688,8 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
         payload["state"] = "conflict"
         payload["diagnostic"] = "ledger-state-worktree-foreign"
         return 1, payload
+    if worktree["state"] == "owned":
+        project["pendingEvents"] = pending_event_count(worktree["path"])
     payload["state"] = "initialized"
     return 0, payload
 
@@ -762,6 +784,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("处理办法见 references/local-ticket-ledger-runtime.md；不要在未经确认时移动或删除该 worktree。")
         elif payload["state"] == "initialized":
             worktree = payload["project"].get("stateWorktree", {})
+            pending = payload["project"].get("pendingEvents")
+            if isinstance(pending, int):
+                print("未提交到状态分支的事件：%d 条" % pending)
+                if pending:
+                    print("这些事件只在本机状态 worktree 里，没有 git 历史；用 local-ticket-portability 的离线归档备份"
+                          "（archive --output <目录>）。")
             if worktree.get("state") == "unknown":
                 print("状态 worktree 未确认：" + worktree["diagnostic"])
                 if worktree.get("checkedOutAt"):
