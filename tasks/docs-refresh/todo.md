@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交已批准的产物 — 能力图新行、已批准的 Spec、Plan 与本 todo 一次提交。
 - [x] Task 1：去掉命令总数（R1） — `README.md`、`README.en.md`、`docs/commands.md` 各一处改为不带数字的说法；三个文件里 `grep -nE '[0-9]+ ?(条|commands)'` 无命中。24 条命令在 `docs/commands.md` 都有说明：21 条有独立小节或表格行，`documentation-baseline／impact／verification` 三条在「文档治理与历史」表各一行，命令对照表以 `documentation-*` 合并一行，不需要补。
-- [ ] Task 2：术语表补 7 个概念（R2）
+- [x] Task 2：术语表补 7 个概念（R2） — `docs/concepts.md` 新增 10 行（7 个概念中评审标记与批准指纹、进度表与关键卡点、变更记录与回告各拆两行）。依据：评审标记、批准指纹、评审节奏取自 `references/workflow-checkpoints.md`「评审节奏」「评审状态标记」；插队与暂停取自 `docs/workflow.md`「插队」与 `hooks/module_stage.py` 的 `paused_modules`（除当前模块外做到一半的都算暂停，不只插队）；挂起取自 `hooks/module_stage.py` 的 `SUSPEND_MARKER` 与 `docs/commands.md`；进度表、关键卡点取自 `commands/map.md`；变更记录、回告取自「需求来源与回告」；项目指向取自 `docs/commands.md` 的 link-project。已有条目未发现与现行行为矛盾。顺带发现（不在本任务文件范围）：`docs/design.md:115` 写“插件不记录原因或日期”，与 map-view 的挂起原因、stall-signals 的挂起时间不符。
 - [ ] Task 3：重新核对上游（R3）
 - [ ] Task 4：审查报告索引与收口状态（R4）
 - [ ] Task 5：SECURITY.md（R5）
