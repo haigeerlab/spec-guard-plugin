@@ -165,6 +165,101 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "ready")
         self.assertEqual(payload["upstreamPush"], "permitted")
 
+    # ledger-local-only: --local-only initializes with an origin without letting Epiq push.
+
+    def test_initialization_preflight_offers_local_only_when_origin_exists(self):
+        self.initialize_git_project(origin="https://example.invalid/local-ledger.git")
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir)
+        self.assertEqual((code, payload["state"]), (1, "push-confirmation-required"))
+        self.assertEqual(payload["localOnly"], "available")
+        code, payload = local_ledger_runtime.initialization_preflight(self.project_dir, local_only=True)
+        self.assertEqual((code, payload["state"]), (0, "ready"))
+        self.assertEqual(payload["upstreamPush"], "disabled-local-only")
+        self.assertEqual(payload["origin"], "https://example.invalid/local-ledger.git")
+
+    def test_initialization_preflight_refuses_local_only_together_with_push_permission(self):
+        self.initialize_git_project(origin="https://example.invalid/local-ledger.git")
+        code, payload = local_ledger_runtime.initialization_preflight(
+            self.project_dir, allow_epiq_push=True, local_only=True)
+        self.assertEqual((code, payload["state"]), (1, "invalid"))
+        self.assertIn("mutually exclusive", payload["diagnostic"])
+
+    def test_initialization_preflight_without_origin_is_unchanged_by_local_only(self):
+        self.initialize_git_project()
+        self.assertEqual(local_ledger_runtime.initialization_preflight(self.project_dir, local_only=True),
+                         local_ledger_runtime.initialization_preflight(self.project_dir))
+
+    def run_initialize(self, preflight, **kwargs):
+        with patch("local_ledger_runtime.initialization_preflight", return_value=preflight) as check, \
+             patch("local_ledger_runtime.node_status", return_value={"state": "ready", "path": "/opt/node", "version": "20.0.0"}), \
+             patch("local_ledger_runtime.runtime_status", return_value={"state": "ready"}), \
+             patch("local_ledger_runtime.mcp_tool_call", return_value={
+                 "status": "success", "value": {"projectId": "project", "stateBranch": "__epiq_state__"},
+             }) as mcp_call:
+            payload = local_ledger_runtime.initialize_project(
+                self.runtime_dir, self.project_dir, "Vilin", "code --wait", False, **kwargs)
+        return payload, check, mcp_call
+
+    LOCAL_ONLY_PREFLIGHT = (0, {"state": "ready", "projectDir": "/repo", "origin": "https://example.invalid/r.git",
+                                "upstreamPush": "disabled-local-only"})
+
+    def test_initialize_local_only_disables_the_origin_push_for_the_epiq_process_only(self):
+        with patch.dict("os.environ", {"KEEP": "1"}, clear=False):
+            os.environ.pop("GIT_CONFIG_COUNT", None)
+            payload, check, mcp_call = self.run_initialize(self.LOCAL_ONLY_PREFLIGHT, local_only=True)
+        self.assertEqual(check.call_args.kwargs.get("local_only"), True)
+        env = mcp_call.call_args.kwargs["environment"]
+        self.assertEqual(env["KEEP"], "1")
+        self.assertEqual(env["GIT_CONFIG_COUNT"], "1")
+        self.assertEqual(env["GIT_CONFIG_KEY_0"], "remote.origin.pushurl")
+        self.assertTrue(env["GIT_CONFIG_VALUE_0"].startswith("/nonexistent/"))
+        self.assertEqual(payload["upstreamPush"], "disabled-local-only")
+        self.assertNotIn("GIT_CONFIG_COUNT", os.environ)
+
+    def test_initialize_local_only_appends_after_existing_git_config_entries(self):
+        with patch.dict("os.environ", {"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "core.x",
+                                       "GIT_CONFIG_VALUE_0": "y"}):
+            _, _, mcp_call = self.run_initialize(self.LOCAL_ONLY_PREFLIGHT, local_only=True)
+        env = mcp_call.call_args.kwargs["environment"]
+        self.assertEqual((env["GIT_CONFIG_COUNT"], env["GIT_CONFIG_KEY_0"], env["GIT_CONFIG_VALUE_0"]),
+                         ("2", "core.x", "y"))
+        self.assertEqual(env["GIT_CONFIG_KEY_1"], "remote.origin.pushurl")
+
+    def test_initialize_without_local_only_keeps_the_inherited_environment(self):
+        _, _, mcp_call = self.run_initialize((0, {
+            "state": "ready", "projectDir": "/repo", "origin": None, "upstreamPush": "will-fail-as-warning"}))
+        self.assertIsNone(mcp_call.call_args.kwargs.get("environment"))
+
+    def test_cli_passes_local_only_and_rejects_it_with_push_permission(self):
+        self.initialize_git_project(origin="https://example.invalid/local-ledger.git")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = local_ledger_runtime.main(["preflight", "--project-dir", str(self.project_dir),
+                                              "--local-only", "--format", "json"])
+        self.assertEqual((code, json.loads(output.getvalue())["upstreamPush"]), (0, "disabled-local-only"))
+        output = io.StringIO()
+        with redirect_stdout(output):
+            code = local_ledger_runtime.main(["preflight", "--project-dir", str(self.project_dir),
+                                              "--local-only", "--allow-epiq-push", "--format", "json"])
+        self.assertEqual((code, json.loads(output.getvalue())["state"]), (1, "invalid"))
+        output = io.StringIO()
+        with patch("local_ledger_runtime.initialize_project", return_value={
+            "state": "initialized", "projectId": "p", "stateBranch": "__epiq_state__",
+            "upstreamPush": "disabled-local-only", "warnings": True,
+        }) as initialize, redirect_stdout(output):
+            local_ledger_runtime.main(["initialize", "--confirm-initialize", "--local-only",
+                                       "--project-dir", str(self.project_dir), "--user-name", "V",
+                                       "--preferred-editor", "vim", "--auto-sync", "false"])
+        self.assertIs(initialize.call_args.kwargs.get("local_only"), True)
+
+    def test_preflight_text_names_both_choices_when_origin_exists(self):
+        self.initialize_git_project(origin="https://example.invalid/local-ledger.git")
+        output = io.StringIO()
+        with redirect_stdout(output):
+            local_ledger_runtime.main(["preflight", "--project-dir", str(self.project_dir)])
+        self.assertIn("--local-only", output.getvalue())
+        self.assertIn("--allow-epiq-push", output.getvalue())
+
     # remote-credential-redaction: credentials in the origin URL never reach the preflight output.
 
     def test_redact_url_hides_the_whole_userinfo_of_a_scheme_url(self):
