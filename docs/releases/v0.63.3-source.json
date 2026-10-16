@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:f26fed00e216074c67ea68109915c163776dc3bc"
+      },
+      "observedAt": "2026-10-16T11:48:20Z",
+      "evidence": [
+        "result:the v0.63.3 annotated tag and origin/main both resolve to merge commit f26fed00e216074c67ea68109915c163776dc3bc (pull request #326; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head afeb8b4's tree; 0.63.3 is one module, acceptance-review-streamline: the shared checkpoint rules gained three passages -- the final gate may carry an approved Spec's revision (diff shown verbatim, one approval covers both, review-mark first), the next Spec already in the map follows an accepted module without a separate stop (announced, /compact offered), and review content must sit in the turn's body before any turn-ending confirmation box; docs/workflow.md and docs/design.md were synced; commands, hooks, checks and convention-block templates are unchanged",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"<module commits>\"",
+        "result:test_workflow_checkpoints.py went from 3 failures to 26 passing cases; the rule commit ran the full verify-and-commit suite under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
