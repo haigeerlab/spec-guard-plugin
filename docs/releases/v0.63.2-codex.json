@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:0.162.1;test:v0.63.2-upgrade-and-maponly-20261016"
+      },
+      "observedAt": "2026-10-16T11:09:46Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.63.1 to v0.63.2; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.63.2 enabled; hooks.json is unchanged between v0.63.1 and v0.63.2, so no new hook trust was needed; the smoke run exited 0 and left the config unchanged",
+        "command:/bin/bash <installed>/hooks/test-phase-guard.sh",
+        "result:331 cases passed from the Codex copy",
+        "command:codex exec --skip-git-repo-check --output-last-message <file> (temporary MAP_ONLY project with artifactLanguage zh-CN)",
+        "result:the answer quoted the injected lines '当前阶段: **MAP_ONLY**' and '- Artifact language: `zh-CN` …' (D1 visible in a real Codex session)",
+        "not-verified:a real Codex compaction above the boundary threshold"
+      ]
+    }
+  ]
+}

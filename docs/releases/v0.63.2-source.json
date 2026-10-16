@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:10a6fe22bdcce429931323b021fc2c9c992cbf62"
+      },
+      "observedAt": "2026-10-16T11:09:46Z",
+      "evidence": [
+        "result:the v0.63.2 annotated tag and origin/main both resolve to merge commit 10a6fe22bdcce429931323b021fc2c9c992cbf62 (pull request #324; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head b3c28d9's tree; 0.63.2 is one module, phase-hint-gaps: the compaction-triggered SessionStart run treats the context size as 0 (the host has not yet written the compaction record, so the transcript still shows the pre-compaction size); a current module with no Spec yet (NEEDS_SPEC) gets the same Module boundary line as MODULE_DONE once the boundary threshold is reached; IDLE and MAP_ONLY carry the project-config lines through module_stage.py --config-lines; README and troubleshooting say Claude Code must reopen the session after an update",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"<module commits>\"",
+        "result:each code commit was made by verify-and-commit.sh after validate, phase-guard (308 -> 331 cases), verify-artifacts and ShellCheck passed under macOS /bin/bash 3.2.57; each fix was red before it and green after it, and three mutations turned the new cases red"
+      ]
+    }
+  ]
+}
