@@ -5,6 +5,6 @@
 - [x] Task 2：status 报告未提交事件数（先红） — 新增 4 例（两个 `~pending` 文件共 3 个非空行 → 3 且文本有离线归档提醒；只有已提交事件 → 0 且无提醒；事件目录不可读 → `null`、state 不变、不出计数行；状态工作树归别的仓库时不出该字段）。与 Plan 的出入：现有用例 `test_text_status_without_conflict_keeps_one_line` 断言整段文本只有一行，因 Spec 规定 owned 时总出计数行，改名为 `..._adds_only_the_pending_count_line` 并把期望改为两行。改前 4 例红；实现 `pending_event_count`（只数行、不解析，跳过符号链接）与文本两行，转绿，80→84 例。变异：计数恒为 0 时“3 个非空行”那例变红。
 - [x] Task 3：标识在别的分支上，与初始化后的提示（先红） — 新增 5 例（另一本地分支提交了 `.epiq/project.json` → `identityElsewhere` 为该分支且文本说明合进默认分支；只在 `__epiq_state__` 上 → 不报；哪里都没有 → 不报；git 查询失败 → 不报且 state 不变；初始化成功文本含“合进默认分支”，`--local-only` 时另有“未推送”）。改前 3 例红（查询失败那例改前即成立）；实现 `identity_elsewhere`（一次 `for-each-ref` 后逐个 `cat-file -e`，找到第一个即停，跳过 `HEAD` 与状态分支）与文本行，转绿，84→89 例。变异：查询恒为空时“另一分支”那例变红。
 - [x] Checkpoint 1（report）：三套核心回归与账本测试全绿，ShellCheck 无警告（若改 `.sh`） — 随 Task 3 的提交跑 `verify-and-commit.sh` 全档；本模块没有改 `.sh`。
-- [ ] Task 4：文档、Spec 补句、CHANGELOG 与版本号
+- [x] Task 4：文档、Spec 补句、CHANGELOG 与版本号 — 账本命令、Codex skill 与运行时参考开头写“本地使用不需要任何推送”，推送确认处改为默认推荐 `--local-only`，示例命令带上它；补 `auto-sync` 关闭时事件不进 git、status 的未提交事件数与离线归档、标识要合进默认分支。ticket 命令与 skill 补传 `repoRoot` 与只读泳道。`spec/local-ticket-ledger.md` 补第三种选择并新建 Change log；能力图变更记录补一行（职责里“最近归档时间”改为“提醒归档”）。CHANGELOG `[0.64.0]`，两份 `plugin.json` 与 README 中英 `--ref` 改为 0.64.0；`validate.sh` 随提交通过。另做了一次真实端到端：临时仓库配本机裸仓库作 origin、`EPIQ_GLOBAL_DIR` 指向临时目录，用工作区代码与本机已装的 Epiq 1.11.0 跑 `initialize --local-only` 退出 0，裸仓库 0 个引用、`main` 无上游、仓库配置无 pushurl，status 报 10 条未提交事件并提醒归档（首跑因临时仓库没配 git 作者身份失败，与本模块无关，配上后通过）。
 - [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
 - [ ] 发版后的验证
