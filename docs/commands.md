@@ -83,6 +83,7 @@ spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠�
 
 挂起一个已开工、只剩等待外部条件的模块：选当前模块时跳过它，它留在 Build order 原位，阶段提示列出 `Suspended:`。
 `--suspend <id>`／`--resume <id>`，先预览、`--confirm` 才改 `tasks/<id>/todo.md` 的一行标记。永不自动恢复。
+你说了原因时加 `--reason "<一行>"`，原因记在标记的下一行，`/spec-guard:map` 里显示；恢复时一起去掉。
 拒绝时退出 2、不写文件。挂起后可以按你说的时间和内容设一个提醒，插件不保存提醒。
 
 ### `/spec-guard:link-project`
@@ -145,6 +146,16 @@ spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠�
 
 ## 报告
 
+### `/spec-guard:map`
+
+参数：`[--all] [--json]`
+
+只读的模块进度表：按开发顺序列出每个模块的作用、状态（✅ 已完成、🔨 进行中、⏸ 挂起（原因）、⛔ 阻塞：等被挂起的
+模块、🟢 可以开始、○ 未就绪：缺哪个依赖）与 Spec、Plan 的审查状态；表头给合计、关键卡点（挂起的模块按依赖链挡住了
+谁）、待审核、下一个 gate、未合入主线与未推送的提交数。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
+结果（`schemaVersion` 1，字段与稳定性承诺见 [spec/map-view.md](../spec/map-view.md)），供其他插件读取，可用
+`--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
+
 ### `/spec-guard:cost-report`
 
 参数：`<module-id> [更多模块] [--prices <价格文件>] [--json]`
@@ -173,4 +184,5 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | agent-relay 的 skill |
 | 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
 | 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | `local-ticket-portability` skill |
+| 模块进度表（含关键卡点） | `/spec-guard:map` | `spec-guard-ops` skill 的 map 一节 |
 | 模块成本与返工报告 | `/spec-guard:cost-report` | `spec-guard-ops` skill 的 cost report 一节 |
