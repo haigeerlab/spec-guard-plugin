@@ -50,7 +50,7 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.63.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.63.2` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` 与 `SessionStart` 两项 hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入 |
 
@@ -117,6 +117,9 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 |---|---|
 | `claude plugin marketplace update spec-guard-marketplace` | 把 `~/.codex/config.toml` 里 `[marketplaces.spec-guard-marketplace]` 的 `ref` 改成新版本 |
 | `claude plugin update spec-guard@spec-guard-marketplace`，然后重开会话 | `codex plugin marketplace upgrade`，然后开新会话 |
+
+Claude Code 在会话开始时就定下了插件目录：不重开会话，已开着的会话里命令仍调用旧版本的脚本，钩子却可能已是新版本，
+两个版本混用。
 
 已经装过旧版约定块的项目，更新插件后先预览 `/spec-guard:setup-convention --replace --dry-run`，确认后再替换。
 块里自己写的规则放进本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`），替换时会保留。

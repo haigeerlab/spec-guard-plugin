@@ -57,7 +57,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.63.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.63.2` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` and `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction |
 
@@ -127,6 +127,9 @@ Self-check:
 |---|---|
 | `claude plugin marketplace update spec-guard-marketplace` | Change the `ref` of `[marketplaces.spec-guard-marketplace]` in `~/.codex/config.toml` to the new version |
 | `claude plugin update spec-guard@spec-guard-marketplace`, then reopen the session | `codex plugin marketplace upgrade`, then open a new session |
+
+Claude Code fixes the plugin directory when a session starts: without reopening, commands in an already open session
+keep calling the old version's scripts while the hook may already be the new one, so two versions mix.
 
 In a project with an older convention block, preview `/spec-guard:setup-convention --replace --dry-run` after updating,
 and replace once you have confirmed. Keep your own rules inside the block's local section
