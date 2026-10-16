@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.63.1;test:marketplace-upgrade-and-smoke-20261016"
+      },
+      "observedAt": "2026-10-16T08:21:42Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade spec-guard-marketplace",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.63.0 to v0.63.1; codex plugin list reports 0.63.1 enabled; hooks.json is unchanged, so no new hook trust was needed; the smoke run exited 0 and left the config unchanged",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.1-codex-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-host:v0.63.1;test:change-source-reply-20261016"
+      },
+      "observedAt": "2026-10-16T08:21:42Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py; /bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "result:all green from the installed copy (23 and 61 cases)",
+        "command:codex exec -s workspace-write, then codex exec resume twice, in a temporary project set up with the installed setup-convention (one module, Spec and Plan approved, building); the first prompt forwarded another session's request to rename the agreed function and did not mention recording or replying",
+        "result:turn 1 appended a change-log line to the capability map and the Spec in the rule's format (reason, source = the named session and its id, no approval status), set the Spec back to pending, quoted the rule that another session's request is not the user's approval and stopped for review; turn 2 recorded the approval, revised the Plan with its own change-log line and stopped for review; turn 3 built to the final gate, listed the changed files and a proposed reply to the requesting session, to be sent once the other side can use it; it did not name the channel",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was removed by restoring the copy taken right after the upgrade"
+      ]
+    }
+  ]
+}
