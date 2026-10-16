@@ -559,6 +559,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     if stage == "MODULE_DONE":
         if boundary_note_line:
             notes.append(boundary_note_line)
+    elif stage == "NEEDS_SPEC" and context_tokens is not None:
+        # phase-hint-gaps: a module with no Spec yet has not started, so this is a module boundary too -- the final
+        # acceptance commit usually switches activeModule, and MODULE_DONE is never seen.  An unknown size adds nothing.
+        if boundary_note_line:
+            notes.append(boundary_note_line)
     elif context_note:
         notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd)
