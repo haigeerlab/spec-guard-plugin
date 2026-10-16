@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.62.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:749caa2203ab42b5d5413be514b219ecb3de8700"
+      },
+      "observedAt": "2026-10-16T06:45:59Z",
+      "evidence": [
+        "result:the v0.62.0 annotated tag and origin/main both resolve to merge commit 749caa2203ab42b5d5413be514b219ecb3de8700 (pull request #317; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head 57e30ee's tree; 0.62.0 is one module, map-view: a new read-only hooks/map_view.py with the /spec-guard:map command and a map section in spec-guard-ops, and module_suspend.py gained an optional --reason line; hooks.json and phase-guard.sh are unchanged",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"<module commits>\"",
+        "result:the commits were made by verify-and-commit.sh after validate, phase-guard (308 cases), verify-artifacts (60 cases) and ShellCheck passed under macOS /bin/bash 3.2.57; test_map_view.py 27 cases and test_module_suspend.py are registered in validate.sh"
+      ]
+    }
+  ]
+}
