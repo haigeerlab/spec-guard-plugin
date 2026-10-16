@@ -228,6 +228,16 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("最终验收", "实际改动的文件"):
                     self.assertIn(phrase, text)
 
+    def test_an_external_blocker_goes_back_to_the_user(self):
+        section = self.section("## Plan 检查点分级")
+        for phrase in ("同一个 gate 因外部原因", "再次挡住", "挂起", "接受风险", "换方案", "代价", "不按默认推荐继续重试"):
+            self.assertIn(phrase, section)
+        for path in (self.plugin / "templates").glob("*-block-local.md"):
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("同一个 gate 因外部原因", "交用户决定"):
+                    self.assertIn(phrase, text)
+
     def test_a_review_handoff_shows_the_content(self):
         section = self.section("## 评审状态标记")
         for phrase in ("交审要让用户看到内容", "目标", "范围内与范围外", "关键决策与取舍", "假设", "验收标准", "未决问题",
