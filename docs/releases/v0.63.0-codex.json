@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "codex:v0.63.0;test:marketplace-upgrade-and-smoke-20261016b"
+      },
+      "observedAt": "2026-10-16T07:24:45Z",
+      "evidence": [
+        "command:codex plugin marketplace upgrade spec-guard-marketplace",
+        "command:/bin/bash evals/codex-plugin-smoke.sh",
+        "result:the marketplace ref in ~/.codex/config.toml moved from v0.62.0 to v0.63.0; the installed manifest reads 0.63.0; hooks.json is unchanged, so no new hook trust was needed; the smoke run passed",
+        "host:codex-cli 0.162.1"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.0-codex-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-host:v0.63.0;test:map-history-json-20261016"
+      },
+      "observedAt": "2026-10-16T07:24:45Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_map_view.py; test_module_suspend.py; test_workflow_checkpoints.py; /bin/bash <installed>/hooks/test-phase-guard.sh",
+        "result:all green from the installed copy (phase-guard 308 cases)",
+        "command:codex exec --skip-git-repo-check \"<use the map section of spec-guard-ops with --json and list history and the four time fields>\", in the same temporary repository",
+        "result:the session ran $ROOT/hooks/map_view.py --json; history was complete and lastTickAt, firstTickAt, tickCommits and suspendedAt equalled the fixed commit dates and counts",
+        "result:the trust entry codex exec added to ~/.codex/config.toml for the temporary directory was removed by restoring the copy taken right after the upgrade"
+      ]
+    }
+  ]
+}

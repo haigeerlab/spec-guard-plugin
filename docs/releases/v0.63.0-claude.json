@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.63.0;test:installed-plugin-upgrade-20261016b"
+      },
+      "observedAt": "2026-10-16T07:24:45Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.62.0 to 0.63.0 for scope user; the installed copy records gitCommitSha 84686d591ce96981902ffd67fc774eec5796ae5d -- the v0.63.0 tag commit",
+        "host:Claude Code 2.1.299"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.0-claude-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-host:v0.63.0;test:map-elapsed-20261016"
+      },
+      "observedAt": "2026-10-16T07:24:45Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_map_view.py; test_module_suspend.py; test_workflow_checkpoints.py; /bin/bash <installed>/hooks/test-phase-guard.sh",
+        "result:test_map_view, test_module_suspend and phase-guard (307 cases; the origin/main comparison is skipped without git history) are green from the installed copy; test_workflow_checkpoints has 4 errors there because those cases read repository files (docs/workflow.md, .github/pull_request_template.md) that the Claude cache does not carry -- the 0.62.0 copy shows the same 4 errors, and the new case passes",
+        "command:claude -p \"/spec-guard:map\" --allowedTools Bash, in a temporary git repository with commits at fixed dates (initial, a tick, a suspension with --reason, a tick in another module)",
+        "result:the table showed the suspended module as 'already suspended 3 days' in its cell and in the bottleneck line, and the module in progress as 'last ticked 21 hours ago', matching the commit dates"
+      ]
+    }
+  ]
+}
