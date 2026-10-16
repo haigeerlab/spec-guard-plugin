@@ -84,7 +84,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | `/spec-guard:config` | 查看或设置项目配置：产物语言、评审节奏 |
 | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 
-Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部 21 条命令的参数、
+Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令的参数、
 输出和 Codex 对照见[命令参考](docs/commands.md)。
 
 ## 运行效果与自检

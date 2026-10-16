@@ -94,7 +94,7 @@ The full flow, what each stage means, and the two ways to add requirements: [wor
 | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 
 Codex does not load slash commands; the same features are reached through skills in plain language (mainly
-`spec-guard-ops`). Arguments and output of all 21 commands, and the Codex mapping: [command reference](docs/commands.md)
+`spec-guard-ops`). Arguments and output of every command, and the Codex mapping: [command reference](docs/commands.md)
 (Chinese).
 
 ## What it looks like, and a self-check

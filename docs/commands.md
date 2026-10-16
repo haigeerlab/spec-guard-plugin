@@ -1,6 +1,6 @@
 # 命令参考
 
-spec-guard 在 Claude Code 里提供 21 条斜杠命令。Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用，
+spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用，
 对照见文末的[命令对照](#命令对照)。每条命令的完整说明以 `plugins/spec-guard/commands/<命令>.md` 为准。
 
 几条共同规则：
