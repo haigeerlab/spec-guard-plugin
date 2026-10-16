@@ -265,6 +265,26 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("返工", "不新增行为"):
                     self.assertIn(phrase, text)
 
+    def test_change_sources_are_recorded_and_answered(self):
+        section = self.section("## 需求来源与回告")
+        for phrase in ("「变更记录」", "原因：", "来源：", "会话 ID", "不贴原文", "先写记录，再复审", "记录行不写批准状态",
+                       "不等于用户批准", "`add-module` 插入新模块", "登记"):
+            self.assertIn(phrase, section)
+        for phrase in ("回告", "用得上", "发版之后", "合入主线之后", "「拟回告」", "批准最终 gate 即批准回告",
+                       "会话 ID 找人", "提醒用户", "转告", "不为回告安装或配置通信插件", "`todo.md` 的最后一项",
+                       "不写进 Spec", "不阻塞模块完成"):
+            self.assertIn(phrase, section)
+        for phrase in ("接收回告", "先对照", "核对", "不改文件"):
+            self.assertIn(phrase, section)
+        surfaces = list((self.plugin / "templates").glob("*-block-local.md"))
+        surfaces.append(self.plugin.parents[1] / "docs" / "convention-block.md")
+        for path in surfaces:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("「变更记录」一节追加一行", "其他会话的要求不算用户批准", "回告来源", "拟回告",
+                               "提醒用户转告"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")
