@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:500d2f812bccd8dcf84b5ad49caf1ea3daaf4ff0"
+      },
+      "observedAt": "2026-10-16T12:36:23Z",
+      "evidence": [
+        "result:the v0.63.4 annotated tag and origin/main both resolve to merge commit 500d2f812bccd8dcf84b5ad49caf1ea3daaf4ff0 (pull request #328; merged==true and main==merge sha were checked as a separate step)",
+        "result:no push run started on main for the merge commit; a workflow_dispatch run of the same CI on main (38900805504, commit 500d2f8) passed before tagging, and the merge commit's tree equals the pull request head 5c86fea's tree, whose pull_request run also passed",
+        "result:0.63.4 is one module, rules-in-context: both convention-block templates (and docs/convention-block.md) gained three lines carrying the 0.63.3 review rules as text; the phase hint, when an approved Spec was revised and the module has reached its final gate, now suggests showing the diff in the acceptance message for one approval instead of a separate re-review",
+        "result:each commit was made by verify-and-commit.sh (full suite for code and templates, plus setup-teardown for the templates) under macOS /bin/bash 3.2.57; phase-guard 331 -> 336 cases; setup-convention --replace from a 0.63.3 block exited 0 on both hosts without --accept-removals"
+      ]
+    }
+  ]
+}

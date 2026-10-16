@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:0.162.1;test:v0.63.4-final-gate-20261016"
+      },
+      "observedAt": "2026-10-16T12:36:23Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.63.3 to v0.63.4; upgrade exited 0; codex plugin list reports 0.63.4 enabled; hooks.json is unchanged; the smoke run exited 0 and left the config unchanged; the installed copy passes 336 phase-guard cases",
+        "command:codex exec, then codex exec resume --last \"批准\", in a temporary project set up with the 0.63.4 block (alpha: Spec approved then revised during the build; only the final gate left; beta in the map)",
+        "result:turn 1 showed the Spec diff, stated that approving the acceptance also approves the revised Spec, previewed review-mark, the tick, the state update and the commit, announced the beta Spec and offered /compact; turn 2 recorded the Spec approval, ticked the gate, moved activeModule to beta, committed, then wrote spec/beta.md and presented its points in the body before stopping"
+      ]
+    }
+  ]
+}

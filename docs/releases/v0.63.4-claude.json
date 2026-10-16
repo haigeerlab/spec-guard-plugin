@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.63.4;test:installed-plugin-upgrade-20261016"
+      },
+      "observedAt": "2026-10-16T12:36:23Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.63.3 to 0.63.4 for scope user; the installed copy records gitCommitSha 500d2f8 -- the v0.63.4 tag commit; the installed copy passes 335 phase-guard cases (one repository-file case is the known class)",
+        "host:Claude Code 2.1.299"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.4-claude-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-host:v0.63.4;test:final-gate-20261016"
+      },
+      "observedAt": "2026-10-16T12:36:23Z",
+      "evidence": [
+        "command:claude -p --model sonnet --permission-mode acceptEdits (no --add-dir) in the same kind of temporary project set up with the 0.63.4 block; turn 2 with --allowedTools Bash",
+        "result:the installed hook printed the new final-gate suggestion; turn 1 showed the Spec diff verbatim, said that approving the acceptance also approves the revised Spec, planned the change-log line and review-mark before ticking and committing, announced the beta Spec and suggested /compact -- unlike 0.63.3, where it asked for a separate re-review",
+        "result:turn 2 added the change-log line, recorded the Spec approval, ticked the gate and committed; it then stopped and asked for a reply before writing the beta Spec, and left .agent/state.json on alpha",
+        "not-verified:the next-Spec step on Claude Code (the agent announced it but still waited), and the state update in the final commit"
+      ]
+    }
+  ]
+}
