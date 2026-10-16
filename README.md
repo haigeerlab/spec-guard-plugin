@@ -167,6 +167,7 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 
 - 发现 bug 或想提需求：在 [GitHub Issues](https://github.com/haigeerlab/spec-guard-plugin/issues) 用对应模板提交，
   怎么写得清楚见[贡献指南](CONTRIBUTING.md)。
+- 发现安全漏洞：不要公开提 issue，按[安全策略](SECURITY.md)私密报告。
 - 想改代码：先读[贡献指南](CONTRIBUTING.md)和[设计与架构](docs/design.md)。
 - 维护者文档见上面的“维护者”一组。
 

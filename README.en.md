@@ -182,6 +182,8 @@ module records, not templates for users to copy.
 
 - Found a bug or want something: open a [GitHub issue](https://github.com/haigeerlab/spec-guard-plugin/issues) with
   the matching template; [contributing](CONTRIBUTING.md) says what to include.
+- Found a security vulnerability: do not open a public issue; report it privately as described in the
+  [security policy](SECURITY.md) (Chinese).
 - Want to change code: read [contributing](CONTRIBUTING.md) and [design and architecture](docs/design.md) first.
 - Maintainer documents: see the "Maintainers" group above.
 
