@@ -389,6 +389,33 @@ def next_gate(root: Path, module: str) -> str:
     return ""
 
 
+OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \]\s+")
+
+
+def _open_gate(line: str) -> bool:
+    match = OPEN_CHECKPOINT.match(line)
+    if not match:
+        return False
+    tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(1), maxsplit=1)[0])
+    return not (tier and tier.group(1).lower() == "report")
+
+
+def at_final_gate(root: Path, module: str) -> bool:
+    """True when the module's first unchecked item is a `gate` checkpoint and no other gate follows it.
+
+    rules-in-context: that is the final acceptance, where a revised Spec may be re-reviewed together with it.
+    Items after it that are not checkpoints (a post-release check) do not count.  Unreadable is False.
+    """
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    open_items = [line for line in text.splitlines() if OPEN_ITEM.match(line)]
+    if not open_items or not _open_gate(open_items[0]):
+        return False
+    return not any(_open_gate(line) for line in open_items[1:])
+
+
 def file_review_state(path: Path, kind: str) -> str:
     """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
     if not path.is_file():
@@ -427,6 +454,11 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
+    if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "at the final gate, show the diff of the revised `%s` verbatim in the acceptance message and say that "
+                "approving the acceptance also approves the revised Spec; once approved, record the Spec approval with "
+                "%s before ticking and committing." % (spec_path, cmd["review-mark"]), spec, plan)
     if spec == "revised":
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
                 "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec, plan)

@@ -1267,6 +1267,22 @@ isnt "两份都已批准：没有 Review 行" '- Review:'
 printf '%s\n' '补一条' >> "$rv/spec/alpha.md"
 out="$(ctx_of)"
 is "BUILDING 时 Spec 批准后被改：要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+# rules-in-context：已到最终验收（第一个未勾的 gate 之前没有未勾项、之后没有别的 gate）时，建议改为在验收消息里附差异一并复审。
+FINAL_HINT='Suggested next step: at the final gate, show the diff of the revised `spec/alpha.md` verbatim in the acceptance message and say that approving the acceptance also approves the revised Spec; once approved, record the Spec approval with `/spec-guard:review-mark` (Codex: spec-guard-ops review-mark) before ticking and committing.'
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '- [ ] 发版后的验证' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 只剩最终 gate：建议附差异一并复审" "$FINAL_HINT"
+is "已修订 + 只剩最终 gate：Review 行不变" '- Review: Spec `spec/alpha.md` was edited after it was approved.'
+printf '%s\n' '- [x] Task 1' '- [ ] Task 2' '- [ ] Checkpoint 1（gate）：最终验收' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 还有未勾任务：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：中途' '- [ ] Task 2' '- [ ] Checkpoint 2（gate）：最终验收' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 后面还有别的 gate：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（report）：回归' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 只剩 report 检查点：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+printf '%s\n' '- [ ] open' > "$rv/tasks/alpha/todo.md"
 plan_file alpha '<!-- spec-guard: review approved 0123456789ab -->'
 spec_file alpha ''
 out="$(ctx_of)"
