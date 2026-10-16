@@ -18,7 +18,7 @@ import re
 import subprocess
 import sys
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
@@ -32,6 +32,9 @@ ICONS = {"done": "✅", "in_progress": "🔨", "suspended": "⏸", "blocked": "�
 AWAITING = ("pending", "revised", "invalid")
 REVIEW_WORDS = {"approved": "✔", "pending": "待审核", "revised": "改过待重审", "invalid": "标记无效", "none": "无标记"}
 RESPONSIBILITY_LIMIT = 40
+CHECKED_LINE = re.compile(r"^\s*[-*+]\s+\[[xX]\]")
+DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
+COMMIT_SEP = "\x1e"
 
 
 class Unreadable(Exception):
@@ -93,6 +96,54 @@ def _head(root: Path) -> dict:
             unpushed = {"count": int(count), "upstream": upstream}
     return {"sha": sha, "branch": branch,
             "unmerged": {"count": merged[0], "base": merged[1]} if merged else None, "unpushed": unpushed}
+
+
+def history(root: Path) -> tuple:
+    """(state, last_tick, suspended_write) from committed history of tasks/*/todo.md.
+
+    state is `complete`, `shallow` or `unavailable`.  last_tick maps a module to the commit time
+    of the newest commit that raised its number of checked items; suspended_write maps it to the
+    commit time of the newest commit that touched the suspend marker, or None when that commit
+    removed it.  One `git log` for every module; nothing in the working tree is looked at.
+    """
+    if not _git(root, "rev-parse", "--verify", "--quiet", "HEAD"):
+        return "unavailable", {}, {}
+    try:
+        done = subprocess.run(["git", "-C", str(root), "log", "--no-color", "--no-renames", "-U0", "-p",
+                               "--format=" + COMMIT_SEP + "%H%x00%cI", "--", ":(glob)tasks/*/todo.md"],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return "unavailable", {}, {}
+    if done.returncode != 0:
+        return "unavailable", {}, {}
+    last_tick, suspended = {}, {}
+    for chunk in done.stdout.split(COMMIT_SEP)[1:]:
+        header, _, body = chunk.partition("\n")
+        when = header.partition("\x00")[2].strip()
+        counts = {}
+        module = None
+        for line in body.splitlines():
+            match = DIFF_FILE.match(line)
+            if match:
+                module = match.group(1)
+                counts.setdefault(module, [0, 0, False, False])
+                continue
+            if module is None or line.startswith(("+++", "---")) or not line[:1] in ("+", "-"):
+                continue
+            entry = counts[module]
+            added = line[0] == "+"
+            text = line[1:]
+            if CHECKED_LINE.match(text):
+                entry[0 if added else 1] += 1
+            if text.strip() == SUSPEND_MARKER:
+                entry[2 if added else 3] = True
+        for module, (plus, minus, marker_added, marker_removed) in counts.items():
+            if module not in last_tick and plus > minus:
+                last_tick[module] = when
+            if module not in suspended and (marker_added or marker_removed):
+                suspended[module] = when if marker_added else None
+    state = "shallow" if _git(root, "rev-parse", "--is-shallow-repository") == "true" else "complete"
+    return state, last_tick, suspended
 
 
 def _version() -> str | None:
@@ -172,6 +223,13 @@ def build(root: Path) -> dict:
             "review": _review(root, module),
         })
 
+    state, last_tick, suspended_write = history(root)
+    if state == "unavailable" and _git(root, "rev-parse", "--verify", "--quiet", "HEAD"):
+        print("map-view: 读不出 git 历史，不给勾选与挂起时间。", file=sys.stderr)
+    for m in modules:
+        m["lastTickAt"] = last_tick.get(m["id"])
+        m["suspendedAt"] = suspended_write.get(m["id"]) if m["status"] == "suspended" else None
+
     suspended = [m for m in modules if m["status"] == "suspended"]
     suspended.sort(key=lambda m: (-m["blocks"]["count"], m["position"]))
     awaiting = [{"id": m["id"], "kind": kind, "review": m["review"][kind]}
@@ -191,10 +249,42 @@ def build(root: Path) -> dict:
                         for m in suspended],
         "awaitingReview": awaiting,
         "modules": modules,
+        "history": state,
     }
 
 
-def _status_cell(m: dict) -> str:
+def _now() -> datetime:
+    fixed = os.environ.get("SPEC_GUARD_MAP_NOW")
+    if fixed:
+        try:
+            return datetime.fromisoformat(fixed)
+        except ValueError:
+            pass
+    return datetime.now().astimezone()
+
+
+def _elapsed(stamp: str | None, now: datetime) -> str | None:
+    """`不到 1 小时`, `N 小时` or `N 天` since a commit time; None when there is no time."""
+    if not stamp:
+        return None
+    try:
+        delta = now - datetime.fromisoformat(stamp)
+    except (TypeError, ValueError):
+        return None
+    if delta < timedelta(hours=1):
+        return "不到 1 小时"
+    if delta < timedelta(days=1):
+        return "%d 小时" % (delta.total_seconds() // 3600)
+    return "%d 天" % delta.days
+
+
+def _suspended_label(m: dict, now: datetime) -> str:
+    reason = clean(m["suspendedReason"] or "") or "未记原因"
+    since = _elapsed(m.get("suspendedAt"), now)
+    return reason + ("，已挂 " + since if since else "")
+
+
+def _status_cell(m: dict, now: datetime) -> str:
     value = m["status"]
     if value == "done":
         return "✅ 已完成"
@@ -203,11 +293,12 @@ def _status_cell(m: dict) -> str:
             return "🔨 写 Spec"
         if m["step"] == "plan":
             return "🔨 写 Plan"
-        return "🔨 进行中 %d/%d" % (m["progress"]["done"], m["progress"]["total"])
+        since = _elapsed(m.get("lastTickAt"), now)
+        return "🔨 进行中 %d/%d%s" % (m["progress"]["done"], m["progress"]["total"],
+                                    "，上次勾选 %s前" % since if since else "")
     if value == "suspended":
-        reason = clean(m["suspendedReason"] or "") or "未记原因"
         tail = "，挡住 %d 个" % m["blocks"]["count"] if m["blocks"]["count"] else ""
-        return "⏸ 挂起（%s）%s" % (reason, tail)
+        return "⏸ 挂起（%s）%s" % (_suspended_label(m, now), tail)
     if value == "blocked":
         return "⛔ 阻塞：等 " + "、".join(m["blockedOn"])
     if value == "ready":
@@ -242,10 +333,11 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     lines = ["%s · %d 个模块 · %s · %s" % (title, len(modules),
                                          " ".join("%s %d" % (ICONS[k], totals[k]) for k in STATUSES), stamp)]
     by_id = {m["id"]: m for m in modules}
+    now = _now()
     if data["bottlenecks"]:
         parts = []
         for item in data["bottlenecks"]:
-            reason = clean(item["suspendedReason"] or "") or "未记原因"
+            reason = _suspended_label(by_id[item["id"]], now)
             tail = "→ 挡住 %d 个：%s" % (len(item["blocks"]), "、".join(item["blocks"])) if item["blocks"] else "→ 没有挡住其他模块"
             parts.append("%s 挂起（%s）%s" % (item["id"], reason, tail))
         lines.append("关键卡点：" + "；".join(parts))
@@ -260,7 +352,9 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     merged = ("%d 个提交（相对 %s）" % (head["unmerged"]["count"], head["unmerged"]["base"])
               if head["unmerged"] else "判断不了")
     pushed = "%d 个提交" % head["unpushed"]["count"] if head["unpushed"] else "判断不了"
-    lines.append("未合入主线：%s；未推送：%s" % (merged, pushed))
+    notes = {"shallow": "（浅克隆：较早的勾选可能看不到）",
+             "unavailable": "（没有 git 历史：不显示勾选与挂起时间）"}
+    lines.append("未合入主线：%s；未推送：%s%s" % (merged, pushed, notes.get(data["history"], "")))
     lines += ["", "| 位 | 模块 | 作用 | 状态 | 审查 |", "|---|---|---|---|---|"]
 
     done = [m for m in modules if m["status"] == "done"]
@@ -291,7 +385,7 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
         else:
             lines.append("| %d | %s | %s | %s | %s |" % (item["position"], item["id"],
                                                          _responsibility(item["responsibility"]),
-                                                         _status_cell(by_id[item["id"]]), _review_cell(root, item)))
+                                                         _status_cell(by_id[item["id"]], now), _review_cell(root, item)))
     return "\n".join(lines) + "\n"
 
 

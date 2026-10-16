@@ -16,9 +16,9 @@ PENDING = "<!-- spec-guard: review pending -->"
 APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
-            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules"}
+            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
-               "suspendedReason", "blockedOn", "missingDeps", "blocks", "review"}
+               "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -186,6 +186,9 @@ class StatusTest(unittest.TestCase):
 
     def test_not_a_git_repository(self):
         self.assertEqual(self.data["head"], {"sha": None, "branch": None, "unmerged": None, "unpushed": None})
+        self.assertEqual(self.data["history"], "unavailable")
+        self.assertTrue(all(m["lastTickAt"] is None and m["suspendedAt"] is None for m in self.data["modules"]))
+        self.assertIn("（没有 git 历史：不显示勾选与挂起时间）", self.project.run().stdout)
 
     def test_table_header_and_rows(self):
         out = self.project.run().stdout
@@ -362,6 +365,119 @@ class GitTest(unittest.TestCase):
             self.assertIsNone(head["unpushed"])
             self.assertIsNone(head["unmerged"])
 
+
+
+class HistoryTest(unittest.TestCase):
+    """lastTickAt / suspendedAt / history from committed git history only."""
+    ROWS = [("alpha", "甲", "—"), ("beta", "乙", "alpha")]
+
+    def make(self):
+        files = {"spec/alpha.md": "# alpha\n", "spec/beta.md": "# beta\n",
+                 "tasks/alpha/plan.md": "# Plan\n", "tasks/beta/plan.md": "# Plan\n",
+                 "tasks/alpha/todo.md": "- [ ] a\n- [ ] b\n", "tasks/beta/todo.md": "- [ ] x\n- [ ] y\n"}
+        return Project(self.ROWS, ["alpha", "beta"], files)
+
+    @staticmethod
+    def commit(project, when, message="改"):
+        env = dict(os.environ, GIT_COMMITTER_DATE=when, GIT_AUTHOR_DATE=when)
+        subprocess.run(GIT + ["add", "-A"], cwd=project.root, check=True, capture_output=True, timeout=30)
+        subprocess.run(GIT + ["commit", "-q", "-m", message], cwd=project.root, check=True, capture_output=True,
+                       timeout=30, env=env)
+
+    @staticmethod
+    def write(project, module, text):
+        (project.root / "tasks" / module / "todo.md").write_text(text, encoding="utf-8")
+
+    def history(self, project):
+        project.git("init")
+        self.commit(project, "2026-10-01T10:00:00+08:00")
+        self.write(project, "alpha", "* [X] a\n- [ ] b\n")
+        self.commit(project, "2026-10-02T10:00:00+08:00")
+        self.write(project, "alpha", "* [X] a\n- [ ] b2\n")
+        self.commit(project, "2026-10-03T10:00:00+08:00")
+        self.write(project, "alpha", "* [ ] a\n- [ ] b2\n")
+        self.write(project, "beta", "- [x] x\n- [ ] y\n")
+        self.commit(project, "2026-10-04T10:00:00+08:00")
+        self.write(project, "alpha", "* [X] a\n- [ ] b2\n%s\n%s等上游 -->\n" % (SUSPEND_MARKER, REASON_PREFIX))
+        self.commit(project, "2026-10-05T10:00:00+08:00")
+
+    def test_ticks_and_suspension_times(self):
+        with self.make() as project:
+            self.history(project)
+            data = project.json()
+            by_id = {m["id"]: m for m in data["modules"]}
+            self.assertEqual(data["history"], "complete")
+            # the re-tick in the suspending commit counts; the text edit and the untick did not move it
+            self.assertEqual(by_id["alpha"]["lastTickAt"], "2026-10-05T10:00:00+08:00")
+            self.assertEqual(by_id["alpha"]["suspendedAt"], "2026-10-05T10:00:00+08:00")
+            self.assertEqual(by_id["beta"]["lastTickAt"], "2026-10-04T10:00:00+08:00")
+            self.assertIsNone(by_id["beta"]["suspendedAt"])
+
+    def test_text_edit_and_untick_do_not_count(self):
+        with self.make() as project:
+            project.git("init")
+            self.commit(project, "2026-10-01T10:00:00+08:00")
+            self.write(project, "alpha", "- [x] a\n- [ ] b\n")
+            self.commit(project, "2026-10-02T10:00:00+08:00")
+            self.write(project, "alpha", "- [x] a\n- [ ] b2\n")
+            self.commit(project, "2026-10-03T10:00:00+08:00")
+            self.write(project, "alpha", "- [ ] a\n- [ ] b2\n")
+            self.commit(project, "2026-10-04T10:00:00+08:00")
+            by_id = {m["id"]: m for m in project.json()["modules"]}
+            self.assertEqual(by_id["alpha"]["lastTickAt"], "2026-10-02T10:00:00+08:00")
+            self.assertIsNone(by_id["beta"]["lastTickAt"])
+
+    def test_uncommitted_ticks_and_markers_are_invisible(self):
+        with self.make() as project:
+            self.history(project)
+            self.write(project, "alpha", "* [X] a\n- [ ] b2\n")
+            self.commit(project, "2026-10-06T10:00:00+08:00")
+            self.write(project, "alpha", "* [X] a\n- [x] b2\n- [ ] c\n%s\n" % SUSPEND_MARKER)
+            by_id = {m["id"]: m for m in project.json()["modules"]}
+            self.assertEqual(by_id["alpha"]["status"], "suspended")
+            self.assertIsNone(by_id["alpha"]["suspendedAt"])
+            self.assertEqual(by_id["alpha"]["lastTickAt"], "2026-10-05T10:00:00+08:00")
+
+    def test_suspended_at_is_the_latest_write_not_the_first(self):
+        with self.make() as project:
+            self.history(project)
+            self.write(project, "alpha", "* [X] a\n- [ ] b2\n")
+            self.commit(project, "2026-10-06T10:00:00+08:00")
+            self.write(project, "alpha", "* [X] a\n- [ ] b2\n%s\n" % SUSPEND_MARKER)
+            self.commit(project, "2026-10-07T10:00:00+08:00")
+            by_id = {m["id"]: m for m in project.json()["modules"]}
+            self.assertEqual(by_id["alpha"]["suspendedAt"], "2026-10-07T10:00:00+08:00")
+
+    def test_table_shows_elapsed_time(self):
+        with self.make() as project:
+            self.history(project)
+            out = project.run(env={"SPEC_GUARD_MAP_NOW": "2026-10-07T12:00:00+08:00"}).stdout
+            self.assertIn("⏸ 挂起（等上游，已挂 2 天），挡住 1 个", out)
+            self.assertIn("关键卡点：alpha 挂起（等上游，已挂 2 天）→ 挡住 1 个：beta", out)
+            self.assertIn("🔨 进行中 1/2，上次勾选 3 天前", out)
+            out = project.run(env={"SPEC_GUARD_MAP_NOW": "2026-10-04T15:30:00+08:00"}).stdout
+            self.assertIn("上次勾选 5 小时前", out)
+            out = project.run(env={"SPEC_GUARD_MAP_NOW": "2026-10-04T10:30:00+08:00"}).stdout
+            self.assertIn("上次勾选 不到 1 小时前", out)
+            self.assertNotIn("git 历史", out)
+
+    def test_repository_without_commits_is_unavailable(self):
+        with self.make() as project:
+            project.git("init")
+            self.assertEqual(project.json()["history"], "unavailable")
+
+    def test_shallow_clone(self):
+        with self.make() as project:
+            self.history(project)
+            clone = Path(project.tmp.name) / "clone"
+            subprocess.run(GIT + ["clone", "-q", "--depth", "1", "file://" + str(project.root), str(clone)],
+                           check=True, capture_output=True, timeout=60)
+            done = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(clone), "--json"],
+                                  capture_output=True, text=True, timeout=30)
+            self.assertEqual(json.loads(done.stdout)["history"], "shallow")
+            table = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(clone)],
+                                   capture_output=True, text=True, timeout=30).stdout
+            self.assertIn("（浅克隆：较早的勾选可能看不到）", table)
 
 if __name__ == "__main__":
     unittest.main()
