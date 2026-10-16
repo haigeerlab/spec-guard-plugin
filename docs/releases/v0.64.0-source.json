@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.64.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:f211d60341748b10c36ec484df830f17c7fbb25d"
+      },
+      "observedAt": "2026-10-16T15:27:24Z",
+      "evidence": [
+        "result:the v0.64.0 annotated tag and origin/main both resolve to merge commit f211d60341748b10c36ec484df830f17c7fbb25d (pull request #332; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (38923450813) passed before tagging",
+        "result:0.64.0 is one module, ledger-local-only: initialization gains --local-only, which disables origin's push URL for the one Epiq child process (GIT_CONFIG_* appended after existing entries) and is mutually exclusive with --allow-epiq-push; status reports project.pendingEvents (non-empty lines of untracked ~pending event files) with an offline-archive reminder, and project.identityElsewhere when the current checkout lacks .epiq/project.json but another local or remote-tracking branch has it; successful initialization tells the user to merge the identity into the default branch",
+        "result:each commit was made by verify-and-commit.sh under macOS /bin/bash 3.2.57; test_local_ledger_runtime.py 72 -> 89 cases, each task red before and green after; removing the appended environment, forcing the pending count to zero, or dropping the cross-branch query each turn assertions red"
+      ]
+    }
+  ]
+}
