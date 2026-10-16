@@ -272,6 +272,15 @@ class FoldTest(unittest.TestCase):
             self.assertIsNone(project.json()["modules"][2]["suspendedReason"])
             self.assertIn("⏸ 挂起（未记原因），挡住 1 个", project.run().stdout)
 
+    def test_reason_written_by_module_suspend_round_trips(self):
+        with self.make() as project:
+            (project.root / "tasks" / "p3" / "todo.md").write_text("- [x] one\n- [ ] two\n", encoding="utf-8")
+            tool = Path(__file__).with_name("module_suspend.py")
+            subprocess.run([sys.executable, "-B", str(tool), "--project", str(project.root), "--suspend", "p3",
+                            "--reason", "等上游修复", "--confirm"], check=True, capture_output=True, timeout=30)
+            self.assertEqual(project.json()["bottlenecks"], [{"id": "p3", "suspendedReason": "等上游修复",
+                                                              "blocks": ["q"]}])
+
     def test_reason_line_without_marker_is_ignored(self):
         with self.make() as project:
             todo = project.root / "tasks" / "p3" / "todo.md"

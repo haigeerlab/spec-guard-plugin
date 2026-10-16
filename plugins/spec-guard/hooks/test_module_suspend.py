@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from module_stage import SUSPEND_MARKER
+from module_stage import SUSPEND_MARKER, module_state
 
 SCRIPT = str(Path(__file__).with_name("module_suspend.py"))
 MAP = ("# Capability Map\n| Module id | Responsibility | Depends on |\n|---|---|---|\n"
@@ -125,6 +125,73 @@ class Resume(unittest.TestCase):
             self.assertIn("beta is half done", out)
             self.assertIn("alpha will show as paused", out)
 
+
+
+REASON = "<!-- spec-guard: suspended-reason: %s -->"
+
+
+class SuspendReason(unittest.TestCase):
+    def test_reason_goes_on_the_line_after_the_marker(self):
+        with Project() as project:
+            code, out = project.run("--suspend", "alpha", "--reason", "  上游漏洞  ", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.todo("alpha").splitlines()[-2:], [SUSPEND_MARKER, REASON % "上游漏洞"])
+            self.assertTrue(module_state(project.root, "alpha")["suspended"])
+
+    def test_reason_on_a_suspended_module_replaces_only_the_reason(self):
+        with Project() as project:
+            project.run("--suspend", "alpha", "--reason", "旧", "--confirm")
+            code, out = project.run("--suspend", "alpha", "--reason", "新")
+            self.assertEqual(code, 0, out)
+            self.assertIn("-" + REASON % "旧", out)
+            self.assertIn("+" + REASON % "新", out)
+            self.assertIn(REASON % "旧", project.todo("alpha"))
+            self.assertEqual(project.run("--suspend", "alpha", "--reason", "新", "--confirm")[0], 0)
+            lines = project.todo("alpha").splitlines()
+            self.assertEqual(lines[-2:], [SUSPEND_MARKER, REASON % "新"])
+            self.assertEqual(sum(1 for line in lines if "suspended-reason" in line), 1)
+
+    def test_reason_added_to_a_suspended_module_without_one(self):
+        with Project() as project:
+            project.run("--suspend", "alpha", "--confirm")
+            self.assertEqual(project.run("--suspend", "alpha", "--reason", "等发版", "--confirm")[0], 0)
+            self.assertEqual(project.todo("alpha").splitlines()[-2:], [SUSPEND_MARKER, REASON % "等发版"])
+
+    def test_suspended_again_without_reason_is_still_refused(self):
+        with Project() as project:
+            project.run("--suspend", "alpha", "--reason", "x", "--confirm")
+            code, out = project.run("--suspend", "alpha", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertIn("already-suspended", out)
+
+    def test_resume_removes_marker_and_reason(self):
+        with Project() as project:
+            project.run("--suspend", "alpha", "--reason", "上游漏洞", "--confirm")
+            self.assertEqual(project.run("--resume", "alpha", "--confirm")[0], 0)
+            self.assertEqual(project.todo("alpha"), "- [x] built\n- [ ] review later\n")
+
+    def test_bad_reasons_are_refused_and_write_nothing(self):
+        for reason in ("", "   ", "a\nb", "x --> y", "长" * 121):
+            with Project() as project:
+                before = project.todo("alpha")
+                code, out = project.run("--suspend", "alpha", "--reason", reason, "--confirm")
+                self.assertEqual(code, 2, repr(reason))
+                self.assertIn("bad-reason", out)
+                self.assertEqual(project.todo("alpha"), before)
+        with Project() as project:
+            self.assertEqual(project.run("--suspend", "alpha", "--reason", "长" * 120, "--confirm")[0], 0)
+
+    def test_reason_with_resume_is_a_usage_error(self):
+        with Project() as project:
+            project.run("--suspend", "alpha", "--confirm")
+            before = project.todo("alpha")
+            code, out = project.run("--resume", "alpha", "--reason", "x", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertEqual(project.todo("alpha"), before)
+
+    def test_stage_still_reads_the_old_marker_only(self):
+        with Project(alpha="- [x] built\n- [ ] review later\n" + REASON % "孤立" + "\n") as project:
+            self.assertFalse(module_state(project.root, "alpha")["suspended"])
 
 if __name__ == "__main__":
     unittest.main()
