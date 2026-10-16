@@ -140,6 +140,26 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
+## Data and privacy
+
+- **What it reads**: at the start of every turn the hook reads only this project's capability map, module Specs,
+  plans, todos, the settings under `.agent/` and local git refs (it never fetches). From the session transcript the
+  host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
+  the conversation.
+- **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
+  `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
+  goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).
+- **When it goes online**: only when you explicitly use one of these. Proposal commands, `ticket` with GitHub/GitLab,
+  and archiving, restoring or handing over local tickets reach GitHub／GitLab through your local `gh`／`glab` and
+  `git ls-remote`／`git fetch`, using the logins those tools already have; enabling the local ticket ledger installs
+  its runtime with `npm ci` from the lock files shipped in the package. The hook and every other command, such as
+  `map`, `phase`, `verify-artifacts`, `review-mark` and `cost-report`, stay offline.
+- **Usage statistics and uploads**: `cost-report` reads the local Claude Code (`~/.claude/projects/`) and Codex
+  (`~/.codex/sessions/`) session transcripts offline, counts only tokens and turns, and prints the result to the
+  terminal. The plugin has no telemetry and reports nothing anywhere.
+
+Details: [design and architecture](docs/design.md) (Chinese).
+
 ## Troubleshooting
 
 | Symptom | Check first |
