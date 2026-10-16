@@ -80,3 +80,18 @@
 - 真实 Epiq、真实宿主会话读取模式、Windows 与 Linux 上的 `/bin/bash` 行为未运行。
 - 审查外观察（不计入本报告问题）：delegate 插件的 `/delegate:doctor` 在派活实际失败的 `PATH` 下仍报告通过，属于
   delegate 插件仓库。
+
+## 收口状态
+
+2026-10-16 追加，依据 CHANGELOG 与已合并的 PR；上文的发现与证据不改。20 条全部已收口。
+
+| 发现 | 收口 | 模块与 PR |
+|---|---|---|
+| F1、F2 | 0.52.1 | `remote-credential-redaction`，#241 |
+| F3 | 0.52.2 | `hosted-ticket-untrusted-text`，#243 |
+| F4、F11 | 0.52.3 | `map-read-failure`，#245 |
+| F7、F8、F9、F10、F13、F19 | 0.53.0 | `checker-hardening`，#247 |
+| F5 | 0.53.0 | `codex-skill-root`，#248 |
+| F6、F14 | 0.53.0 | `collaboration-map-retirement`，#249 |
+| F12、F15、F16、F17、F18 | 0.53.0 | `audit-small-cleanups`，#250 |
+| F20 | 0.54.0（命令已移除；0.53.0 起预告） | `collaboration-command-retirement`，#258 |
