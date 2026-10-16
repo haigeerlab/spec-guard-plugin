@@ -243,6 +243,16 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("结束本轮的确认框", "确认框摘要", "本轮的对话正文"):
             self.assertIn(phrase, section)
 
+    def test_the_review_rules_live_in_the_convention_block(self):
+        # rules-in-context: agents rarely reread the rules file, so the block carries the rule text itself.
+        paths = list((self.plugin / "templates").glob("*-block-local.md"))
+        paths.append(self.plugin.parents[1] / "docs" / "convention-block.md")
+        for path in paths:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("确认框之前", "附上 Spec 的改动差异", "直接写它的 Spec"):
+                    self.assertIn(phrase, text)
+
     def test_an_external_blocker_goes_back_to_the_user(self):
         section = self.section("## Plan 检查点分级")
         for phrase in ("同一个 gate 因外部原因", "再次挡住", "挂起", "接受风险", "换方案", "代价", "不按默认推荐继续重试"):
