@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:2d5d59960296a35254f9a8899e3a0b3e963006a7"
+      },
+      "observedAt": "2026-10-16T08:21:42Z",
+      "evidence": [
+        "result:the v0.63.1 annotated tag and origin/main both resolve to merge commit 2d5d59960296a35254f9a8899e3a0b3e963006a7 (pull request #321; merged==true and main==merge sha were checked as a separate step; the push run on main passed before tagging)",
+        "result:the merge commit's tree equals the pull request head c0c7abc's tree; 0.63.1 is one module, change-source-record: the shared checkpoint rules gained a section on recording the source of changes to approved artifacts (a change-log line at the end of the edited file, written before re-review, no approval status), replying to the source once the work is usable (listed at the final gate, sent through an available channel or forwarded by the user, result in the last todo item) and checking incoming replies; each convention-block template gained two lines and no existing line changed; hooks, commands and checks are unchanged",
+        "command:/bin/bash scripts/verify-and-commit.sh -- -m \"<module commits>\"",
+        "result:the commits were made by verify-and-commit.sh after validate, phase-guard (308 cases), verify-artifacts (61 cases) and ShellCheck passed under macOS /bin/bash 3.2.57; setup-convention --replace from a 0.63.0 install exited 0 on both hosts without --accept-removals"
+      ]
+    }
+  ]
+}

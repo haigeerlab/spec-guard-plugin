@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.63.1;test:installed-plugin-upgrade-20261016"
+      },
+      "observedAt": "2026-10-16T08:21:42Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.63.0 to 0.63.1 for scope user; the installed copy records gitCommitSha 2d5d59960296a35254f9a8899e3a0b3e963006a7 -- the v0.63.1 tag commit",
+        "host:Claude Code 2.1.299"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.63.1-claude-copy",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code-host:v0.63.1;test:change-source-reply-20261016"
+      },
+      "observedAt": "2026-10-16T08:21:42Z",
+      "evidence": [
+        "command:python3 -B <installed>/hooks/test_workflow_checkpoints.py; /bin/bash <installed>/hooks/test-verify-artifacts.sh",
+        "result:verify-artifacts is green (61 cases); test_workflow_checkpoints has 5 errors in the Claude cache: the 4 known ones plus the new case, all because they read repository files (docs/...) that the cache does not carry; the same cases pass from the Codex copy, which carries the repository",
+        "command:claude -p with --resume for three turns (--permission-mode acceptEdits), in a temporary project set up the same way, with the same first prompt",
+        "result:turn 1 changed nothing, said another session's request is not the user's approval, proposed the edits with a change-log line naming the requesting session and its id, and a reply to that session once the change lands; turn 2 wrote change-log lines to the capability map, Spec and Plan, set both review markers back to pending and added a reply item at the end of todo.md; turn 3 built to the final gate and listed the proposed reply with its object, channel (the local relay mailbox) and content, to be sent after acceptance; the check stopped there without approving, so no message was sent",
+        "result:deviations from the rule text: the change-log lines used '｜' separators instead of 'reason/source' labels and ended with 'approved by the user (option A)', recorded before re-review so the Spec digest was not affected"
+      ]
+    }
+  ]
+}

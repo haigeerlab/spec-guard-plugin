@@ -6,4 +6,4 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — 随 Task 2 的提交跑 `verify-and-commit.sh` 全档（暂存了 `.sh`，含 ShellCheck）。
 - [x] Task 3：文档、CHANGELOG 与版本号 — `docs/workflow.md` 两段（需求在开发中途被别人改了时、做完后回告提需求的人）；CHANGELOG `[0.63.1] - 2026-10-16`；两份 `plugin.json` 改为 0.63.1，中英 README 的 `--ref` 改为 v0.63.1；`validate.sh` 通过。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-16 在对话里列出实际改动的 17 个文件（无删除、无超出 Plan 的文件）、验证结果与未验证项，拟回告为“无”（本模块由用户本人提出）；用户验收通过并确认推送与开 PR。验证链（`verify-and-commit.sh` 全档，macOS `/bin/bash`）：`validate.sh` 通过、phase-guard 308 例、verify-artifacts 61 例、`test_workflow_checkpoints.py` 23 例、ShellCheck 无告警、本仓库 5 通过 0 警告；`setup-convention --replace` 两边宿主退出码 0。未验证：真实会话里 agent 是否照做、安装副本上的效果（发版后看）；未做独立代码评审。
-- [ ] 发版后的验证：两边宿主各一次真实会话，观察转来的变更要求是否被记录并交复审、最终 gate 是否列出拟回告
+- [x] 发版后的验证（2026-10-16，v0.63.1） — 两边宿主升级到 0.63.1，Codex smoke 退出码 0。真实会话各三轮，提示词转来另一个会话的改名要求、不提记录与回告：两边都在能力图、Spec、Plan 写了带会话名与 ID 的变更记录，说明别人的要求不算用户批准并停下复审，最终 gate 列出拟回告（Claude 写明渠道，Codex 没写渠道）；Claude 的记录行用了“｜”分隔并带“用户批准（方案 A）”，与规则字面有出入。拟回告：无（本模块由用户本人提出）。记录见 `docs/releases/v0.63.1-*.json`。
