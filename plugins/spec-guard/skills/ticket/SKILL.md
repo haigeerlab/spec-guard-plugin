@@ -14,7 +14,9 @@ description: 在已启用的本地事项账本中受理开发需求或修复问�
 不调用 Epiq 写工具，不移动或清理状态 worktree。状态检查只是使用前检查；
 它不替代 Epiq 调用时的归属和并发保护。
 
-优先使用当前会话已连接的 `spec_guard_local_ledger` MCP 中的 `epiq_*` 工具，操作当前仓库。已知事项
+优先使用当前会话已连接的 `spec_guard_local_ledger` MCP 中的 `epiq_*` 工具，操作当前仓库。每次调用都传
+`repoRoot` 为当前项目根目录（`git rev-parse --show-toplevel`）：Epiq 不传时取 MCP 进程自己的当前目录，
+Claude 的用户级 MCP 进程不在会话目录里启动，会报 “No .epiq/project.json found”，这不代表账本未启用。已知事项
 短编号时直接 `epiq_issue_get`；查找或列出时用 `epiq_issue_list`，先用 `brief` 缩小范围。
 面向用户提到具体事项时，以工具读到的标题为主、短编号仅作定位：首次写成
 `《标题》（短编号）`，并说明状态或操作结果；不要只显示短编号，也不要展示完整内部 ID。
@@ -37,7 +39,8 @@ description: 在已启用的本地事项账本中受理开发需求或修复问�
 读回实际事项后才把报告中的状态从“待入账”改为“事项已入账”；Local 不可用或结果未知时保持待入账。
 若仓库代码通过 GitHub PR 交付，日常事项目标仍以已选用的 Local 账本为准，不因 Git remote 改成 GitHub Issue。
 
-创建时用 `epiq_swimlane_list` 找现有开放泳道，并把它的 ID 传给 `epiq_issue_create` 的 `parentId`；
+创建时用 `epiq_swimlane_list` 找现有开放泳道，并把它的 ID 传给 `epiq_issue_create` 的 `parentId`；Closed
+看板下的泳道是只读的，不能作为 `parentId`（会报 “Swimlane is readonly”）；
 用户没有指定阶段时，优先使用现有
 `Todo`／`To do`／`Backlog` 泳道。没有明显的收件泳道且多个选项都合理时，才问一次。不要因为一次
 事项请求自动创建看板、泳道、标签、负责人或永久 Agent 身份。

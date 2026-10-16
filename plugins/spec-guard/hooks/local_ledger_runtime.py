@@ -257,6 +257,42 @@ def state_worktree_status(project_dir: Path, project_id: str) -> dict[str, str]:
     return {"state": "foreign", "path": path, "owner": owner}
 
 
+def identity_elsewhere(project_dir: Path) -> str | None:
+    """First local or remote-tracking branch, other than the state branch, that commits the project identity."""
+    refs = _git(project_dir, "for-each-ref", "--format=%(refname)%09%(refname:short)",
+                "refs/heads", "refs/remotes")
+    if refs is None or refs.returncode != 0:
+        return None
+    for line in refs.stdout.splitlines():
+        full, _, short = line.partition("\t")
+        if not short or full.endswith("/HEAD") or full.rsplit("/", 1)[-1] == STATE_BRANCH:
+            continue
+        found = _git(project_dir, "cat-file", "-e", full + ":" + PROJECT_RELATIVE_PATH.as_posix())
+        if found is not None and found.returncode == 0:
+            return short
+    return None
+
+
+def pending_event_count(worktree_path: str) -> int | None:
+    """Count non-empty lines in the state worktree's ~pending event files; None when they cannot be read."""
+    events = os.path.join(worktree_path, ".epiq", "events")
+    try:
+        if not os.path.lexists(events):
+            return 0
+        names = os.listdir(events)
+        count = 0
+        for name in names:
+            path = os.path.join(events, name)
+            if "~pending" not in name or not name.endswith(".jsonl") or not os.path.isfile(path) \
+                    or os.path.islink(path):
+                continue
+            with open(path, "rb") as handle:
+                count += sum(1 for line in handle if line.strip())
+        return count
+    except OSError:
+        return None
+
+
 # remote-credential-redaction: a scheme URL's userinfo (user:token@ or token@) never leaves this module.
 _URL_USERINFO = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@")
 
@@ -268,9 +304,12 @@ def redact_url(url):
 
 
 def initialization_preflight(
-    project_dir: Path, allow_epiq_push: bool = False,
+    project_dir: Path, allow_epiq_push: bool = False, local_only: bool = False,
 ) -> tuple[int, dict[str, Any]]:
     """Read Git facts that must be safe before explicit Epiq initialization."""
+    if allow_epiq_push and local_only:
+        return 1, {"state": "invalid",
+                   "diagnostic": "--local-only and --allow-epiq-push are mutually exclusive"}
     project_dir = Path(project_dir)
     top_level = _git(project_dir, "rev-parse", "--show-toplevel")
     if top_level is None or top_level.returncode != 0:
@@ -287,6 +326,14 @@ def initialization_preflight(
     if origin.returncode == 0:
         origin_url, redacted = redact_url(origin.stdout.strip())
         marker = {"originCredentialsRedacted": True} if redacted else {}
+        if local_only:
+            return 0, {
+                "state": "ready",
+                "projectDir": str(repository),
+                "origin": origin_url,
+                **marker,
+                "upstreamPush": "disabled-local-only",
+            }
         if not allow_epiq_push:
             return 1, {
                 "state": "push-confirmation-required",
@@ -294,6 +341,7 @@ def initialization_preflight(
                 "origin": origin_url,
                 **marker,
                 "upstreamPush": "requires-explicit-confirmation",
+                "localOnly": "available",
             }
         return 0, {
             "state": "ready",
@@ -511,12 +559,30 @@ def mcp_tool_call(
             process.wait(timeout=2)
 
 
+# ledger-local-only: Epiq's init runs `git push -u origin HEAD` and reports a failed push as a warning, so pointing
+# origin's push URL at a path that cannot exist keeps the push on this machine. Only the Epiq child process sees it.
+LOCAL_ONLY_PUSH_URL = "/nonexistent/spec-guard-local-only"
+
+
+def local_only_environment(base: dict[str, str]) -> dict[str, str]:
+    """Copy of base with origin's push URL disabled, appended after any GIT_CONFIG_* entries already set."""
+    environment = dict(base)
+    try:
+        count = int(environment.get("GIT_CONFIG_COUNT") or 0)
+    except ValueError:
+        count = 0
+    environment["GIT_CONFIG_KEY_%d" % count] = "remote.origin.pushurl"
+    environment["GIT_CONFIG_VALUE_%d" % count] = LOCAL_ONLY_PUSH_URL
+    environment["GIT_CONFIG_COUNT"] = str(count + 1)
+    return environment
+
+
 def initialize_project(
     runtime_dir: Path, project_dir: Path, user_name: str, preferred_editor: str, auto_sync: bool,
-    allow_epiq_push: bool = False,
+    allow_epiq_push: bool = False, local_only: bool = False,
 ) -> dict[str, Any]:
     """Explicitly initialize Epiq only after clean-tree and push-consent preflight."""
-    code, preflight = initialization_preflight(project_dir, allow_epiq_push)
+    code, preflight = initialization_preflight(project_dir, allow_epiq_push, local_only=local_only)
     if code != 0:
         raise RuntimeContractError("initialization preflight: " + preflight["state"])
     node = node_status()
@@ -527,6 +593,7 @@ def initialize_project(
         [node["path"], str(Path(runtime_dir) / MCP_RELATIVE_PATH)],
         "epiq_project_init",
         project_init_arguments(Path(preflight["projectDir"]), user_name, preferred_editor, auto_sync),
+        environment=local_only_environment(dict(os.environ)) if local_only else None,
     )
     value = result.get("value")
     if not isinstance(value, dict) or not isinstance(value.get("projectId"), str):
@@ -629,6 +696,9 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
         payload["state"] = "invalid"
         return 1, payload
     if project["state"] == "uninitialized":
+        elsewhere = identity_elsewhere(Path(project_dir))
+        if elsewhere:
+            project["identityElsewhere"] = elsewhere
         payload["state"] = "ready"
         return 0, payload
     worktree = state_worktree_status(project_dir, project["projectId"])
@@ -637,6 +707,8 @@ def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
         payload["state"] = "conflict"
         payload["diagnostic"] = "ledger-state-worktree-foreign"
         return 1, payload
+    if worktree["state"] == "owned":
+        project["pendingEvents"] = pending_event_count(worktree["path"])
     payload["state"] = "initialized"
     return 0, payload
 
@@ -649,6 +721,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--runtime-dir", type=Path, default=default_runtime_dir())
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
     parser.add_argument("--allow-epiq-push", action="store_true")
+    parser.add_argument("--local-only", action="store_true")
     parser.add_argument("--confirm-install", action="store_true")
     parser.add_argument("--confirm-protect", action="store_true")
     parser.add_argument("--replace-unlocked", action="store_true")
@@ -670,7 +743,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         global_dir = os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global")
         code, payload = storage_protect(Path(global_dir), confirm=args.confirm_protect)
     elif args.command == "preflight":
-        code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push)
+        code, payload = initialization_preflight(args.project_dir, args.allow_epiq_push,
+                                                 local_only=args.local_only)
     elif args.command == "install" and not args.confirm_install:
         code, payload = 1, {
             "state": "install-confirmation-required",
@@ -698,7 +772,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             payload = initialize_project(
                 args.runtime_dir, args.project_dir, args.user_name, args.preferred_editor,
-                args.auto_sync == "true", args.allow_epiq_push,
+                args.auto_sync == "true", args.allow_epiq_push, local_only=args.local_only,
             )
         except RuntimeContractError as error:
             code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
@@ -710,6 +784,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本固定运行时：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     elif args.command == "preflight":
         print("本地事项账本初始化预检：" + payload["state"])
+        if payload.get("localOnly") == "available":
+            print("仓库有 origin：只在本地使用加 --local-only（不推送）；确实要让 Epiq 推送到 origin 才加 --allow-epiq-push。")
     elif args.command == "storage-check":
         print("Epiq 数据目录 POSIX 权限：" + payload["state"] + "（" + payload["path"] + "）")
     elif args.command == "storage-protect":
@@ -718,8 +794,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本运行时已安装：%s@%s" % (PACKAGE_NAME, PACKAGE_VERSION))
     elif args.command == "initialize" and payload["state"] == "initialized":
         print("本地事项账本项目已初始化：" + payload["projectId"])
+        if payload.get("upstreamPush") == "disabled-local-only":
+            print("按 --local-only 未推送：账本只在本机。")
+        print("请把含 .epiq/project.json 的这次提交合进默认分支，其他工作树和从默认分支开的会话才能找到这个账本。")
     else:
         print("本地事项账本状态：" + payload["state"])
+        if payload.get("project", {}).get("identityElsewhere"):
+            print("当前检出没有 .epiq/project.json，分支 %s 上有：把它合进默认分支，或从那个分支开工作树。"
+                  % payload["project"]["identityElsewhere"])
         if payload["state"] == "conflict":
             worktree = payload["project"]["stateWorktree"]
             print("状态 worktree：" + worktree["path"])
@@ -727,6 +809,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("处理办法见 references/local-ticket-ledger-runtime.md；不要在未经确认时移动或删除该 worktree。")
         elif payload["state"] == "initialized":
             worktree = payload["project"].get("stateWorktree", {})
+            pending = payload["project"].get("pendingEvents")
+            if isinstance(pending, int):
+                print("未提交到状态分支的事件：%d 条" % pending)
+                if pending:
+                    print("这些事件只在本机状态 worktree 里，没有 git 历史；用 local-ticket-portability 的离线归档备份"
+                          "（archive --output <目录>）。")
             if worktree.get("state") == "unknown":
                 print("状态 worktree 未确认：" + worktree["diagnostic"])
                 if worktree.get("checkedOutAt"):
