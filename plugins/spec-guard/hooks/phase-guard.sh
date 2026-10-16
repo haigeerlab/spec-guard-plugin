@@ -200,13 +200,22 @@ Suggested next step: make \`spec/CAPABILITY-MAP.md\` a readable file (check its 
   exit 0
 fi
 
+# phase-hint-gaps：IDLE 与 MAP_ONLY 不经 module_stage.py 的完整判定，项目配置行（产物语言、combined 节奏、配置无效）
+# 另向它取，与其他阶段同一实现；取不到时不加，阶段输出照旧。
+CONFIG_LINES=""
+if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
+  CONFIG_LINES="$(python3 "$HOOKDIR/module_stage.py" . --config-lines ${HOST:+--host "$HOST"} 2>/dev/null)" || CONFIG_LINES=""
+  [ -z "$CONFIG_LINES" ] || CONFIG_LINES="
+${CONFIG_LINES}"
+fi
+
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
 当前阶段: **IDLE**
 
 - Capability map: absent
-- Module specs: ${SPECS}
+- Module specs: ${SPECS}${CONFIG_LINES}
 
 Suggested next step: create and review a capability map before planning."
   exit 0
@@ -218,7 +227,7 @@ if [ "$SPECS" -eq 0 ]; then
 当前阶段: **MAP_ONLY**
 
 - Capability map: present
-- Module specs: absent
+- Module specs: absent${CONFIG_LINES}
 
 Suggested next step: write the first reviewed module spec under \`spec/\`."
   exit 0

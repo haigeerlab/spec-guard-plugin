@@ -601,5 +601,11 @@ if __name__ == "__main__":
     parser.add_argument("--context-window", type=int)
     parser.add_argument("--unattended", action="store_true")
     parser.add_argument("--host", choices=["claude", "codex"])
+    # phase-hint-gaps: IDLE and MAP_ONLY are answered by phase-guard.sh itself; it asks for the project-config lines
+    # here so they come from the one implementation.
+    parser.add_argument("--config-lines", action="store_true")
     args = parser.parse_args()
+    if args.config_lines:
+        print("\n".join(config_lines(Path(args.root), args.host)))
+        raise SystemExit(0)
     print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host))

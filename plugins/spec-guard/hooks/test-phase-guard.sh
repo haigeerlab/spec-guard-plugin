@@ -1564,6 +1564,9 @@ fi
 # 达到边界档也给模块边界行；D1 IDLE 与 MAP_ONLY 也带项目配置行。
 part_16() {
 build_fixture ctx
+LANG_LINE='- Artifact language: `zh-CN`'
+CADENCE_LINE='- Review cadence: combined'
+INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
 run_start() {  # $1=项目目录 $2=标准输入文本：以 SessionStart 运行
   env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" \
     /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$2"
@@ -1629,6 +1632,41 @@ grep -F -- "$(mid_line 850 'at or over 800 k')" >/dev/null <<<"$out" && ! grep -
   || fail "BUILDING 850k 应照旧只有上下文行
 $out"
 echo "  ✅ BUILDING 850k：上下文行照旧"; PASS=$((PASS + 1))
+
+# D1：IDLE（没有能力图）与 MAP_ONLY（有能力图、没有模块 Spec）也带项目配置行，放在建议之前；没配置时逐字不变。
+for kind in IDLE MAP_ONLY; do
+  early="$WORK/early-$kind"
+  mkdir -p "$early/.agent"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$early/CLAUDE.md"
+  [ "$kind" = IDLE ] || map "$early"
+  plain_early="$(run "$early" | context_of)"
+  grep -F "**${kind}**" >/dev/null <<<"$plain_early" || fail "夹具应为 $kind
+$plain_early"
+  early_case() {  # $1=用例名 $2=config.json 内容 $3...=期望多出的行（前缀）
+    local name="$1" body="$2" line rest; shift 2
+    printf '%s\n' "$body" > "$early/.agent/config.json"
+    out="$(run "$early" | context_of)"
+    for line in "$@"; do
+      python3 -c 'import sys; t, l = sys.argv[1], sys.argv[2]; assert l in t and t.index(l) < t.index("Suggested next step"), t' \
+        "$out" "$line" || fail "$name: 缺少「${line}」或不在建议之前
+$out"
+    done
+    rest="$(python3 -c 'import sys; t, e = sys.argv[1], sys.argv[2:]; print("\n".join(l for l in t.split("\n") if not l.startswith(tuple(e))), end="")' "$out" "$@")"
+    [ "$rest" = "$plain_early" ] || fail "$name: 除配置行外输出应与无配置时一致
+--- got
+$out
+--- plain
+$plain_early"
+    echo "  ✅ $name"; PASS=$((PASS + 1))
+  }
+  early_case "$kind 设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "zh-CN"}' "$LANG_LINE"
+  early_case "$kind combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
+  early_case "$kind 无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
+    "$INVALID_LINE"
+  printf '%s\n' '{"version": 1, "reviewCadence": "separate"}' > "$early/.agent/config.json"
+  [ "$(run "$early" | context_of)" = "$plain_early" ] || fail "$kind separate 不应注入任何内容"
+  echo "  ✅ $kind separate：输出逐字不变"; PASS=$((PASS + 1))
+done
 }
 
 PARTS=16
