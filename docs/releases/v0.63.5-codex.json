@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.5"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli:0.162.1;test:v0.63.5-boundary-hint-20261016"
+      },
+      "observedAt": "2026-10-16T14:52:45Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.63.4 to v0.63.5; upgrade exited 0; codex plugin list reports 0.63.5 enabled; hooks.json is unchanged between the tags; the smoke run exited 0; the installed copy passes 339 phase-guard cases",
+        "command:the installed copy's phase-guard.sh on a temporary DONE project with a constructed token_count record (window 258400)",
+        "result:180,880 tokens prints the Module boundary line with (at or over 70% of the 258 k window); 129,200 tokens (the old 50% point) prints no Module boundary line"
+      ]
+    }
+  ]
+}

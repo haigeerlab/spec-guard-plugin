@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.5"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:c9c6d7382ef48c2e6f4ace3b67c7181e971024aa"
+      },
+      "observedAt": "2026-10-16T14:52:45Z",
+      "evidence": [
+        "result:the v0.63.5 annotated tag and origin/main both resolve to merge commit c9c6d7382ef48c2e6f4ace3b67c7181e971024aa (pull request #330; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (38918754647) passed before tagging",
+        "result:0.63.5 is one module, boundary-hint-70: the module-boundary context hint (MODULE_DONE, DONE, NEEDS_SPEC) moves from 50% to 70% of the window (Claude, which has no window in its transcript, uses 700k instead of 500k; Codex uses 70% of the recorded window); the mid-module 80% tier is unchanged",
+        "result:each commit was made by verify-and-commit.sh (full suite for code) under macOS /bin/bash 3.2.57; phase-guard 336 -> 339 cases, red before the change and green after; reverting BOUNDARY_SHARE to 0.5 or the windowed formula to 5/10 turns assertions red"
+      ]
+    }
+  ]
+}
