@@ -5,5 +5,5 @@
 - [x] Task 3：挂起原因（`module_suspend.py --reason`） — `test_module_suspend.py` 新增 8 例（带原因挂起、替换原因只换一行、给已挂起无原因的模块补原因、已挂起不带原因仍拒绝、恢复删两行、五种不合法原因被拒且不改文件、恢复时给 `--reason` 报参数错误、孤立原因行不算挂起），新增 6 例先红；实现后全绿，现有用例期望值未改。`test_map_view.py` 加一例：用 `module_suspend.py` 写原因、`map_view.py` 读回（27 例）。
 - [x] Checkpoint 1（report）：脚本与挂起原因回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
 - [x] Task 4：命令、技能与实跑 — 新建 `commands/map.md`（定位片段与 cost-report 相同，要求把表格原样给用户）；`spec-guard-ops` 加 map 一节；`commands/module-suspend.md` 与技能的挂起一节写明 `--reason`（只按用户说的写，不从上下文推断）。实跑：本仓库（93 个模块，`BUILDING map-view`，未合入 1、未推送 1）；临时项目 7 个模块，用 `module_suspend.py --reason` 挂起一个后，表头显示“关键卡点：quality-gates 挂起（2 个高危漏洞，上游未修复）→ 挡住 1 个：pwa-lifecycle”、待审核一项与下一个 gate，六种状态各出现一次，`--all` 展开未就绪那一行并写出缺哪个依赖，JSON 的 bottlenecks、awaitingReview、totals 与表一致；不是 git 仓库时两项写“判断不了”。临时目录已删。
-- [ ] Task 5：文档、CHANGELOG 与版本号
+- [x] Task 5：文档、CHANGELOG 与版本号 — `docs/commands.md`（随 Task 4 的提交，`validate.sh` 要求命令对照表收录新命令）加 map 一节与对照表一行、挂起一节写明 `--reason`；`docs/design.md` 部件表加 `map_view.py`；CHANGELOG 新增 `[0.62.0] - 2026-10-16`；两份 `plugin.json` 改为 0.62.0，中英 README 的 `--ref` 改为 v0.62.0。
 - [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
