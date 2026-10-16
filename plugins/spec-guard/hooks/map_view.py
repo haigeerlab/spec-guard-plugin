@@ -99,10 +99,10 @@ def _head(root: Path) -> dict:
 
 
 def history(root: Path) -> tuple:
-    """(state, last_tick, suspended_write) from committed history of tasks/*/todo.md.
+    """(state, ticks, suspended_write) from committed history of tasks/*/todo.md.
 
-    state is `complete`, `shallow` or `unavailable`.  last_tick maps a module to the commit time
-    of the newest commit that raised its number of checked items; suspended_write maps it to the
+    state is `complete`, `shallow` or `unavailable`.  ticks maps a module to [newest, oldest, count]
+    over the commits that raised its number of checked items; suspended_write maps it to the
     commit time of the newest commit that touched the suspend marker, or None when that commit
     removed it.  One `git log` for every module; nothing in the working tree is looked at.
     """
@@ -116,7 +116,7 @@ def history(root: Path) -> tuple:
         return "unavailable", {}, {}
     if done.returncode != 0:
         return "unavailable", {}, {}
-    last_tick, suspended = {}, {}
+    ticks, suspended = {}, {}
     for chunk in done.stdout.split(COMMIT_SEP)[1:]:
         header, _, body = chunk.partition("\n")
         when = header.partition("\x00")[2].strip()
@@ -138,12 +138,14 @@ def history(root: Path) -> tuple:
             if text.strip() == SUSPEND_MARKER:
                 entry[2 if added else 3] = True
         for module, (plus, minus, marker_added, marker_removed) in counts.items():
-            if module not in last_tick and plus > minus:
-                last_tick[module] = when
+            if plus > minus:
+                entry = ticks.setdefault(module, [when, when, 0])
+                entry[1] = when  # commits come newest first, so the last one seen is the oldest
+                entry[2] += 1
             if module not in suspended and (marker_added or marker_removed):
                 suspended[module] = when if marker_added else None
     state = "shallow" if _git(root, "rev-parse", "--is-shallow-repository") == "true" else "complete"
-    return state, last_tick, suspended
+    return state, ticks, suspended
 
 
 def _version() -> str | None:
@@ -223,11 +225,14 @@ def build(root: Path) -> dict:
             "review": _review(root, module),
         })
 
-    state, last_tick, suspended_write = history(root)
+    state, ticks, suspended_write = history(root)
     if state == "unavailable" and _git(root, "rev-parse", "--verify", "--quiet", "HEAD"):
         print("map-view: 读不出 git 历史，不给勾选与挂起时间。", file=sys.stderr)
     for m in modules:
-        m["lastTickAt"] = last_tick.get(m["id"])
+        newest, oldest, count = ticks.get(m["id"], (None, None, 0))
+        m["lastTickAt"] = newest
+        m["firstTickAt"] = oldest
+        m["tickCommits"] = None if state == "unavailable" else count
         m["suspendedAt"] = suspended_write.get(m["id"]) if m["status"] == "suspended" else None
 
     suspended = [m for m in modules if m["status"] == "suspended"]

@@ -131,7 +131,8 @@ python3 -B "$ROOT/hooks/map_view.py" --project "$PROJECT" [--all] [--json]
 把表格原样给用户，不改写成段落。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量、不折叠的结果
 （`schemaVersion` 1，字段与稳定性承诺见 `spec/map-view.md`），供其他插件读取。退出码 3 是没有能力图，4 是能力图或
 模块文件读不出，2 是参数或路径错误。"阻塞"只指被挂起的模块挡住，外部等待这里看不到。进行中与挂起两格带距今多久
-（上次勾选、已挂多久），JSON 对应 `lastTickAt`、`suspendedAt` 与顶层 `history`，都取自已提交的 git 历史；只给时间，
+（上次勾选、已挂多久），JSON 对应 `lastTickAt`、`suspendedAt` 与顶层 `history`，另有 `firstTickAt`、`tickCommits`，
+都取自已提交的 git 历史；只给时间，
 不判断算不算卡住。
 
 ## tracker default

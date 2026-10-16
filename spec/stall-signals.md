@@ -1,6 +1,6 @@
 # Spec: stall-signals
 
-<!-- spec-guard: review approved ab173fe5c196 -->
+<!-- spec-guard: review approved b9171b29f499 -->
 
 ## Objective
 
@@ -27,6 +27,8 @@
    `unavailable`（不是 git 仓库、没有提交、找不到 git 或 `git log` 失败），让读取方分清"没有数据"与"从没勾过"。
    `unavailable` 时所有模块的两项都是 `null`。
 5. **JSON 只增字段**：模块加 `lastTickAt`、`suspendedAt`，顶层加 `history`；`schemaVersion` 仍为 1，原有字段不变。
+   2026-10-16 decision-inbox 核对后建议、用户同意再加两项：`firstTickAt`（第一次勾选的提交时间）与 `tickCommits`（勾选过
+   的提交次数），供读取方自己算这个模块平时的节奏（平均间隔 =（lastTickAt − firstTickAt）÷（tickCommits − 1））。
 6. **表格只为人加距今多久**：进行中写"…，上次勾选 3 天前"，挂起写"⏸ 挂起（原因，已挂 2 天）"；没有值时不写。
    不设阈值，不出现"停滞"之类的判断。
 7. **检查点规则补一条停点**：同一个 gate 因外部原因（上游未修复、缺权限、要用户取舍）再次挡住时停下，把挂起、接受
@@ -40,7 +42,7 @@
 - 一次调用：`git -C <root> log --no-color --no-renames -U0 --format=<分隔符>%H%x00%cI -p -- ':(glob)tasks/*/todo.md'`，
   按提交从新到旧解析每个文件的增删行：
   - 增行里匹配 `- [x]`（`*`/`+` 列表符、`X` 同样认）的行数多于删行里匹配的行数 → 该提交是该模块的一次勾选；
-    最新的一次给 `lastTickAt`。
+    最新的一次给 `lastTickAt`，最早的一次给 `firstTickAt`，次数给 `tickCommits`。
   - 最新一个碰到挂起标记行的提交：增行是标记 → `suspendedAt` 取它的时间；删行是标记 → `null`。
 - 浅克隆用 `git rev-parse --is-shallow-repository` 判断。
 - 历史读取失败不影响其余输出，也不改变退出码；只把 `history` 置为 `unavailable`、两项置空，stderr 一句说明。
@@ -51,12 +53,16 @@
 {
   "history": "complete",
   "modules": [
-    {"id": "...", "lastTickAt": "2026-10-14T09:12:03+08:00", "suspendedAt": null}
+    {"id": "...", "lastTickAt": "2026-10-14T09:12:03+08:00", "firstTickAt": "2026-10-09T15:40:11+08:00",
+     "tickCommits": 6, "suspendedAt": null}
   ]
 }
 ```
 
-- 两项都是提交时间原样（`%cI`），不换算时区。
+- 时间都是提交时间原样（`%cI`），不换算时区。
+- `tickCommits`：勾选过的提交次数，从没勾过为 `0`；`history` 为 `unavailable` 时为 `null`（与"从没勾过"区分）。
+- 局限（写进说明）：todo 第一次提交时已有勾选项也算一次勾选，一次提交勾完整份 todo 的模块两个时间相同、次数为 1，
+  算不出间隔，读取方应跳过次数小于 2 的模块；压缩合并（squash）会让次数偏少、间隔偏大。
 - 稳定性承诺照旧；`history` 的三个取值在承诺之内。
 
 ### 表格

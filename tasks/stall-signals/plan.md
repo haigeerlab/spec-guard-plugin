@@ -66,6 +66,20 @@ PR，含 0.63.0 版本号；合并后的 tag、Release、两边宿主同步与�
 展示验证结果、未验证项、实际改动的文件清单与文档建议；把新增字段发给 decision-inbox 核对。推送与开 PR 在此由用户确认，
 合并由用户进行。
 
+## 追加：首次勾选时间与勾选次数（2026-10-16）
+
+decision-inbox 核对字段后建议加 `firstTickAt` 与 `tickCommits`，用户同意。出自同一次 `git log`，扫描时多记最早一次与次数，
+不增加 git 调用；只给原始数据，节奏由读取方算。追加 Task 5，完成后回到 Checkpoint 2。
+
+### Task 5：`firstTickAt` 与 `tickCommits`
+
+先补测试（次数、最早时间、没勾过为 0、没有历史为 null，键集合加两项），再实现；Spec、命令与技能说明、CHANGELOG 同步。
+
+- 验收：新增断言先红后绿；一处变异（不更新最早时间）变红。
+- 验证：`verify-and-commit.sh` 全档。
+- 文件：`hooks/map_view.py`、`hooks/test_map_view.py`、`spec/stall-signals.md`、`commands/map.md`、`spec-guard-ops`、
+  `docs/commands.md`、`CHANGELOG.md`。
+
 ## Risks
 
 - **历史很长时变慢**：`-U0` 且只限 todo 文件；本仓库实测超出 1 秒较多时记入 todo 交检查点。

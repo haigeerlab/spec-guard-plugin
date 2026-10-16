@@ -18,7 +18,8 @@ APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
             "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
-               "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt"}
+               "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
+               "firstTickAt", "tickCommits"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -187,7 +188,8 @@ class StatusTest(unittest.TestCase):
     def test_not_a_git_repository(self):
         self.assertEqual(self.data["head"], {"sha": None, "branch": None, "unmerged": None, "unpushed": None})
         self.assertEqual(self.data["history"], "unavailable")
-        self.assertTrue(all(m["lastTickAt"] is None and m["suspendedAt"] is None for m in self.data["modules"]))
+        self.assertTrue(all(m["lastTickAt"] is None and m["suspendedAt"] is None and m["firstTickAt"] is None
+                            and m["tickCommits"] is None for m in self.data["modules"]))
         self.assertIn("（没有 git 历史：不显示勾选与挂起时间）", self.project.run().stdout)
 
     def test_table_header_and_rows(self):
@@ -412,6 +414,11 @@ class HistoryTest(unittest.TestCase):
             self.assertEqual(by_id["alpha"]["suspendedAt"], "2026-10-05T10:00:00+08:00")
             self.assertEqual(by_id["beta"]["lastTickAt"], "2026-10-04T10:00:00+08:00")
             self.assertIsNone(by_id["beta"]["suspendedAt"])
+            # tick commits: alpha c2 and c5 (the untick in c4 and the text edit in c3 are not ticks)
+            self.assertEqual((by_id["alpha"]["firstTickAt"], by_id["alpha"]["tickCommits"]),
+                             ("2026-10-02T10:00:00+08:00", 2))
+            self.assertEqual((by_id["beta"]["firstTickAt"], by_id["beta"]["tickCommits"]),
+                             ("2026-10-04T10:00:00+08:00", 1))
 
     def test_text_edit_and_untick_do_not_count(self):
         with self.make() as project:
@@ -426,6 +433,7 @@ class HistoryTest(unittest.TestCase):
             by_id = {m["id"]: m for m in project.json()["modules"]}
             self.assertEqual(by_id["alpha"]["lastTickAt"], "2026-10-02T10:00:00+08:00")
             self.assertIsNone(by_id["beta"]["lastTickAt"])
+            self.assertEqual((by_id["beta"]["firstTickAt"], by_id["beta"]["tickCommits"]), (None, 0))
 
     def test_uncommitted_ticks_and_markers_are_invisible(self):
         with self.make() as project:
