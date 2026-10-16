@@ -70,7 +70,7 @@ plugins/spec-guard/
    指向，都没有则静默。标识只用来查表，不读会话记录的内容。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
    交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
-   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 50% 出边界行；模块进行中（`NEEDS_PLAN`、
+   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
    `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
    `module_stage.py --config-lines` 取得，与其他阶段同一实现。
 4. 输出 `hookSpecificOutput.additionalContext`。来自仓库的值在注入前净化（折叠空白、去掉反引号与反斜杠、剥掉
