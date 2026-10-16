@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.63.5"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.63.5;test:installed-plugin-upgrade-20261016"
+      },
+      "observedAt": "2026-10-16T14:52:45Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.63.4 to 0.63.5 for scope user; the installed copy records gitCommitSha c9c6d73 -- the v0.63.5 tag commit; the installed copy passes 338 phase-guard cases (one repository-file case is the known class)",
+        "command:the installed copy's phase-guard.sh on a temporary DONE project with a constructed Claude transcript",
+        "result:600k tokens prints no Module boundary line; 700k tokens prints it with (at or over 700 k)",
+        "not-verified:a live interactive Claude Code session reaching 70%; the installed hook output above is the check for this threshold-only change",
+        "host:Claude Code 2.1.299"
+      ]
+    }
+  ]
+}
