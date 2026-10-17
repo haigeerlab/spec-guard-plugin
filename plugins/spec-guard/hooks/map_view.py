@@ -17,13 +17,15 @@ import os
 import re
 import subprocess
 import sys
+import time
 import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, _git, active_module, external_review_state, file_review_state, module_state,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, external_review_state, file_review_state, module_state,
                           next_gate, project_stage, unmerged_commits)
+from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, parse as parse_scope
 from project_config import module_concurrency
 
@@ -202,10 +204,95 @@ def _overlap(a: Scope, b: Scope) -> list:
     return sorted(found)
 
 
+SCAN_BUDGET = 10.0  # seconds for one /map's worktree scan; later worktrees get path, branch and head only
+
+
+def _worktree_list(root: Path) -> list:
+    """`git worktree list --porcelain -z` as dicts; an empty list when git cannot say."""
+    try:
+        done = subprocess.run(["git", "-C", str(root), "worktree", "list", "--porcelain", "-z"],
+                              capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if done.returncode != 0:
+        return []
+    records, record = [], {}
+    for field in done.stdout.split("\0"):
+        if not field:
+            if record:
+                records.append(record)
+            record = {}
+            continue
+        key, _, value = field.partition(" ")
+        record[key] = value
+    if record:
+        records.append(record)
+    return records
+
+
+def _todo_progress(path: Path) -> tuple:
+    """(progress, todo state) for another worktree's todo.md."""
+    if not os.path.lexists(path):
+        return None, "missing"
+    try:
+        if path.is_symlink() or not path.is_file():
+            return None, "unreadable"
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None, "unreadable"
+    done = len(re.findall(r"^\s*[-*+]\s+\[[xX]\]", text, re.MULTILINE))
+    return {"done": done, "total": done + len(UNCHECKED.findall(text))}, "ok"
+
+
+def scan_worktrees(root: Path, budget: float = SCAN_BUDGET) -> dict:
+    """checkout-role: {module id: worktree entry} for the other worktrees of this project that carry a module role.
+
+    The current checkout's switch authorises reading the other markers; their own configuration is not consulted.
+    At most three git calls per worktree; after `budget` seconds only path, branch and head are filled in.
+    """
+    started = time.monotonic()
+    here = root.resolve()
+    current_head = _git(root, "rev-parse", "HEAD")
+    found = {}
+    for record in _worktree_list(root):
+        path = Path(record.get("worktree", ""))
+        if not record.get("worktree") or "bare" in record or "prunable" in record or not path.is_dir():
+            continue
+        if path.resolve() == here:
+            continue
+        raw = _git(path, "rev-parse", "--git-path", MARKER)
+        if not raw:
+            continue
+        kind, module = read_marker(Path(raw) if os.path.isabs(raw) else path / raw)
+        if kind != "module":
+            continue
+        if module in found:
+            found[module].setdefault("duplicates", []).append(str(path))
+            continue
+        branch = record.get("branch")
+        entry = {"path": str(path), "branch": branch[len("refs/heads/"):] if branch and branch.startswith("refs/heads/")
+                 else branch, "head": record.get("HEAD"), "progress": None, "todo": None, "dirty": None, "merged": None}
+        if time.monotonic() - started < budget:
+            entry["progress"], entry["todo"] = _todo_progress(path / "tasks" / module / "todo.md")
+            status = _git(path, "status", "--porcelain")
+            entry["dirty"] = None if status is None else bool(status)
+            if entry["head"] and current_head:
+                try:
+                    done = subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", entry["head"], current_head],
+                                          capture_output=True, timeout=5)
+                    entry["merged"] = {0: True, 1: False}.get(done.returncode)
+                except (OSError, subprocess.SubprocessError):
+                    entry["merged"] = None
+        found[module] = entry
+    return found
+
+
 def _concurrency(root: Path, parsed, modules: list) -> dict:
     """The fields map-startable adds when moduleConcurrency is on."""
+    worktrees = scan_worktrees(root)
     for m in modules:
         m["scope"] = _scope(root, m["id"])
+        m["worktree"] = worktrees.get(m["id"])
     open_ = [m for m in modules if m["status"] in ("in_progress", "ready")
              and m["scope"] is not None and "error" not in m["scope"]]
     conflicts = []
@@ -372,6 +459,22 @@ def _status_cell(m: dict, now: datetime, concurrent: bool = False) -> str:
     return "○ 未就绪：缺 " + "、".join(m["missingDeps"])
 
 
+def _worktree_suffix(m: dict) -> str:
+    """checkout-role: the other worktree's progress for a module, when one carries its role."""
+    wt = m.get("worktree")
+    if not wt:
+        return ""
+    progress = wt["progress"]
+    parts = [" · worktree %d/%d" % (progress["done"], progress["total"]) if progress else " · worktree 进度未知"]
+    if wt["dirty"]:
+        parts.append("有未提交改动")
+    if wt["merged"] is False:
+        parts.append("未合入")
+    elif wt["merged"] is None:
+        parts.append("合入未知")
+    return " ".join(parts)
+
+
 def _review_cell(root: Path, m: dict) -> str:
     parts = []
     if (root / "spec" / (m["id"] + ".md")).is_file():
@@ -455,7 +558,8 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
         else:
             lines.append("| %d | %s | %s | %s | %s |" % (item["position"], item["id"],
                                                          _responsibility(item["responsibility"]),
-                                                         _status_cell(by_id[item["id"]], now, concurrent),
+                                                         _status_cell(by_id[item["id"]], now, concurrent)
+                                                         + _worktree_suffix(item),
                                                          _review_cell(root, item)))
     return "\n".join(lines) + "\n"
 

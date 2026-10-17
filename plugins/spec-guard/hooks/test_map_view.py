@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from module_stage import SUSPEND_MARKER
@@ -583,7 +584,7 @@ class ConcurrencyOnJson(unittest.TestCase):
         self.assertEqual(data["buildOrderGroups"], [["setup"], ["billing", "shop"], ["report"], ["later"]])
         self.assertEqual(set(data) - TOP_KEYS, {"moduleConcurrency", "buildOrderGroups", "startable"})
         for module in data["modules"]:
-            self.assertEqual(set(module) - MODULE_KEYS, {"scope"})
+            self.assertEqual(set(module) - MODULE_KEYS, {"scope", "worktree"})  # worktree: checkout-role
 
     def test_scope_values(self):
         by_id = {m["id"]: m["scope"] for m in self.data({"spec/later.md": "# later\n\n## 并行边界\n\n- 独占：apps/later/\n"})["modules"]}
@@ -654,6 +655,131 @@ class ConcurrencyOnTable(unittest.TestCase):
     def test_off_has_neither(self):
         lines = self.table(switch=False)
         self.assertFalse(any("可同时开工" in line or line.startswith("并行边界重叠") for line in lines))
+
+
+WT_ROWS = "| a | x | — |\n| b | x | a |\n| c | x | a |\n"
+
+
+class Worktrees:
+    """A committed project (a done; b and c ready) with module worktrees around it."""
+
+    def __init__(self, switch="on"):
+        self.switch = switch
+
+    def git(self, cwd, *args):
+        return subprocess.run(GIT + list(args), cwd=cwd, check=True, capture_output=True, text=True, timeout=30).stdout
+
+    def role(self, cwd, text):
+        raw = self.git(cwd, "rev-parse", "--git-path", "spec-guard/role").strip()
+        path = Path(raw) if os.path.isabs(raw) else Path(cwd) / raw
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text + "\n", encoding="utf-8")
+
+    def __enter__(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name).resolve()
+        self.root = base / "proj"
+        (self.root / "spec").mkdir(parents=True)
+        (self.root / "spec" / "CAPABILITY-MAP.md").write_text(
+            "# Capability Map: wt\n\n| Module id | Responsibility | Depends on |\n|---|---|---|\n" + WT_ROWS
+            + "\nBuild order: a → b, c\n", encoding="utf-8")
+        for rel, text in {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}.items():
+            (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / rel).write_text(text, encoding="utf-8")
+        if self.switch is not None:
+            (self.root / ".agent").mkdir()
+            (self.root / ".agent" / "config.json").write_text(
+                json.dumps({"version": 1, "moduleConcurrency": self.switch}), encoding="utf-8")
+        self.git(self.root, "init", "-q")
+        self.git(self.root, "add", "-A")
+        self.git(self.root, "commit", "-qm", "base")
+        self.wt = {name: base / name for name in ("wt1", "wt2", "wt3", "wt4", "wt5")}
+        # wt1: module b, one of two items done and committed there, plus an untracked file.
+        self.git(self.root, "worktree", "add", "-q", "-b", "wt1", str(self.wt["wt1"]))
+        (self.wt["wt1"] / "tasks" / "b").mkdir(parents=True)
+        (self.wt["wt1"] / "tasks" / "b" / "todo.md").write_text("- [x] one\n- [ ] two\n", encoding="utf-8")
+        self.git(self.wt["wt1"], "add", "-A")
+        self.git(self.wt["wt1"], "commit", "-qm", "b work")
+        (self.wt["wt1"] / "scratch.txt").write_text("x\n", encoding="utf-8")
+        self.role(self.wt["wt1"], "module b")
+        # wt2: module c, no todo yet, same commit as the project.
+        self.git(self.root, "worktree", "add", "-q", "-b", "wt2", str(self.wt["wt2"]))
+        self.role(self.wt["wt2"], "module c")
+        # wt3: a second worktree claiming b, detached.
+        self.git(self.root, "worktree", "add", "-q", "--detach", str(self.wt["wt3"]))
+        self.role(self.wt["wt3"], "module b")
+        # wt4: module a with an unreadable todo (a directory).
+        self.git(self.root, "worktree", "add", "-q", "-b", "wt4", str(self.wt["wt4"]))
+        (self.wt["wt4"] / "tasks" / "a" / "todo.md").unlink()
+        (self.wt["wt4"] / "tasks" / "a" / "todo.md").mkdir()
+        self.role(self.wt["wt4"], "module a")
+        # wt5: claims c, then its directory disappears (prunable): skipped.
+        self.git(self.root, "worktree", "add", "-q", "-b", "wt5", str(self.wt["wt5"]))
+        self.role(self.wt["wt5"], "module c")
+        subprocess.run(["rm", "-rf", str(self.wt["wt5"])], check=True)
+        return self
+
+    def json(self):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--json", "--project", str(self.root)],
+                              capture_output=True, text=True, timeout=60)
+        assert done.returncode == 0, done.stderr
+        return json.loads(done.stdout)
+
+    def table(self):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(self.root)],
+                              capture_output=True, text=True, timeout=60)
+        assert done.returncode == 0, done.stderr
+        return done.stdout
+
+    def __exit__(self, *exc):
+        self.tmp.cleanup()
+
+
+class WorktreeField(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture = Worktrees()
+        cls.fixture.__enter__()
+        cls.data = cls.fixture.json()
+        cls.by_id = {m["id"]: m["worktree"] for m in cls.data["modules"]}
+        cls.text = cls.fixture.table()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fixture.__exit__()
+
+    def test_module_with_progress_dirty_and_unmerged(self):
+        b = self.by_id["b"]
+        self.assertEqual((b["path"], b["branch"]), (str(self.fixture.wt["wt1"]), "wt1"))
+        self.assertEqual((b["progress"], b["todo"], b["dirty"], b["merged"]), ({"done": 1, "total": 2}, "ok", True, False))
+        self.assertEqual(len(b["head"]), 40)
+        self.assertEqual(b["duplicates"], [str(self.fixture.wt["wt3"])])
+
+    def test_missing_todo_and_merged(self):
+        c = self.by_id["c"]
+        self.assertEqual(c["path"], str(self.fixture.wt["wt2"]))
+        self.assertEqual((c["progress"], c["todo"], c["dirty"], c["merged"]), (None, "missing", False, True))
+        self.assertNotIn("duplicates", c)
+
+    def test_unreadable_todo(self):
+        a = self.by_id["a"]
+        self.assertEqual((a["progress"], a["todo"]), (None, "unreadable"))
+
+    def test_table_suffixes_for_any_local_status(self):
+        rows = {line.split("|")[2].strip(): line for line in self.text.splitlines() if line.startswith("| ")}
+        self.assertIn("· worktree 1/2 有未提交改动 未合入", rows["b"])
+        self.assertIn("· worktree 进度未知", rows["a"])
+        self.assertIn("· worktree 进度未知", rows["c"])
+        self.assertNotIn("未合入", rows["c"])
+
+    def test_switch_off_never_scans(self):
+        import map_view
+        with Worktrees(switch="off") as fixture:
+            with mock.patch.object(map_view, "scan_worktrees", wraps=map_view.scan_worktrees) as spy:
+                data = map_view.build(fixture.root)
+            self.assertEqual(spy.call_count, 0)
+            self.assertNotIn("worktree", data["modules"][0])
+            self.assertNotIn("worktree", fixture.table())
 
 if __name__ == "__main__":
     unittest.main()

@@ -53,11 +53,8 @@ def _describe(kind: str, module: str | None) -> str:
     return "module %s" % module if kind == "module" else kind
 
 
-def read_role(root) -> tuple:
-    """("none"|"invalid"|"coordinator"|"module", id-or-None); links, special files and oversize are invalid."""
-    path = role_path(root)
-    if path is None:
-        return "none", None
+def read_marker(path: Path) -> tuple:
+    """Read one marker file: links, special files, oversize and anything but one valid line are invalid."""
     if path.parent.is_symlink() or (os.path.lexists(path.parent) and not path.parent.is_dir()):
         return "invalid", None
     flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
@@ -84,6 +81,12 @@ def read_role(root) -> tuple:
     if match is None:
         return "invalid", None
     return ("module", match.group(1)) if match.group(1) else ("coordinator", None)
+
+
+def read_role(root) -> tuple:
+    """("none"|"invalid"|"coordinator"|"module", id-or-None) for the checkout at `root`."""
+    path = role_path(root)
+    return ("none", None) if path is None else read_marker(path)
 
 
 def role(root) -> tuple:
