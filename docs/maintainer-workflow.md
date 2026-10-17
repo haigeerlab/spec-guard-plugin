@@ -112,7 +112,8 @@ codex plugin add spec-guard@spec-guard-marketplace
 
 若 `spec-guard-marketplace` 已指向一个发布版，不要在活跃会话中替换它来测试开发源码；应在
 隔离的 Codex 配置/机器中安装候选，或先明确备份并恢复原 marketplace。安装或升级后开启新会话，
-在 `/hooks` 审核并信任 `UserPromptSubmit`，再运行：
+在 `/hooks` 审核并信任 `UserPromptSubmit`，再运行（Codex 桌面版不弹出钩子信任提示，信任只能在命令行版 `codex`
+里做；钩子命令一改，原来的信任就失效，要重新信任）：
 
 ```bash
 /bin/bash evals/codex-plugin-smoke.sh \
