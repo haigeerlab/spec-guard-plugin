@@ -10,8 +10,13 @@ fail() { echo "  ❌ $1" >&2; exit 1; }
 
 # 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（unattended-run-hint）；用例按需显式设置。
 # 宿主信号（codex-command-wording）：跑测试的宿主自己的 PLUGIN_ROOT／SPEC_GUARD_HOST 不得漏进被测 hook；用例要指定宿主时设 SG_HOST。
+# 插件记录（delegate-review-hint）：跑测试的机器上装的插件不得漏进被测 hook；默认指向空目录，用例要伪造安装时设
+# SG_CLAUDE_HOME／SG_CODEX_HOME。
+mkdir -p "$WORK/no-claude-home" "$WORK/no-codex-home"
 run() {  # $1=项目目录；可用 RUN_PATH 替换 PATH
-  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} \
+    CLAUDE_CONFIG_DIR="${SG_CLAUDE_HOME:-$WORK/no-claude-home}" CODEX_HOME="${SG_CODEX_HOME:-$WORK/no-codex-home}" \
+    PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
 }
 
 silent() {  # $1=用例名 $2=项目目录
