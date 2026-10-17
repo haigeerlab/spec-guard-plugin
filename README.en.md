@@ -57,7 +57,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.67.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.68.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` and `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction |
 
@@ -143,9 +143,24 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
+## Developing several modules at once (optional)
+
+By default spec-guard moves one module at a time. When there are many modules and several are independent, several sessions can each work on
+one: spec-guard does the **planning**, and the companion plugin module-crew does the **running** (opening sessions, creating worktrees,
+messaging, merging). With the switch off none of this appears and nothing changes.
+
+1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid).
+2. At the capability-map review the agent adds a concurrency assessment: which modules could become comma groups in the Build order, which are worth moving up.
+3. Each module Spec gets a "并行边界" (concurrency boundary) section naming the directories it owns; `verify-artifacts` checks its format and the final acceptance marks files changed outside it.
+4. `/spec-guard:map` lists the modules that can start together, overlapping boundaries, and the progress in each module worktree.
+5. `/spec-guard:checkout-role` gives each checkout a role: a module checkout's stage hint points only at its module, the coordinating checkout is never told to build.
+
+Who records review approvals and who merges locally is set out in its own section of the shared checkpoint rules ("协调会话的批准与合并"); merging into the remote is always yours.
+
 ## External interface
 
-Other plugins that read progress and review state should use `interface.json` at the plugin root: it lists the read-only command, the format version, the exit codes and what each value means, so a reader can check the version. See "对外接口" in [docs/design.md](docs/design.md).
+Other plugins that read progress and review state should use `interface.json` at the plugin root: it lists the read-only command, the format version, the exit codes and what each value means, so a reader can check the version.
+From 1.1 it also lists the entries used for developing several modules at once (the switch, the boundary check, the role marker, the review marker). See "对外接口" in [docs/design.md](docs/design.md).
 
 ## Data and privacy
 

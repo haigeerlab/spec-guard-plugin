@@ -1,8 +1,10 @@
 # Changelog
 
-## [未发布]
+## [0.68.0] - 2026-10-18
 
-多模块并行规划层（7 个模块，合成 0.68.0 发布）。
+本版 7 个模块，组成多模块并行的规划层：`module-concurrency-switch`、`concurrency-assessment`、`module-scope-boundary`、`concurrency-rule-wording`、
+`map-startable`、`checkout-role`、`crew-interface`。全部只在 `.agent/config.json` 的 `moduleConcurrency` 为 `on` 时生效；不打开时 spec-guard 的
+输出与 0.67.1 逐字节相同。运行层（开会话、建 worktree、合并）由配套插件 module-crew 负责。
 
 ### 新增
 
@@ -25,6 +27,8 @@
   的 git 目录、不进版本库，先预览后确认。模块 checkout 的阶段提示另报告自己的模块、「下一步」只指向它，做完只提示交回协调会话；协调 checkout 保留评审约束、
   不建议 `/build`；全项目的当前模块与阶段不受影响。`/map --json` 的模块多一个 `worktree` 字段（本机其他 worktree 里的进度、未提交改动、提交是否已合入），
   表格加对应后缀。开关不是 `on` 时不读标记、不扫描 worktree，输出与以前逐字节相同。
+- **`interface.json` 1.1。** 只加不改：新增 `moduleConcurrency`、`scopeCheck`、`checkoutRole`、`reviewMark` 四个入口和 `mapView.concurrency`，
+  供 module-crew 等运行时读取；1.0 的内容不变。`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
 
 ### 变更
 

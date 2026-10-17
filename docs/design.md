@@ -96,6 +96,22 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 不读 spec-guard 的内部文件。spec-guard 读 agent-relay（`agent_relay_probe.py`）用的是同一方式。和其他插件的取值说法之间
 怎么对照，由使用方自己维护。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
 
+1.1（crew-interface）起另有四个入口，都是多模块并行用的：`moduleConcurrency`（开关的位置、取值与读法：看 `/map --json` 顶层有没有
+`"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（评审标记）；`mapView.concurrency`
+列出开关为 on 时 `/map --json` 才有的字段。1.0 的内容不变，`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
+
+### 规划层与运行层
+
+多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
+
+| | spec-guard（规划层） | module-crew（运行层） |
+|---|---|---|
+| 读 | 能力图、Spec、Plan、todo、`.agent/config.json`、本 checkout 与本机其他 worktree 的角色标记 | `interface.json`、`/map --json`、越界检查的 JSON |
+| 写 | 只经命令、预览确认后写：配置、评审标记、角色标记 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
+| 判断 | 能否开工、边界是否重叠、阶段与评审状态 | 开哪几个、什么时候合、失败怎么退 |
+
+spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不是 on 时，规划层的新东西都不出现。
+
 ## 两个宿主的差异
 
 | | Claude Code | Codex |
