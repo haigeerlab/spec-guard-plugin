@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.65.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:0332f39d960a257b39c79aa54a809b9067f80359"
+      },
+      "observedAt": "2026-10-17T09:33:48Z",
+      "evidence": [
+        "result:the v0.65.0 annotated tag and origin/main both resolve to merge commit 0332f39d960a257b39c79aa54a809b9067f80359 (pull request #339; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (39020850642) passed the repository validation, phase-guard and verify-artifacts steps but failed twice (attempts 1 and 2) at the ShellCheck step, both times because downloading the ShellCheck binary was rate-limited by GitHub (HTTP 403 'rate limit exceeded'); no script finding was reported",
+        "result:the merge commit's tree (1220947343071b06d3d9c9ce4feed50a65557295) is identical to the pull request head 9052631, whose CI run 39020569765 passed every step including ShellCheck; the user approved tagging on that basis",
+        "result:0.65.0 is one module, delegate-review-hint: when delegate is installed and enabled, the phase hint adds one line at the three review checkpoints (Spec awaiting review, Plan awaiting review, final acceptance) proposing a read-only review by delegate, whose ability to run is left to delegate's doctor check; the new hooks/sibling_plugins.py reads only local plugin records, runs no subprocess and answers 'not installed' when it cannot tell; an external-review section or a decline marker in the Spec or todo stops the line for the module; projects without delegate get byte-identical output",
+        "result:each commit was made by verify-and-commit.sh under macOS /bin/bash 3.2.57 (full tier with ShellCheck for the hook changes); phase-guard 339 -> 362 cases, test_sibling_plugins 11 cases, test_agent_relay_probe unchanged and green; two deliberate breakages (decline check disabled, Codex entry miswritten) each turned a case red and were reverted"
+      ]
+    }
+  ]
+}
