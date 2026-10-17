@@ -75,6 +75,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 |---|---|---|
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en` | 未设置 |
 | `reviewCadence` | `separate`／`combined` | `separate` |
+| `moduleConcurrency` | `off`／`on` | `off` |
 
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件无效时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`。同时只读汇总派活开关与默认事项后端的当前值和来源。
@@ -174,7 +175,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
-| 查看或设置项目配置（产物语言、评审节奏） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
+| 查看或设置项目配置（产物语言、评审节奏、多模块并行开关） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
 | 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | `spec-guard-ops` skill 的 link-project 一节 |
 | 记录 Spec 或 Plan 的评审状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |

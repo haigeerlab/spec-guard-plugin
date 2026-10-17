@@ -1,5 +1,5 @@
 ---
-description: 查看或按明确确认设置项目配置（产物语言、评审节奏），并汇总派活开关与默认事项后端的当前值和来源
+description: 查看或按明确确认设置项目配置（产物语言、评审节奏、多模块并行开关），并汇总派活开关与默认事项后端的当前值和来源
 allowed-tools: Bash
 ---
 
@@ -56,8 +56,9 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 |---|---|---|---|
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「评审节奏」 |
+| `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记，由后续版本逐项提供）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件。0.67.0 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置 |
 
-设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。
+设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency` 例外：取什么值都不注入，它的效果只在相应规则的停点出现。
 
 只读汇总、不在这里修改的两项：
 

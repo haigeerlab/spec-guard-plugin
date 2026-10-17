@@ -170,7 +170,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 ## config
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
-行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence` 的生效值与来源，以及只在别处修改的
+行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency` 的生效值与来源，以及只在别处修改的
 `dispatch`（约定块标记，用 setup 的 `--dispatch`／`--no-dispatch`）和 `trackerDefault`（上一节）：
 
 ```bash
@@ -181,6 +181,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
+- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.0 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 
