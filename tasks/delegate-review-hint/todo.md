@@ -1,6 +1,6 @@
 # Todo: delegate-review-hint
 
-- [ ] Task 0：提交已批准的 Plan 与 todo
+- [x] Task 0：提交已批准的 Plan 与 todo — 2026-10-17 用户批准 Plan，review_mark 记录后与 todo 一起提交。
 - [ ] Task 1：测试隔离（先做，行为不变）
 - [ ] Task 2：`sibling_plugins.py` 安装判断（先红后绿）
 - [ ] Task 3：外部审查状态判定与阶段提示行（先红后绿）
