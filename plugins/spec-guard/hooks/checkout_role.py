@@ -25,6 +25,7 @@ from tracker_default import _write_atomic
 
 MARKER = "spec-guard/role"
 MAX_BYTES = 256
+ROLE_KINDS = ("module", "coordinator")  # interface.json checkoutRole.values.role
 LINE = re.compile(r"^(?:module ([a-z0-9]+(?:-[a-z0-9]+)*)|(coordinator))$")
 
 
@@ -80,7 +81,8 @@ def read_marker(path: Path) -> tuple:
     match = LINE.match(lines[0]) if len(lines) == 1 else None
     if match is None:
         return "invalid", None
-    return ("module", match.group(1)) if match.group(1) else ("coordinator", None)
+    module_kind, coordinator_kind = ROLE_KINDS
+    return (module_kind, match.group(1)) if match.group(1) else (coordinator_kind, None)
 
 
 def read_role(root) -> tuple:

@@ -32,6 +32,7 @@ FIELD = re.compile(r"^-\s+([^:：]+?)\s*[:：]\s*(.*)$")
 TICKED = re.compile(r"^`([^`]*)`$")
 SEPARATORS = re.compile(r"\s*[、,]\s*")
 BAD_PATH_CHARS = set("*?[]\\")
+SCOPES = ("exclusive", "own", "outside")  # interface.json scopeCheck.values.scope
 
 
 class ScopeError(ValueError):
@@ -115,12 +116,13 @@ def parse(text: str) -> Scope | None:
 
 def covers(scope: Scope, module_id: str, path: str) -> str:
     """`own` for the module's flow files, `exclusive` inside its paths, otherwise `outside`."""
+    exclusive, own, outside = SCOPES
     if path == "spec/%s.md" % module_id or path.startswith("tasks/%s/" % module_id):
-        return "own"
+        return own
     for owned in scope.exclusive:
         if (path.startswith(owned) if owned.endswith("/") else path == owned):
-            return "exclusive"
-    return "outside"
+            return exclusive
+    return outside
 
 
 def _git(root: Path, *args: str) -> str | None:

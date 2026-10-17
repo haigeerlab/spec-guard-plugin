@@ -1,5 +1,5 @@
 {
-  "interface": "1.0",
+  "interface": "1.1",
   "mapView": {
     "command": [
       "python3",
@@ -30,6 +30,138 @@
         "recorded": "an external review (for example from delegate) is recorded; advisory only, not an approval",
         "declined": "the user declined an external review for this module"
       }
+    },
+    "concurrency": {
+      "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear and the output is byte-identical to interface 1.0",
+      "fields": {
+        "moduleConcurrency": "top level; always \"on\" when present",
+        "buildOrderGroups": "top level; the Build order as a list of groups, a comma group being one inner list",
+        "startable": "top level; {\"modules\": every ready module in Build order, \"conflicts\": [{\"modules\": [a, b], \"paths\": [...]}] for unfinished modules whose exclusive paths overlap, a before b in Build order}",
+        "scope": "per module; null without a concurrency boundary section, {\"exclusive\": [...], \"shared\": [...]} when valid, {\"error\": \"<code>\"} when malformed",
+        "worktree": "per module; null without a worktree carrying this module's role, else {\"path\", \"branch\", \"head\", \"progress\", \"todo\", \"dirty\", \"merged\"} plus \"duplicates\" when several worktrees claim it; merged is commit ancestry only (true, false, or null when unknown) and authorises nothing"
+      },
+      "contracts": [
+        "spec/map-startable.md",
+        "spec/checkout-role.md"
+      ]
     }
+  },
+  "moduleConcurrency": {
+    "config": ".agent/config.json",
+    "key": "moduleConcurrency",
+    "default": "off",
+    "values": {
+      "off": "default; spec-guard behaves exactly as without the switch",
+      "on": "planning-layer rules for developing several modules at once apply: concurrency assessment, concurrency boundaries, the /map fields above, checkout roles"
+    },
+    "readFrom": "read mapView's top-level moduleConcurrency; absent means off. Readers need not open .agent/config.json",
+    "contract": "spec/module-concurrency-switch.md"
+  },
+  "scopeCheck": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/module_scope.py",
+      "check",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>",
+      "--base",
+      "<base-ref>",
+      "--format",
+      "json"
+    ],
+    "readOnly": true,
+    "exitCodes": {
+      "0": "ok; stdout is {\"module\", \"base\", \"files\": [{\"path\", \"status\": \"A|M|D|?\", \"scope\"}], \"outside\": count}",
+      "2": "usage error, not a git repository, invalid module id, or the base is not a commit",
+      "3": "moduleConcurrency is not on; nothing was checked",
+      "4": "the module Spec has no concurrency boundary section, or it is malformed"
+    },
+    "values": {
+      "scope": {
+        "exclusive": "inside one of the module's exclusive paths",
+        "own": "the module's own spec/<id>.md or tasks/<id>/",
+        "outside": "outside the boundary; reported only, never blocked"
+      }
+    },
+    "contract": "spec/module-scope-boundary.md"
+  },
+  "checkoutRole": {
+    "commands": {
+      "show": [
+        "python3",
+        "-B",
+        "hooks/checkout_role.py",
+        "show",
+        "--project",
+        "<checkout-root>"
+      ],
+      "setModule": [
+        "python3",
+        "-B",
+        "hooks/checkout_role.py",
+        "set",
+        "--module",
+        "<module-id>",
+        "--project",
+        "<checkout-root>"
+      ],
+      "setCoordinator": [
+        "python3",
+        "-B",
+        "hooks/checkout_role.py",
+        "set",
+        "--coordinator",
+        "--project",
+        "<checkout-root>"
+      ],
+      "clear": [
+        "python3",
+        "-B",
+        "hooks/checkout_role.py",
+        "clear",
+        "--project",
+        "<checkout-root>"
+      ]
+    },
+    "confirm": "setModule, setCoordinator and clear only preview (\"role: <old> -> <new>\") unless --confirm is added",
+    "marker": "the file at `git rev-parse --git-path spec-guard/role` of that checkout: never committed and not shared between worktrees, so each worktree is set on its own",
+    "exitCodes": {
+      "0": "ok (preview, written, or no change)",
+      "2": "refused: not the top of a non-bare checkout, module not in the capability map, or the marker or its directory is a link or not a regular file",
+      "3": "moduleConcurrency is not on (set and clear only)",
+      "4": "the marker does not read back as written (a concurrent change); check it with show, do not retry blindly"
+    },
+    "values": {
+      "role": {
+        "module <id>": "a module checkout: the stage hint also reports this module and points its next step only at it",
+        "coordinator": "the coordinating checkout: the stage hint keeps review constraints and never suggests building"
+      }
+    },
+    "contract": "spec/checkout-role.md"
+  },
+  "reviewMark": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/review_mark.py",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>",
+      "--target",
+      "<spec|plan|both>",
+      "--state",
+      "<pending|approved>"
+    ],
+    "confirm": "only previews unless --confirm is added",
+    "exitCodes": {
+      "0": "ok (preview, written, or no change)",
+      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid"
+    },
+    "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges)",
+    "contract": "spec/review-approval-marker.md"
   }
 }
