@@ -6,5 +6,7 @@
 - [x] Task 3：`interface.json` 与检查器（先红后绿） — `scripts/test-checkers.sh` 新增 8 例（2 正 6 反），先因文件不存在两例正例变红；写出 `plugins/spec-guard/interface.json` 与 `scripts/check-interface.py`（导入 `map_view.SCHEMA_VERSION` 与 `module_stage` 两组常量对照，不运行 map_view）后 125 例全绿，并逐个核对 5 个反例报出的是对应原因；接进 `validate.sh`。真文件 `schemaVersion` 改成 2 时 `validate.sh` 退出 1、指出不一致，复原后通过。
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — Task 3 提交时 `verify-and-commit.sh` 全档（含 ShellCheck）通过。
 - [x] Task 4：文档、CHANGELOG 与版本号 — `docs/design.md` 新增「对外接口」一节，`map_view.py` 一行补「接口说明见 `interface.json`」；README 中英各新增「对外接口」一节；顺带补上 0.65.0 在「数据与隐私」里漏写的一点（钩子在评审检查点会读本机插件记录），这一点超出了 Plan，交审时说明；CHANGELOG `[0.66.0]`（新增两条、维护者工具一条、文档一条）；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.66.0。
-- [ ] Checkpoint 2（gate）：模块评审；PR 转为可评审由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；PR 转为可评审由用户确认，合并由用户进行 — 2026-10-17 在对话正文列出：实际改动的 17 个文件（新增 4、修改 13、删除 0）；interface.json 全文；JSON 样例；map-view Spec 的完整差异；验证结果；未验证项；超出 Plan 的 README 隐私段补句；拟回告。用户验收通过，同时批准修订后的 map-view Spec（已用 review-mark 重新记录），不做外部审查；PR #341 转为可评审，合并由用户进行。
 - [ ] 发版后的验证
+
+<!-- spec-guard: external-review declined -->

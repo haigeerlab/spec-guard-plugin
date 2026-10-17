@@ -1,6 +1,6 @@
 # Spec: map-view
 
-<!-- spec-guard: review approved a06d38293b2c -->
+<!-- spec-guard: review approved cff92546e803 -->
 
 ## Objective
 
