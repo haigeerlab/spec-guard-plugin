@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.65.0] - 2026-10-17
+
+本版一个模块：`delegate-review-hint`，在评审检查点用阶段提示提醒可以请 delegate 做只读复核，并约定结论写在哪里。
+
+### 新增
+
+- **检查点的外部审查提示。** 装了并启用 delegate 时，Spec 待审、Plan 待审、最终验收这三处的阶段提示多一行：这一项值得另一个 agent
+  只读复核时（跨模块、有取舍、不可逆、信息不足、有接口提案、Task 多），可提议 `/delegate:review`（Codex：`delegate:delegate-routing`），
+  能否运行以 delegate 的体检为准，用户同意后才发起，结论只作参考、不算批准。是否安装只读本机插件记录，不调子进程，读不到按没装处理；
+  没装 delegate 的项目，阶段提示逐字不变。
+- **「外部审查意见」小节与拒绝标记。** 结论按 delegate 审查报告的字段引用（来源、后端、`execution_status`、`review_outcome`、条数、
+  范围指纹，不写严重程度），Spec 交审时写在 Spec 里，之后写在 todo；用户不需要时写一行 `<!-- spec-guard: external-review declined -->`。
+  二者有其一，这个模块就不再提示。细则见共享检查点规则「外部审查意见」。
+
 ## [0.64.2] - 2026-10-17
 
 本版一个模块：`compact-next-step`，让压缩后的 agent 核对完旧请求后接着往下做（来自一份真实使用报告）。
