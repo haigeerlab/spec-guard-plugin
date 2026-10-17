@@ -54,7 +54,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 
 | 键 | 取值 | 默认 | 作用 |
 |---|---|---|---|
-| `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译 |
+| `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译。恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「评审节奏」 |
 
 设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。

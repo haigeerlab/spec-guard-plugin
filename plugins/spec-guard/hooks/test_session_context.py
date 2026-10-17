@@ -266,6 +266,7 @@ def git(*args, cwd):
 
 
 TELL = "State this location to the user whenever you ask them to review or confirm."
+TELL_ZH = "请用户审阅或确认时，向用户说明这个位置。"
 
 
 class Location(unittest.TestCase):
@@ -329,6 +330,31 @@ class Location(unittest.TestCase):
         done = subprocess.run([sys.executable, "-B", SCRIPT, str(self.repo)], input="", capture_output=True,
                               text=True, timeout=10)
         self.assertEqual(done.stdout.split("\n")[1], location_line(self.repo))
+
+    # hint-language-follow: zh-CN gives the Chinese line; any other value keeps the English one.
+    def test_chinese_branch(self):
+        self.commit()
+        self.assertEqual(location_line(self.repo, "zh-CN"),
+                         "位置: 分支 `main` · worktree `%s`。%s" % (self.top, TELL_ZH))
+
+    def test_chinese_detached_head(self):
+        self.commit()
+        git("checkout", "-q", "--detach", cwd=self.repo)
+        sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=self.repo,
+                             capture_output=True, text=True).stdout.strip()
+        self.assertEqual(location_line(self.repo, "zh-CN"),
+                         "位置: 分离于 `%s` · worktree `%s`。%s" % (sha, self.top, TELL_ZH))
+
+    def test_other_languages_keep_english(self):
+        self.commit()
+        for lang in ("en", "zh-TW", ""):
+            self.assertEqual(location_line(self.repo, lang), location_line(self.repo))
+
+    def test_command_line_language(self):
+        self.commit()
+        done = subprocess.run([sys.executable, "-B", SCRIPT, str(self.repo), "--lang", "zh-CN"], input="",
+                              capture_output=True, text=True, timeout=10)
+        self.assertEqual(done.stdout.split("\n")[1], location_line(self.repo, "zh-CN"))
 
 
 

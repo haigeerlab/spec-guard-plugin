@@ -141,7 +141,8 @@ Proposal 代码从不读它。已开工、在等外部条件的模块可以用 `
 `.agent/config.json` 是入库的项目配置，团队与两个宿主共用一份。`project_config.py` 是唯一解析器，阶段提示、
 `verify-artifacts` 与 `/spec-guard:config` 都调用它。文件不存在时什么都不变；文件无效时用固定的问题代码报告，所有
 设置都不生效，键和值不会进入注入上下文（它们是仓库内容）。目前的项有 `artifactLanguage`（新写的 Spec、Plan、todo
-正文的语言，结构关键字不变）与 `reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）。
+正文的语言，结构关键字不变；恰好为 `zh-CN` 时阶段提示的说明文字也用中文，判据是 `module_stage.hint_language`，
+phase-guard 与 `session_context.py` 的位置行都向它取，其他值的提示与 0.67.0 逐字节相同）与 `reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）。
 派活开关与默认事项后端各有自己的位置，这里只汇总显示。
 
 ## 文件布局（File layout）
