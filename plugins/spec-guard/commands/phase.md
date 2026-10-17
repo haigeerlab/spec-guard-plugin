@@ -61,6 +61,11 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 在 git 仓库里，标题下第一行是 ``Location: branch `<分支>` · worktree `<工作树根目录>`. …``（分离 HEAD 时为 ``detached at `<短 sha>` ``），
 各阶段都有；呈现结果时把它一并告诉用户，agent 请用户评审或确认时也应说明这个位置。不在 git 仓库里时没有这一行。
 
+`.agent/config.json` 的 `artifactLanguage` 恰好是 `zh-CN` 时，说明文字改用中文（hint-language-follow）：例如
+``位置: 分支 `<分支>` · worktree `<目录>`。…``、`- 能力图: 已有`、`建议下一步: …`、`- 模块边界: …`、`- 会话上下文: …`。
+标题行 `## spec-guard local workflow`、`当前阶段: **<阶段>**`、阶段代码、命令、路径、模块 id 与标记行不变。
+未设、其他语言或配置无效时，输出为英文，与 0.67.0 逐字节相同。
+
 上下文提醒以模块为单位，按最近一轮主会话上下文分两档（宿主在 hook 输入里给出会话记录 `transcript_path` 时才读得到）：
 
 - `MODULE_DONE` / `DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`：达到窗口 70% 时，事实列表末尾有一行带大小的 `- Module boundary: …`，让 agent 把一条可直接复制的
