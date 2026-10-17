@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.64.1] - 2026-10-17
+
+本版一个模块：`sibling-plugin-hints`，让约定块在合适的时刻想起同一生态的两个插件。
+
+### 新增
+
+- **约定块新增两行带条件的提示。** Spec、Plan 交审或最终验收值得另一个 agent 复核时，若装了 delegate 插件，可提议用它做只读审查
+  （Claude `/delegate:review`，Codex `delegate:delegate-routing`），用户同意后再发起，审查结论不算用户批准，同一模块里拒绝过就不再提；
+  回告来源或通知其他会话时，若装了 agent-relay 插件，用它给对方会话发消息。没装的项目行为不变；不改钩子、不探测插件。
+  已装项目运行一次 `setup-convention --replace`（先 `--dry-run`）拿到新行。
+
 ## [0.64.0] - 2026-10-16
 
 本版一个模块：`ledger-local-only`，让本地事项账本可以纯本地启用，并把数据风险说清楚（来自一份真实使用报告）。
