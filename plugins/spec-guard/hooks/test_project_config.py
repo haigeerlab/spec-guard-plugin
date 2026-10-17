@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_config import load, summary
+from project_config import load, module_concurrency, summary
 
 SCRIPT = str(Path(__file__).with_name("project_config.py"))
 CLAUDE_BLOCK = ("<!-- BEGIN:agent-skills-convention -->\n%s<!-- END:agent-skills-convention -->\n")
@@ -70,6 +70,14 @@ class Load(unittest.TestCase):
         for value in ("Combined", "both", "", 1, None):
             self.assertEqual(self.check({"version": 1, "reviewCadence": value}), ({}, ["reviewCadence-invalid"]))
 
+    def test_module_concurrency_values(self):
+        for value in ("off", "on"):
+            self.assertEqual(self.check({"version": 1, "moduleConcurrency": value}),
+                             ({"moduleConcurrency": value}, []), value)
+        for value in (True, "ON", 1, "", None, "yes"):
+            self.assertEqual(self.check({"version": 1, "artifactLanguage": "en", "moduleConcurrency": value}),
+                             ({}, ["moduleConcurrency-invalid"]), value)
+
     def test_invalid_documents_return_no_values(self):
         cases = {
             "unknown-key": {"version": 1, "artifactLanguage": "en", "extra": 1},
@@ -97,21 +105,55 @@ class Load(unittest.TestCase):
         self.assertNotIn(hostile, " ".join(problems))
 
 
+class ModuleConcurrency(unittest.TestCase):
+    """module-concurrency-switch: the one reader later modules use; only a valid `on` is True."""
+
+    def value(self, payload=None, raw=None):
+        with Project(payload, raw) as project:
+            return module_concurrency(project.root)
+
+    def test_only_a_valid_on_is_true(self):
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "on"}), True)
+        self.assertIs(self.value({"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"}), True)
+
+    def test_everything_else_is_false(self):
+        self.assertIs(self.value(), False)
+        self.assertIs(self.value({"version": 1}), False)
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "off"}), False)
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "on", "extra": 1}), False)
+        self.assertIs(self.value({"version": 2, "moduleConcurrency": "on"}), False)
+        self.assertIs(self.value(raw="{broken"), False)
+        with Project() as project:
+            (project.root / ".agent").mkdir()
+            project.config.mkdir()
+            self.assertIs(module_concurrency(project.root), False)
+
+
 class Summary(unittest.TestCase):
     def test_sources_for_every_item(self):
         with Project({"version": 1, "artifactLanguage": "zh-CN"}) as project:
             (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "dispatch", "trackerDefault"})
+        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "dispatch",
+                                      "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
         self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),
                          ("separate", "default"))
+        self.assertEqual((items["moduleConcurrency"]["value"], items["moduleConcurrency"]["source"]),
+                         ("off", "default"))
         self.assertEqual(items["dispatch"]["value"], {"CLAUDE.md": "on", "AGENTS.md": "off"})
         self.assertIn("setup-convention", items["dispatch"]["editWith"])
         self.assertEqual(items["trackerDefault"]["value"], "absent")
         self.assertIn("tracker-default", items["trackerDefault"]["editWith"])
+
+    def test_module_concurrency_set_in_file(self):
+        with Project({"version": 1, "moduleConcurrency": "on"}) as project:
+            items = {item["key"]: item for item in summary(project.root)}
+        self.assertEqual((items["moduleConcurrency"]["value"], items["moduleConcurrency"]["source"]),
+                         ("on", ".agent/config.json"))
+        self.assertEqual(items["moduleConcurrency"]["editWith"], "/spec-guard:config")
 
     def test_dispatch_without_any_block(self):
         with Project() as project:
@@ -154,6 +196,29 @@ class Cli(unittest.TestCase):
             code, out = project.run("unset", "--key", "artifactLanguage", "--confirm")
             self.assertEqual(code, 0, out)
             self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, []))
+
+    def test_module_concurrency_set_and_unset(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "moduleConcurrency", "--value", "on")
+            self.assertEqual(code, 0, out)
+            self.assertIn("preview only", out)
+            self.assertFalse(project.config.exists())
+            code, out = project.run("set", "--key", "moduleConcurrency", "--value", "on", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({"moduleConcurrency": "on"}, []))
+            self.assertIs(module_concurrency(project.root), True)
+            code, out = project.run("unset", "--key", "moduleConcurrency", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({}, []))
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual(items["moduleConcurrency"]["source"], "default")
+
+    def test_module_concurrency_rejects_other_values(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "moduleConcurrency", "--value", "yes", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertIn("moduleConcurrency-invalid", out)
+            self.assertFalse(project.config.exists())
 
     def test_set_rejects_invalid_value_without_writing(self):
         with Project() as project:

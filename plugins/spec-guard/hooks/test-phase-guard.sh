@@ -1009,6 +1009,16 @@ out="$(run "$pc" | context_of)"
 [ "$out" = "$plain_pc" ] || fail "separate 不应注入任何内容
 $out"
 echo "  ✅ separate：输出与无配置时逐字节一致"; PASS=$((PASS + 1))
+# module-concurrency-switch：开关不论 off、on 还是只有 version，都不注入任何内容。
+for body in '{"version": 1}' '{"version": 1, "moduleConcurrency": "off"}' '{"version": 1, "moduleConcurrency": "on"}'; do
+  printf '%s\n' "$body" > "$pc/.agent/config.json"
+  out="$(run "$pc" | context_of)"
+  [ "$out" = "$plain_pc" ] || fail "moduleConcurrency 不应改变注入（${body}）
+$out"
+done
+echo "  ✅ 并行开关：只有 version、off、on 三种输出都与无配置时逐字节一致"; PASS=$((PASS + 1))
+config_case "并行开关 on 加产物语言：只多出语言行" '{"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"}' \
+  "$LANG_LINE"
 printf '%s\n' '{"version": 1, "artifactLanguage": "en"}' > "$pc/.agent/config.json"
 printf '%s\n' '- [x] open' > "$pc/tasks/alpha/todo.md"
 out="$(run "$pc" | context_of)"

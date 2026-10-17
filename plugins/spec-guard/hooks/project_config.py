@@ -29,10 +29,12 @@ RELATIVE_PATH = Path(".agent") / "config.json"
 VERSION = 1
 LANGUAGE_TAG = re.compile(r"[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?\Z")
 CADENCES = ("separate", "combined")
-DEFAULTS = {"reviewCadence": "separate"}
+CONCURRENCY = ("off", "on")
+DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off"}
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
     "reviewCadence": lambda value: value in CADENCES,
+    "moduleConcurrency": lambda value: value in CONCURRENCY,
 }
 OWNED_ELSEWHERE = {
     "dispatch": "/spec-guard:setup-convention --replace --dispatch (or --no-dispatch)",
@@ -69,6 +71,12 @@ def load(root: Path) -> tuple[dict[str, Any], list[str]]:
     if problems:
         return {}, problems
     return {key: document[key] for key in VALIDATORS if key in document}, []
+
+
+def module_concurrency(root: Path) -> bool:
+    """module-concurrency-switch: the only reader of the switch.  Unset, `off` or an invalid file is off."""
+    values, problems = load(root)
+    return not problems and values.get("moduleConcurrency") == "on"
 
 
 def _dispatch(root: Path) -> dict[str, str]:

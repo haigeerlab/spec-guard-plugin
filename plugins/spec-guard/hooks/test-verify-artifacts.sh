@@ -209,6 +209,10 @@ printf '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}
 check "合法的项目配置通过" 0 "项目配置有效"
 printf '{"version": 1, "reviewCadence": "both", "extra": 1}\n' > "$PROJECT/.agent/config.json"
 check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknown-key, reviewCadence-invalid"
+printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
+check "并行开关 on 的项目配置通过" 0 "项目配置有效"
+printf '{"version": 1, "moduleConcurrency": "yes"}\n' > "$PROJECT/.agent/config.json"
+check "并行开关取值无效时失败" 1 "项目配置无效: moduleConcurrency-invalid"
 printf '{broken' > "$PROJECT/.agent/config.json"
 check "无法解析的项目配置失败" 1 "项目配置无效: not-json"
 
