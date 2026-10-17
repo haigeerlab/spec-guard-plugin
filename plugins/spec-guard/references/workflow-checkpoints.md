@@ -135,7 +135,9 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题里�
 - **写什么。** 按 delegate 审查报告的固定格式（JSON `schema_version` 1）引用：来源（delegate）、后端、`execution_status`、
   `review_outcome`、findings 条数、审查范围指纹（`scope` 的 `baseline` 与 `diff_sha256`），有未审到的部分（unreviewed）时注明。
   报告里没有严重程度，不写也不推断。
-- **跑不起来时**，在小节里记一行未能执行及原因即可，这不算拒绝。
+- **怎么读结论。** 只有 `execution_status` 为 `completed`，且 `review_outcome` 为 `findings` 或 `no_findings_in_scope`，才算有结论；
+  `no_findings_in_scope` 只说明审查范围内没找到问题，不等于没有缺陷。`inconclusive` 或没有完成（`conditions_missing`、`failed`、
+  `timed_out`、`cancelled`）时，记一行「未得出结论」，写明状态和原因，这不算拒绝。报告里的 `limitations` 有内容时一并注明。
 - **用户不需要时**，在当时该写的那个文件里加一行 `<!-- spec-guard: external-review declined -->`。
 - **每个模块只提示一次。** Spec 或 todo 里，这个小节有内容或有拒绝标记，后续检查点都不再出现这一行。
 
