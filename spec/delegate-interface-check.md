@@ -1,6 +1,6 @@
 # Spec: delegate-interface-check
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved a9ecaaedfc47 -->
 
 ## Objective
 
@@ -100,3 +100,5 @@ python3 -B plugins/spec-guard/hooks/test_sibling_plugins.py
 1. delegate 的接口为 1.x 时，Claude 侧的提示命令取自它的 interface.json；接口主版本不兼容时，不出提示。
 2. delegate 0.5.2 及更早（没有这个文件）和文件损坏时，提示与 0.66.0 逐字相同。
 3. 不合规的命令名不会进入注入；阶段提示每轮不调子进程。
+
+<!-- spec-guard: external-review declined -->
