@@ -23,7 +23,7 @@
 - **新字段集中在 `build()` 末尾一处加。** `module_concurrency(root)` 为假时直接返回原来的 dict，不经过任何新代码；为真时再读并行边界、算 `startable`。
 - **并行边界只经 `module_scope.parse` 读；重叠判断写成 `_overlap(a, b)`，按路径段比较**（`apps/bill/` 与 `apps/billing/` 不算重叠）。
 - **`buildOrderGroups` 取自 `parse_map(...).order_groups`**，不另写解析。
-- **表格只改 `_status_cell` 里 `ready` 那一支**：开关为真时根据 `startable` 加后缀，为假时走原来的返回值。
+- **表格改两处**：`_status_cell` 里 `ready` 那一支在开关为真时加后缀；`render` 在开关为真且有冲突时，在「未合入主线」一行前插一行。开关为假时都走原来的代码路径。
 
 ## Task List
 
@@ -46,18 +46,18 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
 先写失败的用例（Spec 测试策略第二、三组）：
 - `moduleConcurrency == "on"`；`buildOrderGroups` 按 Build order，逗号组在同一子数组；
 - `scope` 三种情况：没有 Spec 或没有这一节为 `null`，正常为 `{"exclusive", "shared"}`，格式错误为 `{"error": "<code>"}`；
-- `startable`：就绪且无边界的照样列入；就绪且与进行中模块重叠的被排除，并出现在 `conflicts`；两个进行中模块重叠只进 `conflicts`；挂起、已完成模块
-  不参与；顺序按 Build order；目录与子路径算重叠，`apps/bill/` 与 `apps/billing/` 不算；`conflicts` 里 `a` 排在 `b` 前、`paths` 取较具体的路径；
+- `startable`：全部就绪模块按 Build order 列入；两个进行中模块重叠时进 `conflicts`；挂起、已完成模块不参与；目录与子路径算重叠，
+  `apps/bill/` 与 `apps/billing/` 不算；`conflicts` 里 `a` 排在 `b` 前、`paths` 取较具体的路径；
 - `schemaVersion` 仍为 1。
 
 再实现 `_scope`、`_overlap` 与 `build()` 末尾的新字段。
 
 - 验收：新旧用例全绿。
 
-### Task 3：表格里就绪模块的说明（先红后绿）
+### Task 3：表格里就绪模块的说明与冲突一行（先红后绿）
 
-先写失败的用例：开关 on 时，在 `startable.modules` 里的就绪模块状态格是「🟢 可以开始 · 可同时开工」，被排除的是「🟢 可以开始 · 与 <id> 的并行边界重叠」，
-其他行不变；off 时仍是「🟢 可以开始」。再改 `_status_cell`。
+先写失败的用例：开关 on 时，就绪模块状态格是「🟢 可以开始 · 可同时开工」；有冲突时，表头上方多一行「并行边界重叠：a 与 b（路径）」，位置在
+「未合入主线」那一行之前，没有冲突时不出现；其他行不变；off 时都没有。再改 `_status_cell` 与 `render`。
 
 - 验收：用例全绿。
 
@@ -98,3 +98,7 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
 ## Open Questions
 
 - 无。
+
+## 变更记录
+
+- 2026-10-18：Task 2 去掉「就绪且与进行中模块重叠的被排除」的用例，Task 3 改为「就绪格统一写可同时开工＋表格上方冲突一行」，架构决定同步。原因：随 Spec 修订（就绪模块一定没有并行边界，原排除规则永远不会触发）。来源：本会话实现前自查发现，用户本人决定按建议修订（2026-10-18）。
