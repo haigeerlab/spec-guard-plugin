@@ -564,5 +564,65 @@ class ConcurrencyOff(unittest.TestCase):
         for module in data["modules"]:
             self.assertEqual(set(module), MODULE_KEYS)
 
+
+ON = {".agent/config.json": '{"version": 1, "moduleConcurrency": "on"}'}
+
+
+class ConcurrencyOnJson(unittest.TestCase):
+    """map-startable: the additive JSON fields when moduleConcurrency is on."""
+
+    def data(self, extra=None):
+        files = dict(CON_FILES, **ON, **(extra or {}))
+        with Project(CON_ROWS, CON_ORDER, files) as project:
+            return project.json()
+
+    def test_switch_and_groups(self):
+        data = self.data()
+        self.assertEqual(data["schemaVersion"], 1)
+        self.assertEqual(data["moduleConcurrency"], "on")
+        self.assertEqual(data["buildOrderGroups"], [["setup"], ["billing", "shop"], ["report"], ["later"]])
+        self.assertEqual(set(data) - TOP_KEYS, {"moduleConcurrency", "buildOrderGroups", "startable"})
+        for module in data["modules"]:
+            self.assertEqual(set(module) - MODULE_KEYS, {"scope"})
+
+    def test_scope_values(self):
+        by_id = {m["id"]: m["scope"] for m in self.data({"spec/later.md": "# later\n\n## 并行边界\n\n- 独占：apps/later/\n"})["modules"]}
+        self.assertEqual(by_id["billing"], {"exclusive": ["apps/billing/", "apps/shared/"], "shared": ["lockfile"]})
+        self.assertEqual(by_id["report"], {"exclusive": ["apps/shared/report/", "apps/reporting/"], "shared": []})
+        self.assertIsNone(by_id["setup"])
+        self.assertIsNone(by_id["shop"])
+        self.assertEqual(by_id["later"], {"error": "bad-path"})
+
+    def test_startable_lists_every_ready_module_in_build_order(self):
+        data = self.data()
+        self.assertEqual(data["startable"]["modules"], ["shop"])
+        # d comes first and is therefore the current module (in progress), so it is not listed.
+        rows = [("a", "x", "—"), ("b", "x", "—"), ("c", "x", "a"), ("d", "x", "—")]
+        with Project(rows, ["d", "b, a", "c"], dict(ON)) as project:
+            data = project.json()
+        self.assertEqual(data["startable"]["modules"], ["b", "a"])
+        self.assertEqual(data["buildOrderGroups"], [["d"], ["b", "a"], ["c"]])
+
+    def test_conflicts_between_unfinished_modules(self):
+        self.assertEqual(self.data()["startable"]["conflicts"],
+                         [{"modules": ["billing", "report"], "paths": ["apps/shared/report/"]}])
+
+    def test_done_and_suspended_modules_do_not_conflict(self):
+        extra = {"spec/setup.md": "# setup\n\n## 并行边界\n\n- 独占：`apps/billing/`\n",
+                 "tasks/report/todo.md": "- [ ] one\n" + SUSPEND_MARKER + "\n"}
+        self.assertEqual(self.data(extra)["startable"]["conflicts"], [])
+
+    def test_same_name_prefix_is_not_an_overlap(self):
+        extra = {"spec/report.md": "# report\n\n## 并行边界\n\n- 独占：`apps/bill/`、`apps/shared`\n"}
+        self.assertEqual(self.data(extra)["startable"]["conflicts"], [])
+
+    def test_overlap_paths_and_order(self):
+        from map_view import _overlap
+        from module_scope import Scope
+        a = Scope(("apps/x/", "docs/a.md", "lib/"), ())
+        b = Scope(("apps/x/y/", "docs/a.md", "libs/", "lib/z.py"), ())
+        self.assertEqual(_overlap(a, b), ["apps/x/y/", "docs/a.md", "lib/z.py"])
+        self.assertEqual(_overlap(b, a), ["apps/x/y/", "docs/a.md", "lib/z.py"])
+
 if __name__ == "__main__":
     unittest.main()

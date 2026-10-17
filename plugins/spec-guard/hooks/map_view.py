@@ -24,6 +24,8 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, _git, active_module, external_review_state, file_review_state, module_state,
                           next_gate, project_stage, unmerged_commits)
+from module_scope import Scope, ScopeError, parse as parse_scope
+from project_config import module_concurrency
 
 SCHEMA_VERSION = 1
 REASON_LINE = re.compile(r"^<!-- spec-guard: suspended-reason: (.*) -->$")
@@ -172,6 +174,53 @@ def _title(map_path: Path) -> str | None:
     return None
 
 
+def _scope(root: Path, module: str) -> dict | None:
+    """map-startable: the module's concurrency boundary as JSON, judged only by module_scope.parse."""
+    path = root / "spec" / ("%s.md" % module)
+    if not path.is_file():
+        return None
+    try:
+        scope = parse_scope(path.read_text(encoding="utf-8"))
+    except ScopeError as error:
+        return {"error": error.code}
+    except (OSError, UnicodeError):
+        return {"error": "unreadable"}
+    return None if scope is None else {"exclusive": list(scope.exclusive), "shared": list(scope.shared)}
+
+
+def _overlap(a: Scope, b: Scope) -> list:
+    """Exclusive paths the two boundaries share: equal, or one inside the other's directory (the narrower one)."""
+    found = set()
+    for left in a.exclusive:
+        for right in b.exclusive:
+            if left == right:
+                found.add(left)
+            elif left.endswith("/") and right.startswith(left):
+                found.add(right)
+            elif right.endswith("/") and left.startswith(right):
+                found.add(left)
+    return sorted(found)
+
+
+def _concurrency(root: Path, parsed, modules: list) -> dict:
+    """The fields map-startable adds when moduleConcurrency is on."""
+    for m in modules:
+        m["scope"] = _scope(root, m["id"])
+    open_ = [m for m in modules if m["status"] in ("in_progress", "ready")
+             and m["scope"] is not None and "error" not in m["scope"]]
+    conflicts = []
+    for index, first in enumerate(open_):
+        for second in open_[index + 1:]:
+            paths = _overlap(Scope(tuple(first["scope"]["exclusive"]), ()), Scope(tuple(second["scope"]["exclusive"]), ()))
+            if paths:
+                conflicts.append({"modules": [first["id"], second["id"]], "paths": paths})
+    return {
+        "moduleConcurrency": "on",
+        "buildOrderGroups": parsed.declared_groups,
+        "startable": {"modules": [m["id"] for m in modules if m["status"] == "ready"], "conflicts": conflicts},
+    }
+
+
 def build(root: Path) -> dict:
     map_path = root / "spec" / "CAPABILITY-MAP.md"
     parsed = parse_map(map_path)
@@ -249,7 +298,7 @@ def build(root: Path) -> dict:
     awaiting = [{"id": m["id"], "kind": kind, "review": m["review"][kind]}
                 for m in modules for kind in ("spec", "plan") if m["review"][kind] in AWAITING]
     active = current["id"] if current is not None and stage != "DONE" else None
-    return {
+    data = {
         "schemaVersion": SCHEMA_VERSION,
         "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
         "generator": {"name": "spec-guard", "version": _version()},
@@ -265,6 +314,9 @@ def build(root: Path) -> dict:
         "modules": modules,
         "history": state,
     }
+    if module_concurrency(root):
+        data.update(_concurrency(root, parsed, modules))
+    return data
 
 
 def _now() -> datetime:
