@@ -1510,7 +1510,7 @@ hasnt "本会话的登记失效时不输出阶段" '当前阶段'
 part_15() {
 build_fixture empty other-state prose local
 touch "$local_project/spec/alpha.md"
-REMIND='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything.'
+REMIND='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
 run_ev() {  # $1=项目目录 $2=参数（空=不带）；可用 RUN_PATH 替换 PATH
   env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" \
     /bin/bash "$HOOKDIR/phase-guard.sh" ${2:+"$2"} </dev/null

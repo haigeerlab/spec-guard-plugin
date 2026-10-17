@@ -71,7 +71,7 @@ fi
 
 # python3 在 PATH 上却跑不起来时 emit 自己也会失败；同样不能静默，退回一段手写转义的 JSON。
 # 压缩后（SessionStart）多一句核对提醒：摘要里较早的请求可能已做完；不说“旧指令不是新任务”，压缩前刚下的指令也可能还没进 todo。
-COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything.'
+COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
 emit() {
   local out text="$1"
   [ "$EVENT" != SessionStart ] || text="${text}
