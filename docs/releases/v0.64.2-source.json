@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.64.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:3378167fd7119a0de48445b717ed970dda1cb47b"
+      },
+      "observedAt": "2026-10-17T04:09:52Z",
+      "evidence": [
+        "result:the v0.64.2 annotated tag and origin/main both resolve to merge commit 3378167fd7119a0de48445b717ed970dda1cb47b (pull request #336; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (39001175109) passed before tagging",
+        "result:0.64.2 is one module, compact-next-step: phase-guard.sh's COMPACT_NOTE, appended only to the SessionStart (post-compaction) injection, gains 'and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn'; the per-turn injection is unchanged",
+        "result:each commit was made by verify-and-commit.sh under macOS /bin/bash 3.2.57 (full tier with ShellCheck for the hook change); changing the test constant first turned part 15 red, the hook change turned it green at 339 cases, and the 'identical except the last sentence' case stayed green"
+      ]
+    }
+  ]
+}

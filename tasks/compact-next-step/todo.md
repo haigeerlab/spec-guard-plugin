@@ -5,4 +5,4 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — 随 Task 1 的提交跑 `verify-and-commit.sh` 全档（含 ShellCheck）。
 - [x] Task 2：CHANGELOG 与版本号 — CHANGELOG `[0.64.2] - 2026-10-17`（修复一条）；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.64.2。`validate.sh` 随提交通过。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-17 在对话正文列出实际改动的 12 个文件（新增 3、修改 9、删除 0，无超出 Plan 的文件）、新旧两句原文、验证（先红后绿、339 例不变、三次 `verify-and-commit.sh` 通过、ShellCheck 无告警）、未验证项（真实压缩后的行为待发版后；未做独立评审）、文档建议（只同步 `docs/design.md`）与拟回告（经「Codex LIVE-SAAS 前端基础架构监测」转 spec-guard-monitor，0.64.2 装上之后）；用户验收通过并确认推送与开 PR。
-- [ ] 发版后的验证 — 两边升级到 0.64.2，确认压缩后注入的新措辞与每轮注入不变；能做到时看一轮真实压缩；回告来源。
+- [x] 发版后的验证（2026-10-17，v0.64.2） — #336 合并于 `3378167`，main 上 CI（39001175109）通过后打 tag；包 sha256 `46dbd5e1…07e6c815`，下载一致。两边升级到 0.64.2（Claude gitCommitSha = tag，phase-guard 338 例；Codex ref v0.64.1→v0.64.2，smoke 退出 0，339 例；hooks.json 未变）。两个安装副本以 `SessionStart` 调用时末尾为新措辞，不带参数时无压缩提醒。未验证：真实的一轮中途自动压缩后 agent 是否接着做下一步（临时项目里无法按需制造）。回告：经宿主会话消息告知「Codex LIVE-SAAS 前端基础架构监测」（`local_4f410de8-418e-440c-90d8-436a73edcc6b`）转 spec-guard-monitor。记录见 `docs/releases/v0.64.2-*.json`。
