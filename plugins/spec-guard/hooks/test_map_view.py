@@ -1,5 +1,6 @@
 """map-view: the read-only module progress table and its JSON. No network."""
 import json
+import re
 import os
 import subprocess
 import sys
@@ -516,6 +517,52 @@ class HistoryTest(unittest.TestCase):
             table = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(clone)],
                                    capture_output=True, text=True, timeout=30).stdout
             self.assertIn("（浅克隆：较早的勾选可能看不到）", table)
+
+
+# map-startable: setup done; billing and report in progress with overlapping boundaries; shop ready (comma group
+# with billing); later waits on billing.
+CON_ROWS = [("setup", "公共预置", "—"), ("billing", "账单", "setup"), ("shop", "商城", "setup"),
+            ("report", "报表", "setup"), ("later", "之后", "billing")]
+CON_ORDER = ["setup", "billing, shop", "report", "later"]
+CON_FILES = {
+    "spec/setup.md": "# setup\n", "tasks/setup/plan.md": "# Plan\n", "tasks/setup/todo.md": "- [x] one\n",
+    "spec/billing.md": "# billing\n\n## 并行边界\n\n- 独占：`apps/billing/`、`apps/shared/`\n- 公共：锁文件\n",
+    "tasks/billing/plan.md": "# Plan\n", "tasks/billing/todo.md": "- [ ] one\n",
+    "spec/report.md": "# report\n\n## 并行边界\n\n- 独占：`apps/shared/report/`、`apps/reporting/`\n",
+    "tasks/report/plan.md": "# Plan\n", "tasks/report/todo.md": "- [ ] one\n",
+}
+STAMP = re.compile(r" · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$", re.MULTILINE)
+
+
+def snapshot(project):
+    """JSON without generatedAt, and the table without its minute stamp."""
+    data = project.json()
+    data.pop("generatedAt")
+    done = project.run()
+    assert done.returncode == 0, done.stderr
+    return json.dumps(data, ensure_ascii=False, sort_keys=True), STAMP.sub("", done.stdout)
+
+
+class ConcurrencyOff(unittest.TestCase):
+    """map-startable: off, unset or an invalid config reads exactly like no config at all."""
+
+    def test_off_unset_and_invalid_match_no_config(self):
+        with Project(CON_ROWS, CON_ORDER, CON_FILES) as project:
+            plain = snapshot(project)
+            (project.root / ".agent").mkdir(exist_ok=True)
+            config = project.root / ".agent" / "config.json"
+            for body in ('{"version": 1, "moduleConcurrency": "off"}', '{"version": 1}',
+                         '{"version": 1, "moduleConcurrency": "on", "x": 1}', '{"version": 1, "moduleConcurrency": "yes"}'):
+                with self.subTest(body=body):
+                    config.write_text(body, encoding="utf-8")
+                    self.assertEqual(snapshot(project), plain)
+
+    def test_off_keeps_the_fixed_key_sets(self):
+        with Project(CON_ROWS, CON_ORDER, CON_FILES) as project:
+            data = project.json()
+        self.assertEqual(set(data), TOP_KEYS)
+        for module in data["modules"]:
+            self.assertEqual(set(module), MODULE_KEYS)
 
 if __name__ == "__main__":
     unittest.main()
