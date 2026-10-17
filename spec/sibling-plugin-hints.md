@@ -1,6 +1,6 @@
 # Spec: sibling-plugin-hints
 
-<!-- spec-guard: review approved 2eb23448d574 -->
+<!-- spec-guard: review approved 7b847590cc5b -->
 
 ## Objective
 
