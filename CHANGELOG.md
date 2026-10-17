@@ -17,6 +17,10 @@
   verify-artifacts 校验它的格式（缺失只警告，格式错误判失败）；新增 `hooks/module_scope.py check --module <id> --base <集成基线>`，
   把本模块相对基线的改动文件分成独占内、本模块流程文件、超出边界三类，有文本与 JSON 两种输出，只报告不拦截；最终验收的改动清单里
   标出「超出并行边界」的文件。开关不是 `on` 时这些都不出现，越界检查以退出码 3 拒绝运行。
+- **`/map` 给协调会话的可开工信息。** 开关为 `on` 时，`/map --json` 只增字段（`schemaVersion` 仍为 1）：`moduleConcurrency`、按 Build order
+  保留逗号组的 `buildOrderGroups`、每个模块的 `scope`（并行边界）、`startable`（全部就绪模块与并行边界重叠的模块对）；表格里就绪模块标「可同时开工」，
+  有重叠时上方多一行「并行边界重叠」。能力图解析器多记一份原样逗号分组，`order_groups` 与 `capability-map.py` 的输出不变。开关不是 `on` 时
+  `/map` 的表格与 JSON 与以前逐字节相同。
 
 ### 变更
 
