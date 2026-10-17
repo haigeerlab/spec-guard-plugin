@@ -1017,6 +1017,18 @@ for body in '{"version": 1}' '{"version": 1, "moduleConcurrency": "off"}' '{"ver
 $out"
 done
 echo "  ✅ 并行开关：只有 version、off、on 三种输出都与无配置时逐字节一致"; PASS=$((PASS + 1))
+# module-scope-boundary：phase-guard 不读并行边界；Spec 带这一节时，无配置与开关 on 的输出都与原来逐字节一致。
+printf '# alpha\n\n## 并行边界\n\n- 独占：`apps/alpha/`\n' > "$pc/spec/alpha.md"
+rm -f "$pc/.agent/config.json"
+out="$(run "$pc" | context_of)"
+[ "$out" = "$plain_pc" ] || fail "带并行边界的 Spec 不应改变注入（无配置）
+$out"
+printf '%s\n' '{"version": 1, "moduleConcurrency": "on"}' > "$pc/.agent/config.json"
+out="$(run "$pc" | context_of)"
+[ "$out" = "$plain_pc" ] || fail "带并行边界的 Spec 不应改变注入（开关 on）
+$out"
+printf '# alpha\n' > "$pc/spec/alpha.md"
+echo "  ✅ 并行边界：无配置与开关 on 时注入都与原来逐字节一致"; PASS=$((PASS + 1))
 config_case "并行开关 on 加产物语言：只多出语言行" '{"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"}' \
   "$LANG_LINE"
 printf '%s\n' '{"version": 1, "artifactLanguage": "en"}' > "$pc/.agent/config.json"
