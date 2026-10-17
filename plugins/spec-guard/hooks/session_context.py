@@ -190,19 +190,25 @@ def root_from_hook_input(text, fallback: str) -> str:
     return _git(cwd, "rev-parse", "--show-toplevel") or fallback
 
 
-def location_line(root) -> str | None:
-    """Branch (or detached commit) and worktree root of `root`, or None outside a git worktree."""
+def location_line(root, lang: str | None = None) -> str | None:
+    """Branch (or detached commit) and worktree root of `root`, or None outside a git worktree.
+
+    hint-language-follow: `lang` "zh-CN" gives the Chinese line; anything else the English one.
+    """
+    zh = lang == "zh-CN"
     top = _git(root, "rev-parse", "--show-toplevel")
     if not top:
         return None
     branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
     if branch:
-        head = "branch `%s`" % safe_fragment(branch)
+        head = ("分支 `%s`" if zh else "branch `%s`") % safe_fragment(branch)
     else:
         sha = _git(root, "rev-parse", "--short", "HEAD")
         if not sha:
             return None
-        head = "detached at `%s`" % safe_fragment(sha)
+        head = ("分离于 `%s`" if zh else "detached at `%s`") % safe_fragment(sha)
+    if zh:
+        return "位置: %s · worktree `%s`。请用户审阅或确认时，向用户说明这个位置。" % (head, safe_fragment(top))
     return ("Location: %s · worktree `%s`. State this location to the user whenever you ask them "
             "to review or confirm." % (head, safe_fragment(top)))
 
@@ -259,7 +265,8 @@ def main() -> None:
         nobody = False
     tokens, window = usage if usage else (None, None)
     try:
-        location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".")
+        lang = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--lang" else None
+        location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".", lang)
     except Exception:
         location = None
     print("" if tokens is None else tokens)
