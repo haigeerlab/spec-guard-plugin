@@ -38,7 +38,8 @@
 1. 提交已验证的变更。
 2. 创建匹配版本的 Git tag。
 3. 推送提交和 tag。
-4. 刷新 marketplace，并在新会话中安装/启用更新后的插件。
+4. 刷新 marketplace，并在新会话中安装/启用更新后的插件。Codex 桌面版里已开着的会话不会换到新版，要 ⌘Q 完全退出
+   ChatGPT 应用再打开。
 5. 在 `/hooks` 审核 `UserPromptSubmit`，然后从临时消费者项目运行真实 Codex smoke。
 
 不同宿主的 marketplace 刷新命令与权限策略可能不同；先以 `codex plugin marketplace --help`
