@@ -385,5 +385,38 @@ class ConcurrencyAssessmentTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"))
 
+
+class ConcurrencyBoundaryTests(unittest.TestCase):
+    """module-scope-boundary: the boundary section and the overreach mark apply only when moduleConcurrency is on."""
+
+    HEADING = "## 并行边界（moduleConcurrency 为 on 时）"
+
+    def setUp(self):
+        self.text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self):
+        # The section carries a fenced example with its own `## 并行边界` heading, so end at the next real section.
+        start = self.text.index(self.HEADING)
+        return self.text[start:self.text.index("\n## 按需求批量前置审", start)]
+
+    def test_section_place_and_scope(self):
+        self.assertLess(self.text.index("## 并行评估（moduleConcurrency 为 on 时）"), self.text.index(self.HEADING))
+        self.assertLess(self.text.index(self.HEADING), self.text.index("## 按需求批量前置审"))
+        first = self.section().split("\n\n")[1]
+        for phrase in ("不是 `on`", "不适用"):
+            self.assertIn(phrase, first)
+
+    def test_section_covers_format_check_and_handoff(self):
+        body = self.section()
+        for phrase in ("## 并行边界", "## Concurrency boundary", "独占", "公共", "全局配置", "锁文件", "迁移", "测试资源",
+                       "hooks/module_scope.py\" check", "--base", "超出并行边界", "Spec 交审", "未完成", "verify-artifacts"):
+            self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_final_acceptance_points_to_the_boundary(self):
+        start = self.text.index("- **最终验收列出实际改动的文件。**")
+        rule = self.text[start:self.text.index("\n- **", start + 1)]
+        self.assertIn("并行边界", rule)
+
 if __name__ == "__main__":
     unittest.main()
