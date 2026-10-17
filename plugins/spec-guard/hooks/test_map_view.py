@@ -624,5 +624,36 @@ class ConcurrencyOnJson(unittest.TestCase):
         self.assertEqual(_overlap(a, b), ["apps/x/y/", "docs/a.md", "lib/z.py"])
         self.assertEqual(_overlap(b, a), ["apps/x/y/", "docs/a.md", "lib/z.py"])
 
+
+class ConcurrencyOnTable(unittest.TestCase):
+    """map-startable: the table marks ready modules and lists overlaps above the header, only when on."""
+
+    def table(self, extra=None, switch=True):
+        files = dict(CON_FILES, **(ON if switch else {}), **(extra or {}))
+        with Project(CON_ROWS, CON_ORDER, files) as project:
+            done = project.run()
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return done.stdout.splitlines()
+
+    def test_ready_module_is_marked(self):
+        lines = self.table()
+        self.assertTrue(any("| shop |" in line and "🟢 可以开始 · 可同时开工" in line for line in lines), lines)
+
+    def test_overlap_line_sits_before_the_mainline_line(self):
+        lines = self.table()
+        overlap = [i for i, line in enumerate(lines) if line.startswith("并行边界重叠：")]
+        mainline = [i for i, line in enumerate(lines) if line.startswith("未合入主线：")]
+        self.assertEqual(len(overlap), 1, lines)
+        self.assertEqual(lines[overlap[0]], "并行边界重叠：billing 与 report（apps/shared/report/）")
+        self.assertEqual(overlap[0] + 1, mainline[0])
+
+    def test_no_overlap_no_line(self):
+        extra = {"spec/report.md": "# report\n\n## 并行边界\n\n- 独占：`apps/reporting/`\n"}
+        self.assertFalse(any(line.startswith("并行边界重叠") for line in self.table(extra)))
+
+    def test_off_has_neither(self):
+        lines = self.table(switch=False)
+        self.assertFalse(any("可同时开工" in line or line.startswith("并行边界重叠") for line in lines))
+
 if __name__ == "__main__":
     unittest.main()

@@ -350,7 +350,7 @@ def _suspended_label(m: dict, now: datetime) -> str:
     return reason + ("，已挂 " + since if since else "")
 
 
-def _status_cell(m: dict, now: datetime) -> str:
+def _status_cell(m: dict, now: datetime, concurrent: bool = False) -> str:
     value = m["status"]
     if value == "done":
         return "✅ 已完成"
@@ -368,7 +368,7 @@ def _status_cell(m: dict, now: datetime) -> str:
     if value == "blocked":
         return "⛔ 阻塞：等 " + "、".join(m["blockedOn"])
     if value == "ready":
-        return "🟢 可以开始"
+        return "🟢 可以开始 · 可同时开工" if concurrent else "🟢 可以开始"
     return "○ 未就绪：缺 " + "、".join(m["missingDeps"])
 
 
@@ -420,6 +420,10 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     pushed = "%d 个提交" % head["unpushed"]["count"] if head["unpushed"] else "判断不了"
     notes = {"shallow": "（浅克隆：较早的勾选可能看不到）",
              "unavailable": "（没有 git 历史：不显示勾选与挂起时间）"}
+    concurrent = data.get("moduleConcurrency") == "on"
+    if concurrent and data["startable"]["conflicts"]:
+        lines.append("并行边界重叠：" + "；".join("%s 与 %s（%s）" % (c["modules"][0], c["modules"][1], clean("、".join(c["paths"])))
+                                              for c in data["startable"]["conflicts"]))
     lines.append("未合入主线：%s；未推送：%s%s" % (merged, pushed, notes.get(data["history"], "")))
     lines += ["", "| 位 | 模块 | 作用 | 状态 | 审查 |", "|---|---|---|---|---|"]
 
@@ -451,7 +455,8 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
         else:
             lines.append("| %d | %s | %s | %s | %s |" % (item["position"], item["id"],
                                                          _responsibility(item["responsibility"]),
-                                                         _status_cell(by_id[item["id"]], now), _review_cell(root, item)))
+                                                         _status_cell(by_id[item["id"]], now, concurrent),
+                                                         _review_cell(root, item)))
     return "\n".join(lines) + "\n"
 
 
