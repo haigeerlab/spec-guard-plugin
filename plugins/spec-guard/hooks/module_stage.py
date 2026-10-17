@@ -17,6 +17,7 @@ import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
 from project_config import load as load_config
+from sibling_plugins import delegate_enabled
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
@@ -279,9 +280,12 @@ COMMANDS = {
         "free-next": FREE_BOUNDARY,
         "free-current": ("say in one sentence that the user can /compact with a focus on it, or /clear if the next "
                          "work is unrelated; " + NO_PASTE + "."),
+        "delegate-review": ("`/delegate:review` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
+                            "`/delegate:doctor`)"),
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
+    "delegate-review": "`/delegate:review` (whether it can run is decided by `/delegate:doctor`)",
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
                   + SLASH_BLOCK + "; " + NO_PASTE
@@ -304,6 +308,7 @@ COMMANDS["codex"] = {
     "free-next": ("Give the user " + CODEX_COMPACT
                   + " This stage summary carries over, the conversation does not need to."),
     "free-current": "give the user " + CODEX_COMPACT,
+    "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
 }
 
 
@@ -468,6 +473,60 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
     return "", "", spec, plan
 
 
+# delegate-review-hint: where an external review is recorded, and the line the user's decline leaves behind.
+EXTERNAL_REVIEW_HEADING = re.compile(r"^##\s+(?:外部审查意见|External review)\s*$")
+EXTERNAL_REVIEW_DECLINED = "<!-- spec-guard: external-review declined -->"
+
+
+def external_review_state(root: Path, module: str) -> str | None:
+    """`recorded`, `declined` or `none` from the module's Spec and todo; None when either cannot be read.
+
+    Recorded: an external-review section with any non-blank line.  Declined: the exact decline line anywhere.
+    """
+    recorded = declined = False
+    for path in (root / "spec" / ("%s.md" % module), root / "tasks" / module / "todo.md"):
+        if not path.is_file():
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError):
+            return None
+        inside = False
+        for line in lines:
+            if line.strip() == EXTERNAL_REVIEW_DECLINED:
+                declined = True
+            elif EXTERNAL_REVIEW_HEADING.match(line):
+                inside = True
+            elif line.startswith("#"):
+                inside = False
+            elif inside and line.strip():
+                recorded = True
+    return "recorded" if recorded else "declined" if declined else "none"
+
+
+def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: str, host: str | None) -> str:
+    """The optional line proposing a read-only review by delegate at a review checkpoint; empty when not due.
+
+    Fixed wording and the validated module id only.  The plugin records are read only at a checkpoint.
+    """
+    if stage == "NEEDS_PLAN" and spec in ("pending", "none"):
+        what, where = "Spec", "spec/%s.md" % module
+    elif stage == "BUILDING" and plan == "pending":
+        what, where = "Plan", "tasks/%s/todo.md" % module
+    elif stage == "BUILDING" and at_final_gate(root, module):
+        what, where = "final acceptance", "tasks/%s/todo.md" % module
+    else:
+        return ""
+    if external_review_state(root, module) != "none" or not delegate_enabled(root, host):
+        return ""
+    return ("- External review (from delegate, installed): if this %s deserves a second agent's read-only review "
+            "(cross-module, trade-offs, irreversible, missing information, an interface proposal, many tasks), you "
+            "may propose %s; start it only after the user agrees. Findings are advisory, not the user's approval. "
+            "Record them under `## 外部审查意见` (or `## External review`) in `%s`, or add `%s` there if the user "
+            "declines; either one stops this line for the module."
+            % (what, COMMANDS[host]["delegate-review"], where, EXTERNAL_REVIEW_DECLINED))
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
              unattended: bool = False, host: str | None = None) -> str:
     root = Path(root)
@@ -601,6 +660,9 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd)
     if review_line:
         counts += "\n" + review_line
+    external_line = external_review_hint(root, module, stage, spec_review, plan_review, host)
+    if external_line:
+        counts += "\n" + external_line
     next_step = {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         # No marker says nothing about approval either way, so the suggestion names the condition.
