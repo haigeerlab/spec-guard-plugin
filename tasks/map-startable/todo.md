@@ -6,4 +6,4 @@
 - [x] Task 3：表格里就绪模块的说明与冲突一行（先红后绿） — `test_map_view.py` 新增 `ConcurrencyOnTable` 4 例，先红 2 例（无冲突不出行、off 都没有两例本来就绿，作防线）；`_status_cell` 加 `concurrent` 参数，`render` 在开关为 on 且有冲突时于「未合入主线」前插一行，路径经 `clean()` 处理（与表格其他取自文件的文字一致）。map 49 例全绿。
 - [x] Checkpoint 1（report）：一次性整份比对、三套核心回归与改坏验证 — 一次性整份比对（临时脚本，不入库）：`e7e2859` 导出的整套 hooks 与当前版本，在 CON 与原有 STATUS 两个夹具 × 无配置／off／只有 version／取值无效四种配置 × 表格与 JSON，共 16 组逐字节相同（JSON 去掉 generatedAt，表格去掉分钟戳）；另在本仓库真实能力图（113 个模块）上表格与 JSON 也相同。改坏验证：`_overlap` 改为前缀匹配时 `test_overlap_paths_and_order`、`test_same_name_prefix_is_not_an_overlap` 变红；开关 off 时也加字段时 `test_off_keeps_the_fixed_key_sets` 变红（「与无配置逐字节相同」那例不红，因为两边多出同样的字段，两例搭配才完整）；均已复原。三套核心回归：Task 1～3 各次提交全档通过（最后 `c8ca903`：phase-guard 368、verify-artifacts 67）。
 - [x] Task 4：设计文档与 CHANGELOG — `docs/design.md` 的 `map_view.py` 一行补开关为 on 时只增字段；CHANGELOG「未发布」小节「新增」加一条。
-- [ ] Checkpoint 2（gate）：模块验收
+- [x] Checkpoint 2（gate）：模块验收 — 2026-10-18 在对话正文列出：实际改动 9 个文件（+400/-29；`capability_map.py` 与其测试经复审后加入影响面）、演示项目开关为 on 时的表格与 JSON 原文、整份比对结果（16 组与本仓库真实能力图均逐字节相同）、验证结果、期间改正的测试期望、未验证项（module-crew 实际读取、已安装副本）。用户验收通过；回告 module-crew 实现与修订后的定稿一致；不推送、不开 PR，进入 checkout-role。
