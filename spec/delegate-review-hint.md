@@ -1,6 +1,6 @@
 # Spec: delegate-review-hint
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved ce17d0d92461 -->
 
 ## Objective
 

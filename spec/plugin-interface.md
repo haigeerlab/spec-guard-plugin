@@ -1,6 +1,6 @@
 # Spec: plugin-interface
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved bed3cb90fd07 -->
 
 ## Objective
 
@@ -86,6 +86,7 @@ delegate-review-hint 引入的「外部审查意见」状态，只增不改地�
 
 - `docs/design.md` 新增一小节「对外接口」：interface.json 管什么、版本规则、使用方怎么读，并点明 spec-guard 也是按同样的方式
   读 agent-relay 的。
+- README 中英两版各加一句：对外只读接口见插件根目录的 `interface.json`，格式说明见 `docs/design.md`「对外接口」。
 - CHANGELOG 记一条「新增」。
 
 ## Commands
