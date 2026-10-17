@@ -5,4 +5,4 @@
 - [x] Checkpoint 1（report）：三套核心回归、规则测试与 setup-teardown 回归全绿 — 随 Task 1 的提交跑 `verify-and-commit.sh` 全档加 `--suite setup-teardown`。
 - [x] Task 2：CHANGELOG 与版本号 — CHANGELOG `[0.64.1] - 2026-10-17`（新增一条，写明已装项目跑一次 `--replace`）；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.64.1。`validate.sh` 随提交通过。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-17 在对话正文列出实际改动的 14 个文件（新增 3、修改 11、删除 0；超出 Plan 的 `scripts/check-command-names.py` 已说明）、两边新增两行原文、与 Plan 的出入与 Spec 差异、验证（新用例先红后绿、变异变红、`--replace` 两边退出 0、三次 `verify-and-commit.sh` 通过）、未验证项（真实会话效果待发版后；未做独立评审）、文档建议（无）；用户验收通过并一并批准修订后的 Spec，确认推送与开 PR。
-- [ ] 发版后的验证 — 两边升级到 0.64.1，各跑一轮到 Spec 交审，看是否只提议一次 delegate 只读审查、未自行发起。
+- [x] 发版后的验证（2026-10-17，v0.64.1） — #334 合并于 `6daf02f`，main 上 CI（38998965435）通过后打 tag；包 sha256 `fa613879…b82a3ed0`，下载一致。两边升级到 0.64.1（Claude gitCommitSha = tag；Codex ref v0.64.0→v0.64.1，smoke 退出 0，安装副本 phase-guard Claude 338 例、Codex 339 例）。真实会话：两宿主各两轮（普通交审；强调数据不可恢复、用户不放心），约定块均由 0.64.1 写入、delegate 已启用——四轮都正确交审，**都没有提议 delegate 审查，也没有自行发起**；Codex 那轮可见读到了新行。结论：提示在上下文里，但这四轮里没有触发；没造成错误动作，按“只记录”处理，后续若要更明确再议。Codex 临时信任项已删。记录见 `docs/releases/v0.64.1-*.json`。

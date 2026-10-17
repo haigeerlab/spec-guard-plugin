@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.64.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude-code-cli",
+      "status": "installed-verified",
+      "target": {
+        "kind": "installed-session",
+        "id": "claude-code:v0.64.1;test:installed-plugin-upgrade-20261017"
+      },
+      "observedAt": "2026-10-17T03:42:52Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.64.0 to 0.64.1 for scope user; the installed copy records gitCommitSha 6daf02f -- the v0.64.1 tag commit; it passes 338 phase-guard cases (one repository-file case is the known class); test_workflow_checkpoints.py has 7 errors in the installed copy, all FileNotFoundError on repository files (docs/, .github/) that the plugin cache does not carry -- the same class as 0.64.0's 6, plus the new case's docs path",
+        "host:Claude Code 2.1.301"
+      ]
+    },
+    {
+      "subject": "spec-guard-0.64.1-sibling-hints-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-p-sonnet;test:sibling-hints-two-prompts-20261017"
+      },
+      "observedAt": "2026-10-17T03:42:52Z",
+      "evidence": [
+        "command:claude -p --model sonnet --permission-mode acceptEdits in two temporary projects whose CLAUDE.md block was written by the installed 0.64.1, with delegate 0.5.2 enabled at user scope; same two prompts as the Codex record",
+        "result:both runs wrote the Spec and handed it off in the conversation; neither proposed a delegate review and neither started one",
+        "not-verified:a hand-off where the agent does propose a delegate review; the hint was not acted on in these two runs"
+      ]
+    }
+  ]
+}
