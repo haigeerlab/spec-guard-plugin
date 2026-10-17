@@ -180,6 +180,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 `show` 末尾列出本机状态根目录（`~/.spec-guard` 或 `SPEC_GUARD_STATE_DIR`）以及仍在回退读取的旧位置，照实转述，不建议删除。
 
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
+  恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.0 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
 

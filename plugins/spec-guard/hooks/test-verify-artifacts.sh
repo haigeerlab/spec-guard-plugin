@@ -207,6 +207,10 @@ check_absent "没有配置文件时不报告项目配置" "项目配置"
 project config-valid; mkdir -p "$PROJECT/.agent"
 printf '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}\n' > "$PROJECT/.agent/config.json"
 check "合法的项目配置通过" 0 "项目配置有效"
+# hint-language-follow：阶段提示的语言与这里同一判据（project_config.load）。zh-CN 有效（上一例），不合规的
+# zh_CN 判无效——阶段提示在同一份配置下出英文并带 invalid 行。
+printf '{"version": 1, "artifactLanguage": "zh_CN"}\n' > "$PROJECT/.agent/config.json"
+check "不合规的语言标签判无效" 1 "项目配置无效: artifactLanguage-invalid"
 printf '{"version": 1, "reviewCadence": "both", "extra": 1}\n' > "$PROJECT/.agent/config.json"
 check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknown-key, reviewCadence-invalid"
 printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"

@@ -130,9 +130,15 @@ spec-guard: 本目录有指向文件 \`.agent/spec-guard-link.json\`，但${LINK
   fi
 fi
 
+# hint-language-follow：说明文字的语言只由 module_stage.py --hint-language 判定（artifactLanguage 恰好是 zh-CN 才是中文）；
+# 取不到时按英文，输出与改前逐字相同。跟随指向时这里已在目标项目里，用的是目标项目的配置。
+ZH=""
+[ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" != zh-CN ] || ZH=1
+[ -z "$ZH" ] || COMPACT_NOTE='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo 和状态记录，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
 # hook 输入已在上面读过，这里转交那一行原文。
-FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . 2>/dev/null)" || FACTS=""
+FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . ${ZH:+--lang zh-CN} 2>/dev/null)" || FACTS=""
 TOKENS="${FACTS%%$'\n'*}"
 case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
 # phase-hint-gaps：压缩后那一次（SessionStart）宿主还没把压缩记录写进会话记录，读到的是压缩前最后一轮的用量；
@@ -170,7 +176,15 @@ HEADER="## spec-guard local workflow"
 
 ${LOCATION}"
 # 跟随指向时写明项目在哪：阶段是那个项目的，位置行也是它的；路径已在 project_link.py 里清洗。
-if [ -n "$LINKED" ] && [ "$LINK_SOURCE" = session ]; then
+if [ -n "$LINKED" ] && [ -n "$ZH" ] && [ "$LINK_SOURCE" = session ]; then
+  HEADER="${HEADER}
+
+关联项目: \`${LINK_SHOWN}\` — 本会话在 \`${LINK_FROM}\` 下的 \`.agent/spec-guard-link.json\` 里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。运行 spec-guard 命令时把这个路径作为项目传入。"
+elif [ -n "$LINKED" ] && [ -n "$ZH" ]; then
+  HEADER="${HEADER}
+
+关联项目: \`${LINK_SHOWN}\` — 本会话的目录 \`${LINK_FROM}\` 通过 \`.agent/spec-guard-link.json\` 指向它。运行 spec-guard 命令时把这个路径作为项目传入。这个指向对在该目录里运行的每个会话都生效；如果本会话做的是别的项目，忽略这里的阶段，传入你自己的项目路径。"
+elif [ -n "$LINKED" ] && [ "$LINK_SOURCE" = session ]; then
   HEADER="${HEADER}
 
 Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. Pass this path as the project when you run spec-guard commands."
@@ -189,6 +203,18 @@ done
 # 能力图存在却读不了是读取故障，不是能力图的状态：不论有没有模块 spec 都报 UNKNOWN（与 module_stage 同一行）。
 if [ -e spec/CAPABILITY-MAP.md ] && { [ ! -f spec/CAPABILITY-MAP.md ] || [ ! -r spec/CAPABILITY-MAP.md ]; }; then
   if [ ! -f spec/CAPABILITY-MAP.md ]; then REASON="not a regular file"; else REASON="no read permission"; fi
+  if [ -n "$ZH" ]; then
+    if [ ! -f spec/CAPABILITY-MAP.md ]; then REASON="不是普通文件"; else REASON="没有读取权限"; fi
+    emit "${HEADER}
+
+当前阶段: **UNKNOWN**
+
+- 能力图: 已有但读不了（${REASON}）
+- 模块 Spec: ${SPECS}
+
+建议下一步: 让 \`spec/CAPABILITY-MAP.md\` 成为可读的文件（检查它的权限），然后再发下一条消息；这是读取故障，不是能力图的状态。"
+    exit 0
+  fi
   emit "${HEADER}
 
 当前阶段: **UNKNOWN**
@@ -209,6 +235,18 @@ if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
 ${CONFIG_LINES}"
 fi
 
+if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
+  emit "${HEADER}
+
+当前阶段: **IDLE**
+
+- 能力图: 没有
+- 模块 Spec: ${SPECS}${CONFIG_LINES}
+
+建议下一步: 先写能力图并交审，再做规划。"
+  exit 0
+fi
+
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
@@ -218,6 +256,18 @@ if [ ! -f spec/CAPABILITY-MAP.md ]; then
 - Module specs: ${SPECS}${CONFIG_LINES}
 
 Suggested next step: create and review a capability map before planning."
+  exit 0
+fi
+
+if [ "$SPECS" -eq 0 ] && [ -n "$ZH" ]; then
+  emit "${HEADER}
+
+当前阶段: **MAP_ONLY**
+
+- 能力图: 已有
+- 模块 Spec: 没有${CONFIG_LINES}
+
+建议下一步: 在 \`spec/\` 下写第一份模块 Spec 并交审。"
   exit 0
 fi
 
@@ -238,6 +288,13 @@ if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TO
   emit "${HEADER}
 
 ${STAGE}"
+elif [ -n "$ZH" ]; then
+  emit "${HEADER}
+
+当前阶段: **UNKNOWN**
+
+- 模块 Spec: ${SPECS}
+- 没能算出模块阶段；运行 ${VERIFY_CMD} 查看详情。"
 else
   emit "${HEADER}
 

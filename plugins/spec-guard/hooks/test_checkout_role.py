@@ -338,5 +338,36 @@ class RoleOffOrInvalid(unittest.TestCase):
                 with View(role_text=text, switch=switch) as v:
                     self.assertEqual(v.describe(), plain, (switch, text))
 
+
+class ChineseRoleView(unittest.TestCase):
+    """checkout-role lines follow hint-language-follow: Chinese when artifactLanguage is exactly zh-CN."""
+
+    def view(self, role_text, files=None):
+        config = {".agent/config.json": json.dumps({"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"})}
+        return View(dict(config, **(files or {})), role_text, switch=None)
+
+    def test_module_role_in_chinese(self):
+        with self.view("module gamma\n") as v:
+            out = v.describe()
+        self.assertIn("checkout 角色: 模块 `gamma`", out)
+        self.assertIn("本 checkout 的模块 `gamma`: NEEDS_SPEC", out)
+        tail = out.split("建议下一步: ", 1)[1]
+        self.assertIn("spec/gamma.md", tail)
+        self.assertNotIn("Checkout role", out)
+        self.assertNotIn("hand it", tail)
+
+    def test_coordinator_in_chinese(self):
+        with self.view("coordinator\n", {"tasks/beta/plan.md": "# Plan\n\n<!-- spec-guard: review approved -->\n"}) as v:
+            out = v.describe()
+        self.assertIn("checkout 角色: 协调", out)
+        self.assertIn("`beta` 的下一个 gate", out)
+        self.assertIn("统筹各模块", out.split("建议下一步: ", 1)[1])
+        self.assertNotIn("/build", out.split("建议下一步: ", 1)[1])
+
+    def test_invalid_marker_in_chinese(self):
+        with self.view("nonsense\n") as v:
+            out = v.describe()
+        self.assertIn("checkout 角色: 角色标记无效", out)
+
 if __name__ == "__main__":
     unittest.main()

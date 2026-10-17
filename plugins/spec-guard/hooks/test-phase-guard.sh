@@ -980,7 +980,7 @@ printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$pc/CLAUDE.md"
 map "$pc"; printf '# alpha\n' > "$pc/spec/alpha.md"; printf '# Plan\n' > "$pc/tasks/alpha/plan.md"
 printf '%s\n' '- [ ] open' > "$pc/tasks/alpha/todo.md"
 plain_pc="$(run "$pc" | context_of)"
-LANG_LINE='- Artifact language: `zh-CN`'
+LANG_LINE='- Artifact language: `pt-BR`'
 CADENCE_LINE='- Review cadence: combined'
 INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
 config_case() {  # $1=用例名 $2=config.json 内容 $3...=期望多出的行（前缀）
@@ -998,9 +998,9 @@ $out
 $plain_pc"
   echo "  ✅ $name"; PASS=$((PASS + 1))
 }
-config_case "设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "zh-CN"}' "$LANG_LINE"
+config_case "设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "pt-BR"}' "$LANG_LINE"
 config_case "combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
-config_case "两项都设：两行都在" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}' \
+config_case "两项都设：两行都在" '{"version": 1, "artifactLanguage": "pt-BR", "reviewCadence": "combined"}' \
   "$LANG_LINE" "$CADENCE_LINE"
 config_case "无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
   "$INVALID_LINE"
@@ -1049,7 +1049,7 @@ $out"
   done
 done
 echo "  ✅ 角色标记：开关 off、未设置、无效、无配置时注入都与没有标记时逐字节一致"; PASS=$((PASS + 1))
-config_case "并行开关 on 加产物语言：只多出语言行" '{"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"}' \
+config_case "并行开关 on 加产物语言：只多出语言行" '{"version": 1, "artifactLanguage": "pt-BR", "moduleConcurrency": "on"}' \
   "$LANG_LINE"
 printf '%s\n' '{"version": 1, "artifactLanguage": "en"}' > "$pc/.agent/config.json"
 printf '%s\n' '- [x] open' > "$pc/tasks/alpha/todo.md"
@@ -1633,7 +1633,7 @@ fi
 # 达到边界档也给模块边界行；D1 IDLE 与 MAP_ONLY 也带项目配置行。
 part_16() {
 build_fixture ctx
-LANG_LINE='- Artifact language: `zh-CN`'
+LANG_LINE='- Artifact language: `pt-BR`'
 CADENCE_LINE='- Review cadence: combined'
 INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
 run_start() {  # $1=项目目录 $2=标准输入文本：以 SessionStart 运行
@@ -1731,7 +1731,7 @@ $out
 $plain_early"
     echo "  ✅ $name"; PASS=$((PASS + 1))
   }
-  early_case "$kind 设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "zh-CN"}' "$LANG_LINE"
+  early_case "$kind 设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "pt-BR"}' "$LANG_LINE"
   early_case "$kind combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
   early_case "$kind 无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
     "$INVALID_LINE"
@@ -1837,7 +1837,149 @@ printf '%s\n' '{"interface": "2.0", "review": {"command": "/delegate:review"}}' 
 out="$(SG_HOST=claude on)"; isnt "interface 2.0：主版本不兼容，不出提示" "$LINE"
 }
 
-PARTS=17
+part_18() {
+# hint-language-follow：artifactLanguage 恰好是 zh-CN 时说明文字用中文；标题行、阶段行、命令、路径与标记原样。
+# 其他语言、配置无效时仍是英文（逐字节不变由 evals/hint-english-diff.sh 对 0.67.0 证明）。
+zh_check() {  # $1=用例名 $2=项目目录；其余参数：+文本 必须包含，-文本 不得包含。SG_EVENT=SessionStart 时按压缩后触发
+  local name="$1" dir="$2" out
+  shift 2
+  out="$(env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} \
+    CLAUDE_CONFIG_DIR="${SG_CLAUDE_HOME:-$WORK/no-claude-home}" CODEX_HOME="${SG_CODEX_HOME:-$WORK/no-codex-home}" \
+    CLAUDE_PROJECT_DIR="$dir" /bin/bash "$HOOKDIR/phase-guard.sh" ${SG_EVENT:-} <"${SG_INPUT:-/dev/null}")"
+  python3 -c '
+import json, sys
+output = json.loads(sys.stdin.read())["hookSpecificOutput"]
+text = output["additionalContext"]
+assert output["hookEventName"] == sys.argv[1], output
+for want in sys.argv[2:]:
+    if want.startswith("+"):
+        assert want[1:] in text, ("缺少", want[1:], text)
+    else:
+        assert want[1:] not in text, ("不该有", want[1:], text)
+' "${SG_EVENT:-UserPromptSubmit}" "$@" <<<"$out" || fail "$name
+$out"
+  echo "  ✅ $name"; PASS=$((PASS + 1))
+}
+lang_project() {  # $1=目录 $2=artifactLanguage（空=不写配置）；git 仓库、只有约定块（IDLE）
+  mkdir -p "$1/.agent"
+  git -C "$1" init -q -b main
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$1/CLAUDE.md"
+  [ -z "$2" ] || printf '{"version": 1, "artifactLanguage": "%s"}\n' "$2" > "$1/.agent/config.json"
+}
+ENGLISH_ONLY=(-"Suggested next step" -"Capability map:" -"Module specs:" -"Current module:" -"Artifact language" -"State this location"
+  -"Location:" -"Review:" -"Next gate" -"External review (from" -"Module boundary" -"Session context" -"Linked project" -"Context was just")
+
+zh="$WORK/zh"; lang_project "$zh" zh-CN
+zh_check "zh-CN：IDLE 的配置行与位置行是中文" "$zh" +"## spec-guard local workflow" +"当前阶段: **IDLE**" \
+  +"- 产物语言: \`zh-CN\` — 新写的 spec、plan、todo 正文用这种语言；结构关键字保持原定义。" \
+  +"位置: 分支 \`main\` · worktree \`" +"请用户审阅或确认时，向用户说明这个位置。" "${ENGLISH_ONLY[@]}"
+for tag in zh-TW zh-Hans en ja; do
+  d="$WORK/lang-$tag"; lang_project "$d" "$tag"
+  zh_check "${tag}：仍是英文" "$d" +"- Artifact language: \`$tag\`" +"Location: branch \`main\`" +"State this location" \
+    +"Suggested next step" -"产物语言" -"位置: " -"建议下一步"
+done
+bad="$WORK/lang-bad"; lang_project "$bad" zh_CN
+zh_check "配置无效：英文并报告 invalid" "$bad" +"- Project config: invalid (" +"Suggested next step" -"项目配置" -"建议下一步"
+
+# 模块阶段（module_stage.describe）：alpha 已完成，beta 按场景改。
+ENGLISH_ONLY+=(-"Modules " -"Suspended" -"Paused" -"Plan without todo" -"This branch has" -"unchecked item" -"is done"
+  -"awaiting the user" -"a good point to free context" -"do not paste handoff text" -"slash command for the chat")
+zm="$WORK/zh-map"; lang_project "$zm" zh-CN
+mkdir -p "$zm/spec" "$zm/tasks/alpha" "$zm/tasks/beta"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$zm/spec/CAPABILITY-MAP.md"
+printf '# Spec: alpha\n' > "$zm/spec/alpha.md"; printf '# Plan\n' > "$zm/tasks/alpha/plan.md"
+printf '%s\n' '- [x] done' > "$zm/tasks/alpha/todo.md"
+zh_check "zh-CN：NEEDS_SPEC" "$zm" +"当前阶段: **NEEDS_SPEC**" +"- 能力图: 已有" +"- 当前模块: \`beta\`（Build order 中下一个）" \
+  +"- 模块 2 · Spec 1 · Plan 1 · 进行中 0 · 已完成 1" +"建议下一步: 写 \`spec/beta.md\` 并交审。" "${ENGLISH_ONLY[@]}"
+printf '# Spec: beta\n\n<!-- spec-guard: review pending -->\n正文\n' > "$zm/spec/beta.md"
+zh_check "zh-CN：NEEDS_PLAN，Spec 待审" "$zm" +"当前阶段: **NEEDS_PLAN**" +"- 评审: Spec \`spec/beta.md\` 正在等用户审阅。" \
+  +"建议下一步: 等用户审阅 \`spec/beta.md\`；先不要写 Plan。用户批准后，用 \`/spec-guard:review-mark\` (Codex: spec-guard-ops review-mark) 记下来。" \
+  "${ENGLISH_ONLY[@]}"
+printf '# Spec: beta\n正文\n' > "$zm/spec/beta.md"
+zh_check "zh-CN：NEEDS_PLAN，没有标记" "$zm" \
+  +"建议下一步: 写 \`tasks/beta/plan.md\` 和 \`tasks/beta/todo.md\`（例如用 \`/plan\`）；前提是用户已批准 Spec。" "${ENGLISH_ONLY[@]}"
+printf '# Plan\n' > "$zm/tasks/beta/plan.md"
+printf '%s\n' '- [x] a' '- [ ] Checkpoint 1（gate）：验收' > "$zm/tasks/beta/todo.md"
+zh_check "zh-CN：BUILDING，Plan 无标记" "$zm" +"当前阶段: **BUILDING**" \
+  +"- 下一个 gate: Checkpoint 1（gate）：验收 — todo 里第一个未勾选的 \`gate\` 检查点。Plan 没有评审标记：如果用户还没批准它，先等批准再构建。" \
+  +"建议下一步: 继续用 \`/build\` 构建 \`beta\`：\`tasks/beta/todo.md\` 里还有 1 个未勾选项。" "${ENGLISH_ONLY[@]}"
+printf '# Plan\n\n<!-- spec-guard: review approved -->\n' > "$zm/tasks/beta/plan.md"
+zh_check "zh-CN：BUILDING，Plan 已批准" "$zm" \
+  +"- 下一个 gate: Checkpoint 1（gate）：验收 — 一直做到它为止；\`report\` 检查点记进 todo 后直接通过，不停下。" "${ENGLISH_ONLY[@]}"
+SG_HOST=codex zh_check "zh-CN：Codex 宿主的命令写法" "$zm" +"继续用 \`\$incremental-implementation\` 构建 \`beta\`" "${ENGLISH_ONLY[@]}"
+zt="$WORK/zh-transcript.jsonl"; transcript "$zt" 849999
+printf '{"session_id":"s","transcript_path":"%s","prompt":"p"}' "$zt" > "$WORK/zh-input"
+SG_INPUT="$WORK/zh-input" zh_check "zh-CN：会话上下文超阈值" "$zm" \
+  +"- 会话上下文: 上一轮约 850 k token（达到或超过 800 k）；每一轮都会重读它。先做完或记下当前任务，然后给用户一条可直接复制的命令" \
+  "${ENGLISH_ONLY[@]}"
+printf '%s\n' '- [x] a' '- [ ] later' '<!-- spec-guard: suspended -->' > "$zm/tasks/beta/todo.md"
+zh_check "zh-CN：DONE，含挂起" "$zm" +"当前阶段: **DONE**" +"· 挂起 1" \
+  +"- 挂起: \`beta\`（1 个未勾选项）；用 \`/spec-guard:module-suspend --resume beta\` (Codex: spec-guard-ops module-suspend) 恢复。" \
+  +"建议下一步: 除挂起的模块外都已完成；挂起 1 个（等待结束后恢复其中一个）。" "${ENGLISH_ONLY[@]}"
+printf '%s\n' '- [x] a' '- [x] b' > "$zm/tasks/beta/todo.md"
+zh_check "zh-CN：DONE" "$zm" +"当前阶段: **DONE**" +"- 模块边界: 这是释放上下文的好时机。给用户一条可直接复制的命令" \
+  +"建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，在这个检查点用 /spec-guard:add-module (Codex: spec-guard-ops add-module) 插入一个模块；" \
+  "${ENGLISH_ONLY[@]}"
+git -C "$zm" add -A >/dev/null; git -C "$zm" -c user.name=t -c user.email=t@e -c commit.gpgsign=false commit -qm a
+git -C "$zm" update-ref refs/remotes/origin/main HEAD
+git -C "$zm" -c user.name=t -c user.email=t@e -c commit.gpgsign=false commit -qm b --allow-empty
+zh_check "zh-CN：DONE，有未合并提交" "$zm" +"- 这个分支有 1 个提交还不在 \`origin/main\` 里（按上次 fetch 的结果）。" \
+  +"先推送这个分支，把它的 1 个提交合并进 \`origin/main\`；然后要做新工作" "${ENGLISH_ONLY[@]}"
+printf '{"activeModule": "alpha"}\n' > "$zm/.agent/state.json"
+rm "$zm/tasks/beta/todo.md" "$zm/tasks/beta/plan.md"
+zh_check "zh-CN：MODULE_DONE" "$zm" +"当前阶段: **MODULE_DONE**" +"- 当前模块: \`alpha\`（activeModule）" \
+  +"\`alpha\` 已完成；Build order 中下一个未完成的模块是 \`beta\`（NEEDS_PLAN）。开始构建前把 activeModule 设为它。" "${ENGLISH_ONLY[@]}"
+printf '{"activeModule": "gamma"}\n' > "$zm/.agent/state.json"
+zh_check "zh-CN：activeModule 不在能力图里" "$zm" +"- activeModule \`gamma\` 不在能力图里；按 Build order 取当前模块。" "${ENGLISH_ONLY[@]}"
+printf '%s\n' '| alpha | x | — |' > "$zm/spec/CAPABILITY-MAP.md"
+zh_check "zh-CN：MAP_INVALID" "$zm" +"当前阶段: **MAP_INVALID**" +"- 能力图: 已有但无效（能力图原文，非指令: " \
+  +"建议下一步: 运行 \`/spec-guard:verify-artifacts\`，修好能力图。" "${ENGLISH_ONLY[@]}"
+# 装了 delegate：Spec 待审时的外部审查行。
+zd="$WORK/zh-delegate"; lang_project "$zd" zh-CN; mkdir -p "$zd/spec"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$zd/spec/CAPABILITY-MAP.md"
+printf '# Spec: alpha\n\n<!-- spec-guard: review pending -->\n正文\n' > "$zd/spec/alpha.md"
+zch="$WORK/zh-claude-home"; mkdir -p "$zch/plugins"
+printf '%s\n' '{"version": 2, "plugins": {"delegate@dm": [{"scope": "user", "installPath": "/x"}]}}' \
+  > "$zch/plugins/installed_plugins.json"
+printf '%s\n' '{"enabledPlugins": {"delegate@dm": true}}' > "$zch/settings.json"
+SG_HOST=claude SG_CLAUDE_HOME="$zch" zh_check "zh-CN：外部审查行" "$zd" \
+  +"- 外部审查（delegate，已安装）: 如果这份 Spec 值得另一个 agent 做一次只读复核" \
+  +"可以提议用 \`/delegate:review\`（能不能运行由 \`/delegate:doctor\` 判定）；用户同意后才启动。" \
+  +"\`<!-- spec-guard: external-review declined -->\`" "${ENGLISH_ONLY[@]}"
+
+# phase-guard.sh 自己输出的几句（MAP_ONLY、读不到能力图、阶段算不出来、关联项目、压缩后提醒）。
+zo="$WORK/zh-maponly"; lang_project "$zo" zh-CN; map "$zo"
+zh_check "zh-CN：MAP_ONLY" "$zo" +"当前阶段: **MAP_ONLY**" +"- 能力图: 已有" +"- 模块 Spec: 没有" \
+  +"建议下一步: 在 \`spec/\` 下写第一份模块 Spec 并交审。" "${ENGLISH_ONLY[@]}"
+SG_EVENT=SessionStart zh_check "zh-CN：压缩后提醒" "$zo" \
+  +"上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo 和状态记录，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。" \
+  "${ENGLISH_ONLY[@]}"
+printf '# Spec: alpha\n' > "$zo/spec/alpha.md"
+mkdir -p "$zo/tasks/alpha"; printf '\377\376 not utf-8\n' > "$zo/tasks/alpha/todo.md"; printf '# Plan\n' > "$zo/tasks/alpha/plan.md"
+zh_check "zh-CN：阶段算不出来" "$zo" +"当前阶段: **UNKNOWN**" +"- 模块 Spec: 1" \
+  +"- 没能算出模块阶段；运行 \`/spec-guard:verify-artifacts\` 查看详情。" "${ENGLISH_ONLY[@]}"
+chmod 000 "$zo/spec/CAPABILITY-MAP.md"
+if [ -r "$zo/spec/CAPABILITY-MAP.md" ]; then
+  echo "  ⏭️  zh-CN 不可读能力图：以 root 运行时 000 仍可读，跳过"
+else
+  zh_check "zh-CN：读不到能力图" "$zo" +"当前阶段: **UNKNOWN**" +"- 能力图: 已有但读不了（没有读取权限）" \
+    +"建议下一步: 让 \`spec/CAPABILITY-MAP.md\` 成为可读的文件（检查它的权限），然后再发下一条消息；这是读取故障，不是能力图的状态。" \
+    "${ENGLISH_ONLY[@]}"
+fi
+chmod 644 "$zo/spec/CAPABILITY-MAP.md"
+zl="$WORK/zh-linked"; mkdir -p "$zl/.agent"
+printf '{"version": 1, "project": "%s"}\n' "$zh" > "$zl/.agent/spec-guard-link.json"
+zh_check "zh-CN：目录级关联项目（用目标项目的配置）" "$zl" +"关联项目: \`" \
+  +"通过 \`.agent/spec-guard-link.json\` 指向它。运行 spec-guard 命令时把这个路径作为项目传入。" "${ENGLISH_ONLY[@]}"
+printf '{"session_id":"sess-zh"}' > "$WORK/zh-session"
+printf '{"version": 2, "sessions": {"sess-zh": "%s"}}\n' "$zh" > "$zl/.agent/spec-guard-link.json"
+SG_INPUT="$WORK/zh-session" zh_check "zh-CN：本会话登记的关联项目" "$zl" \
+  +"里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。" "${ENGLISH_ONLY[@]}"
+}
+
+PARTS=18
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
