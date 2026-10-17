@@ -7,5 +7,5 @@
 - [x] Task 4：phase-guard 不受影响的回归 — project-config 段加 1 例：Spec 带并行边界时，无配置与开关 on 两种注入都与原来逐字节一致；预期直接绿，phase-guard 368 例全绿。
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告，并做两次改坏验证 — Task 1～4 各次提交 `verify-and-commit.sh` 全档通过（最后一次 `0fb88a1`：validate、phase-guard 368、verify-artifacts 67、repo-artifacts、ShellCheck 无告警）。改坏验证：`covers` 改为按字符串前缀判断时 `test_directory_does_not_cover_same_prefix` 等 3 例变红；`validate` 在开关 off 时也检查时 verify-artifacts「开关 off 时并行边界不应改变输出」变红；两处均已复原。
 - [x] Task 5：共享规则（先红后绿） — `test_workflow_checkpoints.py` 加 `ConcurrencyBoundaryTests` 3 例，先红 3 例；在「并行评估」之后新增「并行边界（moduleConcurrency 为 on 时）」一节（格式、Spec 交审要点、verify-artifacts 检查范围、最终验收用越界检查标出超出并行边界的文件），「最终验收列出实际改动的文件」一条末尾加指引后 36 例全绿，`check-no-parallel-surface.py` 通过。期间两处是测试本身写错：按下一个 `## ` 切节会被节内示例里的标题截断，改成切到下一节为止；命令断言改成按规则里实际的写法（`hooks/module_scope.py" check`）匹配。
-- [ ] Task 6：设计文档与 CHANGELOG
+- [x] Task 6：设计文档与 CHANGELOG — `docs/design.md` 文件表加 `module_scope.py` 一行；CHANGELOG「未发布」小节「新增」加一条。
 - [ ] Checkpoint 2（gate）：模块验收
