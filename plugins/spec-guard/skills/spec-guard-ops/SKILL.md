@@ -170,7 +170,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 ## config
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
-行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence` 的生效值与来源，以及只在别处修改的
+行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency` 的生效值与来源，以及只在别处修改的
 `dispatch`（约定块标记，用 setup 的 `--dispatch`／`--no-dispatch`）和 `trackerDefault`（上一节）：
 
 ```bash
@@ -182,6 +182,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
+- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.0 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 
@@ -258,6 +259,22 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 标着待审核／已修订／无效时单独批准 Plan
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
 记为批准；既有项目不必补标记，要补先向用户单独确认，不得依据此前含糊的答复补记。
+
+## checkout-role
+
+多模块并行开关（`moduleConcurrency`）为 `on` 时，给当前 checkout 标角色（Claude 侧为 `/spec-guard:checkout-role`）：`module <id>` 或
+`coordinator`。标记写在本 checkout 的 git 目录（`git rev-parse --git-path spec-guard/role`），不进版本库。模块 checkout 的阶段提示另报告这个
+模块、「下一步」只指向它，做完只交回协调会话；协调 checkout 保留评审约束、不建议构建；全项目的当前模块与阶段不受影响。开关不是 `on` 时不读标记。
+默认只预览，用户确认后才加 `--confirm`：
+
+```bash
+python3 -B "$ROOT/hooks/checkout_role.py" show --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" set --module <module-id> --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" set --coordinator --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" clear --project "$PROJECT"
+```
+
+退出码：2 拒绝（不是非 bare 仓库的顶层、模块不在能力图、标记是链接或非普通文件）；3 开关不是 `on`；4 写后读回不一致，不自动重试。
 
 ## add-module
 

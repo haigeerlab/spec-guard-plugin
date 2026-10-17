@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
+from checkout_role import role as checkout_role_of
 from project_config import load as load_config
 from sibling_plugins import delegate_review_entry
 
@@ -285,6 +286,8 @@ COMMANDS = {
         # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
         "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
                             "`%(doctor)s`)"),
+        "checkout-role": "`/spec-guard:checkout-role` (Codex: spec-guard-ops checkout-role)",
+        "map": "`/spec-guard:map` (Codex: spec-guard-ops map)",
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
@@ -312,6 +315,8 @@ COMMANDS["codex"] = {
                   + " This stage summary carries over, the conversation does not need to."),
     "free-current": "give the user " + CODEX_COMPACT,
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
+    "checkout-role": "`$spec-guard-ops` checkout-role",
+    "map": "`$spec-guard-ops` map",
 }
 
 # hint-language-follow: the same entries with Chinese prose, used only when hint_language is zh-CN.  Commands,
@@ -634,6 +639,74 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
             % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
 
 
+def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict, review_step: str = "",
+              zh: bool = False) -> tuple:
+    """checkout-role: (lines, next step) for a checkout with a role; the project-wide selection is not touched.
+
+    A module checkout is told only about its own module; a coordinator keeps any review constraint and is never
+    told to build.  Fixed wording and validated module ids only; Chinese follows hint-language-follow.
+    """
+    if kind == "coordinator":
+        lines = ["- checkout 角色: 协调 — 这个 checkout 负责协调各模块，不在这里开发模块。" if zh else
+                 "- Checkout role: coordinator — this checkout coordinates the modules; do not develop modules here."]
+        if review_step:
+            return lines, review_step + ("作为协调会话，在这里呈现给用户并在这里记录结果。" if zh else
+                                         " As the coordinating session, present it to the user here and record the decision here.")
+        return lines, (("统筹各模块：用 %s 查看可开工的模块、各模块的 worktree 与并行边界重叠，按共享规则「协调会话的批准与合并」"
+                        "处理交回与合并；不在这里开发模块。" if zh else
+                        "coordinate the modules: use %s to see startable modules, module worktrees and boundary overlaps, and "
+                        "handle hand-backs and merges by the shared rule for the coordinating session's approvals and merges; "
+                        "do not build modules here.") % cmd["map"])
+    lines = [("- checkout 角色: 模块 `%s` — 这个 checkout 只做 `%s`；做完后交回协调会话（不在这里合并或推送）。" if zh else
+              "- Checkout role: module `%s` — this checkout works only on `%s`; when it is done, hand it back to the "
+              "coordinating session (no merge or push here).") % (module, module)]
+    state = by_id.get(module)
+    if state is None:
+        return lines, (("这个 checkout 的角色指向 `%s`，但能力图里没有这个模块；用 %s 重新指定或清除角色。不要在这里做别的模块。" if zh else
+                        "this checkout's role names `%s`, which is not in the capability map; set or clear the role "
+                        "with %s. Do not work on other modules here.") % (module, cmd["checkout-role"]))
+    if state["suspended"]:
+        lines.append(("- 本 checkout 的模块 `%s`: 已挂起（%d 个未勾选项）" if zh else
+                      "- This checkout's module `%s`: suspended (%d unchecked item(s))") % (module, state["open"]))
+        return lines, (("`%s` 已挂起；用 %s 恢复它，或请协调会话重新指定或清除这个 checkout 的角色。不要在这里开始别的模块。" if zh else
+                        "`%s` is suspended; resume it with %s, or ask the coordinating session to reassign or clear this "
+                        "checkout's role. Do not start other modules here.") % (module, cmd["resume"] % module))
+    stage = state["stage"]
+    if stage == "DONE":
+        lines.append(("- 本 checkout 的模块 `%s`: DONE" if zh else "- This checkout's module `%s`: DONE") % module)
+        return lines, (("`%s` 在这个 checkout 里已完成；交回协调会话做最终验收与合并。不要在这里开始别的模块，也不要在这里合并或推送。"
+                        if zh else
+                        "`%s` is done in this checkout; hand it back to the coordinating session for its final acceptance "
+                        "and merge. Do not start another module here, and do not merge or push from here.") % module)
+    open_note = (("（%d 个未勾选项）" if zh else " (%d unchecked item(s))") % state["open"]) if stage == "BUILDING" else ""
+    lines.append(("- 本 checkout 的模块 `%s`: %s%s" if zh else "- This checkout's module `%s`: %s%s")
+                 % (module, stage, open_note))
+    review_line, own_step, _spec, _plan = review_hint(root, module, stage, cmd, zh)
+    if review_line:
+        lines.append(review_line)
+    if own_step:
+        return lines, (("`%s` 有待处理的评审（见上面的评审行）：交给协调会话请用户审，批准经集成分支到达这个 checkout 之前不要继续。"
+                        if zh else
+                        "`%s` has a review step open (see the Review line above): hand it to the coordinating session for "
+                        "the user's review, and do not continue until the approval reaches this checkout through the "
+                        "integration branch.") % module)
+    if stage == "NEEDS_SPEC":
+        return lines, (("写 `spec/%s.md`，交给协调会话请用户审。" if zh else
+                        "write `spec/%s.md` and hand it to the coordinating session for review.") % module)
+    if stage == "NEEDS_PLAN":
+        return lines, (("写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s），交给协调会话请用户审。" if zh else
+                        "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
+                        "coordinating session for review.") % (module, module, cmd["plan"]))
+    gate = next_gate(root, module)
+    if gate:
+        lines.append(("- `%s` 的下一个 gate: %s — 到那里停下，把模块交回协调会话。" if zh else
+                      "- Next gate of `%s`: %s — stop there and hand the module back to the coordinating session.")
+                     % (module, gate))
+    return lines, (("继续用 %s 构建 `%s`：`tasks/%s/todo.md` 里还有 %d 个未勾选项。" if zh else
+                    "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`.")
+                   % ((cmd["build"], module, module, state["open"]) if zh else (cmd["build"], module, state["open"], module)))
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
              unattended: bool = False, host: str | None = None) -> str:
     root = Path(root)
@@ -665,6 +738,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
     notes = config_lines(root, host)
+    role_kind, role_id = checkout_role_of(root)  # ("none", None) whenever moduleConcurrency is not on
+    if role_kind == "invalid":
+        notes.append(("- checkout 角色: 角色标记无效，已忽略；用 %s 查看。" if zh else
+                      "- Checkout role: the role marker is invalid, so it is ignored; check it with %s.")
+                     % cmd["checkout-role"])
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.
@@ -735,6 +813,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(hint)
         if boundary_note_line:
             notes.append(boundary_note_line)
+        if role_kind in ("module", "coordinator"):
+            role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd, zh=zh)
+            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "当前阶段: **DONE**\n\n- Capability map: present\n"
+            return (head + counts + "\n" + "".join(n + "\n" for n in notes + role_lines)
+                    + ("\n建议下一步: " if zh else "\nSuggested next step: ") + role_step)
         if zh:
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" + counts + "\n" + "".join(n + "\n" for n in notes)
             proposal = "新增需要留下经过评审的决定记录时，用 Proposal。"
@@ -798,9 +881,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     elif context_note:
         notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
-    if review_line:
+    if review_line and role_kind != "module":
         counts += "\n" + review_line
-    external_line = external_review_hint(root, module, stage, spec_review, plan_review, host, zh)
+    external_line = (external_review_hint(root, module, stage, spec_review, plan_review, host, zh)
+                     if role_kind != "module" else "")
     if external_line:
         counts += "\n" + external_line
     next_step = {
@@ -819,7 +903,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                                                                                          current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
-    if stage == "BUILDING" and not review_step:
+    if stage == "BUILDING" and not review_step and role_kind == "coordinator":
+        gate = next_gate(root, module)
+        if gate:
+            counts += (("\n- `%s` 的下一个 gate: %s — 由它的模块会话推进；到了在这里审。" if zh else
+                        "\n- Next gate of `%s`: %s — the module session builds toward it; review it here when it arrives.")
+                       % (module, gate))
+    elif stage == "BUILDING" and not review_step and role_kind != "module":
         gate = next_gate(root, module)
         # A Plan with no marker may still be waiting for the user, so only an approved one is told to keep going.
         if gate and plan_review == "approved" and zh:
@@ -834,6 +924,9 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             counts += ("\n- Next gate: %s — the first unchecked `gate` checkpoint in the todo. The Plan has no review "
                        "marker: if the user has not approved it yet, wait for that approval before building." % gate)
     next_step = review_step or next_step
+    if role_kind in ("module", "coordinator"):
+        role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step, zh)
+        notes = notes + role_lines
     if zh:
         return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,

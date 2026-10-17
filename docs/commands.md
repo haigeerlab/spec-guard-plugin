@@ -75,6 +75,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 |---|---|---|
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en` | 未设置 |
 | `reviewCadence` | `separate`／`combined` | `separate` |
+| `moduleConcurrency` | `off`／`on` | `off` |
 
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件无效时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`。同时只读汇总派活开关与默认事项后端的当前值和来源。
@@ -101,6 +102,12 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 `--confirm` 才改文件里的一行标记。当前模块待审核时阶段提示报告等待审核、不建议写 Plan 或继续 build；Spec 的批准标记
 带内容指纹，批准后被改会报告“批准后已修订”。记为已批准时命令会提醒 agent 先确认你已在对话里看到内容。`approved` 只在你明确批准之后写（回复“批准”即可，“继续”不算）。没有标记的
 文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待审核或已修订时不行。拒绝时退出 2、不写文件。
+
+### `/spec-guard:checkout-role`
+
+多模块并行开关为 on 时，给当前 checkout 标角色：`set --module <id>` 或 `set --coordinator`，`clear` 清除，`show` 查看；先预览、`--confirm` 才写。
+标记在本 checkout 的 git 目录里，不进版本库。模块 checkout 的阶段提示只指向自己的模块，协调 checkout 不建议构建；`/map` 据此给出各模块 worktree 的进度。
+开关不是 on 时拒绝写入（退出 3），阶段提示也不读标记。
 
 ## 加需求
 
@@ -174,10 +181,11 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
-| 查看或设置项目配置（产物语言、评审节奏） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
+| 查看或设置项目配置（产物语言、评审节奏、多模块并行开关） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
 | 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | `spec-guard-ops` skill 的 link-project 一节 |
 | 记录 Spec 或 Plan 的评审状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |
+| 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | `spec-guard-ops` skill 的 checkout-role 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |

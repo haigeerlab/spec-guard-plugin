@@ -1,7 +1,11 @@
 """map-table-count-diagnostic: the module-table count error names where the tables are."""
+import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import FRAGMENT_LIMIT
@@ -68,6 +72,40 @@ class TableCountTests(unittest.TestCase):
         self.write(lines + ["Build order: m0"])
         self.assertLessEqual(len(self.error()), FRAGMENT_LIMIT)
 
+
+
+class DeclaredGroupsTests(unittest.TestCase):
+    """map-startable: comma groups survive as declared_groups; order_groups and the CLI output stay serial."""
+
+    def parse(self, order, validate_graph=True):
+        handle, path = tempfile.mkstemp(suffix=".md")
+        os.close(handle)
+        self.addCleanup(os.remove, path)
+        with open(path, "w", encoding="utf-8") as out:
+            out.write("\n".join(["# Map", ""] + table("a", "b", "c", "d") + ["", order]) + "\n")
+        return path, parse_map(path, validate_graph=validate_graph)
+
+    def test_commas_are_kept_in_declared_groups(self):
+        _, parsed = self.parse("Build order: a → b, `c` → d")
+        self.assertEqual(parsed.declared_groups, [["a"], ["b", "c"], ["d"]])
+        self.assertEqual(parsed.order_groups, [["a"], ["b"], ["c"], ["d"]])
+        self.assertEqual(parsed.order, ["a", "b", "c", "d"])
+
+    def test_without_commas_each_group_has_one_module(self):
+        _, parsed = self.parse("Build order: a -> b -> c -> d")
+        self.assertEqual(parsed.declared_groups, [["a"], ["b"], ["c"], ["d"]])
+
+    def test_history_mode_has_none(self):
+        _, parsed = self.parse("", validate_graph=False)
+        self.assertIsNone(parsed.declared_groups)
+
+    def test_cli_output_is_unchanged(self):
+        path, _ = self.parse("Build order: a → b, c → d")
+        done = subprocess.run([sys.executable, "-B", str(Path(__file__).with_name("capability-map.py")), path],
+                              capture_output=True, text=True, timeout=20)
+        result = json.loads(done.stdout)
+        self.assertEqual(set(result), {"ok", "modules", "orderGroups", "order"})
+        self.assertEqual(result["orderGroups"], [["a"], ["b"], ["c"], ["d"]])
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

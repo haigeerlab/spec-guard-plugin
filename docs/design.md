@@ -43,8 +43,10 @@ plugins/spec-guard/
 | `setup-convention.sh`、`teardown-convention.sh`、`managed-block.py` | 安装、升级、移除约定块；`managed-block.py` 负责标记校验、本地段与原子写入 |
 | `verify-artifacts.sh` | 按需校验已落地的产物 |
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
-| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`） |
+| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`）；多模块并行开关为 on 时只增 `moduleConcurrency`、`buildOrderGroups`、`startable` 与每模块 `scope`，表格标出可同时开工与并行边界重叠（`spec/map-startable.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
+| `module_scope.py` | 模块 Spec「并行边界」一节的唯一解析器；`check` 对照集成基线做只读越界检查，`validate` 供 verify-artifacts 调用；开关不是 on 时都不生效 |
+| `checkout_role.py` | 每个 checkout 的角色标记（`module <id>`／`coordinator`，存在本 checkout 的 git 目录）：读取、预览确认后写入；阶段提示只经 `role()` 读，开关不是 on 时不读；全项目的选模块与阶段不受影响 |
 | `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`）；提示前读 delegate 的 `interface.json`，按 `>=1.0,<2.0` 校验并只取经校验的命令名（`spec/delegate-interface-check.md`） |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
 | `proposal_*.py` | Proposal 契约、发布、读 Issue、评审、晋级证明、收尾 |
@@ -94,6 +96,22 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 不读 spec-guard 的内部文件。spec-guard 读 agent-relay（`agent_relay_probe.py`）用的是同一方式。和其他插件的取值说法之间
 怎么对照，由使用方自己维护。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
 
+1.1（crew-interface）起另有四个入口，都是多模块并行用的：`moduleConcurrency`（开关的位置、取值与读法：看 `/map --json` 顶层有没有
+`"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（评审标记）；`mapView.concurrency`
+列出开关为 on 时 `/map --json` 才有的字段。1.0 的内容不变，`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
+
+### 规划层与运行层
+
+多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
+
+| | spec-guard（规划层） | module-crew（运行层） |
+|---|---|---|
+| 读 | 能力图、Spec、Plan、todo、`.agent/config.json`、本 checkout 与本机其他 worktree 的角色标记 | `interface.json`、`/map --json`、越界检查的 JSON |
+| 写 | 只经命令、预览确认后写：配置、评审标记、角色标记 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
+| 判断 | 能否开工、边界是否重叠、阶段与评审状态 | 开哪几个、什么时候合、失败怎么退 |
+
+spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不是 on 时，规划层的新东西都不出现。
+
 ## 两个宿主的差异
 
 | | Claude Code | Codex |
@@ -142,7 +160,9 @@ Proposal 代码从不读它。已开工、在等外部条件的模块可以用 `
 `verify-artifacts` 与 `/spec-guard:config` 都调用它。文件不存在时什么都不变；文件无效时用固定的问题代码报告，所有
 设置都不生效，键和值不会进入注入上下文（它们是仓库内容）。目前的项有 `artifactLanguage`（新写的 Spec、Plan、todo
 正文的语言，结构关键字不变；恰好为 `zh-CN` 时阶段提示的说明文字也用中文，判据是 `module_stage.hint_language`，
-phase-guard 与 `session_context.py` 的位置行都向它取，其他值的提示与 0.67.0 逐字节相同）与 `reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）。
+phase-guard 与 `session_context.py` 的位置行都向它取，其他值的提示与 0.67.0 逐字节相同）、`reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）与
+`moduleConcurrency`（多模块并行开关，默认 `off`；规划层的并行规则只在 `on` 时生效，`off`、未设置或文件无效时所有输出与
+引入开关前逐字相同）。其他代码只通过 `project_config.module_concurrency()` 读这个开关，不自己解析。
 派活开关与默认事项后端各有自己的位置，这里只汇总显示。
 
 ## 文件布局（File layout）

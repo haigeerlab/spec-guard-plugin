@@ -20,11 +20,13 @@ class ModuleRow(object):
 
 
 class ParsedMap(object):
-    def __init__(self, rows, goal, order, order_groups=None):
+    def __init__(self, rows, goal, order, order_groups=None, declared_groups=None):
         self.rows = rows
         self.goal = goal
         self.order = order
         self.order_groups = order_groups
+        # map-startable: the comma groups as written; order_groups expands them into serial steps.
+        self.declared_groups = declared_groups
 
 
 def _norm_lines(lines):
@@ -163,12 +165,14 @@ def _parse_declared_order(lines):
         segments = re.split(r"\s*(?:→|->)\s*", raw)
         # 上游格式允许逗号表示可并列的模块；Spec Guard 不提供并行执行，
         # 因此保留输入兼容性，同时按书写顺序展开为单模块串行步骤。
-        groups = []
+        groups, declared = [], []
         for segment in segments:
-            groups.extend([[_strip_ticks(item)] for item in segment.split(",")])
+            items = [_strip_ticks(item) for item in segment.split(",")]
+            groups.extend([[item] for item in items])
+            declared.append(items)
         if any(not item for group in groups for item in group):
             raise MapError("Build order 格式无效")
-        declarations.append(groups)
+        declarations.append((groups, declared))
     if len(declarations) != 1:
         raise MapError("必须恰好有一个 Build order")
     return declarations[0]
@@ -251,7 +255,7 @@ def parse_map(path, validate_graph=True):
     lines = _visible_lines(lines)
     rows = _strict_rows(lines)
     goal = _parse_goal(lines)
-    groups = _parse_declared_order(lines)
+    groups, declared = _parse_declared_order(lines)
     _validate(rows, groups)
     order = [module_id for group in groups for module_id in group]
-    return ParsedMap(rows, goal, order, groups)
+    return ParsedMap(rows, goal, order, groups, declared)

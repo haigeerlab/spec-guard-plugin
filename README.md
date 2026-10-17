@@ -50,7 +50,7 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.67.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.68.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` 与 `SessionStart` 两项 hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入 |
 
@@ -132,9 +132,23 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
    `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
    `codex plugin marketplace remove spec-guard-marketplace`。
 
+## 多模块并行（可选）
+
+默认情况下 spec-guard 一次推进一个模块。模块多而且彼此独立时，可以让几个会话同时各做一个模块：spec-guard 负责**规划**，开会话、建 worktree、
+发消息、合并这些**运行**的事交给配套插件 module-crew。不打开开关时，下面这些都不出现，一切照旧。
+
+1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，旧版本会把整份配置判为无效）。
+2. 能力图评审时，agent 会多给一段并行评估：哪些模块可以写成 Build order 的逗号组、哪些值得往前挪。
+3. 每个模块的 Spec 加一节「并行边界」，写明它独占哪些目录；`verify-artifacts` 检查格式，最终验收时用越界检查标出改到边界外的文件。
+4. `/spec-guard:map` 列出可同时开工的模块、并行边界的重叠，以及各模块 worktree 的进度。
+5. `/spec-guard:checkout-role` 给每个 checkout 标角色：模块 checkout 的阶段提示只指向自己的模块，协调 checkout 不建议构建。
+
+谁写评审标记、谁做本地合并，共享检查点规则里有专门一节（「协调会话的批准与合并」）：远端合并始终由你来做。
+
 ## 对外接口
 
-其他插件要读进度和审查状态时，看插件根目录的 `interface.json`：只读命令、格式版本、退出码和取值含义都写在里面，按版本检查即可。说明见 [docs/design.md](docs/design.md)「对外接口」。
+其他插件要读进度和审查状态时，看插件根目录的 `interface.json`：只读命令、格式版本、退出码和取值含义都写在里面，按版本检查即可。
+1.1 起另外登记了多模块并行用到的入口（并行开关、越界检查、角色标记、评审标记）。说明见 [docs/design.md](docs/design.md)「对外接口」。
 
 ## 数据与隐私
 

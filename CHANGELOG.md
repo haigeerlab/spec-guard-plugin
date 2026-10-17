@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.68.0] - 2026-10-18
+
+本版 7 个模块，组成多模块并行的规划层：`module-concurrency-switch`、`concurrency-assessment`、`module-scope-boundary`、`concurrency-rule-wording`、
+`map-startable`、`checkout-role`、`crew-interface`。全部只在 `.agent/config.json` 的 `moduleConcurrency` 为 `on` 时生效；不打开时 spec-guard 的
+输出与 0.67.1 逐字节相同。运行层（开会话、建 worktree、合并）由配套插件 module-crew 负责。
+
+### 新增
+
+- **多模块并行开关 `moduleConcurrency`。** `.agent/config.json` 新增这一项，取值 `off`／`on`，默认 `off`；用 `/spec-guard:config`
+  预览确认后设置，汇总里显示当前值与来源。开关本身不改任何行为，也不注入阶段提示；后续模块的并行规则只在 `on` 时生效。
+  0.67.0 及更早的 spec-guard 会把含这个键的配置整份判为无效，团队都升级后再设置。
+- **能力图评审给出并行评估。** 开关为 `on` 时，共享检查点规则要求在能力图评审的交审正文里写一段并行评估：两条硬门槛（至少一波能同时
+  开工 2 个及以上模块、有干净的集成基线，没跑过就写「未核实」）、三项参考（文件分区、共享接口、热点文件），结论写成 Build order
+  加哪些逗号组、哪些模块往前挪；关键路径只在这里算。只是建议，改 Build order 仍按变更记录交用户复审。开关不是 `on` 时这一节不适用，
+  约定块不变。
+- **模块 Spec 的并行边界与只读越界检查。** 开关为 `on` 时，未完成模块的 Spec 写一节「并行边界」（独占路径与预计要改的公共文件类别），
+  verify-artifacts 校验它的格式（缺失只警告，格式错误判失败）；新增 `hooks/module_scope.py check --module <id> --base <集成基线>`，
+  把本模块相对基线的改动文件分成独占内、本模块流程文件、超出边界三类，有文本与 JSON 两种输出，只报告不拦截；最终验收的改动清单里
+  标出「超出并行边界」的文件。开关不是 `on` 时这些都不出现，越界检查以退出码 3 拒绝运行。
+- **`/map` 给协调会话的可开工信息。** 开关为 `on` 时，`/map --json` 只增字段（`schemaVersion` 仍为 1）：`moduleConcurrency`、按 Build order
+  保留逗号组的 `buildOrderGroups`、每个模块的 `scope`（并行边界）、`startable`（全部就绪模块与并行边界重叠的模块对）；表格里就绪模块标「可同时开工」，
+  有重叠时上方多一行「并行边界重叠」。能力图解析器多记一份原样逗号分组，`order_groups` 与 `capability-map.py` 的输出不变。开关不是 `on` 时
+  `/map` 的表格与 JSON 与以前逐字节相同。
+- **checkout 角色。** 开关为 `on` 时，新命令 `/spec-guard:checkout-role` 给每个 checkout 标角色（`module <id>` 或 `coordinator`），标记存在本 checkout
+  的 git 目录、不进版本库，先预览后确认。模块 checkout 的阶段提示另报告自己的模块、「下一步」只指向它，做完只提示交回协调会话；协调 checkout 保留评审约束、
+  不建议 `/build`；全项目的当前模块与阶段不受影响。`/map --json` 的模块多一个 `worktree` 字段（本机其他 worktree 里的进度、未提交改动、提交是否已合入），
+  表格加对应后缀。开关不是 `on` 时不读标记、不扫描 worktree，输出与以前逐字节相同。
+- **`interface.json` 1.1。** 只加不改：新增 `moduleConcurrency`、`scopeCheck`、`checkoutRole`、`reviewMark` 四个入口和 `mapView.concurrency`，
+  供 module-crew 等运行时读取；1.0 的内容不变。`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
+
+### 变更
+
+- **开关为 `on` 时，协调会话的批准与本地合并有了明确规则。** 共享检查点规则新增一节，原句一字不改：评审标记由当前协调会话在集成基线上、
+  核对内容与交审版本一致后写入，模块会话不能凭转达自写；用户批准某模块的最终验收（绑定模块分支与集成分支的提交）即授权协调会话把它合入本地
+  集成分支，这是「合并永远由用户进行」的唯一例外，一次一个、不改写历史，检查失败用新提交撤回、撤回失败停下不重试；协调会话替换后未记录的批准
+  要重新取得；推送和远端合并仍只由用户做。开关不是 `on` 时规则与以前相同，约定块模板不变。
+
 ## [0.67.1] - 2026-10-18
 
 本版一个模块：`hint-language-follow`，阶段提示的说明文字跟随项目的产物语言。

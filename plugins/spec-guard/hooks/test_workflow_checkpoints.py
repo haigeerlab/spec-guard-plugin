@@ -339,5 +339,140 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("`.agent/config.json`", "/spec-guard:config", "产物语言", "评审节奏"):
                     self.assertIn(phrase, template)
 
+
+class ConcurrencyAssessmentTests(unittest.TestCase):
+    """concurrency-assessment: the capability-map review adds an assessment only when moduleConcurrency is on."""
+
+    HEADING = "## 并行评估（moduleConcurrency 为 on 时）"
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self, heading):
+        start = self.text.index(heading)
+        end = self.text.find("\n## ", start + len(heading))
+        return self.text[start:end if end != -1 else len(self.text)]
+
+    def test_section_exists_and_says_when_it_applies(self):
+        self.assertIn(self.HEADING, self.text)
+        body = self.section(self.HEADING)
+        first = body.split("\n\n")[1]
+        for phrase in ("不是 `on`", "不适用", "/spec-guard:config"):
+            self.assertIn(phrase, first)
+
+    def test_section_covers_gates_references_and_advice(self):
+        body = self.section(self.HEADING)
+        for phrase in ("同时开工", "2 个", "集成基线", "未核实", "文件分区", "共享接口", "热点文件",
+                       "逗号组", "往前挪", "关键路径", "只在这里算", "能粗就粗", "变更记录"):
+            self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_section_sits_between_doc_suggestions_and_batch_review(self):
+        self.assertLess(self.text.index("## 文档建议"), self.text.index(self.HEADING))
+        self.assertLess(self.text.index(self.HEADING), self.text.index("## 按需求批量前置审"))
+
+    def test_doc_suggestions_point_to_the_assessment(self):
+        doc = self.section("## 文档建议")
+        review = [line for line in doc.split("\n- ") if line.startswith("**能力图评审**")]
+        self.assertEqual(len(review), 1)
+        self.assertIn("并行评估", review[0])
+
+    def test_convention_blocks_never_mention_the_switch(self):
+        templates = list((self.plugin / "templates").glob("*-block-*.md"))
+        self.assertTrue(templates)
+        for path in templates:
+            with self.subTest(path=path.name):
+                self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"))
+
+
+class ConcurrencyBoundaryTests(unittest.TestCase):
+    """module-scope-boundary: the boundary section and the overreach mark apply only when moduleConcurrency is on."""
+
+    HEADING = "## 并行边界（moduleConcurrency 为 on 时）"
+
+    def setUp(self):
+        self.text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self):
+        # The section carries a fenced example with its own `## 并行边界` heading, so end at the next real section.
+        start = self.text.index(self.HEADING)
+        return self.text[start:self.text.index("\n## 按需求批量前置审", start)]
+
+    def test_section_place_and_scope(self):
+        self.assertLess(self.text.index("## 并行评估（moduleConcurrency 为 on 时）"), self.text.index(self.HEADING))
+        self.assertLess(self.text.index(self.HEADING), self.text.index("## 按需求批量前置审"))
+        first = self.section().split("\n\n")[1]
+        for phrase in ("不是 `on`", "不适用"):
+            self.assertIn(phrase, first)
+
+    def test_section_covers_format_check_and_handoff(self):
+        body = self.section()
+        for phrase in ("## 并行边界", "## Concurrency boundary", "独占", "公共", "全局配置", "锁文件", "迁移", "测试资源",
+                       "hooks/module_scope.py\" check", "--base", "超出并行边界", "Spec 交审", "未完成", "verify-artifacts"):
+            self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_final_acceptance_points_to_the_boundary(self):
+        start = self.text.index("- **最终验收列出实际改动的文件。**")
+        rule = self.text[start:self.text.index("\n- **", start + 1)]
+        self.assertIn("并行边界", rule)
+
+
+class CoordinatorApprovalTests(unittest.TestCase):
+    """concurrency-rule-wording: the coordinator's approval and local-merge exception, only when moduleConcurrency is on."""
+
+    HEADING = "## 协调会话的批准与合并（moduleConcurrency 为 on 时）"
+    ORIGINALS = (
+        "- **`approved` 只在用户于当前对话明确批准这份 Spec 或 Plan 之后，",
+        "合并永远由用户进行，任何 Plan 都不能授权 agent 合并。",
+        "两种节奏下人工闸门都在，合并永远由用户进行。",
+    )
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self):
+        start = self.text.index(self.HEADING)
+        return self.text[start:self.text.index("\n## 按需求批量前置审", start)]
+
+    def test_original_sentences_are_kept_verbatim(self):
+        for sentence in self.ORIGINALS:
+            self.assertEqual(self.text.count(sentence), 1, sentence)
+
+    def test_section_place_and_scope(self):
+        self.assertLess(self.text.index("## 并行边界（moduleConcurrency 为 on 时）"), self.text.index(self.HEADING))
+        self.assertLess(self.text.index(self.HEADING), self.text.index("## 按需求批量前置审"))
+        first = self.section().split("\n\n")[1]
+        for phrase in ("不是 `on`", "不适用"):
+            self.assertIn(phrase, first)
+
+    def test_section_states_every_floor(self):
+        body = self.section()
+        for phrase in ("唯一例外", "三个条件", "同一时刻只有一个", "集成基线", "交审", "一致", "转达",
+                       "模块分支", "集成分支", "提交", "重新", "一次只合一个", "Build order",
+                       "不变基", "不压缩", "不强推", "新提交撤回", "不 reset", "停止后续合并", "不自动重试",
+                       "不算完成", "冲突", "退回", "重新取得", "推送和远端合并", "只由用户"):
+            self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_coordinator_is_marked_by_checkout_role(self):
+        body = self.section()
+        for phrase in ("/spec-guard:checkout-role", "`coordinator`", "外部审查", "模块会话不提"):
+            self.assertIn(phrase, body)
+
+    def test_three_pointers(self):
+        approved = self.text.index(self.ORIGINALS[0])
+        rule_end = self.text.index("\n- **", approved + 1)
+        self.assertIn("协调会话的批准与合并", self.text[approved:rule_end])
+        for sentence in self.ORIGINALS[1:]:
+            at = self.text.index(sentence) + len(sentence)
+            self.assertIn("协调会话的批准与合并", self.text[at:self.text.index("\n", at)], sentence)
+
+    def test_convention_blocks_untouched_by_the_switch(self):
+        for path in (self.plugin / "templates").glob("*-block-*.md"):
+            self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"), path.name)
+
 if __name__ == "__main__":
     unittest.main()

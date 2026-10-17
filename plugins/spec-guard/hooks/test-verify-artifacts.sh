@@ -213,6 +213,26 @@ printf '{"version": 1, "artifactLanguage": "zh_CN"}\n' > "$PROJECT/.agent/config
 check "不合规的语言标签判无效" 1 "项目配置无效: artifactLanguage-invalid"
 printf '{"version": 1, "reviewCadence": "both", "extra": 1}\n' > "$PROJECT/.agent/config.json"
 check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknown-key, reviewCadence-invalid"
+printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
+check "并行开关 on 的项目配置通过" 0 "项目配置有效"
+printf '{"version": 1, "moduleConcurrency": "yes"}\n' > "$PROJECT/.agent/config.json"
+check "并行开关取值无效时失败" 1 "项目配置无效: moduleConcurrency-invalid"
+
+# module-scope-boundary：开关不是 on 时，并行边界一节（哪怕格式错误）不影响任何输出；on 时正确、缺失、格式错三种。
+scope_out() { CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$HOOKDIR/verify-artifacts.sh" 2>&1 || true; }
+project scope-off; mkdir -p "$PROJECT/.agent"
+printf '{"version": 1, "moduleConcurrency": "off"}\n' > "$PROJECT/.agent/config.json"
+plain_scope="$(scope_out)"
+printf '# alpha\n\n## 并行边界\n\n- 独占：apps/alpha/\n' > "$PROJECT/spec/alpha.md"
+[ "$(scope_out)" = "$plain_scope" ] || fail "开关 off 时并行边界不应改变输出
+$(scope_out)"
+echo "  ✅ 并行开关 off：格式错误的并行边界也不改变输出"; PASS=$((PASS + 1))
+printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
+check "并行开关 on：并行边界格式错误时失败" 1 "alpha 的并行边界格式错误: bad-path"
+printf '# alpha\n\n## 并行边界\n\n- 独占：`apps/alpha/`\n' > "$PROJECT/spec/alpha.md"
+check "并行开关 on：并行边界有效时通过" 0 "并行边界格式有效（1 个未完成模块）"
+printf '# alpha\n' > "$PROJECT/spec/alpha.md"
+check "并行开关 on：缺并行边界只警告" 0 "alpha 的 Spec 没有并行边界一节"
 printf '{broken' > "$PROJECT/.agent/config.json"
 check "无法解析的项目配置失败" 1 "项目配置无效: not-json"
 
