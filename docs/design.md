@@ -45,7 +45,7 @@ plugins/spec-guard/
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
 | `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
-| `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`） |
+| `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`）；提示前读 delegate 的 `interface.json`，按 `>=1.0,<2.0` 校验并只取经校验的命令名（`spec/delegate-interface-check.md`） |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
 | `proposal_*.py` | Proposal 契约、发布、读 Issue、评审、晋级证明、收尾 |
 | `local_ledger_*.py`、`local_ticket_*.py`、`hosted_ticket*.py` | 本地事项账本、可移植流程、托管事项 |

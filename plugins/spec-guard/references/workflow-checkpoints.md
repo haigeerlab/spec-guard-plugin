@@ -139,6 +139,8 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题里�
   `no_findings_in_scope` 只说明审查范围内没找到问题，不等于没有缺陷。`inconclusive` 或没有完成（`conditions_missing`、`failed`、
   `timed_out`、`cancelled`）时，记一行「未得出结论」，写明状态和原因，这不算拒绝。报告里的 `limitations` 有内容时一并注明。
 - **用户不需要时**，在当时该写的那个文件里加一行 `<!-- spec-guard: external-review declined -->`。
+- **接口不兼容时不提示。** 提示前会读 delegate 安装目录里的 `interface.json`：主版本在 1.x 时，命令名取自文件；文件不存在或读不懂时，
+  照常提示；主版本不在 1.x 时，不出这一行（命令和报告格式可能都已经变了）。
 - **每个模块只提示一次。** Spec 或 todo 里，这个小节有内容或有拒绝标记，后续检查点都不再出现这一行。
 
 ## 文档建议
