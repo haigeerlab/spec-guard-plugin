@@ -88,21 +88,27 @@ _TABLE = re.compile(r'^\s*\[\s*plugins\.\s*"([^"@]+)@([^"]+)"\s*\]\s*(?:#.*)?$')
 _ENABLED_TRUE = re.compile(r"^\s*enabled\s*=\s*true\s*(?:#.*)?$")
 
 
-def codex_plugin_enabled(plugin):
-    """True only when Codex's config enables `plugin` and its cached copy exists; never raises."""
+def codex_plugin_cache(plugin):
+    """Codex's cache directory for an enabled `plugin` (`plugins/cache/<market>/<plugin>`), or None; never raises."""
     home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
     try:
         lines = (home / "config.toml").read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeError):
-        return False
+        return None
     market = None
     for line in lines:
         if line.lstrip().startswith("["):
             match = _TABLE.match(line)
             market = match.group(2) if match and match.group(1) == plugin else None
         elif market and _ENABLED_TRUE.match(line):
-            return (home / "plugins" / "cache" / market / plugin).is_dir()
-    return False
+            cache = home / "plugins" / "cache" / market / plugin
+            return cache if cache.is_dir() else None
+    return None
+
+
+def codex_plugin_enabled(plugin):
+    """True only when Codex's config enables `plugin` and its cached copy exists; never raises."""
+    return codex_plugin_cache(plugin) is not None
 
 
 def delegate_enabled(project, host):
@@ -114,3 +120,55 @@ def delegate_enabled(project, host):
         return claude_plugin_root(Path(project), "delegate", main_checkout_local_settings_from_files) is not None
     except Exception:  # noqa: BLE001 -- a hint is optional; any failure means no hint
         return False
+
+
+# delegate-interface-check: delegate publishes interface.json in its plugin root; read it only when a hint is due.
+DELEGATE_DEFAULTS = {"review": "/delegate:review", "doctor": "/delegate:doctor"}
+_DELEGATE_COMMAND = re.compile(r"/delegate:[a-z][a-z-]*")
+_INTERFACE = re.compile(r"(\d+)\.(\d+)")
+
+
+def _delegate_root(project, host):
+    """(enabled, plugin root or None).  Codex: the one version directory in the cache, else None."""
+    if host == "codex":
+        cache = codex_plugin_cache("delegate")
+        if cache is None:
+            return False, None
+        versions = [path for path in cache.iterdir() if path.is_dir()]
+        if not versions:
+            return False, None
+        return True, versions[0] if len(versions) == 1 else None
+    root = claude_plugin_root(Path(project), "delegate", main_checkout_local_settings_from_files)
+    return root is not None, root
+
+
+def delegate_review_entry(project, host):
+    """Commands for the external-review hint, or None when no hint is due.
+
+    None: delegate not installed or enabled, or its interface major version is outside >=1.0,<2.0.  A missing or
+    unreadable interface.json keeps the defaults: neither means delegate is not installed.  Only command names
+    matching `/delegate:<lowercase-and-hyphens>` are taken from the file.
+    """
+    try:
+        enabled, root = _delegate_root(project, host)
+    except Exception:  # noqa: BLE001 -- a hint is optional; any failure means no hint
+        return None
+    if not enabled:
+        return None
+    default = dict(DELEGATE_DEFAULTS, source="default")
+    try:
+        declared = json.loads((root / "interface.json").read_text(encoding="utf-8")) if root else None
+    except (OSError, ValueError, UnicodeError):
+        return default
+    version = _INTERFACE.fullmatch(str(declared.get("interface", ""))) if isinstance(declared, dict) else None
+    if version is None:
+        return default
+    if int(version.group(1)) != 1:
+        return None
+    entry = dict(default, source="interface")
+    for key in DELEGATE_DEFAULTS:
+        section = declared.get(key)
+        command = section.get("command") if isinstance(section, dict) else None
+        if isinstance(command, str) and _DELEGATE_COMMAND.fullmatch(command):
+            entry[key] = command
+    return entry
