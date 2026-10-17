@@ -1,6 +1,6 @@
 # Todo: delegate-interface-check
 
-- [ ] Task 0：提交已批准的 Plan 与 todo
+- [x] Task 0：提交已批准的 Plan 与 todo — 2026-10-17 用户批准 Plan，review_mark 记录后与 todo 一起提交。
 - [ ] Task 1：`delegate_review_entry`（先红后绿）
 - [ ] Task 2：阶段提示改用 `delegate_review_entry`（先红后绿）
 - [ ] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告，并做一次改坏验证

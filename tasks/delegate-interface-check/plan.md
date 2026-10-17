@@ -1,6 +1,6 @@
 # Plan: delegate-interface-check
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/delegate-interface-check.md`](../../spec/delegate-interface-check.md)。本仓库评审节奏为分开审：Spec 已于 2026-10-17
 单独批准（用户决定不做外部审查，Spec 里已写拒绝标记），本 Plan 单独交审。分支 `claude/delegate-interface-check`，worktree
