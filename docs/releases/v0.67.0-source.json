@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.67.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:b33c56cf02106501a94c73f116a52feb05834223"
+      },
+      "observedAt": "2026-10-17T10:37:10Z",
+      "evidence": [
+        "result:the v0.67.0 annotated tag and origin/main both resolve to merge commit b33c56cf02106501a94c73f116a52feb05834223 (pull request #343; it was stacked on #342, merged as fast-forward 15a7b4b; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (39025138916) passed every step, ShellCheck included, before tagging",
+        "result:0.67.0 is one module, delegate-interface-check: when the external-review hint is due, the hook reads interface.json in delegate's install directory; interface >=1.0,<2.0 takes the Claude review and doctor command names from it (only /delegate:<lowercase-and-hyphens>, else the default); another major version drops the hint; a missing or unreadable file keeps the previous hint and is not treated as not installed; Codex only applies the version gate and reads the file only when its plugin cache has exactly one version directory; no subprocess, no other file text in the injection",
+        "result:each commit was made by verify-and-commit.sh under macOS /bin/bash 3.2.57 (full tier with ShellCheck); test_sibling_plugins 23 and phase-guard 365 cases pass; widening the version bound to <3.0 turned three cases red and was reverted"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.67.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;test:v0.67.0-upgrade-20261017"
+      },
+      "observedAt": "2026-10-17T10:37:10Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.66.0 to 0.67.0 for scope user; the installed copy records gitCommitSha b33c56c -- the v0.67.0 tag commit; it passes 364 phase-guard cases (one repository-file case is the known class), test_sibling_plugins and test_agent_relay_probe",
+        "result:with temporary plugin records pointing at delegate's published v0.5.3 interface.json the installed copy proposes `/delegate:review` (whether it can run is decided by `/delegate:doctor`) with source interface; an interface 2.0 file drops the line; with this machine's real records (delegate 0.5.2, no interface.json) the 0.67.0 and 0.66.0 copies print byte-identical output",
+        "not-verified:a real installed delegate 0.5.3 under Claude Code; the user's delegate installation (0.5.2) was left unchanged",
+        "host:Claude Code 2.1.301"
+      ]
+    }
+  ]
+}
