@@ -1,6 +1,6 @@
 # Plan: plugin-interface
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/plugin-interface.md`](../../spec/plugin-interface.md)。本仓库评审节奏为分开审：Spec 已于 2026-10-17 单独批准（随 #339
 合并），本 Plan 单独交审。分支 `claude/plugin-interface`，worktree `.claude/worktrees/current-plugin-owner-aa5b98`，从 `bda78de`
