@@ -21,6 +21,10 @@
   保留逗号组的 `buildOrderGroups`、每个模块的 `scope`（并行边界）、`startable`（全部就绪模块与并行边界重叠的模块对）；表格里就绪模块标「可同时开工」，
   有重叠时上方多一行「并行边界重叠」。能力图解析器多记一份原样逗号分组，`order_groups` 与 `capability-map.py` 的输出不变。开关不是 `on` 时
   `/map` 的表格与 JSON 与以前逐字节相同。
+- **checkout 角色。** 开关为 `on` 时，新命令 `/spec-guard:checkout-role` 给每个 checkout 标角色（`module <id>` 或 `coordinator`），标记存在本 checkout
+  的 git 目录、不进版本库，先预览后确认。模块 checkout 的阶段提示另报告自己的模块、「下一步」只指向它，做完只提示交回协调会话；协调 checkout 保留评审约束、
+  不建议 `/build`；全项目的当前模块与阶段不受影响。`/map --json` 的模块多一个 `worktree` 字段（本机其他 worktree 里的进度、未提交改动、提交是否已合入），
+  表格加对应后缀。开关不是 `on` 时不读标记、不扫描 worktree，输出与以前逐字节相同。
 
 ### 变更
 

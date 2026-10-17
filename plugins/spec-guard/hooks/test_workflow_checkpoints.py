@@ -457,6 +457,11 @@ class CoordinatorApprovalTests(unittest.TestCase):
             self.assertIn(phrase, body)
         self.assertNotRegex(body, r"parallel[-_]")
 
+    def test_coordinator_is_marked_by_checkout_role(self):
+        body = self.section()
+        for phrase in ("/spec-guard:checkout-role", "`coordinator`", "外部审查", "模块会话不提"):
+            self.assertIn(phrase, body)
+
     def test_three_pointers(self):
         approved = self.text.index(self.ORIGINALS[0])
         rule_end = self.text.index("\n- **", approved + 1)

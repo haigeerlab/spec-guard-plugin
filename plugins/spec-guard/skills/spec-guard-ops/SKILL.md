@@ -259,6 +259,22 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
 记为批准；既有项目不必补标记，要补先向用户单独确认，不得依据此前含糊的答复补记。
 
+## checkout-role
+
+多模块并行开关（`moduleConcurrency`）为 `on` 时，给当前 checkout 标角色（Claude 侧为 `/spec-guard:checkout-role`）：`module <id>` 或
+`coordinator`。标记写在本 checkout 的 git 目录（`git rev-parse --git-path spec-guard/role`），不进版本库。模块 checkout 的阶段提示另报告这个
+模块、「下一步」只指向它，做完只交回协调会话；协调 checkout 保留评审约束、不建议构建；全项目的当前模块与阶段不受影响。开关不是 `on` 时不读标记。
+默认只预览，用户确认后才加 `--confirm`：
+
+```bash
+python3 -B "$ROOT/hooks/checkout_role.py" show --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" set --module <module-id> --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" set --coordinator --project "$PROJECT"
+python3 -B "$ROOT/hooks/checkout_role.py" clear --project "$PROJECT"
+```
+
+退出码：2 拒绝（不是非 bare 仓库的顶层、模块不在能力图、标记是链接或非普通文件）；3 开关不是 `on`；4 写后读回不一致，不自动重试。
+
 ## add-module
 
 先判断是不是该开新模块（细则见共享检查点规则「返工与小模块」）：返工或修订已完成的模块不开新模块，在它的 `todo.md` 追加任务、
