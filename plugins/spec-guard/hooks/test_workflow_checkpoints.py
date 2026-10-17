@@ -253,6 +253,21 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("确认框之前", "附上 Spec 的改动差异", "直接写它的 Spec"):
                     self.assertIn(phrase, text)
 
+    def test_the_convention_block_names_sibling_plugins_conditionally(self):
+        # sibling-plugin-hints: a conditional hint per host, no probe; the entry points differ by host.
+        templates = self.plugin / "templates"
+        docs = self.plugin.parents[1] / "docs" / "convention-block.md"
+        entries = {
+            templates / "claude-block-local.md": ("/delegate:review",),
+            docs: ("/delegate:review",),
+            templates / "codex-block-local.md": ("delegate:delegate-routing", "agent-relay:session-routing"),
+        }
+        for path, host_entries in entries.items():
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("若装了 delegate 插件", "只读审查", "不算用户批准", "若装了 agent-relay 插件", *host_entries):
+                    self.assertIn(phrase, text)
+
     def test_an_external_blocker_goes_back_to_the_user(self):
         section = self.section("## Plan 检查点分级")
         for phrase in ("同一个 gate 因外部原因", "再次挡住", "挂起", "接受风险", "换方案", "代价", "不按默认推荐继续重试"):

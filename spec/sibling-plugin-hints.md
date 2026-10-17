@@ -27,7 +27,7 @@ spec-guard 知道流程走到了哪一步，这是另外两个插件做不到的
 4. **模板只新增两行，现有行一字不改。** 已装项目 `setup-convention --replace` 不需要 `--accept-removals`；代价是要跑一次
    `--replace` 才拿到新行（与 rules-in-context 相同）。
 5. **入口按宿主写**：Claude 侧写 `/delegate:review` 与 agent-relay 的会话通信；Codex 侧 delegate 只有 `delegate-routing`
-   技能，写 `$delegate-routing`，agent-relay 写 `$session-routing`。
+   技能，按 Codex 模板惯例写 `delegate:delegate-routing`，agent-relay 写 `agent-relay:session-routing`。
 6. 共享检查点规则 `references/workflow-checkpoints.md` 不改：这两行是可选提示，不是检查点规则。
 7. 版本 0.64.1（只改模板与文档文字），一个 PR。
 
@@ -43,7 +43,10 @@ Claude 侧：
 - 新增于「别人提出的改动或模块……回告来源」一行之后：
   > 回告来源或通知其他会话（含跨 Claude Code／Codex）时，若装了 agent-relay 插件，用它给对方会话发消息
 
-Codex 侧同样两行，`/delegate:review` 换成 `$delegate-routing`，agent-relay 一行注明 `$session-routing`。
+Codex 侧同样两行，`/delegate:review` 换成 `delegate:delegate-routing`，agent-relay 一行注明 `agent-relay:session-routing`。
+
+`scripts/check-command-names.py` 的外部命令放行表登记 `/delegate:review`（与已登记的 `/agent-relay:collaboration` 同理）；
+agent-relay 技能名一律带 `agent-relay:` 前缀，满足 `check-collaboration-boundary.py`。
 
 `docs/convention-block.md` 同步列出新增的两行。CHANGELOG 记一条「新增」。
 
@@ -58,7 +61,7 @@ python3 plugins/spec-guard/hooks/test_workflow_checkpoints.py
 ## Testing strategy
 
 - 先加失败断言：`test_workflow_checkpoints.py` 断言两份模板与 `docs/convention-block.md` 含两行的关键词（`delegate`、`只读审查`、
-  `不算用户批准`、`agent-relay`），Codex 模板含 `$delegate-routing`、Claude 模板含 `/delegate:review`；再改模板转绿。
+  `不算用户批准`、`agent-relay`），Codex 模板含 `delegate:delegate-routing`、Claude 模板含 `/delegate:review`；再改模板转绿。
 - 改坏一处（删掉 Codex 模板的 delegate 行）确认断言变红，再复原。
 - `setup-convention --replace` 在 0.64.0 装好的临时项目上退出 0、不需 `--accept-removals`，写入后新行在约定块里。
 - 发版后：Claude Code 与 Codex 各在装了两个插件的临时项目里，看到 Spec 交审时 agent 是否提议一次 delegate 审查且未自行发起。
@@ -74,3 +77,7 @@ python3 plugins/spec-guard/hooks/test_workflow_checkpoints.py
 1. 两份模板与约定块文档各多两行带条件的提示，入口按宿主写对，现有行不变，`--replace` 不需 `--accept-removals`。
 2. 钩子、阶段提示、判据与指纹算法没有任何改动（diff 只涉及模板、文档、测试、版本与 CHANGELOG）。
 3. 没装两个插件的项目，agent 行为与现在相同。
+
+## 变更记录
+
+- 2026-10-17：Codex 侧入口由 `$delegate-routing`、`$session-routing` 改为 `delegate:delegate-routing`、`agent-relay:session-routing`，并在命令名检查器登记 `/delegate:review`。原因：构建中全档校验报协作边界与命令名两项不通过（agent-relay 技能名须带前缀、外部插件命令须登记），且 Codex 模板现有行即用 `插件:技能` 写法。来源：本会话构建中的校验结果。

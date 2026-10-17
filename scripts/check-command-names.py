@@ -46,8 +46,9 @@ BUILTIN = {
 # 其他插件里、本插件文字可能提到的命令：协作拆成 agent-relay 后，用户文字会指向它的命令
 # （collaboration-dependency；当时的过渡转交命令已于 0.54.0 移除）。只登记真实存在的
 # 那一条，取自 agent-relay `plugins/agent-relay/commands/*.md` 的文件名（2026-10-07 核对）；
-# 写错名字（/agent-relay:collab 之类）照样报错。
-EXTERNAL_COMMANDS = {"agent-relay": {"collaboration"}}
+# 写错名字（/agent-relay:collab 之类）照样报错。delegate 的 review 取自 delegate `commands/*.md`
+# （sibling-plugin-hints，2026-10-17 核对 0.5.2）。
+EXTERNAL_COMMANDS = {"agent-relay": {"collaboration"}, "delegate": {"review"}}
 
 # 上游的 skill 名（`skills/*/` 的目录名）。命令文里 `invoke <name>` 引用的是这些，
 # 和斜杠命令是两个不同的命名空间 —— `/plan` 是命令，
