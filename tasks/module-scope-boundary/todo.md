@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交已批准的 Plan 与 todo — 2026-10-18 用户批准 Plan，review_mark 记录后与 todo 一起提交。
 - [x] Task 1：解析与路径归属（先红后绿） — 新建 `test_module_scope.py`（解析 11 例、路径归属 4 例），先因模块不存在导入失败；新建 `module_scope.py` 实现 `parse`／`Scope`／`ScopeError`／`covers` 后 15 例全绿。测试登记进 `scripts/validate.sh`，`check-tests-registered.py`（61 个文件）与 `test_python_compat` 通过。
-- [ ] Task 2：越界检查 `check`（先红后绿）
+- [x] Task 2：越界检查 `check`（先红后绿） — 新增 `Check` 6 例（临时 git 仓库里改独占内、流程文件、外部文件，加未跟踪、中文文件名与删除；文本与 JSON；退出码 2／3／4），先红 6 例；实现 `changed_files`（`git diff --no-renames --name-status -z` 加 `ls-files --others --exclude-standard -z`）、`_check` 与命令行入口后全绿。另加一道防线：`--base` 以 `-` 开头直接按无效处理，免得被 git 当成选项（加了对应断言）。
 - [ ] Task 3：`validate` 与 verify-artifacts（先红后绿）
 - [ ] Task 4：phase-guard 不受影响的回归
 - [ ] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告，并做两次改坏验证

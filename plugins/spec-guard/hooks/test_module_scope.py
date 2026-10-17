@@ -104,5 +104,115 @@ class Covers(unittest.TestCase):
         self.assertEqual(covers(self.scope, "m", "spec/CAPABILITY-MAP.md"), "outside")
 
 
+
+class Repo:
+    """A temporary git project with a base commit; the module `m` owns `apps/m/` and `docs/m.md`."""
+
+    BOUNDARY = "- 独占：`apps/m/`、`docs/m.md`\n- 公共：锁文件"
+
+    def __init__(self, switch="on", boundary=BOUNDARY):
+        self.switch, self.boundary = switch, boundary
+
+    def git(self, *args):
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True, env=env)
+
+    def write(self, path, text="x\n"):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+    def __enter__(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.git("init", "-q")
+        if self.switch is not None:
+            self.write(".agent/config.json", json.dumps({"version": 1, "moduleConcurrency": self.switch}))
+        body = "# Spec: m\n\n## 并行边界\n\n%s\n" % self.boundary if self.boundary is not None else "# Spec: m\n"
+        self.write("spec/m.md", body)
+        for path in ("apps/m/old.py", "apps/other/keep.py", "package-lock.json", "gone.txt"):
+            self.write(path)
+        self.git("add", "-A")
+        self.git("commit", "-qm", "base")
+        self.git("tag", "base")
+        return self
+
+    def run(self, *args):
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        done = subprocess.run([sys.executable, "-B", SCRIPT, *args, "--project", str(self.root)],
+                              capture_output=True, text=True, timeout=20, env=env)
+        return done.returncode, done.stdout
+
+    def __exit__(self, *exc):
+        self.tmp.cleanup()
+
+
+class Check(unittest.TestCase):
+    def change(self, repo):
+        repo.write("apps/m/old.py", "changed\n")
+        repo.write("apps/m/新文件.py")
+        repo.write("tasks/m/todo.md", "- [ ] a\n")
+        repo.write("package-lock.json", "changed\n")
+        repo.write("apps/mm/x.py")
+        (repo.root / "gone.txt").unlink()
+        repo.git("add", "apps/m/old.py", "package-lock.json")
+        repo.git("commit", "-qm", "work")
+
+    def test_json_classifies_every_changed_file(self):
+        with Repo() as repo:
+            self.change(repo)
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+        self.assertEqual(code, 0, out)
+        report = json.loads(out)
+        files = {item["path"]: (item["status"], item["scope"]) for item in report["files"]}
+        self.assertEqual(files, {
+            "apps/m/old.py": ("M", "exclusive"),
+            "apps/m/新文件.py": ("?", "exclusive"),
+            "tasks/m/todo.md": ("?", "own"),
+            "package-lock.json": ("M", "outside"),
+            "apps/mm/x.py": ("?", "outside"),
+            "gone.txt": ("D", "outside"),
+        })
+        self.assertEqual((report["module"], report["base"], report["outside"]), ("m", "base", 3))
+
+    def test_text_names_outside_files(self):
+        with Repo() as repo:
+            self.change(repo)
+            code, out = repo.run("check", "--module", "m", "--base", "base")
+        self.assertEqual(code, 0, out)
+        self.assertIn("outside", out)
+        self.assertIn("package-lock.json", out)
+        self.assertIn("3", out)
+
+    def test_no_changes_reports_zero(self):
+        with Repo() as repo:
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+        self.assertEqual((code, json.loads(out)["files"], json.loads(out)["outside"]), (0, [], 0))
+
+    def test_switch_off_or_unset_refuses(self):
+        for switch in ("off", None):
+            with Repo(switch=switch) as repo:
+                code, out = repo.run("check", "--module", "m", "--base", "base")
+            self.assertEqual(code, 3, switch)
+            self.assertIn("moduleConcurrency", out)
+
+    def test_missing_or_malformed_section(self):
+        for boundary in (None, "- 独占：apps/m/"):
+            with Repo(boundary=boundary) as repo:
+                code, _ = repo.run("check", "--module", "m", "--base", "base")
+            self.assertEqual(code, 4, boundary)
+
+    def test_bad_base_or_module(self):
+        with Repo() as repo:
+            self.assertEqual(repo.run("check", "--module", "m", "--base", "no-such-ref")[0], 2)
+            self.assertEqual(repo.run("check", "--module", "m", "--base=--output=evil")[0], 2)
+            self.assertFalse((repo.root / "evil").exists())
+            self.assertEqual(repo.run("check", "--module", "../m", "--base", "base")[0], 2)
+        with tempfile.TemporaryDirectory() as plain:
+            done = subprocess.run([sys.executable, "-B", SCRIPT, "check", "--module", "m", "--base", "HEAD",
+                                   "--project", plain], capture_output=True, text=True, timeout=20)
+        self.assertEqual(done.returncode, 2)
+
 if __name__ == "__main__":
     unittest.main()
