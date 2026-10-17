@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.66.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:02615335b10060d54e5517e8f41e4b2b01bab628"
+      },
+      "observedAt": "2026-10-17T10:02:59Z",
+      "evidence": [
+        "result:the v0.66.0 annotated tag and origin/main both resolve to merge commit 02615335b10060d54e5517e8f41e4b2b01bab628 (pull request #341; merged==true and main==merge sha were checked as a separate step)",
+        "result:the push run of the CI on main for the merge commit (39023091810) passed every step, ShellCheck included, before tagging",
+        "result:0.66.0 is one module, plugin-interface: plugins/spec-guard/interface.json (interface 1.0) publishes map-view's read-only command, JSON schemaVersion 1, the exit codes and the meaning of every review and externalReview value; map-view's JSON gains externalReview (none/recorded/declined) per module, additive under schemaVersion 1; scripts/check-interface.py keeps interface.json in step with the code constants inside validate.sh; no existing field or value changed",
+        "result:each commit was made by verify-and-commit.sh under macOS /bin/bash 3.2.57 (full tier with ShellCheck); test_map_view 36, the checker regression 125 and phase-guard 362 cases pass; setting the real file's schemaVersion to 2 made validate.sh exit 1 and was reverted"
+      ]
+    }
+  ]
+}

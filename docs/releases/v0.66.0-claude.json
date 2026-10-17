@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.66.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;test:v0.66.0-upgrade-20261017"
+      },
+      "observedAt": "2026-10-17T10:02:59Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace",
+        "command:claude plugin update spec-guard@spec-guard-marketplace",
+        "result:the plugin moved from 0.65.0 to 0.66.0 for scope user; the installed copy records gitCommitSha 0261533 -- the v0.66.0 tag commit; it passes 361 phase-guard cases (one repository-file case is the known class), test_map_view and test_review_marker",
+        "result:scripts/check-interface.py accepts the installed copy's interface.json; running its declared command from the installed plugin root on the same temporary project prints schemaVersion 1 and externalReview recorded",
+        "not-verified:a consuming plugin reading interface.json; that change belongs to the consumer",
+        "host:Claude Code 2.1.301"
+      ]
+    }
+  ]
+}
