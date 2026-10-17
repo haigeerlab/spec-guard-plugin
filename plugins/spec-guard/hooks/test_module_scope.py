@@ -214,5 +214,53 @@ class Check(unittest.TestCase):
                                    "--project", plain], capture_output=True, text=True, timeout=20)
         self.assertEqual(done.returncode, 2)
 
+
+class Validate(unittest.TestCase):
+    """`validate` feeds verify-artifacts: nothing when the switch is off, one line per finding when on."""
+
+    MAP = ("# Capability Map: t\n\n## 目标\n\nt\n\n## 模块\n\n| Module id | Responsibility | Depends on |\n"
+           "| --- | --- | --- |\n| good | x | — |\n| missing | x | — |\n| broken | x | — |\n| finished | x | — |\n"
+           "| unwritten | x | — |\n\nBuild order: good → missing → broken → finished → unwritten\n")
+
+    def project(self, root, switch="on"):
+        def write(path, text):
+            (root / path).parent.mkdir(parents=True, exist_ok=True)
+            (root / path).write_text(text, encoding="utf-8")
+        if switch is not None:
+            write(".agent/config.json", json.dumps({"version": 1, "moduleConcurrency": switch}))
+        write("spec/CAPABILITY-MAP.md", self.MAP)
+        write("spec/good.md", "# good\n\n## 并行边界\n\n- 独占：`apps/good/`\n")
+        write("spec/missing.md", "# missing\n")
+        write("spec/broken.md", "# broken\n\n## 并行边界\n\n- 独占：apps/broken/\n")
+        write("spec/finished.md", "# finished\n")
+        for module in ("finished",):
+            write("tasks/%s/plan.md" % module, "# Plan\n")
+            write("tasks/%s/todo.md" % module, "- [x] done\n")
+
+    def run_validate(self, root):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "validate", "--project", str(root)],
+                              capture_output=True, text=True, timeout=20)
+        return done.returncode, done.stdout.splitlines()
+
+    def test_off_or_unset_prints_nothing(self):
+        for switch in ("off", None):
+            with tempfile.TemporaryDirectory() as tmp:
+                self.project(Path(tmp), switch)
+                self.assertEqual(self.run_validate(Path(tmp)), (0, []), switch)
+
+    def test_on_reports_each_unfinished_module(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.project(Path(tmp))
+            code, lines = self.run_validate(Path(tmp))
+        self.assertEqual(code, 0)
+        self.assertEqual(sorted(lines), ["bad bad-path broken", "ok 1", "warn missing missing"])
+
+    def test_unreadable_map_is_unverified(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.project(root)
+            (root / "spec/CAPABILITY-MAP.md").write_text("not a map\n", encoding="utf-8")
+            self.assertEqual(self.run_validate(root), (0, ["unverified map"]))
+
 if __name__ == "__main__":
     unittest.main()

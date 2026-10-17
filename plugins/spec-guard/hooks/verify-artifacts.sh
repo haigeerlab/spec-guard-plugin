@@ -180,6 +180,24 @@ if valid:
   fi
 fi
 
+# 并行边界（module-scope-boundary）：判据只在 module_scope.py；开关不是 on 时它什么都不输出，这一项也就不出现。
+if command -v python3 >/dev/null 2>&1 && [ -e .agent/config.json ]; then
+  if SCOPE_OUT="$(python3 -B "$HOOKDIR/module_scope.py" validate --project . 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind first second; do
+      case "$kind" in
+        ok) ok "并行边界格式有效（${first} 个未完成模块）" ;;
+        warn) warn "${second} 的 Spec 没有并行边界一节，无法判断与其他模块是否冲突" ;;
+        bad) bad "${second} 的并行边界格式错误: ${first}" ;;
+        unverified)
+          if [ "$first" = map ]; then warn '未验证：能力图读不了，没有检查并行边界'
+          else warn "未验证：spec/${first}.md 读取失败，没有检查它的并行边界"; fi ;;
+      esac
+    done <<<"$SCOPE_OUT"
+  else
+    warn '未验证：并行边界检查没有正常运行'
+  fi
+fi
+
 # 旁路清单（rework-in-place）：阶段判定只数 todo.md，所以 tasks/<id>/ 下别的清单文件里没做完的项没人看得见。
 # 只看直接子文件里的 *.md；判据是 module_stage.py 的 UNCHECKED。没有可报告的内容时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then

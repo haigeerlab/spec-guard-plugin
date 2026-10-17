@@ -17,7 +17,8 @@ import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
-from capability_map import MODULE_ID
+from capability_map import MODULE_ID, MapError, parse_map
+from module_stage import module_state
 from project_config import module_concurrency
 
 HEADINGS = ("## 并行边界", "## Concurrency boundary")
@@ -182,6 +183,38 @@ def _check(root: Path, module_id: str, base: str, as_json: bool) -> int:
     return 0
 
 
+def validate(root: Path) -> list:
+    """verify-artifacts lines: nothing when the switch is off; otherwise one line per unfinished module finding.
+
+    `ok <n>` counts valid sections, `warn missing <id>` a Spec without one, `bad <code> <id>` a malformed one,
+    `unverified map` when the capability map cannot be read.  Finished modules and modules without a Spec are skipped.
+    """
+    if not module_concurrency(root):
+        return []
+    try:
+        modules = [row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows]
+    except (MapError, OSError, UnicodeDecodeError):
+        return ["unverified map"]
+    valid, lines = 0, []
+    for module_id in modules:
+        spec_path = root / "spec" / ("%s.md" % module_id)
+        if not spec_path.is_file() or module_state(root, module_id)["stage"] == "DONE":
+            continue
+        try:
+            scope = parse(spec_path.read_text(encoding="utf-8"))
+        except ScopeError as error:
+            lines.append("bad %s %s" % (error.code, module_id))
+            continue
+        except (OSError, UnicodeDecodeError):
+            lines.append("unverified %s" % module_id)
+            continue
+        if scope is None:
+            lines.append("warn missing %s" % module_id)
+        else:
+            valid += 1
+    return (["ok %d" % valid] if valid else []) + lines
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Concurrency boundary of module Specs (read-only).")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -190,8 +223,14 @@ def main() -> int:
     check.add_argument("--base", required=True)
     check.add_argument("--format", choices=("text", "json"), default="text")
     check.add_argument("--project", default=".")
+    checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")
+    checker.add_argument("--project", default=".")
     args = parser.parse_args()
     root = Path(args.project)
+    if args.command == "validate":
+        for line in validate(root):
+            print(line)
+        return 0
     return _check(root, args.module, args.base, args.format == "json")
 
 
