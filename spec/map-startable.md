@@ -1,6 +1,6 @@
 # Spec: map-startable
 
-<!-- spec-guard: review approved 982ac79902f1 -->
+<!-- spec-guard: review approved aaf275ac9776 -->
 
 ## Objective
 
@@ -20,8 +20,8 @@
 2. **顶层 `moduleConcurrency: "on"`。** module-crew 约定只读 `interface.json` 与 `/map --json`，不读 `.agent/config.json`，所以把开关值放进 JSON。
    只在 `on` 时出现；读取方把「没有这个字段」当作 off。这是需求清单之外加的一项。
 3. **新字段的形状：**
-   - 顶层 `buildOrderGroups`：按 Build order 排的二维数组，逗号组放在同一个子数组里，例如 `[["a"], ["b", "c"], ["d"]]`。取自能力图解析器
-     现成的 `order_groups`，不另写解析。
+   - 顶层 `buildOrderGroups`：按 Build order 排的二维数组，逗号组放在同一个子数组里，例如 `[["a"], ["b", "c"], ["d"]]`。取自能力图解析器：
+     解析器现在会把逗号组展开成串行步骤（`order_groups` 里每组只有一个模块），所以让它在同一次解析里多记一份原样的逗号分组，不另写解析。
    - 每个模块 `scope`：Spec 没有并行边界一节（或还没写 Spec）时为 `null`；格式正确时为 `{"exclusive": [...], "shared": [...]}`；格式错误时为
      `{"error": "<code>"}`。判据只用 `module_scope.parse`。
    - 顶层 `startable`：`{"modules": [...], "conflicts": [...]}`，见假设 4、5。
@@ -41,6 +41,12 @@
 8. **`interface.json` 在本模块不改。** 新字段的含义写在本 Spec 的 Contract；到 `crew-interface` 统一把接口升到 1.1，并在接口说明里指向这里。
 
 ## Contract
+
+### `hooks/capability_map.py`
+
+- `_parse_declared_order` 在展开逗号组的同时，保留一份原样的分组（每个 `→` 分段一个子列表，组内按书写顺序）；`ParsedMap` 新增属性
+  `declared_groups`。非严格解析（历史图可以没有 Build order）时为 `None`。
+- `order_groups`、依赖顺序校验、`capability-map.py` 输出的 `orderGroups` 都不变。
 
 ### `hooks/map_view.py`
 
@@ -86,6 +92,8 @@ python3 -B plugins/spec-guard/hooks/test_map_view.py
   - `startable`：全部就绪模块按 Build order 列入；两个进行中模块重叠时进 `conflicts`；挂起、已完成模块不参与；目录与子路径算重叠，
     `apps/bill/` 与 `apps/billing/` 不算；`a` 排在 `b` 前，`paths` 取较具体的路径；
   - 表格：开关 on 时就绪模块带「可同时开工」，有冲突时出现「并行边界重叠」一行且位置在「未合入主线」之前，没有冲突时不出现；off 时都没有。
+- **能力图解析器（`test_capability_map.py`）：** 逗号组原样进入 `declared_groups`；`order_groups` 与 `capability-map.py` 的 JSON 输出和改动前相同；
+  没有逗号时 `declared_groups` 每组一个模块。
 - **阶段提示与 verify-artifacts：** 本模块不改它们；两套回归原样全绿。
 - **改坏验证：** 让 `_overlap` 用字符串前缀判断，确认「同名前缀不算重叠」变红；让新字段在开关 off 时也加上，确认「off 逐字节相同」变红。
 
@@ -112,3 +120,4 @@ python3 -B plugins/spec-guard/hooks/test_map_view.py
 ## 变更记录
 
 - 2026-10-18：去掉「排除与进行中模块边界重叠的就绪模块」（假设 4），`startable.modules` 改为列出全部就绪模块；表格从「就绪格写与 X 重叠」改为在表格上方加一行「并行边界重叠」（假设 6），测试策略与成功标准同步。原因：开工实现时发现，按现有判定模块一有 Spec 就算进行中，就绪模块一定没有并行边界，原排除规则与那句说明永远不会触发。来源：本会话实现 Task 1 前自查发现，用户本人决定按建议修订（2026-10-18）。
+- 2026-10-18：`buildOrderGroups` 的来源从「解析器现成的 `order_groups`」改为「解析器多记一份原样的逗号分组（新属性 `declared_groups`）」；Contract 新增 `capability_map.py` 一节，测试策略加解析器的用例。原因：实现 Task 2 时发现解析器会把逗号组展开成串行步骤，`order_groups` 不保留逗号；改它的含义会改变依赖校验与 `capability-map.py` 的输出。来源：本会话实现中发现，用户本人选择做法 1（2026-10-18）。

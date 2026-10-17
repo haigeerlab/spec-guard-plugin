@@ -22,7 +22,7 @@
     JSON（去掉 `generatedAt`）与表格逐字节相同。结果记进 todo。
 - **新字段集中在 `build()` 末尾一处加。** `module_concurrency(root)` 为假时直接返回原来的 dict，不经过任何新代码；为真时再读并行边界、算 `startable`。
 - **并行边界只经 `module_scope.parse` 读；重叠判断写成 `_overlap(a, b)`，按路径段比较**（`apps/bill/` 与 `apps/billing/` 不算重叠）。
-- **`buildOrderGroups` 取自 `parse_map(...).order_groups`**，不另写解析。
+- **`buildOrderGroups` 取自解析器新属性 `declared_groups`**：`_parse_declared_order` 在展开逗号组时顺便保留原样分组，`order_groups` 与所有现有输出不变；不在 `map_view` 里另写解析。
 - **表格改两处**：`_status_cell` 里 `ready` 那一支在开关为真时加后缀；`render` 在开关为真且有冲突时，在「未合入主线」一行前插一行。开关为假时都走原来的代码路径。
 
 ## Task List
@@ -50,7 +50,9 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
   `apps/bill/` 与 `apps/billing/` 不算；`conflicts` 里 `a` 排在 `b` 前、`paths` 取较具体的路径；
 - `schemaVersion` 仍为 1。
 
-再实现 `_scope`、`_overlap` 与 `build()` 末尾的新字段。
+另在 `test_capability_map.py` 加用例：逗号组原样进入 `declared_groups`；`order_groups` 与 `capability-map.py` 的 JSON 输出与改动前相同；没有逗号时每组一个模块。
+
+再实现解析器的 `declared_groups`，以及 `map_view` 的 `_scope`、`_overlap` 与 `build()` 末尾的新字段。
 
 - 验收：新旧用例全绿。
 
@@ -86,8 +88,8 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
 
 ## 影响面
 
-- 修改：`hooks/map_view.py`、`hooks/test_map_view.py`、`docs/design.md`、CHANGELOG；
-- 本模块的 Plan 与 todo。不改 `module_scope.py`、`capability_map.py`、阶段提示与 `interface.json`。
+- 修改：`hooks/map_view.py`、`hooks/test_map_view.py`、`hooks/capability_map.py`、`hooks/test_capability_map.py`、`docs/design.md`、CHANGELOG；
+- 本模块的 Plan 与 todo。不改 `module_scope.py`、阶段提示与 `interface.json`；`capability_map.py` 只加一个属性。
 
 ## Risks and Mitigations
 
@@ -102,3 +104,4 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
 ## 变更记录
 
 - 2026-10-18：Task 2 去掉「就绪且与进行中模块重叠的被排除」的用例，Task 3 改为「就绪格统一写可同时开工＋表格上方冲突一行」，架构决定同步。原因：随 Spec 修订（就绪模块一定没有并行边界，原排除规则永远不会触发）。来源：本会话实现前自查发现，用户本人决定按建议修订（2026-10-18）。
+- 2026-10-18：Task 2 加能力图解析器的用例与 `declared_groups` 实现，影响面加入 `capability_map.py` 与 `test_capability_map.py`，架构决定同步。原因：随 Spec 修订（解析器不保留逗号组）。来源：本会话实现中发现，用户本人选择做法 1（2026-10-18）。
