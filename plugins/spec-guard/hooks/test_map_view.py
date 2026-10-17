@@ -19,7 +19,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
             "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
-               "firstTickAt", "tickCommits"}
+               "firstTickAt", "tickCommits", "externalReview"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -293,6 +293,36 @@ class FoldTest(unittest.TestCase):
             module = project.json()["modules"][2]
             self.assertEqual(module["status"], "in_progress")
             self.assertIsNone(module["suspendedReason"])
+
+
+class ExternalReviewTest(unittest.TestCase):
+    """plugin-interface: externalReview per module, read from the Spec and the todo (delegate-review-hint)."""
+
+    ROWS = [("a", "x", "—"), ("b", "y", "—"), ("c", "z", "—"), ("d", "w", "—")]
+
+    def test_values(self):
+        files = {
+            "spec/a.md": "# a\n\n## 外部审查意见\n\n- delegate（codex）：completed，findings，2 条\n",
+            "spec/b.md": "# b\n", "tasks/b/plan.md": "# Plan\n",
+            "tasks/b/todo.md": "- [ ] t\n\n## External review\n- recorded\n",
+            "spec/c.md": "# c\n\n<!-- spec-guard: external-review declined -->\n",
+            "spec/d.md": "# d\n\n## 外部审查意见\n\n",
+        }
+        with Project(self.ROWS, ["a", "b", "c", "d"], files) as project:
+            got = {m["id"]: m["externalReview"] for m in project.json()["modules"]}
+        self.assertEqual(got, {"a": "recorded", "b": "recorded", "c": "declined", "d": "none"})
+
+    def test_unreadable_todo_is_exit_4(self):
+        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [ ] t\n"}
+        with Project(self.ROWS[:1], ["a"], files) as project:
+            todo = project.root / "tasks" / "a" / "todo.md"
+            todo.chmod(0)
+            try:
+                done = project.run("--json")
+            finally:
+                todo.chmod(0o644)
+            self.assertEqual(done.returncode, 4, done.stdout)
+            self.assertEqual(json.loads(done.stdout)["error"], "unreadable")
 
 
 class ExitCodeTest(unittest.TestCase):

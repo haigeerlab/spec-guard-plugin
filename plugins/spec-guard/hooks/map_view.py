@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, _git, active_module, file_review_state, module_state,
+from module_stage import (SUSPEND_MARKER, _git, active_module, external_review_state, file_review_state, module_state,
                           next_gate, project_stage, unmerged_commits)
 
 SCHEMA_VERSION = 1
@@ -70,6 +70,14 @@ def _review(root: Path, module: str) -> dict:
         if state == "unreadable":
             raise Unreadable(path)
     return {"spec": spec, "plan": plan}
+
+
+def _external_review(root: Path, module: str) -> str:
+    # plugin-interface: the same reading as the phase hint's external-review line (delegate-review-hint).
+    state = external_review_state(root, module)
+    if state is None:
+        raise Unreadable("spec/%s.md or tasks/%s/todo.md" % (module, module))
+    return state
 
 
 def _closure(start: str, edges: dict) -> set:
@@ -223,6 +231,7 @@ def build(root: Path) -> dict:
             "missingDeps": [d for d in deps[module] if status[d] != "done"] if value == "not_ready" else [],
             "blocks": {"count": len(blocks), "ids": blocks},
             "review": _review(root, module),
+            "externalReview": _external_review(root, module),
         })
 
     state, ticks, suspended_write = history(root)

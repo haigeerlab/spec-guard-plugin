@@ -1,0 +1,35 @@
+{
+  "interface": "1.0",
+  "mapView": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/map_view.py",
+      "--json",
+      "--project",
+      "<project-root>"
+    ],
+    "schemaVersion": 1,
+    "contract": "spec/map-view.md",
+    "exitCodes": {
+      "0": "ok",
+      "2": "usage error, or --project is not a directory",
+      "3": "no capability map (not an error); stdout is {\"schemaVersion\":1,\"error\":\"no-capability-map\"}",
+      "4": "capability map or a module file unreadable; stdout is {\"schemaVersion\":1,\"error\":\"unreadable\",\"detail\":...}"
+    },
+    "values": {
+      "review": {
+        "none": "no review marker in the file (the project may not use markers); says nothing about approval",
+        "pending": "written and waiting for the user's review",
+        "approved": "approved by the user; the file has not changed since",
+        "revised": "Spec only: approved earlier, edited after approval, needs another review",
+        "invalid": "the marker line is malformed; review state unknown"
+      },
+      "externalReview": {
+        "none": "no external review recorded and not declined",
+        "recorded": "an external review (for example from delegate) is recorded; advisory only, not an approval",
+        "declined": "the user declined an external review for this module"
+      }
+    }
+  }
+}

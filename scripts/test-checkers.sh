@@ -732,6 +732,33 @@ REG_OUT="$(python3 "$REG" "$TMP/regnorunner" 2>&1)"
 want pass "tests-registered: 读不到运行器时说的是没找到，不是把每个文件报成没登记" \
   grep -qF -- "读不到任何运行器" <<<"$REG_OUT"
 
+# ── check-interface.py（plugin-interface）──
+IFC="$ROOT/scripts/check-interface.py"
+mkifc() {  # $1=目录 $2=python 表达式，对 data（正确的 interface.json）做的改动，空=不改
+  rm -rf "$1"; mkdir -p "$1/hooks"; : > "$1/hooks/map_view.py"
+  python3 - "$ROOT/plugins/spec-guard/interface.json" "$1/interface.json" "${2:-}" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+exec(sys.argv[3] or "pass")
+open(sys.argv[2], "w", encoding="utf-8").write(json.dumps(data))
+PY
+}
+mkifc "$TMP/ifc-good"
+want pass "interface: 与代码一致 → 放行" python3 "$IFC" "$TMP/ifc-good/interface.json"
+want pass "interface: 仓库里的真文件 → 放行" python3 "$IFC"
+mkifc "$TMP/ifc-json"; printf '{not json' > "$TMP/ifc-json/interface.json"
+want fail "interface: 不是合法 JSON → 报错" python3 "$IFC" "$TMP/ifc-json/interface.json"
+mkifc "$TMP/ifc-ver" 'data["interface"] = "1"'
+want fail "interface: 版本号不是 <主>.<次> → 报错" python3 "$IFC" "$TMP/ifc-ver/interface.json"
+mkifc "$TMP/ifc-schema" 'data["mapView"]["schemaVersion"] = 2'
+want fail "interface: schemaVersion 与 map_view 不一致 → 报错" python3 "$IFC" "$TMP/ifc-schema/interface.json"
+mkifc "$TMP/ifc-review" 'del data["mapView"]["values"]["review"]["revised"]'
+want fail "interface: review 少一个取值 → 报错" python3 "$IFC" "$TMP/ifc-review/interface.json"
+mkifc "$TMP/ifc-ext" 'data["mapView"]["values"]["externalReview"]["waived"] = "x"'
+want fail "interface: externalReview 多一个取值 → 报错" python3 "$IFC" "$TMP/ifc-ext/interface.json"
+mkifc "$TMP/ifc-cmd"; rm "$TMP/ifc-cmd/hooks/map_view.py"
+want fail "interface: command 指向的脚本不存在 → 报错" python3 "$IFC" "$TMP/ifc-cmd/interface.json"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1

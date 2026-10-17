@@ -29,6 +29,8 @@ SUSPEND_MARKER = "<!-- spec-guard: suspended -->"
 REVIEW_PREFIX = "<!-- spec-guard: review"
 REVIEW_PENDING = "<!-- spec-guard: review pending -->"
 REVIEW_APPROVED = "<!-- spec-guard: review approved -->"
+# plugin-interface: published in interface.json; scripts/check-interface.py keeps the two in step.
+REVIEW_STATES = ("none", "pending", "approved", "revised", "invalid")
 REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]{12}) -->")
 FENCES = ("```", "~~~")
 _DIGEST_MODULE = None
@@ -476,6 +478,7 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict) -> tuple:
 # delegate-review-hint: where an external review is recorded, and the line the user's decline leaves behind.
 EXTERNAL_REVIEW_HEADING = re.compile(r"^##\s+(?:外部审查意见|External review)\s*$")
 EXTERNAL_REVIEW_DECLINED = "<!-- spec-guard: external-review declined -->"
+EXTERNAL_REVIEW_STATES = ("none", "recorded", "declined")
 
 
 def external_review_state(root: Path, module: str) -> str | None:

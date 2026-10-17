@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, review_approved_line, review_body, review_digest,
+from module_stage import (EXTERNAL_REVIEW_DECLINED, EXTERNAL_REVIEW_STATES, REVIEW_APPROVED, REVIEW_PENDING,
+                          REVIEW_STATES, external_review_state, review_approved_line, review_body, review_digest,
                           review_state)
 
 SCRIPT = str(Path(__file__).with_name("review_mark.py"))
@@ -67,6 +68,28 @@ class States(unittest.TestCase):
         self.assertEqual(review_state(with_marker(REVIEW_PENDING, fenced), "spec"), "pending")
         tilde = SPEC + "~~~\n%s\n~~~\n" % REVIEW_PENDING
         self.assertEqual(review_state(tilde, "spec"), "none")
+
+
+class ValueSets(unittest.TestCase):
+    """plugin-interface: interface.json publishes these sets, so every state the code returns must be in them."""
+
+    def test_review_states(self):
+        self.assertEqual(REVIEW_STATES, ("none", "pending", "approved", "revised", "invalid"))
+        seen = {review_state(SPEC, "spec"), review_state(with_marker(REVIEW_PENDING), "spec"),
+                review_state(approved(), "spec"), review_state(approved() + "改\n", "spec"),
+                review_state(with_marker(REVIEW_APPROVED), "spec")}
+        self.assertEqual(seen, set(REVIEW_STATES))
+
+    def test_external_review_states(self):
+        self.assertEqual(EXTERNAL_REVIEW_STATES, ("none", "recorded", "declined"))
+        seen = set()
+        for todo in ("- [ ] a\n", "## 外部审查意见\n- delegate：completed\n", EXTERNAL_REVIEW_DECLINED + "\n"):
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / "tasks" / "alpha").mkdir(parents=True)
+                (root / "tasks" / "alpha" / "todo.md").write_text(todo, encoding="utf-8")
+                seen.add(external_review_state(root, "alpha"))
+        self.assertEqual(seen, set(EXTERNAL_REVIEW_STATES))
 
 
 class Digest(unittest.TestCase):
