@@ -36,13 +36,16 @@ Ask first，用户这次的确认就是对这一项的批准。
    - Spec 交审时，写在模块 Spec 里。这时 Spec 还没批准，写进去的内容会一起被审。
    - 之后写在 `tasks/<id>/todo.md`。todo 不参与评审指纹，所以 Spec、Plan 批准以后再写，也不会把它们变成「改过待重审」。
 
-   每条结论写清：审查对象、哪个后端、几条发现、来源（delegate）。这些是给人看的参考，不是让人批准的内容。
+   每条结论按 delegate 审查报告的固定格式（JSON `schema_version` 1）引用，写清：来源（delegate）、后端、`execution_status`、
+   `review_outcome`、findings 条数、审查范围指纹（`scope` 的 `baseline` 与 `diff_sha256`），有 unreviewed 时注明。delegate 的报告
+   没有严重程度字段（delegate 负责人确认暂不加），这里不写也不推断严重程度。这些是给人看的参考，不是让人批准的内容。
 5. **拒绝标记：** 用户说不需要时，agent 在当时该写的那个文件里加一行固定标记 `<!-- spec-guard: external-review declined -->`。
    hook 只读这行标记，不写任何文件，符合「hook 不写文件」的不变量。
 6. **每个模块只提示一次：** Spec 或 todo 里，只要「外部审查意见」小节有非空内容，或者有拒绝标记，这个模块的后续检查点都不再
    提示。监测会话希望三个检查点各提一次，这里选每模块一次，是为了少打扰。用户要按检查点分别提示，可以在审本 Spec 时改。
 7. **命令名先写死**（D3-A）：Claude 写 `/delegate:review`，Codex 写 `delegate:delegate-routing`。delegate 以后发布了
-   interface.json，再另开模块按它的版本校验；本模块不等 delegate。
+   interface.json，再另开模块按它的版本校验；本模块不等 delegate。delegate 负责人已说明：即使有 interface.json，里面也只是静态的
+   能力声明，后端现在能不能用要靠 `/delegate:doctor` 现场检查。所以「装了」不等于「审查一定能跑」，提示措辞要留这个余地。
 8. **约定块模板不改。** 0.64.1 加的那一行继续作为规则原文；本模块只补每轮注入和落点约定。共享检查点规则补一段落点说明。
 9. 版本 0.65.0（阶段提示行为有变化），一个 PR。
 
@@ -69,16 +72,17 @@ Ask first，用户这次的确认就是对这一项的批准。
 
 > - External review (from delegate, installed): if this <Spec|Plan|final acceptance> deserves a second agent's read-only
 >   review (cross-module, trade-offs, irreversible, missing information, an interface proposal, many tasks), you may
->   propose <`/delegate:review`|`delegate:delegate-routing`>; start it only after the user agrees. Findings are advisory,
->   not the user's approval. Record them under `## 外部审查意见` in `<spec/<id>.md|tasks/<id>/todo.md>`, or add
+>   propose <`/delegate:review`|`delegate:delegate-routing`> (whether it can run is decided by `/delegate:doctor`); start it
+>   only after the user agrees. Findings are advisory, not the user's approval. Record them under `## 外部审查意见` in `<spec/<id>.md|tasks/<id>/todo.md>`, or add
 >   `<!-- spec-guard: external-review declined -->` there if the user declines; either one stops this line for the module.
 
 这一行不改变建议的下一步，不改变阶段判定。
 
 ### 共享检查点规则与文档
 
-- `references/workflow-checkpoints.md` 在交审一节补一段：「外部审查意见」小节的位置、每条结论该写什么、拒绝标记的写法，以及
-  「只作参考，不算批准」。
+- `references/workflow-checkpoints.md` 在交审一节补一段：「外部审查意见」小节的位置；每条结论按 delegate 报告格式引用哪些
+  字段（来源、后端、`execution_status`、`review_outcome`、findings 条数、`scope` 指纹，不写严重程度）；拒绝标记的写法；
+  「只作参考，不算批准」；delegate 跑不起来时，记一行未能执行及原因即可，不算拒绝。
 - `docs/design.md` 的部件表加 `sibling_plugins.py`；数据流里注明阶段提示会只读本机插件记录。
 - CHANGELOG 记一条「新增」。
 
