@@ -50,7 +50,7 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.64.2` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.65.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` 与 `SessionStart` 两项 hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入 |
 

@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import sibling_plugins
+
 PLUGIN = "agent-relay"
 REQUIRED = ">=1.0,<3.0"
 MIN_VERSION, MAX_VERSION = (1, 0), (3, 0)
@@ -45,45 +47,12 @@ def read_json(path):
         raise ProbeFailure(f"cannot read {path}: {exc}") from exc
 
 
-def main_checkout_local_settings(project):
-    """Claude Code keeps a linked git worktree's local settings in its main checkout."""
-    try:
-        done = subprocess.run(["git", "-C", str(project), "rev-parse", "--path-format=absolute",
-                               "--git-common-dir", "--git-dir"], stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return ()
-    lines = done.stdout.splitlines()
-    if done.returncode != 0 or len(lines) != 2 or lines[0] == lines[1]:
-        return ()
-    return (Path(lines[0]).parent / ".claude" / "settings.local.json",)
-
-
 def claude_root(project):
     """Plugin root of an enabled agent-relay for this project in Claude Code, or None."""
-    home = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
-    record = read_json(home / "plugins" / "installed_plugins.json")
-    if record is None:
-        return None
-    if not isinstance(record, dict) or not isinstance(record.get("plugins"), dict):
-        raise ProbeFailure("installed_plugins.json has no plugins table")
-    enabled = {}
-    for settings in (home / "settings.json", project / ".claude" / "settings.json",
-                     *main_checkout_local_settings(project), project / ".claude" / "settings.local.json"):
-        data = read_json(settings)
-        if isinstance(data, dict) and isinstance(data.get("enabledPlugins"), dict):
-            enabled.update(data["enabledPlugins"])
-    for key, installs in record["plugins"].items():
-        if key.split("@", 1)[0] != PLUGIN or enabled.get(key) is not True:
-            continue
-        for install in installs if isinstance(installs, list) else []:
-            if not isinstance(install, dict) or not install.get("installPath"):
-                continue
-            scoped = install.get("projectPath")
-            if scoped and Path(scoped).resolve() != project.resolve():
-                continue
-            return Path(install["installPath"])
-    return None
+    try:
+        return sibling_plugins.claude_plugin_root(project, PLUGIN)
+    except sibling_plugins.RecordError as exc:
+        raise ProbeFailure(str(exc)) from exc
 
 
 def codex_root():

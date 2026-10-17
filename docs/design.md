@@ -45,6 +45,7 @@ plugins/spec-guard/
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
 | `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
+| `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`） |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
 | `proposal_*.py` | Proposal 契约、发布、读 Issue、评审、晋级证明、收尾 |
 | `local_ledger_*.py`、`local_ticket_*.py`、`hosted_ticket*.py` | 本地事项账本、可移植流程、托管事项 |
@@ -72,7 +73,9 @@ plugins/spec-guard/
    交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
    （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
    `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
-   `module_stage.py --config-lines` 取得，与其他阶段同一实现。
+   `module_stage.py --config-lines` 取得，与其他阶段同一实现。只在三个评审检查点（Spec 待审、Plan 待审、最终验收）且模块还没有
+   外部审查记录时，`sibling_plugins.py` 再只读本机插件记录（Claude 的 `installed_plugins.json` 与 settings，Codex 的
+   `config.toml` 与插件缓存目录），装了并启用 delegate 才多出一行外部审查提示；不调子进程，读不到按没装处理。
 4. 输出 `hookSpecificOutput.additionalContext`。来自仓库的值在注入前净化（折叠空白、去掉反引号与反斜杠、剥掉
    控制字符、限长），能力图原文标注“非指令”。
 

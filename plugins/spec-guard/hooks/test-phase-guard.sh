@@ -10,8 +10,13 @@ fail() { echo "  ❌ $1" >&2; exit 1; }
 
 # 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（unattended-run-hint）；用例按需显式设置。
 # 宿主信号（codex-command-wording）：跑测试的宿主自己的 PLUGIN_ROOT／SPEC_GUARD_HOST 不得漏进被测 hook；用例要指定宿主时设 SG_HOST。
+# 插件记录（delegate-review-hint）：跑测试的机器上装的插件不得漏进被测 hook；默认指向空目录，用例要伪造安装时设
+# SG_CLAUDE_HOME／SG_CODEX_HOME。
+mkdir -p "$WORK/no-claude-home" "$WORK/no-codex-home"
 run() {  # $1=项目目录；可用 RUN_PATH 替换 PATH
-  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST ${SG_HOST:+SPEC_GUARD_HOST="$SG_HOST"} \
+    CLAUDE_CONFIG_DIR="${SG_CLAUDE_HOME:-$WORK/no-claude-home}" CODEX_HOME="${SG_CODEX_HOME:-$WORK/no-codex-home}" \
+    PATH="${RUN_PATH:-$PATH}" CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null
 }
 
 silent() {  # $1=用例名 $2=项目目录
@@ -1694,7 +1699,88 @@ $plain_early"
 done
 }
 
-PARTS=16
+part_17() {
+# delegate-review-hint：装了 delegate 时，三个检查点多一行外部审查提示；记录过、拒绝过或没装时不出现。
+dr="$WORK/delegate-review"
+mkdir -p "$dr/spec" "$dr/tasks/alpha" "$dr/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$dr/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$dr/spec/CAPABILITY-MAP.md"
+ch="$WORK/claude-home"; xh="$WORK/codex-home"
+mkdir -p "$ch/plugins" "$xh/plugins/cache/dm/delegate"
+printf '%s\n' '{"version": 2, "plugins": {"delegate@dm": [{"scope": "user", "installPath": "/x"}]}}' \
+  > "$ch/plugins/installed_plugins.json"
+printf '%s\n' '{"enabledPlugins": {"delegate@dm": true}}' > "$ch/settings.json"
+printf '%s\n' '[plugins."delegate@dm"]' 'enabled = true' > "$xh/config.toml"
+PENDING='<!-- spec-guard: review pending -->'
+DECLINED='<!-- spec-guard: external-review declined -->'
+LINE='- External review (from delegate, installed): if this'
+spec_md() { printf '# Spec: alpha\n\n%s\n正文\n%s\n' "$1" "${2:-}" > "$dr/spec/alpha.md"; }
+approve() { python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import REVIEW_PENDING, review_approved_line, review_digest
+path = Path(sys.argv[2]); text = path.read_text(encoding="utf-8")
+path.write_text(text.replace(REVIEW_PENDING, review_approved_line(review_digest(text))), encoding="utf-8")
+' "$HOOKDIR" "$1"; }
+ctx() { run "$dr" | context_of; }
+on() { SG_CLAUDE_HOME="$ch" SG_CODEX_HOME="$xh" ctx; }
+is() { case "$out" in *"$2"*) ;; *) fail "$1: 缺少「$2」
+$out" ;; esac; echo "  ✅ $1"; PASS=$((PASS + 1)); }
+isnt() { case "$out" in *"$2"*) fail "$1: 不该出现「$2」
+$out" ;; esac; echo "  ✅ $1"; PASS=$((PASS + 1)); }
+
+# Spec 交审
+spec_md "$PENDING"
+out="$(ctx)"; isnt "没装 delegate：Spec 待审不出提示" "$LINE"
+plain="$out"
+out="$(on)"
+is "装了：Spec 待审出现提示" "$LINE Spec deserves"
+is "装了：默认按 Claude 写入口与 doctor" 'propose `/delegate:review` (whether it can run is decided by `/delegate:doctor`)'
+is "装了：Spec 交审记在 Spec 里" 'in `spec/alpha.md`, or add `<!-- spec-guard: external-review declined -->` there'
+is "装了：只作参考" "Findings are advisory, not the user's approval."
+[ "$(printf '%s\n' "$out" | grep -v "^$LINE")" = "$plain" ] || fail "装了：除提示行外应与没装时逐字相同"
+echo "  ✅ 装了：除提示行外逐字相同"; PASS=$((PASS + 1))
+out="$(SG_HOST=claude on)"
+is "Claude 宿主：只写斜杠入口" 'propose `/delegate:review` (whether it can run is decided by `/delegate:doctor`)'
+out="$(SG_HOST=codex on)"
+is "Codex 宿主：写技能入口" "propose \`delegate:delegate-routing\` (whether it can run is decided by delegate's own doctor check)"
+isnt "Codex 宿主：没有斜杠入口" '/delegate:'
+out="$(SG_HOST=codex SG_CLAUDE_HOME="$ch" ctx)"
+isnt "Codex 宿主只认 Codex 记录" "$LINE"
+spec_md ''
+out="$(on)"; is "无标记 NEEDS_PLAN 也算 Spec 交审" "$LINE Spec deserves"
+spec_md "$PENDING" $'## 外部审查意见\n\n- delegate（codex）：completed，review_outcome=findings，2 条'
+out="$(on)"; isnt "Spec 里已有记录：不再提示" "$LINE"
+spec_md "$PENDING" '## 外部审查意见'
+out="$(on)"; is "小节为空：仍提示" "$LINE"
+spec_md "$PENDING" $'## External review\n- recorded'
+out="$(on)"; isnt "英文标题的记录也认" "$LINE"
+spec_md "$PENDING" "$DECLINED"
+out="$(on)"; isnt "Spec 里有拒绝标记：不再提示" "$LINE"
+spec_md "$PENDING"; approve "$dr/spec/alpha.md"
+out="$(on)"; isnt "Spec 已批准、还没 Plan：不是检查点" "$LINE"
+
+# Plan 交审与最终验收
+printf '# Plan\n\n%s\n' "$PENDING" > "$dr/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' > "$dr/tasks/alpha/todo.md"
+out="$(on)"
+is "Plan 待审出现提示" "$LINE Plan deserves"
+is "Plan 交审记在 todo 里" 'in `tasks/alpha/todo.md`'
+approve "$dr/tasks/alpha/plan.md"
+out="$(on)"; isnt "构建中段不提示" "$LINE"
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' > "$dr/tasks/alpha/todo.md"
+out="$(on)"; is "最终验收出现提示" "$LINE final acceptance deserves"
+out="$(ctx)"; isnt "最终验收没装：不提示" "$LINE"
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '' "$DECLINED" > "$dr/tasks/alpha/todo.md"
+out="$(on)"; isnt "todo 里有拒绝标记：不再提示" "$LINE"
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' > "$dr/tasks/alpha/todo.md"
+printf '\n## 外部审查意见\n- 已审\n' >> "$dr/spec/alpha.md"
+out="$(on)"; isnt "Spec 里记录过：之后的检查点也不再提示（每模块一次）" "$LINE"
+}
+
+PARTS=17
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

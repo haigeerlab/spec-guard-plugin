@@ -123,6 +123,24 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题里�
 - **既有项目补标记要单独确认。** 要给此前确认过的 Spec 或 Plan 补 `approved`，先预览并向用户单独确认一次，
   不得依据此前含糊的答复补记。Spec 没有标记不妨碍单独记录 Plan 的批准；Spec 标着待审核或已修订时，先把 Spec 交用户审核。
 
+## 外部审查意见
+
+装了 delegate 时，阶段提示会在 Spec 待审、Plan 待审、最终验收这三个检查点多一行：这一项值得另一个 agent 只读复核时
+（跨模块、有取舍、不可逆、信息不足、有接口提案、Task 多），可以提议用 delegate 审查，能否运行以 delegate 自己的体检为准。
+
+- **只提议，不发起。** 用户同意后才发起；审查结论只作参考，不算用户批准，也不据此写评审标记。
+- **记在哪里。** 小节标题写 `## 外部审查意见`（英文产物写 `## External review`）。Spec 交审时写在 `spec/<id>.md`
+  （这时还没批准，内容随 Spec 一起审）；之后写在 `tasks/<id>/todo.md`（todo 不参与评审指纹，写入不会让已批准的 Spec、
+  Plan 变成“批准后已修订”）。
+- **写什么。** 按 delegate 审查报告的固定格式（JSON `schema_version` 1）引用：来源（delegate）、后端、`execution_status`、
+  `review_outcome`、findings 条数、审查范围指纹（`scope` 的 `baseline` 与 `diff_sha256`），有未审到的部分（unreviewed）时注明。
+  报告里没有严重程度，不写也不推断。
+- **怎么读结论。** 只有 `execution_status` 为 `completed`，且 `review_outcome` 为 `findings` 或 `no_findings_in_scope`，才算有结论；
+  `no_findings_in_scope` 只说明审查范围内没找到问题，不等于没有缺陷。`inconclusive` 或没有完成（`conditions_missing`、`failed`、
+  `timed_out`、`cancelled`）时，记一行「未得出结论」，写明状态和原因，这不算拒绝。报告里的 `limitations` 有内容时一并注明。
+- **用户不需要时**，在当时该写的那个文件里加一行 `<!-- spec-guard: external-review declined -->`。
+- **每个模块只提示一次。** Spec 或 todo 里，这个小节有内容或有拒绝标记，后续检查点都不再出现这一行。
+
 ## 文档建议
 
 没人问，就没人提文档；跨模块的文档单看一个模块也想不到。所以在三个位置各问一次，每个位置问的层次不同：
