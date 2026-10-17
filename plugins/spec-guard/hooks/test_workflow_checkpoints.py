@@ -339,5 +339,51 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("`.agent/config.json`", "/spec-guard:config", "产物语言", "评审节奏"):
                     self.assertIn(phrase, template)
 
+
+class ConcurrencyAssessmentTests(unittest.TestCase):
+    """concurrency-assessment: the capability-map review adds an assessment only when moduleConcurrency is on."""
+
+    HEADING = "## 并行评估（moduleConcurrency 为 on 时）"
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self, heading):
+        start = self.text.index(heading)
+        end = self.text.find("\n## ", start + len(heading))
+        return self.text[start:end if end != -1 else len(self.text)]
+
+    def test_section_exists_and_says_when_it_applies(self):
+        self.assertIn(self.HEADING, self.text)
+        body = self.section(self.HEADING)
+        first = body.split("\n\n")[1]
+        for phrase in ("不是 `on`", "不适用", "/spec-guard:config"):
+            self.assertIn(phrase, first)
+
+    def test_section_covers_gates_references_and_advice(self):
+        body = self.section(self.HEADING)
+        for phrase in ("同时开工", "2 个", "集成基线", "未核实", "文件分区", "共享接口", "热点文件",
+                       "逗号组", "往前挪", "关键路径", "只在这里算", "能粗就粗", "变更记录"):
+            self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_section_sits_between_doc_suggestions_and_batch_review(self):
+        self.assertLess(self.text.index("## 文档建议"), self.text.index(self.HEADING))
+        self.assertLess(self.text.index(self.HEADING), self.text.index("## 按需求批量前置审"))
+
+    def test_doc_suggestions_point_to_the_assessment(self):
+        doc = self.section("## 文档建议")
+        review = [line for line in doc.split("\n- ") if line.startswith("**能力图评审**")]
+        self.assertEqual(len(review), 1)
+        self.assertIn("并行评估", review[0])
+
+    def test_convention_blocks_never_mention_the_switch(self):
+        templates = list((self.plugin / "templates").glob("*-block-*.md"))
+        self.assertTrue(templates)
+        for path in templates:
+            with self.subTest(path=path.name):
+                self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"))
+
 if __name__ == "__main__":
     unittest.main()
