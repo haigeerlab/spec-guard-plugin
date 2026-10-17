@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.65.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.65.0-upgrade-20261017"
+      },
+      "observedAt": "2026-10-17T09:33:48Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.64.2 to v0.65.0; codex plugin marketplace upgrade reported the new revision; codex plugin list reports 0.65.0 enabled; the smoke run exited 0; the installed copy passes 362 phase-guard cases, test_sibling_plugins and test_agent_relay_probe",
+        "result:in a temporary project with a Spec awaiting review and delegate enabled in this machine's Codex config, the installed copy's phase-guard.sh (SPEC_GUARD_HOST=codex) carries the line proposing `delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
+        "result:a real codex exec session (read-only sandbox) asked to hand the Spec over for review presented its content, proposed a read-only review via delegate:delegate-routing as advisory only, and stated it had not started one"
+      ]
+    }
+  ]
+}
