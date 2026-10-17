@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.67.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:5798c7ac4084fa0ff61eb1ec7c4023f4b0346ba8"
+      },
+      "observedAt": "2026-10-17T19:25:31Z",
+      "evidence": [
+        "result:the v0.67.1 annotated tag resolves to merge commit 5798c7ac4084fa0ff61eb1ec7c4023f4b0346ba8 (pull request #345); merged==true and main==merge sha were checked as a separate step before tagging; main has since moved on to 6620c40 (0.68.0, #346), so the tag was placed on the merge commit, not on the current main",
+        "result:the push run of the CI on main for the merge commit (39056276134) failed on its first attempt in the phase-guard timing case 'hook does not hang when stdin stays open' (3.09 s against a 3 s bound, ubuntu); the merge commit's tree is identical to the pull request head d9c7538 whose CI (39056098935) passed; the rerun (attempt 2) passed every step, ShellCheck included, before tagging; locally that case takes 1.19 s on 0.67.0 and 1.24 s on 0.67.1",
+        "result:0.67.1 is one module, hint-language-follow: when .agent/config.json sets artifactLanguage exactly zh-CN the stage hint's prose is Chinese; the heading line, the stage line, stage codes, commands, skill names, paths, module ids and marker lines are unchanged; any other value, no value or an invalid config keeps English byte-identical to 0.67.0",
+        "result:evals/hint-english-diff.sh v0.67.0 found English 905/905 byte-identical over 37 fixtures x 5 non-Chinese configurations x host and event variants, and 181/181 zh-CN hints without English labels; phase-guard 391, verify-artifacts 62 and test_session_context 54 cases pass under macOS /bin/bash 3.2.57",
+        "not-verified:the suspected root cause (an English hint pulling replies into English) was not confirmed; the comparison run under claude --safe-mode did not execute the --settings hook (0/5 in both groups)"
+      ]
+    }
+  ]
+}
