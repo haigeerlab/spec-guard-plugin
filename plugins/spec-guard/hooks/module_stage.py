@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
+from checkout_role import role as checkout_role_of
 from project_config import load as load_config
 from sibling_plugins import delegate_review_entry
 
@@ -285,6 +286,8 @@ COMMANDS = {
         # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
         "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
                             "`%(doctor)s`)"),
+        "checkout-role": "`/spec-guard:checkout-role` (Codex: spec-guard-ops checkout-role)",
+        "map": "`/spec-guard:map` (Codex: spec-guard-ops map)",
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
@@ -312,6 +315,8 @@ COMMANDS["codex"] = {
                   + " This stage summary carries over, the conversation does not need to."),
     "free-current": "give the user " + CODEX_COMPACT,
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
+    "checkout-role": "`$spec-guard-ops` checkout-role",
+    "map": "`$spec-guard-ops` map",
 }
 
 
@@ -534,6 +539,56 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
             % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
 
 
+def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict, review_step: str = "") -> tuple:
+    """checkout-role: (lines, next step) for a checkout with a role; the project-wide selection is not touched.
+
+    A module checkout is told only about its own module; a coordinator keeps any review constraint and is never
+    told to build.  Fixed wording and validated module ids only.
+    """
+    if kind == "coordinator":
+        lines = ["- Checkout role: coordinator — this checkout coordinates the modules; do not develop modules here."]
+        if review_step:
+            return lines, review_step + " As the coordinating session, present it to the user here and record the decision here."
+        return lines, ("coordinate the modules: use %s to see startable modules, module worktrees and boundary overlaps, and "
+                       "handle hand-backs and merges by the shared rule for the coordinating session's approvals and merges; "
+                       "do not build modules here." % cmd["map"])
+    lines = ["- Checkout role: module `%s` — this checkout works only on `%s`; when it is done, hand it back to the "
+             "coordinating session (no merge or push here)." % (module, module)]
+    state = by_id.get(module)
+    if state is None:
+        return lines, ("this checkout's role names `%s`, which is not in the capability map; set or clear the role "
+                       "with %s. Do not work on other modules here." % (module, cmd["checkout-role"]))
+    if state["suspended"]:
+        lines.append("- This checkout's module `%s`: suspended (%d unchecked item(s))" % (module, state["open"]))
+        return lines, ("`%s` is suspended; resume it with %s, or ask the coordinating session to reassign or clear this "
+                       "checkout's role. Do not start other modules here." % (module, cmd["resume"] % module))
+    stage = state["stage"]
+    if stage == "DONE":
+        lines.append("- This checkout's module `%s`: DONE" % module)
+        return lines, ("`%s` is done in this checkout; hand it back to the coordinating session for its final acceptance "
+                       "and merge. Do not start another module here, and do not merge or push from here." % module)
+    lines.append("- This checkout's module `%s`: %s%s" % (module, stage, " (%d unchecked item(s))" % state["open"]
+                                                         if stage == "BUILDING" else ""))
+    review_line, own_step, _spec, plan_review = review_hint(root, module, stage, cmd)
+    if review_line:
+        lines.append(review_line)
+    if own_step:
+        return lines, ("`%s` has a review step open (see the Review line above): hand it to the coordinating session for "
+                       "the user's review, and do not continue until the approval reaches this checkout through the "
+                       "integration branch." % module)
+    if stage == "NEEDS_SPEC":
+        return lines, "write `spec/%s.md` and hand it to the coordinating session for review." % module
+    if stage == "NEEDS_PLAN":
+        return lines, ("create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
+                       "coordinating session for review." % (module, module, cmd["plan"]))
+    gate = next_gate(root, module)
+    if gate:
+        lines.append("- Next gate of `%s`: %s — stop there and hand the module back to the coordinating session."
+                     % (module, gate))
+    return lines, "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
+                                                                                          state["open"], module)
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
              unattended: bool = False, host: str | None = None) -> str:
     root = Path(root)
@@ -561,6 +616,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
     notes = config_lines(root, host)
+    role_kind, role_id = checkout_role_of(root)  # ("none", None) whenever moduleConcurrency is not on
+    if role_kind == "invalid":
+        notes.append("- Checkout role: the role marker is invalid, so it is ignored; check it with %s."
+                     % cmd["checkout-role"])
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.
@@ -622,6 +681,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(hint)
         if boundary_note_line:
             notes.append(boundary_note_line)
+        if role_kind in ("module", "coordinator"):
+            role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd)
+            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n"
+                    + "".join(n + "\n" for n in notes + role_lines) + "\nSuggested next step: " + role_step)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
@@ -665,9 +728,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     elif context_note:
         notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd)
-    if review_line:
+    if review_line and role_kind != "module":
         counts += "\n" + review_line
-    external_line = external_review_hint(root, module, stage, spec_review, plan_review, host)
+    external_line = (external_review_hint(root, module, stage, spec_review, plan_review, host)
+                     if role_kind != "module" else "")
     if external_line:
         counts += "\n" + external_line
     next_step = {
@@ -679,7 +743,12 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                                                                                          current["open"], module),
         "MODULE_DONE": push_first + module_done,
     }[stage]
-    if stage == "BUILDING" and not review_step:
+    if stage == "BUILDING" and not review_step and role_kind == "coordinator":
+        gate = next_gate(root, module)
+        if gate:
+            counts += ("\n- Next gate of `%s`: %s — the module session builds toward it; review it here when it arrives."
+                       % (module, gate))
+    elif stage == "BUILDING" and not review_step and role_kind != "module":
         gate = next_gate(root, module)
         # A Plan with no marker may still be waiting for the user, so only an approved one is told to keep going.
         if gate and plan_review == "approved":
@@ -689,6 +758,9 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             counts += ("\n- Next gate: %s — the first unchecked `gate` checkpoint in the todo. The Plan has no review "
                        "marker: if the user has not approved it yet, wait for that approval before building." % gate)
     next_step = review_step or next_step
+    if role_kind in ("module", "coordinator"):
+        role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step)
+        notes = notes + role_lines
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s" % (stage, module, source, counts,
                                           "".join(n + "\n" for n in notes), next_step))

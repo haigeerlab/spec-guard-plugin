@@ -182,5 +182,161 @@ class Marker(unittest.TestCase):
             self.assertEqual(spy.call_count, 1)
 
 
+
+# StageView: alpha done; beta half built with a pending Plan (the project-wide current module); gamma, delta later.
+VIEW_MAP = ("# Capability Map: v\n\n| Module id | Responsibility | Depends on |\n| --- | --- | --- |\n"
+            "| alpha | x | — |\n| beta | x | alpha |\n| gamma | x | alpha |\n| delta | x | alpha |\n\n"
+            "Build order: alpha → beta → gamma → delta\n")
+VIEW_FILES = {
+    "spec/CAPABILITY-MAP.md": VIEW_MAP,
+    "spec/alpha.md": "# alpha\n", "tasks/alpha/plan.md": "# Plan\n", "tasks/alpha/todo.md": "- [x] a\n",
+    "spec/beta.md": "# beta\n", "tasks/beta/plan.md": "# Plan\n\n<!-- spec-guard: review pending -->\n",
+    "tasks/beta/todo.md": "- [x] a\n- [ ] b\n- [ ] Checkpoint 1（gate）：验收\n",
+}
+
+
+class View:
+    def __init__(self, files=None, role_text=None, switch="on"):
+        self.files, self.role_text, self.switch = dict(VIEW_FILES, **(files or {})), role_text, switch
+
+    def __enter__(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name).resolve()
+        git(self.root, "init", "-q")
+        files = dict(self.files)
+        if self.switch is not None:
+            files[".agent/config.json"] = json.dumps({"version": 1, "moduleConcurrency": self.switch})
+        for rel, text in files.items():
+            (self.root / rel).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / rel).write_text(text, encoding="utf-8")
+        git(self.root, "add", "-A")
+        git(self.root, "commit", "-qm", "base")
+        if self.role_text is not None:
+            path = role_path(self.root)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(self.role_text, encoding="utf-8")
+        return self
+
+    def describe(self):
+        from module_stage import describe
+        return describe(self.root)
+
+    def __exit__(self, *exc):
+        self.tmp.cleanup()
+
+
+def step(text):
+    return text.split("Suggested next step: ", 1)[1]
+
+
+class ModuleRoleView(unittest.TestCase):
+    def check_common(self, out, module):
+        self.assertIn("Current module: `beta`", out)  # project-wide selection untouched
+        self.assertIn("Checkout role: module `%s`" % module, out)
+        self.assertNotIn("Plan `tasks/beta/plan.md` is awaiting", out)
+        self.assertNotIn("External review", out)
+        self.assertNotIn("beta", step(out))
+        self.assertNotIn("activeModule", step(out))
+
+    def test_needs_spec(self):
+        with View(role_text="module gamma\n") as v:
+            out = v.describe()
+        self.check_common(out, "gamma")
+        self.assertIn("This checkout's module `gamma`: NEEDS_SPEC", out)
+        self.assertIn("spec/gamma.md", step(out))
+
+    def test_needs_plan_with_pending_spec_goes_to_the_coordinator(self):
+        with View({"spec/gamma.md": "# gamma\n\n<!-- spec-guard: review pending -->\n"}, "module gamma\n") as v:
+            out = v.describe()
+        self.check_common(out, "gamma")
+        self.assertIn("Review: Spec `spec/gamma.md` is awaiting", out)
+        self.assertIn("coordinating session", step(out))
+        self.assertNotIn("review-mark", step(out))
+
+    def test_building_uses_its_own_gate(self):
+        files = {"spec/gamma.md": "# gamma\n", "tasks/gamma/plan.md": "# Plan\n",
+                 "tasks/gamma/todo.md": "- [ ] g1\n- [ ] Checkpoint 2（gate）：模块验收\n"}
+        with View(files, "module gamma\n") as v:
+            out = v.describe()
+        self.check_common(out, "gamma")
+        self.assertIn("This checkout's module `gamma`: BUILDING", out)
+        self.assertIn("Next gate of `gamma`: Checkpoint 2（gate）：模块验收", out)
+        self.assertIn("`/build` on `gamma`", step(out))
+
+    def test_done_hands_back_without_switching_or_merging(self):
+        files = {"spec/gamma.md": "# gamma\n", "tasks/gamma/plan.md": "# Plan\n", "tasks/gamma/todo.md": "- [x] g1\n"}
+        with View(files, "module gamma\n") as v:
+            out = v.describe()
+        self.check_common(out, "gamma")
+        self.assertIn("hand it back to the coordinating session", step(out))
+        for word in ("Set activeModule", "push this branch", "/build", "next unfinished"):
+            self.assertNotIn(word, step(out))
+
+    def test_suspended_stops(self):
+        files = {"spec/gamma.md": "# gamma\n", "tasks/gamma/plan.md": "# Plan\n",
+                 "tasks/gamma/todo.md": "- [x] g1\n- [ ] g2\n<!-- spec-guard: suspended -->\n"}
+        with View(files, "module gamma\n") as v:
+            out = v.describe()
+        self.assertIn("is suspended", step(out))
+        self.assertNotIn("/build", step(out))
+
+    def test_module_not_in_map(self):
+        with View(role_text="module zeta\n") as v:
+            out = v.describe()
+        self.assertIn("not in the capability map", step(out))
+        self.assertNotIn("/build", step(out))
+
+    def test_invalid_active_module_stays_a_global_note(self):
+        with View({".agent/state.json": json.dumps({"activeModule": "BAD id"})}, "module gamma\n") as v:
+            out = v.describe()
+        self.assertIn("activeModule", out.split("Suggested next step: ")[0])
+        self.assertIn("spec/gamma.md", step(out))
+
+
+class CoordinatorView(unittest.TestCase):
+    def test_review_constraint_is_kept_and_presented_here(self):
+        with View(role_text="coordinator\n") as v:
+            out = v.describe()
+        self.assertIn("Checkout role: coordinator", out)
+        self.assertIn("wait for the user to review `tasks/beta/plan.md`", step(out))
+        self.assertIn("present it to the user here", step(out))
+        self.assertNotIn("/build", step(out))
+
+    def test_revised_spec_constraint_is_kept(self):
+        files = {"spec/beta.md": "# beta\n\n<!-- spec-guard: review approved 000000000000 -->\n",
+                 "tasks/beta/plan.md": "# Plan\n"}
+        with View(files, "coordinator\n") as v:
+            out = v.describe()
+        self.assertIn("revised `spec/beta.md`", step(out))
+        self.assertNotIn("/build", step(out))
+
+    def test_building_without_constraint_is_coordination(self):
+        with View({"tasks/beta/plan.md": "# Plan\n\n<!-- spec-guard: review approved -->\n"}, "coordinator\n") as v:
+            out = v.describe()
+        self.assertIn("/spec-guard:map", step(out))
+        self.assertNotIn("/build", step(out))
+        self.assertIn("Next gate of `beta`", out)
+        self.assertNotIn("keep going", out)
+
+
+class RoleOffOrInvalid(unittest.TestCase):
+    def test_invalid_marker_is_one_line(self):
+        with View() as v:
+            plain = v.describe()
+        with View(role_text=HOSTILE + "\n") as v:
+            out = v.describe()
+        self.assertNotIn(HOSTILE, out)
+        extra = [line for line in out.splitlines() if line not in plain.splitlines()]
+        self.assertEqual(len(extra), 1, extra)
+        self.assertIn("role marker is invalid", extra[0])
+
+    def test_off_ignores_any_marker(self):
+        for switch in ("off", None):
+            with View(switch=switch) as v:
+                plain = v.describe()
+            for text in ("module gamma\n", "coordinator\n", HOSTILE):
+                with View(role_text=text, switch=switch) as v:
+                    self.assertEqual(v.describe(), plain, (switch, text))
+
 if __name__ == "__main__":
     unittest.main()
