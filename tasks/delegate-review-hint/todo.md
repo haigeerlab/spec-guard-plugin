@@ -7,5 +7,5 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告，并在草稿副本上做一次改坏验证 — Task 3 提交时 `verify-and-commit.sh` 全档（含 ShellCheck）通过；改坏两处，各自变红：拒绝标记判断失效 →「Spec 里有拒绝标记：不再提示」红；Codex 入口改错 →「Codex 宿主：写技能入口」红；均已复原。
 - [x] Task 4：规则、文档、CHANGELOG 与版本号 — `references/workflow-checkpoints.md` 新增「外部审查意见」一节（只提议、落点、按 delegate 报告字段引用不写严重程度、跑不起来记一行、拒绝标记、每模块一次）；`docs/design.md` 部件表加 `sibling_plugins.py`，数据流第 3 步注明检查点时只读本机插件记录；CHANGELOG `[0.65.0] - 2026-10-17`「新增」两条；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.65.0。
 - [x] Task 4 补充：按 delegate 负责人 2026-10-17 发来的报告解读规则，`workflow-checkpoints.md`「外部审查意见」加「怎么读结论」一条（只有 completed 且 findings／no_findings_in_scope 才算有结论；no_findings_in_scope 不等于没有缺陷；其他情况记「未得出结论」及原因；注明 limitations）。只改文档；阶段提示不读 delegate 的 interface.json（D3-A），按版本校验另作后续模块。
-- [ ] Checkpoint 2（gate）：模块评审；PR 转为可评审由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；PR 转为可评审由用户确认，合并由用户进行 — 2026-10-17 在对话正文列出：实际改动的 18 个文件（新增 6、修改 12、删除 0，没有超出 Plan 的文件）；Claude、Codex 两份提示行原文；验证结果（362 例与 11 例全绿、两处改坏都变红、Task 3 补了一次红灯验证）；未验证项（真实宿主里的表现、Codex 配置不常见的写法、拿不到宿主时的措辞、没做独立审查）；文档建议（无）；拟回告。之后又按 delegate 负责人的规则补了「怎么读结论」一条并告知用户。用户验收通过，PR #339 转为可评审，合并由用户进行。
 - [ ] 发版后的验证
