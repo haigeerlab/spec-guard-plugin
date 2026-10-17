@@ -8,6 +8,6 @@
 - [x] Task 4：verify-artifacts 一侧的正反回归 — 正例复用已有的「合法的项目配置通过」（`zh-CN` + combined）；新增反例「不合规的语言标签判无效」（`zh_CN` → `artifactLanguage-invalid`），与第 18 段「配置无效：英文并报告 invalid」同一份配置。verify-artifacts 代码不改；回归 61→62 例。
 - [x] Task 5：根因对照实测（佐证，不是硬门槛） — **未验证。** 我在会话里嵌套跑 `claude -p` 被自动权限分类器拦下（Create Unsafe Agents），改由用户在终端跑脚本（共享笔记目录下的 `hint-language-ab.sh`）：`claude 2.1.301 --safe-mode` 关掉了 CLAUDE.md 与已装插件，但 `--settings` 传入的 UserPromptSubmit hook 同样没有执行（两组都是 hook ran 0/5，没有生成注入日志），所以两组 10 条回复都没收到阶段提示，全是中文，只说明「没有注入时中文提问得到中文回答」，不能佐证或否定「英文提示带偏回复语言」。根因判断仍是推测。
 - [x] Task 6：文档、CHANGELOG 与版本号 — `commands/phase.md` 补中文提示说明；`commands/config.md`、`spec-guard-ops` 的 config 一节、`docs/design.md` 项目配置一段写明 `zh-CN` 时阶段提示用中文；`workflow-checkpoints.md` 注明 `下一个 gate`；CHANGELOG `[0.67.1]`「修复」与「维护者工具」；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.67.1。
-- [ ] Checkpoint 2（gate）：模块验收；推送与开 PR 先问用户，合并由用户进行
+- [x] Checkpoint 2（gate）：模块验收；推送与开 PR 先问用户，合并由用户进行 — 2026-10-18 在对话正文列出：实际改动的 21 个文件（新增 4、修改 17、删除 0）；NEEDS_PLAN、BUILDING、DONE 三份中文注入原文；验证结果（391／62／54 例、差分 905/905、中文 181/181、两次改坏验证、耗时 221→247 ms）；未验证项（根因对照实测无效）；一个 todo 提交未走 verify-and-commit、事后补跑快档；与计划不一致的两处；合并提醒。用户验收通过，并同意推送分支、开 PR；合并由用户进行。
 
 <!-- spec-guard: external-review declined -->
