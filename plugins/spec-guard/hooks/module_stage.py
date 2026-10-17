@@ -17,7 +17,7 @@ import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
 from project_config import load as load_config
-from sibling_plugins import delegate_enabled
+from sibling_plugins import delegate_review_entry
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
@@ -282,12 +282,13 @@ COMMANDS = {
         "free-next": FREE_BOUNDARY,
         "free-current": ("say in one sentence that the user can /compact with a focus on it, or /clear if the next "
                          "work is unrelated; " + NO_PASTE + "."),
-        "delegate-review": ("`/delegate:review` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
-                            "`/delegate:doctor`)"),
+        # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
+        "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
+                            "`%(doctor)s`)"),
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
-    "delegate-review": "`/delegate:review` (whether it can run is decided by `/delegate:doctor`)",
+    "delegate-review": "`%(review)s` (whether it can run is decided by `%(doctor)s`)",
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
                   + SLASH_BLOCK + "; " + NO_PASTE
@@ -520,14 +521,17 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
         what, where = "final acceptance", "tasks/%s/todo.md" % module
     else:
         return ""
-    if external_review_state(root, module) != "none" or not delegate_enabled(root, host):
+    if external_review_state(root, module) != "none":
+        return ""
+    entry = delegate_review_entry(root, host)
+    if entry is None:
         return ""
     return ("- External review (from delegate, installed): if this %s deserves a second agent's read-only review "
             "(cross-module, trade-offs, irreversible, missing information, an interface proposal, many tasks), you "
             "may propose %s; start it only after the user agrees. Findings are advisory, not the user's approval. "
             "Record them under `## 外部审查意见` (or `## External review`) in `%s`, or add `%s` there if the user "
             "declines; either one stops this line for the module."
-            % (what, COMMANDS[host]["delegate-review"], where, EXTERNAL_REVIEW_DECLINED))
+            % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,

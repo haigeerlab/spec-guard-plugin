@@ -1707,7 +1707,7 @@ printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$dr/CLAUDE.md"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '' 'Build order: alpha' > "$dr/spec/CAPABILITY-MAP.md"
 ch="$WORK/claude-home"; xh="$WORK/codex-home"
-mkdir -p "$ch/plugins" "$xh/plugins/cache/dm/delegate"
+mkdir -p "$ch/plugins" "$xh/plugins/cache/dm/delegate/0.5.2"  # 真实安装总有版本目录（delegate-interface-check）
 printf '%s\n' '{"version": 2, "plugins": {"delegate@dm": [{"scope": "user", "installPath": "/x"}]}}' \
   > "$ch/plugins/installed_plugins.json"
 printf '%s\n' '{"enabledPlugins": {"delegate@dm": true}}' > "$ch/settings.json"
@@ -1778,6 +1778,21 @@ out="$(on)"; isnt "todo 里有拒绝标记：不再提示" "$LINE"
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' > "$dr/tasks/alpha/todo.md"
 printf '\n## 外部审查意见\n- 已审\n' >> "$dr/spec/alpha.md"
 out="$(on)"; isnt "Spec 里记录过：之后的检查点也不再提示（每模块一次）" "$LINE"
+
+# delegate-interface-check：按 delegate 安装目录里的 interface.json 校验版本，Claude 侧命令名取自文件。
+rm -rf "$dr/tasks/alpha"; spec_md "$PENDING"
+before="$(SG_HOST=claude on)"
+dg="$WORK/delegate-root"; mkdir -p "$dg"
+printf '{"version": 2, "plugins": {"delegate@dm": [{"scope": "user", "installPath": "%s"}]}}\n' "$dg" \
+  > "$ch/plugins/installed_plugins.json"
+out="$(SG_HOST=claude on)"
+[ "$out" = "$before" ] || fail "没有 interface.json：输出应与改动前逐字相同"
+echo "  ✅ 没有 interface.json：输出逐字不变"; PASS=$((PASS + 1))
+printf '%s\n' '{"interface": "1.0", "review": {"command": "/delegate:review-two"}, "doctor": {"command": "/delegate:doctor"}}' \
+  > "$dg/interface.json"
+out="$(SG_HOST=claude on)"; is "interface 1.0：命令名取自文件" 'propose `/delegate:review-two` (whether it can run is decided by `/delegate:doctor`)'
+printf '%s\n' '{"interface": "2.0", "review": {"command": "/delegate:review"}}' > "$dg/interface.json"
+out="$(SG_HOST=claude on)"; isnt "interface 2.0：主版本不兼容，不出提示" "$LINE"
 }
 
 PARTS=17
