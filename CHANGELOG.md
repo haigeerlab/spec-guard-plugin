@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.66.0] - 2026-10-17
+
+本版一个模块：`plugin-interface`，让其他插件按版本读 spec-guard 的进度与审查数据。
+
+### 新增
+
+- **随插件发布 `interface.json`。** 插件根目录新增只读接口说明：接口版本（1.0，与插件版本无关）、map-view 的只读命令、JSON
+  `schemaVersion` 1、各退出码的含义，以及 `review`、`externalReview` 每个取值的含义。其他插件按版本检查后读取，不必再读 spec-guard
+  的内部文件。现有字段名和取值都没有改动；和其他插件说法之间的对照由使用方维护。
+- **map-view JSON 每个模块加 `externalReview`**（none／recorded／declined），取自 Spec 与 todo 的「外部审查意见」小节和拒绝标记，
+  与阶段提示同一判定。只增字段，`schemaVersion` 仍为 1，表格输出不变。
+
+### 维护者工具
+
+- `scripts/check-interface.py` 在 `validate.sh` 里核对 `interface.json` 与代码常量一致（版本、取值集合、脚本路径）。
+
+### 文档
+
+- README「数据与隐私」补上 0.65.0 漏写的一点：钩子在评审检查点会读本机的插件记录，看 delegate 是否安装。
+
 ## [0.65.0] - 2026-10-17
 
 本版一个模块：`delegate-review-hint`，在评审检查点用阶段提示提醒可以请 delegate 做只读复核，并约定结论写在哪里。

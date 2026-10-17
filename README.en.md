@@ -57,7 +57,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.65.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.66.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` and `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction |
 
@@ -143,10 +143,15 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
+## External interface
+
+Other plugins that read progress and review state should use `interface.json` at the plugin root: it lists the read-only command, the format version, the exit codes and what each value means, so a reader can check the version. See "对外接口" in [docs/design.md](docs/design.md).
+
 ## Data and privacy
 
 - **What it reads**: at the start of every turn the hook reads only this project's capability map, module Specs,
-  plans, todos, the settings under `.agent/` and local git refs (it never fetches). From the session transcript the
+  plans, todos, the settings under `.agent/` and local git refs (it never fetches); at a review checkpoint it also
+  reads this machine's plugin records to see whether delegate is installed. From the session transcript the
   host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
   the conversation.
 - **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:

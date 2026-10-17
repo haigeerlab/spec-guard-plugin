@@ -43,7 +43,7 @@ plugins/spec-guard/
 | `setup-convention.sh`、`teardown-convention.sh`、`managed-block.py` | 安装、升级、移除约定块；`managed-block.py` 负责标记校验、本地段与原子写入 |
 | `verify-artifacts.sh` | 按需校验已落地的产物 |
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
-| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`） |
+| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
 | `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`） |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
@@ -81,6 +81,18 @@ plugins/spec-guard/
 
 写操作只发生在用户调用命令之后：命令先预览，用户确认后才写；写入能力图、配置、事项都是原子写并读回核对。
 Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal 事项、创建 Issue）每次都需要针对精确目标与内容的授权。
+
+## 对外接口
+
+插件根目录的 `interface.json` 是给其他插件读的只读接口说明，随插件发布（plugin-interface）。它写明：
+
+- `interface`：接口版本，`<主>.<次>`，与插件版本无关。只增加内容时升次版本；删除、改名或改变含义时升主版本；
+- `mapView`：只读进度入口的命令（路径相对插件根目录，`<project-root>` 由调用方替换）、JSON 的 `schemaVersion`、各退出码的含义，
+  以及 `review`、`externalReview` 每个取值的含义。完整格式在 `spec/map-view.md`。
+
+使用方从宿主的插件记录找到 spec-guard 的插件根目录，读 `interface.json`，按主版本号和 `schemaVersion` 判断能不能读，
+不读 spec-guard 的内部文件。spec-guard 读 agent-relay（`agent_relay_probe.py`）用的是同一方式。和其他插件的取值说法之间
+怎么对照，由使用方自己维护。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
 
 ## 两个宿主的差异
 
