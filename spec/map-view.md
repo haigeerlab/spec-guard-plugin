@@ -94,7 +94,8 @@ python3 -B map_view.py [--project <路径>] [--json] [--all]
       "blockedOn": [],
       "missingDeps": [],
       "blocks": {"count": 0, "ids": []},
-      "review": {"spec": "none|pending|approved|revised|invalid", "plan": "none|pending|approved|invalid"}
+      "review": {"spec": "none|pending|approved|revised|invalid", "plan": "none|pending|approved|invalid"},
+      "externalReview": "none|recorded|declined"
     }
   ]
 }
@@ -114,6 +115,7 @@ python3 -B map_view.py [--project <路径>] [--json] [--all]
 - `blockedOn`：只对 `blocked` 有值，是依赖链上挂起的模块 id（去重、按 Build order）。
 - `missingDeps`：只对 `not_ready` 有值，是直接依赖里没 `done` 的模块 id。
 - `blocks`：所有直接或间接依赖它、且没 `done` 的模块，按 Build order。
+- `externalReview`（plugin-interface 增加）：Spec 与 todo 里「外部审查意见」小节有非空内容为 `recorded`；否则有拒绝标记`<!-- spec-guard: external-review declined -->` 为 `declined`；都没有为 `none`。判定与阶段提示的外部审查行同一实现（`spec/delegate-review-hint.md`）；只作参考，不是批准。读不出走退出码 `4`。
 - **稳定性承诺**：`schemaVersion` 为 1 期间只增加字段，不删除、不改名、不改已有字段的含义和取值集合（含 `status`、`step`、
   `review`、`stage` 的取值）；需要做这些时
   `schemaVersion` 加一，并在 CHANGELOG 写明。读取方应忽略不认识的字段。
