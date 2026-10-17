@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sibling_plugins  # noqa: E402
 
 
-class DelegateEnabledTests(unittest.TestCase):
+class Fixture(unittest.TestCase):
     def setUp(self):
         tmp = tempfile.TemporaryDirectory(prefix="sg-sibling-")
         self.addCleanup(tmp.cleanup)
@@ -42,6 +42,8 @@ class DelegateEnabledTests(unittest.TestCase):
         if cache:
             (self.codex / "plugins" / "cache" / market / "delegate").mkdir(parents=True)
 
+
+class DelegateEnabledTests(Fixture):
     # ── Claude ──
     def test_claude_installed_and_enabled(self):
         self.install_claude()
@@ -97,6 +99,95 @@ class DelegateEnabledTests(unittest.TestCase):
     def test_codex_unreadable_config(self):
         (self.codex / "config.toml").mkdir()
         self.assertFalse(sibling_plugins.delegate_enabled(self.project, "codex"))
+
+
+
+class DelegateReviewEntryTests(Fixture):
+    """delegate-interface-check: commands from delegate's interface.json, version range >=1.0,<2.0."""
+
+    DEFAULT = {"review": "/delegate:review", "doctor": "/delegate:doctor", "source": "default"}
+
+    def interface(self, root, data):
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "interface.json").write_text(data if isinstance(data, str) else json.dumps(data), encoding="utf-8")
+
+    def declared(self, version="1.0", review="/delegate:review", doctor="/delegate:doctor"):
+        return {"interface": version, "review": {"command": review, "readOnly": True},
+                "doctor": {"command": doctor}}
+
+    def entry(self, host=None):
+        return sibling_plugins.delegate_review_entry(self.project, host)
+
+    # ── Claude ──
+    def test_claude_compatible_takes_the_commands(self):
+        self.install_claude()
+        self.interface(self.tmp / "delegate", self.declared(review="/delegate:review-two", doctor="/delegate:check"))
+        self.assertEqual(self.entry(), {"review": "/delegate:review-two", "doctor": "/delegate:check",
+                                        "source": "interface"})
+
+    def test_claude_minor_versions_stay_compatible(self):
+        self.install_claude()
+        self.interface(self.tmp / "delegate", self.declared("1.7"))
+        self.assertEqual(self.entry()["source"], "interface")
+
+    def test_claude_other_major_versions_give_no_hint(self):
+        self.install_claude()
+        for version in ("2.0", "0.9"):
+            self.interface(self.tmp / "delegate", self.declared(version))
+            self.assertIsNone(self.entry(), version)
+
+    def test_claude_missing_file_keeps_the_defaults(self):
+        self.install_claude()
+        self.assertEqual(self.entry(), self.DEFAULT)
+
+    def test_claude_unreadable_file_keeps_the_defaults(self):
+        self.install_claude()
+        self.interface(self.tmp / "delegate", "{not json")
+        self.assertEqual(self.entry(), self.DEFAULT)
+        self.interface(self.tmp / "delegate", {"interface": "one"})
+        self.assertEqual(self.entry(), self.DEFAULT)
+
+    def test_claude_malformed_commands_fall_back_one_by_one(self):
+        self.install_claude()
+        self.interface(self.tmp / "delegate", self.declared(review="rm -rf /", doctor="/delegate:doctor-now"))
+        self.assertEqual(self.entry(), {"review": "/delegate:review", "doctor": "/delegate:doctor-now",
+                                        "source": "interface"})
+        self.interface(self.tmp / "delegate", self.declared(review="/other:review"))
+        self.assertEqual(self.entry()["review"], "/delegate:review")
+
+    def test_claude_not_installed(self):
+        self.assertIsNone(self.entry())
+
+    def test_claude_disabled(self):
+        self.install_claude(enabled=False)
+        self.interface(self.tmp / "delegate", self.declared())
+        self.assertIsNone(self.entry())
+
+    # ── Codex ──
+    def codex_enabled(self, versions):
+        self.codex_config('[plugins."delegate@delegate-marketplace"]\nenabled = true\n')
+        base = self.codex / "plugins" / "cache" / "delegate-marketplace" / "delegate"
+        for version, data in versions.items():
+            if data is None:
+                (base / version).mkdir(parents=True)
+            else:
+                self.interface(base / version, data)
+
+    def test_codex_single_version_compatible(self):
+        self.codex_enabled({"0.5.3": self.declared(review="/delegate:review-two")})
+        self.assertEqual(self.entry("codex")["source"], "interface")
+
+    def test_codex_single_version_incompatible(self):
+        self.codex_enabled({"0.6.0": self.declared("2.0")})
+        self.assertIsNone(self.entry("codex"))
+
+    def test_codex_several_versions_keep_the_defaults(self):
+        self.codex_enabled({"0.5.2": None, "0.5.3": self.declared("2.0")})
+        self.assertEqual(self.entry("codex"), self.DEFAULT)
+
+    def test_codex_no_version_directory(self):
+        self.codex_enabled({})
+        self.assertIsNone(self.entry("codex"))
 
 
 if __name__ == "__main__":

@@ -7,6 +7,6 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无警告 — Task 3 提交时 `verify-and-commit.sh` 全档（含 ShellCheck）通过。
 - [x] Task 4：文档、CHANGELOG 与版本号 — `docs/design.md` 新增「对外接口」一节，`map_view.py` 一行补「接口说明见 `interface.json`」；README 中英各新增「对外接口」一节；顺带补上 0.65.0 在「数据与隐私」里漏写的一点（钩子在评审检查点会读本机插件记录），这一点超出了 Plan，交审时说明；CHANGELOG `[0.66.0]`（新增两条、维护者工具一条、文档一条）；两份 `plugin.json` 与 README 中英 `--ref` 改为 0.66.0。
 - [x] Checkpoint 2（gate）：模块评审；PR 转为可评审由用户确认，合并由用户进行 — 2026-10-17 在对话正文列出：实际改动的 17 个文件（新增 4、修改 13、删除 0）；interface.json 全文；JSON 样例；map-view Spec 的完整差异；验证结果；未验证项；超出 Plan 的 README 隐私段补句；拟回告。用户验收通过，同时批准修订后的 map-view Spec（已用 review-mark 重新记录），不做外部审查；PR #341 转为可评审，合并由用户进行。
-- [ ] 发版后的验证
+- [x] 发版后的验证（2026-10-17，v0.66.0） — #341 合并于 `0261533`，main 上 CI（39023091810）全部通过后打 tag。发布包 sha256 `737d4cfd…8b43fc3b`（538286 字节），包里有 `plugins/spec-guard/interface.json`，下载回来一致。两个宿主都已升级（Codex ref v0.65.0→v0.66.0，smoke 退出 0，362 例；Claude gitCommitSha 等于 tag 所在提交，361 例，少的 1 例是已知的仓库文件类用例）。两个安装副本的 interface.json 都过了 `check-interface.py`；从安装副本的插件根目录按 interface.json 写明的命令跑 map-view，临时项目输出 schemaVersion 1、externalReview recorded。Proposal 收尾扫描 pending 为空。回告：经宿主会话消息告知「Codex LIVE-SAAS 前端基础架构监测」（`local_4f410de8-418e-440c-90d8-436a73edcc6b`）转 spec-guard-monitor，并请其转告 decision-inbox 负责人。记录见 `docs/releases/v0.66.0-*.json`。
 
 <!-- spec-guard: external-review declined -->
