@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.67.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "not-run"
+      },
+      "reason": "the Claude marketplace source follows main's ./plugins/spec-guard, and main was already 0.68.0 (#346, 6620c40) when v0.67.1 was tagged, so an update would install 0.68.0, not 0.67.1; with the user's agreement the Claude install stayed at 0.67.0 and its host check is left to 0.68.0. Instead the hooks from the downloaded v0.67.1 asset were run the way Claude Code runs them (CLAUDE_PROJECT_DIR, PATH=/usr/bin:/bin, system Python 3.9.6): a zh-CN project got the Chinese BUILDING hint and a project with no artifactLanguage got the English one"
+    }
+  ]
+}
