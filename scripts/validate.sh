@@ -34,6 +34,10 @@ echo "═══ marketplace ↔ Claude / Codex plugin 一致性 ═══"
 python3 scripts/check-manifests.py || F=1
 
 echo ""
+echo "═══ interface.json ↔ 代码 一致性 ═══"
+python3 scripts/check-interface.py || F=1
+
+echo ""
 echo "═══ 公开安装元数据 ═══"
 /bin/bash evals/test-public-metadata.sh || F=1
 
