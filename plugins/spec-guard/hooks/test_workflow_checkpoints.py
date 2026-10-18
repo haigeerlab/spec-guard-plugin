@@ -325,6 +325,25 @@ class CheckpointContractTests(unittest.TestCase):
                                "提醒用户转告"):
                     self.assertIn(phrase, text)
 
+    def test_open_commitments_are_recorded_when_the_ball_moves(self):
+        # open-commitments: anything someone waits on is a ledger issue, written when the ball changes hands.
+        section = self.section("## 未了的承诺")
+        for phrase in ("收到那一刻", "`waiting-on-me`", "`waiting-on-them`", "`waiting-on-user`", "稳定身份",
+                       "会话 ID", "只作", "来路与回路", "关闭条件", "球每换一次手", "不先判断",
+                       "追问一次", "`未确认`", "不设固定天数", "不挡工作", "做出承诺", "对外通道", "草稿",
+                       "内部通道", "直接发", "没启用账本", "`/spec-guard:local-ticket-ledger`", "隐私",
+                       "公开远端", "不写私有项目名", "证据", "todo 末项"):
+            self.assertIn(phrase, section)
+        surfaces = list((self.plugin / "templates").glob("*-block-local.md"))
+        surfaces.append(self.plugin.parents[1] / "docs" / "convention-block.md")
+        for path in surfaces:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("在球换手时记进本地事项账本", "`waiting-on-me`／`waiting-on-them`／`waiting-on-user`",
+                               "稳定身份与回复通道", "会替用户做出承诺的先问用户", "对外通道一律先在正文给草稿",
+                               "内部会话间的告知直接发"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")
