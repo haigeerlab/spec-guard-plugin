@@ -112,7 +112,7 @@ codex plugin add spec-guard@spec-guard-marketplace
 
 若 `spec-guard-marketplace` 已指向一个发布版，不要在活跃会话中替换它来测试开发源码；应在
 隔离的 Codex 配置/机器中安装候选，或先明确备份并恢复原 marketplace。安装或升级后开启新会话，
-在 `/hooks` 审核并信任 `UserPromptSubmit`，再运行（Codex 桌面版不弹出钩子信任提示，信任只能在命令行版 `codex`
+在 `/hooks` 查看并信任 `UserPromptSubmit`，再运行（Codex 桌面版不弹出钩子信任提示，信任只能在命令行版 `codex`
 里做；钩子命令一改，原来的信任就失效，要重新信任）：
 
 ```bash
@@ -172,7 +172,7 @@ CI 仍是合并前的必需检查。
 
 ## PR 状态
 
-改动已完成且本地验证通过时，默认创建普通 PR，等待 CI 与评审；不把草稿当成运行 CI 的前置步骤。
+改动已完成且本地验证通过时，默认创建普通 PR，等待 CI 与审查；不把草稿当成运行 CI 的前置步骤。
 只有工作尚未完成或用户明确要求时才创建草稿 PR。草稿不会因 CI 通过而自动解除合并阻挡；
 工作完成后须显式转为 Ready for review。
 若本次开发绑定了 Local 事项，创建 PR 后记录其地址与覆盖范围；合并后按

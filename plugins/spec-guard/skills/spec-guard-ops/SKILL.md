@@ -121,7 +121,7 @@ python3 -B "$ROOT/hooks/module_cost_report.py" --project "$PROJECT" <module-id> 
 ## map
 
 只读的模块进度表（Claude 侧为 `/spec-guard:map`）：按开发顺序列出每个模块的状态（✅ 已完成／🔨 进行中／⏸ 挂起（原因）／
-⛔ 阻塞：等被挂起的模块／🟢 可以开始／○ 未就绪：缺哪个依赖）、Spec 与 Plan 的审查状态，表头给合计、关键卡点、待审核、
+⛔ 阻塞：等被挂起的模块／🟢 可以开始／○ 未就绪：缺哪个依赖）、Spec 与 Plan 的审查状态，表头给合计、关键卡点、待批准、
 下一个 gate 与未合入／未推送的提交数：
 
 ```bash
@@ -182,7 +182,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
-- `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「评审节奏」。
+- `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
@@ -242,9 +242,9 @@ python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
 
 ## review-mark
 
-记录模块 Spec 或 Plan 的评审状态（Claude 侧为 `/spec-guard:review-mark`）：在 `spec/<id>.md` 或 `tasks/<id>/plan.md` 写一行
+记录模块 Spec 或 Plan 的批准状态（Claude 侧为 `/spec-guard:review-mark`）：在 `spec/<id>.md` 或 `tasks/<id>/plan.md` 写一行
 `<!-- spec-guard: review pending -->`、`<!-- spec-guard: review approved <digest> -->`（Spec，带批准时的内容指纹）或
-`<!-- spec-guard: review approved -->`（Plan）。当前模块待审核时阶段提示报告等待用户审核、不建议写 Plan 或继续构建；
+`<!-- spec-guard: review approved -->`（Plan）。当前模块待批准时阶段提示报告等待用户批准、不建议写 Plan 或继续构建；
 Spec 批准后内容有变即判为批准后已修订，需复审后重新记录；没有标记的文件判定照旧。默认只预览，把预览给用户看过并
 确认后才加 `--confirm`，只改这一行并读回：
 
@@ -253,12 +253,12 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state approved --confirm
 ```
 
-`pending` 在把 Spec 或 Plan 交给用户审核时写，也可以写文件时直接带上这一行。交审时在对话正文里呈现内容要点（Spec：目标、范围内与范围外、
+`pending` 在把 Spec 或 Plan 交给用户审阅时写，也可以写文件时直接带上这一行。交审时在对话正文里呈现内容要点（Spec：目标、范围内与范围外、
 关键决策与取舍、假设、验收标准、未决问题、文档建议；Plan：任务与验证方式、检查点及其类型、影响面、风险；短文件可贴全文），并写明这次
-批准授权什么；只给链接或一句概述不算交审。文档建议在能力图评审与能力图全部完成时也各问一次，细则见共享检查点规则「文档建议」一节。`approved` 只在用户明确批准之后写：用户在当前对话里批准，或已登记的收件枢纽按 session-protocol 契约转来带事项号与用户原话的【用户答复】
+批准授权什么；只给链接或一句概述不算交审。文档建议在能力图审阅与能力图全部完成时也各问一次，细则见共享检查点规则「文档建议」一节。`approved` 只在用户明确批准之后写：用户在当前对话里批准，或已登记的收件枢纽按 session-protocol 契约转来带事项号与用户原话的【用户答复】
 （条件见共享检查点规则「经收件枢纽转来的批准」一节）；
 含糊的“继续”不算，先问清楚；获批后先写标记再动代码或写 Plan；不得为消除阶段提示自行批准，标记是给后续会话的记录，不是授权来源。合并审一次批准
-两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 标着待审核／已修订／无效时单独批准 Plan
+两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 标着待批准／已修订／无效时单独批准 Plan
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
 记为批准；既有项目不必补标记，要补先向用户单独确认，不得依据此前含糊的答复补记。
 
@@ -266,7 +266,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 
 多模块并行开关（`moduleConcurrency`）为 `on` 时，给当前 checkout 标角色（Claude 侧为 `/spec-guard:checkout-role`）：`module <id>` 或
 `coordinator`。标记写在本 checkout 的 git 目录（`git rev-parse --git-path spec-guard/role`），不进版本库。模块 checkout 的阶段提示另报告这个
-模块、「下一步」只指向它，做完只交回协调会话；协调 checkout 保留评审约束、不建议构建；全项目的当前模块与阶段不受影响。开关不是 `on` 时不读标记。
+模块、「下一步」只指向它，做完只交回协调会话；协调 checkout 保留批准约束、不建议构建；全项目的当前模块与阶段不受影响。开关不是 `on` 时不读标记。
 默认只预览，用户确认后才加 `--confirm`：
 
 ```bash
@@ -281,7 +281,7 @@ python3 -B "$ROOT/hooks/checkout_role.py" clear --project "$PROJECT"
 ## add-module
 
 先判断是不是该开新模块（细则见共享检查点规则「返工与小模块」）：返工或修订已完成的模块不开新模块，在它的 `todo.md` 追加任务、
-`plan.md` 补一节并把 Plan 的评审标记改回待审核；只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或
+`plan.md` 补一节并把 Plan 的批准标记改回待批准；只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或
 与同类模块一次批量交审。
 
 只在模块检查点使用：当前模块做到一半（`tasks/<id>/todo.md` 既有已勾选项又有未勾选项）时，脚本自己会拒绝并
@@ -308,9 +308,9 @@ responsibility、depends-on 或 anchor 中任何一项，都要先重新预览�
 
 写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
 Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
-并评审 `spec/<id>.md`，不是本命令的职责。需要留下经过评审的决定记录时改用 Proposal 流程；已接受的 Proposal 用下面的 `--proposal` 晋级。
+并交审 `spec/<id>.md`，不是本命令的职责。需要留下经过审查的决定记录时改用 Proposal 流程；已接受的 Proposal 用下面的 `--proposal` 晋级。
 
-从已接受的 Proposal 晋级（Issue 带 `proposal-stage:accepted` 且评审新鲜）：id、responsibility、depends-on、anchor
+从已接受的 Proposal 晋级（Issue 带 `proposal-stage:accepted` 且审查新鲜）：id、responsibility、depends-on、anchor
 全部取自远端已发布的 Proposal，与 `--id`／`--responsibility`／`--depends-on`／`--anchor` 同时出现即报错；
 必须给 `--platform` 与 `--target`。先预览（只读）：
 
@@ -322,9 +322,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 原样转述输出（Proposal id、revision、baseCommit 与新行、Build order、diff）。命令内嵌同一预检；预检非 `ready`、
 本地能力图与 baseCommit 上的不一致（提示 `git switch -c <晋级分支> <baseCommit>`）、锚点在 Build order 并行段中致使
 写入结果无法被 proposal-promotion-proof 证明、当前模块做到一半（`--interrupt` 规则同上），
-均原样说明并停下。`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审），
-未评审先评审再 `--confirm`。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
-不改 Issue 标签。正式 Spec 与 Plan 若已可评审，可与能力图放在同一个晋级 PR；
+均原样说明并停下。`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已批准），
+未批准先批准再 `--confirm`。等用户明确确认后才加 `--confirm` 重跑；只改 `spec/CAPABILITY-MAP.md`，不建分支、不提交、
+不改 Issue 标签。正式 Spec 与 Plan 若已可交审，可与能力图放在同一个晋级 PR；
 本命令仍只写能力图，且内嵌预检通常无需再单独运行。Spec 与 Plan 分别按阶段审阅，
 不能因同 PR 跳过。合并后运行 proposal 一节的 `--prove`，`proved` 后按「收尾」一节预览并经授权关闭事项；只手工改标签不会关闭事项。
 
@@ -349,7 +349,7 @@ Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 G
 # 任何分支：单个 Proposal 的新鲜度与阶段
 python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
-# Issue 阶段标签 proposal-stage:accepted 加新鲜评审后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
+# Issue 阶段标签 proposal-stage:accepted 加新鲜审查后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
   --proposal-id <id> --platform <github|gitlab> --target <target>
 ```

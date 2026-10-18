@@ -201,14 +201,14 @@ class StatusTest(unittest.TestCase):
         lines = out.splitlines()
         self.assertIn("Capability Map: 测试项目 · 9 个模块 · ✅ 1 🔨 2 ⏸ 1 ⛔ 3 🟢 1 ○ 1 · ", lines[0])
         self.assertIn("关键卡点：b 挂起（上游漏洞）→ 挡住 3 个：c、d、i", out)
-        self.assertIn("待审核：g Spec（待审核）、h Plan（待审核）", out)
+        self.assertIn("待批准：g Spec（待批准）、h Plan（待批准）", out)
         self.assertIn("下一个 gate：Checkpoint 1（gate）：模块评审", out)
         self.assertIn("未合入主线：判断不了；未推送：判断不了", out)
         self.assertIn("| 2 | b | 质量门禁 | ⏸ 挂起（上游漏洞），挡住 3 个 | Spec 无标记 Plan 无标记 |", out)
         self.assertIn("| 3 | c | 下游一 | ⛔ 阻塞：等 b | — |", out)
         self.assertIn("| 5 | e | 可开工 | 🟢 可以开始 | — |", out)
-        self.assertIn("| 7 | g | 写 Plan 中 | 🔨 写 Plan | Spec 待审核 |", out)
-        self.assertIn("| 8 | h | 构建中 | 🔨 进行中 1/3 | Spec 无标记 Plan 待审核 |", out)
+        self.assertIn("| 7 | g | 写 Plan 中 | 🔨 写 Plan | Spec 待批准 |", out)
+        self.assertIn("| 8 | h | 构建中 | 🔨 进行中 1/3 | Spec 无标记 Plan 待批准 |", out)
         self.assertIn("| 1 | a | 基础 | ✅ 已完成 | Spec ✔ Plan ✔ |", out)
         self.assertIn("| 6 | 1 个未就绪 | | ○ | |", out)
         self.assertNotIn("| 6 | f |", out)
@@ -245,7 +245,7 @@ class FoldTest(unittest.TestCase):
         with self.make() as project:
             data = project.json()
             self.assertEqual(data["awaitingReview"], [{"id": "q", "kind": "spec", "review": "revised"}])
-            self.assertIn("待审核：q Spec（改过待重审）", project.run().stdout)
+            self.assertIn("待批准：q Spec（改过待重审）", project.run().stdout)
             (project.root / "spec" / "q.md").write_text("# q\n\n%s\n%s\n" % (PENDING, PENDING), encoding="utf-8")
             data = project.json()
             self.assertEqual(data["awaitingReview"], [{"id": "q", "kind": "spec", "review": "invalid"}])
@@ -262,7 +262,7 @@ class FoldTest(unittest.TestCase):
             self.assertEqual(data["bottlenecks"], [])
             out = project.run().stdout
             self.assertIn("关键卡点：无", out)
-            self.assertIn("待审核：无", out)
+            self.assertIn("待批准：无", out)
 
     def test_control_characters_are_cleaned(self):
         with self.make() as project:

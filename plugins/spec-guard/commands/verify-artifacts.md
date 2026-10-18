@@ -74,6 +74,6 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/verify-artifacts.sh"
 
 ## 什么时候该跑
 
-- 评审能力图与模块 spec 之后：确认文件名与目录结构一致
+- 审阅能力图与模块 spec 之后：确认文件名与目录结构一致
 - 新增、改名或删除模块 spec 之后：确认 `spec/` 与能力图仍然一致
 - 接手别人的分支、或隔了几天回来时

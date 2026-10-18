@@ -54,12 +54,12 @@ $OUT"
 head -1 "$P/CLAUDE.md" | grep -Fx '# Mine' >/dev/null || fail "setup 改动了用户原有内容"
 grep -F 'MAP_ONLY' >/dev/null <<<"$(CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null)" || fail "setup 后 hook 未激活"
 ok "首次 setup 建好目录与声明块，hook 激活"
-# review-handoff-content：接入完成时说明评审节奏的两种取值，让用户知道有合并审这个选项。
+# review-handoff-content：接入完成时说明批准节奏的两种取值，让用户知道有合并审这个选项。
 for phrase in 'Review cadence:' '`separate` (default)' '`combined`' 'one approval' '/spec-guard:config (Codex: spec-guard-ops config)' 'artifact language'; do
-  grep -F -- "$phrase" >/dev/null <<<"$OUT" || fail "setup 完成时的输出应说明评审节奏，缺少「${phrase}」
+  grep -F -- "$phrase" >/dev/null <<<"$OUT" || fail "setup 完成时的输出应说明批准节奏，缺少「${phrase}」
 $OUT"
 done
-ok "setup 完成时说明评审节奏的两种取值"
+ok "setup 完成时说明批准节奏的两种取值"
 
 # state.json 只存当前模块书签：退役的 tracker 与无人读取的 modules 都不再写入。
 [ "$(cat "$P/.agent/state.json")" = '{"activeModule":""}' ] \

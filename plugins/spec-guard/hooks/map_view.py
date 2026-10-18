@@ -34,7 +34,7 @@ REASON_LINE = re.compile(r"^<!-- spec-guard: suspended-reason: (.*) -->$")
 STATUSES = ("done", "in_progress", "suspended", "blocked", "ready", "not_ready")
 ICONS = {"done": "✅", "in_progress": "🔨", "suspended": "⏸", "blocked": "⛔", "ready": "🟢", "not_ready": "○"}
 AWAITING = ("pending", "revised", "invalid")
-REVIEW_WORDS = {"approved": "✔", "pending": "待审核", "revised": "改过待重审", "invalid": "标记无效", "none": "无标记"}
+REVIEW_WORDS = {"approved": "✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效", "none": "无标记"}
 RESPONSIBILITY_LIMIT = 40
 CHECKED_LINE = re.compile(r"^\s*[-*+]\s+\[[xX]\]")
 DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
@@ -573,7 +573,7 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     else:
         lines.append("关键卡点：无")
     kinds = {"spec": "Spec", "plan": "Plan"}
-    lines.append("待审核：" + ("、".join("%s %s（%s）" % (a["id"], kinds[a["kind"]], REVIEW_WORDS[a["review"]])
+    lines.append("待批准：" + ("、".join("%s %s（%s）" % (a["id"], kinds[a["kind"]], REVIEW_WORDS[a["review"]])
                                        for a in data["awaitingReview"]) or "无"))
     if data["nextGate"]:
         lines.append("下一个 gate：" + clean(data["nextGate"]))

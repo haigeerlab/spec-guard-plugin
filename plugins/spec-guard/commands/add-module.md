@@ -65,18 +65,18 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒）。**被拒绝时**，原样说明
 是哪一条校验失败，然后停下——不要自行改字段重试，除非那正是用户接下来要做的事。
 
-`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审）；若这份 Spec 尚未评审，先评审再 `--confirm`。
+`spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已批准）；若这份 Spec 尚未批准，先批准再 `--confirm`。
 
 等用户对预览结果给出明确确认后，才在同一条命令后加 `--confirm` 重新运行一次（不要跳过预览直接确认）。用户
 改动了 id、responsibility、depends-on 或 anchor 中的任何一项，都要先重新跑预览，不能直接对着旧预览确认。
 
 写入只改 `spec/CAPABILITY-MAP.md`；不创建 `spec/<id>.md`、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，
 不执行任何 Git 或远端操作。成功后原样转述写入结果与阶段提示；如果新模块因此成为当前模块，阶段会是
-`NEEDS_SPEC`——下一步是写并评审 `spec/<id>.md`（例如用 `/spec`），不是本命令的职责。
+`NEEDS_SPEC`——下一步是写并交审 `spec/<id>.md`（例如用 `/spec`），不是本命令的职责。
 
 ## 从已接受的 Proposal 晋级（`--proposal`）
 
-前提：Proposal 已发布，Issue 带 `proposal-stage:accepted` 标签且评审新鲜。此时**不要自己提出**
+前提：Proposal 已发布，Issue 带 `proposal-stage:accepted` 标签且审查新鲜。此时**不要自己提出**
 id、responsibility、depends-on、anchor——它们全部取自远端已发布的 Proposal，同时传 `--id`、`--responsibility`、
 `--depends-on`、`--anchor` 任一项都会报错。必须给 `--platform <github|gitlab>` 与 `--target <target>`。
 
@@ -95,12 +95,12 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
   （`git switch -c <晋级分支> <baseCommit>`），在该分支上重跑；
 - 锚点在 Build order 的并行段中，按声明插入后无法被 `proposal-promotion-proof` 证明：不能按该声明晋级，停下；
 - 当前模块做到一半：按上文 `--interrupt` 规则处理；
-- `spec/<id>.md` 已存在：允许，预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已评审）；若这份 Spec 尚未评审，先评审再 `--confirm`。
+- `spec/<id>.md` 已存在：允许，预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已批准）；若这份 Spec 尚未批准，先批准再 `--confirm`。
 
 等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次。命令只改 `spec/CAPABILITY-MAP.md`，
 不创建分支、不提交、不改 Issue 标签。写入后由用户提交并合并；合并后运行 `/spec-guard:proposal-promotion-proof`，
 证明为 `proved` 后（输出带 `closeoutPending: true` 表示事项还开着），用 `/spec-guard:proposal-closeout` 预览收尾，经授权后
-由它改阶段并关闭事项；只手工改标签不会关闭事项。正式 Spec 与 Plan 若已可评审，
+由它改阶段并关闭事项；只手工改标签不会关闭事项。正式 Spec 与 Plan 若已可交审，
 可在同一个晋级 PR 中补齐；本命令仍只写能力图，Spec、Plan 必须分别按其阶段审阅，
 不因同 PR 而跳过。预检已内嵌于本命令，通常无需另跑独立 preflight。
 不带 `--proposal` 时行为不变。
@@ -108,5 +108,5 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 先判断是不是该开新模块（细则见 `spec-guard-ops` 的共享检查点规则「返工与小模块」）：返工或修订已完成的模块，不开新模块，在它的 `todo.md` 追加任务；
 只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或与同类模块一次批量交审。
 
-如果这次新增需要留下经过评审的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
+如果这次新增需要留下经过审查的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
 已接受的 Proposal 用上面的 `--proposal` 晋级。

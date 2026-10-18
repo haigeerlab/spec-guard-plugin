@@ -282,7 +282,7 @@ def prove(project, publication, tracker, platform, target, remote="origin"):
                 return Proof("invalid", diagnostic="promotion-other-rows-changed",
                              promotion_commit=commit, proposal_id=proposal.proposal_id,
                              module_id=module_id)
-            # 晋级那一刻的新鲜度：在父提交的能力图上评审，accepted 与 promoted 阶段等价。
+            # 晋级那一刻的新鲜度：在父提交的能力图上审查，accepted 与 promoted 阶段等价。
             at_parent = Publication(
                 "published", review_commit=parent, proposal=proposal,
                 baseline_map=getattr(publication, "baseline_map", None), review_map=parent_text)
