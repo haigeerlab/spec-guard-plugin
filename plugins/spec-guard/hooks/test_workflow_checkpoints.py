@@ -443,7 +443,7 @@ class CoordinatorApprovalTests(unittest.TestCase):
 
     HEADING = "## 协调会话的批准与合并（moduleConcurrency 为 on 时）"
     ORIGINALS = (
-        "- **`approved` 只在用户于当前对话明确批准这份 Spec 或 Plan 之后，",
+        "- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，",
         "合并永远由用户进行，任何 Plan 都不能授权 agent 合并。",
         "两种节奏下人工闸门都在，合并永远由用户进行。",
     )
@@ -492,6 +492,61 @@ class CoordinatorApprovalTests(unittest.TestCase):
     def test_convention_blocks_untouched_by_the_switch(self):
         for path in (self.plugin / "templates").glob("*-block-*.md"):
             self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"), path.name)
+
+
+class HubRelayedApprovalTests(unittest.TestCase):
+    """hub-relayed-approval: `approved` accepts the user's words relayed in the session-protocol format, no lower bar."""
+
+    HEADING = "## 经收件枢纽转来的批准"
+    POINTER = "经收件枢纽转来的批准"
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self):
+        start = self.text.index(self.HEADING)
+        return self.text[start:self.text.index("\n## ", start + 1)]
+
+    def test_section_sits_before_the_coordinator_section(self):
+        self.assertLess(self.text.index(self.HEADING),
+                        self.text.index("## 协调会话的批准与合并（moduleConcurrency 为 on 时）"))
+
+    def test_section_states_every_condition(self):
+        body = self.section()
+        for phrase in ("【用户答复】", "事项号", "原消息号", "登记", "转自", "用户原话", "明确批准这一份",
+                       "回显核对", "`#H`", "指纹", "重新交审", "不解析"):
+            self.assertIn(phrase, body)
+
+    def test_section_lists_what_does_not_count(self):
+        body = self.section()
+        for phrase in ("【答复告知】", "【协调通知】", "自称", "没有契约格式", "含糊", "模块会话"):
+            self.assertIn(phrase, body)
+
+    def test_approved_rule_names_both_sources(self):
+        start = self.text.index("- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，")
+        rule = self.text[start:self.text.index("\n- **", start + 1)]
+        self.assertIn("当前对话", rule)
+        self.assertIn(self.POINTER, rule)
+        self.assertNotIn("用户于当前对话明确批准", self.text)
+
+    def test_coordinator_section_points_here_and_keeps_module_sessions_out(self):
+        start = self.text.index("**评审标记由协调会话写，先核对内容。**")
+        body = self.text[start:self.text.index("**本地集成分支的合并。**", start)]
+        first = body.split("\n- ")[1]
+        self.assertIn(self.POINTER, first)
+        self.assertNotIn("用户在协调会话里明确批准", self.text)
+        self.assertIn("不能因此自己写 `approved`", body)
+
+    def test_command_and_codex_skill_name_both_sources(self):
+        for rel in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
+            text = (self.plugin / rel).read_text(encoding="utf-8")
+            with self.subTest(rel=rel):
+                self.assertIn(self.POINTER, text)
+                self.assertIn("当前对话", text)
+                self.assertNotIn("用户于当前对话明确批准", text)
+                self.assertNotIn("只在用户于当前对话明确批准之后写", text)
+
 
 if __name__ == "__main__":
     unittest.main()

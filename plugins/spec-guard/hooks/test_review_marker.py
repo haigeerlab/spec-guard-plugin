@@ -251,6 +251,16 @@ class Mark(unittest.TestCase):
             self.assertIn(reminder, out)
             self.assertEqual(project.states(), ("approved", "approved"))  # a reminder, not a gate
 
+    def test_approving_names_both_sources(self):
+        # hub-relayed-approval: the user's words in this conversation, or relayed by a registered decision hub.
+        with Project() as project:
+            code, out = project.run("--module", "alpha", "--target", "spec", "--state", "approved")
+            self.assertEqual(code, 0, out)
+            self.assertIn("decision hub", out)
+            self.assertIn("item number", out)
+            self.assertIn("the message sent to the hub", out)
+            self.assertNotIn("an approval the user gave in this conversation.", out)
+
     def test_marking_pending_carries_no_reminder(self):
         with Project() as project:
             code, out = project.run("--module", "alpha", "--target", "both", "--state", "pending", "--confirm")
