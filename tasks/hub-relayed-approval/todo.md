@@ -6,4 +6,4 @@
 - [x] Checkpoint 1（report）：三套核心回归、模板未改与改坏验证 — 约定块模板与 `docs/convention-block.md` 相对 `origin/main` 0 行差异；改坏验证：删「【答复告知】与【协调通知】」→ `test_section_lists_what_does_not_count` 红，删「回显核对」→ `test_section_states_every_condition` 红，`approved` 一条改回「用户于当前对话明确批准」→ 3 例红（含 `test_approved_rule_names_both_sources`）；均已用提交版本复原，复原后全绿。三套核心回归随 72b3fa4 全档通过（phase-guard 403、verify-artifacts 68）。
 - [x] Task 3：文档、CHANGELOG 与版本号 — `docs/workflow.md`、`docs/commands.md` 各补一句；CHANGELOG `[0.70.0]`；两份 `plugin.json` 与中英 README `--ref` 改为 0.70.0。
 - [x] Checkpoint 2（gate）：模块验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出实际改动 17 个文件（+305/-20，均在 Plan 影响面内）、与 Spec 的一处细化（经枢纽批准时预览由本会话核对指纹后直接 `--confirm`）、验证结果（macOS `/bin/bash` 3.2.57 全档、smoke 自检退出 0、模板 0 行差异、三处改坏验证）与未验证项（真实协调会话行为、独立代码审查、宿主安装）；用户验收通过，确认推送与开 PR，合并由用户进行。
-- [ ] 发版后的验证
+- [x] 发版后的验证 — v0.70.0 tag 在 712ed62（main CI 39105933783 通过），Release 资产 sha256 b1b0c582…2c683199 下载回读一致；Codex ref v0.69.0→v0.70.0，安装目录与资产一致，真实 smoke 退出 0；Claude 0.69.0→0.70.0（gitCommitSha 712ed62），安装目录与资产一致，无头会话报出 BUILDING；Proposal 收尾扫描 pending 为空；证据见 docs/releases/v0.70.0-*.json；已通知接入协调人。

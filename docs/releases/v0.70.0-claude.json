@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:712ed629b1a4c822524ee4bb95550d27c66b3d29"
+      },
+      "observedAt": "2026-10-18T07:04:37Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.69.0 to 0.70.0; installed_plugins.json records gitCommitSha 712ed62 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; it contains the new rule section and review_mark.py prompt",
+        "result:a new claude -p session (haiku) in this repository reported the injected stage BUILDING from the installed hook",
+        "not-verified:a real Claude coordinator session writing a marker from a hub-relayed reply; left to the joint rehearsal"
+      ]
+    }
+  ]
+}
