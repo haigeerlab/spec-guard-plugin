@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.68.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6620c40231eca2cc0282aedb0e8406937a4b1448"
+      },
+      "observedAt": "2026-10-18T02:55:41Z",
+      "evidence": [
+        "result:the v0.68.0 annotated tag resolves to merge commit 6620c40231eca2cc0282aedb0e8406937a4b1448 (pull request #346); merged==true and main==merge sha were checked as a separate step before tagging; main has since moved on to 19c073d (v0.67.1 evidence, #347, docs/releases only), so the tag was placed on the merge commit",
+        "result:the push run of the CI on main for the merge commit (39062078217) passed; v0.67.1 was tagged and released before v0.68.0 as the user decided",
+        "result:0.68.0 is seven modules forming the planning layer for developing several modules at once: module-concurrency-switch, concurrency-assessment, module-scope-boundary, concurrency-rule-wording, map-startable, checkout-role, crew-interface; every new behaviour applies only when .agent/config.json sets moduleConcurrency to on; interface.json is 1.1 (additive), /map --json schemaVersion stays 1",
+        "result:with no moduleConcurrency set, the stage hint and /map (table and JSON, generatedAt and generator.version removed) matched the 0.67.1 hooks byte for byte over 26 fixture runs; evals/hint-english-diff.sh 5798c7a found English 905/905 byte-identical and 181/181 zh-CN hints without English labels; phase-guard 395 and verify-artifacts 68 cases and validate.sh pass under macOS 15.7.3 /bin/bash 3.2.57",
+        "not-verified:a config containing moduleConcurrency is reported unknown-key by 0.67.1 and earlier (documented in the CHANGELOG); the module-crew runtime calling these entries was not exercised from this repository"
+      ]
+    }
+  ]
+}

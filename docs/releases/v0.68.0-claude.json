@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.68.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:19c073deed880ef0caccffbbde8a35499232d2f8"
+      },
+      "observedAt": "2026-10-18T02:55:41Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.67.0 to 0.68.0; installed_plugins.json records gitCommitSha 19c073d (main, which differs from the tag only under docs/releases); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:run as Claude Code runs hooks (CLAUDE_PROJECT_DIR, PATH=/usr/bin:/bin, system Python 3.9.6) on a clone of the repository at the tag: with moduleConcurrency unset /map --json has none of the new keys and checkout-role set exits 3; with it on /map --json carries moduleConcurrency, buildOrderGroups and startable, checkout-role previews then writes coordinator with --confirm, and the zh-CN stage hint shows the coordinator role line and the coordinating next step",
+        "not-verified:a new interactive Claude Code session after restart was not opened in this check"
+      ]
+    }
+  ]
+}

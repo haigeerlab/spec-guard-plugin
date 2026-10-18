@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.68.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.68.0-upgrade-20261018"
+      },
+      "observedAt": "2026-10-18T02:55:41Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.67.1 to v0.68.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.68.0 enabled from the marketplace cache; the installed plugin directory is identical to the release asset; the smoke run exited 0; the installed copy passes 395 phase-guard cases"
+      ]
+    }
+  ]
+}
