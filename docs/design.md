@@ -35,7 +35,7 @@ plugins/spec-guard/
 
 | 部件 | 职责 |
 |---|---|
-| `hooks.json` → `phase-guard.sh` | `UserPromptSubmit` hook 与只在上下文压缩后触发的 `SessionStart`（matcher `compact`）hook：判断项目是否激活，读本地文件，输出阶段注入 |
+| `hooks.json` → `phase-guard.sh` | `UserPromptSubmit` hook 与只在上下文压缩后触发的 `SessionStart`（matcher `compact`）hook：判断项目是否激活，读本地文件，输出阶段注入；另一项 `SessionStart`（matcher `startup\|clear`）只在项目启用了本地事项账本时出一句读回提醒 |
 | `module_stage.py` | 按模块计算阶段、当前模块、计数、Paused／Suspended 与上下文提醒 |
 | `capability_map.py` | 能力图的唯一严格解析器；阶段提示、`verify-artifacts`、`add-module`、Proposal 共用 |
 | `spec-digest.py` | 唯一的指纹算法，能力图与 Proposal 校验共用 |
@@ -64,6 +64,10 @@ plugins/spec-guard/
    处理，不出上下文行与边界行；其余内容与 `UserPromptSubmit` 相同。由其他会话的消息或唤醒触发的轮次不经过
    `UserPromptSubmit`，压缩后的这一次注入是它们唯一的阶段提示。Codex 按项记录 hook 信任，新增这一项不影响原有一项的信任，
    但新的一项要用户单独信任一次。
+   会话开始与清空后（matcher `startup|clear`）另有一项 `SessionStart`，调用 `phase-guard.sh SessionStart fresh`：项目根（跟随指向时为
+   目标项目根）有 `.epiq/project.json` 时只输出一句读回提醒（先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的
+   未关闭事项），不输出阶段摘要（随后的 `UserPromptSubmit` 会给）；没有账本、未激活或指向失效时静默。钩子只判断这个文件在不在，
+   不读账本内容、不调 Epiq，提醒的 JSON 手写，不靠 python3 生成。压缩后的核对提醒在有账本时也补上账本里的这类事项，没有账本时不变。
 2. `phase-guard.sh` 判断激活信号：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的
    `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`：没有就静默退出 0
    （这一步只用 bash 内建，不启动 python3）；有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行

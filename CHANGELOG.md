@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.69.0] - 2026-10-18
+
+本版 1 个模块：`open-commitments`。有人在等的事不再只放在会话上下文里：记进本地事项账本，会话清空或压缩后读得回来。
+没有启用本地事项账本的项目，钩子输出与 0.68.0 逐字节相同。
+
+### 新增
+
+- **未了的承诺。** 共享检查点规则新增「未了的承诺」一节：别人发来期待回音的需求、发出后在等对方、在等用户拍板，在球换手的那一刻
+  记进本地事项账本，挂 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 之一，正文写对方的稳定身份（会话 ID 只作线索）、来路与回路、
+  内容、关闭条件与关联。默认告知后关闭，有决定依赖对方采用时才等回报；等回报只追问一次，再不回记 `未确认`，不设固定天数、不挡工作。
+- **两道闸门。** 回复会替用户做出承诺的先问用户；邮件、GitHub／GitLab 评论等对外通道一律先在正文给草稿，用户答应才发；内部会话间的
+  告知直接发。
+- **读回提醒。** `hooks.json` 新增一项 `SessionStart`（matcher `startup|clear`），调用 `phase-guard.sh SessionStart fresh`：项目根有
+  `.epiq/project.json` 时，会话开始与清空后只输出一句「先列出这三类标签的未关闭事项」，否则静默；压缩后的核对提醒在有账本时也补上
+  账本一句。钩子只判断这个文件在不在，不读账本内容、不调 Epiq。
+- 两份约定块模板各新增两行，现有行不变；`setup-convention --replace` 不需要 `--accept-removals`。
+
+### 升级注意
+
+- Codex 按项记录 hook 信任：升级后在 `/hooks` 里信任新增的那项 `SessionStart` 一次，否则会话开始与清空后没有读回提醒。
+- Claude Code 升级插件后要新开会话才会用新版本。
+
 ## [0.68.0] - 2026-10-18
 
 本版 7 个模块，组成多模块并行的规划层：`module-concurrency-switch`、`concurrency-assessment`、`module-scope-boundary`、`concurrency-rule-wording`、
