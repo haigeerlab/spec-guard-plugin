@@ -336,4 +336,23 @@ chmod +x "$WORK/side-fails/python3"
 SPEC_GUARD_TEST_REAL_PYTHON="$(command -v python3)" RUN_PATH="$WORK/side-fails:$PATH" \
   check "旁路清单检查没有正常运行时报未验证" 0 "未验证：旁路清单检查没有正常运行"
 
+# 验收标准编号（stop-rule-and-ac）：未完成模块的验收标准缺 AC 编号只提示、不失败；已完成模块不追溯。
+ac_spec() { project "$1"; shift; printf '%s\n' '# alpha' '' "$@" > "$PROJECT/spec/alpha.md"; }
+AC_HINT="的验收标准有"
+ac_spec ac-missing '## Success criteria' '' '- AC1：第一条' '- 第二条没有编号' '  - 子项不算' '' '## Open questions' '' '- 不在验收标准里'
+check "未编号的验收标准给提示且不失败" 0 "alpha 的验收标准有 1 条没有编号（AC1、AC2…）；最终验收要按编号对证据"
+ac_spec ac-all '## Success Criteria' '' '- AC1：a' '* **AC2**：b' '1. AC3：c'
+check_absent "全部编号时不提示" "$AC_HINT"
+ac_spec ac-zh '## 验收标准' '' '- 没编号一' '- 没编号二'
+check "中文标题同样识别" 0 "alpha 的验收标准有 2 条没有编号"
+ac_spec ac-en '### Acceptance criteria' '' '+ no id'
+check "Acceptance criteria 标题同样识别" 0 "alpha 的验收标准有 1 条没有编号"
+ac_spec ac-none '## Objective' '' '- 没有验收标准一节'
+check_absent "没有验收标准一节时不提示" "$AC_HINT"
+ac_spec ac-fence '## Success criteria' '' '```markdown' '- 示例里的条目' '```' '- AC1：真的条目'
+check_absent "围栏代码块里的示例不算" "$AC_HINT"
+ac_spec ac-done '## Success criteria' '' '- 已完成模块没有编号'
+mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' > "$PROJECT/tasks/alpha/plan.md"; printf '%s\n' '- [x] 做完' > "$PROJECT/tasks/alpha/todo.md"
+check_absent "已完成模块不追溯" "$AC_HINT"
+
 echo "verify-artifacts regression passed ($PASS cases)"

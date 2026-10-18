@@ -21,8 +21,8 @@
 - 明确选用 GitHub/GitLab 普通 Issue 时，用 `spec-guard:hosted-ticket-workflow` 逐项查重、授权写入与交付对账；
   Local 事项仍走 `spec-guard:ticket`，不凭 Git remote 改目标
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
-- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），未标注按 `gate`；按需求批量前置审与
-  UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
+- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），未标注按 `gate`，范围内能自动判定的中间检查点可标 `report`；
+  按需求批量前置审与 UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 交审 Spec 或 Plan 时在对话里呈现内容要点并写明这次批准授权什么，只给链接不算交审；细则见
   `spec-guard:spec-guard-ops` 的共享检查点规则
 - 任务改到用户看得到的界面时，不论 Plan 是否预计到，都在这个任务里打开页面对照预期验证，写清看了哪个页面、对照了什么、
@@ -31,8 +31,10 @@
   细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 能力图评审、每个模块的 Spec 交审、能力图全部完成时各提一次文档建议（README 默认在候选里），没有就写“无”；
   细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 同一个 gate 因外部原因（上游未修复、缺权限、要用户取舍）再次挡住时停下，把挂起、接受风险、换方案等选项与代价
-  交用户决定，不按默认推荐继续重试；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 同一模块、同一目标因外部原因（上游未修复、缺权限、要用户取舍）第二次过不去，或第二次为它报批时停下，把挂起（并
+  先开可开工模块）、接受风险、换方案等选项与代价交用户决定，不按默认推荐继续重试；细则见 `spec-guard:spec-guard-ops`
+  的共享检查点规则
+- Spec 的验收标准按 AC1、AC2… 编号，最终验收按编号给证据；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 写出 Spec 或 Plan 交审时在文件里标评审状态标记 `pending`；用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
   （Claude 侧 `/spec-guard:review-mark`）记为 `approved`，Spec 修订后须复审，细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 产物语言与评审节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
