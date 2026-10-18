@@ -98,9 +98,10 @@ dispatch_status() {
   fi
 }
 # 写入内容＝基础模板，开启时其后接规则段；新建与 --replace 共用。
+# convention-block-blank-lines：两段之间空一行；标记旁的空行由 managed-block.py compose／replace 统一排。
 block_content() {
   cat "$TEMPLATE"
-  [ "$DISPATCH" = on ] && cat "$RULE"
+  [ "$DISPATCH" = on ] && { printf '\n'; cat "$RULE"; }
   return 0
 }
 
@@ -151,8 +152,14 @@ install_block() {
     dispatch_status
     return
   fi
+  BODY="$(mktemp)"
+  trap 'rm -f "$BODY"' EXIT
+  block_content > "$BODY"
+  INNER="$(mktemp)"
+  trap 'rm -f "$BODY" "$INNER"' EXIT
+  python3 "$BLOCK_TOOL" compose "$BODY" > "$INNER" || exit 1
   [ -f "$TARGET" ] && printf '\n' >> "$TARGET"
-  { printf '%s\n' "$BEGIN"; block_content; printf '%s\n' "$END"; } >> "$TARGET"
+  { printf '%s\n' "$BEGIN"; cat "$INNER"; printf '%s\n' "$END"; } >> "$TARGET"
   printf '  ✅ updated %s\n' "$TARGET"
 }
 
