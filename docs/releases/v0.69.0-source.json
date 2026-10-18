@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.69.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:0236e0e2c18c92bd16b2cc4c55684ce0c6d2ae4f"
+      },
+      "observedAt": "2026-10-18T06:48:23Z",
+      "evidence": [
+        "result:the v0.69.0 annotated tag resolves to merge commit 0236e0e2c18c92bd16b2cc4c55684ce0c6d2ae4f (pull request #350); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39104566209) passed before tagging",
+        "result:0.69.0 is one module, open-commitments: a shared checkpoint rule section for things someone is waiting on (recorded in the local ticket ledger when the ball changes hands, tagged waiting-on-me/waiting-on-them/waiting-on-user; two gates for replies), two added lines in each convention block template, and a new SessionStart hook (matcher startup|clear, phase-guard.sh SessionStart fresh) that prints one read-back sentence only when .epiq/project.json exists; the compact note gains a ledger clause in that case",
+        "result:phase-guard 403, verify-artifacts 68, workflow checkpoint 43 cases, ShellCheck 4.1.0 and validate.sh pass under macOS /bin/bash; without .epiq/project.json the fresh hook is silent and the compact note and UserPromptSubmit output are unchanged (asserted byte for byte)",
+        "result:setup-convention --replace over a 0.68.0 block exits 0 on both hosts without --accept-removals"
+      ]
+    }
+  ]
+}

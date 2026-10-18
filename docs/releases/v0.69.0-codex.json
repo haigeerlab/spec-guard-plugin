@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.69.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.69.0-upgrade-20261018"
+      },
+      "observedAt": "2026-10-18T06:48:23Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.68.0 to v0.69.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.69.0 enabled from the marketplace cache; the installed plugin directory is identical to the release asset; the smoke run exited 0",
+        "result:in a temporary project with the convention block and .epiq/project.json, a new codex exec session (hook trust bypassed for the run) received the read-back sentence on SessionStart(startup) as a developer message before the stage injection; the project trust entries codex exec wrote were removed afterwards and ~/.codex/config.toml differs from before only in the ref line",
+        "result:real sessions with a local-only ledger: (1) mid-task message from another session while told to hold it -> the agent created a ledger issue tagged waiting-on-user keeping the sender name and session id; (2) a new session told only to carry on -> it listed the waiting-on-* issues and reported the held item; (3) asked to reply with the version and to answer a request for a delivery date -> it drafted the informational reply, tried agent-relay (recipient absent, recorded), and left the date to the user as a commitment",
+        "not-verified:SessionStart(clear) in an interactive Codex session, and the new hook under the user's own /hooks trust (the user has not trusted the new entry yet)"
+      ]
+    }
+  ]
+}
