@@ -191,9 +191,12 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
   --format json
 ```
 
-`user-name`、`preferred-editor` 和 `auto-sync` 是 Epiq 首次在当前 macOS 用户下保存的偏好；Spec Guard
-不会猜测或代填它们。若预检显示已有 `origin`，还必须明确增加 `--local-only` 或 `--allow-epiq-push` 之一。该标记只允许本次
-Epiq 上游初始化尝试推送，不能表示远端操作已经成功；输出只报告是否有警告，不回显上游原始 Git 错误。
+`user-name`、`preferred-editor` 和 `auto-sync` 是 Epiq 首次在当前 macOS 用户下保存的整机偏好（`~/.epiq-global/config.json`，
+或 `EPIQ_GLOBAL_DIR` 指定的目录）；Spec Guard 不会猜测或代填它们。三项都可省略：Epiq 用传入的值补上机器缺的项，机器已有的不改，
+传了与机器不同的值就拒绝。`status` 的 `machineSetup` 只读地报告机器已有哪几项（`absent`、`read` 带三项取值、读不了为
+`unknown`，不当作未设置），文本输出在项目未初始化时列出已设置与缺的项；初始化前据此只问缺的项，已有的告诉用户要改就在 Epiq 的
+TUI 里用 `:config`。Epiq 拒绝时诊断为 `Epiq refused: <message>`：控制字符换成空格，远端地址里的凭据遮掉，最长 300 字。若预检显示已有 `origin`，还必须明确增加 `--local-only` 或 `--allow-epiq-push` 之一。该标记只允许本次
+Epiq 上游初始化尝试推送，不能表示远端操作已经成功；输出报告是否有警告（`warnings`）、条数（`warningCount`）与编号（`warningCodes`，如 `init:15`），不回显上游原始 Git 错误。
 
 成功后 Epiq 会提交 `.epiq/project.json`、创建 `__epiq_state__` 状态分支，并在同一 macOS 用户的 linked
 worktree 间共享状态。它不会安装 Claude/Codex MCP 配置；那是独立的后续明确操作。

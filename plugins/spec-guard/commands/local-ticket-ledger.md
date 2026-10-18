@@ -84,7 +84,10 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --rep
 `__epiq_state__` 分支；工作树不干净时不得继续。发现 `origin` 时，向用户说明两种选择：默认推荐
 `--local-only`（只对这一次 Epiq 调用屏蔽推送，账本只在本机，不改任何 git 配置）；只有用户明确要把账本推到
 `origin` 时，才在许可这一次推送尝试后改用 `--allow-epiq-push`。两者不能同时给。`user-name`、
-`preferred-editor`、`auto-sync` 不可猜测：向用户索取实际值。
+`preferred-editor`、`auto-sync` 不可猜测。先看 `status --format json` 的 `machineSetup`：机器已设置的项告诉用户
+「这是整机设置，初始化改不了；要改，在 Epiq 的 TUI 里用 `:config`」，不再传；只向用户索取机器缺的项，没给的参数整个省略。
+`machineSetup` 为 `unknown` 时照旧三项都问；Epiq 拒绝时诊断以 `Epiq refused:` 开头，照它说的调整。初始化有警告时报条数
+`warningCount` 与编号 `warningCodes`，不回显警告原文。
 
 初始化后把含 `.epiq/project.json` 的提交合进默认分支，否则从默认分支开的工作树和会话找不到账本；
 `status` 在当前检出没有标识、但别的分支有时会指出是哪个分支。`auto-sync` 为 false 时，事项事件只作为
@@ -96,6 +99,7 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
   --confirm-initialize --user-name "用户提供的显示名" \
   --preferred-editor "用户提供的编辑器命令" --auto-sync "用户给的 true 或 false" --format json
+# 机器已设置的项省略对应参数，例如三项都已设置时只写 initialize --local-only --confirm-initialize --format json
 ```
 
 初始化或配置任一宿主都不是隐式动作。需要先显示无副作用的配置片段时运行：
