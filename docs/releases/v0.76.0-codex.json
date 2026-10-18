@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.76.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.76.0-upgrade-20261019"
+      },
+      "observedAt": "2026-10-18T19:09:14Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.72.0 to v0.76.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.76.0 enabled; the installed plugin directory is identical to the release asset; the smoke run exited 0 on codex-cli 0.162.1",
+        "result:a fresh codex exec session in a temporary DONE-stage consumer project: the rollout's first-turn injection reports DONE and has no Module boundary line; the project trust entry codex exec added was removed afterwards"
+      ]
+    }
+  ]
+}

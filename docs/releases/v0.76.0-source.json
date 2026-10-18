@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.76.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:431e728433034a651a5ac05ef6631ed06cddafbb"
+      },
+      "observedAt": "2026-10-18T19:09:14Z",
+      "evidence": [
+        "result:the v0.76.0 annotated tag resolves to merge commit 431e728433034a651a5ac05ef6631ed06cddafbb (pull request #370); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39156808220) passed",
+        "result:one release for one requirement: 0.73.0, 0.74.0 and 0.75.0 were never released on their own; their version bumps went into each module's pull request (#367, #368, #369) instead of only the last one, which the release process does not intend; no host picked up an intermediate version (both hosts were still on 0.72.0 before this release)",
+        "result:0.73.0 map-progress-facts: /map --json adds modules[].uncommittedTicks, modules[].startedAt, head.committedAt and top-level reviewCadence {value, source}; interface.json 1.2 describes them under mapView.progressFacts",
+        "result:0.74.0 stop-rule-and-ac: the external-blocker stop is judged by the same module and goal (second external failure or second request for approval) with a ready option to suspend and start a startable module; checkpoints that a script can judge may be marked report (default stays gate); acceptance criteria numbered AC1, AC2; verify-artifacts warns for unfinished modules only",
+        "result:0.75.0 display-terms: user-facing Chinese uses 审查／批准／验收／审阅 (批准标记, 批准节奏, 待批准); command names, config keys, marker lines, JSON values and English output unchanged; a regression keeps the old words out of current product text",
+        "result:0.76.0 boundary-hint-unknown-size: at MODULE_DONE and DONE, an unknown context size no longer prints the module boundary line",
+        "result:test-phase-guard.sh (413 cases), test-verify-artifacts.sh (75 cases), verify-and-commit full tier, ShellCheck and validate.sh passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}
