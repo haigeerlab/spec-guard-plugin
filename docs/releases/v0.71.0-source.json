@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.71.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:8039cb7de07ad3f5639d1ce2070a9398972b94ef"
+      },
+      "observedAt": "2026-10-18T09:33:24Z",
+      "evidence": [
+        "result:the v0.71.0 annotated tag resolves to merge commit 8039cb7de07ad3f5639d1ce2070a9398972b94ef (pull request #361); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39115445203) passed on its first attempt, including the phase-guard case where stdin stays open, now judged by the extra wait over a closed-stdin baseline (stdin-timing-test, #359)",
+        "result:0.71.0 is two modules: ledger-init-machine-config (initialize takes user-name, preferred-editor and auto-sync only when given and leaves the machine's existing values to Epiq; an Epiq refusal is reported as 'Epiq refused: <message>' with control characters replaced, URL credentials masked and at most 300 characters; status adds a read-only machineSetup; initialization adds warningCount and warningCodes beside the warnings boolean) and stdin-timing-test (test only)",
+        "result:before the pull request, real Epiq 1.11.0 in a temporary EPIQ_GLOBAL_DIR and temporary repositories: a machine set to userName A refused --user-name B with Epiq's own message in the diagnostic; the same machine initialized with none of the three values and kept its settings; an empty machine initialized with all three and Epiq wrote them; ~/.epiq-global on this Mac was unchanged",
+        "result:verify-and-commit full tier, test_local_ledger_runtime.py (100 cases) and validate.sh passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.71.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.71.0-upgrade-20261018"
+      },
+      "observedAt": "2026-10-18T09:33:24Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.70.2 to v0.71.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.71.0 enabled; the installed plugin directory is identical to the release asset; the smoke run exited 0",
+        "result:the installed local_ledger_runtime.py status --format json reports machineSetup state read with this Mac's three values"
+      ]
+    }
+  ]
+}

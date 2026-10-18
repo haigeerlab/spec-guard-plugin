@@ -9,7 +9,7 @@
 - [x] Task 5：说明文档 — `commands/local-ticket-ledger.md`、`skills/local-ticket-ledger-ops/SKILL.md`、`references/local-ticket-ledger-runtime.md`：初始化前看 `machineSetup`，机器已有的告诉用户是整机设置、用 TUI 的 `:config` 改，不再传；只问缺的；`unknown` 时三项都问；`Epiq refused:` 诊断；警告报条数与编号。示例命令加一行省略参数的写法。
 - [x] Task 6：CHANGELOG 与 0.71.0 版本号 — 顶部「未发布」并入 `[0.71.0] - 2026-10-18`（2 个模块，变更写本模块，维护者工具保留 stdin-timing-test 那条）；两份 `plugin.json` 改为 0.71.0，中英 README 的 `--ref` 改为 v0.71.0。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 7444242 的 14 个文件（均在 Plan 范围内）、比 Spec 窄的一处（status 文本只在未初始化时列机器设置，JSON 始终带）、验证结果与未验证项（宿主安装副本放到发版后，未做独立代码评审），以及发给 session-protocol 契约负责人的回告草稿；用户验收通过，回告草稿一并批准，确认推送与开 PR。
-- [ ] 发版后的验证
+- [x] 发版后的验证 — 2026-10-18，v0.71.0（tag 在合并提交 8039cb7，#361；main CI 39115445203 首次即通过；发布包 sha256 0320cd66…95590bb2，下载回来一致）。两边宿主升级到 0.71.0，安装副本与发布包一致，Codex smoke 退出码 0；两边安装副本的 `status --format json` 都报 `machineSetup` 为 read；Claude 安装版 hook 注入 BUILDING，本次没跑 headless 会话。记录见 `docs/releases/v0.71.0-*.json`。之后关闭账本 CH92E11 并按批准的草稿回告 session-protocol 契约负责人。
 
 ## 外部审查意见
 
