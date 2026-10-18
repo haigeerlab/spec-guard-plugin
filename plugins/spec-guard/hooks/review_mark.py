@@ -18,17 +18,38 @@ from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, file_review_state, re
 from tracker_default import _write_atomic
 
 
+def _eol(line: str) -> str:
+    """The line ending a line carries, or a plain newline when it carries none (files are read with universal newlines)."""
+    return line[len(line.rstrip("\r\n")):] or "\n"
+
+
 def _with_marker(text: str, marker: str) -> str:
-    """The text with `marker` as its one marker line: replaced in place, else put after the title line."""
+    """The text with `marker` as its one marker line: replaced in place, else put after the title line.
+
+    review-marker-blank-line: the marker line always gets a blank line on both sides (none before it at the start of
+    the file, none after it at the end), as Markdown formatters such as oxfmt require; blank lines already there are
+    kept and none is added twice. The caller computes the Spec digest from this text, so the digest includes them.
+    """
     lines = text.splitlines(keepends=True)
     found = review_marker_lines(text)
     if found:
-        line = lines[found[0]]
-        lines[found[0]] = marker + line[len(line.rstrip("\r\n")):]
-        return "".join(lines)
-    if lines and lines[0].startswith("#"):
-        return lines[0] + "\n" + marker + "\n" + "".join(lines[1:])
-    return marker + "\n\n" + text
+        at = found[0]
+        lines[at] = marker + lines[at][len(lines[at].rstrip("\r\n")):]
+    elif lines and lines[0].startswith("#"):
+        eol = _eol(lines[0])
+        lines[0] = lines[0].rstrip("\r\n") + eol
+        lines[1:1] = [eol, marker + eol]
+        at = 2
+    else:
+        eol = _eol(lines[0]) if lines else "\n"
+        lines[0:0] = [marker + eol, eol]
+        at = 0
+    eol = _eol(lines[at])
+    if at + 1 < len(lines) and lines[at + 1].strip():
+        lines.insert(at + 1, eol)
+    if at > 0 and lines[at - 1].strip():
+        lines.insert(at, eol)
+    return "".join(lines)
 
 
 def _marked(text: str, kind: str, state: str) -> str:
