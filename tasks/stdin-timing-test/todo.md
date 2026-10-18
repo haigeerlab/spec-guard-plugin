@@ -5,4 +5,4 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警 — 随 Task 1 的提交跑 `verify-and-commit.sh` 全档：phase-guard 404 例、verify-artifacts 68 例、repo-artifacts 5 通过、ShellCheck 无告警。
 - [x] Task 2：CHANGELOG — 顶部新增 `## [未发布]` 一节，记一条维护者工具（插件包里只有测试脚本变化）；版本号不变；`validate.sh` 随提交跑过。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 811341d 的 6 个文件（均在 Plan 范围内）、用例差异、反向验证结果与未验证项（CI 上的结果、未做独立代码评审），拟回告为无；完整 `validate.sh` 通过；用户验收通过，确认推送与开 PR。
-- [ ] 合并后的 CI 核对
+- [x] 合并后的 CI 核对 — 2026-10-18，#359 合并为 66e845f，main 等于合并提交；main CI 39113737682 第一次运行即通过（success，attempt 1），日志里这条用例为「✅ 标准输入不关闭时只多等约 1 秒并照常输出」，phase-guard 404 例通过。用例通过时不打印耗时，所以 CI 上的具体耗时没有记录。不单独发版。
