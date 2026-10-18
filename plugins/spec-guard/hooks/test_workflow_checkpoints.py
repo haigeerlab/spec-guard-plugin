@@ -183,27 +183,27 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, section)
 
     def test_review_markers(self):
-        section = self.section("## 评审状态标记")
+        section = self.section("## 批准标记")
         for phrase in ("<!-- spec-guard: review pending -->", "<!-- spec-guard: review approved", "不是授权来源",
                        "修订后须复审", "明确批准", "review-mark", "没有标记", "先于任何代码改动",
                        "“继续”不会被记为批准", "不要等用户说了“继续”再解释", "不得依据此前含糊的答复补记",
-                       "不妨碍单独记录 Plan 的批准", "评审状态只看标记", "正文不写"):
+                       "不妨碍单独记录 Plan 的批准", "批准状态只看标记", "正文不写"):
             self.assertIn(phrase, section)
         self.assertNotIn("自动批准", section)
         self.assertIn("连续执行到下一个 `gate`", self.section("## Plan 检查点分级"))
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("评审状态标记", "review-mark", "共享检查点规则"):
+                for phrase in ("批准标记", "review-mark", "共享检查点规则"):
                     self.assertIn(phrase, text)
 
     def test_documentation_suggestions(self):
         section = self.section("## 文档建议")
-        for phrase in ("能力图评审", "Spec 交审", "能力图全部完成", "跨模块", "收尾", "是什么、给谁用", "使用者和维护者",
+        for phrase in ("能力图审阅", "Spec 交审", "能力图全部完成", "跨模块", "收尾", "是什么、给谁用", "使用者和维护者",
                        "文档基线", "会因这次的工作过时", "README", "写什么、为什么现在写", "“无”", "另开一个收尾模块",
                        "不再就同一层次重复提", "不卡验收"):
             self.assertIn(phrase, section)
-        self.assertIn("文档建议", self.section("## 评审状态标记"))
+        self.assertIn("文档建议", self.section("## 批准标记"))
         self.assertIn("问是否记一份 ADR", self.section("## Plan 检查点分级"))
         for path in (self.plugin / "commands" / "review-mark.md", self.plugin / "skills" / "spec-guard-ops" / "SKILL.md"):
             with self.subTest(path=path):
@@ -239,7 +239,7 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, section)
 
     def test_review_content_comes_before_a_turn_ending_box(self):
-        section = self.section("## 评审状态标记")
+        section = self.section("## 批准标记")
         for phrase in ("结束本轮的确认框", "确认框摘要", "本轮的对话正文"):
             self.assertIn(phrase, section)
 
@@ -267,6 +267,24 @@ class CheckpointContractTests(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
                 for phrase in ("若装了 delegate 插件", "只读审查", "不算用户批准", "若装了 agent-relay 插件", *host_entries):
                     self.assertIn(phrase, text)
+
+    def test_user_facing_text_uses_the_shared_terms(self):
+        # display-terms: 审查 for technical checks, 批准 for the user's decision, 验收 for the final acceptance.
+        # Current product text only; spec/, tasks/, CHANGELOG and docs/ subdirectories are records and stay as written.
+        repo = self.plugin.parents[1]
+        files = [path for folder in ("commands", "skills", "templates", "references")
+                 for path in sorted((self.plugin / folder).rglob("*.md"))]
+        files += [path for path in sorted((self.plugin / "hooks").iterdir())
+                  if path.suffix in (".py", ".sh") and not path.name.startswith("test")]
+        files += [repo / "README.md", repo / "README.en.md", repo / "AGENTS.md"]
+        files += sorted((repo / "docs").glob("*.md"))
+        found = []
+        for path in files:
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                for word in ("评审", "审核", "审批"):
+                    if word in line:
+                        found.append("%s:%d %s" % (path.relative_to(repo), number, word))
+        self.assertEqual(found, [], "\n".join(found))
 
     def block_surfaces(self):
         # stop-rule-and-ac: every copy of the convention block, including this repository's own AGENTS.md.
@@ -304,7 +322,7 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_acceptance_criteria_are_numbered(self):
         # stop-rule-and-ac: AC1, AC2… so the final acceptance can match evidence to each one.
-        self.assertIn("验收标准（按 AC1、AC2… 编号）", self.section("## 评审状态标记"))
+        self.assertIn("验收标准（按 AC1、AC2… 编号）", self.section("## 批准标记"))
         contract = self.target.read_text(encoding="utf-8")
         for phrase in ("**验收标准编号。**", "`AC<数字>`", "删掉的编号不复用", "按编号逐条给证据", "只提示、不拦"):
             self.assertIn(phrase, contract)
@@ -315,12 +333,12 @@ class CheckpointContractTests(unittest.TestCase):
                     self.assertIn(phrase, text)
 
     def test_a_review_handoff_shows_the_content(self):
-        section = self.section("## 评审状态标记")
+        section = self.section("## 批准标记")
         for phrase in ("交审要让用户看到内容", "目标", "范围内与范围外", "关键决策与取舍", "假设", "验收标准", "未决问题",
                        "验证方式", "检查点及其类型", "影响面", "风险", "只给链接", "不算交审", "授权什么",
                        "同时批准 Spec 与 Plan", "不记为 `approved`", "不能替代内容"):
             self.assertIn(phrase, section)
-        cadence = self.section("## 评审节奏")
+        cadence = self.section("## 批准节奏")
         for phrase in ("第一次交审时说明一次", "之后不再重复", "/spec-guard:config"):
             self.assertIn(phrase, cadence)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
@@ -382,9 +400,9 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_one_module_per_review_and_grouped_by_module(self):
         # review-one-module: hand in one module at a time; when several are reviewed together, group them by module.
-        markers = self.section("## 评审状态标记")
+        markers = self.section("## 批准标记")
         for phrase in ("一次交审只放一个模块", "「一起发版」不等于「一起审」", "按模块分组", "Build order", "不按产物类型",
-                       "不主动提议合并交审", "能力图评审"):
+                       "不主动提议合并交审", "能力图审阅"):
             self.assertIn(phrase, markers)
         self.assertIn("只在用户明确要求时", self.section("## 按需求批量前置审"))
         rework = self.section("## 返工与小模块")
@@ -415,7 +433,7 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
-        cadence = self.section("## 评审节奏")
+        cadence = self.section("## 批准节奏")
         for phrase in ("`.agent/config.json`", "`reviewCadence`", "`separate`", "`combined`", "默认",
                        "一次批准", "新决策", "范围不清", "高风险", "合并永远由用户"):
             self.assertIn(phrase, cadence)
@@ -424,7 +442,7 @@ class CheckpointContractTests(unittest.TestCase):
         for name in ("claude-block-local.md", "codex-block-local.md"):
             template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
             with self.subTest(name=name):
-                for phrase in ("`.agent/config.json`", "/spec-guard:config", "产物语言", "评审节奏"):
+                for phrase in ("`.agent/config.json`", "/spec-guard:config", "产物语言", "批准节奏"):
                     self.assertIn(phrase, template)
 
 
@@ -462,7 +480,7 @@ class ConcurrencyAssessmentTests(unittest.TestCase):
 
     def test_doc_suggestions_point_to_the_assessment(self):
         doc = self.section("## 文档建议")
-        review = [line for line in doc.split("\n- ") if line.startswith("**能力图评审**")]
+        review = [line for line in doc.split("\n- ") if line.startswith("**能力图审阅**")]
         self.assertEqual(len(review), 1)
         self.assertIn("并行评估", review[0])
 
@@ -600,7 +618,7 @@ class HubRelayedApprovalTests(unittest.TestCase):
         self.assertNotIn("用户于当前对话明确批准", self.text)
 
     def test_coordinator_section_points_here_and_keeps_module_sessions_out(self):
-        start = self.text.index("**评审标记由协调会话写，先核对内容。**")
+        start = self.text.index("**批准标记由协调会话写，先核对内容。**")
         body = self.text[start:self.text.index("**本地集成分支的合并。**", start)]
         first = body.split("\n- ")[1]
         self.assertIn(self.POINTER, first)

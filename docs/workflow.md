@@ -16,10 +16,10 @@
    .agent/state.json                    # 只记录当前模块：{"activeModule":""}
    ```
 
-2. **写能力图并评审。** 用 agent-skills 的 `/spec` 做 Phase 0：列出模块、职责、依赖和一行 Build order。
+2. **写能力图并审阅。** 用 agent-skills 的 `/spec` 做 Phase 0：列出模块、职责、依赖和一行 Build order。
    人工确认模块边界清楚、依赖单向无环，再往下走。
 3. **按 Build order 逐个模块推进。** 每个模块依次是：
-   - 写 `spec/<模块>.md` 并评审；
+   - 写 `spec/<模块>.md` 并交审；
    - 用 `/plan` 生成 `tasks/<模块>/plan.md` 和 `todo.md`；
    - 用 `/build` 逐项实现，每完成一项勾掉一项。
 4. **切到下一个模块。** 当前模块的 todo 全部勾完后，把 `.agent/state.json` 的 `activeModule` 改成下一个模块。
@@ -33,7 +33,7 @@
 任务块不完整、属于停止条件、L3、或为子代理选的模型不比主会话便宜时，主代理自己做。这条规则只是引导，spec-guard
 不检测是否照做。省钱效果尚未证明：对照实验里派活没有减少主会话轮次，比不派贵 15%–54%，因此规则默认由主代理自己做，
 只派预计要改动 3 个以上文件、验收明确的 task。默认关闭；已开启的项目 `--replace` 升级时保持开启，
-关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你审批。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
+关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你批准。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
 也没有程序读取，只作建议。
 
 **怎么看省没省钱。** `/spec-guard:cost-report <模块>`（Codex 里让 `spec-guard-ops` 跑 cost report）离线读取本机的
@@ -52,7 +52,7 @@ PR 合并后核对合并提交与验证结果并写回；只有事项全部范�
 
 **少停、该停的照停。** Plan 里的检查点标 `gate`（停下等你确认）或 `report`（把验证结果记进 todo 后直接继续），
 未标注的按 `gate`；测试改不红、Spec 没覆盖的决策（会影响以后的设计时顺带问是否记 ADR）、高风险不可逆改动、权限被拒时任何级别都停。
-agent 会在能力图评审、每个模块的 Spec 交审和能力图全部完成时各提一次文档建议，没有就写“无”。推送、开 PR 只有 Plan 的
+agent 会在能力图审阅、每个模块的 Spec 交审和能力图全部完成时各提一次文档建议，没有就写“无”。推送、开 PR 只有 Plan 的
 `gate` 检查点写明授权时才免问，合并始终由你来做。模块的最后一个 `gate`（最终验收）上，agent 会在对话里列出实际改动的
 文件（新增、修改、删除与行数），并标出超出 Plan 预计的文件。一个需求拆成几个模块时，可以一次审完它们的 Spec 与 Plan，之后按
 Build order 连续构建；任务改到界面时，不论 Plan 是否预计到，agent 都在那个任务里打开页面对照预期自验并写清看了什么，做不了就记为“UI 未验证”；
@@ -82,19 +82,19 @@ todo 的最后一项。反过来，你的项目收到依赖方“做完了”的
 不另找地方记，agent 会提一次可以启用。记账不是受理：别的会话发来的需求，agent 收到就先记下，不用问你，但
 要不要做、怎么回仍由你定。调用账本工具时要传 `repoRoot`（项目根目录），读回提醒里会写出这个路径。
 
-**模块太小、停得太勤时。** 在已有实现上补建能力图时，很多模块只是盘点既有功能、不新增行为。这类模块不必各走一遍全套审核：
+**模块太小、停得太勤时。** 在已有实现上补建能力图时，很多模块只是盘点既有功能、不新增行为。这类模块不必各走一遍全套审查：
 让 agent 把它们并成相邻模块里的任务，或一次把几个模块的 Spec 与 Plan 一起交给你审，中间的检查点只汇报不停。
 
-**交审时你应该看到内容。** agent 把 Spec 或 Plan 交给你审核时，要在对话里给出内容要点，而不只是一句“写好了”加文件链接：
+**交审时你应该看到内容。** agent 把 Spec 或 Plan 交给你审阅时，要在对话里给出内容要点，而不只是一句“写好了”加文件链接：
 Spec 的目标、范围内外、关键决策、假设、验收标准、未决问题；Plan 的任务与验证方式、检查点、影响面、风险；并说明这次批准
 授权它做什么。这些要点要写在对话正文里：宿主的“下一步”这类确认框一出现这一轮就结束，只写在确认框摘要里的不算交审。没看到这些就被要求批准时，直接让它把内容摆出来。如果一个模块的 Spec 与 Plan 你总是连着批，可以用
-`/spec-guard:config` 把评审节奏改成 `combined`：两份一起交、批一次。agent 一次只交一个模块：几个模块要一起发版，也是一个审完、
+`/spec-guard:config` 把批准节奏改成 `combined`：两份一起交、批一次。agent 一次只交一个模块：几个模块要一起发版，也是一个审完、
 做完再交下一个；只有你说要一次审完几个模块（或开了多模块并行、由协调会话汇总）时才一起交，而且按模块分组，每个模块依次是 Spec、Plan、任务。
 
 **最终验收少一轮确认。** 构建中补改过已批准的 Spec 时，agent 会在最终验收的消息里附上 Spec 的改动差异，你批准验收即同时批准修订后的 Spec；没附差异的验收不算复审 Spec。验收获批后，下一个模块已在能力图里时它会接着写那份 Spec，不再停下问“要不要开始”，验收消息里会预告这一步；想先释放上下文，就先发 `/compact`。这几条也写在约定块里：已经装好约定块的项目，升级插件后运行一次 `/spec-guard:setup-convention --replace`（先 `--dry-run` 预览）才会拿到新行。
 
-**批准要留下记录。** agent 把 Spec 或 Plan 交给你审核时，在文件里标一行 `<!-- spec-guard: review pending -->`；这期间
-阶段提示报告“等待用户审核”，不会建议它写 Plan 或继续实现。你明确批准后，它用 `/spec-guard:review-mark` 把标记改成
+**批准要留下记录。** agent 把 Spec 或 Plan 交给你审阅时，在文件里标一行 `<!-- spec-guard: review pending -->`；这期间
+阶段提示报告“等待用户批准”，不会建议它写 Plan 或继续实现。你明确批准后，它用 `/spec-guard:review-mark` 把标记改成
 已批准（先给你看预览）。Spec 的批准标记带内容指纹：批准后 Spec 又被改过，阶段提示和 `verify-artifacts` 会指出
 “批准后已修订”，需要你再看一遍。实现阶段的阶段提示还会写出下一个要停下等你的检查点（`Next gate`）。
 接了收件枢纽（例如 decision-inbox）时，你在收件枢纽里的答复也算：它要按 session-protocol 契约转来，带收件枢纽的事项号和你的原话，
@@ -104,7 +104,7 @@ Spec 的目标、范围内外、关键决策、假设、验收标准、未决问
 ### 项目级审查后处理缺陷
 
 一轮项目级审查先固定基准提交、模块或路径范围、排除项和预计检查的批次。复用 agent-skills 的
-`code-review-and-quality` 检查正确性、可读性、架构、安全和性能；它原本主要用于变更和 PR 评审，
+`code-review-and-quality` 检查正确性、可读性、架构、安全和性能；它原本主要用于变更和 PR 审查，
 项目级审查需额外限定覆盖范围。每个范围系统检查一次，对候选缺陷做定向核实；证据不够的标为
 “待调查”并写出缺少什么，不为追求“找完所有 bug”无限扩大范围。P0 风险立即报告并暂停扩大扫描。
 已经安装旧版项目约定块的项目，先预览 `setup-convention local --replace`，确认后更新声明块；
@@ -139,7 +139,7 @@ Issue 已关闭并读回，不代替对 CI／验收证据的实际核对。后�
 
 | 阶段 | 意思 | 下一步 |
 |---|---|---|
-| `IDLE` | 还没有能力图 | 写能力图并人工评审 |
+| `IDLE` | 还没有能力图 | 写能力图并人工审阅 |
 | `MAP_INVALID` | 能力图格式不对，比如 Build order 不是恰好一行 | 用 `/spec-guard:verify-artifacts` 查原因 |
 | `MAP_ONLY` | 有能力图，还没有任何模块 Spec | 写第一个模块的 Spec |
 | `NEEDS_SPEC` | 当前模块缺 Spec | 写 `spec/<模块>.md` |
@@ -174,9 +174,9 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 | 方式 | 适合 | 步骤 |
 |---|---|---|
 | **快速插入**（默认） | 个人或小团队，需求已经理顺 | 一次预览、一次确认 |
-| **Proposal** | 需要在 Issue 上留下评审与接受的记录，或需要多人确认 | 四步（提交、接受、晋级、收尾），要先做一次性准备 |
+| **Proposal** | 需要在 Issue 上留下审查与接受的记录，或需要多人确认 | 四步（提交、接受、晋级、收尾），要先做一次性准备 |
 
-两种方式都只**新增**模块。修改、删除或调整已有模块的顺序，直接改能力图并人工评审。
+两种方式都只**新增**模块。修改、删除或调整已有模块的顺序，直接改能力图并人工审阅。
 
 ### 快速插入
 
@@ -189,7 +189,7 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 1. agent 读能力图，提出新模块的 id、职责、依赖和插入位置（`after:<某模块>` 或 `end`），每项说明理由；
 2. 命令预览：给出新行、新 Build order、能力图改动对比，以及插入后当前模块会不会变；
 3. 你确认后才写入。只改 `spec/CAPABILITY-MAP.md`，不建文件、不动 `tasks/` 和 `.agent/state.json`，也不做 Git 操作；
-4. 新模块排到当前位置时，阶段变为 `NEEDS_SPEC`，接着照常写并评审它的 Spec，再 Plan、Build。
+4. 新模块排到当前位置时，阶段变为 `NEEDS_SPEC`，接着照常写并交审它的 Spec，再 Plan、Build。
 
 命令会先校验，任何一条不满足就拒绝，什么都不写：
 
@@ -197,7 +197,7 @@ hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`
 - 依赖不存在、依赖排在插入位置之后、出现循环依赖，或 id 重复、不是 kebab-case；
 - 插入会改动 `## 目标`、已有模块行，或已有模块在 Build order 中的先后。
 
-若 `spec/<id>.md` 已存在，预览会提示插入后为 `NEEDS_PLAN`；先确认这份 Spec 已评审，再确认写入。
+若 `spec/<id>.md` 已存在，预览会提示插入后为 `NEEDS_PLAN`；先确认这份 Spec 已批准，再确认写入。
 
 ### 插队
 
@@ -223,18 +223,18 @@ Proposal 路径同样适用。
 ### Proposal（需要留痕时）
 
 ```text
-提交（写草稿 → proposal-submit → 合进 main → 开 Issue）→ 接受（评审 → 改标签）
+提交（写草稿 → proposal-submit → 合进 main → 开 Issue）→ 接受（审查 → 改标签）
      → 晋级（add-module --proposal 插进能力图 → 合并）→ 收尾（证明 → 预览 → 授权 → 改阶段并关闭）
 ```
 
 | # | 步骤 | 谁来做 | 怎么做 |
 |---|---|---|---|
 | 1 | 提交 | agent + 命令 + 人 | agent 按[模板](../plugins/spec-guard/references/proposal-contract.md)写草稿 `spec/proposals/<id>.md`；运行 `/spec-guard:proposal-submit --draft spec/proposals/<id>.md --platform <github\|gitlab>` 预览，确认后加 `--confirm`，命令从远端 main 补全基线一节并算出 revision，只改这一份草稿；经 PR 把草稿合进 main（发布，只在本地或分支上都不算）；再用命令打印的现成命令开 Issue（标签 `proposal`、`proposal-stage:published`）。改了草稿，重跑一遍即可重算 revision |
-| 2 | 接受 | 命令 + 人 | `/spec-guard:proposal-review` 报告 Proposal 是否新鲜、过期或被卡住；人把 Issue 标签改成 `proposal-stage:accepted`。接受只看这个标签加一次新鲜评审（基线未漂移、模块还不在能力图里、依赖齐全、锚点有效） |
-| 3 | 晋级 | 人 + 命令 | 从预检给出的 `baseCommit` 开晋级分支，运行 `/spec-guard:add-module --proposal <id> --platform … --target …`（Codex 同等入口），预览确认后加 `--confirm` 写入能力图，提交并合并。命令已内嵌预检，通常无需单独再跑 `/spec-guard:proposal-promotion-preflight`。若正式 Spec 与 Plan 已可评审，可与能力图放在同一个晋级 PR；否则先合入能力图，随后按正常流程补齐。命令会自检写入结果能通过收尾的证明 |
+| 2 | 接受 | 命令 + 人 | `/spec-guard:proposal-review` 报告 Proposal 是否新鲜、过期或被卡住；人把 Issue 标签改成 `proposal-stage:accepted`。接受只看这个标签加一次新鲜审查（基线未漂移、模块还不在能力图里、依赖齐全、锚点有效） |
+| 3 | 晋级 | 人 + 命令 | 从预检给出的 `baseCommit` 开晋级分支，运行 `/spec-guard:add-module --proposal <id> --platform … --target …`（Codex 同等入口），预览确认后加 `--confirm` 写入能力图，提交并合并。命令已内嵌预检，通常无需单独再跑 `/spec-guard:proposal-promotion-preflight`。若正式 Spec 与 Plan 已可交审，可与能力图放在同一个晋级 PR；否则先合入能力图，随后按正常流程补齐。命令会自检写入结果能通过收尾的证明 |
 | 4 | 收尾 | 命令 + 人 | `/spec-guard:proposal-promotion-proof`：从 Proposal 的基线提交起沿远端默认分支找到第一个纳入该模块的提交，核对它与声明一致。证明为 `proved` 后用 `/spec-guard:proposal-closeout` 预览收尾，确认后它写一条带稳定标记的收尾记录、把阶段改成 `proposal-stage:promoted` 并关闭事项，再读回这三项。只手工改标签不会关闭事项，事项会一直开着；`/spec-guard:proposal-closeout` 的只读 `scan` 列出所有证明已通过而事项仍开着的 Proposal |
 
-晋级后，这个模块仍按 Spec → Plan → Build 的评审顺序推进；同一个晋级 PR 可以提交 Spec 与 Plan 并分别评审，不要求为每份文档再开 PR。`proposal-submit` 只在 `--confirm` 时写草稿；评审、预检、证明只读；晋级命令只写能力图；Issue、标签、分支与提交由人操作。合并后运行证明并报告结果，再用 `proposal-closeout` 预览并经授权收尾（它把 Issue 标为 `promoted` 并关闭）；证明与收尾都不需要第三个 PR。
+晋级后，这个模块仍按 Spec → Plan → Build 的批准顺序推进；同一个晋级 PR 可以提交 Spec 与 Plan 并分别交审，不要求为每份文档再开 PR。`proposal-submit` 只在 `--confirm` 时写草稿；审查、预检、证明只读；晋级命令只写能力图；Issue、标签、分支与提交由人操作。合并后运行证明并报告结果，再用 `proposal-closeout` 预览并经授权收尾（它把 Issue 标为 `promoted` 并关闭）；证明与收尾都不需要第三个 PR。
 
 ### Proposal 文档怎么写
 
@@ -260,7 +260,7 @@ Proposal 路径同样适用。
 - **每个项目只有一张在用的能力图**，路径固定为 `spec/CAPABILITY-MAP.md`。阶段提示和产物校验都只认这一张。
 - **新需求插进同一张图**：用快速插入或 Proposal，按锚点插到某个模块后面或追加到末尾，不再为新需求另开一张图。
 - **和当前项目无关的独立产品**，另开一个项目，用它自己的能力图。
-- **改 `## 目标` 要慎重**：这一节的摘要是 Proposal 评审的基准，改了会让所有已发布的 Proposal 判为过期。
+- **改 `## 目标` 要慎重**：这一节的摘要是 Proposal 审查的基准，改了会让所有已发布的 Proposal 判为过期。
   只是追加模块时不用改它。
 - **旧版本留下的归档图**在 `spec/history/`，只读核验，见[可选能力](optional-features.md#能力历史)。
 

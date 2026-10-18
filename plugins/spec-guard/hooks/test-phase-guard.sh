@@ -1922,7 +1922,7 @@ printf '%s\n' '- [x] done' > "$zm/tasks/alpha/todo.md"
 zh_check "zh-CN：NEEDS_SPEC" "$zm" +"当前阶段: **NEEDS_SPEC**" +"- 能力图: 已有" +"- 当前模块: \`beta\`（Build order 中下一个）" \
   +"- 模块 2 · Spec 1 · Plan 1 · 进行中 0 · 已完成 1" +"建议下一步: 写 \`spec/beta.md\` 并交审。" "${ENGLISH_ONLY[@]}"
 printf '# Spec: beta\n\n<!-- spec-guard: review pending -->\n正文\n' > "$zm/spec/beta.md"
-zh_check "zh-CN：NEEDS_PLAN，Spec 待审" "$zm" +"当前阶段: **NEEDS_PLAN**" +"- 评审: Spec \`spec/beta.md\` 正在等用户审阅。" \
+zh_check "zh-CN：NEEDS_PLAN，Spec 待审" "$zm" +"当前阶段: **NEEDS_PLAN**" +"- 批准: Spec \`spec/beta.md\` 正在等用户批准。" \
   +"建议下一步: 等用户审阅 \`spec/beta.md\`；先不要写 Plan。用户批准后，用 \`/spec-guard:review-mark\` (Codex: spec-guard-ops review-mark) 记下来。" \
   "${ENGLISH_ONLY[@]}"
 printf '# Spec: beta\n正文\n' > "$zm/spec/beta.md"
@@ -1931,7 +1931,7 @@ zh_check "zh-CN：NEEDS_PLAN，没有标记" "$zm" \
 printf '# Plan\n' > "$zm/tasks/beta/plan.md"
 printf '%s\n' '- [x] a' '- [ ] Checkpoint 1（gate）：验收' > "$zm/tasks/beta/todo.md"
 zh_check "zh-CN：BUILDING，Plan 无标记" "$zm" +"当前阶段: **BUILDING**" \
-  +"- 下一个 gate: Checkpoint 1（gate）：验收 — todo 里第一个未勾选的 \`gate\` 检查点。Plan 没有评审标记：如果用户还没批准它，先等批准再构建。" \
+  +"- 下一个 gate: Checkpoint 1（gate）：验收 — todo 里第一个未勾选的 \`gate\` 检查点。Plan 没有批准标记：如果用户还没批准它，先等批准再构建。" \
   +"建议下一步: 继续用 \`/build\` 构建 \`beta\`：\`tasks/beta/todo.md\` 里还有 1 个未勾选项。" "${ENGLISH_ONLY[@]}"
 printf '# Plan\n\n<!-- spec-guard: review approved -->\n' > "$zm/tasks/beta/plan.md"
 zh_check "zh-CN：BUILDING，Plan 已批准" "$zm" \

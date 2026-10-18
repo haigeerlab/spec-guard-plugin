@@ -620,7 +620,7 @@ class ModuleInsertTests(unittest.TestCase):
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "alpha,alpha", "end"))
 
     def test_reordering_existing_build_order_is_refused(self):
-        # 表格行序不变、只打乱 Build order 的插入必须被拒：Proposal 评审按 Build order 判断先后。
+        # 表格行序不变、只打乱 Build order 的插入必须被拒：Proposal 审查按 Build order 判断先后。
         self.write("spec/CAPABILITY-MAP.md", MAP.replace("| beta | Second module | alpha |", "| beta | Second module | — |")
                    .replace("| gamma | Third module | beta |", "| gamma | Third module | — |")
                    .replace("Build order: alpha, beta → gamma", "Build order: alpha → beta → gamma"))

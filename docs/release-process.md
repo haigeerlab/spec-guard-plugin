@@ -40,7 +40,7 @@
 3. 推送提交和 tag。
 4. 刷新 marketplace，并在新会话中安装/启用更新后的插件。Codex 桌面版里已开着的会话不会换到新版，要 ⌘Q 完全退出
    ChatGPT 应用再打开。
-5. 在 `/hooks` 审核 `UserPromptSubmit`，然后从临时消费者项目运行真实 Codex smoke。
+5. 在 `/hooks` 查看 `UserPromptSubmit`，然后从临时消费者项目运行真实 Codex smoke。
 
 不同宿主的 marketplace 刷新命令与权限策略可能不同；先以 `codex plugin marketplace --help`
 或宿主 UI 显示的当前命令为准，不要假定工作区 HEAD 已被运行时自动采用。

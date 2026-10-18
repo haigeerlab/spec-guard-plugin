@@ -4,7 +4,7 @@ allowed-tools: Bash
 ---
 
 只在人工已把 Issue 标签改成 `proposal-stage:accepted` 之后运行。它重新读取远端 Proposal 池与
-Issue 阶段，并做一次新鲜评审（基线未漂移、模块还不在能力图中、依赖齐全、锚点有效）；
+Issue 阶段，并做一次新鲜审查（基线未漂移、模块还不在能力图中、依赖齐全、锚点有效）；
 不读取策略文件或验收记录：
 
 ~~~bash

@@ -136,7 +136,7 @@ Build order: identity → billing, notifications → reporting
 > `SPEC.md`. This skill owns the clarification, content, and approval gates; the
 > external tool owns how the approved spec is represented.
 
-这正是 spec-guard 的分工：澄清与审批闸门归上游，`spec/` 布局归 spec-guard。
+这正是 spec-guard 的分工：澄清与批准闸门归上游，`spec/` 布局归 spec-guard。
 
 ### 3.4 外部 tracker 扩展点 —— `skills/planning-and-task-breakdown/SKILL.md:157-164`
 

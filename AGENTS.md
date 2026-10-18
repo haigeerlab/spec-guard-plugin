@@ -29,15 +29,15 @@
   看到了什么；做不了就记为“UI 未验证”并说明原因；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 模块最终验收时在对话里列出实际改动的文件（新增、修改、删除与行数，取自版本库），任务做完的结果带文件数与提交号；
   细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 能力图评审、每个模块的 Spec 交审、能力图全部完成时各提一次文档建议（README 默认在候选里），没有就写“无”；
+- 能力图审阅、每个模块的 Spec 交审、能力图全部完成时各提一次文档建议（README 默认在候选里），没有就写“无”；
   细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 同一模块、同一目标因外部原因（上游未修复、缺权限、要用户取舍）第二次过不去，或第二次为它报批时停下，把挂起（并
   先开可开工模块）、接受风险、换方案等选项与代价交用户决定，不按默认推荐继续重试；细则见 `spec-guard:spec-guard-ops`
   的共享检查点规则
 - Spec 的验收标准按 AC1、AC2… 编号，最终验收按编号给证据；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 写出 Spec 或 Plan 交审时在文件里标评审状态标记 `pending`；用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
+- 写出 Spec 或 Plan 交审时在文件里标批准标记 `pending`；用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
   （Claude 侧 `/spec-guard:review-mark`）记为 `approved`，Spec 修订后须复审，细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 产物语言与评审节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
+- 产物语言与批准节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
   新写的 spec、plan、todo 正文用配置的产物语言，结构关键字不变
 <!-- BEGIN:spec-guard-local -->
 > `spec/CAPABILITY-MAP.md` 是整个插件唯一的能力图；新需求经 Proposal 按锚点插入模块，不另建图。

@@ -26,7 +26,7 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | 探测失败就降级，不误报 | 缺 `python3` 或读不到远端时报「未验证」或 `unknown`，不说「流程断了」 | 把环境问题说成流程违规，会让人不再信任提示 |
 | 共享事实只认远端默认分支 | Proposal 状态只从远端 main 的固定快照读，不看本地文件和其他 worktree | 多个 agent、多个 worktree 并行时，本地文件经常互相矛盾 |
 | 一个项目一张能力图 | 新需求经快速插入或 Proposal，按锚点插进同一张图；模块按 Build order 逐个推进 | 两张图会给出两份互相冲突的「现在该做什么」；逐个推进让每一步都能验收 |
-| 人工接受，只改标签 | 接受 Proposal 要人来做：把 Issue 标签改成 `proposal-stage:accepted`，插件再核对评审是否新鲜 | 决定留给人，又不要求额外的策略文件或记录，接受这一步足够轻 |
+| 人工接受，只改标签 | 接受 Proposal 要人来做：把 Issue 标签改成 `proposal-stage:accepted`，插件再核对审查是否新鲜 | 决定留给人，又不要求额外的策略文件或记录，接受这一步足够轻 |
 | 可选能力显式启用 | 本地事项账本、文档治理都要单独开启；会话协作已移到独立插件 agent-relay | 不用的人不背它们的依赖和风险 |
 
 ## 术语
@@ -44,19 +44,19 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | 精确目标 | 足以无歧义定位一个事项容器的元组：github 是 `(主机, owner/name)`，gitlab 是 `(主机, 正整数 project id)`，local 是 `(Epiq projectId)`。**永不推断**，只来自显式参数或项目默认值 |
 | 项目默认后端 | `.agent/tracker.json` 里的 `defaultBackend` 与 `defaultTarget`，入口 `/spec-guard:tracker-default`。它**只预填预览**，不决定写入、不改变已有事项的绑定，也不是激活信号 |
 | 阶段 | 每轮对话开头注入的状态，如 `NEEDS_PLAN`、`BUILDING`。完整列表见[使用流程](workflow.md#阶段提示) |
-| 评审标记 | Spec 与 Plan 文件里独占一行的 `<!-- spec-guard: review pending -->` 或 `review approved`，记录这份文件待审核还是已批准，只经 `/spec-guard:review-mark` 预览确认后写入；只有用户明确说“批准”才记已批准。它是记录，不是授权来源 |
+| 批准标记 | Spec 与 Plan 文件里独占一行的 `<!-- spec-guard: review pending -->` 或 `review approved`，记录这份文件待批准还是已批准，只经 `/spec-guard:review-mark` 预览确认后写入；只有用户明确说“批准”才记已批准。它是记录，不是授权来源 |
 | 批准指纹 | Spec 记为已批准时，标记里带上除标记行以外全文的指纹。批准后内容再被改，阶段提示与 `verify-artifacts` 报告“批准后已修订”，要交用户复审再重新记批准 |
-| 评审节奏 | `.agent/config.json` 的 `reviewCadence`，入口 `/spec-guard:config`。`separate`（默认）：能力图、Spec、Plan 各审一次，前一份批准后才写下一份；`combined`：Spec、Plan 与 todo 一起交审、一次批准，遇到新决策、范围不清或高风险改动时退回 `separate` |
+| 批准节奏 | `.agent/config.json` 的 `reviewCadence`，入口 `/spec-guard:config`。`separate`（默认）：能力图、Spec、Plan 各审一次，前一份批准后才写下一份；`combined`：Spec、Plan 与 todo 一起交审、一次批准，遇到新决策、范围不清或高风险改动时退回 `separate` |
 | 快速插入 | `/spec-guard:add-module`：在检查点（或显式插队）校验、预览、经确认后把一个新模块插进能力图，是新增模块的默认方式 |
 | 插队与暂停 | 当前模块做到一半、剩下的都在等外部条件时，`add-module --interrupt` 让新模块先做；被让开的模块叫“暂停”。更准确地说，除当前模块外凡是 todo 做到一半的模块都算暂停（插队是最常见的原因），阶段提示每轮带 `Paused: …`，当前模块做完后按 Build order 回到第一个。暂停不写任何标记，由勾选现状算出 |
 | 挂起 | `/spec-guard:module-suspend` 在模块 `todo.md` 里写一行 `<!-- spec-guard: suspended -->`（可带一行原因）：模块留在 Build order 原位，选当前模块时跳过，阶段提示列出 `Suspended: …`，永不自动恢复，只有显式 `--resume` 才回来。与暂停的区别：挂起是显式记下的、由用户决定何时恢复；暂停只是插队的副作用 |
 | 进度表 | `/spec-guard:map`：按 Build order 列出每个模块的状态与 Spec、Plan 审查状态，只读；`--json` 供其他插件读取 |
 | 关键卡点 | 进度表表头的一行：被挂起的模块，以及它沿依赖链挡住了哪些模块。只看挂起造成的阻塞，等人交付、等审查结论这类外部等待看不到 |
-| 变更记录 | 已批准的 Spec、Plan，或评审过的能力图被修改时，在被改文件末尾「变更记录」一节追加的一行：日期、改了什么、原因、来源（用户本人、会话名加会话 ID、事项号或版本发布）。先记录再复审；其他会话提出的修改不等于用户批准。细则见共享检查点规则「需求来源与回告」 |
+| 变更记录 | 已批准的 Spec、Plan，或审阅过的能力图被修改时，在被改文件末尾「变更记录」一节追加的一行：日期、改了什么、原因、来源（用户本人、会话名加会话 ID、事项号或版本发布）。先记录再复审；其他会话提出的修改不等于用户批准。细则见共享检查点规则「需求来源与回告」 |
 | 回告 | 由别人提出的改动或模块，在对方用得上时（插件发版后、其他项目合入主线后）告诉提出者做完了什么。最终 gate 交审时列出“拟回告”，批准后按批准的内容发；结果记在模块 `todo.md` 最后一项 |
 | 项目指向 | 会话目录不是项目目录时，`/spec-guard:link-project` 在会话目录写 `.agent/spec-guard-link.json`，让阶段钩子改读被指向的项目；可以按会话登记（`--session`），也可以整个目录共用 |
 | Proposal | 需要留痕时，给已有能力图新增一个模块的提案，写在 `spec/proposals/<id>.md`，经 `/spec-guard:proposal-submit` 补全基线与 revision，合进远端 main 才算发布；流程是提交、接受、晋级、收尾四步 |
 | Proposal Issue | 与 Proposal 一一对应的事项，用 `proposal-stage:*` 记录阶段。可以是 GitHub/GitLab Issue，也可以是本地事项账本里的一条（阶段用同名 tag）。无论落在哪里，Proposal 的共享事实仍然只来自远端默认分支 |
-| revision | Proposal 内容的 SHA-256。内容一改，revision 就变，旧的评审结论随之失效 |
+| revision | Proposal 内容的 SHA-256。内容一改，revision 就变，旧的审查结论随之失效 |
 | 晋级 | 把已接受的 Proposal 按锚点插进能力图，并补上它的 Spec 和 Plan |
 | 收尾 | 晋级证明为 `proved` 后，经授权在 Proposal 事项上写一条带稳定标记的记录、把阶段改成 `promoted` 并关闭它。关闭只说明**设计决定已落地**，不代表模块已交付 |

@@ -48,7 +48,7 @@ python3 -B "$ROOT/hooks/checkout_role.py" show --project "$PROJECT"
 给每个 checkout 标一个角色，阶段提示就知道该说什么：
 
 - **模块 checkout**（`module <id>`）：阶段提示另报告这个模块的状态，「下一步」只指向它；做完时只提示交回协调会话，不建议切到别的模块，也不建议合并或推送。
-- **协调 checkout**（`coordinator`）：阶段提示保留全局进度与评审约束，「下一步」改为统筹措辞，不建议 `/build`。
+- **协调 checkout**（`coordinator`）：阶段提示保留全局进度与批准约束，「下一步」改为统筹措辞，不建议 `/build`。
 - `/spec-guard:map` 会读本机其他 worktree 的角色，给出各模块在那里的进度、有没有未提交改动、提交是否已合入。
 
 全项目的当前模块和阶段**不受角色影响**。开关不是 `on` 时角色标记一概不读，阶段提示与 `/map` 照旧。

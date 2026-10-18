@@ -43,13 +43,13 @@ plugins/spec-guard/
 | `setup-convention.sh`、`teardown-convention.sh`、`managed-block.py` | 安装、升级、移除约定块；`managed-block.py` 负责标记校验、本地段与原子写入 |
 | `verify-artifacts.sh` | 按需校验已落地的产物 |
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
-| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`）；未提交勾选数、Spec 首次提交时间、HEAD 提交时间与 `reviewCadence` 的生效值另由三次 git 调用与 `project_config.summary()` 给出，只给事实不设阈值（`spec/map-progress-facts.md`）；多模块并行开关为 on 时只增 `moduleConcurrency`、`buildOrderGroups`、`startable` 与每模块 `scope`，表格标出可同时开工与并行边界重叠（`spec/map-startable.md`） |
+| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待批准；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`）；未提交勾选数、Spec 首次提交时间、HEAD 提交时间与 `reviewCadence` 的生效值另由三次 git 调用与 `project_config.summary()` 给出，只给事实不设阈值（`spec/map-progress-facts.md`）；多模块并行开关为 on 时只增 `moduleConcurrency`、`buildOrderGroups`、`startable` 与每模块 `scope`，表格标出可同时开工与并行边界重叠（`spec/map-startable.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
 | `module_scope.py` | 模块 Spec「并行边界」一节的唯一解析器；`check` 对照集成基线做只读越界检查，`validate` 供 verify-artifacts 调用；开关不是 on 时都不生效 |
 | `checkout_role.py` | 每个 checkout 的角色标记（`module <id>`／`coordinator`，存在本 checkout 的 git 目录）：读取、预览确认后写入；阶段提示只经 `role()` 读，开关不是 on 时不读；全项目的选模块与阶段不受影响 |
 | `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`）；提示前读 delegate 的 `interface.json`，按 `>=1.0,<2.0` 校验并只取经校验的命令名（`spec/delegate-interface-check.md`） |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
-| `proposal_*.py` | Proposal 契约、发布、读 Issue、评审、晋级证明、收尾 |
+| `proposal_*.py` | Proposal 契约、发布、读 Issue、审查、晋级证明、收尾 |
 | `local_ledger_*.py`、`local_ticket_*.py`、`hosted_ticket*.py` | 本地事项账本、可移植流程、托管事项 |
 
 ## 数据流
@@ -79,7 +79,7 @@ plugins/spec-guard/
    交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
    （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
    `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
-   `module_stage.py --config-lines` 取得，与其他阶段同一实现。只在三个评审检查点（Spec 待审、Plan 待审、最终验收）且模块还没有
+   `module_stage.py --config-lines` 取得，与其他阶段同一实现。只在三个交审检查点（Spec 待审、Plan 待审、最终验收）且模块还没有
    外部审查记录时，`sibling_plugins.py` 再只读本机插件记录（Claude 的 `installed_plugins.json` 与 settings，Codex 的
    `config.toml` 与插件缓存目录），装了并启用 delegate 才多出一行外部审查提示；不调子进程，读不到按没装处理。
 4. 输出 `hookSpecificOutput.additionalContext`。来自仓库的值在注入前净化（折叠空白、去掉反引号与反斜杠、剥掉
@@ -101,7 +101,7 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 怎么对照，由使用方自己维护。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
 
 1.1（crew-interface）起另有四个入口，都是多模块并行用的：`moduleConcurrency`（开关的位置、取值与读法：看 `/map --json` 顶层有没有
-`"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（评审标记）；`mapView.concurrency`
+`"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（批准标记）；`mapView.concurrency`
 列出开关为 on 时 `/map --json` 才有的字段。1.0 的内容不变，`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
 
 ### 规划层与运行层
@@ -111,8 +111,8 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 | | spec-guard（规划层） | module-crew（运行层） |
 |---|---|---|
 | 读 | 能力图、Spec、Plan、todo、`.agent/config.json`、本 checkout 与本机其他 worktree 的角色标记 | `interface.json`、`/map --json`、越界检查的 JSON |
-| 写 | 只经命令、预览确认后写：配置、评审标记、角色标记 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
-| 判断 | 能否开工、边界是否重叠、阶段与评审状态 | 开哪几个、什么时候合、失败怎么退 |
+| 写 | 只经命令、预览确认后写：配置、批准标记、角色标记 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
+| 判断 | 能否开工、边界是否重叠、阶段与批准状态 | 开哪几个、什么时候合、失败怎么退 |
 
 spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不是 on 时，规划层的新东西都不出现。
 
@@ -125,7 +125,7 @@ spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不�
 | 插件根目录 | `CLAUDE_PLUGIN_ROOT`，命令里由宿主代入 | `PLUGIN_ROOT`；命令片段找不到时查询 `codex plugin list` |
 | 约定块 | `CLAUDE.md` 的 `agent-skills-convention` 块 | `AGENTS.md` 的 `spec-guard-codex-convention` 块 |
 | 上下文窗口 | 会话记录不带窗口大小，按 1M 窗口折算阈值 | 从会话记录读取窗口 |
-| 其他 | | 默认的 workspace-write 沙箱不允许写 `.git`，提交需要提权审批 |
+| 其他 | | 默认的 workspace-write 沙箱不允许写 `.git`，提交需要提权批准 |
 
 命令与 skill 的路由一致性由 `scripts/check-command-parity.py` 检查：每条命令引用的脚本都要有 skill 能走到。
 
@@ -145,7 +145,7 @@ spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不�
 
 `spec/CAPABILITY-MAP.md` 是唯一的能力图：已接受的 Proposal 按声明的锚点或末尾插入模块，不另建图。Proposal v2 用
 revision 摘要绑定已发布内容。“接受”是人写的 Issue 阶段标签（`proposal-stage:accepted`）加上对远端默认分支的一次新鲜
-评审；不读主线策略、验收凭证或权威身份。合并后的证明从 Proposal 的基线提交出发，在晋级提交的父提交上判断新鲜度。
+审查；不读主线策略、验收凭证或权威身份。合并后的证明从 Proposal 的基线提交出发，在晋级提交的父提交上判断新鲜度。
 
 tracker 适配器只读，只按显式给出的容器里的完整身份标记找回 Proposal Issue。预检与合并后证明都只读，既不能创建
 晋级分支，也不能改能力图或 tracker 状态。
@@ -154,8 +154,8 @@ tracker 适配器只读，只按显式给出的容器里的完整身份标记找
 
 本地约定把模块文档放在 `spec/` 与 `tasks/<module-id>/` 下。`.agent/state.json` 只记录本地的当前模块，不是 Proposal 池，
 Proposal 代码从不读它。已开工、在等外部条件的模块可以用 `todo.md` 里的一行标记挂起：保留 Build order 位置，选当前
-模块时跳过，只有用户恢复时才回来；可用 `--reason` 在标记下记一行原因，挂起时长不另存，由进度表从 git 历史读出；提醒（如果有）放在宿主里。Spec 与 Plan 各可带一行评审状态
-标记（待审核／已批准，Spec 的批准带内容指纹）：阶段判定仍只看文件与勾选，标记只改当前模块的建议语与 `verify-artifacts`
+模块时跳过，只有用户恢复时才回来；可用 `--reason` 在标记下记一行原因，挂起时长不另存，由进度表从 git 历史读出；提醒（如果有）放在宿主里。Spec 与 Plan 各可带一行批准状态
+标记（待批准／已批准，Spec 的批准带内容指纹）：阶段判定仍只看文件与勾选，标记只改当前模块的建议语与 `verify-artifacts`
 的报告；hook 只读它，写入只经 `review_mark.py` 预览确认。标记是记录，不是授权来源。
 
 ## 项目配置

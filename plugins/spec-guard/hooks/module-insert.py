@@ -237,7 +237,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
     filtered_new_order = [module_id_ for module_id_ in new_digest["order"] if module_id_ in existing_ids]
     if filtered_new_order != old_digest["order"]:
         raise InsertError("插入改变了已有模块在模块表中的相对顺序")
-    # Proposal 评审按 Build order 判断锚点与依赖的先后，所以这里比对的是 Build order，不是表格行序。
+    # Proposal 审查按 Build order 判断锚点与依赖的先后，所以这里比对的是 Build order，不是表格行序。
     if [module_id_ for module_id_ in new_parsed.order if module_id_ in existing_ids] != order:
         raise InsertError("插入改变了已有模块在 Build order 中的相对顺序")
 
@@ -321,7 +321,7 @@ def format_stage_hint(outcome):
 
 
 def format_existing_spec_hint(outcome):
-    return ("提示: spec/%s.md 已存在：该模块阶段为 NEEDS_PLAN（视为已评审）；若尚未评审，请先评审"
+    return ("提示: spec/%s.md 已存在：该模块阶段为 NEEDS_PLAN（视为已批准）；若尚未批准，请先批准"
             % outcome["module_id"])
 
 
@@ -406,12 +406,12 @@ def format_report(result):
                          % (interrupted["id"], result["module_id"]))
     if result["existing_spec"]:
         lines.append("")
-        lines.append("提示: spec/%s.md 已存在——插入后该模块阶段为 NEEDS_PLAN（视为已评审）；"
-                     "若这份 Spec 尚未评审，先评审再 --confirm。" % result["module_id"])
+        lines.append("提示: spec/%s.md 已存在——插入后该模块阶段为 NEEDS_PLAN（视为已批准）；"
+                     "若这份 Spec 尚未批准，先批准再 --confirm。" % result["module_id"])
     if result["proposal_conflict"]:
         lines.append("")
         lines.append("警告: 本地存在 spec/proposals/%s.md；若该 Proposal 之后发布，"
-                     "评审将报告 in-map（proposal-module-already-present）。" % result["module_id"])
+                     "审查将报告 in-map（proposal-module-already-present）。" % result["module_id"])
     return "\n".join(lines)
 
 

@@ -1,5 +1,5 @@
 ---
-description: 记录模块 Spec 或 Plan 的评审状态（待审核／已批准）：先预览后确认，只改一行标记；已批准只在用户明确批准后写
+description: 记录模块 Spec 或 Plan 的批准状态（待批准／已批准）：先预览后确认，只改一行标记；已批准只在用户明确批准后写
 allowed-tools: Bash
 ---
 
@@ -44,21 +44,21 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 
 ## 标记是什么
 
-`spec/<id>.md` 与 `tasks/<id>/plan.md` 各可带一行评审状态标记，阶段提示与 `/spec-guard:verify-artifacts` 据此报告事实：
+`spec/<id>.md` 与 `tasks/<id>/plan.md` 各可带一行批准标记，阶段提示与 `/spec-guard:verify-artifacts` 据此报告事实：
 
 ```text
-<!-- spec-guard: review pending -->                 待用户审核
+<!-- spec-guard: review pending -->                 待用户批准
 <!-- spec-guard: review approved <digest> -->       Spec 已批准，digest 是批准时的内容指纹
 <!-- spec-guard: review approved -->                Plan 已批准
 ```
 
-- 当前模块的 Spec 或 Plan 待审核时，阶段提示报告“等待用户审核”，不建议写 Plan 或继续 build；
+- 当前模块的 Spec 或 Plan 待批准时，阶段提示报告“等待用户批准”，不建议写 Plan 或继续 build；
 - Spec 在批准后内容有变，自动判为“批准后已修订”，需要用户复审后重新记录；
 - 没有标记的文件不受影响，判定照旧。围栏代码块里的同样文字是示例，不算标记。
 
 ## 什么时候写
 
-- **`pending`**：写出一份 Spec 或 Plan 交给用户审核时。可以用本命令，也可以在写文件时直接带上这一行。
+- **`pending`**：写出一份 Spec 或 Plan 交给用户审阅时。可以用本命令，也可以在写文件时直接带上这一行。
 - **交审要让用户看到内容**：在对话正文里给出要点，短文件可以贴全文。Spec 给目标、范围内与范围外、关键决策与取舍、假设、
   验收标准、未决问题、文档建议（细则见共享检查点规则「文档建议」一节）；Plan 给每个任务与验证方式、检查点及其类型、影响面、风险。只给链接、一句概述或任务标题不算交审。
   写明这次批准授权什么。内容之后再加一句：回复“批准”即可，“继续”不会被记为批准；不要等用户说了“继续”再解释。
@@ -73,7 +73,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 
 ## 预览与确认
 
-默认只预览：打印每个文件的 diff、Spec 的当前指纹和写入后的评审状态；记为已批准时另给出文件行数，并提醒先确认用户已在
+默认只预览：打印每个文件的 diff、Spec 的当前指纹和写入后的批准状态；记为已批准时另给出文件行数，并提醒先确认用户已在
 对话里看到这份文件的内容（只给过链接或一句概述时，先补上内容再请用户确认）。这是提醒，不是拒绝条件。把预览给用户看过并得到确认后，才在同一条命令
 后加 `--confirm`；写入只改标记这一行（已有标记原地替换，没有则放在第一行标题之后）并读回核对：
 
@@ -82,6 +82,6 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 ```
 
 目标已是所求状态时说明无需改动并正常退出。拒绝（退出码 2、不写文件）：不是有效 module id、不在能力图上、目标文件
-不存在或读不了、标记无效（多于一行或写法不符，需手工改正）、Spec 标着待审核、已修订或标记无效时单独把 Plan 标为已批准
+不存在或读不了、标记无效（多于一行或写法不符，需手工改正）、Spec 标着待批准、已修订或标记无效时单独把 Plan 标为已批准
 （Spec 的批准需要用户针对这份 Spec 单独明确确认；Spec 没有标记时不拒绝）。
 不执行任何 Git 或远端操作，不改 `.agent/state.json`、todo.md 或能力图。

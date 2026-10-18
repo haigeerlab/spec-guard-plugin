@@ -98,10 +98,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:review-mark`
 
-记录模块 Spec 或 Plan 的评审状态：`--module <id> --target <spec|plan|both> --state <pending|approved>`，先预览、
-`--confirm` 才改文件里的一行标记。当前模块待审核时阶段提示报告等待审核、不建议写 Plan 或继续 build；Spec 的批准标记
+记录模块 Spec 或 Plan 的批准状态：`--module <id> --target <spec|plan|both> --state <pending|approved>`，先预览、
+`--confirm` 才改文件里的一行标记。当前模块待批准时阶段提示报告等待批准、不建议写 Plan 或继续 build；Spec 的批准标记
 带内容指纹，批准后被改会报告“批准后已修订”。记为已批准时命令会提醒 agent 先确认你已在对话里看到内容。`approved` 只在你明确批准之后写（回复“批准”即可，“继续”不算）；接了收件枢纽时，按 session-protocol 契约转来、带事项号与你原话的批准也算。没有标记的
-文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待审核或已修订时不行。拒绝时退出 2、不写文件。
+文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待批准或已修订时不行。拒绝时退出 2、不写文件。
 
 ### `/spec-guard:checkout-role`
 
@@ -159,7 +159,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 只读的模块进度表：按开发顺序列出每个模块的作用、状态（✅ 已完成、🔨 进行中、⏸ 挂起（原因）、⛔ 阻塞：等被挂起的
 模块、🟢 可以开始、○ 未就绪：缺哪个依赖）与 Spec、Plan 的审查状态；表头给合计、关键卡点（挂起的模块按依赖链挡住了
-谁）、待审核、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
+谁）、待批准、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间与批准节奏的生效值和来源（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
 结果（`schemaVersion` 1，字段与稳定性承诺见 [spec/map-view.md](../spec/map-view.md)），供其他插件读取，可用
@@ -182,13 +182,13 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
 | 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
 | 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
-| 查看或设置项目配置（产物语言、评审节奏、多模块并行开关） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
+| 查看或设置项目配置（产物语言、批准节奏、多模块并行开关） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
 | 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | `spec-guard-ops` skill 的 link-project 一节 |
-| 记录 Spec 或 Plan 的评审状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |
+| 记录 Spec 或 Plan 的批准状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |
 | 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | `spec-guard-ops` skill 的 checkout-role 一节 |
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
-| Proposal 提交、评审、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
+| Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
 | 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
 | 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | agent-relay 的 skill |

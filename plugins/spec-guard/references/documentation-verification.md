@@ -14,7 +14,7 @@
 | Concern | Outcome | Evidence | Rationale |
 |---|---|---|---|
 | architecture | delivered | `docs/architecture.md#module-boundary` | 边界已由架构负责人确认。 |
-| integration-contract | deferred | — | 等待外部 API 评审。 |
+| integration-contract | deferred | — | 等待外部 API 审查。 |
 ```
 
 `Outcome` 仅可为：

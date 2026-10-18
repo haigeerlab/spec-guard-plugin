@@ -419,7 +419,7 @@ def config_lines(root: Path, host: str | None = None) -> list:
                       "- Artifact language: `%s` — write new spec, plan and todo prose in it; "
                       "structural keywords stay as defined.") % values["artifactLanguage"])
     if values.get("reviewCadence") == "combined":
-        lines.append("- 评审节奏: combined — 能力图写好后，把 Spec 和 Plan 一起交给用户一次批准；出现新的决定、范围不清"
+        lines.append("- 批准节奏: combined — 能力图写好后，把 Spec 和 Plan 一起交给用户一次批准；出现新的决定、范围不清"
                      "或高风险改动时，分开交审。" if zh else
                      "- Review cadence: combined — after the capability map is written, present the Spec "
                      "and the Plan together for one approval; split them when a new decision, unclear "
@@ -512,10 +512,10 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
     for state, path in ((spec, spec_path), (plan, plan_path)):
         if state == "invalid" and zh:
-            return ("- 评审: `%s` 里的评审标记无效。" % path,
-                    "运行 %s 查看标记哪里不对；评审状态未知，修好之前不要继续。" % cmd["verify"], spec, plan)
+            return ("- 批准: `%s` 里的批准标记无效。" % path,
+                    "运行 %s 查看标记哪里不对；批准状态未知，修好之前不要继续。" % cmd["verify"], spec, plan)
         if state == "unreadable" and zh:
-            return ("- 评审: `%s` 读不了，评审状态未知（这是读取故障，不是评审状态）。" % path, "", spec, plan)
+            return ("- 批准: `%s` 读不了，批准状态未知（这是读取故障，不是批准状态）。" % path, "", spec, plan)
         if state == "invalid":
             return ("- Review: the review marker in `%s` is invalid." % path,
                     "run %s to see what is wrong with the marker; the review state is unknown, so do not "
@@ -554,21 +554,21 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
     hold = "先不要写 Plan" if stage == "NEEDS_PLAN" else "不要继续构建"
     record = "用户批准后，用 %s 记下来。" % cmd["review-mark"]
     if spec == "pending":
-        line = "- 评审: Spec `%s` 正在等用户审阅。" % spec_path
+        line = "- 批准: Spec `%s` 正在等用户批准。" % spec_path
         values, problems = load_config(root)
         if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan
     if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
-        return ("- 评审: Spec `%s` 批准后又改过。" % spec_path,
+        return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "在最终 gate，把改过的 `%s` 的 diff 原样放进验收消息，并说明批准验收也就批准了改过的 Spec；批准后，"
                 "先用 %s 记下 Spec 的批准，再勾选并提交。" % (spec_path, cmd["review-mark"]), spec, plan)
     if spec == "revised":
-        return ("- 评审: Spec `%s` 批准后又改过。" % spec_path,
+        return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "把改过的 `%s` 再给用户审一次；%s。%s" % (spec_path, hold, record), spec, plan)
     if plan == "pending":
-        return ("- 评审: Plan `%s` 正在等用户审阅。" % plan_path,
+        return ("- 批准: Plan `%s` 正在等用户批准。" % plan_path,
                 "等用户审阅 `%s`；%s。%s" % (plan_path, hold, record), spec, plan)
     return "", "", spec, plan
 
@@ -685,7 +685,7 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
     if review_line:
         lines.append(review_line)
     if own_step:
-        return lines, (("`%s` 有待处理的评审（见上面的评审行）：交给协调会话请用户审，批准经集成分支到达这个 checkout 之前不要继续。"
+        return lines, (("`%s` 有待处理的批准（见上面的批准行）：交给协调会话请用户审，批准经集成分支到达这个 checkout 之前不要继续。"
                         if zh else
                         "`%s` has a review step open (see the Review line above): hand it to the coordinating session for "
                         "the user's review, and do not continue until the approval reaches this checkout through the "
@@ -820,7 +820,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                     + ("\n建议下一步: " if zh else "\nSuggested next step: ") + role_step)
         if zh:
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" + counts + "\n" + "".join(n + "\n" for n in notes)
-            proposal = "新增需要留下经过评审的决定记录时，用 Proposal。"
+            proposal = "新增需要留下经过审查的决定记录时，用 Proposal。"
             if push_first:
                 return (head + "\n建议下一步: " + ("除挂起的模块外都已完成；挂起 %d 个；" % len(suspended) if suspended else
                                                 "能力图里每个模块都有 Plan，且没有未勾选的 todo 项；") + push_first +
@@ -915,7 +915,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         if gate and plan_review == "approved" and zh:
             counts += "\n- 下一个 gate: %s — 一直做到它为止；`report` 检查点记进 todo 后直接通过，不停下。" % gate
         elif gate and plan_review == "none" and zh:
-            counts += ("\n- 下一个 gate: %s — todo 里第一个未勾选的 `gate` 检查点。Plan 没有评审标记：如果用户还没批准它，"
+            counts += ("\n- 下一个 gate: %s — todo 里第一个未勾选的 `gate` 检查点。Plan 没有批准标记：如果用户还没批准它，"
                        "先等批准再构建。" % gate)
         elif gate and plan_review == "approved":
             counts += ("\n- Next gate: %s — keep going until it; a `report` checkpoint is recorded in the todo "

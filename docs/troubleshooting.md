@@ -34,7 +34,7 @@ ls .agent/
   多一行 `Linked project`。其他命令目前不自动跟随指向，要显式带上项目路径。
 - 有 `state.json.disabled`：确认要恢复后，把它改回 `.agent/state.json`。setup 在这种情况下会拒绝新建空状态，
   免得覆盖原来的 `activeModule`。
-- Claude Code：在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
+- Claude Code：在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
 
 **压缩后没有阶段注入**（0.61.0 起，上下文压缩后会多一次注入，末尾带一句压缩后的核对提醒）：
 
@@ -119,10 +119,10 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `` `.agent/state.json` 的 activeModule 不是有效的 module id `` | `activeModule` 的值不是能力图里的模块 id；按 Build order 取当前模块。改成正确的 id，或清空 |
 | `Project config: invalid (…)` | `.agent/config.json` 不可用，所有配置按默认处理；运行 `/spec-guard:config` 看问题代码 |
 | `Paused: <模块>` | 有模块因插队被暂停，做完当前模块会回到它 |
-| `Review: Spec … is awaiting the user's review` | 当前模块的 Spec 或 Plan 标着待审核；你批准后让 agent 运行 `/spec-guard:review-mark` 记录 |
+| `Review: Spec … is awaiting the user's review` | 当前模块的 Spec 或 Plan 标着待批准；你批准后让 agent 运行 `/spec-guard:review-mark` 记录 |
 | `Review: Spec … was edited after it was approved` | Spec 在批准后被改过；看过修订内容并批准后，重新运行 `/spec-guard:review-mark` |
-| `Review: the review marker in … is invalid` | 该文件的评审标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
-| `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有评审标记时只指出这个检查点，并提醒尚未批准就先等批准 |
+| `Review: the review marker in … is invalid` | 该文件的批准标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
+| `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有批准标记时只指出这个检查点，并提醒尚未批准就先等批准 |
 | 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
 | 升级插件后，命令的行为还是旧版本的（例如新加的参数报不认识） | Claude Code 在会话开始时定下插件目录，已开着的会话里命令仍调用旧版本的脚本。升级后重开会话；Codex 升级后开新会话，新增的钩子还要信任一次 |
 | `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。如果这个会话做的是别的项目，这段提示不适用——多个会话共用一个目录、各做不同项目时不要建立指向，用 `/spec-guard:link-project` 的 `unset` 解除，或把会话开在各自的项目目录里 |
