@@ -344,6 +344,25 @@ class CheckpointContractTests(unittest.TestCase):
                                "内部会话间的告知直接发"):
                     self.assertIn(phrase, text)
 
+    def test_one_module_per_review_and_grouped_by_module(self):
+        # review-one-module: hand in one module at a time; when several are reviewed together, group them by module.
+        markers = self.section("## 评审状态标记")
+        for phrase in ("一次交审只放一个模块", "「一起发版」不等于「一起审」", "按模块分组", "Build order", "不按产物类型",
+                       "不主动提议合并交审", "能力图评审"):
+            self.assertIn(phrase, markers)
+        self.assertIn("只在用户明确要求时", self.section("## 按需求批量前置审"))
+        rework = self.section("## 返工与小模块")
+        self.assertIn("用户也要求一次审完时", rework)
+        self.assertNotIn("确需各自成模块时，用「按需求批量前置审」\n  一次交审", rework)
+        self.assertIn("按模块分组", self.section("## 协调会话的批准与合并（moduleConcurrency 为 on 时）"))
+        surfaces = list((self.plugin / "templates").glob("*-block-local.md"))
+        surfaces.append(self.plugin.parents[1] / "docs" / "convention-block.md")
+        for path in surfaces:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("交审一次只放一个模块", "并按模块分组", "不按产物类型横排", "一起发版不等于一起审"):
+                    self.assertIn(phrase, text)
+
     def test_recording_on_receipt_is_not_accepting(self):
         # record-on-receipt: recording that someone waits needs no approval and is not taking the work on.
         section = self.section("## 未了的承诺")
