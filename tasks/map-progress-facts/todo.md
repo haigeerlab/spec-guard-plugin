@@ -5,7 +5,7 @@
 - [x] Checkpoint 1（report）：map 回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
 - [x] Task 3：接口说明 — `interface.json` 升到 1.2：`mapView` 下加 `progressFacts`（四项字段的含义与 null 的情形、`reviewCadence` 两个取值、"只给事实，阈值与判断由读取方做"），concurrency 一节去掉"与 1.0 逐字相同"；`map_view.py` 加 `PROGRESS_FIELDS` 常量，`check-interface.py` 加 `_progress_facts()` 核对字段与 `project_config.CADENCES`。`test-checkers.sh` 加 3 例：先只改 `interface.json`、不改检查器时 3 例红（期望拦下、实际放行），改检查器后 136 例全绿。
 - [x] Task 4：文档、实跑、CHANGELOG 与版本号 — `commands/map.md`、`spec-guard-ops` 的 map 一节、`docs/commands.md`、`docs/design.md` 写明新字段；CHANGELOG 新增 `[0.73.0] - 2026-10-19`；两份 `plugin.json` 改为 0.73.0，中英 README 的 `--ref` 改为 v0.73.0。实跑：临时 git 仓库（`mktemp -d` 固定前缀，用后按前缀删除）按 2026-10-16 提交 1/4，工作区再勾 2 项，`SPEC_GUARD_MAP_NOW=2026-10-19T09:00:00+08:00 map_view.py` 表格为「🔨 进行中 3/4，上次勾选 3 天前，2 项勾选未提交（最后一次提交 3 天前）」，JSON 的 `uncommittedTicks` 为 2、`startedAt` 与 `head.committedAt` 为 2026-10-16T09:00:00+08:00、`reviewCadence` 为 separate／default。本仓库实跑见 Task 2。
-- [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-19 在对话里按 AC1–AC6 逐条给出证据（测试名与结果、临时仓库实跑输出、本仓库耗时）、三处变异变红、与 Plan 的三处差异（`ConcurrencyOff` 快照去掉 `reviewCadence`、`@` 行首标记、`PROGRESS_FIELDS` 常量）、未验证项（安装版真实会话待发版后；未在那个前端项目实跑；未做独立代码审查）、实际改动的文件清单（取自版本库：18 个文件，新增 3、修改 15、删除 0，无超出 Plan 预计的文件）与文档建议（无）。用户批准：勾上 gate、推送、开 PR，并通知 module-crew 与 decision-inbox 核对字段。
 
 ## 外部审查意见
 
