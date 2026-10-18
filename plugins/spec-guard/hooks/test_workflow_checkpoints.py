@@ -276,7 +276,7 @@ class CheckpointContractTests(unittest.TestCase):
                  for path in sorted((self.plugin / folder).rglob("*.md"))]
         files += [path for path in sorted((self.plugin / "hooks").iterdir())
                   if path.suffix in (".py", ".sh") and not path.name.startswith("test")]
-        files += [repo / "README.md", repo / "README.en.md", repo / "AGENTS.md"]
+        files += [repo / "README.md", repo / "README.en.md", repo / "AGENTS.md", repo / "CLAUDE.md"]
         files += sorted((repo / "docs").glob("*.md"))
         found = []
         for path in files:
