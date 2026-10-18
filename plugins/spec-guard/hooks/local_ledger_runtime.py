@@ -463,21 +463,39 @@ def install_runtime(
 
 
 def project_init_arguments(
-    project_dir: Path, user_name: str, preferred_editor: str, auto_sync: bool,
+    project_dir: Path, user_name: str | None = None, preferred_editor: str | None = None,
+    auto_sync: bool | None = None,
 ) -> dict[str, Any]:
-    """Build the documented Epiq setup input without using an agent identity."""
-    if not isinstance(user_name, str) or not user_name.strip():
-        raise RuntimeContractError("Epiq user name is required")
-    if not isinstance(preferred_editor, str) or not preferred_editor.strip():
-        raise RuntimeContractError("Epiq preferred editor is required")
-    if not isinstance(auto_sync, bool):
-        raise RuntimeContractError("Epiq auto sync must be a boolean")
-    return {
-        "repoRoot": str(Path(project_dir)),
-        "userName": user_name.strip(),
-        "preferredEditor": preferred_editor.strip(),
-        "autoSync": auto_sync,
-    }
+    """Build the Epiq setup input from the values the user gave; Epiq keeps what the machine already has."""
+    arguments: dict[str, Any] = {"repoRoot": str(Path(project_dir))}
+    if user_name is not None:
+        if not isinstance(user_name, str) or not user_name.strip():
+            raise RuntimeContractError("Epiq user name must not be empty")
+        arguments["userName"] = user_name.strip()
+    if preferred_editor is not None:
+        if not isinstance(preferred_editor, str) or not preferred_editor.strip():
+            raise RuntimeContractError("Epiq preferred editor must not be empty")
+        arguments["preferredEditor"] = preferred_editor.strip()
+    if auto_sync is not None:
+        if not isinstance(auto_sync, bool):
+            raise RuntimeContractError("Epiq auto sync must be a boolean")
+        arguments["autoSync"] = auto_sync
+    return arguments
+
+
+_WARNING_CODE = re.compile(r"^\[(init:\d+)\]")
+
+
+def warning_summary(warnings: Any) -> tuple[int, list[str]]:
+    """Count Epiq's initialization warnings and list their [init:N] codes, never their text."""
+    if not isinstance(warnings, list):
+        return (1 if warnings else 0), []
+    codes: list[str] = []
+    for warning in warnings:
+        match = _WARNING_CODE.match(warning) if isinstance(warning, str) else None
+        if match and match.group(1) not in codes:
+            codes.append(match.group(1))
+    return len(warnings), codes
 
 
 def _read_mcp_response(stream: Any, request_id: int) -> dict[str, Any]:
@@ -495,6 +513,17 @@ def _read_mcp_response(stream: Any, request_id: int) -> dict[str, Any]:
             return response["result"]
 
 
+# ledger-init-machine-config: Epiq's refusal message, with control characters, URL credentials and length bounded.
+_TEXT_URL_USERINFO = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@\s]*@")
+REFUSAL_MESSAGE_LIMIT = 300
+
+
+def clean_refusal_message(message: str) -> str:
+    text = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", message).split())
+    text = _TEXT_URL_USERINFO.sub(r"\1***@", text)
+    return text if len(text) <= REFUSAL_MESSAGE_LIMIT else text[:REFUSAL_MESSAGE_LIMIT] + "…"
+
+
 def read_mcp_tool_result(stream: Any, request_id: int) -> dict[str, Any]:
     """Read Epiq's JSON text result without exposing unstructured server diagnostics."""
     result = _read_mcp_response(stream, request_id)
@@ -509,6 +538,9 @@ def read_mcp_tool_result(stream: Any, request_id: int) -> dict[str, Any]:
     except json.JSONDecodeError as error:
         raise RuntimeContractError("MCP tool response is invalid") from error
     if not isinstance(payload, dict) or payload.get("status") != "success":
+        message = payload.get("message") if isinstance(payload, dict) else None
+        if isinstance(message, str) and message.strip():
+            raise RuntimeContractError("Epiq refused: " + clean_refusal_message(message))
         raise RuntimeContractError("MCP tool response is unsuccessful")
     return payload
 
@@ -578,8 +610,8 @@ def local_only_environment(base: dict[str, str]) -> dict[str, str]:
 
 
 def initialize_project(
-    runtime_dir: Path, project_dir: Path, user_name: str, preferred_editor: str, auto_sync: bool,
-    allow_epiq_push: bool = False, local_only: bool = False,
+    runtime_dir: Path, project_dir: Path, user_name: str | None = None, preferred_editor: str | None = None,
+    auto_sync: bool | None = None, allow_epiq_push: bool = False, local_only: bool = False,
 ) -> dict[str, Any]:
     """Explicitly initialize Epiq only after clean-tree and push-consent preflight."""
     code, preflight = initialization_preflight(project_dir, allow_epiq_push, local_only=local_only)
@@ -600,12 +632,15 @@ def initialize_project(
         raise RuntimeContractError("Epiq initialization returned an invalid project identity")
     if value.get("stateBranch") != STATE_BRANCH:
         raise RuntimeContractError("Epiq initialization returned an unexpected state branch")
+    warning_count, warning_codes = warning_summary(value.get("warnings"))
     return {
         "state": "initialized",
         "projectId": value["projectId"],
         "stateBranch": value["stateBranch"],
         "upstreamPush": preflight["upstreamPush"],
         "warnings": bool(value.get("warnings")),
+        "warningCount": warning_count,
+        "warningCodes": warning_codes,
     }
 
 
@@ -680,12 +715,56 @@ def storage_protect(global_dir: Path, confirm: bool = False) -> tuple[int, dict[
     return 0, {**preview, "state": "protected", "previousMode": check["mode"], "mode": "0700"}
 
 
+MACHINE_SETUP_KEYS = ("userName", "preferredEditor", "autoSync")
+MACHINE_CONFIG_LIMIT = 64 * 1024
+
+
+def epiq_global_dir() -> Path:
+    return Path(os.environ.get("EPIQ_GLOBAL_DIR") or os.path.join(os.path.expanduser("~"), ".epiq-global"))
+
+
+def machine_setup(global_dir: Path) -> dict[str, Any]:
+    """Read only the three machine-wide Epiq setup values; an unreadable config is unknown, not unset."""
+    path = Path(global_dir) / "config.json"
+    try:
+        metadata = path.lstat()
+    except FileNotFoundError:
+        return {"state": "absent"}
+    except OSError:
+        return {"state": "unknown", "diagnostic": "epiq-config-unreadable"}
+    if not stat.S_ISREG(metadata.st_mode):
+        return {"state": "unknown", "diagnostic": "epiq-config-not-regular-file"}
+    if metadata.st_size > MACHINE_CONFIG_LIMIT:
+        return {"state": "unknown", "diagnostic": "epiq-config-too-large"}
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descriptor, "rb") as handle:
+            raw = handle.read(MACHINE_CONFIG_LIMIT + 1)
+    except OSError:
+        return {"state": "unknown", "diagnostic": "epiq-config-unreadable"}
+    if len(raw) > MACHINE_CONFIG_LIMIT:
+        return {"state": "unknown", "diagnostic": "epiq-config-too-large"}
+    try:
+        config = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {"state": "unknown", "diagnostic": "epiq-config-invalid-json"}
+    if not isinstance(config, dict):
+        return {"state": "unknown", "diagnostic": "epiq-config-not-object"}
+    result: dict[str, Any] = {"state": "read"}
+    for key in ("userName", "preferredEditor"):
+        value = config.get(key)
+        result[key] = value.strip() if isinstance(value, str) and value.strip() else None
+    result["autoSync"] = config["autoSync"] if isinstance(config.get("autoSync"), bool) else None
+    return result
+
+
 def status(runtime_dir: Path, project_dir: Path) -> tuple[int, dict[str, Any]]:
     """Return side-effect-free status for the optional local ledger."""
     node = node_status()
     runtime = runtime_status(runtime_dir)
     project: dict[str, Any] = project_status(project_dir)
-    payload: dict[str, Any] = {"node": node, "runtime": runtime, "project": project}
+    payload: dict[str, Any] = {"node": node, "runtime": runtime, "project": project,
+                               "machineSetup": machine_setup(epiq_global_dir())}
     if runtime["state"] == "invalid" or project["state"] == "invalid":
         payload["state"] = "invalid"
         return 1, payload
@@ -763,16 +842,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "state": "initialization-confirmation-required",
             "diagnostic": "rerun with --confirm-initialize after reviewing the Git effects",
         }
-    elif not args.user_name or not args.preferred_editor or args.auto_sync is None:
-        code, payload = 1, {
-            "state": "user-setup-required",
-            "diagnostic": "user name, preferred editor, and auto sync choice are required",
-        }
     else:
         try:
             payload = initialize_project(
                 args.runtime_dir, args.project_dir, args.user_name, args.preferred_editor,
-                args.auto_sync == "true", args.allow_epiq_push, local_only=args.local_only,
+                None if args.auto_sync is None else args.auto_sync == "true",
+                args.allow_epiq_push, local_only=args.local_only,
             )
         except RuntimeContractError as error:
             code, payload = 1, {"state": "invalid", "diagnostic": str(error)}
@@ -796,9 +871,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("本地事项账本项目已初始化：" + payload["projectId"])
         if payload.get("upstreamPush") == "disabled-local-only":
             print("按 --local-only 未推送：账本只在本机。")
+        if payload.get("warningCount"):
+            codes = payload.get("warningCodes") or []
+            print("Epiq 初始化有 %d 条警告%s" % (payload["warningCount"], "（%s）" % "、".join(codes) if codes else ""))
         print("请把含 .epiq/project.json 的这次提交合进默认分支，其他工作树和从默认分支开的会话才能找到这个账本。")
     else:
         print("本地事项账本状态：" + payload["state"])
+        # The setup values matter only before initialization, so text shows them only for an uninitialized project.
+        uninitialized = payload.get("project", {}).get("state") == "uninitialized"
+        setup = (payload.get("machineSetup") or {}) if uninitialized else {}
+        if setup.get("state") == "read":
+            given = ["%s=%s" % (key, json.dumps(setup[key])) for key in MACHINE_SETUP_KEYS if setup.get(key) is not None]
+            missing = [key for key in MACHINE_SETUP_KEYS if setup.get(key) is None]
+            if given:
+                print("本机 Epiq 已设置：%s（整机设置，初始化不改，不必再传）" % "、".join(given))
+            if missing:
+                print("未设置：%s（初始化时向用户索取）" % "、".join(missing))
+        elif setup.get("state") == "absent":
+            print("本机 Epiq 尚无设置：初始化时 userName、preferredEditor、autoSync 都向用户索取。")
+        elif setup.get("state") == "unknown":
+            print("本机 Epiq 设置读不了（%s）：初始化时照旧三项都问。" % setup.get("diagnostic"))
         if payload.get("project", {}).get("identityElsewhere"):
             print("当前检出没有 .epiq/project.json，分支 %s 上有：把它合进默认分支，或从那个分支开工作树。"
                   % payload["project"]["identityElsewhere"])

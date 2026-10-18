@@ -472,17 +472,26 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
             self.assertEqual(test_local_ledger_acceptance.main(), 2)
         self.assertEqual(json.loads(output.getvalue())["state"], "skipped")
 
-    def test_project_init_arguments_require_user_setup_values_without_using_agent_identity(self):
+    def test_project_init_arguments_pass_only_the_given_user_setup_values(self):
         arguments = local_ledger_runtime.project_init_arguments(
-            self.project_dir, "Vilin", "code --wait", False)
+            self.project_dir, " Vilin ", "code --wait", False)
         self.assertEqual(arguments, {
             "repoRoot": str(self.project_dir),
             "userName": "Vilin",
             "preferredEditor": "code --wait",
             "autoSync": False,
         })
-        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "user name"):
-            local_ledger_runtime.project_init_arguments(self.project_dir, "", "code --wait", False)
+        # ledger-init-machine-config: values the machine already has are left to Epiq.
+        self.assertEqual(local_ledger_runtime.project_init_arguments(self.project_dir),
+                         {"repoRoot": str(self.project_dir)})
+        self.assertEqual(local_ledger_runtime.project_init_arguments(self.project_dir, auto_sync=True),
+                         {"repoRoot": str(self.project_dir), "autoSync": True})
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "user name must not be empty"):
+            local_ledger_runtime.project_init_arguments(self.project_dir, " ", "code --wait", False)
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "preferred editor must not be empty"):
+            local_ledger_runtime.project_init_arguments(self.project_dir, preferred_editor="")
+        with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "auto sync must be a boolean"):
+            local_ledger_runtime.project_init_arguments(self.project_dir, auto_sync="false")
 
     def test_mcp_tool_result_reader_requires_a_successful_json_tool_payload(self):
         response = io.StringIO(
@@ -504,7 +513,8 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
              patch("local_ledger_runtime.runtime_status", return_value={"state": "ready"}), \
              patch("local_ledger_runtime.mcp_tool_call", return_value={
                  "status": "success",
-                 "value": {"projectId": "project", "stateBranch": "__epiq_state__", "warnings": ["do not print this"]},
+                 "value": {"projectId": "project", "stateBranch": "__epiq_state__",
+                           "warnings": ["[init:15] do not print this", "[init:15] nor this", "no code here"]},
              }) as mcp_call:
             payload = local_ledger_runtime.initialize_project(
                 self.runtime_dir, self.project_dir, "Vilin", "code --wait", False,
@@ -512,7 +522,9 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         self.assertEqual(payload, {
             "state": "initialized", "projectId": "project", "stateBranch": "__epiq_state__",
             "upstreamPush": "will-fail-as-warning", "warnings": True,
+            "warningCount": 3, "warningCodes": ["init:15"],
         })
+        self.assertNotIn("print this", json.dumps(payload))
         self.assertEqual(mcp_call.call_args.args[1], "epiq_project_init")
         self.assertEqual(mcp_call.call_args.args[2]["userName"], "Vilin")
 
@@ -526,7 +538,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
                 )
         mcp_call.assert_not_called()
 
-    def test_initialize_cli_requires_confirmation_and_user_setup_before_starting_epiq(self):
+    def test_initialize_cli_requires_confirmation_but_not_user_setup_before_starting_epiq(self):
         output = io.StringIO()
         with patch("local_ledger_runtime.initialize_project") as initialize, redirect_stdout(output):
             self.assertEqual(local_ledger_runtime.main([
@@ -537,13 +549,30 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         initialize.assert_not_called()
 
         output = io.StringIO()
-        with patch("local_ledger_runtime.initialize_project") as initialize, redirect_stdout(output):
+        with patch("local_ledger_runtime.initialize_project", return_value={
+            "state": "initialized", "projectId": "p", "stateBranch": "__epiq_state__", "upstreamPush": "none",
+            "warnings": False, "warningCount": 0, "warningCodes": [],
+        }) as initialize, redirect_stdout(output):
             self.assertEqual(local_ledger_runtime.main([
                 "initialize", "--confirm-initialize", "--runtime-dir", str(self.runtime_dir),
                 "--project-dir", str(self.project_dir), "--format", "json",
-            ]), 1)
-        self.assertEqual(json.loads(output.getvalue())["state"], "user-setup-required")
-        initialize.assert_not_called()
+            ]), 0)
+        self.assertEqual(json.loads(output.getvalue())["state"], "initialized")
+        initialize.assert_called_once()
+        self.assertEqual(initialize.call_args.args[2:5], (None, None, None))
+
+    def test_initialize_cli_passes_only_the_given_values_and_prints_warning_codes(self):
+        output = io.StringIO()
+        with patch("local_ledger_runtime.initialize_project", return_value={
+            "state": "initialized", "projectId": "p", "stateBranch": "__epiq_state__",
+            "upstreamPush": "none", "warnings": True, "warningCount": 2, "warningCodes": ["init:14", "init:15"],
+        }) as initialize, redirect_stdout(output):
+            self.assertEqual(local_ledger_runtime.main([
+                "initialize", "--confirm-initialize", "--runtime-dir", str(self.runtime_dir),
+                "--project-dir", str(self.project_dir), "--auto-sync", "false",
+            ]), 0)
+        self.assertEqual(initialize.call_args.args[2:5], (None, None, False))
+        self.assertIn("Epiq 初始化有 2 条警告（init:14、init:15）", output.getvalue())
 
 
     def copy_lock_files(self, drop=(), name="lock-copy"):
@@ -1215,6 +1244,117 @@ class EpiqStorageCheckTests(unittest.TestCase):
         self.assertEqual(result["path"], str(self.root))
         self.assertNotIn("sensitive history", output.getvalue())
         self.assertEqual(self.root.stat().st_mode & 0o777, 0o755)
+
+
+# ledger-init-machine-config: Epiq's refusal message is reported, cleaned.
+class EpiqRefusalMessageTests(unittest.TestCase):
+    def read(self, payload):
+        text = json.dumps(json.dumps(payload))
+        return io.StringIO('{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":%s}]}}\n' % text)
+
+    def refusal(self, payload):
+        with self.assertRaises(local_ledger_runtime.RuntimeContractError) as caught:
+            local_ledger_runtime.read_mcp_tool_result(self.read(payload), 1)
+        return str(caught.exception)
+
+    def test_refusal_reports_epiq_message(self):
+        message = 'This machine is already set up with userName "A"; epiq_project_init does not change it.'
+        self.assertEqual(self.refusal({"status": "error", "message": message}), "Epiq refused: " + message)
+
+    def test_refusal_message_is_cleaned(self):
+        diagnostic = self.refusal({"status": "error", "message":
+                                   "push https://user:SECRET@example.invalid/r.git\n\tthen ssh://TOKEN@host/x  failed\x1b[0m"})
+        self.assertNotIn("SECRET", diagnostic)
+        self.assertNotIn("TOKEN", diagnostic)
+        self.assertIn("https://***@example.invalid/r.git", diagnostic)
+        self.assertIn("ssh://***@host/x", diagnostic)
+        self.assertNotRegex(diagnostic, r"[\x00-\x1f\x7f]")
+        self.assertNotIn("  ", diagnostic)
+
+    def test_refusal_message_is_truncated(self):
+        diagnostic = self.refusal({"status": "error", "message": "x" * 1000})
+        self.assertEqual(diagnostic, "Epiq refused: " + "x" * 300 + "…")
+
+    def test_refusal_without_a_string_message_keeps_the_old_text(self):
+        for payload in ({"status": "error"}, {"status": "error", "message": 3}, {"status": "error", "message": "  "}):
+            self.assertEqual(self.refusal(payload), "MCP tool response is unsuccessful")
+
+
+# ledger-init-machine-config: status reads which of the three setup values the machine already has.
+class MachineSetupTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="sg-machine-setup-")
+        self.addCleanup(self.tmp.cleanup)
+        self.global_dir = Path(self.tmp.name) / ".epiq-global"
+        self.global_dir.mkdir()
+        self.config = self.global_dir / "config.json"
+
+    def setup_of(self):
+        return local_ledger_runtime.machine_setup(self.global_dir)
+
+    def test_absent_config(self):
+        self.assertEqual(self.setup_of(), {"state": "absent"})
+
+    def test_read_config_reports_only_the_three_values(self):
+        self.config.write_text(json.dumps({
+            "userName": "A", "preferredEditor": "code --wait", "autoSync": False, "userId": "secret-id",
+        }), encoding="utf-8")
+        before = self.config.stat().st_mtime_ns
+        self.assertEqual(self.setup_of(), {
+            "state": "read", "userName": "A", "preferredEditor": "code --wait", "autoSync": False,
+        })
+        self.assertEqual(self.config.stat().st_mtime_ns, before)
+
+    def test_missing_blank_or_mistyped_values_are_null(self):
+        self.config.write_text(json.dumps({"userName": "  ", "autoSync": "yes"}), encoding="utf-8")
+        self.assertEqual(self.setup_of(), {
+            "state": "read", "userName": None, "preferredEditor": None, "autoSync": None,
+        })
+
+    def test_unreadable_config_is_unknown_not_unset(self):
+        cases = {
+            "invalid-json": lambda: self.config.write_text("{", encoding="utf-8"),
+            "not-object": lambda: self.config.write_text("[]", encoding="utf-8"),
+            "too-large": lambda: self.config.write_text(" " * (64 * 1024 + 1) + "{}", encoding="utf-8"),
+            "directory": lambda: self.config.mkdir(),
+            "symlink": lambda: self.config.symlink_to(self.global_dir),
+        }
+        for name, make in cases.items():
+            with self.subTest(name):
+                if self.config.is_symlink() or self.config.is_file():
+                    self.config.unlink()
+                elif self.config.is_dir():
+                    self.config.rmdir()
+                make()
+                setup = self.setup_of()
+                self.assertEqual(setup["state"], "unknown")
+                self.assertIsInstance(setup.get("diagnostic"), str)
+
+    def test_status_uses_epiq_global_dir_and_keeps_its_state(self):
+        self.config.write_text(json.dumps({"userName": "A"}), encoding="utf-8")
+        project = Path(self.tmp.name) / "project"
+        project.mkdir()
+        output = io.StringIO()
+        with patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.global_dir)}), redirect_stdout(output):
+            code = local_ledger_runtime.main([
+                "status", "--runtime-dir", str(Path(self.tmp.name) / "runtime"),
+                "--project-dir", str(project), "--format", "json",
+            ])
+        payload = json.loads(output.getvalue())
+        self.assertEqual((code, payload["state"]), (0, "absent"))
+        self.assertEqual(payload["machineSetup"], {
+            "state": "read", "userName": "A", "preferredEditor": None, "autoSync": None,
+        })
+
+    def test_status_text_names_the_set_and_missing_values(self):
+        self.config.write_text(json.dumps({"userName": "A", "autoSync": False}), encoding="utf-8")
+        output = io.StringIO()
+        with patch.dict(os.environ, {"EPIQ_GLOBAL_DIR": str(self.global_dir)}), redirect_stdout(output):
+            local_ledger_runtime.main(["status", "--runtime-dir", str(Path(self.tmp.name) / "runtime"),
+                                       "--project-dir", self.tmp.name])
+        text = output.getvalue()
+        self.assertIn('本机 Epiq 已设置：userName="A"、autoSync=false', text)
+        self.assertIn("未设置：preferredEditor", text)
 
 
 if __name__ == "__main__":
