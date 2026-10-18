@@ -1,6 +1,6 @@
 # Spec: receipt-hint-on-message
 
-<!-- spec-guard: review approved 307adf12d6ad -->
+<!-- spec-guard: review approved 1bd48d6784c3 -->
 
 ## Objective
 
