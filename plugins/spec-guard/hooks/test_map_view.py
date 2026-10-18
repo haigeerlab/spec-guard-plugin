@@ -18,11 +18,11 @@ PENDING = "<!-- spec-guard: review pending -->"
 APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
-            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history"}
+            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
-               "firstTickAt", "tickCommits", "externalReview"}
-HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed"}
+               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt"}
+HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
 
@@ -188,10 +188,12 @@ class StatusTest(unittest.TestCase):
         self.assertRegex(self.data["generatedAt"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$")
 
     def test_not_a_git_repository(self):
-        self.assertEqual(self.data["head"], {"sha": None, "branch": None, "unmerged": None, "unpushed": None})
+        self.assertEqual(self.data["head"], {"sha": None, "branch": None, "unmerged": None, "unpushed": None,
+                                             "committedAt": None})
         self.assertEqual(self.data["history"], "unavailable")
         self.assertTrue(all(m["lastTickAt"] is None and m["suspendedAt"] is None and m["firstTickAt"] is None
-                            and m["tickCommits"] is None for m in self.data["modules"]))
+                            and m["tickCommits"] is None and m["uncommittedTicks"] is None
+                            and m["startedAt"] is None for m in self.data["modules"]))
         self.assertIn("（没有 git 历史：不显示勾选与挂起时间）", self.project.run().stdout)
 
     def test_table_header_and_rows(self):
@@ -520,6 +522,103 @@ class HistoryTest(unittest.TestCase):
             self.assertIn("（浅克隆：较早的勾选可能看不到）", table)
 
 
+class ProgressFactsTest(unittest.TestCase):
+    """map-progress-facts: uncommittedTicks, startedAt, head.committedAt and reviewCadence."""
+    ROWS = [("alpha", "甲", "—"), ("beta", "乙", "alpha"), ("gamma", "丙", "alpha")]
+    NOW = {"SPEC_GUARD_MAP_NOW": "2026-10-04T10:00:00+08:00"}
+    BASE = "- [x] a\n- [ ] b\n- [ ] c\n- [ ] d\n- [ ] e\n"
+
+    def make(self, extra=None):
+        files = {"spec/alpha.md": "# alpha\n", "tasks/alpha/plan.md": "# Plan\n", "tasks/alpha/todo.md": self.BASE}
+        files.update(extra or {})
+        return Project(self.ROWS, ["alpha", "beta", "gamma"], files)
+
+    def init(self, project):
+        project.git("init")
+        HistoryTest.commit(project, "2026-10-02T10:00:00+08:00")
+
+    @staticmethod
+    def by_id(project):
+        return {m["id"]: m for m in project.json()["modules"]}
+
+    def test_uncommitted_ticks_are_counted_and_shown(self):
+        with self.make() as project:
+            self.init(project)
+            HistoryTest.write(project, "alpha", "- [x] a\n- [x] b\n- [X] c\n* [x] d\n- [ ] e\n")
+            data = project.json()
+            by_id = {m["id"]: m for m in data["modules"]}
+            self.assertEqual(by_id["alpha"]["uncommittedTicks"], 3)
+            self.assertEqual(by_id["beta"]["uncommittedTicks"], 0)
+            self.assertEqual(data["head"]["committedAt"], "2026-10-02T10:00:00+08:00")
+            out = project.run(env=self.NOW).stdout
+            self.assertIn("🔨 进行中 4/5，上次勾选 2 天前，3 项勾选未提交（最后一次提交 2 天前）", out)
+
+    def test_committed_ticks_leave_the_table_unchanged(self):
+        with self.make() as project:
+            self.init(project)
+            before = project.run(env=self.NOW).stdout
+            HistoryTest.write(project, "alpha", "- [x] a\n- [x] b\n- [ ] c\n- [ ] d\n- [ ] e\n")
+            HistoryTest.commit(project, "2026-10-03T10:00:00+08:00")
+            self.assertEqual(self.by_id(project)["alpha"]["uncommittedTicks"], 0)
+            after = project.run(env=self.NOW).stdout
+            self.assertNotIn("勾选未提交", after)
+            self.assertEqual(STAMP.sub("", after.replace("2/5", "1/5").replace("上次勾选 1 天前", "上次勾选 2 天前")),
+                             STAMP.sub("", before))
+
+    def test_untick_is_zero_not_negative(self):
+        with self.make() as project:
+            self.init(project)
+            HistoryTest.write(project, "alpha", "- [ ] a\n- [ ] b\n- [ ] c\n- [ ] d\n- [ ] e\n")
+            self.assertEqual(self.by_id(project)["alpha"]["uncommittedTicks"], 0)
+            self.assertNotIn("勾选未提交", project.run(env=self.NOW).stdout)
+
+    def test_untracked_todo_counts_every_tick(self):
+        with self.make() as project:
+            self.init(project)
+            for rel, text in (("spec/gamma.md", "# gamma\n"), ("tasks/gamma/plan.md", "# Plan\n"),
+                              ("tasks/gamma/todo.md", "- [x] one\n- [x] two\n- [ ] three\n")):
+                (project.root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (project.root / rel).write_text(text, encoding="utf-8")
+            by_id = self.by_id(project)
+            self.assertEqual(by_id["gamma"]["uncommittedTicks"], 2)
+            self.assertIsNone(by_id["gamma"]["startedAt"])
+
+    def test_started_at_is_the_first_commit_of_the_spec(self):
+        with self.make() as project:
+            self.init(project)
+            (project.root / "spec" / "beta.md").write_text("# beta\n", encoding="utf-8")
+            HistoryTest.commit(project, "2026-10-03T10:00:00+08:00")
+            (project.root / "spec" / "alpha.md").write_text("# alpha\n\nmore\n", encoding="utf-8")
+            HistoryTest.commit(project, "2026-10-04T09:00:00+08:00")
+            data = project.json()
+            by_id = {m["id"]: m for m in data["modules"]}
+            self.assertEqual(by_id["alpha"]["startedAt"], "2026-10-02T10:00:00+08:00")
+            self.assertEqual(by_id["beta"]["startedAt"], "2026-10-03T10:00:00+08:00")
+            self.assertIsNone(by_id["gamma"]["startedAt"])
+            self.assertEqual(data["head"]["committedAt"], "2026-10-04T09:00:00+08:00")
+
+    def test_repository_without_commits(self):
+        with self.make() as project:
+            project.git("init")
+            data = project.json()
+            self.assertIsNone(data["head"]["committedAt"])
+            self.assertTrue(all(m["uncommittedTicks"] is None and m["startedAt"] is None for m in data["modules"]))
+
+    def test_review_cadence_matches_the_config_summary(self):
+        from project_config import summary
+        cases = (None, '{"version": 1, "reviewCadence": "combined"}', '{"version": 1, "reviewCadence": "weekly"}')
+        expected = ({"value": "separate", "source": "default"},
+                    {"value": "combined", "source": ".agent/config.json"},
+                    {"value": "separate", "source": "default (config invalid)"})
+        for body, want in zip(cases, expected):
+            with self.subTest(body=body):
+                extra = {".agent/config.json": body} if body else None
+                with self.make(extra) as project:
+                    self.assertEqual(project.json()["reviewCadence"], want)
+                    item = next(i for i in summary(project.root) if i["key"] == "reviewCadence")
+                    self.assertEqual({"value": item["value"], "source": item["source"]}, want)
+
+
 # map-startable: setup done; billing and report in progress with overlapping boundaries; shop ready (comma group
 # with billing); later waits on billing.
 CON_ROWS = [("setup", "公共预置", "—"), ("billing", "账单", "setup"), ("shop", "商城", "setup"),
@@ -539,6 +638,7 @@ def snapshot(project):
     """JSON without generatedAt, and the table without its minute stamp."""
     data = project.json()
     data.pop("generatedAt")
+    data.pop("reviewCadence")  # map-progress-facts: its source reports an invalid config; checked in ProgressFactsTest
     done = project.run()
     assert done.returncode == 0, done.stderr
     return json.dumps(data, ensure_ascii=False, sort_keys=True), STAMP.sub("", done.stdout)
