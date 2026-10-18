@@ -2016,6 +2016,11 @@ ZH_FRESH='本项目启用了本地事项账本：先列出带 `waiting-on-me`／
 EN_REMIND='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
 EN_REMIND_LEDGER='Context was just compacted: earlier requests in the summary may already be done; check the todo, the state record and the open `waiting-on-*` issues in the ledger before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
 ZH_REMIND_LEDGER='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo、状态记录和账本里未关闭的 `waiting-on-*` 事项，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+# record-on-receipt：有账本时两处提醒都以「调用账本工具传 repoRoot」一句结尾，路径是项目根（跟随指向时为目标项目根）。
+EN_ROOT=" Pass \`repoRoot\` = \`$local_project\` to every ledger tool call."
+ZH_ROOT="调用账本工具时都传 \`repoRoot\` 为 \`$local_project\`。"
+EN_FRESH="$EN_FRESH$EN_ROOT"; ZH_FRESH="$ZH_FRESH$ZH_ROOT"
+EN_REMIND_LEDGER="$EN_REMIND_LEDGER$EN_ROOT"; ZH_REMIND_LEDGER="$ZH_REMIND_LEDGER$ZH_ROOT"
 
 # 没有账本：fresh 静默且退出 0；无关目录有账本文件也静默。
 out="$(oc_run "$local_project" SessionStart fresh)" || fail "没有账本时 fresh 应退出 0"
@@ -2061,7 +2066,10 @@ echo "  ✅ zh-CN：压缩后以带账本的中文一句结尾"; PASS=$((PASS + 
 # 跟随指向：按被指向的项目判断账本；指向失效时 fresh 静默（诊断留给 UserPromptSubmit）。
 mkdir -p "$WORK/session-dir/.agent"
 printf '{"version": 1, "project": "%s"}\n' "$local_project" > "$WORK/session-dir/.agent/spec-guard-link.json"
-oc_run "$WORK/session-dir" SessionStart fresh | context_is "跟随指向：目标项目有账本时给提醒" SessionStart "$ZH_FRESH"
+# 指向文件解析出的是目标的真实路径（/var 是 /private/var 的软链接），提醒里写的就是它。
+real_local="$(cd "$local_project" && pwd -P)"
+oc_run "$WORK/session-dir" SessionStart fresh | context_is "跟随指向：目标项目有账本时给提醒，路径是目标项目根" SessionStart \
+  "${ZH_FRESH%"$ZH_ROOT"}调用账本工具时都传 \`repoRoot\` 为 \`$real_local\`。"
 build_fixture stages
 mkdir -p "$WORK/session-dir2/.agent"
 printf '{"version": 1, "project": "%s"}\n' "$stages" > "$WORK/session-dir2/.agent/spec-guard-link.json"
@@ -2070,6 +2078,19 @@ echo "  ✅ 跟随指向：目标项目没有账本时静默"; PASS=$((PASS + 1)
 printf '%s\n' '{broken' > "$WORK/session-dir2/.agent/spec-guard-link.json"
 [ -z "$(oc_run "$WORK/session-dir2" SessionStart fresh)" ] || fail "指向失效时 fresh 应静默"
 echo "  ✅ 指向失效时 fresh 静默"; PASS=$((PASS + 1))
+# 路径含引号时不写路径（手写的 JSON 不能被它弄坏），改说项目根目录。
+quoted="$WORK/q\"uote"
+mkdir -p "$quoted/.epiq"
+printf '%s\n' '<!-- BEGIN:spec-guard-codex-convention -->' > "$quoted/AGENTS.md"
+printf '{"projectId":"x"}\n' > "$quoted/.epiq/project.json"
+oc_run "$quoted" SessionStart fresh | context_is "路径含引号时 fresh 不写路径" SessionStart \
+  "${EN_FRESH%"$EN_ROOT"} Pass \`repoRoot\` = the project root to every ledger tool call."
+python3 -c '
+import json, sys
+text = json.loads(sys.argv[1])["hookSpecificOutput"]["additionalContext"]
+assert text.endswith(" Pass `repoRoot` = the project root to every ledger tool call."), text
+' "$(oc_run "$quoted" SessionStart)" || fail "路径含引号时压缩后的一句也不写路径"
+echo "  ✅ 路径含引号时压缩后的一句也不写路径"; PASS=$((PASS + 1))
 }
 
 PARTS=19

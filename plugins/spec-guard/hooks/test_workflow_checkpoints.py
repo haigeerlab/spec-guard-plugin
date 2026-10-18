@@ -344,6 +344,20 @@ class CheckpointContractTests(unittest.TestCase):
                                "内部会话间的告知直接发"):
                     self.assertIn(phrase, text)
 
+    def test_recording_on_receipt_is_not_accepting(self):
+        # record-on-receipt: recording that someone waits needs no approval and is not taking the work on.
+        section = self.section("## 未了的承诺")
+        for phrase in ("记账不是受理", "不需要用户批准", "照样先记", "传 `repoRoot`"):
+            self.assertIn(phrase, section)
+        surfaces = list((self.plugin / "templates").glob("*-block-local.md"))
+        surfaces.append(self.plugin.parents[1] / "docs" / "convention-block.md")
+        for path in surfaces:
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("当场记账，不用先问用户", "不是受理需求", "不受上面「确认要实现的需求先用",
+                               "调用账本工具时传 `repoRoot` 为项目根目录"):
+                    self.assertIn(phrase, text)
+
     def test_review_cadence(self):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 评审节奏")
