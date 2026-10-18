@@ -1,6 +1,6 @@
 # Spec: review-marker-blank-line
 
-<!-- spec-guard: review approved 78d8362f6576 -->
+<!-- spec-guard: review approved 9ae204a3906e -->
 
 ## Objective
 
