@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:bd37cde3c1e6e454dd35c2900a3ec8f3077991bb"
+      },
+      "observedAt": "2026-10-18T08:07:27Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.70.0 to 0.70.1; installed_plugins.json records gitCommitSha bd37cde (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed review_mark.py turned a file whose first line was a pending marker right above the title into marker, blank line, title on approve, and the result passed oxfmt --check (exit 0)",
+        "result:3 interactive Claude sessions (sonnet, driven through tmux) in fresh projects with the convention block and a local-only ledger were each given a small README task, then received a real cross-session message from this session asking for a change: 2 of 3 recorded it in the ledger at once (waiting-on-user and waiting-on-me), 1 of 3 did not and went straight to asking the user for a decision; none acted on or answered the message; every ledger tool call in all 3 sessions passed repoRoot for that project",
+        "not-verified:2 of 3 is an improvement over 0 of 1 before the fix, not a guarantee; whether the remaining miss needs another change is left to a later decision"
+      ]
+    }
+  ]
+}

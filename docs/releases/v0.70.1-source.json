@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:bd37cde3c1e6e454dd35c2900a3ec8f3077991bb"
+      },
+      "observedAt": "2026-10-18T08:07:27Z",
+      "evidence": [
+        "result:the v0.70.1 annotated tag resolves to merge commit bd37cde3c1e6e454dd35c2900a3ec8f3077991bb (pull request #355, which merged after #354 at d068989); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39108564742) passed before tagging",
+        "result:0.70.1 is two fix modules: record-on-receipt (one added convention-block line in each template and two rule lines saying that recording a waiting item is not accepting it and needs no approval, and that ledger tool calls pass repoRoot; the read-back reminders end with the repoRoot sentence and the project root path when a ledger exists) and review-marker-blank-line (review_mark.py keeps a blank line on both sides of the marker line, before the digest is computed); docs/releases/v0.69.0-claude.json had one untrue sentence corrected",
+        "result:phase-guard 404 cases, review-marker 31 cases, verify-artifacts 68 cases, the workflow checkpoint tests, ShellCheck 4.1.0 and validate.sh passed under macOS /bin/bash; without .epiq/project.json the hook output is unchanged (asserted byte for byte); setup-convention --replace over a 0.70.0 block exits 0 on both hosts without --accept-removals"
+      ]
+    }
+  ]
+}
