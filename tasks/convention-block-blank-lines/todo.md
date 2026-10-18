@@ -6,5 +6,11 @@
 - [x] Task 3：oxfmt 人工核对 — 2026-10-18，使用方项目已装的 oxfmt，只在临时目录跑：工作区版本新建（Claude 与 Codex × 派活关／开，再加一个本地段并 `--replace`）`--check` 退出码都是 0；0.71.0 写的旧块 `--check` 为 1，工作区版本 `--replace --dry-run` 报 `will adjust blank lines: add 2, remove 0`（派活开为 add 4），实际写入恰好新增同样多的空行、0 行删除，升级后 `--check` 为 0。临时目录已删。
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警 — 随 e80ac7f 跑 `verify-and-commit.sh` 全档：phase-guard、verify-artifacts 68 例、repo-artifacts 5 通过、ShellCheck 无告警；setup/teardown 回归 73 例。
 - [x] Task 4：CHANGELOG 与 0.71.1 版本号 — CHANGELOG `[0.71.1]`（1 个模块，修复）；两份 `plugin.json` 改为 0.71.1，中英 README 的 `--ref` 改为 v0.71.1；`commands/setup-convention.md` 预览一段补空行写法与 `will adjust blank lines` 一行。
-- [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 3f4e54f 的 15 个文件（均在 Plan 范围内）、构建中纠正的两处测试代码、验证结果与未验证项（宿主安装副本放到发版后，未做独立代码评审），以及发给接入协调人的回告草稿；用户验收通过，回告草稿一并批准，确认推送与开 PR。
 - [ ] 发版后的验证
+
+## 外部审查意见
+
+<!-- spec-guard: external-review declined -->
+
+用户在最终验收时直接验收通过、没有要求外部审查（2026-10-18）。
