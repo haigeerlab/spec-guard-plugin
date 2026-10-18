@@ -106,7 +106,17 @@ fi
 # 压缩后（SessionStart）多一句核对提醒：摘要里较早的请求可能已做完；不说“旧指令不是新任务”，压缩前刚下的指令也可能还没进 todo。
 COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
 emit() {
-  local out text="$1"
+  local out text="$1" mark
+  # receipt-hint-on-message：提醒行放在建议下一步之前（没有建议下一步时放在末尾）。
+  if [ -n "${RECEIPT:-}" ]; then
+    case "$text" in
+      *$'\n\n建议下一步'*) mark=$'\n\n建议下一步' ;;
+      *$'\n\nSuggested next step'*) mark=$'\n\nSuggested next step' ;;
+      *) mark="" ;;
+    esac
+    if [ -n "$mark" ]; then text="${text%%"$mark"*}"$'\n'"${RECEIPT}${mark}${text#*"$mark"}"
+    else text="${text}"$'\n\n'"${RECEIPT}"; fi
+  fi
   [ "$EVENT" != SessionStart ] || text="${text}
 
 ${COMPACT_NOTE}"
@@ -180,6 +190,28 @@ if [ -f .epiq/project.json ]; then
     COMPACT_NOTE="${COMPACT_NOTE}$(ledger_root_note)"
   fi
 fi
+
+# receipt-hint-on-message：有账本、且这一轮是别的会话转来的消息时，建议下一步之前多一行当场记账的提醒。
+# 判定与清理在 session_context.py --received（只读提示词开头的包装与它的两个属性）；其他情形不出这一行。
+receipt_hint() {
+  [ "$EVENT" = UserPromptSubmit ] && [ -f .epiq/project.json ] || return 0
+  local got name session who
+  got="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" --received 2>/dev/null)" || return 0
+  case "$got" in received$'\t'*) ;; *) return 0 ;; esac
+  got="${got#received$'\t'}"; name="${got%%$'\t'*}"; session="${got#*$'\t'}"
+  if [ -n "$ZH" ]; then
+    who=""
+    [ -z "$name" ] || who="对方 \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}，}会话 \`${session}\`"
+    printf '%s' "- 这一轮是别的会话发来的消息${who:+（${who}）}：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。$(ledger_root_note zh)"
+  else
+    who=""
+    [ -z "$name" ] || who="sender \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}, }session \`${session}\`"
+    printf '%s' "- Message from another session${who:+ (${who})}: record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call.$(ledger_root_note)"
+  fi
+}
+RECEIPT="$(receipt_hint)"
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
 # hook 输入已在上面读过，这里转交那一行原文。
