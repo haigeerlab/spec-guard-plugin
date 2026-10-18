@@ -1,5 +1,5 @@
 {
-  "interface": "1.1",
+  "interface": "1.2",
   "mapView": {
     "command": [
       "python3",
@@ -31,8 +31,25 @@
         "declined": "the user declined an external review for this module"
       }
     },
+    "progressFacts": {
+      "appearsWhen": "always, whatever moduleConcurrency is (interface 1.2)",
+      "fields": {
+        "uncommittedTicks": "per module; checked items in this checkout's working-tree tasks/<id>/todo.md minus those at HEAD, never below 0; an untracked todo counts every checked item; null when history is unavailable. Other worktrees are not counted: read worktree.dirty and worktree.progress",
+        "startedAt": "per module; commit time (%cI) of the first commit in HEAD's history that added spec/<id>.md; null when the Spec was never committed or history is unavailable; in a shallow clone it may be the first commit after the shallow boundary",
+        "head.committedAt": "commit time (%cI) of HEAD of this checkout, for the whole checkout and not per module; null without commits",
+        "reviewCadence": "top level; {\"value\", \"source\"}, the same effective value and source /spec-guard:config shows; source is .agent/config.json, default, or default (config invalid)"
+      },
+      "values": {
+        "reviewCadence": {
+          "separate": "default; the Spec is approved on its own before the Plan is written",
+          "combined": "the Spec and the Plan are approved together, unless the rules send the Spec back to be approved alone"
+        }
+      },
+      "notes": "facts only: spec-guard sets no threshold and makes no stalled judgement; readers decide how long is too long",
+      "contract": "spec/map-progress-facts.md"
+    },
     "concurrency": {
-      "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear and the output is byte-identical to interface 1.0",
+      "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear",
       "fields": {
         "moduleConcurrency": "top level; always \"on\" when present",
         "buildOrderGroups": "top level; the Build order as a list of groups, a comma group being one inner list",

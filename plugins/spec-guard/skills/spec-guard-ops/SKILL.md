@@ -132,8 +132,9 @@ python3 -B "$ROOT/hooks/map_view.py" --project "$PROJECT" [--all] [--json]
 （`schemaVersion` 1，字段与稳定性承诺见 `spec/map-view.md`），供其他插件读取。退出码 3 是没有能力图，4 是能力图或
 模块文件读不出，2 是参数或路径错误。"阻塞"只指被挂起的模块挡住，外部等待这里看不到。进行中与挂起两格带距今多久
 （上次勾选、已挂多久），JSON 对应 `lastTickAt`、`suspendedAt` 与顶层 `history`，另有 `firstTickAt`、`tickCommits`，
-都取自已提交的 git 历史；只给时间，
-不判断算不算卡住。
+都取自已提交的 git 历史；工作区比 HEAD 多勾的项数在 `uncommittedTicks`，表格进行中一格写"N 项勾选未提交（最后一次
+提交多久前）"；另有 `startedAt`（第一次提交 Spec 的时间）、`head.committedAt` 与顶层 `reviewCadence`（生效值与来源）。
+只给事实，不判断算不算卡住。
 
 ## tracker default
 

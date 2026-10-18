@@ -27,7 +27,7 @@ from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, extern
                           next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, parse as parse_scope
-from project_config import module_concurrency
+from project_config import module_concurrency, summary as config_summary
 
 SCHEMA_VERSION = 1
 REASON_LINE = re.compile(r"^<!-- spec-guard: suspended-reason: (.*) -->$")
@@ -38,7 +38,10 @@ REVIEW_WORDS = {"approved": "✔", "pending": "待审核", "revised": "改过待
 RESPONSIBILITY_LIMIT = 40
 CHECKED_LINE = re.compile(r"^\s*[-*+]\s+\[[xX]\]")
 DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
+TODO_PATH = re.compile(r"^tasks/([^/\s]+)/todo\.md$")
+SPEC_PATH = re.compile(r"^spec/([^/\s]+)\.md$")
 COMMIT_SEP = "\x1e"
+PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence")  # interface.json progressFacts
 
 
 class Unreadable(Exception):
@@ -97,7 +100,7 @@ def _closure(start: str, edges: dict) -> set:
 def _head(root: Path) -> dict:
     sha = _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
     if not sha:
-        return {"sha": None, "branch": None, "unmerged": None, "unpushed": None}
+        return {"sha": None, "branch": None, "unmerged": None, "unpushed": None, "committedAt": None}
     branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD") or None
     merged = unmerged_commits(root)
     unpushed = None
@@ -107,7 +110,8 @@ def _head(root: Path) -> dict:
         if upstream and count and count.isdigit():
             unpushed = {"count": int(count), "upstream": upstream}
     return {"sha": sha, "branch": branch,
-            "unmerged": {"count": merged[0], "base": merged[1]} if merged else None, "unpushed": unpushed}
+            "unmerged": {"count": merged[0], "base": merged[1]} if merged else None, "unpushed": unpushed,
+            "committedAt": _git(root, "log", "-1", "--format=%cI") or None}
 
 
 def history(root: Path) -> tuple:
@@ -308,6 +312,53 @@ def _concurrency(root: Path, parsed, modules: list) -> dict:
     }
 
 
+def progress_facts(root: Path, modules: list) -> tuple:
+    """map-progress-facts: ({module: uncommitted ticks}, {module: first commit time of spec/<id>.md}), or (None, None).
+
+    Uncommitted ticks are the checked items of the working-tree todo minus those at HEAD, never below 0; an untracked
+    todo counts every checked item.  Three git calls for every module.  Facts only: no threshold, readers judge.
+    """
+    if not _git(root, "rev-parse", "--verify", "--quiet", "HEAD"):
+        return None, None
+    diff = _git(root, "diff", "--no-color", "--no-renames", "--no-ext-diff", "-U0", "HEAD", "--",
+                ":(glob)tasks/*/todo.md")
+    untracked = _git(root, "ls-files", "--others", "--exclude-standard", "--", ":(glob)tasks/*/todo.md")
+    added = _git(root, "log", "--no-color", "--no-renames", "--diff-filter=A", "--name-only",
+                 "--format=@%cI", "--", ":(glob)spec/*.md")  # not COMMIT_SEP: _git strips it as whitespace
+    if diff is None or untracked is None or added is None:
+        return None, None
+    net, module = {}, None
+    for line in diff.splitlines():
+        match = DIFF_FILE.match(line)
+        if match:
+            module = match.group(1)
+            continue
+        if module is None or line.startswith(("+++", "---")) or line[:1] not in ("+", "-"):
+            continue
+        if CHECKED_LINE.match(line[1:]):
+            net[module] = net.get(module, 0) + (1 if line[0] == "+" else -1)
+    done = {m["id"]: m["progress"]["done"] for m in modules}
+    for line in untracked.splitlines():
+        match = TODO_PATH.match(line.strip())
+        if match:
+            net[match.group(1)] = done.get(match.group(1), 0)
+    started, when = {}, None
+    for line in added.splitlines():
+        if line.startswith("@"):
+            when = line[1:].strip()
+            continue
+        match = SPEC_PATH.match(line.strip())
+        if match and when:
+            started[match.group(1)] = when  # newest first, so the last one kept is the oldest
+    return {key: max(value, 0) for key, value in net.items()}, started
+
+
+def _review_cadence(root: Path) -> dict:
+    # map-progress-facts: the same effective value and source that /spec-guard:config shows.
+    item = next(i for i in config_summary(root) if i["key"] == "reviewCadence")
+    return {"value": item["value"], "source": item["source"]}
+
+
 def build(root: Path) -> dict:
     map_path = root / "spec" / "CAPABILITY-MAP.md"
     parsed = parse_map(map_path)
@@ -379,6 +430,10 @@ def build(root: Path) -> dict:
         m["firstTickAt"] = oldest
         m["tickCommits"] = None if state == "unavailable" else count
         m["suspendedAt"] = suspended_write.get(m["id"]) if m["status"] == "suspended" else None
+    uncommitted, started = (None, None) if state == "unavailable" else progress_facts(root, modules)
+    for m in modules:
+        m["uncommittedTicks"] = None if uncommitted is None else uncommitted.get(m["id"], 0)
+        m["startedAt"] = None if started is None else started.get(m["id"])
 
     suspended = [m for m in modules if m["status"] == "suspended"]
     suspended.sort(key=lambda m: (-m["blocks"]["count"], m["position"]))
@@ -400,6 +455,7 @@ def build(root: Path) -> dict:
         "awaitingReview": awaiting,
         "modules": modules,
         "history": state,
+        "reviewCadence": _review_cadence(root),
     }
     if module_concurrency(root):
         data.update(_concurrency(root, parsed, modules))
@@ -437,7 +493,7 @@ def _suspended_label(m: dict, now: datetime) -> str:
     return reason + ("，已挂 " + since if since else "")
 
 
-def _status_cell(m: dict, now: datetime, concurrent: bool = False) -> str:
+def _status_cell(m: dict, now: datetime, concurrent: bool = False, head_at: str | None = None) -> str:
     value = m["status"]
     if value == "done":
         return "✅ 已完成"
@@ -447,8 +503,12 @@ def _status_cell(m: dict, now: datetime, concurrent: bool = False) -> str:
         if m["step"] == "plan":
             return "🔨 写 Plan"
         since = _elapsed(m.get("lastTickAt"), now)
-        return "🔨 进行中 %d/%d%s" % (m["progress"]["done"], m["progress"]["total"],
-                                    "，上次勾选 %s前" % since if since else "")
+        pending = ""
+        if m.get("uncommittedTicks"):
+            committed = _elapsed(head_at, now)
+            pending = "，%d 项勾选未提交%s" % (m["uncommittedTicks"], "（最后一次提交 %s前）" % committed if committed else "")
+        return "🔨 进行中 %d/%d%s%s" % (m["progress"]["done"], m["progress"]["total"],
+                                      "，上次勾选 %s前" % since if since else "", pending)
     if value == "suspended":
         tail = "，挡住 %d 个" % m["blocks"]["count"] if m["blocks"]["count"] else ""
         return "⏸ 挂起（%s）%s" % (_suspended_label(m, now), tail)
@@ -558,7 +618,7 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
         else:
             lines.append("| %d | %s | %s | %s | %s |" % (item["position"], item["id"],
                                                          _responsibility(item["responsibility"]),
-                                                         _status_cell(by_id[item["id"]], now, concurrent)
+                                                         _status_cell(by_id[item["id"]], now, concurrent, data["head"]["committedAt"])
                                                          + _worktree_suffix(item),
                                                          _review_cell(root, item)))
     return "\n".join(lines) + "\n"
