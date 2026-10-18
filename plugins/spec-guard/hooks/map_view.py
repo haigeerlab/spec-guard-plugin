@@ -41,6 +41,7 @@ DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
 TODO_PATH = re.compile(r"^tasks/([^/\s]+)/todo\.md$")
 SPEC_PATH = re.compile(r"^spec/([^/\s]+)\.md$")
 COMMIT_SEP = "\x1e"
+PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence")  # interface.json progressFacts
 
 
 class Unreadable(Exception):

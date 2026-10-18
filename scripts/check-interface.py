@@ -43,7 +43,24 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return found + _concurrency(path, data, view)
+    return found + _progress_facts(view) + _concurrency(path, data, view)
+
+
+def _progress_facts(view: dict) -> list:
+    """map-progress-facts: interface 1.2 describes every progress fact and every reviewCadence value the code uses."""
+    facts = view.get("progressFacts")
+    if not isinstance(facts, dict):
+        return ["mapView 缺少 progressFacts 说明"]
+    found = []
+    fields = facts.get("fields")
+    if not isinstance(fields, dict) or set(fields) != set(map_view.PROGRESS_FIELDS):
+        found.append("mapView.progressFacts.fields 为 %s，代码为 %s"
+                     % (sorted(fields) if isinstance(fields, dict) else fields, sorted(map_view.PROGRESS_FIELDS)))
+    cadence = (facts.get("values") or {}).get("reviewCadence") if isinstance(facts.get("values"), dict) else None
+    if not isinstance(cadence, dict) or set(cadence) != set(project_config.CADENCES):
+        found.append("mapView.progressFacts.values.reviewCadence 的取值为 %s，代码为 %s"
+                     % (sorted(cadence) if isinstance(cadence, dict) else cadence, sorted(project_config.CADENCES)))
+    return found
 
 
 def _scripts(path: Path, label: str, command) -> list:

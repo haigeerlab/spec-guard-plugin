@@ -776,6 +776,13 @@ mkifc "$TMP/ifc-v10" 'del data["mapView"]["contract"]'
 want fail "interface: mapView 缺 1.0 的键 → 报错" python3 "$IFC" "$TMP/ifc-v10/interface.json"
 mkifc "$TMP/ifc-conc" 'del data["mapView"]["concurrency"]'
 want fail "interface: mapView 缺 concurrency 说明 → 报错" python3 "$IFC" "$TMP/ifc-conc/interface.json"
+# map-progress-facts：interface 1.2 的 progressFacts 说明，字段与评审节奏取值和代码常量一致。
+mkifc "$TMP/ifc-facts" 'del data["mapView"]["progressFacts"]'
+want fail "interface: mapView 缺 progressFacts 说明 → 报错" python3 "$IFC" "$TMP/ifc-facts/interface.json"
+mkifc "$TMP/ifc-facts-field" 'del data["mapView"]["progressFacts"]["fields"]["startedAt"]'
+want fail "interface: progressFacts 少一个字段 → 报错" python3 "$IFC" "$TMP/ifc-facts-field/interface.json"
+mkifc "$TMP/ifc-facts-cadence" 'del data["mapView"]["progressFacts"]["values"]["reviewCadence"]["combined"]'
+want fail "interface: progressFacts 的评审节奏少一个取值 → 报错" python3 "$IFC" "$TMP/ifc-facts-cadence/interface.json"
 
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
