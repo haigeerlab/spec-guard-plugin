@@ -4,8 +4,10 @@ set -u
 
 # 触发事件由 hooks.json 的注册处用参数告诉本脚本（compact-phase-injection）：SessionStart 一项只在上下文压缩后触发；
 # 不带参数或其他值一律按 UserPromptSubmit，输出与改前逐字相同。
+# open-commitments：另一项 SessionStart（会话开始与清空后）带第二个参数 fresh，只出账本读回提醒，见下面的 fresh_out。
+FRESH=""
 case "${1:-}" in
-  SessionStart) EVENT=SessionStart ;;
+  SessionStart) EVENT=SessionStart; [ "${2:-}" != fresh ] || FRESH=1 ;;
   *) EVENT=UserPromptSubmit ;;
 esac
 
@@ -61,6 +63,24 @@ LINKED=""
 if ! has_block && ! has_state; then
   [ -e .agent/spec-guard-link.json ] || [ -L .agent/spec-guard-link.json ] || exit 0
   LINKED=1
+fi
+
+# open-commitments：会话开始与清空后只出一句读回提醒，不出阶段摘要（随后的 UserPromptSubmit 会给）。只看项目根有没有
+# .epiq/project.json，不读账本内容、不调 Epiq；没有就静默。提醒是固定文字，JSON 手写，不依赖 python3 生成。
+fresh_out() {
+  [ -f .epiq/project.json ] || exit 0
+  local text='This project has the local ticket ledger enabled: first list the open issues tagged `waiting-on-me`, `waiting-on-them` or `waiting-on-user`; carry on with the `waiting-on-me` ones, follow up once on the `waiting-on-them` ones if needed, and hand the `waiting-on-user` ones to the user, then continue with what the user asked. If there are none, just continue.'
+  if command -v python3 >/dev/null 2>&1 &&
+    [ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" = zh-CN ]; then
+    text='本项目启用了本地事项账本：先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的未关闭事项，`waiting-on-me` 的接着处理，`waiting-on-them` 的按需追问一次，`waiting-on-user` 的交给用户，再继续用户的请求；没有就直接继续。'
+  fi
+  printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"'"${text}"'"}}'
+  exit 0
+}
+if [ -n "$FRESH" ]; then
+  [ -n "$LINKED" ] || fresh_out
+  # 跟随指向要用 python3；缺 python3 或指向失效时静默，诊断留给随后的 UserPromptSubmit。
+  command -v python3 >/dev/null 2>&1 || exit 0
 fi
 
 # 已启用却缺 python3 时不能静默：静默会被当成“未启用”。这段 JSON 手写转义，不依赖 python3。
@@ -123,18 +143,28 @@ if [ -n "$LINKED" ]; then
     *) LINK_BAD="没能读取它（检查没有正常运行）" ;;
   esac
   if [ -n "$LINK_BAD" ]; then
+    [ -z "$FRESH" ] || exit 0
     emit "## spec-guard local workflow
 
 spec-guard: 本目录有指向文件 \`.agent/spec-guard-link.json\`，但${LINK_BAD}，本轮没有阶段注入。${LINK_FIX}"
     exit 0
   fi
 fi
+[ -z "$FRESH" ] || fresh_out
 
 # hint-language-follow：说明文字的语言只由 module_stage.py --hint-language 判定（artifactLanguage 恰好是 zh-CN 才是中文）；
 # 取不到时按英文，输出与改前逐字相同。跟随指向时这里已在目标项目里，用的是目标项目的配置。
 ZH=""
 [ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" != zh-CN ] || ZH=1
 [ -z "$ZH" ] || COMPACT_NOTE='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo 和状态记录，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+# open-commitments：项目启用了本地事项账本时，压缩后的核对也包括账本里未关闭的 waiting-on-* 事项；没有账本时上面两句不变。
+if [ -f .epiq/project.json ]; then
+  if [ -n "$ZH" ]; then
+    COMPACT_NOTE='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo、状态记录和账本里未关闭的 `waiting-on-*` 事项，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+  else
+    COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo, the state record and the open `waiting-on-*` issues in the ledger before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
+  fi
+fi
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
 # hook 输入已在上面读过，这里转交那一行原文。

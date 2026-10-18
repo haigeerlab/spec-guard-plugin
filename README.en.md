@@ -57,9 +57,9 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.68.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.69.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| Open a new session and review and trust spec-guard's `UserPromptSubmit` and `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction |
+| Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction; after upgrading from 0.68.x, also trust the `SessionStart` hook for session start and clear once |
 
 For Codex, use the version of the [latest release](https://github.com/haigeerlab/spec-guard-plugin/releases) as `--ref`.
 
@@ -168,7 +168,8 @@ From 1.1 it also lists the entries used for developing several modules at once (
   plans, todos, the settings under `.agent/` and local git refs (it never fetches); at a review checkpoint it also
   reads this machine's plugin records to see whether delegate is installed. From the session transcript the
   host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
-  the conversation.
+  the conversation. In a project with the local ticket ledger enabled, the hook only checks whether
+  `.epiq/project.json` exists; it does not read the ledger.
 - **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
   `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
   goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).

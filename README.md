@@ -50,9 +50,9 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.68.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.69.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` 与 `SessionStart` 两项 hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入 |
+| 开新会话，在 `/hooks` 里审核并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入；从 0.68.x 升级后，会话开始与清空后的那项 `SessionStart` 也要信任一次 |
 
 Codex 的 `--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
 
@@ -153,7 +153,7 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 ## 数据与隐私
 
 - **读什么**：每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用
-  （不 fetch）；在评审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。
+  （不 fetch）；在评审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容。
 - **写什么**：钩子不写任何文件。命令在你看过预览、明确确认后才写：项目里的 `spec/`、`tasks/`、`.agent/` 和
   `CLAUDE.md`／`AGENTS.md` 的约定块；本机状态写在 `~/.spec-guard/`（可用 `SPEC_GUARD_STATE_DIR` 改位置）。
 - **什么时候联网**：只在你明确调用下面这些功能时。Proposal 相关命令、选了 GitHub/GitLab 的 `ticket`、本地事项的

@@ -34,6 +34,9 @@
   结果记在 todo 末项；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 回告来源或通知其他会话（含跨 Claude Code／Codex）时，若装了 agent-relay 插件，用它的
   `agent-relay:session-routing` 给对方会话发消息
+- 有人在等的事（别人发来期待回音的需求、我发出后在等对方、在等用户拍板）在球换手时记进本地事项账本，挂
+  `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 之一，写明对方的稳定身份与回复通道；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 回复会替用户做出承诺的先问用户；邮件、公开评论等对外通道一律先在正文给草稿，用户答应才发；内部会话间的告知直接发
 - 交审要点写在本轮对话正文里，放在任何会结束本轮的确认框之前；只出现在确认框摘要里的不算交审
 - 最终验收时若 Spec 在构建中被补改过，验收消息附上 Spec 的改动差异并写明一次批准同时批准修订后的 Spec；批准后先用
   `spec-guard-ops` 的 review-mark 一节 记下 Spec 的批准再勾选与提交，没附差异就单独复审
