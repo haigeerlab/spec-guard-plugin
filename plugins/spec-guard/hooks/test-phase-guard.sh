@@ -727,22 +727,38 @@ for bad in "not json" "{}" "{\"transcript_path\":\"$WORK/missing.jsonl\"}"; do
 done
 echo "  ✅ 不可用的 hook 输入不改变输出"; PASS=$((PASS + 1))
 
-# 标准输入一直不关闭：hook 必须照常输出，不能挂住。
-python3 - "$HOOKDIR/phase-guard.sh" "$ctx" <<'HANG' || fail "标准输入不关闭时 hook 挂住或输出不对"
-import json, os, subprocess, sys, time
+# 标准输入一直不关闭：hook 必须照常输出，不能挂住。只判断比关闭标准输入时多等的时间，不判断总耗时。
+python3 - "$HOOKDIR/phase-guard.sh" "$ctx" <<'HANG' || fail "标准输入不关闭时 hook 挂住、多等太久或输出不对"
+import json, os, subprocess, sys, threading, time
+cmd = ["/bin/bash", sys.argv[1]]
+env = dict(os.environ, CLAUDE_PROJECT_DIR=sys.argv[2])
+
+def building(out):
+    assert "BUILDING" in json.loads(out)["hookSpecificOutput"]["additionalContext"], out
+
 started = time.monotonic()
-proc = subprocess.Popen(["/bin/bash", sys.argv[1]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                        env=dict(os.environ, CLAUDE_PROJECT_DIR=sys.argv[2]))
+out = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, env=env, timeout=15).stdout
+base = time.monotonic() - started
+building(out)
+
+hung = []
+started = time.monotonic()
+proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+timer = threading.Timer(15, lambda: (hung.append(True), proc.kill()))
+timer.start()
 try:
     out = proc.stdout.read()
-    proc.wait(timeout=5)
+    proc.wait()
 finally:
+    timer.cancel()
     proc.stdin.close()
     proc.kill()
-assert time.monotonic() - started < 3, time.monotonic() - started
-assert "BUILDING" in json.loads(out)["hookSpecificOutput"]["additionalContext"], out
+opened = time.monotonic() - started
+assert not hung, "hook hung with stdin left open (killed after 15 s)"
+building(out)
+assert opened - base < 2, f"extra wait {opened - base:.2f} s (open {opened:.2f} s, base {base:.2f} s)"
 HANG
-echo "  ✅ 标准输入不关闭时约 1 秒内照常输出"; PASS=$((PASS + 1))
+echo "  ✅ 标准输入不关闭时只多等约 1 秒并照常输出"; PASS=$((PASS + 1))
 
 # 只读：项目文件与会话记录的修改时间不变。
 snap() { python3 -c '

@@ -1,7 +1,7 @@
 # Todo: stdin-timing-test
 
-- [ ] Task 0：提交已批准的 Plan 与 todo
-- [ ] Task 1：改写这条用例并做反向验证
+- [x] Task 0：提交已批准的 Plan 与 todo — Plan 经用户批准（2026-10-18），与本 todo 一次提交（252efe5）。
+- [x] Task 1：改写这条用例并做反向验证 — 第 9 段那条改为先以 `stdin=DEVNULL` 量 base，再以不关闭的 `stdin=PIPE` 跑并用 15 秒 `threading.Timer` 兜底，断言 `open - base < 2`；当前代码上通过，phase-guard 回归 404 例不变。反向验证（`git archive HEAD` 出的草稿副本，覆盖新测试文件，跑完即删）：`INPUT_WAIT = 4` 时失败，信息为 `extra wait 3.85 s (open 5.44 s, base 1.59 s)`；`select` 不设超时时 15 秒后失败，信息为 `hook hung with stdin left open (killed after 15 s)`；两次整套都在 46 秒内结束，没有卡死。
 - [ ] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警
 - [ ] Task 2：CHANGELOG
 - [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
