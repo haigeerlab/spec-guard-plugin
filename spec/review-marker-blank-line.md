@@ -1,6 +1,6 @@
 # Spec: review-marker-blank-line
 
-<!-- spec-guard: review approved 78d8362f6576 -->
+<!-- spec-guard: review approved 9ae204a3906e -->
 
 ## Objective
 
@@ -46,7 +46,7 @@
 - 找到已有标记（原地替换）：替换那一行后，保证这一行前后都是空行（文件开头和末尾除外）。
 - 没有标记、首行是标题：结果是「标题、空行、标记、空行、其余正文」；其余正文本来就以空行开头时，不再多加。
 - 没有标记、首行不是标题：结果是「标记、空行、正文」（现有行为）。
-- 换行符沿用该行原有的写法（`\n` 或 `\r\n`）；补的空行用同一种换行符。
+- 换行符照现有做法：`review_mark.py` 按通用换行读入、以 `\n` 写回，`\r\n` 文件写回后是 `\n`；补的空行同样是 `\n`。本模块不改读写方式。
 - `_marked` 与 approve 时的指纹计算方式不变，仍然基于整理过空行的文本。
 
 预览照旧给出完整差异，补的空行会出现在差异里。其他命令、钩子、`verify-artifacts`、阶段判定不变。
@@ -64,7 +64,7 @@ python3 -B plugins/spec-guard/hooks/test_review_marker.py
 
 - 先写断言并确认变红（`test_review_marker.py`）：
   - 上表五种写法的 pending 和 approved 各写一次，结果都是「标记前后都有空行（文件开头除外）」；原本已经合格的写法不多加空行。
-  - `\r\n` 文件补的空行也是 `\r\n`。
+  - `\r\n` 文件写回后是 `\n`，标记两侧的空行齐全（与现有读写方式一致）。
   - approve 后，文件里的指纹等于按最终文件重新计算的指纹，阶段判定为已批准，不是「批准后已修订」。
   - 标记在文件末尾、后面没有内容时，不在后面补空行。
 - 其余回归不改，全部通过即说明行为没有别的变化。
@@ -85,3 +85,7 @@ python3 -B plugins/spec-guard/hooks/test_review_marker.py
 ## Open questions
 
 - 无。
+
+## 变更记录
+
+- 2026-10-18：Contract 与 Testing strategy 里「补的空行沿用 `\r\n`」改为「`\r\n` 文件写回后是 `\n`」。原因：构建 Task 1 时发现 `review_mark.py` 本来就按通用换行读入、以 `\n` 写回，保留 `\r\n` 要改读写方式，超出只改 `_with_marker` 的范围，还会改变指纹。来源：本会话（当前插件所有者）构建时发现。

@@ -299,5 +299,48 @@ class Mark(unittest.TestCase):
             self.assertIn("```\n%s\n```\n" % REVIEW_PENDING, project.spec.read_text(encoding="utf-8"))
 
 
+class BlankLinesAroundTheMarker(unittest.TestCase):
+    """review-marker-blank-line: whatever review_mark.py writes has a blank line on both sides of the marker line
+    (none before it at the start of the file, none after it at the end), and the digest matches the file as written."""
+
+    P = REVIEW_PENDING
+    CASES = {  # name: (file before, expected layout with {m} for the marker written)
+        "top, title right after": (P + "\n# Spec: alpha\n\n正文\n", "{m}\n\n# Spec: alpha\n\n正文\n"),
+        "top, blank then title": (P + "\n\n# Spec: alpha\n\n正文\n", "{m}\n\n# Spec: alpha\n\n正文\n"),
+        "right under the title": ("# Spec: alpha\n" + P + "\n\n正文\n", "# Spec: alpha\n\n{m}\n\n正文\n"),
+        "text right after it": ("# Spec: alpha\n\n" + P + "\n正文\n", "# Spec: alpha\n\n{m}\n\n正文\n"),
+        "already spaced": ("# Spec: alpha\n\n" + P + "\n\n正文\n", "# Spec: alpha\n\n{m}\n\n正文\n"),
+        "no marker, text right under the title": ("# Spec: alpha\n正文\n", "# Spec: alpha\n\n{m}\n\n正文\n"),
+        "at the end": ("# Spec: alpha\n\n正文\n" + P + "\n", "# Spec: alpha\n\n正文\n\n{m}\n"),
+        # review_mark.py reads with universal newlines and writes "\n" (unchanged behaviour): CRLF comes back as LF, spaced.
+        "crlf": ("# Spec: alpha\r\n" + P + "\r\n正文\r\n", "# Spec: alpha\n\n{m}\n\n正文\n"),
+    }
+
+    def test_pending_is_spaced(self):
+        for name, (before, layout) in self.CASES.items():
+            with self.subTest(case=name), Project() as project:
+                project.spec.write_bytes(before.encode("utf-8"))
+                code, out = project.run("--module", "alpha", "--target", "spec", "--state", "pending", "--confirm")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(project.spec.read_bytes().decode("utf-8"), layout.format(m=REVIEW_PENDING))
+
+    def test_approved_is_spaced_and_its_digest_matches_the_file(self):
+        for name, (before, layout) in self.CASES.items():
+            with self.subTest(case=name), Project() as project:
+                project.spec.write_bytes(before.encode("utf-8"))
+                code, out = project.run("--module", "alpha", "--target", "spec", "--state", "approved", "--confirm")
+                self.assertEqual(code, 0, out)
+                text = project.spec.read_bytes().decode("utf-8")
+                self.assertEqual(text, layout.format(m=review_approved_line(review_digest(text))))
+                self.assertEqual(project.states()[0], "approved")
+
+    def test_a_plan_is_spaced_too(self):
+        with Project() as project:
+            project.plan.write_text(self.P + "\n# Plan: alpha\n\n步骤\n", encoding="utf-8")
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.plan.read_text(encoding="utf-8"), "%s\n\n# Plan: alpha\n\n步骤\n" % REVIEW_APPROVED)
+
+
 if __name__ == "__main__":
     unittest.main()
