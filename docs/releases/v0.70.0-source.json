@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:712ed629b1a4c822524ee4bb95550d27c66b3d29"
+      },
+      "observedAt": "2026-10-18T07:04:37Z",
+      "evidence": [
+        "result:the v0.70.0 annotated tag resolves to merge commit 712ed629b1a4c822524ee4bb95550d27c66b3d29 (pull request #352); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39105933783) passed before tagging",
+        "result:0.70.0 is one module, hub-relayed-approval: the review marker `approved` accepts two sources, the user's explicit approval in the current conversation, or a session-protocol 【用户答复】 relayed by the registered decision hub or the registered active coordinator (with the 转自 line), carrying the hub item number, naming this session's own review message, explicitly approving this one file, echoed and fingerprint-checked before writing, with the item number recorded; 答复告知, 协调通知, self-claimed approvals and relays without the contract format do not count; module sessions still do not write the marker when moduleConcurrency is on; review-mark command, Codex skill and review_mark.py preview text changed accordingly; owner handoffs (负责人转交) are not a source in this release (user decision 2026-10-18)",
+        "result:phase-guard 403, verify-artifacts 68, workflow checkpoint 49 and review marker cases and validate.sh pass under macOS /bin/bash 3.2.57; codex-plugin-smoke --selftest exits 0; the convention block templates and docs/convention-block.md have no diff against 0.69.0, so no setup-convention rerun is needed"
+      ]
+    }
+  ]
+}
