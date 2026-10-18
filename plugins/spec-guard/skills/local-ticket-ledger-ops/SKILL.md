@@ -67,7 +67,13 @@ worktree. Tell the user that initialization creates a committed `.epiq/project.j
 (it disables the push for this one Epiq process only and changes no Git configuration), or, only
 when the user explicitly wants the ledger pushed to `origin`, `--allow-epiq-push` after a separate
 confirmation, because upstream Epiq will attempt a normal/state-branch push. The two are mutually
-exclusive. Do not infer `user-name`, `preferred-editor`, or `auto-sync`; collect the user's values.
+exclusive. Do not infer `user-name`, `preferred-editor`, or `auto-sync`. First read `machineSetup` in
+`status --format json`: tell the user that values the machine already has are machine-wide, that
+initialization cannot change them, and that they change them in the Epiq TUI with `:config`; do not
+pass those. Ask only for the missing values and omit the flags the user did not give. When
+`machineSetup` is `unknown`, ask for all three as before. A refusal from Epiq starts with
+`Epiq refused:`; adjust as it says. Initialization warnings are reported as `warningCount` and
+`warningCodes`, never their text.
 
 After initialization, the commit holding `.epiq/project.json` must be merged into the default
 branch, or worktrees and sessions started from it will not find the ledger; `status` names the
@@ -81,6 +87,7 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
 python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
   --confirm-initialize --user-name "<display name the user gave>" \
   --preferred-editor "<editor command the user gave>" --auto-sync "<true|false the user gave>" --format json
+# Omit each flag the machine already has; with all three set: initialize --local-only --confirm-initialize --format json
 ```
 
 Adapter inspection is read-only and available for either host:

@@ -1,6 +1,19 @@
 # Changelog
 
-## [未发布]
+## [0.71.0] - 2026-10-18
+
+本版 2 个模块：`ledger-init-machine-config`、`stdin-timing-test`。
+
+### 变更
+
+- **账本初始化与机器级 Epiq 设置共存。** 机器上已有 Epiq 设置（`~/.epiq-global/config.json` 里的 userName、preferredEditor、autoSync）时，
+  原来 `initialize` 要求三项都传，传了与机器不同的值必然失败，且只报 `MCP tool response is unsuccessful`。现在：
+  - `--user-name`、`--preferred-editor`、`--auto-sync` 都可省略，只传用户给出的值；机器已有的由 Epiq 沿用，传了不同的值由 Epiq 拒绝。
+    去掉了 `user-setup-required` 这一拒绝。
+  - Epiq 拒绝时诊断为 `Epiq refused: <Epiq 的 message>`：控制字符换成空格，远端地址里的凭据遮掉，最长 300 字。
+  - `status` 新增 `machineSetup`：只读地报告机器已设置了哪几项与取值（`absent`／`read`／读不了为 `unknown`）；项目未初始化时文本输出列出已设置与缺的项。
+  - 初始化结果在 `warnings` 布尔值之外新增 `warningCount` 与 `warningCodes`（如 `init:15`），警告原文仍不回显；文本输出有警告时多一行条数与编号。
+  - 命令、技能与参考文档改为初始化前先看 `machineSetup`，只向用户索取机器缺的项。
 
 ### 维护者工具（插件包里只有测试脚本变化）
 
