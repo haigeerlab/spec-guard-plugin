@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import select
 import subprocess
 import sys
@@ -246,9 +247,39 @@ def resolve_root_main(fallback: str) -> None:
     print(line)
 
 
+# receipt-hint-on-message: Claude Code delivers a message from another session as a prompt wrapped in
+# <cross-session-message from-session="local_..." from-name="...">. Only the wrapper's two attributes are read.
+_RECEIVED_TAG = re.compile(r"<cross-session-message\s[^>]*>")
+_RECEIVED_SESSION = re.compile(r"^local_[A-Za-z0-9-]+$")
+
+
+def received_from(text) -> tuple | None:
+    """(sender name, session id) when the hook input's prompt is a forwarded session message, else None."""
+    data = json.loads(text)
+    prompt = data.get("prompt") if isinstance(data, dict) else None
+    if not isinstance(prompt, str):
+        return None
+    prompt = prompt.lstrip()
+    match = _RECEIVED_TAG.match(prompt) if prompt.startswith("<cross-session-message ") else None
+    if not match:
+        return None
+    attributes = dict(re.findall(r'([a-z-]+)="([^"]*)"', match.group(0)))
+    session = attributes.get("from-session", "")
+    return (safe_fragment(attributes.get("from-name", ""), 79),
+            session if _RECEIVED_SESSION.match(session) else "")
+
+
 def main() -> None:
     if len(sys.argv) > 2 and sys.argv[1] == "--resolve-root":
         resolve_root_main(sys.argv[2])
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "--received":
+        try:
+            found = received_from(read_hook_input(sys.stdin.fileno()))
+        except Exception:
+            found = None
+        if found:
+            print("received\t%s\t%s" % found)
         return
     try:
         text = read_hook_input(sys.stdin.fileno())

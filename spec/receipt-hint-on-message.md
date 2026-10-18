@@ -35,10 +35,10 @@
 
 ## Contract
 
-- `hooks/session_context.py`：从 hook 输入读 `prompt`；按假设 3 判定后，输出第 5 行 `received\t<name>\t<session>`（不是转来的消息时为空行；取不到的属性留空）。
-  其余四行不变。
-- `hooks/phase-guard.sh`：只在 UserPromptSubmit、项目根有 `.epiq/project.json`、且第 5 行是 `received` 时，在阶段注入的 `建议下一步`／`Suggested next step`
-  一行之前加一行提醒（中文或英文按 `--hint-language`）：
+- `hooks/session_context.py`：新增 `--received` 模式，从标准输入的 hook 输入读 `prompt`；按假设 3 判定后输出一行 `received\t<name>\t<session>`
+  （取不到的属性留空），不是转来的消息时不输出。原有的五行输出不变（第 5 行是宿主，phase-guard 按最后一行认 Codex，所以不在其后加行）。
+- `hooks/phase-guard.sh`：只在 UserPromptSubmit、项目根有 `.epiq/project.json`、且 `--received` 有输出时，在阶段注入的 `建议下一步`／`Suggested next step`
+  一行之前加一行提醒（没有建议下一步的输出放在末尾；所有阶段都经输出函数 `emit` 加入；中文或英文按 `--hint-language`，英文版意思相同）：
 
   > 这一轮是别的会话发来的消息（对方 `<name>`，会话 `<session>`）：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（`waiting-on-me`／`waiting-on-user`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。调用账本工具时都传 `repoRoot` 为 `<项目根>`。
 
