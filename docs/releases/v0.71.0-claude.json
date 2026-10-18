@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.71.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:8039cb7de07ad3f5639d1ce2070a9398972b94ef"
+      },
+      "observedAt": "2026-10-18T09:33:24Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.70.2 to 0.71.0; installed_plugins.json records gitCommitSha 8039cb7 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed phase-guard.sh run with CLAUDE_PROJECT_DIR set to this repository injects the BUILDING phase; the installed local_ledger_runtime.py status --format json reports machineSetup state read",
+        "not-verified:no headless claude -p session was run for this release; the change is in a script the agent calls, not in the hook injection"
+      ]
+    }
+  ]
+}
