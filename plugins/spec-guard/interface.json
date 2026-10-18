@@ -35,7 +35,7 @@
       "appearsWhen": "always, whatever moduleConcurrency is (interface 1.2)",
       "fields": {
         "uncommittedTicks": "per module; checked items in this checkout's working-tree tasks/<id>/todo.md minus those at HEAD, never below 0; an untracked todo counts every checked item; null when history is unavailable. Other worktrees are not counted: read worktree.dirty and worktree.progress",
-        "startedAt": "per module; commit time (%cI) of the first commit in HEAD's history that added spec/<id>.md; null when the Spec was never committed or history is unavailable; in a shallow clone it may be the first commit after the shallow boundary",
+        "startedAt": "per module; commit time (%cI) of the first commit in HEAD's history that added spec/<id>.md; null when the Spec was never committed or history is unavailable; in a shallow clone it may be the first commit after the shallow boundary; it is a commit time, not when writing began, so a project that commits the Spec only after approval gets a later time than the actual start",
         "head.committedAt": "commit time (%cI) of HEAD of this checkout, for the whole checkout and not per module; null without commits",
         "reviewCadence": "top level; {\"value\", \"source\"}, the same effective value and source /spec-guard:config shows; source is .agent/config.json, default, or default (config invalid)"
       },

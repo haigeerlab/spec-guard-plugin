@@ -78,3 +78,21 @@ CHANGELOG 新增 `[0.75.0]`，写明改了哪些叫法、哪些不变；两份 `
 - **改动面大、容易漏改或改错意思**：Task 1 的断言兜住"漏改"；"改错意思"靠逐处按对照表判断，最终验收列出每类的实际例子供用户抽查。
 - **测试断言与产品文字两边对不上**：每类改完立刻跑对应测试，不攒到最后。
 - **本仓库 `CLAUDE.md` 有 1 处"评审"**：它是维护者说明，不在 Spec 的范围里，本模块不改，最终验收时说明。
+
+## 返工：本仓库 `CLAUDE.md` 的一处旧词（2026-10-19）
+
+模块验收时说明过：本仓库 `CLAUDE.md` 第 22 行"只读地评审 GitHub / GitLab Proposal Issue"不在当初的范围里。用户要求一并改掉，
+并让防回退断言也覆盖它，免得以后回退。
+
+### Task 6：改 `CLAUDE.md` 并纳入防回退断言
+
+`CLAUDE.md` 的"评审"按对照表改为"审查"（Proposal 审查是技术检查）；`test_workflow_checkpoints.py` 的
+`test_user_facing_text_uses_the_shared_terms` 文件清单加上仓库根目录的 `CLAUDE.md`。
+
+- 验收：断言先在加入清单、未改文字时变红，改字后转绿。
+- 验证：`verify-and-commit.sh`。
+- 文件：`CLAUDE.md`、`hooks/test_workflow_checkpoints.py`。
+
+### Checkpoint 3（gate）：返工验收
+
+展示改动与验证结果；推送与开 PR 在此由用户确认，合并由用户进行。

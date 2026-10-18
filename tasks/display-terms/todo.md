@@ -7,6 +7,8 @@
 - [x] Task 4：命令、skill、README 与 docs — 按对照表改 commands（含 frontmatter description）、skills、`templates/CAPABILITY-MAP.md`（「审阅记录」「审阅人」）、README、`docs/*.md`；宿主 `/hooks` 界面的「审核并信任」改为「查看并信任」，Codex 提权的「审批」改为「批准」。防回退断言转绿，命中 0；完整 `validate.sh` 通过。
 - [x] Task 5：CHANGELOG 与版本号 — CHANGELOG 新增 `[0.75.0] - 2026-10-19`，写明主要改名与不变的东西；两份 `plugin.json` 改为 0.75.0，中英 README 的 `--ref` 改为 v0.75.0。
 - [x] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-19 在对话里按 AC1–AC4 逐条给出证据（防回退断言 182→0、新叫法的测试断言、`module_stage.py` 英文串改前改后差异 0 行、全套检查），附每类改法的实际例子，说明与 Plan 的两处差异（Task 1–4 合成一个提交；README 的改名放进第一个提交）、未验证项（安装版真实会话待发版后；本仓库 `CLAUDE.md` 的 1 处不在范围内）、实际改动的文件清单（取自版本库：47 个文件，新增 3、修改 44、删除 0，无超出 Plan 预计的文件）与文档建议（无）。用户批准：勾上 gate、推送、开 PR。
+- [ ] Task 6：改 `CLAUDE.md` 并纳入防回退断言（返工，见 plan.md 末节）
+- [ ] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行
 
 ## 外部审查意见
 

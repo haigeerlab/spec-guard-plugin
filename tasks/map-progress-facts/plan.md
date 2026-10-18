@@ -72,3 +72,22 @@
 - **工作区 todo 与 HEAD 都改了但勾选数相同**（比如勾一项、取消另一项）：记 0。只报净增，Spec 已写明。
 - **`git diff HEAD` 在没有提交的仓库里失败**：归入 `history` 为 `unavailable` 的情形，几项为 `null`，不报错。
 - **配置无效时 `reviewCadence` 的 source**：取 `summary()` 的原样输出（`default (config invalid)`），不另造取值。
+
+## 返工：说明 `startedAt` 与实际开工的差别（2026-10-19）
+
+decision-inbox 核对 0.73.0 字段时提醒：`startedAt` 是 Spec 第一次**提交**的时间；项目若习惯在 Spec 批准后才提交，它会比实际
+开工（开始写 Spec）晚。契约本身不变，只把这一点写进读取方看得到的说明。
+
+### Task 5：`startedAt` 的说明补一句
+
+`interface.json` 的 `mapView.progressFacts.fields.startedAt` 补一句：取的是提交时间，Spec 批准后才提交的项目会比实际开工晚；
+`commands/map.md` 与 `spec-guard-ops` 的 map 一节在 `startedAt` 后补同一层意思。接口版本仍为 1.2（只改说明文字），不单独发版，
+随下一次发版带出。
+
+- 验收：`check-interface.py` 与 `test-checkers.sh` 照常通过；三处都写明这个差别。
+- 验证：`verify-and-commit.sh`。
+- 文件：`interface.json`、`commands/map.md`、`skills/spec-guard-ops/SKILL.md`。
+
+### Checkpoint 3（gate）：返工验收
+
+展示改动与验证结果；推送与开 PR 在此由用户确认，合并由用户进行。
