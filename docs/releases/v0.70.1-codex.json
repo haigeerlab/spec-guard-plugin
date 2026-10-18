@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.70.1-upgrade-20261018"
+      },
+      "observedAt": "2026-10-18T08:07:27Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.70.0 to v0.70.1; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.70.1 enabled; the installed plugin directory is identical to the release asset; the smoke run exited 0",
+        "result:3 codex exec sessions (hook trust bypassed for the runs; the project trust entries they wrote were removed and ~/.codex/config.toml differs from before only in the ref line), each in a fresh project with the Codex convention block and a local-only ledger, asked to do a small README task while the prompt also carried a message from another session: all 3 recorded it in the ledger at once (tagged waiting-on-user, keeping the sender name and session id), none acted on or answered it, and every ledger tool call passed repoRoot for that project (one run passed it through a script variable)",
+        "not-verified:the message reached Codex inside the prompt, not through the agent-relay mailbox the Spec names; a one-shot codex exec session cannot receive a mailbox message without being told to read its inbox, which would change the test"
+      ]
+    }
+  ]
+}
