@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.70.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:06659cd583ea5e60437e5d2369432c7aa3d04084"
+      },
+      "observedAt": "2026-10-18T08:40:33Z",
+      "evidence": [
+        "result:the v0.70.2 annotated tag resolves to merge commit 06659cd583ea5e60437e5d2369432c7aa3d04084 (pull request #357); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39111434069) failed 3 times, each time only at the phase-guard case where stdin stays open (the hook took 3.05, 3.12 and 3.11 s against a 3 s limit); the merge commit's tree is identical to the pull request head 2f161d8, whose CI run 39111180011 passed; on this Mac the same case takes 1.2-1.7 s on v0.69.0, v0.70.0 and this commit alike, so the code did not get slower; the user chose to tag anyway and to fix the timing case in a separate module",
+        "result:0.70.2 is one module, review-one-module: the shared checkpoint rules say a review hands in one module at a time, several modules are reviewed together only when the user asks (the batch pre-review) or when the coordinating session gathers them with moduleConcurrency on, and then grouped by module (Spec, Plan, tasks per module, in Build order, never laid out by artifact type); the batch pre-review is used only on the user's explicit request; one added convention-block line in each template; no hook or command changed",
+        "result:verify-and-commit full tier, the workflow checkpoint tests and validate.sh passed under macOS /bin/bash; setup-convention --replace over a 0.70.1 block exits 0 on both hosts without --accept-removals"
+      ]
+    }
+  ]
+}
