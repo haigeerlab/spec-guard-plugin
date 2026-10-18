@@ -4,7 +4,7 @@
 - [x] Task 2：实现 — `map_view.py` 加 `progress_facts()`（一次 `git diff HEAD -U0`、一次 `ls-files --others`、一次 `log --diff-filter=A`）、`_head()` 的 `committedAt`、顶层 `reviewCadence`（取 `project_config.summary()`）、进行中状态格的「N 项勾选未提交（最后一次提交 … 前）」。61 例全绿。两处变异各有断言变红：不把负数记为 0（1 例红）、未跟踪 todo 按 0 计（1 例红）。实现中发现 `_git` 会把 `\x1e` 分隔符当空白 strip 掉，Spec 首次提交改用 `@` 行首标记解析。本仓库实跑：改动前 0.34／0.34 秒，改动后 0.25／0.36 秒；126 个模块里 123 个有 `startedAt`，没有的 3 个是本轮新插、Spec 未提交的模块。
 - [x] Checkpoint 1（report）：map 回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
 - [x] Task 3：接口说明 — `interface.json` 升到 1.2：`mapView` 下加 `progressFacts`（四项字段的含义与 null 的情形、`reviewCadence` 两个取值、"只给事实，阈值与判断由读取方做"），concurrency 一节去掉"与 1.0 逐字相同"；`map_view.py` 加 `PROGRESS_FIELDS` 常量，`check-interface.py` 加 `_progress_facts()` 核对字段与 `project_config.CADENCES`。`test-checkers.sh` 加 3 例：先只改 `interface.json`、不改检查器时 3 例红（期望拦下、实际放行），改检查器后 136 例全绿。
-- [ ] Task 4：文档、实跑、CHANGELOG 与版本号
+- [x] Task 4：文档、实跑、CHANGELOG 与版本号 — `commands/map.md`、`spec-guard-ops` 的 map 一节、`docs/commands.md`、`docs/design.md` 写明新字段；CHANGELOG 新增 `[0.73.0] - 2026-10-19`；两份 `plugin.json` 改为 0.73.0，中英 README 的 `--ref` 改为 v0.73.0。实跑：临时 git 仓库（`mktemp -d` 固定前缀，用后按前缀删除）按 2026-10-16 提交 1/4，工作区再勾 2 项，`SPEC_GUARD_MAP_NOW=2026-10-19T09:00:00+08:00 map_view.py` 表格为「🔨 进行中 3/4，上次勾选 3 天前，2 项勾选未提交（最后一次提交 3 天前）」，JSON 的 `uncommittedTicks` 为 2、`startedAt` 与 `head.committedAt` 为 2026-10-16T09:00:00+08:00、`reviewCadence` 为 separate／default。本仓库实跑见 Task 2。
 - [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
 
 ## 外部审查意见

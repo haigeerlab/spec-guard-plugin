@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.73.0] - 2026-10-19
+
+本版 1 个模块：`map-progress-facts`。`/map --json` 只增字段，`schemaVersion` 仍为 1；`interface.json` 升到 1.2。
+
+### 新增
+
+- **勾了没提交，map 现在会说。** 一个真实的前端项目里，进行中的模块在工作区已勾到 8/9，但都没提交：勾选时间全是空的、
+  勾选次数为 0，进度表看不出任何异常。现在每个模块多一个 `uncommittedTicks`（工作区 todo 比 HEAD 多勾的项数，未跟踪的 todo
+  按全部勾选计，不会小于 0），表格进行中一格写"N 项勾选未提交（最后一次提交几天前）"。只给事实，不设阈值、不判断"停滞"，
+  多久算卡住由读取方决定。不读文件修改时间，`bottlenecks` 仍只列挂起的模块。
+- **开工时间与最后一次提交时间。** 每个模块的 `startedAt` 是第一次提交 Spec 的时间；`head.committedAt` 是当前 checkout HEAD 的
+  提交时间（整个 checkout 的，不按模块分）。
+- **批准节奏对外公开。** 顶层 `reviewCadence` 给 `{value, source}`，和 `/spec-guard:config` 显示的一致，读取方不必再打开
+  `.agent/config.json`。`interface.json` 1.2 在 `mapView.progressFacts` 里说明这四项，`check-interface.py` 核对字段与取值。
+
 ## [0.72.0] - 2026-10-18
 
 本版 1 个模块：`receipt-hint-on-message`。

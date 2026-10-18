@@ -43,7 +43,7 @@ plugins/spec-guard/
 | `setup-convention.sh`、`teardown-convention.sh`、`managed-block.py` | 安装、升级、移除约定块；`managed-block.py` 负责标记校验、本地段与原子写入 |
 | `verify-artifacts.sh` | 按需校验已落地的产物 |
 | `module-insert.py` | 快速插入与 Proposal 晋级的写入（只改能力图） |
-| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`）；多模块并行开关为 on 时只增 `moduleConcurrency`、`buildOrderGroups`、`startable` 与每模块 `scope`，表格标出可同时开工与并行边界重叠（`spec/map-startable.md`） |
+| `map_view.py` | 只读的模块进度表（`/spec-guard:map`）：组合 `module_stage` 的判定，给出六种状态、按依赖链算的挡住个数、关键卡点与待审核；同一份结构渲染成表格或 JSON（`schemaVersion` 1，是给其他插件的接口，契约见 `spec/map-view.md`，接口说明见 `interface.json`）；最后勾选与挂起开始的时间由一次 `git log` 从已提交的 todo 历史取得（`spec/stall-signals.md`）；未提交勾选数、Spec 首次提交时间、HEAD 提交时间与 `reviewCadence` 的生效值另由三次 git 调用与 `project_config.summary()` 给出，只给事实不设阈值（`spec/map-progress-facts.md`）；多模块并行开关为 on 时只增 `moduleConcurrency`、`buildOrderGroups`、`startable` 与每模块 `scope`，表格标出可同时开工与并行边界重叠（`spec/map-startable.md`） |
 | `project_config.py` | `.agent/config.json` 的唯一解析器 |
 | `module_scope.py` | 模块 Spec「并行边界」一节的唯一解析器；`check` 对照集成基线做只读越界检查，`validate` 供 verify-artifacts 调用；开关不是 on 时都不生效 |
 | `checkout_role.py` | 每个 checkout 的角色标记（`module <id>`／`coordinator`，存在本 checkout 的 git 目录）：读取、预览确认后写入；阶段提示只经 `role()` 读，开关不是 on 时不读；全项目的选模块与阶段不受影响 |
