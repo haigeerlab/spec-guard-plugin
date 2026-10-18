@@ -1598,7 +1598,8 @@ RUN_PATH="$WORK/nopy" event_is "缺 python3 时的诊断也用 SessionStart 事�
 mkdir -p "$WORK/brokenpy"
 printf '%s\n' '#!/bin/sh' 'exit 1' > "$WORK/brokenpy/python3"; chmod +x "$WORK/brokenpy/python3"
 RUN_PATH="$WORK/brokenpy:$PATH" event_is "python3 跑不起来时的诊断也用 SessionStart 事件名" "$local_project" SessionStart SessionStart "python3 无法运行"
-# hooks.json：两项都在；SessionStart 只在压缩后触发并带参数；兜底的事件名与所在项一致；UserPromptSubmit 一项逐字不变。
+# hooks.json：三项都在；SessionStart 一项只在压缩后触发并带参数，另一项（open-commitments）只在会话开始与清空后触发并带
+# SessionStart fresh；兜底的事件名与所在项一致；UserPromptSubmit 一项逐字不变。
 python3 - "$HOOKDIR/hooks.json" <<'PY' || fail "hooks.json 的结构不对"
 import json, sys
 hooks = json.load(open(sys.argv[1]))["hooks"]
@@ -1606,16 +1607,28 @@ assert sorted(hooks) == ["SessionStart", "UserPromptSubmit"], sorted(hooks)
 ups = hooks["UserPromptSubmit"]
 assert len(ups) == 1 and "matcher" not in ups[0], ups
 ss = hooks["SessionStart"]
-assert len(ss) == 1 and ss[0].get("matcher") == "compact", ss
+assert [entry.get("matcher") for entry in ss] == ["compact", "startup|clear"], ss
 for event, entries in hooks.items():
-    command = entries[0]["hooks"][0]["command"]
-    assert command.count('"hookEventName":"%s"' % event) == 2, (event, command)
-    other = "UserPromptSubmit" if event == "SessionStart" else "SessionStart"
-    assert other not in command, (event, command)
+    for entry in entries:
+        command = entry["hooks"][0]["command"]
+        assert command.count('"hookEventName":"%s"' % event) == 2, (event, command)
+        other = "UserPromptSubmit" if event == "SessionStart" else "SessionStart"
+        assert other not in command, (event, command)
 assert 'bash "$SCRIPT" SessionStart ||' in ss[0]["hooks"][0]["command"], ss
+assert 'bash "$SCRIPT" SessionStart fresh ||' in ss[1]["hooks"][0]["command"], ss
+assert ss[0]["hooks"][0]["command"].replace('SessionStart ||', 'SessionStart fresh ||') == ss[1]["hooks"][0]["command"], ss
 assert 'bash "$SCRIPT" ||' in ups[0]["hooks"][0]["command"], ups
 PY
-echo "  ✅ hooks.json 两项齐全，SessionStart 只在压缩后触发并带参数，兜底事件名一致"; PASS=$((PASS + 1))
+echo "  ✅ hooks.json 三项齐全，压缩后与会话开始／清空后各一项并带参数，兜底事件名一致"; PASS=$((PASS + 1))
+if base="$(git -C "$HOOKDIR" show origin/main:plugins/spec-guard/hooks/hooks.json 2>/dev/null)"; then
+  python3 -c '
+import json, sys
+old = json.loads(sys.argv[1])["hooks"]["SessionStart"][0]
+new = json.load(open(sys.argv[2]))["hooks"]["SessionStart"][0]
+assert old == new
+' "$base" "$HOOKDIR/hooks.json" || fail "压缩后那一项 SessionStart 应与 origin/main 上逐字相同（Codex 按项记录信任）"
+  echo "  ✅ 压缩后那一项 SessionStart 与 origin/main 逐字相同"; PASS=$((PASS + 1))
+fi
 if base="$(git -C "$HOOKDIR" show origin/main:plugins/spec-guard/hooks/hooks.json 2>/dev/null)"; then
   python3 -c '
 import json, sys
@@ -1979,7 +1992,87 @@ SG_INPUT="$WORK/zh-session" zh_check "zh-CN：本会话登记的关联项目" "$
   +"里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。" "${ENGLISH_ONLY[@]}"
 }
 
-PARTS=18
+part_19() {
+# open-commitments：项目根有 .epiq/project.json 时，会话开始与清空后（SessionStart fresh）只出一句账本读回提醒，压缩后的
+# 核对提醒补账本一句；没有账本时 fresh 静默、压缩后与 0.68.0 相同；每轮 UserPromptSubmit 有无账本都相同。
+build_fixture local
+oc_run() {  # $1=项目目录，其余参数原样传给 phase-guard.sh
+  local dir="$1"; shift
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="${RUN_PATH:-$PATH}" \
+    CLAUDE_CONFIG_DIR="$WORK/no-claude-home" CODEX_HOME="$WORK/no-codex-home" CLAUDE_PROJECT_DIR="$dir" \
+    /bin/bash "$HOOKDIR/phase-guard.sh" "$@" </dev/null
+}
+context_is() {  # $1=用例名 $2=期望事件名 $3=期望的完整注入文字；标准输入是 hook 输出
+  python3 -c '
+import json, sys
+output = json.loads(sys.stdin.read())["hookSpecificOutput"]
+assert output["hookEventName"] == sys.argv[1], output
+assert output["additionalContext"] == sys.argv[2], output["additionalContext"]
+' "$2" "$3" || fail "$1"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+EN_FRESH='This project has the local ticket ledger enabled: first list the open issues tagged `waiting-on-me`, `waiting-on-them` or `waiting-on-user`; carry on with the `waiting-on-me` ones, follow up once on the `waiting-on-them` ones if needed, and hand the `waiting-on-user` ones to the user, then continue with what the user asked. If there are none, just continue.'
+ZH_FRESH='本项目启用了本地事项账本：先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的未关闭事项，`waiting-on-me` 的接着处理，`waiting-on-them` 的按需追问一次，`waiting-on-user` 的交给用户，再继续用户的请求；没有就直接继续。'
+EN_REMIND='Context was just compacted: earlier requests in the summary may already be done; check the todo and the state record before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
+EN_REMIND_LEDGER='Context was just compacted: earlier requests in the summary may already be done; check the todo, the state record and the open `waiting-on-*` issues in the ledger before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
+ZH_REMIND_LEDGER='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo、状态记录和账本里未关闭的 `waiting-on-*` 事项，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+
+# 没有账本：fresh 静默且退出 0；无关目录有账本文件也静默。
+out="$(oc_run "$local_project" SessionStart fresh)" || fail "没有账本时 fresh 应退出 0"
+[ -z "$out" ] || fail "没有账本时 fresh 应静默：$out"
+echo "  ✅ 没有账本时 SessionStart fresh 静默且退出 0"; PASS=$((PASS + 1))
+mkdir -p "$WORK/stray/.epiq"; printf '{}\n' > "$WORK/stray/.epiq/project.json"
+[ -z "$(oc_run "$WORK/stray" SessionStart fresh)" ] || fail "未激活的目录有账本文件也应静默"
+echo "  ✅ 未激活的目录有账本文件时 fresh 也静默"; PASS=$((PASS + 1))
+plain_before="$(oc_run "$local_project")"
+compact_before="$(oc_run "$local_project" SessionStart)"
+
+# 有账本：fresh 只出读回提醒；压缩后核对提醒换成带账本的一句，其余与 UserPromptSubmit 相同；UserPromptSubmit 不变。
+mkdir -p "$local_project/.epiq"; printf '{"projectId":"x"}\n' > "$local_project/.epiq/project.json"
+oc_run "$local_project" SessionStart fresh | context_is "有账本时 fresh 只出英文读回提醒" SessionStart "$EN_FRESH"
+[ "$(oc_run "$local_project")" = "$plain_before" ] || fail "有无账本时 UserPromptSubmit 应逐字相同"
+echo "  ✅ 有无账本时 UserPromptSubmit 逐字相同"; PASS=$((PASS + 1))
+python3 -c '
+import json, sys
+plain = json.loads(sys.argv[1])["hookSpecificOutput"]["additionalContext"]
+before = json.loads(sys.argv[2])["hookSpecificOutput"]["additionalContext"]
+after = json.loads(sys.argv[3])["hookSpecificOutput"]["additionalContext"]
+assert before == plain + "\n\n" + sys.argv[4], before
+assert after == plain + "\n\n" + sys.argv[5], after
+' "$plain_before" "$compact_before" "$(oc_run "$local_project" SessionStart)" "$EN_REMIND" "$EN_REMIND_LEDGER" \
+  || fail "压缩后的核对提醒：没有账本时应是原句，有账本时应是带账本的一句"
+echo "  ✅ 压缩后的核对提醒：没有账本是原句，有账本换成带账本的一句"; PASS=$((PASS + 1))
+
+# 缺 python3 时 fresh 仍给英文提醒（不靠 python3 生成 JSON）；没有账本时在启动 python3 之前就静默。
+mkdir -p "$WORK/nopy"
+RUN_PATH="$WORK/nopy" oc_run "$local_project" SessionStart fresh | context_is "缺 python3 时 fresh 仍给英文提醒" SessionStart "$EN_FRESH"
+
+# zh-CN：fresh 与压缩后的一句都用中文。
+mkdir -p "$local_project/.agent"
+printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$local_project/.agent/config.json"
+oc_run "$local_project" SessionStart fresh | context_is "zh-CN：fresh 只出中文读回提醒" SessionStart "$ZH_FRESH"
+python3 -c '
+import json, sys
+text = json.loads(sys.argv[1])["hookSpecificOutput"]["additionalContext"]
+assert text.endswith("\n\n" + sys.argv[2]), text
+' "$(oc_run "$local_project" SessionStart)" "$ZH_REMIND_LEDGER" || fail "zh-CN 压缩后应以带账本的中文一句结尾"
+echo "  ✅ zh-CN：压缩后以带账本的中文一句结尾"; PASS=$((PASS + 1))
+
+# 跟随指向：按被指向的项目判断账本；指向失效时 fresh 静默（诊断留给 UserPromptSubmit）。
+mkdir -p "$WORK/session-dir/.agent"
+printf '{"version": 1, "project": "%s"}\n' "$local_project" > "$WORK/session-dir/.agent/spec-guard-link.json"
+oc_run "$WORK/session-dir" SessionStart fresh | context_is "跟随指向：目标项目有账本时给提醒" SessionStart "$ZH_FRESH"
+build_fixture stages
+mkdir -p "$WORK/session-dir2/.agent"
+printf '{"version": 1, "project": "%s"}\n' "$stages" > "$WORK/session-dir2/.agent/spec-guard-link.json"
+[ -z "$(oc_run "$WORK/session-dir2" SessionStart fresh)" ] || fail "跟随指向：目标项目没有账本时应静默"
+echo "  ✅ 跟随指向：目标项目没有账本时静默"; PASS=$((PASS + 1))
+printf '%s\n' '{broken' > "$WORK/session-dir2/.agent/spec-guard-link.json"
+[ -z "$(oc_run "$WORK/session-dir2" SessionStart fresh)" ] || fail "指向失效时 fresh 应静默"
+echo "  ✅ 指向失效时 fresh 静默"; PASS=$((PASS + 1))
+}
+
+PARTS=19
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
