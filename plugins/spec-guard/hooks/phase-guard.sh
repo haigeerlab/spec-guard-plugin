@@ -67,12 +67,25 @@ fi
 
 # open-commitments：会话开始与清空后只出一句读回提醒，不出阶段摘要（随后的 UserPromptSubmit 会给）。只看项目根有没有
 # .epiq/project.json，不读账本内容、不调 Epiq；没有就静默。提醒是固定文字，JSON 手写，不依赖 python3 生成。
+# record-on-receipt：两处读回提醒末尾都给出调用账本工具要传的 repoRoot。路径来自当前目录（跟随指向时已在目标项目里）；
+# 含引号、反斜杠或控制字符时不写路径，免得手写的 JSON 出错。$1 为 zh 时用中文。
+ledger_root_note() {
+  local root="$PWD"
+  if [[ $root == *'"'* || $root == *'\'* || $root =~ [[:cntrl:]] ]]; then
+    if [ "${1:-}" = zh ]; then printf '%s' '调用账本工具时都传 `repoRoot` 为项目根目录。'
+    else printf '%s' ' Pass `repoRoot` = the project root to every ledger tool call.'; fi
+  elif [ "${1:-}" = zh ]; then printf '%s' "调用账本工具时都传 \`repoRoot\` 为 \`${root}\`。"
+  else printf '%s' " Pass \`repoRoot\` = \`${root}\` to every ledger tool call."; fi
+}
 fresh_out() {
   [ -f .epiq/project.json ] || exit 0
   local text='This project has the local ticket ledger enabled: first list the open issues tagged `waiting-on-me`, `waiting-on-them` or `waiting-on-user`; carry on with the `waiting-on-me` ones, follow up once on the `waiting-on-them` ones if needed, and hand the `waiting-on-user` ones to the user, then continue with what the user asked. If there are none, just continue.'
   if command -v python3 >/dev/null 2>&1 &&
     [ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" = zh-CN ]; then
     text='本项目启用了本地事项账本：先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的未关闭事项，`waiting-on-me` 的接着处理，`waiting-on-them` 的按需追问一次，`waiting-on-user` 的交给用户，再继续用户的请求；没有就直接继续。'
+    text="${text}$(ledger_root_note zh)"
+  else
+    text="${text}$(ledger_root_note)"
   fi
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"'"${text}"'"}}'
   exit 0
@@ -161,8 +174,10 @@ ZH=""
 if [ -f .epiq/project.json ]; then
   if [ -n "$ZH" ]; then
     COMPACT_NOTE='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo、状态记录和账本里未关闭的 `waiting-on-*` 事项，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。'
+    COMPACT_NOTE="${COMPACT_NOTE}$(ledger_root_note zh)"
   else
     COMPACT_NOTE='Context was just compacted: earlier requests in the summary may already be done; check the todo, the state record and the open `waiting-on-*` issues in the ledger before redoing anything, and once checked, carry on with the suggested next step above, if there is one, instead of ending the turn.'
+    COMPACT_NOTE="${COMPACT_NOTE}$(ledger_root_note)"
   fi
 fi
 
