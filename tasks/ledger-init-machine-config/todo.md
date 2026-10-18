@@ -8,5 +8,11 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警 — 随 e93d91a 跑 `verify-and-commit.sh` 全档：phase-guard 404 例、verify-artifacts 68 例、repo-artifacts 5 通过；本模块未改 `.sh`，ShellCheck 不适用。
 - [x] Task 5：说明文档 — `commands/local-ticket-ledger.md`、`skills/local-ticket-ledger-ops/SKILL.md`、`references/local-ticket-ledger-runtime.md`：初始化前看 `machineSetup`，机器已有的告诉用户是整机设置、用 TUI 的 `:config` 改，不再传；只问缺的；`unknown` 时三项都问；`Epiq refused:` 诊断；警告报条数与编号。示例命令加一行省略参数的写法。
 - [x] Task 6：CHANGELOG 与 0.71.0 版本号 — 顶部「未发布」并入 `[0.71.0] - 2026-10-18`（2 个模块，变更写本模块，维护者工具保留 stdin-timing-test 那条）；两份 `plugin.json` 改为 0.71.0，中英 README 的 `--ref` 改为 v0.71.0。
-- [ ] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 7444242 的 14 个文件（均在 Plan 范围内）、比 Spec 窄的一处（status 文本只在未初始化时列机器设置，JSON 始终带）、验证结果与未验证项（宿主安装副本放到发版后，未做独立代码评审），以及发给 session-protocol 契约负责人的回告草稿；用户验收通过，回告草稿一并批准，确认推送与开 PR。
 - [ ] 发版后的验证
+
+## 外部审查意见
+
+<!-- spec-guard: external-review declined -->
+
+用户在最终验收时直接验收通过、没有要求外部审查（2026-10-18）。
