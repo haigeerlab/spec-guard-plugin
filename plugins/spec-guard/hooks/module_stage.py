@@ -759,14 +759,9 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     boundary_at, mid_at, boundary_note, mid_note = thresholds(context_window, zh)
     context_note = (context_line(context_tokens, mid_note, host, zh)
                     if context_tokens is not None and context_tokens >= mid_at else "")
-    if context_tokens is None:
-        boundary_note_line = (("- 模块边界: 这是释放上下文的好时机。" if zh else
-                               "- Module boundary: a good point to free context. ")  # size unknown: no size given
-                              + cmd["free-next"])
-    elif context_tokens >= boundary_at:
-        boundary_note_line = boundary_line(context_tokens, boundary_note, host, zh)
-    else:
-        boundary_note_line = ""
+    # boundary-hint-unknown-size: no reading means no hint; a new session's first turn has no usage yet.
+    boundary_note_line = (boundary_line(context_tokens, boundary_note, host, zh)
+                          if context_tokens is not None and context_tokens >= boundary_at else "")
     if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
         context_note = boundary_note_line = ""
     no_todo_note = ""
