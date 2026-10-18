@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.69.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:0236e0e2c18c92bd16b2cc4c55684ce0c6d2ae4f"
+      },
+      "observedAt": "2026-10-18T06:48:23Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.68.0 to 0.69.0; installed_plugins.json records gitCommitSha 0236e0e (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:a new claude -p session in a temporary project with .epiq/project.json got the read-back sentence from SessionStart:startup in hook_additional_context; an interactive session driven through tmux ran /clear and SessionStart:clear delivered the same sentence into the context",
+        "result:real sessions with a local-only ledger (sonnet): the mid-task message from another session was NOT recorded in the ledger in 2 of 2 runs (the agent only ran the read-back listing and said it would wait); a new session told only to carry on listed the waiting-on-* issues, found the held item and its reply target, did not send to the absent recipient and left the delivery date to the user",
+        "not-verified:the read-back listing calls omitted repoRoot; they returned this project's issues in these runs, but without repoRoot the ledger MCP can answer for a different project (observed in the maintainer session), so a follow-up should state repoRoot in the reminder"
+      ]
+    }
+  ]
+}

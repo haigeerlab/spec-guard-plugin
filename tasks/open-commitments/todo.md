@@ -7,7 +7,7 @@
 - [x] Task 3：宿主实测新一项钩子会触发 — Claude：临时项目（约定块 + `.epiq/project.json`）里 `claude -p --plugin-dir <工作区插件> --model haiku` 跑一轮，会话记录里 `SessionStart:startup` 钩子输出了英文读回提醒，并进入 `hook_additional_context`（与另一插件的注入并列），模型上下文里有。Codex：未测——smoke 只测已安装到 Codex 的那份插件，测工作区版本要改本机 Codex 安装，新的一项钩子还要用户在 `/hooks` 信任；放到发版后同步宿主时测。`/clear`（两边）也放到发版后在交互会话里测。
 - [x] Task 4：文档、CHANGELOG 与版本号 — `docs/workflow.md` 一段（有人在等的事不靠会话记忆）；`docs/design.md` 钩子表与数据流补新的 `SessionStart` 一项；CHANGELOG `[0.69.0]`（含 Codex 要信任新一项钩子）；两份 `plugin.json` 改为 0.69.0，中英 README 的 `--ref` 改为 v0.69.0，安装表补信任说明，数据与隐私一节补「只看 `.epiq/project.json` 在不在」；`validate.sh` 通过。另核对成功标准：临时项目先用 0.68.0（`git archive e77af2e`）装约定块，再用工作区版本 `setup-convention local --replace`（Claude 与 `--host=codex` 各一次），退出码都是 0，新增行已写入，不需要 `--accept-removals`。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出实际改动的 19 个文件（均在 Plan 范围内；删除行来自第 15 段 hooks.json 断言改为三项）、验证结果与未验证项（Codex 新钩子、两边 `/clear`、真实会话行为、未做独立代码评审），以及拟回告（session-protocol 契约负责人，Claude 原生会话消息，发版后发 0.69.0 的改动与升级方法，随后以「已告知」关闭 HP2G7RV）；用户验收通过，拟回告一并批准，确认推送与开 PR；不做外部审查。
-- [ ] 发版后的验证
+- [x] 发版后的验证 — 2026-10-18，v0.69.0（tag 在合并提交 0236e0e，main CI 39104566209 通过；发布包 sha256 6d86b0aa…8d61645c，下载回来一致）。两边宿主升级到 0.69.0，安装副本与发布包一致，Codex smoke 退出码 0。钩子：Claude 的 startup、/clear（tmux 驱动交互会话）与 Codex 的 startup 都注入了读回提醒；Codex 交互 /clear 与用户自己信任新钩子后的情况未测。真实会话（临时项目，纯本地账本）：Codex 三轮都照规则——收到即记（挂 waiting-on-user，保留对方会话名与 ID）、新会话找回、日期承诺留给用户、告知走 agent-relay 找不到收件方并如实记录；Claude（sonnet）收到即记 2/2 未执行（只做了读回列表），新会话读回与闸门照规则执行；读回时列表调用都没带 repoRoot，有查错项目的风险。以上两处问题作为后续模块的候选。回告：发版后已按批准内容通知 session-protocol 契约负责人（Claude 原生会话消息），HP2G7RV 以「已告知」关闭。记录见 `docs/releases/v0.69.0-*.json`。
 
 ## 外部审查意见
 
