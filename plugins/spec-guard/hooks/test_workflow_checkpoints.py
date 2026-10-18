@@ -268,14 +268,50 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("若装了 delegate 插件", "只读审查", "不算用户批准", "若装了 agent-relay 插件", *host_entries):
                     self.assertIn(phrase, text)
 
+    def block_surfaces(self):
+        # stop-rule-and-ac: every copy of the convention block, including this repository's own AGENTS.md.
+        yield from (self.plugin / "templates").glob("*-block-local.md")
+        yield self.plugin.parents[1] / "docs" / "convention-block.md"
+        yield self.plugin.parents[1] / "AGENTS.md"
+
     def test_an_external_blocker_goes_back_to_the_user(self):
+        # stop-rule-and-ac: the same module and goal, not the same gate; a rewording or a new one-off permission is no new goal.
+        contract = self.target.read_text(encoding="utf-8")
         section = self.section("## Plan 检查点分级")
-        for phrase in ("同一个 gate 因外部原因", "再次挡住", "挂起", "接受风险", "换方案", "代价", "不按默认推荐继续重试"):
+        for phrase in ("同一模块、同一目标", "第二次过不去", "第二次为它向用户报批", "自己能修", "换一份草稿", "一次性许可",
+                       "/spec-guard:map", "可以开始", "module-suspend", "没有就照实说", "接受风险", "换方案", "代价",
+                       "不按默认推荐继续重试"):
             self.assertIn(phrase, section)
-        for path in (self.plugin / "templates").glob("*-block-local.md"):
+        self.assertNotIn("同一个 gate 因外部原因", contract)
+        for path in self.block_surfaces():
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("同一个 gate 因外部原因", "交用户决定"):
+                for phrase in ("同一模块、同一目标", "第二次", "报批", "先开可开工模块", "交用户决定"):
+                    self.assertIn(phrase, text)
+                self.assertNotIn("同一个 gate 因外部原因", text)
+
+    def test_checks_a_script_can_judge_may_be_report(self):
+        # stop-rule-and-ac: the default stays gate; writing and handing in a Plan say report is available.
+        tiers = self.section("## Plan 检查点分级")
+        for phrase in ("未标注的检查点按 `gate`", "靠测试或检查脚本就能判定", "最终验收、推送与不可逆操作",
+                       "交审 Plan 时说明哪些检查点是 `report`"):
+            self.assertIn(phrase, tiers)
+        for path in self.block_surfaces():
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("未标注按 `gate`", "可标 `report`"):
+                    self.assertIn(phrase, text)
+
+    def test_acceptance_criteria_are_numbered(self):
+        # stop-rule-and-ac: AC1, AC2… so the final acceptance can match evidence to each one.
+        self.assertIn("验收标准（按 AC1、AC2… 编号）", self.section("## 评审状态标记"))
+        contract = self.target.read_text(encoding="utf-8")
+        for phrase in ("**验收标准编号。**", "`AC<数字>`", "删掉的编号不复用", "按编号逐条给证据", "只提示、不拦"):
+            self.assertIn(phrase, contract)
+        for path in self.block_surfaces():
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("AC1、AC2", "按编号给证据"):
                     self.assertIn(phrase, text)
 
     def test_a_review_handoff_shows_the_content(self):
