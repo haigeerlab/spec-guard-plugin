@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.76.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:431e728433034a651a5ac05ef6631ed06cddafbb"
+      },
+      "observedAt": "2026-10-18T19:09:14Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.72.0 to 0.76.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 431e728 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:a fresh claude -p session (sonnet) in a temporary DONE-stage consumer project: the transcript's first-turn hook_additional_context reports DONE and has no Module boundary line (the context size is unknown on a first turn)",
+        "result:the installed copy on a temporary project: map_view.py --json gives uncommittedTicks 2, startedAt, head.committedAt and reviewCadence {separate, default}; the table shows 待批准 and 2 项勾选未提交; verify-artifacts.sh warns that one acceptance criterion has no AC number; the convention block template carries the same-module-same-goal stop",
+        "not-verified:the model reply of that claude -p session was blocked by a model safeguard (the prompt asked it to repeat the injected text verbatim); the check above reads the transcript, not the reply"
+      ]
+    }
+  ]
+}
