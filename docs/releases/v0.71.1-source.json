@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.71.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:5d3b235d6757ce3970a5fa5115d1442c5c522611"
+      },
+      "observedAt": "2026-10-18T10:01:03Z",
+      "evidence": [
+        "result:the v0.71.1 annotated tag resolves to merge commit 5d3b235d6757ce3970a5fa5115d1442c5c522611 (pull request #363); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39117239360) passed on its first attempt",
+        "result:0.71.1 is one module, convention-block-blank-lines: the convention block has one blank line on each side of the block markers, the local-section markers and the dispatch-rule comment; --replace --dry-run reports 'will adjust blank lines: add N, remove M' and says 'block content unchanged' only when the block is byte-identical; upgrading an old block needs no --accept-removals; the local section's inside is kept as is; teardown is unchanged",
+        "result:before the pull request, with the oxfmt a consumer project has installed, in temporary directories: blocks written by the working tree (both hosts, dispatch off and on, with a local section) pass oxfmt --check; a block written by 0.71.0 fails it, the upgrade preview reports the same number of blank lines the write then adds (2, or 4 with dispatch on; nothing removed), and the upgraded block passes",
+        "result:test-setup-teardown.sh (73 cases), verify-and-commit full tier, ShellCheck and validate.sh passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}

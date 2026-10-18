@@ -7,7 +7,7 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警 — 随 e80ac7f 跑 `verify-and-commit.sh` 全档：phase-guard、verify-artifacts 68 例、repo-artifacts 5 通过、ShellCheck 无告警；setup/teardown 回归 73 例。
 - [x] Task 4：CHANGELOG 与 0.71.1 版本号 — CHANGELOG `[0.71.1]`（1 个模块，修复）；两份 `plugin.json` 改为 0.71.1，中英 README 的 `--ref` 改为 v0.71.1；`commands/setup-convention.md` 预览一段补空行写法与 `will adjust blank lines` 一行。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 3f4e54f 的 15 个文件（均在 Plan 范围内）、构建中纠正的两处测试代码、验证结果与未验证项（宿主安装副本放到发版后，未做独立代码评审），以及发给接入协调人的回告草稿；用户验收通过，回告草稿一并批准，确认推送与开 PR。
-- [ ] 发版后的验证
+- [x] 发版后的验证 — 2026-10-18，v0.71.1（tag 在合并提交 5d3b235，#363；main CI 39117239360 首次即通过；发布包 sha256 3bf159fa…85439301，下载回来一致）。两边宿主升级到 0.71.1，安装副本与发布包一致，Codex smoke 退出码 0；两边安装版 setup-convention（派活关／开）建的块 `oxfmt --check` 都是 0。第一次把两宿主放在一个循环里跑时 Codex 两例报 1，没留下文件与输出，逐个重跑都通过，原因未查明，已如实写进证据。记录见 `docs/releases/v0.71.1-*.json`。之后关闭账本 8AB0R0B 并按批准的草稿回告接入协调人。
 
 ## 外部审查意见
 
