@@ -116,8 +116,10 @@ from pathlib import Path
 p, begin, end, lb, le, tpl = sys.argv[1:7]
 lines = Path(p).read_text(encoding="utf-8").splitlines()
 body = lines[lines.index(begin) + 1:lines.index(end)]
-assert body[-3:] == [lb, "- 本项目自己的规则", le], body[-3:]
-assert body[:-3] == Path(tpl).read_text(encoding="utf-8").splitlines(), "template part differs"
+# convention-block-blank-lines: one blank line inside each block marker and before the local section.
+assert body[-4:] == [lb, "- 本项目自己的规则", le, ""], body[-4:]
+assert body[0] == "" and body[-5] == "", (body[0], body[-5])
+assert body[1:-5] == Path(tpl).read_text(encoding="utf-8").splitlines(), "template part differs"
 PY
 ok "本地段原样保留在新块末尾，模板正文完整"
 
@@ -445,8 +447,35 @@ ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
 # $1=文件 $2=BEGIN $3=END：输出两条标记之间的正文（不含标记行）
 block_body() { awk -v b="$2" -v e="$3" '{s=$0; gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)} s==e{inb=0} inb{print} s==b{inb=1}' "$1"; }
 host_run() { run setup-convention.sh local ${HOSTARG:+"$HOSTARG"} "$@"; }
-# $1=期望内容文件：块正文与它逐字节相同（不经 $(...)，末尾换行也算数）
-block_is() { block_body "$P/$HT" "$HB" "$HE" > "$WORK/actual-body"; cmp -s "$WORK/actual-body" "$1"; }
+# $1=期望内容文件（模板按序拼接）：块的非空行与它的非空行逐字相同，且块按标准写法排空行。
+block_is() { block_body "$P/$HT" "$HB" "$HE" > "$WORK/actual-body"; blank_lines_ok "$P/$HT" "$HB" "$HE" \
+  && python3 -c 'import sys; t=lambda f: [l for l in open(f, encoding="utf-8").read().splitlines() if l.strip()]; sys.exit(t(sys.argv[1]) != t(sys.argv[2]))' \
+     "$WORK/actual-body" "$1"; }
+# convention-block-blank-lines：$1=文件 $2=BEGIN $3=END。块标记、本地段标记与派活规则段注释前后各恰好一个空行
+# （文件开头与末尾除外；本地段只查外侧），标记前不留两个空行。
+blank_lines_ok() { python3 - "$@" <<'PY'
+import sys
+path, begin, end = sys.argv[1:4]
+lines = [l.rstrip("\r") for l in open(path, encoding="utf-8").read().split("\n")]
+if lines and lines[-1] == "":
+    lines.pop()
+marks = {begin, end, "<!-- BEGIN:spec-guard-local -->", "<!-- END:spec-guard-local -->",
+         "<!-- spec-guard: build-task-dispatch -->"}
+start = next(i for i, l in enumerate(lines) if l.strip() == begin)
+finish = next(i for i, l in enumerate(lines) if l.strip() == end)
+for i in range(start, finish + 1):
+    if lines[i].strip() not in marks:
+        continue
+    # The local section's inside belongs to the project: only its outside is checked.
+    mark = lines[i].strip()
+    if i > 0 and lines[i - 1].strip() and mark != "<!-- END:spec-guard-local -->":
+        sys.exit("no blank line before line %d: %s" % (i + 1, lines[i]))
+    if i + 1 < len(lines) and lines[i + 1].strip() and mark != "<!-- BEGIN:spec-guard-local -->":
+        sys.exit("no blank line after line %d: %s" % (i + 1, lines[i]))
+    if i > 1 and i - 1 > start and not lines[i - 2].strip() and lines[i].strip() != begin:
+        sys.exit("two blank lines before line %d" % (i + 1))
+PY
+}
 for host in claude codex; do
   if [ "$host" = codex ]; then
     HB='<!-- BEGIN:spec-guard-codex-convention -->'; HE='<!-- END:spec-guard-codex-convention -->'
@@ -549,6 +578,99 @@ PY
   [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：块内行中提及或块外的标记不应算开启
 $OUT"
   ok "${host}：块内正文提及或块外的标记不算开启"
+done
+
+# ── convention-block-blank-lines：标准空行写法、旧写法升级、本地段 ──
+for host in claude codex; do
+  if [ "$host" = codex ]; then
+    HB='<!-- BEGIN:spec-guard-codex-convention -->'; HE='<!-- END:spec-guard-codex-convention -->'
+    HT=AGENTS.md; HOSTARG=--host=codex
+  else
+    HB="$BEGIN"; HE="$END"; HT=CLAUDE.md; HOSTARG=""
+  fi
+  for mode in off on; do
+    DARG=""; [ "$mode" = on ] && DARG=--dispatch
+    project "${host}-blank-${mode}-fresh"
+    host_run ${DARG:+"$DARG"}
+    [ "$RC" -eq 0 ] && blank_lines_ok "$P/$HT" "$HB" "$HE" || fail "${host}/${mode}：新建文件里的块每条标记前后应各一个空行
+$(cat "$P/$HT")"
+    cp "$P/$HT" "$WORK/${host}-${mode}-canonical"
+    project "${host}-blank-${mode}-existing"
+    printf '# Mine\n\ntext\n' > "$P/$HT"
+    host_run ${DARG:+"$DARG"}
+    [ "$RC" -eq 0 ] && blank_lines_ok "$P/$HT" "$HB" "$HE" || fail "${host}/${mode}：追加到已有文件的块每条标记前后应各一个空行
+$(cat "$P/$HT")"
+    ok "${host}/${mode}：新建块每条标记前后各一个空行"
+
+    cp "$P/$HT" "$WORK/canonical"
+    host_run --replace --dry-run
+    [ "$RC" -eq 0 ] && grep -F 'block content unchanged' >/dev/null <<<"$OUT" && ! grep -F 'will adjust blank lines' >/dev/null <<<"$OUT" \
+      || fail "${host}/${mode}：标准写法再预览应为 block content unchanged
+$OUT"
+    host_run --replace
+    [ "$RC" -eq 0 ] && cmp -s "$P/$HT" "$WORK/canonical" || fail "${host}/${mode}：标准写法再 --replace 应逐字节不变"
+    ok "${host}/${mode}：标准写法再 --replace 不变，预览报 unchanged"
+
+    # 旧写法：去掉每条标记内侧／两侧紧邻的空行（块外 BEGIN 前那一行保留）。
+    python3 - "$P/$HT" "$HB" "$HE" <<'PY'
+import sys
+path, begin, end = sys.argv[1:4]
+lines = open(path, encoding="utf-8").read().split("\n")
+marks = {begin, end, "<!-- spec-guard: build-task-dispatch -->"}
+keep = []
+for i, l in enumerate(lines):
+    after_mark = i > 0 and lines[i - 1].strip() in marks
+    before_inner_mark = i + 1 < len(lines) and lines[i + 1].strip() in marks - {begin}
+    if not l.strip() and (after_mark or before_inner_mark) and i != len(lines) - 1:
+        continue
+    keep.append(l)
+open(path, "w", encoding="utf-8").write("\n".join(keep))
+PY
+    blank_lines_ok "$P/$HT" "$HB" "$HE" 2>/dev/null && fail "${host}/${mode}：测试夹具应是旧写法"
+    before="$(snapshot)"
+    host_run --replace --dry-run
+    [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -E 'will adjust blank lines: add [1-9][0-9]*, remove 0' >/dev/null <<<"$OUT" \
+      && ! grep -F 'needs --accept-removals' >/dev/null <<<"$OUT" && ! grep -F 'block content unchanged' >/dev/null <<<"$OUT" \
+      || fail "${host}/${mode}：旧写法预览应列出补空行、不需要 --accept-removals
+$OUT"
+    host_run --replace
+    [ "$RC" -eq 0 ] && cmp -s "$P/$HT" "$WORK/canonical" || fail "${host}/${mode}：旧写法 --replace 后应与新建块逐字节相同
+$(diff "$WORK/canonical" "$P/$HT")"
+    ok "${host}/${mode}：旧写法升级预览如实列出空行，写入后与新建块相同"
+  done
+
+  # 本地段：旧写法紧贴着，--replace 后前后有空行、内部原样；内部已被格式化器补过空行时再替换不变。
+  project "${host}-blank-local"
+  host_run
+  python3 - "$P/$HT" "$HE" <<'PY'
+import sys
+path, end = sys.argv[1:3]
+t = open(path, encoding="utf-8").read()
+t = t.replace("\n\n" + end, "\n<!-- BEGIN:spec-guard-local -->\n- 本地一\n<!-- END:spec-guard-local -->\n" + end, 1)
+open(path, "w", encoding="utf-8").write(t)
+PY
+  host_run --replace
+  [ "$RC" -eq 0 ] && blank_lines_ok "$P/$HT" "$HB" "$HE" && grep -Fx -- '- 本地一' "$P/$HT" >/dev/null \
+    && python3 -c 'import sys; t=open(sys.argv[1],encoding="utf-8").read(); sys.exit("<!-- BEGIN:spec-guard-local -->\n\n- 本地一" in t)' "$P/$HT" \
+    || fail "${host}：本地段前后应有空行、内部原样
+$(cat "$P/$HT")"
+  ok "${host}：本地段前后补空行，内部原样保留"
+  python3 - "$P/$HT" <<'PY'
+import sys
+path = sys.argv[1]
+t = open(path, encoding="utf-8").read()
+t = t.replace("<!-- BEGIN:spec-guard-local -->\n- 本地一\n<!-- END:spec-guard-local -->",
+              "<!-- BEGIN:spec-guard-local -->\n\n- 本地一\n\n<!-- END:spec-guard-local -->", 1)
+open(path, "w", encoding="utf-8").write(t)
+PY
+  cp "$P/$HT" "$WORK/formatted"
+  host_run --replace --dry-run
+  grep -F 'block content unchanged' >/dev/null <<<"$OUT" || fail "${host}：格式化过的本地段预览应为 unchanged
+$OUT"
+  host_run --replace
+  [ "$RC" -eq 0 ] && cmp -s "$P/$HT" "$WORK/formatted" || fail "${host}：格式化过的本地段再 --replace 应逐字节不变
+$(diff "$WORK/formatted" "$P/$HT")"
+  ok "${host}：格式化器整理过的本地段再 --replace 不变"
 done
 
 echo "setup/teardown regression passed (${PASS} cases)"

@@ -17,6 +17,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention.sh" $ARGUMENTS --dry-run
 `--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或派活规则段里时标着
 `[needs --accept-removals]`，真正替换会拒绝并不改文件。原样转述这些行，让用户决定把它们移进本地段，还是明确同意
 删除后加 `--accept-removals` 重跑；从旧版模板升级时，旧模板的行同样需要这一步。
+块里每条标记（块标记、本地段标记、派活规则段注释）前后各留一个空行，符合 oxfmt、Prettier 等 Markdown 格式化器的规则；空行有变化时预览多一行 `will adjust blank lines: add N, remove M`，这不需要 `--accept-removals`；块完全不用改时才报 `block content unchanged`。本地段内部原样保留。
 **实验性**：省钱效果未经证明。对照实验里派活没有减少主会话轮次，opus 父代理加 sonnet 子代理仍比不派贵 15%–54%，所以规则默认由主代理自己做，只派预计要改动 3 个以上文件、验收明确的 task。
 `--dispatch` 在约定块的基础模板之后加一段可选规则：`/build` 把 todo 中非 Checkpoint 的 task 交给一个子代理做
 RED → GREEN → 回归 → 构建，交出完整任务块与 plan 的 Architecture Decisions，派活 prompt 带 tier-guard 档位标记；

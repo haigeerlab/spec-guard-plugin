@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.71.1] - 2026-10-18
+
+本版 1 个模块：`convention-block-blank-lines`。修复，没有新功能。
+
+### 修复
+
+- **约定块过不了 Markdown 格式化检查。** `setup-convention` 写的块，标记行旁边没有空行，用 oxfmt、Prettier 做提交前检查的项目，
+  每次改到 `CLAUDE.md`／`AGENTS.md` 都判不合格；而 `--replace` 又会把格式化器补上的空行删掉，预览里却不列出。现在：
+  - 块的 `BEGIN`／`END`、本地段标记与派活规则段注释前后各留一个空行；新建与 `--replace` 写出的块，`oxfmt --check` 通过；
+  - `--replace --dry-run` 在空行有变化时多一行 `will adjust blank lines: add N, remove M`，与实际写入一致；块完全不用改时才报
+    `block content unchanged`；升级旧写法的块不需要 `--accept-removals`；
+  - 本地段内部原样保留；判断块是否最新照旧忽略空行；setup→teardown 往返仍逐字节还原。
+
 ## [0.71.0] - 2026-10-18
 
 本版 2 个模块：`ledger-init-machine-config`、`stdin-timing-test`。

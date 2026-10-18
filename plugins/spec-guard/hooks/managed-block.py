@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 
+import difflib
 import os
 import sys
 import tempfile
@@ -46,6 +47,29 @@ def local_section(block):
 
 def _text(lines):
     return [line.rstrip("\r\n") for line in lines if line.strip()]
+
+
+def compose(body, local):
+    """convention-block-blank-lines: the block's inner lines, with one blank line inside each marker and around the local section."""
+    while body and not body[0].strip():
+        body = body[1:]
+    while body and not body[-1].strip():
+        body = body[:-1]
+    inner = ["\n"] + body
+    if local:
+        inner += ["\n"] + local
+    return inner + ["\n"]
+
+
+def _blank_changes(old, new):
+    """(blank lines added, blank lines removed) going from old to new block lines."""
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+        if tag in ("delete", "replace"):
+            removed += sum(1 for line in old[i1:i2] if not line.strip())
+        if tag in ("insert", "replace"):
+            added += sum(1 for line in new[j1:j2] if not line.strip())
+    return added, removed
 
 
 def _options(rest, action):
@@ -99,6 +123,14 @@ def atomic_write(path, content):
 
 
 def main(argv):
+    if argv[1:2] == ["compose"] and len(argv) == 3:
+        # compose <body>: a new block's inner lines on stdout (setup-convention writes them between the markers)
+        with open(argv[2], "r", encoding="utf-8", newline="") as handle:
+            body = handle.readlines()
+        if body and not body[-1].endswith(("\n", "\r")):
+            body[-1] += "\n"
+        sys.stdout.write("".join(compose(body, [])))
+        return
     if len(argv) < 5:
         raise SystemExit("usage: managed-block.py <validate|replace|remove> <file> <begin> <end> [template] [options]")
     action, path, begin, end = argv[1:5]
@@ -128,19 +160,23 @@ def main(argv):
         added = [line for line in new_text if line not in old_text]
         known_text = _known(known)
         needs_accept = [line for line in removed if line not in known_text]
+        inner = compose(body, local)
         if dry:
             for line in removed:
                 print("will remove: %s%s" % (line, "" if line in known_text else "   [needs --accept-removals]"))
             for line in added:
                 print("will add: %s" % line)
-            if not removed and not added:
+            blank_added, blank_removed = _blank_changes(block, inner)
+            if blank_added or blank_removed:
+                print("will adjust blank lines: add %d, remove %d" % (blank_added, blank_removed))
+            if inner == block:
                 print("block content unchanged")
             if local:
                 print("keeps the local section (%d lines)" % len(local))
             return
         if needs_accept and not accept:
             _refuse(needs_accept)
-        atomic_write(path, "".join(lines[: start + 1] + body + local + lines[finish:]))
+        atomic_write(path, "".join(lines[: start + 1] + inner + lines[finish:]))
         print(finish - start - 1)
         return
     if action == "remove":
