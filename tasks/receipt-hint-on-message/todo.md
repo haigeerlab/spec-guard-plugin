@@ -6,7 +6,7 @@
 - [x] Checkpoint 1（report）：三套核心回归全绿，ShellCheck 无告警 — 随 fe20ba7 跑 `verify-and-commit.sh` 全档：phase-guard 410 例、verify-artifacts 68 例、repo-artifacts 5 通过 1 警告（Spec 批准后修订，待复审）、ShellCheck 无告警。
 - [x] Task 3：CHANGELOG 与 0.72.0 版本号 — CHANGELOG `[0.72.0]`（1 个模块，新增）；两份 `plugin.json` 改为 0.72.0，中英 README 的 `--ref` 改为 v0.72.0。
 - [x] Checkpoint 2（gate）：模块评审；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-18 在对话里列出相对 207218d 的 12 个文件（均在 Plan 范围内）、实跑提醒行、Spec Contract 两处修订的原样差异（批准验收即批准修订后的 Spec）、验证结果与未验证项（真实会话复测与宿主安装副本放到发版后，未做独立代码评审），拟回告为无；用户验收通过并批准修订后的 Spec，已用 review-mark 重新记录 Spec 的批准；确认推送与开 PR。
-- [ ] 发版后的验证
+- [x] 发版后的验证 — 2026-10-18，v0.72.0（tag 在合并提交 f550e86，#365；main CI 39120022168 首次即通过；发布包 sha256 730964c4…5947baefd，下载回来一致）。两边宿主升级到 0.72.0，安装副本与发布包一致，Codex smoke 退出码 0。真实会话复测（tmux 起 3 个 Sonnet 交互会话，全新项目带约定块与纯本地账本，临时 `EPIQ_GLOBAL_DIR`；先做一个 README 小任务，再收到一条真实跨会话需求）：**3 次都当场记账**（`waiting-on-user`），都没擅自改文件或回复，都说明记账不是受理；3 份会话记录里都有这行提醒；建事项都带对的 `repoRoot`，第 1 次有一次只读的 `epiq_swimlane_list` 没带。达到 3/3 的合格线。临时会话与目录已清理，本机账本数据未动。记录见 `docs/releases/v0.72.0-*.json`。
 
 ## 外部审查意见
 

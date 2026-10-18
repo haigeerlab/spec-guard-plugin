@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.72.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:f550e86feda2c498ccf6b097dbea86bd16f8301e"
+      },
+      "observedAt": "2026-10-18T10:46:28Z",
+      "evidence": [
+        "result:the v0.72.0 annotated tag resolves to merge commit f550e86feda2c498ccf6b097dbea86bd16f8301e (pull request #365); merged==true and main==merge sha were checked as a separate step before tagging",
+        "result:the push run of the CI on main for the merge commit (39120022168) passed on its first attempt",
+        "result:0.72.0 is one module, receipt-hint-on-message: when the project has the local ticket ledger and the UserPromptSubmit prompt is a message Claude Code forwarded from another session (it starts with <cross-session-message), the stage injection adds one line before the suggested next step telling the agent to record the message in the ledger first, then decide whether to ask the user; only the wrapper's from-name and from-session are read; output is unchanged otherwise",
+        "result:before the module, a temporary UserPromptSubmit hook in a tmux session on Claude Code 2.1.302 recorded that a SendMessage delivery fires UserPromptSubmit with the prompt wrapped in <cross-session-message from-session=... from-name=...>",
+        "result:test-phase-guard.sh (410 cases), verify-and-commit full tier, ShellCheck and validate.sh passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}

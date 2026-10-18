@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.72.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.72.0-upgrade-20261018"
+      },
+      "observedAt": "2026-10-18T10:46:28Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.71.1 to v0.72.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.72.0 enabled; the installed plugin directory is identical to the release asset; the smoke run exited 0",
+        "not-verified:the receipt hint is Claude-only by design (Codex reads relay mail through a tool, not the prompt); no Codex session was retested"
+      ]
+    }
+  ]
+}
