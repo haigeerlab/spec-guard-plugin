@@ -437,6 +437,11 @@ class CheckpointContractTests(unittest.TestCase):
                        "不带 shell 语言标签", "不用行内代码", "最短的可接受说法", "合成一行", "有代码块就是要用户回答",
                        "不需要回答的内容", "不用代码块", "“继续”不会被记为批准", "不能替代内容"):
             self.assertIn(phrase, item)
+        # hub-only-reply: when a consumer plugin asks only in the hub, show the content but point to the hub instead of a copy block.
+        for phrase in ("只在收件枢纽问", "经协调会话送到那里问", "按意思认", "照常在正文里给全部小项", "不放推荐答复的复制块",
+                       "“去决策收件箱答 #N”", "不知道事项号就写“去决策收件箱答”", "“等决策收件箱答复”意思相同",
+                       "没有这种规定时照旧放复制块", "spec-guard 不判断项目接没接收件枢纽", "「经收件枢纽转来的批准」"):
+            self.assertIn(phrase, item)
         stuck = self.section("## Plan 检查点分级")
         for phrase in ("“出了什么事：”", "代价是什么", "可复制代码块"):
             self.assertIn(phrase, stuck)
@@ -445,7 +450,7 @@ class CheckpointContractTests(unittest.TestCase):
         for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md", "../../docs/commands.md"):
             with self.subTest(path=relative):
                 text = (self.plugin / relative).read_text(encoding="utf-8")
-                for phrase in ("可复制代码块", "不会被记为批准"):
+                for phrase in ("可复制代码块", "不会被记为批准", "去决策收件箱答"):
                     self.assertIn(phrase, text)
         for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
             with self.subTest(path=relative):
