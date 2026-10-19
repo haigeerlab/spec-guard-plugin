@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.79.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:165df830d6631d735202b0fd63b888b2ebdd653d"
+      },
+      "observedAt": "2026-10-19T08:40:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.78.1 to 0.79.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 165df83 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; the installed interface.json is 1.4",
+        "result:the installed copy on a temporary git project (untiered middle checkpoint and untiered final acceptance, unnumbered acceptance criteria): map_view.py --json gives gates {total 1, done 0} and nextGate Checkpoint 2; verify-artifacts.sh gives 0 warnings",
+        "result:a fresh claude -p session (sonnet) in that temporary project: the transcript's hook context reports BUILDING and Next gate Checkpoint 2 (the final acceptance)"
+      ]
+    }
+  ]
+}
