@@ -4,5 +4,5 @@
 - [x] Task 2：共享检查点规则与四处约定块 — `workflow-checkpoints.md` 九处：常规操作加启动本地开发服务与浏览器；最终验收一并复审的停下条件改为改范围／方向／新取舍；「Spec 修订后须复审」改为「构建中范围内的修正不停」并举例何为改范围；Spec 要点里文档建议改为有才写；AC 编号改为推荐、不做检查；文档建议在 Spec 交审有才提；返工改为「范围内增补不重新交审」；UI 自验加不能勾完成、截图路径、开工先确认工具（缺失时提前提醒）、人工并进最终验收，删兜底 gate；变更记录改为「先写记录，再呈现」。四处约定块改对应各行（`AGENTS.md` 本来没有变更记录那一行）；`check-readme-sync.py` 一致。
 - [x] Task 3：阶段提示与 verify-artifacts — `module_stage.py` 中英两份 review_hint 在最终 gate 分支之后、通用 revised 分支之前加「BUILDING 时范围内修正可继续」分支；`verify-artifacts.sh` 删「验收标准编号」一段（58 行）。阶段提示 418 例、verify-artifacts 72 例全绿。变异：让新分支永不命中，「BUILDING 时 Spec 批准后被改」用例变红，还原后通过。
 - [x] Checkpoint 1（report）：规则、阶段提示与 verify-artifacts 的回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
-- [ ] Task 4：CHANGELOG 与版本号
+- [x] Task 4：CHANGELOG 与版本号 — CHANGELOG 新增 `[0.79.0] - 2026-10-19`（checkpoint-default-report 与本模块：检查点默认 report、gates 含义变化与 interface 1.4、范围内修正与增补不停、UI 自验与人工并进最终验收、文档建议有才提；移除 AC 编号提示）；两份 `plugin.json` 改为 0.79.0，中英 README 的 `--ref` 改为 v0.79.0。
 - [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
