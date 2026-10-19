@@ -21,7 +21,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
             "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
-               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt"}
+               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -617,6 +617,49 @@ class ProgressFactsTest(unittest.TestCase):
                     self.assertEqual(project.json()["reviewCadence"], want)
                     item = next(i for i in summary(project.root) if i["key"] == "reviewCadence")
                     self.assertEqual({"value": item["value"], "source": item["source"]}, want)
+
+
+class GateCountTest(unittest.TestCase):
+    """map-gate-count: per-module gates {total, done} from the working-tree todo, by the next-gate criterion."""
+    ROWS = [("alpha", "甲", "—"), ("beta", "乙", "alpha"), ("gamma", "丙", "alpha")]
+    TODO = ("- [x] Task 1\n"
+            "- [x] Checkpoint 1（gate）：先停\n"
+            "- [ ] Checkpoint 2（report）：记入 todo\n"
+            "- [ ] Task 2\n"
+            "- [ ] Checkpointing is not a checkpoint\n"
+            "- [ ] Checkpoint 3：最终验收\n")
+
+    def gates(self, files):
+        with Project(self.ROWS, ["alpha", "beta", "gamma"], files) as project:
+            return {m["id"]: m["gates"] for m in project.json()["modules"]}
+
+    def test_gate_and_untiered_count_report_does_not(self):
+        got = self.gates({"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": self.TODO})
+        self.assertEqual(got["alpha"], {"total": 2, "done": 1})
+
+    def test_all_checked_and_upper_case_x(self):
+        todo = self.TODO.replace("- [ ] Checkpoint 3", "- [X] Checkpoint 3")
+        got = self.gates({"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": todo})
+        self.assertEqual(got["alpha"], {"total": 2, "done": 2})
+
+    def test_no_checkpoint_is_zero_and_no_todo_is_null(self):
+        got = self.gates({"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": "- [ ] one\n",
+                          "spec/beta.md": "# b\n", "tasks/beta/plan.md": "# P\n"})
+        self.assertEqual(got, {"alpha": {"total": 0, "done": 0}, "beta": None, "gamma": None})
+
+    def test_present_without_git_history(self):
+        with Project(self.ROWS, ["alpha", "beta", "gamma"],
+                     {"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": self.TODO}) as project:
+            data = project.json()
+        self.assertEqual(data["history"], "unavailable")
+        self.assertEqual(data["modules"][0]["gates"], {"total": 2, "done": 1})
+
+    def test_next_gate_uses_the_same_criterion(self):
+        with Project(self.ROWS, ["alpha", "beta", "gamma"],
+                     {"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": self.TODO},
+                     active="alpha") as project:
+            data = project.json()
+        self.assertEqual(data["nextGate"], "Checkpoint 3：最终验收")
 
 
 # map-startable: setup done; billing and report in progress with overlapping boundaries; shop ready (comma group
