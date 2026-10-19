@@ -379,4 +379,56 @@ check_absent "已完成模块不追溯" "$EXT_HINT"
 project ext-no-plan; printf '%s\n' '# alpha' > "$PROJECT/spec/alpha.md"
 check_absent "还没有 Plan 时不提示" "$EXT_HINT"
 
+# 依赖改动（dependency-check）：临时 git 仓库先提交 Spec 作为起点，再在工作区改清单；只提示、不失败。
+dgit() { git -C "$PROJECT" -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false \
+  -c core.hooksPath=/dev/null -c init.defaultBranch=main "$@" >/dev/null 2>&1; }
+dep_repo() {  # $1=目录，其余为 Plan「需要的外部条件」一节的各行；alpha 进行中
+  project "$1"; shift; mkdir -p "$PROJECT/tasks/alpha"
+  printf '%s\n' '# alpha' > "$PROJECT/spec/alpha.md"
+  printf '%s\n' '# Plan' '' '## 需要的外部条件' '' "$@" '' '## Task List' '' '- 提到 lodash 不算' > "$PROJECT/tasks/alpha/plan.md"
+  printf '%s\n' '- [ ] a' > "$PROJECT/tasks/alpha/todo.md"
+  printf '%s\n' '{"dependencies": {"react": "18"}}' > "$PROJECT/package.json"
+  printf '%s\n' 'flask' > "$PROJECT/requirements.txt"
+  dgit init && dgit add -A && dgit commit -m base
+}
+DEP_HINT="的依赖改动"
+dep_repo dep-npm '- dayjs' '- zod-form'
+printf '%s\n' '{"dependencies": {"react": "19", "zod": "3", "dayjs": "1", "lodash": "4"}}' > "$PROJECT/package.json"
+check "没写进 Plan 的新增依赖逐个报出且不失败" 0 "alpha 的依赖改动：新增依赖没写进 Plan「需要的外部条件」：package.json：lodash、zod"
+check_absent "Plan 列了的不报" "dayjs"
+dep_repo dep-version '- 无'
+printf '%s\n' '{"dependencies": {"react": "19"}}' > "$PROJECT/package.json"
+check_absent "只改版本号不报" "$DEP_HINT"
+dep_repo dep-sub '- 无'
+mkdir -p "$PROJECT/apps/web" "$PROJECT/node_modules/x"
+printf '%s\n' '{"devDependencies": {"vitest": "1"}}' > "$PROJECT/apps/web/package.json"
+printf '%s\n' '{"dependencies": {"evil": "1"}}' > "$PROJECT/node_modules/x/package.json"
+check "子目录的清单同样识别（含未跟踪文件）" 0 "apps/web/package.json：vitest"
+check_absent "node_modules 下的不看" "evil"
+dep_repo dep-py '- requests'
+printf '%s\n' 'flask' 'Requests[socks]>=2' 'httpx==0.27' > "$PROJECT/requirements.txt"
+printf '%s\n' '[project]' 'dependencies = [' '  "pydantic",' ']' > "$PROJECT/pyproject.toml"
+check "Python 包名规范化后比，没列的报出" 0 "requirements.txt：httpx"
+check "pyproject 的 dependencies 同样识别" 0 "pyproject.toml：pydantic"
+check_absent "规范化后列了的不报" "requests"
+dep_repo dep-scope '- 允许范围：为跑通测试，可以从官方源装开发依赖'
+printf '%s\n' '{"dependencies": {"react": "18", "vitest": "1"}}' > "$PROJECT/package.json"
+check "允许范围时报按范围授权、未逐项核对" 0 "按允许范围授权，未逐项核对：package.json：vitest"
+dep_repo dep-lock '- 无'
+printf '%s\n' 'lock' > "$PROJECT/pnpm-lock.yaml"; printf '%s\n' 'module x' > "$PROJECT/go.mod"
+printf '%s\n' '[tool.pdm.dev-dependencies]' 'test = ["pytest"]' > "$PROJECT/pyproject.toml"
+check "锁文件只报有改动" 0 "锁文件有改动：pnpm-lock.yaml"
+check "其他清单与读不懂的写法只报改了" 0 "改了，未逐项核对：go.mod、pyproject.toml"
+dep_repo dep-clean '- 无'
+check_absent "什么都没改时不输出" "$DEP_HINT"
+dep_repo dep-unborn '- 无'
+case "$PROJECT" in "$WORK"/dep-unborn) rm -rf "$PROJECT/.git" ;; esac; dgit init && dgit add package.json requirements.txt tasks spec/CAPABILITY-MAP.md && dgit commit -m base
+printf '%s\n' '{"dependencies": {"react": "18", "zod": "3"}}' > "$PROJECT/package.json"
+check "Spec 没提交过时从 HEAD 比起" 0 "package.json：zod"
+check_absent "Spec 没提交过时不报未验证" "依赖改动没有核对"
+dep_repo dep-done '- 无'
+printf '%s\n' '- [x] a' > "$PROJECT/tasks/alpha/todo.md"
+printf '%s\n' '{"dependencies": {"react": "18", "zod": "3"}}' > "$PROJECT/package.json"
+check_absent "已完成模块不追溯" "$DEP_HINT"
+
 echo "verify-artifacts regression passed ($PASS cases)"
