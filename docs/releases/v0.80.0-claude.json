@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.80.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:5d1f24ebb9864c87ed86c4175819ebf5b7d09d8d"
+      },
+      "observedAt": "2026-10-19T15:13:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.79.0 to 0.80.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 5d1f24e (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; the installed interface.json is 1.5 and passes check-interface.py",
+        "result:a fresh claude -p session (sonnet) in a temporary git project with only a capability map reports the injected stage MAP_ONLY"
+      ]
+    }
+  ]
+}
