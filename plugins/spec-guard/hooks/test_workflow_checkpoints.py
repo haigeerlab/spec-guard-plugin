@@ -167,15 +167,17 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_ui_self_verification(self):
         ui = self.section("## UI 自验")
-        for phrase in ("浏览器", "电脑操作", "缺失", "提前提醒", "兜底", "Claude 桌面应用"):
+        for phrase in ("浏览器", "电脑操作", "缺失", "提前提醒", "Claude 桌面应用", "不能勾完成", "截图路径",
+                       "开工时先确认", "并进最终验收"):
             self.assertIn(phrase, ui)
+        self.assertNotIn("人做最后的兜底审查", ui)
         for phrase in ("不论 Plan 是否预计到", "实际改动", "在任务里验证", "开发服务", "对照", "控制台", "看到了什么",
                        "只写“已验证”不算", "UI 未验证"):
             self.assertIn(phrase, ui)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("不论 Plan 是否预计到", "UI 未验证"):
+                for phrase in ("不论 Plan 是否预计到", "UI 未验证", "不能勾完成"):
                     self.assertIn(phrase, text)
 
     def test_no_remote_write_is_authorized_by_default(self):
@@ -199,7 +201,7 @@ class CheckpointContractTests(unittest.TestCase):
     def test_review_markers(self):
         section = self.section("## 批准标记")
         for phrase in ("<!-- spec-guard: review pending -->", "<!-- spec-guard: review approved", "不是授权来源",
-                       "修订后须复审", "明确批准", "review-mark", "没有标记", "先于任何代码改动",
+                       "范围内的修正", "明确批准", "review-mark", "没有标记", "先于任何代码改动",
                        "“继续”不会被记为批准", "不要等用户说了“继续”再解释", "不得依据此前含糊的答复补记",
                        "不妨碍单独记录 Plan 的批准", "批准状态只看标记", "正文不写"):
             self.assertIn(phrase, section)
@@ -215,7 +217,7 @@ class CheckpointContractTests(unittest.TestCase):
         section = self.section("## 文档建议")
         for phrase in ("能力图审阅", "Spec 交审", "能力图全部完成", "跨模块", "收尾", "是什么、给谁用", "使用者和维护者",
                        "文档基线", "会因这次的工作过时", "README", "写什么、为什么现在写", "“无”", "另开一个收尾模块",
-                       "不再就同一层次重复提", "不卡验收"):
+                       "不再就同一层次重复提", "不卡验收", "有才提"):
             self.assertIn(phrase, section)
         self.assertIn("文档建议", self.section("## 批准标记"))
         self.assertIn("问是否记一份 ADR", self.section("## Plan 检查点分级"))
@@ -368,8 +370,9 @@ class CheckpointContractTests(unittest.TestCase):
         # stop-rule-and-ac: AC1, AC2… so the final acceptance can match evidence to each one.
         self.assertIn("验收标准（按 AC1、AC2… 编号）", self.section("## 批准标记"))
         contract = self.target.read_text(encoding="utf-8")
-        for phrase in ("**验收标准编号。**", "`AC<数字>`", "删掉的编号不复用", "按编号逐条给证据", "只提示、不拦"):
+        for phrase in ("**验收标准编号。**", "`AC<数字>`", "删掉的编号不复用", "按编号逐条给证据", "推荐写法"):
             self.assertIn(phrase, contract)
+        self.assertNotIn("对未完成模块缺编号只提示", contract)  # align-upstream-rules: no verify-artifacts hint
         for path in self.block_surfaces():
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
@@ -394,7 +397,7 @@ class CheckpointContractTests(unittest.TestCase):
     def test_rework_goes_back_into_the_module(self):
         section = self.section("## 返工与小模块")
         for phrase in ("`tasks/<id>/todo.md` 追加", "`plan.md` 补一节", "不在 `tasks/<id>/` 下另建带清单的文件",
-                       "改回 `pending`", "另开模块", "下一个模块的第一个任务", "不新增行为", "并成相邻模块的一个任务",
+                       "不改回 `pending`", "另开模块", "下一个模块的第一个任务", "不新增行为", "并成相邻模块的一个任务",
                        "按需求批量前置审", "只留最后一个 `gate`"):
             self.assertIn(phrase, section)
         for relative in ("commands/add-module.md", "skills/spec-guard-ops/SKILL.md"):
@@ -403,9 +406,23 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("返工", "不新增行为"):
                     self.assertIn(phrase, text)
 
+    def test_rules_follow_upstream_agent_skills(self):
+        # align-upstream-rules (user decision 66): in-scope fixes and additions do not stop the build.
+        contract = self.target.read_text(encoding="utf-8")
+        for phrase in ("范围内的修正", "改范围、改方向或需要新取舍", "最终验收时附上 Spec 的改动差异", "范围内增补",
+                       "启动本地开发服务、用浏览器打开本地页面验证"):
+            self.assertIn(phrase, contract)
+        for retired in ("把 Plan 的批准标记改回 `pending`", "人做最后的兜底审查", "构建途中的修改若会改变后续任务的做法"):
+            self.assertNotIn(retired, contract)
+        for path in self.block_surfaces():
+            with self.subTest(path=path):
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("范围内修正", "最终验收附差异", "有才提"):
+                    self.assertIn(phrase, text)
+
     def test_change_sources_are_recorded_and_answered(self):
         section = self.section("## 需求来源与回告")
-        for phrase in ("「变更记录」", "原因：", "来源：", "会话 ID", "不贴原文", "先写记录，再复审", "记录行不写批准状态",
+        for phrase in ("「变更记录」", "原因：", "来源：", "会话 ID", "不贴原文", "先写记录，再呈现", "记录行不写批准状态",
                        "不等于用户批准", "`add-module` 插入新模块", "登记"):
             self.assertIn(phrase, section)
         for phrase in ("回告", "用得上", "发版之后", "合入主线之后", "「拟回告」", "批准最终 gate 即批准回告",

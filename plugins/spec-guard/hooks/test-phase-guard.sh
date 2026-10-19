@@ -1362,7 +1362,10 @@ is "两份都已批准：建议语与现行相同" 'Suggested next step: continu
 isnt "两份都已批准：没有 Review 行" '- Review:'
 printf '%s\n' '补一条' >> "$rv/spec/alpha.md"
 out="$(ctx_of)"
-is "BUILDING 时 Spec 批准后被改：要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+# align-upstream-rules：构建中、还没到最终 gate 时，范围内修正已批准的 Spec 可以继续，不再要求停下复审。
+REVISED_GO="Suggested next step: an in-scope fix to the approved \`spec/alpha.md\` may go on: record it in the Spec's change log and show its diff at the final gate for one approval; if it changes the scope or the direction or needs a new trade-off, stop and show the user the revised Spec for another review."
+is "BUILDING 时 Spec 批准后被改：范围内修正可继续，最终验收附差异" "$REVISED_GO"
+isnt "BUILDING 时 Spec 批准后被改：不再说不要继续构建" 'do not continue the build'
 # rules-in-context：已到最终验收（第一个未勾的 gate 之前没有未勾项、之后没有别的 gate）时，建议改为在验收消息里附差异一并复审。
 FINAL_HINT='Suggested next step: at the final gate, show the diff of the revised `spec/alpha.md` verbatim in the acceptance message and say that approving the acceptance also approves the revised Spec; once approved, record the Spec approval with `/spec-guard:review-mark` (Codex: spec-guard-ops review-mark) before ticking and committing.'
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '- [ ] 发版后的验证' > "$rv/tasks/alpha/todo.md"
@@ -1371,13 +1374,13 @@ is "已修订 + 只剩最终 gate：建议附差异一并复审" "$FINAL_HINT"
 is "已修订 + 只剩最终 gate：Review 行不变" '- Review: Spec `spec/alpha.md` was edited after it was approved.'
 printf '%s\n' '- [x] Task 1' '- [ ] Task 2' '- [ ] Checkpoint 1（gate）：最终验收' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
-is "已修订 + 还有未勾任务：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+is "已修订 + 还有未勾任务：范围内修正可继续" "$REVISED_GO"
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：中途' '- [ ] Task 2' '- [ ] Checkpoint 2（gate）：最终验收' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
-is "已修订 + 后面还有别的 gate：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+is "已修订 + 后面还有别的 gate：范围内修正可继续" "$REVISED_GO"
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（report）：回归' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
-is "已修订 + 只剩 report 检查点：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+is "已修订 + 只剩 report 检查点：范围内修正可继续" "$REVISED_GO"
 # checkpoint-default-report：最终 gate 之后只有未标级别的中间检查点与 report 时，仍算到了最终验收。
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '- [ ] Checkpoint 2：记录' '- [ ] Checkpoint 3（report）：发版后核对' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
@@ -1973,6 +1976,13 @@ printf '# Plan\n\n<!-- spec-guard: review approved -->\n' > "$zm/tasks/beta/plan
 zh_check "zh-CN：BUILDING，Plan 已批准" "$zm" \
   +"- 下一个 gate: Checkpoint 1（gate）：验收 — 一直做到它为止；\`report\` 检查点记进 todo 后直接通过，不停下。" "${ENGLISH_ONLY[@]}"
 SG_HOST=codex zh_check "zh-CN：Codex 宿主的命令写法" "$zm" +"继续用 \`\$incremental-implementation\` 构建 \`beta\`" "${ENGLISH_ONLY[@]}"
+printf '# Spec: beta\n\n<!-- spec-guard: review approved 000000000000 -->\n正文\n' > "$zm/spec/beta.md"
+printf '%s\n' '- [x] a' '- [ ] Task 2' '- [ ] Checkpoint 1（gate）：验收' > "$zm/tasks/beta/todo.md"
+zh_check "zh-CN：BUILDING，Spec 批准后改过且未到最终 gate：范围内修正可继续" "$zm" \
+  +"建议下一步: 范围内修正已批准的 \`spec/beta.md\` 可以继续：记进 Spec 末尾的变更记录，最终验收时附差异一并批准；改了范围、方向或需要新取舍时，停下把修订后的 Spec 交用户复审。" \
+  -"不要继续构建" "${ENGLISH_ONLY[@]}"
+printf '# Spec: beta\n正文\n' > "$zm/spec/beta.md"
+printf '%s\n' '- [x] a' '- [ ] Checkpoint 1（gate）：验收' > "$zm/tasks/beta/todo.md"
 zt="$WORK/zh-transcript.jsonl"; transcript "$zt" 849999
 printf '{"session_id":"s","transcript_path":"%s","prompt":"p"}' "$zt" > "$WORK/zh-input"
 SG_INPUT="$WORK/zh-input" zh_check "zh-CN：会话上下文超阈值" "$zm" \
