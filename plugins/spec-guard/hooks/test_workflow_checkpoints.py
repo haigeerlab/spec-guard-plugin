@@ -230,22 +230,32 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_plan_approval_authorizes_by_scope(self):
         tiers = self.section("## Plan 检查点分级")
-        for phrase in ("批 Plan 按范围授权", "需要的外部条件", "按范围", "不按次数", "改本仓库文件", "本地提交",
-                       "允许范围", "写「无」", "只在这几类情况停下问用户", "改模块范围", "Spec 没覆盖的决定",
-                       "Plan 没列的新依赖只问一次", "补进 Plan", "删除工作区外的文件", "改全局配置", "外发凭据",
+        for phrase in ("批 Plan 按范围授权", "已批准范围", "构建需要的装包", "默认放行", "不按次数", "改本仓库文件",
+                       "本地提交", "愿意写可以写", "只在这几类情况停下问用户", "改模块范围", "Spec 没覆盖的决定",
+                       "删除工作区外的文件", "改全局配置", "外发凭据", "全局安装", "下载脚本直接执行",
                        "测试改不红", "权限被拒", "结果未知", "记一份 ADR", "一次列全过这个检查点所需的全部权限",
-                       "新增或升级的依赖", "锁文件"):
+                       "新增的直接依赖", "锁文件", "工作区自己的包"):
             self.assertIn(phrase, tiers)
-        self.assertIn("需要的外部条件", self.section("## UI 自验"))
         host = self.section("## 权限、未知结果与取消")
-        for phrase in ("宿主确认", "去哪个会话", "点什么", "不算问用户做决定", "一条命令"):
+        for phrase in ("宿主确认", "去哪个会话", "点什么", "不算问用户做决定"):
             self.assertIn(phrase, host)
+        self.assertIn("Plan 开头列出验证所需的工具", self.section("## UI 自验"))
+        retired = ("只问一次", "一条命令", "verify-artifacts` 会对照 Plan", "Plan 开头写「需要的外部条件」",
+                   "Plan 没列的新依赖")
+        surfaces = [("workflow-checkpoints", self.target.read_text(encoding="utf-8"))]
+        surfaces += [(path.name, path.read_text(encoding="utf-8"))
+                     for path in (self.plugin / "templates").glob("*-block-local.md")]
+        for name, text in surfaces:
+            for phrase in retired:
+                with self.subTest(surface=name, phrase=phrase):
+                    self.assertNotIn(phrase, text)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("按范围授权", "需要的外部条件", "不按次数", "一次列全所需权限", "新增依赖与锁文件改动",
-                               "宿主确认", "去哪个会话"):
+                for phrase in ("按已批准范围授权", "装包", "不按次数", "一次列全所需权限", "新增依赖与锁文件改动",
+                               "不含工作区自己的包", "宿主确认", "去哪个会话"):
                     self.assertIn(phrase, text)
+                self.assertNotIn("需要的外部条件", text)
 
     def test_the_final_gate_can_carry_the_spec_revision(self):
         section = self.section("## Plan 检查点分级")
