@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.81.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:5018eac25f9eec2d92402b86277046ea581152c6"
+      },
+      "observedAt": "2026-10-19T20:05:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.80.1 to 0.81.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 5018eac (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed map_view.py --json read the rehearsal project read-only and reported gates.total 1/1/1/1/2 for gamma/summary/delta/epsilon/zeta, matching the hand count (0.80.1 read 0)",
+        "result:a fresh claude -p session (sonnet) in a temporary git project whose todo uses G1（gate） and 最终验收（gate） reports stage BUILDING and the injected line 下一个 gate: 最终验收（gate）"
+      ]
+    }
+  ]
+}
