@@ -444,57 +444,56 @@ GATE_TITLE_LIMIT = 80
 def next_gate(root: Path, module: str) -> str:
     """Title of the first unchecked `gate` checkpoint in the module's todo.md, or "" when there is none.
 
-    The tier is read from the part before the first colon; a checkpoint with no tier is a gate.
-    Anything that cannot be read or recognised yields "": the line is a convenience, not a verdict.
+    Which checkpoints are gates is decided by `gate_checkpoints`.  Anything that cannot be read or recognised
+    yields "": the line is a convenience, not a verdict.
     """
     try:
         text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return ""
-    for line in text.splitlines():
-        gate = gate_checkpoint(line)
-        if gate and not gate[1]:
-            return safe_fragment(gate[0], GATE_TITLE_LIMIT)
+    for _, title, checked in gate_checkpoints(text):
+        if not checked:
+            return safe_fragment(title, GATE_TITLE_LIMIT)
     return ""
 
 
-def gate_checkpoint(line: str):
-    """(title, checked) when the todo line is a `gate` checkpoint, else None.
+def gate_checkpoints(text: str) -> list:
+    """[(line index, title, checked)] of the todo's `gate` checkpoints, in order.
 
-    The one gate criterion (next gate, final gate, map-gate-count's `gates`): a `Checkpoint` item whose tier,
-    read from the part before the first colon, is not `report`; a checkpoint with no tier is a gate.
+    The one gate criterion (next gate, final gate, map-gate-count's `gates`).  The tier is read from the part of
+    a `Checkpoint` item before the first colon: `gate` counts, `report` does not.  checkpoint-default-report: an
+    untiered checkpoint is a report, except the last checkpoint of the todo, which is the final acceptance.
     """
-    match = CHECKPOINT.match(line)
-    if not match:
-        return None
-    tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(2), maxsplit=1)[0])
-    if tier and tier.group(1).lower() == "report":
-        return None
-    return match.group(2), match.group(1) != " "
+    found = []
+    for index, line in enumerate(text.splitlines()):
+        match = CHECKPOINT.match(line)
+        if match:
+            tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(2), maxsplit=1)[0])
+            found.append((index, match.group(2), match.group(1) != " ", tier.group(1).lower() if tier else None))
+    last = len(found) - 1
+    return [(index, title, checked) for position, (index, title, checked, tier) in enumerate(found)
+            if tier == "gate" or (tier is None and position == last)]
 
 
 OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \]\s+")
-
-
-def _open_gate(line: str) -> bool:
-    gate = gate_checkpoint(line)
-    return bool(gate) and not gate[1]
 
 
 def at_final_gate(root: Path, module: str) -> bool:
     """True when the module's first unchecked item is a `gate` checkpoint and no other gate follows it.
 
     rules-in-context: that is the final acceptance, where a revised Spec may be re-reviewed together with it.
-    Items after it that are not checkpoints (a post-release check) do not count.  Unreadable is False.
+    Items after it that are not gates (a post-release check, a report) do not count.  Unreadable is False.
     """
     try:
         text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return False
-    open_items = [line for line in text.splitlines() if OPEN_ITEM.match(line)]
-    if not open_items or not _open_gate(open_items[0]):
+    lines = text.splitlines()
+    open_gates = {index for index, _, checked in gate_checkpoints(text) if not checked}
+    open_items = [index for index, line in enumerate(lines) if OPEN_ITEM.match(line)]
+    if not open_items or open_items[0] not in open_gates:
         return False
-    return not any(_open_gate(line) for line in open_items[1:])
+    return not any(index in open_gates for index in open_items[1:])
 
 
 def file_review_state(path: Path, kind: str) -> str:

@@ -117,10 +117,24 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_plan_checkpoints_are_gate_or_report(self):
         tiers = self.section("## Plan 检查点分级")
-        for phrase in ("`gate`", "`report`", "未标注的检查点按 `gate`", "记入 todo", "不倒计时",
+        for phrase in ("`gate`", "`report`", "没标级别的中间检查点按 `report`", "最后一个检查点", "记入 todo", "不倒计时",
                        "测试改不红", "权限被拒", "合并永远由用户"):
             self.assertIn(phrase, tiers)
         self.assertIn("`gate` 检查点写明的授权", self.section("## 阶段交接"))
+
+    def test_checkpoint_default_is_report(self):
+        tiers = self.section("## Plan 检查点分级")
+        for phrase in ("没标级别的中间检查点按 `report`", "最后一个检查点没标级别时按 `gate`", "推送与不可逆操作的检查点必须标明 `gate`"):
+            self.assertIn(phrase, tiers)
+        surfaces = [self.target] + list((self.plugin / "templates").glob("*-block-local.md"))
+        surfaces += [self.plugin / "skills" / "spec-guard-ops" / "SKILL.md", self.plugin / "commands" / "map.md",
+                     self.plugin.parents[1] / "docs" / "workflow.md", self.plugin.parents[1] / "docs" / "convention-block.md",
+                     self.plugin.parents[1] / "AGENTS.md"]
+        for path in surfaces:
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                for retired in ("未标注的检查点按 `gate`", "未标注按 `gate`", "未标注的按 `gate`", "未标级别按 gate"):
+                    self.assertNotIn(retired, text)
 
     def test_batch_review_and_continuous_build(self):
         batch = self.section("## 按需求批量前置审")
@@ -338,15 +352,16 @@ class CheckpointContractTests(unittest.TestCase):
                 self.assertNotIn("同一个 gate 因外部原因", text)
 
     def test_checks_a_script_can_judge_may_be_report(self):
-        # stop-rule-and-ac: the default stays gate; writing and handing in a Plan say report is available.
+        # stop-rule-and-ac said the default stays gate; checkpoint-default-report (user decision 66) replaces that:
+        # untiered middle checkpoints are reports, the last one is the final acceptance gate.
         tiers = self.section("## Plan 检查点分级")
-        for phrase in ("未标注的检查点按 `gate`", "靠测试或检查脚本就能判定", "最终验收、推送与不可逆操作",
-                       "交审 Plan 时说明哪些检查点是 `report`"):
+        for phrase in ("没标级别的中间检查点按 `report`", "最后一个检查点没标级别时按 `gate`", "最终验收",
+                       "推送与不可逆操作的检查点必须标明 `gate`", "交审 Plan 时说明哪些检查点是 `gate`"):
             self.assertIn(phrase, tiers)
         for path in self.block_surfaces():
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("未标注按 `gate`", "可标 `report`"):
+                for phrase in ("没标级别的中间检查点按 `report`", "最后一个检查点按 `gate`", "推送与不可逆操作须标 `gate`"):
                     self.assertIn(phrase, text)
 
     def test_acceptance_criteria_are_numbered(self):
