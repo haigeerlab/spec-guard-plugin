@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.79.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:165df830d6631d735202b0fd63b888b2ebdd653d"
+      },
+      "observedAt": "2026-10-19T08:40:00Z",
+      "evidence": [
+        "result:the v0.79.0 annotated tag resolves to merge commit 165df830d6631d735202b0fd63b888b2ebdd653d (pull request #382); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip",
+        "result:the push run of the CI on main for the merge commit (39223205656) passed on attempt 1",
+        "result:one release for one requirement (user decision 66): checkpoint-default-report (#381) and align-upstream-rules (#382) share 0.79.0; the version bump is only in #382",
+        "result:checkpoint-default-report: an untiered middle checkpoint is a report, the last checkpoint of the todo is a gate when untiered; module_stage.gate_checkpoints is the one criterion for the next gate, the final gate and /map --json gates; interface.json 1.4 notes that gates may be smaller than under 1.3",
+        "result:align-upstream-rules: in-scope fixes to an approved Spec during the build are recorded and approved with the final acceptance, only a change of scope, direction or a new trade-off stops; in-scope added tasks do not send the Plan back to pending; UI self-verification needs a record (page, expectation, observation, screenshot path) or UI-not-verified with a reason before a task is ticked, starting a local dev server and opening local pages are routine work, the separate human gate is gone; document suggestions at Spec review only when there is one; AC numbering is a recommendation and verify-artifacts no longer warns",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh 418 cases, test-verify-artifacts.sh 72 cases, ShellCheck) passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}
