@@ -5,4 +5,4 @@
 - [x] Task 3：阶段提示与 verify-artifacts — `module_stage.py` 中英两份 review_hint 在最终 gate 分支之后、通用 revised 分支之前加「BUILDING 时范围内修正可继续」分支；`verify-artifacts.sh` 删「验收标准编号」一段（58 行）。阶段提示 418 例、verify-artifacts 72 例全绿。变异：让新分支永不命中，「BUILDING 时 Spec 批准后被改」用例变红，还原后通过。
 - [x] Checkpoint 1（report）：规则、阶段提示与 verify-artifacts 的回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
 - [x] Task 4：CHANGELOG 与版本号 — CHANGELOG 新增 `[0.79.0] - 2026-10-19`（checkpoint-default-report 与本模块：检查点默认 report、gates 含义变化与 interface 1.4、范围内修正与增补不停、UI 自验与人工并进最终验收、文档建议有才提；移除 AC 编号提示）；两份 `plugin.json` 改为 0.79.0，中英 README 的 `--ref` 改为 v0.79.0。
-- [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-19 在对话里按 AC1–AC6 逐条给出证据（规则与阶段提示用例、反向用例、四处约定块一致、全档检查含阶段提示 418 例与 verify-artifacts 72 例、本仓库实跑 0 警告）、一处变异变红、因新说法而改的 8 处原有期望、未验证项（真实会话里是否少停需观察；安装版待发版；未做独立代码审查）、实际改动的文件清单（相对 main：20 个文件，新增 3、修改 17、删除 0；超出 Plan 预计的 `test_checkout_role.py` 已说明原因；新增依赖与锁文件：无）与文档建议（无）。用户批准：勾上 gate 并提交、推送、开一个 PR；合并后发 0.79.0（tag、Release、两边宿主、证据 PR），发完通知 decision-inbox 并抄送协调人。
