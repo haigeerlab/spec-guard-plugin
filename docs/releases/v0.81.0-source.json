@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.81.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:5018eac25f9eec2d92402b86277046ea581152c6"
+      },
+      "observedAt": "2026-10-19T20:05:00Z",
+      "evidence": [
+        "result:the v0.81.0 annotated tag resolves to merge commit 5018eac25f9eec2d92402b86277046ea581152c6 (pull request #393); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip b907352",
+        "result:pull request #393's check validate (ubuntu-latest) passed before tagging; the push run on main for 5018eac (39313369537) completed with success",
+        "result:cn-checkpoint-gates (#392, merge 5f574c4): a checkbox item is a checkpoint when it starts with Checkpoint or 检查点, or when the part before its first colon carries (gate) or (report); tiers and the untiered default are unchanged; interface.json 1.6 only rewrites the gates description. #392 was merged by the user through a temporary enforce_admins bypass while its CI was queued; its push run on main (39287200703) later passed",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh, test-verify-artifacts.sh, ShellCheck) and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57 on b907352"
+      ]
+    }
+  ]
+}
