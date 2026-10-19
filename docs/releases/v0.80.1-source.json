@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.80.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:7c2e672175ef6b208caee29068d7f0e8e76b7087"
+      },
+      "observedAt": "2026-10-19T16:21:00Z",
+      "evidence": [
+        "result:the v0.80.1 annotated tag resolves to merge commit 7c2e672175ef6b208caee29068d7f0e8e76b7087 (pull request #390); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip 4009fc7",
+        "result:CI did not run before the merges: GitHub Actions had an open incident (degraded availability for GitHub Actions, Pages and Webhooks) and every run stayed queued; the user merged #389 (f76a7a1) and #390 by temporarily turning off enforce_admins on main's branch protection; the push runs on main for f76a7a1 (39283691110) and 7c2e672 (39284434871) were still queued when the release was made",
+        "result:the pull request run for #389's head 671f74e (39281001251) passed once runners returned; #390 only changes version strings and the CHANGELOG heading",
+        "result:hub-only-reply (#389): when a consumer plugin requires the user's decisions to be asked only in the hub (or relayed there through a coordinating session), a review shows its full content but no copy block, only a line pointing to the hub; reviewKinds' description in interface.json notes the exception, fields and interface version 1.5 unchanged",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh 418 cases, test-verify-artifacts.sh 72 cases) and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57 on 4009fc7"
+      ]
+    }
+  ]
+}
