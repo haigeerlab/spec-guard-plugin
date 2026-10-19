@@ -682,6 +682,42 @@ class GateCountTest(unittest.TestCase):
             data = project.json()
         self.assertEqual(data["nextGate"], "Checkpoint 3：最终验收")
 
+    def files(self, todos):
+        out = {}
+        for module, todo in todos.items():
+            out.update({"spec/%s.md" % module: "# m\n", "tasks/%s/plan.md" % module: "# P\n",
+                        "tasks/%s/todo.md" % module: todo})
+        return out
+
+    def test_chinese_checkpoint_forms_count(self):
+        # cn-checkpoint-gates: the shapes of the rehearsal todos (1, 1, 2 gates).
+        got = self.gates(self.files({
+            "alpha": "- [x] T1：做事\n- [x] Task 2：测试（开始前未到位则 gate：等待）\n- [x] 最终验收（gate）\n",
+            "beta": "- [x] T1\n- [x] 检查点 1（gate）：最终验收交审\n",
+            "gamma": "- [x] T1\n- [x] G1（gate）\n- [ ] T2\n- [ ] 最终验收（gate）\n"}))
+        self.assertEqual(got, {"alpha": {"total": 1, "done": 1}, "beta": {"total": 1, "done": 1},
+                               "gamma": {"total": 2, "done": 1}})
+
+    def test_chinese_untiered_rules(self):
+        # Untiered 检查点 follows checkpoint-default-report; a tier after the colon does not make a checkpoint;
+        # a bare 最终验收 without a tier is not a checkpoint.
+        got = self.gates(self.files({
+            "alpha": "- [ ] 检查点 1：中途\n- [ ] Task\n- [ ] 检查点 2：最终验收\n",
+            "beta": "- [ ] Checkpoint：验收\n- [ ] Task 1：加依赖（report）\n",
+            "gamma": "- [ ] Task\n- [ ] 最终验收\n"}))
+        self.assertEqual(got, {"alpha": {"total": 1, "done": 0}, "beta": {"total": 1, "done": 0},
+                               "gamma": {"total": 0, "done": 0}})
+
+    def test_tiered_task_head_is_a_report_checkpoint(self):
+        got = self.gates(self.files({"alpha": "- [ ] Task 1（report）：记一下\n- [ ] 最终验收（Gate）\n"}))
+        self.assertEqual(got["alpha"], {"total": 1, "done": 0})
+
+    def test_next_gate_finds_chinese_gate(self):
+        with Project(self.ROWS, ["alpha", "beta", "gamma"],
+                     self.files({"alpha": "- [x] G1（gate）\n- [ ] Task\n- [ ] 最终验收（gate）\n"}),
+                     active="alpha") as project:
+            self.assertEqual(project.json()["nextGate"], "最终验收（gate）")
+
 
 # map-startable: setup done; billing and report in progress with overlapping boundaries; shop ready (comma group
 # with billing); later waits on billing.

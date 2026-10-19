@@ -1385,6 +1385,13 @@ is "已修订 + 只剩 report 检查点：范围内修正可继续" "$REVISED_GO
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '- [ ] Checkpoint 2：记录' '- [ ] Checkpoint 3（report）：发版后核对' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
 is "已修订 + 最终 gate 之后只有未标的中间检查点与 report：附差异一并复审" "$FINAL_HINT"
+# cn-checkpoint-gates：中文写法的最终验收同样算到了最终 gate；只写「最终验收」不标级别的不是检查点。
+printf '%s\n' '- [x] Task 1' '- [x] G1（gate）' '- [ ] 最终验收（gate）' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 只剩中文写法的最终验收：附差异一并复审" "$FINAL_HINT"
+printf '%s\n' '- [x] Task 1' '- [ ] 最终验收' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 只写「最终验收」不标级别：不算最终 gate" "$REVISED_GO"
 printf '%s\n' '- [ ] open' > "$rv/tasks/alpha/todo.md"
 plan_file alpha '<!-- spec-guard: review approved 0123456789ab -->'
 spec_file alpha ''
@@ -1436,9 +1443,19 @@ todo '- [ ] Task 2' '- [ ] Checkpoint 1：中途回归' '- [ ] Task 3' '- [ ] Ch
 out="$(ctx_of)"
 is "未标级别的中间检查点按 report：Next gate 指向最后一个检查点" '- Next gate: Checkpoint 2：最终验收 — the first unchecked'
 isnt "未标级别的中间检查点不当作 Next gate" 'Next gate: Checkpoint 1'
-todo '- [ ] Task 2' '- [ ] 检查点 3（gate）：标题不以 Checkpoint 开头' 'Checkpoint 9（gate）：不是清单项'
+todo '- [ ] Task 2' '- [ ] 最终验收' '- [ ] Task 3：加依赖（report）' 'Checkpoint 9（gate）：不是清单项'
 out="$(ctx_of)"
 isnt "没有可识别的检查点：不输出" 'Next gate'
+# cn-checkpoint-gates：「检查点」开头、或冒号前标了级别的中文写法也是检查点。
+todo '- [ ] Task 2' '- [ ] 检查点 3（gate）：标题不以 Checkpoint 开头'
+out="$(ctx_of)"
+is "「检查点」开头的 gate" '- Next gate: 检查点 3（gate）：标题不以 Checkpoint 开头 — the first unchecked'
+todo '- [x] G1（gate）' '- [ ] Task 2' '- [ ] 最终验收（gate）'
+out="$(ctx_of)"
+is "冒号前标了级别的中文写法：Next gate 指向最终验收" '- Next gate: 最终验收（gate） — the first unchecked'
+todo '- [ ] 检查点 1：中途' '- [ ] Task 2' '- [ ] 检查点 2：最终验收'
+out="$(ctx_of)"
+is "未标级别的中文中间检查点按 report" '- Next gate: 检查点 2：最终验收 — the first unchecked'
 todo '- [ ] Task 2' "- [ ] Checkpoint 5（gate）：带 \`反引号\` 的标题 $(printf 'x%.0s' $(seq 1 200))"
 out="$(ctx_of)"
 is "标题清洗并截断" '- Next gate: Checkpoint 5（gate）：带 反引号 的标题 xxxx'

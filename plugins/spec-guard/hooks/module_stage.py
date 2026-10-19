@@ -436,7 +436,8 @@ def hint_language(root: Path) -> str:
     return "zh-CN" if not problems and values.get("artifactLanguage") == "zh-CN" else "en"
 
 
-CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(Checkpoint(?![A-Za-z]).*)$")
+CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(\S.*)$")
+CHECKPOINT_KEYWORD = re.compile(r"(?:Checkpoint(?![A-Za-z])|检查点)")
 CHECKPOINT_TIER = re.compile(r"[（(]\s*(gate|report)\s*[）)]", re.IGNORECASE)
 GATE_TITLE_LIMIT = 80
 
@@ -460,16 +461,21 @@ def next_gate(root: Path, module: str) -> str:
 def gate_checkpoints(text: str) -> list:
     """[(line index, title, checked)] of the todo's `gate` checkpoints, in order.
 
-    The one gate criterion (next gate, final gate, map-gate-count's `gates`).  The tier is read from the part of
-    a `Checkpoint` item before the first colon: `gate` counts, `report` does not.  checkpoint-default-report: an
-    untiered checkpoint is a report, except the last checkpoint of the todo, which is the final acceptance.
+    The one gate criterion (next gate, final gate, map-gate-count's `gates`).  cn-checkpoint-gates: a checkbox
+    item is a checkpoint when it starts with `Checkpoint` or `检查点`, or when the part before its first colon (the
+    whole item when there is none) carries a tier, e.g. 最终验收（gate）.  The tier is read from that part: `gate`
+    counts, `report` does not.  checkpoint-default-report: an untiered checkpoint is a report, except the last
+    checkpoint of the todo, which is the final acceptance.
     """
     found = []
     for index, line in enumerate(text.splitlines()):
         match = CHECKPOINT.match(line)
-        if match:
-            tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(2), maxsplit=1)[0])
-            found.append((index, match.group(2), match.group(1) != " ", tier.group(1).lower() if tier else None))
+        if not match:
+            continue
+        title = match.group(2)
+        tier = CHECKPOINT_TIER.search(re.split("[：:]", title, maxsplit=1)[0])
+        if tier or CHECKPOINT_KEYWORD.match(title):
+            found.append((index, title, match.group(1) != " ", tier.group(1).lower() if tier else None))
     last = len(found) - 1
     return [(index, title, checked) for position, (index, title, checked, tier) in enumerate(found)
             if tier == "gate" or (tier is None and position == last)]
