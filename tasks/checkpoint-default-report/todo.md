@@ -4,5 +4,5 @@
 - [x] Task 2：判据函数与调用方 — `module_stage.py` 用 `gate_checkpoints(text) -> [(行号, 标题, 已勾)]` 取代 line 级 `gate_checkpoint`（显式 gate 算、显式 report 不算、未标的只有最后一个检查点算）；`next_gate` 取第一个未勾的，`at_final_gate` 按行号比对未勾的 gate，删掉 `_open_gate`；`map_view._gates()` 改用它。`git grep` 无旧函数引用。变异：未标的中间检查点也算 gate → map 3 例红，还原后通过。
 - [x] Task 3：接口说明、规则、模板与文档 — `interface.json` 升到 1.4（`gates` 写新判据与「1.4 起未标的中间检查点不再计入、total 可能变小」，`appearsWhen` 注明）；共享检查点规则两条改写；两份模板、`docs/convention-block.md`、`AGENTS.md`、`docs/workflow.md`、`commands/map.md` 同步。`check-interface.py`、`check-readme-sync.py` 通过；`git grep` 产品文字里不再有「未标注／未标级别」的旧说法（历史证据 `docs/releases/` 除外）。
 - [x] Checkpoint 1（report）：判据、接口与规则的回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
-- [ ] Task 4：本仓库与临时项目实跑
+- [x] Task 4：本仓库与临时项目实跑 — 本仓库：用 origin/main（dea4d5a）的 `map_view.py` 与本分支各跑一次 `--json`，132 个模块里 5 个的 `gates` 变小（audit-remediation 3→1、plan-without-todo 2→1、local-ticket-portability 7→1、module-cost-report 2→1、fresh-session-hint 2→1），都是 todo 里有未标级别的中间检查点；其余不变。临时项目（`mktemp -d` 固定前缀，用后按前缀删除）todo 为「中途回归（未标）＋最终验收（未标）」：`/map --json` 的 `gates` 为 {total 1, done 0}，`nextGate` 为「Checkpoint 2：最终验收」，phase-guard 注入的 Next gate 同样指向它。
 - [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
