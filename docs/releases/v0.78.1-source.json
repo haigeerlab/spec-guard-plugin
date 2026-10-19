@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.78.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:dea4d5ae5bcc59bf3d7191b72df7fffded480ca4"
+      },
+      "observedAt": "2026-10-19T07:25:00Z",
+      "evidence": [
+        "result:the v0.78.1 annotated tag resolves to merge commit dea4d5ae5bcc59bf3d7191b72df7fffded480ca4 (pull request #379); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit differs from the accepted branch tip only by the four v0.78.0 evidence files merged earlier in #378",
+        "result:the push run of the CI on main for the merge commit (39215027025) passed on attempt 1",
+        "result:install-by-scope (user decision 62): a Plan approval covers approved-scope work including the installs the build needs (installs allowed by default), by scope not per use; the 需要的外部条件 requirement, the ask-once rule for unlisted dependencies and the one-install-command advice are gone; the final acceptance still lists new direct dependencies and lock file changes, excluding the workspace's own packages; global installs and running downloaded scripts are listed as high risk",
+        "result:verify-artifacts no longer warns about the 需要的外部条件 section or unlisted dependencies; hooks/dependency_check.py and its tests are removed; verify-artifacts.sh, commands/verify-artifacts.md, docs/commands.md and scripts/validate.sh are byte-identical to 0883717 (before scope-authorization)",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh, test-verify-artifacts.sh 78 cases, ShellCheck) passed under macOS /bin/bash"
+      ]
+    }
+  ]
+}
