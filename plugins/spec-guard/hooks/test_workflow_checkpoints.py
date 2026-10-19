@@ -237,13 +237,18 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, section)
         for phrase in ("再列出本模块的提交", "提交号和一句话", "多时按任务归并", "写作待提交", "推上去的提交和这份清单不一致"):
             self.assertIn(phrase, section)
+        for phrase in ("用表格（状态、文件、行数）", "单独一张表放在最前", "按用途判断、不按扩展名", "文档改动：无",
+                       "一行写目录与文件数", "为什么加", "锁文件只写有没有改动和行数",
+                       "新增依赖、锁文件改动：无", "对应任务", "放在最后一行"):
+            self.assertIn(phrase, section)
         for phrase in ("最终验收的提交包含勾选与状态记录", "先勾上这个 gate", "`.agent/state.json`", "列进待批准的提交清单",
                        "批准不含提交时"):
             self.assertIn(phrase, section)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("最终验收", "实际改动的文件", "本模块的提交（提交号＋一句话）", "与这份提交清单不一致的单独列出"):
+                for phrase in ("最终验收", "实际改动的文件", "本模块的提交（提交号＋一句话）", "与这份提交清单不一致的单独列出",
+                               "用表格列出", "单独一张表放在最前", "没有内容的写“无”"):
                     self.assertIn(phrase, text)
 
     def test_plan_approval_authorizes_by_scope(self):
