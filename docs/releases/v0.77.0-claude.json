@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.77.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:3d02b7fa2f12b09bb8c0e9cc55307d173ee0a6ff"
+      },
+      "observedAt": "2026-10-19T05:30:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.76.0 to 0.77.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 3d02b7f (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed copy on a temporary project (one checked gate, one report, one untiered final acceptance): map_view.py --json gives gates {total 2, done 1}, null for a module without a todo, nextGate Checkpoint 3, generator version 0.77.0",
+        "result:a fresh claude -p session (sonnet) in that temporary project: the transcript's hook context reports BUILDING"
+      ]
+    }
+  ]
+}

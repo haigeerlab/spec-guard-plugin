@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, external_review_state, file_review_state, module_state,
-                          next_gate, project_stage, unmerged_commits)
+                          gate_checkpoint, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, parse as parse_scope
 from project_config import module_concurrency, summary as config_summary
@@ -41,7 +41,7 @@ DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
 TODO_PATH = re.compile(r"^tasks/([^/\s]+)/todo\.md$")
 SPEC_PATH = re.compile(r"^spec/([^/\s]+)\.md$")
 COMMIT_SEP = "\x1e"
-PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence")  # interface.json progressFacts
+PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence", "gates")  # interface.json progressFacts
 
 
 class Unreadable(Exception):
@@ -68,6 +68,12 @@ def _read(path: Path) -> str:
         return path.read_text(encoding="utf-8") if path.is_file() else ""
     except (OSError, UnicodeError) as error:
         raise Unreadable("%s: %s" % (path, error))
+
+
+def _gates(todo: str) -> dict:
+    """map-gate-count: {total, done} of the todo's gate checkpoints, by the same criterion as the next gate."""
+    gates = [gate for gate in map(gate_checkpoint, todo.splitlines()) if gate]
+    return {"total": len(gates), "done": sum(1 for _, checked in gates if checked)}
 
 
 def _review(root: Path, module: str) -> dict:
@@ -402,7 +408,8 @@ def build(root: Path) -> dict:
     modules = []
     for module in order:
         state, value = by_id[module], status[module]
-        todo = _read(root / "tasks" / module / "todo.md")
+        todo_path = root / "tasks" / module / "todo.md"
+        todo = _read(todo_path)
         done_items = len(re.findall(r"^\s*[-*+]\s+\[[xX]\]", todo, re.MULTILINE))
         blocks = sorted((m for m in _closure(module, dependents) if status[m] != "done"), key=position.get)
         upstream = _closure(module, deps)
@@ -419,6 +426,7 @@ def build(root: Path) -> dict:
             "blocks": {"count": len(blocks), "ids": blocks},
             "review": _review(root, module),
             "externalReview": _external_review(root, module),
+            "gates": _gates(todo) if todo_path.is_file() else None,
         })
 
     state, ticks, suspended_write = history(root)

@@ -56,7 +56,8 @@ python3 -B "$ROOT/hooks/map_view.py" --project "$PROJECT" $ARGUMENTS
   时间与勾选过的提交次数，供其他插件自己算这个模块平时的节奏。
 - 工作区比 HEAD 多勾了几项时，进行中一格再加"N 项勾选未提交（最后一次提交几天前）"，同样不设阈值。JSON 里对应每个模块的
   `uncommittedTicks` 与 `startedAt`（第一次提交 Spec 的时间；Spec 批准后才提交的项目，它会比实际开工晚）、`head.committedAt`，以及顶层 `reviewCadence`（批准节奏的生效值
-  与来源，和 `/spec-guard:config` 一致）；含义见 `interface.json` 的 `progressFacts`。
+  与来源，和 `/spec-guard:config` 一致）。每个模块还有 `gates`：todo 里 gate 检查点的总数与已勾数（未标级别按 gate，report
+  不计，最终验收通常已在其中；没有 todo 时为 `null`），表格不显示。含义见 `interface.json` 的 `progressFacts`。
 - 已完成与未就绪的模块默认折叠；`--all` 全部展开。
 - `--json` 给全量、不折叠的机器可读结果（`schemaVersion` 1，字段与稳定性承诺见 `spec/map-view.md` 的 Contract），
   供其他插件读取；给用户看时用表格。

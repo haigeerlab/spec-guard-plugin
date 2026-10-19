@@ -783,6 +783,9 @@ mkifc "$TMP/ifc-facts-field" 'del data["mapView"]["progressFacts"]["fields"]["st
 want fail "interface: progressFacts 少一个字段 → 报错" python3 "$IFC" "$TMP/ifc-facts-field/interface.json"
 mkifc "$TMP/ifc-facts-cadence" 'del data["mapView"]["progressFacts"]["values"]["reviewCadence"]["combined"]'
 want fail "interface: progressFacts 的评审节奏少一个取值 → 报错" python3 "$IFC" "$TMP/ifc-facts-cadence/interface.json"
+# map-gate-count：interface 1.3 的 progressFacts 说明了 gates。
+mkifc "$TMP/ifc-facts-gates" 'del data["mapView"]["progressFacts"]["fields"]["gates"]'
+want fail "interface: progressFacts 缺 gates 说明 → 报错" python3 "$IFC" "$TMP/ifc-facts-gates/interface.json"
 
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"

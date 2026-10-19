@@ -1,5 +1,5 @@
 {
-  "interface": "1.2",
+  "interface": "1.3",
   "mapView": {
     "command": [
       "python3",
@@ -32,12 +32,13 @@
       }
     },
     "progressFacts": {
-      "appearsWhen": "always, whatever moduleConcurrency is (interface 1.2)",
+      "appearsWhen": "always, whatever moduleConcurrency is (interface 1.2; gates since 1.3)",
       "fields": {
         "uncommittedTicks": "per module; checked items in this checkout's working-tree tasks/<id>/todo.md minus those at HEAD, never below 0; an untracked todo counts every checked item; null when history is unavailable. Other worktrees are not counted: read worktree.dirty and worktree.progress",
         "startedAt": "per module; commit time (%cI) of the first commit in HEAD's history that added spec/<id>.md; null when the Spec was never committed or history is unavailable; in a shallow clone it may be the first commit after the shallow boundary; it is a commit time, not when writing began, so a project that commits the Spec only after approval gets a later time than the actual start",
         "head.committedAt": "commit time (%cI) of HEAD of this checkout, for the whole checkout and not per module; null without commits",
-        "reviewCadence": "top level; {\"value\", \"source\"}, the same effective value and source /spec-guard:config shows; source is .agent/config.json, default, or default (config invalid)"
+        "reviewCadence": "top level; {\"value\", \"source\"}, the same effective value and source /spec-guard:config shows; source is .agent/config.json, default, or default (config invalid)",
+      "gates": "per module (interface 1.3, spec/map-gate-count.md); {\"total\", \"done\"}: the gate checkpoints in this checkout's working-tree tasks/<id>/todo.md and how many of them are checked; a Checkpoint item counts unless its tier before the first colon is (report), so an untiered checkpoint counts, the same criterion as nextGate; the final acceptance is normally the last gate and is already in total, so do not add it again when counting a baseline; null when the todo does not exist; does not need git history"
       },
       "values": {
         "reviewCadence": {
