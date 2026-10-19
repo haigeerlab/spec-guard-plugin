@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.78.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:dea4d5ae5bcc59bf3d7191b72df7fffded480ca4"
+      },
+      "observedAt": "2026-10-19T07:25:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.78.0 to 0.78.1 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha dea4d5a (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker and has no dependency_check.py",
+        "result:the installed verify-artifacts.sh on a temporary git project (Plan without the section, zod added to package.json after the base commit): 3 passed, 0 warnings",
+        "result:a fresh claude -p session (sonnet) in that temporary project: the transcript's hook context reports BUILDING"
+      ]
+    }
+  ]
+}
