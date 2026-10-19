@@ -546,6 +546,12 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
                 "at the final gate, show the diff of the revised `%s` verbatim in the acceptance message and say that "
                 "approving the acceptance also approves the revised Spec; once approved, record the Spec approval with "
                 "%s before ticking and committing." % (spec_path, cmd["review-mark"]), spec, plan)
+    if spec == "revised" and stage == "BUILDING":
+        # align-upstream-rules: an in-scope fix waits for the final acceptance; only a change of scope stops.
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "an in-scope fix to the approved `%s` may go on: record it in the Spec's change log and show its diff at "
+                "the final gate for one approval; if it changes the scope or the direction or needs a new trade-off, stop "
+                "and show the user the revised Spec for another review." % spec_path, spec, plan)
     if spec == "revised":
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
                 "show the user the revised `%s` for another review; %s.%s" % (spec_path, hold, record), spec, plan)
@@ -571,6 +577,10 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
         return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "在最终 gate，把改过的 `%s` 的 diff 原样放进验收消息，并说明批准验收也就批准了改过的 Spec；批准后，"
                 "先用 %s 记下 Spec 的批准，再勾选并提交。" % (spec_path, cmd["review-mark"]), spec, plan)
+    if spec == "revised" and stage == "BUILDING":
+        return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
+                "范围内修正已批准的 `%s` 可以继续：记进 Spec 末尾的变更记录，最终验收时附差异一并批准；改了范围、方向或"
+                "需要新取舍时，停下把修订后的 Spec 交用户复审。" % spec_path, spec, plan)
     if spec == "revised":
         return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "把改过的 `%s` 再给用户审一次；%s。%s" % (spec_path, hold, record), spec, plan)

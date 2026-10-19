@@ -307,7 +307,9 @@ class CoordinatorView(unittest.TestCase):
                  "tasks/beta/plan.md": "# Plan\n"}
         with View(files, "coordinator\n") as v:
             out = v.describe()
-        self.assertIn("revised `spec/beta.md`", step(out))
+        # align-upstream-rules: while building, an in-scope fix goes on and is approved at the final gate.
+        self.assertIn("in-scope fix to the approved `spec/beta.md`", step(out))
+        self.assertIn("present it to the user here", step(out))
         self.assertNotIn("/build", step(out))
 
     def test_building_without_constraint_is_coordination(self):
