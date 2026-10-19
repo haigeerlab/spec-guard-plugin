@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.80.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:7c2e672175ef6b208caee29068d7f0e8e76b7087"
+      },
+      "observedAt": "2026-10-19T16:21:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.80.0 to 0.80.1 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha 7c2e672 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; the installed rules carry the hub exception",
+        "result:a fresh claude -p session (sonnet) in a temporary git project with only a capability map reports the injected stage MAP_ONLY"
+      ]
+    }
+  ]
+}
