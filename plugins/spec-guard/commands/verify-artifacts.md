@@ -59,6 +59,14 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/verify-artifacts.sh"
 
 能力图通过解析后，若有模块有 `tasks/<id>/plan.md` 却没有 `tasks/<id>/todo.md`，会多一条汇总 ⚠️：`N 个模块有 Plan 但没有 todo.md，按已完成计：…`（按 Build order 最多列 10 个，其余以「等 N 个」收尾）。它只是提醒，不是失败，不改变退出码：这些模块按已完成计，已交付的可以不管；仍有活要做的，补 `tasks/<id>/todo.md` 列出剩余任务。已交付、有意不建 todo 的模块，可在 `plan.md` 里加独占一行的 `<!-- spec-guard: no-todo -->` 声明，汇总就不再列它（仍按已完成计）；全部都有声明时不发这条警告。这条汇总只看文件与声明行，与 `.agent/state.json` 的内容无关。
 
+未完成且已有 Plan 的模块还有两条只提示的检查（已完成模块不追溯，不改变退出码）：
+
+- Plan 里没有「需要的外部条件」一节（标题或行首写法，英文 `Required external conditions`）时提示；批 Plan 按这一节授权。
+- **依赖改动**：从本模块 Spec 第一次提交（Spec 没提交过时从 HEAD）到工作区，`package.json`（四类 dependencies）、
+  `requirements*.txt`、`pyproject.toml`（`[project]` 与 Poetry 的常见写法）里新增、而「需要的外部条件」没列出的包逐个报出；
+  这一节写了允许范围时报「按允许范围授权，未逐项核对」；锁文件只报有改动；`go.mod`、`Cargo.toml` 等其他清单与读不懂的
+  写法只报「改了，未逐项核对」。不联网、不装包；没有 git 历史时报「未验证」。
+
 若 `.agent/state.json` 里还残留 `tracker` 字段，会多一条 ⚠️ 指出它已退役、可以删除。没有任何代码再读它，删不删都不影响任何判断；退役说明见 `docs/retirements/state-tracker-field.md`。
 
 ## 和 `/spec-guard:phase` 的分工
