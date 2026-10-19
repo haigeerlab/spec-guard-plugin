@@ -1,6 +1,6 @@
 # Spec: hub-only-reply
 
-<!-- spec-guard: review approved e143a71aed30 -->
+<!-- spec-guard: review approved 3a1a7db4d225 -->
 
 ## Objective
 
@@ -23,8 +23,8 @@
    不登记收件枢纽，接没接由使用方插件决定。所以 agent 读到使用方插件的这条规定才让步。
 4. **卡住时选做法也跟着让步。** 「第二次过不去」那条写的是推荐答复「按「交审时说明怎么批准」放进可复制代码块」，引用的是同一条规则，
    不另改。
-5. **不改的地方**：不加检测代码、不改判据，不碰 phase-guard、verify-artifacts 与 `interface.json`。`interface.json` 的 `reviewKinds`
-   说明里「推荐答复放在一个可复制代码块里」一句，在收件枢纽场景下不完全准确；按用户定的范围这次不改，作为已知遗留记下。
+5. **不改的地方**：不加检测代码、不改判据，不碰 phase-guard 与 verify-artifacts。`interface.json` 只改 `reviewKinds` 的说明文字，
+   在「推荐答复放在一个可复制代码块里」一句后补上收件枢纽的例外；不改字段，不改接口版本 1.5。
 6. **不改版本号、不发版**；CHANGELOG 写进「[未发布]」段。
 
 ## Contract
@@ -57,7 +57,7 @@ python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py
 ## Boundaries
 
 - Always：规则只在共享检查点规则写一处，镜像只摘要。
-- Ask first：加检测或钩子；改 `interface.json`。
+- Ask first：加检测或钩子；改 `interface.json` 里 `reviewKinds` 说明文字以外的内容（字段、接口版本 1.5）。
 - Never：仓库文件、提交信息或 PR 中写私有项目名；改插件版本号；让模块会话在这种场景下少给任何一项内容。
 
 ## Success criteria
@@ -65,9 +65,16 @@ python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py
 - AC1：「交审时说明怎么批准」有这条让步规则，写明两种说法都算且按意思认、内容一项不少、不放复制块、改写「去决策收件箱答 #N」
   （不知道事项号的写法、与「等决策收件箱答复」同义）、没有规定时照旧放复制块、spec-guard 不判断接没接收件枢纽；回归断言先红后绿。
 - AC2：三处镜像都带「去决策收件箱答」；回归断言覆盖。
-- AC3：不改 `hooks/` 下的判定代码（测试文件除外）、`interface.json`，已有断言不改且全部通过。
+- AC3：不改 `hooks/` 下的判定代码（测试文件除外）；`interface.json` 只改 `reviewKinds` 的说明文字，不改字段，不改接口版本 1.5；
+  已有断言不改且全部通过。
 - AC4：全套检查通过，插件版本号仍为 0.80.0，CHANGELOG 只写「[未发布]」段。
 
 ## Open questions
 
 - 无。
+
+## 变更记录
+
+- 2026-10-19：假设 5、Boundaries 的 Ask first 与 AC3 由「不碰 `interface.json`」改为「只改 `reviewKinds` 的说明文字，不改字段，
+  不改接口版本 1.5」。原因：说明文字原先写推荐答复一定在复制块里，会误导使用方插件；来源：用户在 spec-guard 插件负责人会话里
+  选 A，经该会话转来，Spec 由用户在本会话重新批准。
