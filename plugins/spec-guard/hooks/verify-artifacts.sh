@@ -285,5 +285,58 @@ for row in rows:
   fi
 fi
 
+# 需要的外部条件（scope-authorization）：未完成且已有 Plan 的模块，Plan 里要有「需要的外部条件」标题或以它开头的一行；
+# 批 Plan 按这一节授权。只提示、不失败，已完成模块不追溯，代码块里的不算。
+if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ]; then
+  if EXT_OUT="$(python3 -B -c '
+import re
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from capability_map import MapError, parse_map
+from module_stage import FENCES, module_state
+SECTION = re.compile(r"^(?:#{1,6}\s*)?(?:\*\*)?(需要的外部条件|required external conditions)", re.IGNORECASE)
+try:
+    rows = parse_map(Path("spec/CAPABILITY-MAP.md")).rows
+except (MapError, OSError, UnicodeError):
+    sys.exit(0)  # the capability map check above already reports it
+for row in rows:
+    path = Path("tasks") / row.module_id / "plan.md"
+    if not path.is_file():
+        continue
+    try:
+        if module_state(Path("."), row.module_id)["stage"] == "DONE":
+            continue
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        print("UNREADABLE %s" % path.as_posix())
+        continue
+    fence, found = None, False
+    for line in text.splitlines():
+        stripped = line.strip()
+        opener = stripped[:3] if stripped[:3] in FENCES else None
+        if fence:
+            fence = None if opener == fence else fence
+            continue
+        if opener:
+            fence = opener
+            continue
+        if SECTION.match(stripped):
+            found = True
+            break
+    if not found:
+        print("MISSING %s" % row.module_id)
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind item; do
+      case "$kind" in
+        MISSING) warn "${item} 的 Plan 没有「需要的外部条件」一节；批 Plan 按这一节授权，没有就写「无」" ;;
+        UNREADABLE) warn "未验证：${item} 读取失败，没有检查「需要的外部条件」" ;;
+      esac
+    done <<<"$EXT_OUT"
+  else
+    warn '未验证：「需要的外部条件」检查没有正常运行'
+  fi
+fi
+
 printf '\n结果: %s 通过 · %s 警告 · %s 失败\n' "$PASS" "$WARN" "$FAIL"
 [ "$FAIL" -eq 0 ]

@@ -355,4 +355,28 @@ ac_spec ac-done '## Success criteria' '' '- 已完成模块没有编号'
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' > "$PROJECT/tasks/alpha/plan.md"; printf '%s\n' '- [x] 做完' > "$PROJECT/tasks/alpha/todo.md"
 check_absent "已完成模块不追溯" "$AC_HINT"
 
+# 需要的外部条件（scope-authorization）：未完成且有 Plan 的模块缺这一节只提示、不失败；已完成或没有 Plan 不提示。
+ext_plan() {  # $1=目录，其余为 plan.md 的各行；alpha 进行中（todo 有未勾项）
+  project "$1"; shift; mkdir -p "$PROJECT/tasks/alpha"
+  printf '%s\n' '# alpha' > "$PROJECT/spec/alpha.md"
+  printf '%s\n' '# Plan' '' "$@" > "$PROJECT/tasks/alpha/plan.md"
+  printf '%s\n' '- [ ] a' > "$PROJECT/tasks/alpha/todo.md"
+}
+EXT_HINT="没有「需要的外部条件」一节"
+ext_plan ext-missing '## Task List' '' '- 做事'
+check "缺「需要的外部条件」给提示且不失败" 0 "alpha 的 Plan 没有「需要的外部条件」一节；批 Plan 按这一节授权，没有就写「无」"
+ext_plan ext-heading '## 需要的外部条件' '' '- 无'
+check_absent "写成标题时不提示" "$EXT_HINT"
+ext_plan ext-line '需要的外部条件：无（不装依赖、不联网）。'
+check_absent "写成行首一句时不提示" "$EXT_HINT"
+ext_plan ext-en '## Required external conditions' '' '- none'
+check_absent "英文标题同样认" "$EXT_HINT"
+ext_plan ext-fence '```markdown' '需要的外部条件：无' '```'
+check "只出现在代码块里仍提示" 0 "alpha 的 Plan 没有「需要的外部条件」一节"
+ext_plan ext-done '## Task List'
+printf '%s\n' '- [x] a' > "$PROJECT/tasks/alpha/todo.md"
+check_absent "已完成模块不追溯" "$EXT_HINT"
+project ext-no-plan; printf '%s\n' '# alpha' > "$PROJECT/spec/alpha.md"
+check_absent "还没有 Plan 时不提示" "$EXT_HINT"
+
 echo "verify-artifacts regression passed ($PASS cases)"
