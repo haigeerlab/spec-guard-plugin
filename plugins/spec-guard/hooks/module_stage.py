@@ -436,7 +436,7 @@ def hint_language(root: Path) -> str:
     return "zh-CN" if not problems and values.get("artifactLanguage") == "zh-CN" else "en"
 
 
-OPEN_CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[ \]\s+(Checkpoint(?![A-Za-z]).*)$")
+CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(Checkpoint(?![A-Za-z]).*)$")
 CHECKPOINT_TIER = re.compile(r"[（(]\s*(gate|report)\s*[）)]", re.IGNORECASE)
 GATE_TITLE_LIMIT = 80
 
@@ -452,25 +452,33 @@ def next_gate(root: Path, module: str) -> str:
     except (OSError, UnicodeError):
         return ""
     for line in text.splitlines():
-        match = OPEN_CHECKPOINT.match(line)
-        if not match:
-            continue
-        tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(1), maxsplit=1)[0])
-        if tier and tier.group(1).lower() == "report":
-            continue
-        return safe_fragment(match.group(1), GATE_TITLE_LIMIT)
+        gate = gate_checkpoint(line)
+        if gate and not gate[1]:
+            return safe_fragment(gate[0], GATE_TITLE_LIMIT)
     return ""
+
+
+def gate_checkpoint(line: str):
+    """(title, checked) when the todo line is a `gate` checkpoint, else None.
+
+    The one gate criterion (next gate, final gate, map-gate-count's `gates`): a `Checkpoint` item whose tier,
+    read from the part before the first colon, is not `report`; a checkpoint with no tier is a gate.
+    """
+    match = CHECKPOINT.match(line)
+    if not match:
+        return None
+    tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(2), maxsplit=1)[0])
+    if tier and tier.group(1).lower() == "report":
+        return None
+    return match.group(2), match.group(1) != " "
 
 
 OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \]\s+")
 
 
 def _open_gate(line: str) -> bool:
-    match = OPEN_CHECKPOINT.match(line)
-    if not match:
-        return False
-    tier = CHECKPOINT_TIER.search(re.split("[：:]", match.group(1), maxsplit=1)[0])
-    return not (tier and tier.group(1).lower() == "report")
+    gate = gate_checkpoint(line)
+    return bool(gate) and not gate[1]
 
 
 def at_final_gate(root: Path, module: str) -> bool:
