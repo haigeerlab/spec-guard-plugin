@@ -122,6 +122,13 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, tiers)
         self.assertIn("`gate` 检查点写明的授权", self.section("## 阶段交接"))
 
+    def test_checkpoint_forms_include_chinese(self):
+        # cn-checkpoint-gates: the three recognised forms and what is not a checkpoint.
+        tiers = self.section("## Plan 检查点分级")
+        for phrase in ("`Checkpoint 1（report）`", "`检查点 1（report）`", "`最终验收（gate）`",
+                       "既不以 `Checkpoint`／`检查点` 开头、冒号前又没标级别的待办项不算检查点"):
+            self.assertIn(phrase, tiers)
+
     def test_checkpoint_default_is_report(self):
         tiers = self.section("## Plan 检查点分级")
         for phrase in ("没标级别的中间检查点按 `report`", "最后一个检查点没标级别时按 `gate`", "推送与不可逆操作的检查点必须标明 `gate`"):
