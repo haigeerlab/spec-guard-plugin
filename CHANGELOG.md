@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.77.0] - 2026-10-19
+
+本版 1 个模块：`map-gate-count`。只增字段，`interface.json` 升到 1.3。
+
+### 新增
+
+- **`/map --json` 每个模块给 `gates`：gate 检查点的总数与已勾数。** 读取方要按模块算"问用户的基准次数"时，原来只能自己
+  解析 `todo.md` 的检查点写法，容易和 spec-guard 的判据走偏。现在 `gates` 为 `{"total", "done"}`，判据与"下一个 gate"同一个
+  函数：标了 `（report）` 的不算，标 `（gate）` 或没标级别的都算；最终验收通常就是最后一个 gate，已在 `total` 里，算基准时
+  不要再单独加。没有 todo 时为 `null`，不依赖 git 历史。进度表、`nextGate` 与每轮注入都不变。
+
 ## [0.76.0] - 2026-10-19
 
 本版 1 个模块：`boundary-hint-unknown-size`。修复，没有新功能。
