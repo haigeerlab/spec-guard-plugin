@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.78.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:b3ff5e0859f272f72b205f4404d685795e5fd301"
+      },
+      "observedAt": "2026-10-19T06:50:00Z",
+      "evidence": [
+        "result:the v0.78.0 annotated tag resolves to merge commit b3ff5e0859f272f72b205f4404d685795e5fd301 (pull request #377); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree (6b9e655) is identical to the accepted branch tip",
+        "result:the push run of the CI on main for the merge commit (39210723392) passed on attempt 2; attempt 1 failed before any check ran because downloading the ShellCheck binary hit GitHub's rate limit (403 rate limit exceeded); only the failed job was rerun",
+        "result:one release for one requirement: scope-authorization (#376) and dependency-check (#377) share 0.78.0; the version bump is only in #377; the stdin-timing test fix (#375) is carried in the same CHANGELOG section",
+        "result:scope-authorization: the shared checkpoint rules and the four convention block copies say a Plan approval covers its 需要的外部条件 section and routine in-scope work by scope, not per use; the full list of when to ask the user; an unlisted new dependency is asked once; a second request may bundle every permission the checkpoint needs; the final acceptance lists new dependencies and lock file changes; a host confirmation is not a user decision; verify-artifacts warns when an unfinished module's Plan lacks the section",
+        "result:dependency-check: verify-artifacts reports packages added to package.json, requirements*.txt or pyproject.toml since the module's Spec was first committed and not listed in the Plan section; allowed scope, lock files and other manifests are reported without item checks; logic in hooks/dependency_check.py, Python 3.9 compatible, no network",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh, test-verify-artifacts.sh 97 cases, ShellCheck) passed under macOS /bin/bash; test_dependency_check.py also passed under /usr/bin/python3 3.9.6"
+      ]
+    }
+  ]
+}
