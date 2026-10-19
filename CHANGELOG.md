@@ -1,8 +1,9 @@
 # Changelog
 
-## [未发布]
+## [0.80.0] - 2026-10-19
 
-本段排到下一版发布；阶段丙期间版本冻结，版本号仍为 0.79.0。
+本版 3 个模块：`commits-at-acceptance`、`tables-at-acceptance`、`review-card-sections`。最终验收补列提交、
+清单有内容用表格；交审按决策卡片的小项与顺序给出、推荐答复放进可复制代码块。`interface.json` 升到 1.5（只增 `reviewKinds`）。
 
 ### 变更
 
