@@ -737,6 +737,7 @@ IFC="$ROOT/scripts/check-interface.py"
 mkifc() {  # $1=目录 $2=python 表达式，对 data（正确的 interface.json）做的改动，空=不改
   rm -rf "$1"; mkdir -p "$1/hooks"
   for script in map_view module_scope checkout_role review_mark; do : > "$1/hooks/$script.py"; done
+  mkdir -p "$1/references"; cp "$ROOT/plugins/spec-guard/references/workflow-checkpoints.md" "$1/references/"
   python3 - "$ROOT/plugins/spec-guard/interface.json" "$1/interface.json" "${2:-}" <<'PY'
 import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -776,6 +777,24 @@ mkifc "$TMP/ifc-v10" 'del data["mapView"]["contract"]'
 want fail "interface: mapView 缺 1.0 的键 → 报错" python3 "$IFC" "$TMP/ifc-v10/interface.json"
 mkifc "$TMP/ifc-conc" 'del data["mapView"]["concurrency"]'
 want fail "interface: mapView 缺 concurrency 说明 → 报错" python3 "$IFC" "$TMP/ifc-conc/interface.json"
+# review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
+mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
+want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"
+mkifc "$TMP/ifc-kinds-less" 'del data["reviewKinds"]["kinds"]["stuck"]'
+want fail "interface: reviewKinds 少一类 → 报错" python3 "$IFC" "$TMP/ifc-kinds-less/interface.json"
+mkifc "$TMP/ifc-kinds-more" 'data["reviewKinds"]["kinds"]["go-to-session"] = {"label": "去会话操作", "sections": []}'
+want fail "interface: reviewKinds 多一类（去会话操作不归 spec-guard）→ 报错" python3 "$IFC" "$TMP/ifc-kinds-more/interface.json"
+mkifc "$TMP/ifc-kinds-name" 'data["reviewKinds"]["kinds"]["spec"]["sections"].append("规则里没有的小项")'
+want fail "interface: 小项名在规则里找不到 → 报错" python3 "$IFC" "$TMP/ifc-kinds-name/interface.json"
+mkifc "$TMP/ifc-kinds-rule"
+python3 - "$TMP/ifc-kinds-rule/references/workflow-checkpoints.md" <<'PY2'
+import sys
+from pathlib import Path
+rule = Path(sys.argv[1]); rule.write_text(rule.read_text(encoding="utf-8").replace("出了什么事", "发生了什么"), encoding="utf-8")
+PY2
+want fail "interface: 规则里删掉一个小项名 → 报错" python3 "$IFC" "$TMP/ifc-kinds-rule/interface.json"
+mkifc "$TMP/ifc-kinds-common" 'data["reviewKinds"]["commonLines"].remove("注意")'
+want fail "interface: commonLines 少一行 → 报错" python3 "$IFC" "$TMP/ifc-kinds-common/interface.json"
 # map-progress-facts：interface 1.2 的 progressFacts 说明，字段与评审节奏取值和代码常量一致。
 mkifc "$TMP/ifc-facts" 'del data["mapView"]["progressFacts"]'
 want fail "interface: mapView 缺 progressFacts 说明 → 报错" python3 "$IFC" "$TMP/ifc-facts/interface.json"

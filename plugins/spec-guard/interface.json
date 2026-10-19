@@ -1,5 +1,5 @@
 {
-  "interface": "1.4",
+  "interface": "1.5",
   "mapView": {
     "command": [
       "python3",
@@ -181,5 +181,86 @@
     },
     "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges)",
     "contract": "spec/review-approval-marker.md"
+  },
+  "reviewKinds": {
+    "appearsWhen": "always (interface 1.5); add-only: kinds and section names are never renamed or removed within 1.x",
+    "description": "the kinds of user decision spec-guard's shared checkpoint rules produce, with the sections each one shows in the conversation, in order. Every kind needs a reply; the recommended reply sits in one copyable code block. Kinds spec-guard does not produce (go-to-session, interface proposals) are not listed",
+    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (contract v2.3); label is the value written there",
+    "kinds": {
+      "capability-map": {
+        "label": "能力图审阅",
+        "sections": [
+          "拆成哪些模块",
+          "先后顺序",
+          "文档建议"
+        ]
+      },
+      "spec": {
+        "label": "Spec",
+        "sections": [
+          "目标",
+          "做／不做",
+          "要你确认的假设",
+          "验收标准",
+          "附带的小决定"
+        ]
+      },
+      "plan": {
+        "label": "Plan",
+        "sections": [
+          "分几步",
+          "会改哪些文件",
+          "风险",
+          "中途会停下来问你的地方"
+        ]
+      },
+      "spec-plan": {
+        "label": "Spec 与 Plan",
+        "sections": [
+          "目标",
+          "做／不做",
+          "要你确认的假设",
+          "验收标准",
+          "附带的小决定",
+          "分几步",
+          "会改哪些文件",
+          "风险",
+          "中途会停下来问你的地方"
+        ],
+        "notes": "reviewCadence combined: the Spec sections, then the Plan sections, approved at once"
+      },
+      "checkpoint": {
+        "label": "中途检查点",
+        "sections": [
+          "做到哪了",
+          "为什么停在这",
+          "接下来要做的那一步"
+        ]
+      },
+      "final": {
+        "label": "最终验收",
+        "sections": [
+          "做了什么",
+          "验收结果",
+          "改了哪些文件",
+          "Spec 中途改过吗"
+        ]
+      },
+      "stuck": {
+        "label": "卡住选做法",
+        "sections": [
+          "出了什么事"
+        ],
+        "notes": "not an approval but needs a reply: the same goal failed a second time for an outside reason; each option with its cost"
+      }
+    },
+    "commonLines": [
+      "注意",
+      "推荐理由",
+      "批了会怎样"
+    ],
+    "commonLinesNote": "separate lines after the sections, not sections themselves; 注意 says 无 when empty",
+    "rules": "references/workflow-checkpoints.md",
+    "contract": "spec/review-card-sections.md"
   }
 }
