@@ -5,4 +5,4 @@
 - [x] Task 3：删掉检查与模块 — `git rm` 了 `dependency_check.py` 与 `test_dependency_check.py`；删 verify-artifacts 两段、`validate.sh` 登记、`commands/verify-artifacts.md` 与 `docs/commands.md` 的说明。复核：`git grep` 只剩测试里的退役断言；`verify-artifacts.sh`、两处文档与 `validate.sh` 与 0883717（0.77.0 之后、scope-authorization 之前）逐字一致。回归 78 例全绿；本仓库实跑 5 通过、0 警告（原先对本模块 Plan 的那条提示消失）。
 - [x] Checkpoint 1（report）：规则、约定块与 verify-artifacts 回归全绿 — 随本次提交跑 `verify-and-commit.sh` 全档。
 - [x] Task 4：CHANGELOG 与版本号 — CHANGELOG 新增 `[0.78.1] - 2026-10-19`（变更：按已批准范围授权、装包默认放行，及原因——真实前端项目实跑的三类打扰；移除：verify-artifacts 两条提示与 `dependency_check.py`；已写这一节的 Plan 不受影响）；两份 `plugin.json` 改为 0.78.1，中英 README 的 `--ref` 改为 v0.78.1。
-- [ ] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-19 在对话里按 AC1–AC7 逐条给出证据（约定块改动行、规则断言与退役短语断言、verify-artifacts 与 0.77.0 逐字一致、反向用例、全档检查、本仓库实跑 0 警告）、与 Plan 的一处差异（换行拆开关键句后重排）、未验证项（未在真实前端项目重跑；安装版待发版；未做独立代码审查）、实际改动的文件清单（相对 main：22 个文件，新增 3、修改 17、删除 2，无超出 Plan 预计的文件；新增依赖与锁文件：无）与文档建议（无）。用户批准：勾上 gate 并提交、推送、开一个 PR；合并后发 0.78.1（tag、Release、两边宿主、证据 PR），发完抄送协调人并告知 decision-inbox。
