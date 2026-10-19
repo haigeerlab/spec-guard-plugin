@@ -401,6 +401,58 @@ class CheckpointContractTests(unittest.TestCase):
                 for phrase in ("在对话里呈现内容要点", "只给链接不算交审"):
                     self.assertIn(phrase, text)
 
+    # review-card-sections: the sections of each kind, in the order of the decision-inbox card template.
+    CARD_SECTIONS = (
+        ("能力图审阅：", ("拆成哪些模块", "先后顺序", "文档建议")),
+        ("Spec：", ("目标", "做／不做", "要你确认的假设", "验收标准", "附带的小决定")),
+        ("Plan：", ("分几步", "会改哪些文件", "风险", "中途会停下来问你的地方")),
+        ("中途 gate：", ("做到哪了", "为什么停在这", "接下来要做的那一步")),
+        ("最终验收：", ("做了什么", "验收结果", "改了哪些文件", "Spec 中途改过吗")),
+    )
+
+    def handoff_item(self, title, following):
+        section = self.section("## 批准标记")
+        start = section.index(title)
+        return section[start:section.index(following, start)]
+
+    def test_review_sections_follow_the_card_order(self):
+        item = self.handoff_item("**交审要让用户看到内容。**", "**验收标准编号。**")
+        labels = [label for label, _ in self.CARD_SECTIONS]
+        for index, (label, names) in enumerate(self.CARD_SECTIONS):
+            with self.subTest(kind=label):
+                start = item.index("  - " + label)
+                end = item.index("  - " + labels[index + 1]) if index + 1 < len(labels) else item.index("\n\n", start)
+                line = item[start:end]
+                positions = [line.find(name) for name in names]
+                self.assertNotIn(-1, positions, line)
+                self.assertEqual(positions, sorted(positions), line)
+        for phrase in ("逐条全列", "照旧用表格", "不为了短而删减", "新插入的标「新」", "开头的五件事落在这几项里",
+                       "“注意：”", "“批了会怎样：”", "没有写“无”", "Spec 的五项再接 Plan 的四项", "`reviewKinds`",
+                       "决策收件箱把这些缩成卡片"):
+            self.assertIn(phrase, item)
+
+    def test_how_to_approve_uses_one_copy_block(self):
+        item = self.handoff_item("**交审时说明怎么批准。**", "**没有标记的文件判定照旧**")
+        for phrase in ("每个选项写清选了之后会怎样", "能不能撤回", "还要另外问用户", "“推荐理由：”", "可复制代码块",
+                       "不带 shell 语言标签", "不用行内代码", "最短的可接受说法", "合成一行", "有代码块就是要用户回答",
+                       "不需要回答的内容", "不用代码块", "“继续”不会被记为批准", "不能替代内容"):
+            self.assertIn(phrase, item)
+        stuck = self.section("## Plan 检查点分级")
+        for phrase in ("“出了什么事：”", "代价是什么", "可复制代码块"):
+            self.assertIn(phrase, stuck)
+
+    def test_mirrors_follow_the_card_sections(self):
+        for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md", "../../docs/commands.md"):
+            with self.subTest(path=relative):
+                text = (self.plugin / relative).read_text(encoding="utf-8")
+                for phrase in ("可复制代码块", "不会被记为批准"):
+                    self.assertIn(phrase, text)
+        for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
+            with self.subTest(path=relative):
+                text = (self.plugin / relative).read_text(encoding="utf-8")
+                for phrase in ("做／不做", "要你确认的假设", "附带的小决定", "批了会怎样"):
+                    self.assertIn(phrase, text)
+
     def test_rework_goes_back_into_the_module(self):
         section = self.section("## 返工与小模块")
         for phrase in ("`tasks/<id>/todo.md` 追加", "`plan.md` 补一节", "不在 `tasks/<id>/` 下另建带清单的文件",
