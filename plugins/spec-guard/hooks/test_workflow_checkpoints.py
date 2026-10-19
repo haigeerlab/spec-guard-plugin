@@ -235,13 +235,15 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("最终验收列出实际改动的文件", "最后一个 `gate`", "新增、修改、删除", "差异统计", "不凭记忆",
                        "超出 Plan 预计影响面", "未提交改动", "不算", "文件数与提交号", "不展开清单"):
             self.assertIn(phrase, section)
+        for phrase in ("再列出本模块的提交", "提交号和一句话", "多时按任务归并", "写作待提交", "推上去的提交和这份清单不一致"):
+            self.assertIn(phrase, section)
         for phrase in ("最终验收的提交包含勾选与状态记录", "先勾上这个 gate", "`.agent/state.json`", "列进待批准的提交清单",
                        "批准不含提交时"):
             self.assertIn(phrase, section)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("最终验收", "实际改动的文件"):
+                for phrase in ("最终验收", "实际改动的文件", "本模块的提交（提交号＋一句话）", "与这份提交清单不一致的单独列出"):
                     self.assertIn(phrase, text)
 
     def test_plan_approval_authorizes_by_scope(self):
