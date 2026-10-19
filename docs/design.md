@@ -104,6 +104,11 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 `"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（批准标记）；`mapView.concurrency`
 列出开关为 on 时 `/map --json` 才有的字段。1.0 的内容不变，`check-interface.py` 同时核对新入口引用的脚本存在、取值与代码一致。
 
+1.5（review-card-sections）起另有 `reviewKinds`：spec-guard 共享检查点规则产生的要用户决定的几类（能力图审阅、Spec、Plan、Spec 与 Plan、
+中途检查点、最终验收、卡住选做法），键是 session-protocol 契约【等待用户】「类型」的代码，每类列出交审时在对话里给的小项及顺序，
+另有小项之后的通用行（注意、推荐理由、批了会怎样）。去会话操作与接口提案不由 spec-guard 产生，不在其中。`check-interface.py` 核对
+类别正好这七个、每个小项名都写在共享检查点规则里。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：

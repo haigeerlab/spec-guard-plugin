@@ -19,6 +19,9 @@ import project_config  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark")  # crew-interface: interface 1.1
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
+# review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
+REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
+COMMON_LINES = ("注意", "推荐理由", "批了会怎样")
 
 
 def problems(path: Path) -> list:
@@ -43,7 +46,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return found + _progress_facts(view) + _concurrency(path, data, view)
+    return found + _progress_facts(view) + _concurrency(path, data, view) + _review_kinds(path, data)
 
 
 def _progress_facts(view: dict) -> list:
@@ -91,6 +94,39 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
         names = {(keyed or (lambda key: key))(key) for key in got} if isinstance(got, dict) else None
         if names != expected:
             found.append("%s 的取值为 %s，代码为 %s" % (label, sorted(names) if names is not None else got, sorted(expected)))
+    return found
+
+
+def _review_kinds(path: Path, data: dict) -> list:
+    """review-card-sections: exactly the seven kinds, and every section and common line is named in the shared rules."""
+    block = data.get("reviewKinds")
+    if not isinstance(block, dict):
+        return ["缺少 reviewKinds"]
+    kinds = block.get("kinds") if isinstance(block.get("kinds"), dict) else {}
+    found = []
+    if set(kinds) != set(REVIEW_KINDS):
+        found.append("reviewKinds.kinds 的类别为 %s，应为 %s" % (sorted(kinds), sorted(REVIEW_KINDS)))
+    rules = path.parent / str(block.get("rules", ""))
+    try:
+        text = rules.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return found + ["reviewKinds.rules 指向的 %s 读不出" % block.get("rules")]
+    for code, kind in kinds.items():
+        sections = kind.get("sections") if isinstance(kind, dict) else None
+        if not isinstance(kind, dict) or not isinstance(kind.get("label"), str) or not isinstance(sections, list) or not sections:
+            found.append("reviewKinds.kinds.%s 要有 label 与非空的 sections" % code)
+            continue
+        found += ["reviewKinds.kinds.%s 的小项「%s」在共享检查点规则里找不到" % (code, name)
+                  for name in sections if not isinstance(name, str) or name not in text]
+    combined = [kinds.get(code, {}).get("sections") if isinstance(kinds.get(code), dict) else None for code in ("spec", "plan")]
+    if isinstance(kinds.get("spec-plan"), dict) and None not in combined \
+            and kinds["spec-plan"].get("sections") != combined[0] + combined[1]:
+        found.append("reviewKinds.kinds.spec-plan 的小项应为 spec 的小项再接 plan 的小项")
+    lines = block.get("commonLines")
+    if lines != list(COMMON_LINES):
+        found.append("reviewKinds.commonLines 为 %s，应为 %s" % (lines, list(COMMON_LINES)))
+    found += ["reviewKinds.commonLines 的「%s」在共享检查点规则里找不到" % name
+              for name in COMMON_LINES if name not in text]
     return found
 
 
