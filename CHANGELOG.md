@@ -1,6 +1,8 @@
 # Changelog
 
-## [未发布]
+## [0.81.0] - 2026-10-20
+
+本版 1 个模块：`cn-checkpoint-gates`。检查点判据认中文写法，中文 todo 的 gate 能被计数；`interface.json` 升到 1.6（只改 `gates` 的说明）。
 
 ### 变更
 
