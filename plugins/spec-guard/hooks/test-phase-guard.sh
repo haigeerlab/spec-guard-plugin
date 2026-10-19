@@ -1378,6 +1378,10 @@ is "已修订 + 后面还有别的 gate：照旧要求复审" 'Suggested next st
 printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（report）：回归' > "$rv/tasks/alpha/todo.md"
 out="$(ctx_of)"
 is "已修订 + 只剩 report 检查点：照旧要求复审" 'Suggested next step: show the user the revised `spec/alpha.md` for another review; do not continue the build.'
+# checkpoint-default-report：最终 gate 之后只有未标级别的中间检查点与 report 时，仍算到了最终验收。
+printf '%s\n' '- [x] Task 1' '- [ ] Checkpoint 1（gate）：最终验收' '- [ ] Checkpoint 2：记录' '- [ ] Checkpoint 3（report）：发版后核对' > "$rv/tasks/alpha/todo.md"
+out="$(ctx_of)"
+is "已修订 + 最终 gate 之后只有未标的中间检查点与 report：附差异一并复审" "$FINAL_HINT"
 printf '%s\n' '- [ ] open' > "$rv/tasks/alpha/todo.md"
 plan_file alpha '<!-- spec-guard: review approved 0123456789ab -->'
 spec_file alpha ''
@@ -1423,7 +1427,12 @@ out="$(ctx_of)"
 isnt "只剩 report 检查点：不输出" 'Next gate'
 todo '- [ ] Task 2' '* [ ] Checkpoint: 评审'
 out="$(ctx_of)"
-is "未标注级别按 gate" '- Next gate: Checkpoint: 评审 — the first unchecked `gate` checkpoint in the todo.'
+is "未标级别的最后一个检查点按 gate" '- Next gate: Checkpoint: 评审 — the first unchecked `gate` checkpoint in the todo.'
+# checkpoint-default-report：未标级别的中间检查点按 report，最后一个检查点未标级别时仍按 gate。
+todo '- [ ] Task 2' '- [ ] Checkpoint 1：中途回归' '- [ ] Task 3' '- [ ] Checkpoint 2：最终验收' '- [ ] 发版后的核对'
+out="$(ctx_of)"
+is "未标级别的中间检查点按 report：Next gate 指向最后一个检查点" '- Next gate: Checkpoint 2：最终验收 — the first unchecked'
+isnt "未标级别的中间检查点不当作 Next gate" 'Next gate: Checkpoint 1'
 todo '- [ ] Task 2' '- [ ] 检查点 3（gate）：标题不以 Checkpoint 开头' 'Checkpoint 9（gate）：不是清单项'
 out="$(ctx_of)"
 isnt "没有可识别的检查点：不输出" 'Next gate'

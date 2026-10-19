@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, external_review_state, file_review_state, module_state,
-                          gate_checkpoint, next_gate, project_stage, unmerged_commits)
+                          gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, parse as parse_scope
 from project_config import module_concurrency, summary as config_summary
@@ -72,8 +72,8 @@ def _read(path: Path) -> str:
 
 def _gates(todo: str) -> dict:
     """map-gate-count: {total, done} of the todo's gate checkpoints, by the same criterion as the next gate."""
-    gates = [gate for gate in map(gate_checkpoint, todo.splitlines()) if gate]
-    return {"total": len(gates), "done": sum(1 for _, checked in gates if checked)}
+    gates = gate_checkpoints(todo)
+    return {"total": len(gates), "done": sum(1 for _, _, checked in gates if checked)}
 
 
 def _review(root: Path, module: str) -> dict:

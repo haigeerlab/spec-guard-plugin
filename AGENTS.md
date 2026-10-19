@@ -21,7 +21,7 @@
 - 明确选用 GitHub/GitLab 普通 Issue 时，用 `spec-guard:hosted-ticket-workflow` 逐项查重、授权写入与交付对账；
   Local 事项仍走 `spec-guard:ticket`，不凭 Git remote 改目标
 - 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
-- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），未标注按 `gate`，范围内能自动判定的中间检查点可标 `report`；
+- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），没标级别的中间检查点按 `report`，最后一个检查点按 `gate`，推送与不可逆操作须标 `gate`；
   按需求批量前置审与 UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 批 Plan 即按已批准范围授权：改本仓库文件、跑测试与构建、本地提交与构建需要的装包（默认放行），不按次数；只问用户的情形见
   `spec-guard:spec-guard-ops` 的共享检查点规则

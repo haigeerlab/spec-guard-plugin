@@ -654,6 +654,27 @@ class GateCountTest(unittest.TestCase):
         self.assertEqual(data["history"], "unavailable")
         self.assertEqual(data["modules"][0]["gates"], {"total": 2, "done": 1})
 
+    def test_untiered_middle_checkpoints_are_reports(self):
+        todo = ("- [ ] Checkpoint 1：中途\n- [x] Checkpoint 2（gate）：已过\n- [ ] Task\n"
+                "- [ ] Checkpoint 3：最终验收\n- [ ] 发版后的核对\n")
+        got = self.gates({"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": todo})
+        self.assertEqual(got["alpha"], {"total": 2, "done": 1})
+
+    def test_single_untiered_checkpoint_and_report_last(self):
+        got = self.gates({"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n",
+                          "tasks/alpha/todo.md": "- [ ] Task\n- [ ] Checkpoint：验收\n",
+                          "spec/beta.md": "# b\n", "tasks/beta/plan.md": "# P\n",
+                          "tasks/beta/todo.md": "- [ ] Checkpoint 1：中途\n- [ ] Checkpoint 2（report）：收尾\n"})
+        self.assertEqual(got["alpha"], {"total": 1, "done": 0})
+        self.assertEqual(got["beta"], {"total": 0, "done": 0})
+
+    def test_next_gate_skips_untiered_middle_checkpoints(self):
+        todo = "- [ ] Checkpoint 1：中途\n- [ ] Task\n- [ ] Checkpoint 2：最终验收\n"
+        with Project(self.ROWS, ["alpha", "beta", "gamma"],
+                     {"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": todo},
+                     active="alpha") as project:
+            self.assertEqual(project.json()["nextGate"], "Checkpoint 2：最终验收")
+
     def test_next_gate_uses_the_same_criterion(self):
         with Project(self.ROWS, ["alpha", "beta", "gamma"],
                      {"spec/alpha.md": "# a\n", "tasks/alpha/plan.md": "# P\n", "tasks/alpha/todo.md": self.TODO},
