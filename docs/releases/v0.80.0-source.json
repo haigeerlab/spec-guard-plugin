@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.80.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:5d1f24ebb9864c87ed86c4175819ebf5b7d09d8d"
+      },
+      "observedAt": "2026-10-19T15:13:00Z",
+      "evidence": [
+        "result:the v0.80.0 annotated tag resolves to merge commit 5d1f24ebb9864c87ed86c4175819ebf5b7d09d8d (pull request #387); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip cdb248c",
+        "result:the push run of the CI on main for the merge commit (39275033053) passed on attempt 1",
+        "result:one release for three modules merged without a version bump: commits-at-acceptance (#384), tables-at-acceptance (#385) and review-card-sections (#386); the version bump is only in #387",
+        "result:commits-at-acceptance and tables-at-acceptance: the final acceptance lists the module's commits, and every list with content is a table (documents first), an empty one says none",
+        "result:review-card-sections: the five approval kinds show their sections in the order of the decision-inbox card template with nothing cut, the recommended reply goes in one copyable code block; interface.json 1.5 adds reviewKinds with the seven session-protocol v2.3 type codes, checked by check-interface.py",
+        "result:verify-and-commit full tier (validate.sh, test-phase-guard.sh 418 cases, test-verify-artifacts.sh 72 cases) and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
