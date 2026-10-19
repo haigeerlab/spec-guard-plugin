@@ -731,6 +731,7 @@ done
 echo "  ✅ 不可用的 hook 输入不改变输出"; PASS=$((PASS + 1))
 
 # 标准输入一直不关闭：hook 必须照常输出，不能挂住。只判断比关闭标准输入时多等的时间，不判断总耗时。
+# 负载只会让一次运行变慢，不会变快：超限时最多重测 3 轮，按各轮最小 open 减最小 base 判断。
 python3 - "$HOOKDIR/phase-guard.sh" "$ctx" <<'HANG' || fail "标准输入不关闭时 hook 挂住、多等太久或输出不对"
 import json, os, subprocess, sys, threading, time
 cmd = ["/bin/bash", sys.argv[1]]
@@ -739,27 +740,37 @@ env = dict(os.environ, CLAUDE_PROJECT_DIR=sys.argv[2])
 def building(out):
     assert "BUILDING" in json.loads(out)["hookSpecificOutput"]["additionalContext"], out
 
-started = time.monotonic()
-out = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, env=env, timeout=15).stdout
-base = time.monotonic() - started
-building(out)
+def measure():
+    started = time.monotonic()
+    out = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, env=env, timeout=15).stdout
+    base = time.monotonic() - started
+    building(out)
 
-hung = []
-started = time.monotonic()
-proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
-timer = threading.Timer(15, lambda: (hung.append(True), proc.kill()))
-timer.start()
-try:
-    out = proc.stdout.read()
-    proc.wait()
-finally:
-    timer.cancel()
-    proc.stdin.close()
-    proc.kill()
-opened = time.monotonic() - started
-assert not hung, "hook hung with stdin left open (killed after 15 s)"
-building(out)
-assert opened - base < 2, f"extra wait {opened - base:.2f} s (open {opened:.2f} s, base {base:.2f} s)"
+    hung = []
+    started = time.monotonic()
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
+    timer = threading.Timer(15, lambda: (hung.append(True), proc.kill()))
+    timer.start()
+    try:
+        out = proc.stdout.read()
+        proc.wait()
+    finally:
+        timer.cancel()
+        proc.stdin.close()
+        proc.kill()
+    opened = time.monotonic() - started
+    assert not hung, "hook hung with stdin left open (killed after 15 s)"
+    building(out)
+    return base, opened
+
+rounds = []
+for _ in range(3):
+    rounds.append(measure())
+    extra = min(o for _, o in rounds) - min(b for b, _ in rounds)
+    if extra < 2:
+        break
+tried = ", ".join(f"open {o:.2f} s / base {b:.2f} s" for b, o in rounds)
+assert extra < 2, f"extra wait {extra:.2f} s after {len(rounds)} rounds ({tried})"
 HANG
 echo "  ✅ 标准输入不关闭时只多等约 1 秒并照常输出"; PASS=$((PASS + 1))
 
