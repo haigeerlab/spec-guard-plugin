@@ -284,7 +284,7 @@ def audit(root: Path) -> list:
         rows = parse_map(root / "spec" / "CAPABILITY-MAP.md").rows
     except (MapError, OSError, UnicodeError):
         return []  # verify-artifacts reports the capability map itself
-    found = []
+    found, history = [], bool(_git(root, "rev-parse", "--verify", "--quiet", "HEAD"))
     for row in rows:
         plan = root / "tasks" / row.module_id / "plan.md"
         if not plan.is_file():
@@ -296,6 +296,8 @@ def audit(root: Path) -> list:
         except (OSError, UnicodeError):
             found.append(("UNVERIFIED", row.module_id, "读不出 Plan"))
             continue
+        if not history:
+            return [("UNVERIFIED", "*", "没有 git 历史")]  # once, not once per module
         kind, text = audit_module(root, row.module_id, plan_text)
         if kind:
             found.append((kind, row.module_id, text))
