@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.78.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:b3ff5e0859f272f72b205f4404d685795e5fd301"
+      },
+      "observedAt": "2026-10-19T06:50:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.77.0 to 0.78.0 on Claude Code 2.1.302; installed_plugins.json records gitCommitSha b3ff5e0 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed verify-artifacts.sh on a temporary git project (Plan without the section, zod added to package.json after the base commit): warns that the Plan has no 需要的外部条件 section and lists package.json: zod as a new dependency; 3 passed, 2 warnings, exit 0; the installed convention block template and shared checkpoint rules carry the new section",
+        "result:a fresh claude -p session (sonnet) in that temporary project: the transcript's hook context reports BUILDING"
+      ]
+    }
+  ]
+}
