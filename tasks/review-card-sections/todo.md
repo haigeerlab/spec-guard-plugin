@@ -4,7 +4,7 @@
 - [x] Task 2：interface.json 的 reviewKinds（先红） — `test-checkers.sh` 新增 6 个反例（缺 reviewKinds、少一类、多一类 go-to-session、小项名在规则里找不到、规则里删掉小项名、commonLines 少一行），`mkifc` 另拷一份共享检查点规则；先跑红（规则里删掉小项名未报错，1 失败），给 `check-interface.py` 加 `_review_kinds` 并让 `interface.json` 升 1.5、新增 `reviewKinds` 后 143 例全通过；逐个核对反例的报错原因都是 reviewKinds 本身（不是临时文件读不出）。原有内容只改了版本号一行。`docs/design.md` 接口一节加 1.5 一段。
 - [x] Task 3：CHANGELOG — 「[未发布]」段加三条（交审小项、复制块、interface 1.5）；两份 `plugin.json` 仍为 0.79.0。
 - [x] Checkpoint 1（report）：变异核对与契约对齐 — 在 `git archive HEAD` 的副本上逐项改坏，未改动的副本先跑通：① 删 Plan 的「风险」小项 → `test_review_sections_follow_the_card_order`（Plan）与已有的 `test_a_review_handoff_shows_the_content` 变红；`check-interface.py` 仍绿，因为“风险”在规则别处也出现，小项名检查只证明名字在规则里，顺序与归属靠测试守；② 复制块改回行内代码 → `test_how_to_approve_uses_one_copy_block` 变红；③ `reviewKinds` 删 checkpoint → `check-interface.py` 报类别不符；④ 删「逐条全列」→ `test_review_sections_follow_the_card_order` 变红。契约：session-protocol v2.3 已经用户批准定稿（提交 `6b8810e`），七类取值、代码与小项名与本模块逐字一致；Spec 的 Open questions 改为已对齐并追加变更记录（范围内修正，随最终验收复审）。
-- [ ] Checkpoint 2（gate）：模块最终验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-19 按本模块的新格式在对话里呈现：做了什么、AC1～AC9 逐条证据、文档改动表（3 个）、其他改动表（11 个，新增 3、修改 8、删除 0，无超出 Plan 预计的文件）、「新增依赖、锁文件改动：无」、本模块的提交表（6f4e3c0、14bd869、edc4e9b、9792fcd、b4bdef7，勾选本 gate 为待提交）、Spec 修订的改前改后对照（Open questions 改为已对齐，加变更记录）、注意与批了会怎样；用户回复「验收通过，推送并开 PR」，批准同时覆盖修订后的 Spec，已用 review-mark 重新记录批准。未验证：agent 在真实会话里是否照新格式写（发版后两边各跑一次）；未做独立代码评审（D1 A）。版本号不变。
 
 ## 外部审查意见
 
