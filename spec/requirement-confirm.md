@@ -1,6 +1,6 @@
 # Spec: requirement-confirm
 
-<!-- spec-guard: review approved 8ac30a770779 -->
+<!-- spec-guard: review approved 3b593ba81b58 -->
 
 ## Objective
 
