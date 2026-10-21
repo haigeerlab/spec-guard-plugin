@@ -48,6 +48,7 @@ plugins/spec-guard/
 | `module_scope.py` | 模块 Spec「并行边界」一节的唯一解析器；`check` 对照集成基线做只读越界检查，`validate` 供 verify-artifacts 调用；开关不是 on 时都不生效 |
 | `checkout_role.py` | 每个 checkout 的角色标记（`module <id>`／`coordinator`，存在本 checkout 的 git 目录）：读取、预览确认后写入；阶段提示只经 `role()` 读，开关不是 on 时不读；全项目的选模块与阶段不受影响 |
 | `sibling_plugins.py` | 只读本机插件记录，判断同生态插件是否安装并启用：`agent_relay_probe.py` 与检查点的 delegate 外部审查提示共用（`spec/delegate-review-hint.md`）；提示前读 delegate 的 `interface.json`，按 `>=1.0,<2.0` 校验并只取经校验的命令名（`spec/delegate-interface-check.md`） |
+| `gate_tick.py` | 勾选模块的最终验收（`interface.json` 的 `gateTick`）：判据只取 `module_stage`，预览确认后只改那一格，不提交 |
 | `state_paths.py` | 本机状态目录的唯一来源（见下文文件布局） |
 | `proposal_*.py` | Proposal 契约、发布、读 Issue、审查、晋级证明、收尾 |
 | `local_ledger_*.py`、`local_ticket_*.py`、`hosted_ticket*.py` | 本地事项账本、可移植流程、托管事项 |
@@ -109,6 +110,10 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 另有小项之后的通用行（注意、推荐理由、批了会怎样）。去会话操作与接口提案不由 spec-guard 产生，不在其中。`check-interface.py` 核对
 类别正好这七个、每个小项名都写在共享检查点规则里。
 
+1.7（gate-tick）起另有 `gateTick`：勾选一个模块最终验收的命令，给合并流程这类使用方用。判据与阶段提示的「最终 gate」同一处，
+只在模块第一个未勾项正是最后一个 gate 检查点时勾那一格；已勾过时不改、退出码 0；其他情形退出码 2 并打印短码。它不判断用户
+有没有批准验收，调用方须已有这份批准。`check-interface.py` 核对它引用的脚本存在。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
@@ -116,7 +121,7 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 | | spec-guard（规划层） | module-crew（运行层） |
 |---|---|---|
 | 读 | 能力图、Spec、Plan、todo、`.agent/config.json`、本 checkout 与本机其他 worktree 的角色标记 | `interface.json`、`/map --json`、越界检查的 JSON |
-| 写 | 只经命令、预览确认后写：配置、批准标记、角色标记 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
+| 写 | 只经命令、预览确认后写：配置、批准标记、角色标记、最终验收的勾 | 开会话、建 worktree、发消息、合并；按需调用 spec-guard 的写入命令 |
 | 判断 | 能否开工、边界是否重叠、阶段与批准状态 | 开哪几个、什么时候合、失败怎么退 |
 
 spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不是 on 时，规划层的新东西都不出现。
