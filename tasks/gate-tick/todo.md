@@ -5,3 +5,5 @@
 - [x] Task 3：文档、CHANGELOG 与版本号 — `docs/design.md` 部件表加 `gate_tick.py`、接口一段加 1.7 说明、分层表「写」一栏补「最终验收的勾」；CHANGELOG 新开 0.83.0 段；两份 `plugin.json` 与中英 README 的 `--ref` 改为 0.83.0。
 - [x] Checkpoint 1（report）：变异核对 — `git archive HEAD` 的完整仓库副本：未改时 10 例全过；判据换成「唯一未勾项」后 `test_items_after_the_final_gate_stay_and_are_counted` 与判据一致性用例变红；预览也写文件后 `test_preview_changes_nothing` 等 3 处变红。
 - [x] Checkpoint 2（gate）：模块最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-22 按交审小项呈现：做了什么、AC1～AC5 逐条证据、变异核对、文档改动表（3 个）、其他改动表（无超出 Plan 的文件）、「新增依赖、锁文件改动：无」、提交表（97017c6、da92902、8260510，勾选本 gate 为待提交）、Spec 未改、注意（未做独立评审；module-crew 发版后才接入）；用户回复「验收通过，推送并开 PR」。
+- [x] Task 4：返工——预览显示勾选前的原样（先红） — `test_gate_tick.py` 加 `test_preview_shows_the_line_as_it_is_and_what_it_becomes`，先红；`gate_tick.py` 预览改为打印原样并另起一句「would become」，`--confirm` 写入后才打印改后的行；11 例全过。变异核对：在工作区副本上把预览改回打印勾完后的行，正好这个新用例变红。CHANGELOG 新开「[未发布]」段；版本号未改。
+- [x] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-22 呈现改了什么（以前／现在对照）、证据（新用例先红后绿、11 例全过、全档校验、变异核对）、改动文件表、Spec 未改、注意（对 module-crew 的影响、发版另问）；用户回复「返工验收通过，推送并开 PR」。版本号不变。

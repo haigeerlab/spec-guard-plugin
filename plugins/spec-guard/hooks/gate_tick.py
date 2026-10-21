@@ -63,13 +63,16 @@ def main() -> int:
         print("not-at-final-gate: the first unchecked item of %s is not its last gate: %s" % (relative, first))
         return 2
     at = open_items[0]
-    lines[at] = BOX.sub("[x]", lines[at], count=1)
+    ticked = BOX.sub("[x]", lines[at], count=1)
     left = len(open_items) - 1
-    print("%s line %d: %s" % (relative, at + 1, lines[at].strip()))
     if not args.confirm:
-        print("preview only: add --confirm to tick it (%d unchecked item(s) left after)" % left)
+        print("%s line %d: %s" % (relative, at + 1, lines[at].strip()))
+        print("preview only, would become: %s; add --confirm to tick it (%d unchecked item(s) left after)"
+              % (ticked.strip(), left))
         return 0
+    lines[at] = ticked
     _write_atomic(path, "".join(lines))
+    print("%s line %d: %s" % (relative, at + 1, ticked.strip()))
     print("ticked; %d unchecked item(s) left" % left)
     return 0
 

@@ -43,6 +43,15 @@ class GateTick(unittest.TestCase):
         self.assertIn("0 unchecked item(s) left", done.stdout)
         self.assertEqual(self.text(), todo)
 
+    def test_preview_shows_the_line_as_it_is_and_what_it_becomes(self):
+        # Rework 1: the preview prints the unchanged line, and the ticked form only as what it would become.
+        self.write("- [x] Task 1\n- [ ] 最终验收（gate）\n")
+        out = self.run_tick().stdout.splitlines()
+        self.assertEqual(out[0], "tasks/alpha/todo.md line 2: - [ ] 最终验收（gate）")
+        self.assertIn("would become: - [x] 最终验收（gate）", out[1])
+        done = self.run_tick("--confirm").stdout.splitlines()
+        self.assertEqual(done[0], "tasks/alpha/todo.md line 2: - [x] 最终验收（gate）")
+
     def test_confirm_ticks_only_that_box(self):
         self.write("# Todo\n\n- [x] Task 1\n- [ ] Checkpoint 1（gate）：最终验收 — 记 [ ] 原样\n")
         done = self.run_tick("--confirm")
