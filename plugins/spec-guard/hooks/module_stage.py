@@ -842,28 +842,28 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             if push_first:
                 return (head + "\n建议下一步: " + ("除挂起的模块外都已完成；挂起 %d 个；" % len(suspended) if suspended else
                                                 "能力图里每个模块都有 Plan，且没有未勾选的 todo 项；") + push_first +
-                        "要做新工作，用 " + cmd["add-module"] + " 插入一个模块；" + proposal)
+                        "要做新工作，先总结需求、问用户是否说完，确认后再用 " + cmd["add-module"] + " 插入一个模块；" + proposal)
             if suspended:
                 return (head + "\n建议下一步: 除挂起的模块外都已完成；挂起 %d 个（等待结束后恢复其中一个）。要做新工作，"
-                        "在这个检查点用 %s 插入一个模块；%s" % (len(suspended), cmd["add-module"], proposal))
-            return (head + "\n建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，在这个检查点用 "
+                        "先总结需求、问用户是否说完，确认后再在这个检查点用 %s 插入一个模块；%s" % (len(suspended), cmd["add-module"], proposal))
+            return (head + "\n建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 "
                     + cmd["add-module"] + " 插入一个模块；" + proposal)
         if push_first:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
                                                  % len(suspended) if suspended else
                                                  "every mapped module has a plan and no open todo item; ") + push_first +
-                    "for new work, insert a module with " + cmd["add-module"] + "; "
+                    "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + "; "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
         if suspended:
             return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
-                    "when its wait is over). For new work, insert a module with %s at this checkpoint; "
+                    "when its wait is over). For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with %s at this checkpoint; "
                     "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended),
                                                                                               cmd["add-module"]))
         return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
-                "For new work, insert a module with " + cmd["add-module"] + " at this checkpoint; "
+                "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + " at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]
     if no_todo_note:

@@ -320,7 +320,7 @@ if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
 - 能力图: 没有
 - 模块 Spec: ${SPECS}${CONFIG_LINES}
 
-建议下一步: 先写能力图并交审，再做规划。"
+建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。"
   exit 0
 fi
 
@@ -332,7 +332,7 @@ if [ ! -f spec/CAPABILITY-MAP.md ]; then
 - Capability map: absent
 - Module specs: ${SPECS}${CONFIG_LINES}
 
-Suggested next step: create and review a capability map before planning."
+Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning."
   exit 0
 fi
 
@@ -344,7 +344,7 @@ if [ "$SPECS" -eq 0 ] && [ -n "$ZH" ]; then
 - 能力图: 已有
 - 模块 Spec: 没有${CONFIG_LINES}
 
-建议下一步: 在 \`spec/\` 下写第一份模块 Spec 并交审。"
+建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。"
   exit 0
 fi
 
@@ -356,7 +356,7 @@ if [ "$SPECS" -eq 0 ]; then
 - Capability map: present
 - Module specs: absent${CONFIG_LINES}
 
-Suggested next step: write the first reviewed module spec under \`spec/\`."
+Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`."
   exit 0
 fi
 

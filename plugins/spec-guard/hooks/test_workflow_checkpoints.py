@@ -767,5 +767,45 @@ class HubRelayedApprovalTests(unittest.TestCase):
                 self.assertNotIn("只在用户于当前对话明确批准之后写", text)
 
 
+class RequirementConfirmTests(unittest.TestCase):
+    """requirement-confirm: summarise and ask whether the user is done before a new requirement enters the map."""
+    QUESTION = "需求说完了吗？还有要补充的吗？"
+    POINTER = "需求确认"
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+        start = text.index("## 需求确认")
+        self.section = text[start:text.index("\n## ", start + 1)]
+        self.order = text.index("## 需求确认") < text.index("## 阶段交接")
+
+    def test_section_states_when_what_and_how(self):
+        self.assertTrue(self.order, "the section goes before 阶段交接")
+        for phrase in (self.QUESTION, "插入模块", "第一份 Spec", "目标", "给谁", "怎样算成功", "限制", "不做什么", "还没定",
+                       "只认明确确认", "这一轮停下", "`interview-me`", "不用拷问", "已在别处批过"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+
+    def test_section_names_what_does_not_trigger(self):
+        for phrase in ("改 bug", "已批准范围内", "验收后接着写下一份 Spec"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+
+    def test_templates_and_add_module_entries_point_here(self):
+        for rel in ("templates/claude-block-local.md", "templates/codex-block-local.md",
+                    "commands/add-module.md", "skills/spec-guard-ops/SKILL.md"):
+            text = (self.plugin / rel).read_text(encoding="utf-8")
+            with self.subTest(rel=rel):
+                self.assertIn("「" + self.POINTER + "」", text)
+                self.assertIn("说完", text)
+
+    def test_add_module_asks_before_proposing(self):
+        for rel, anchor in (("commands/add-module.md", "提出四项"),
+                            ("skills/spec-guard-ops/SKILL.md", "根据用户给的需求上下文提出 id")):
+            text = (self.plugin / rel).read_text(encoding="utf-8")
+            with self.subTest(rel=rel):
+                self.assertLess(text.index("「" + self.POINTER + "」"), text.index(anchor))
+
+
 if __name__ == "__main__":
     unittest.main()
