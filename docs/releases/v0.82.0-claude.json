@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.82.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:a7250eb07aa49291144a57975dfe35ef26d17eb3"
+      },
+      "observedAt": "2026-10-21T16:00:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.81.0 to 0.82.0; installed_plugins.json records gitCommitSha a7250eb (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:a fresh claude -p session (sonnet) in a temporary git project with only a capability map reports stage MAP_ONLY and the injected next step 先跟用户确认第一个模块的需求已说完，再在 `spec/` 下写第一份模块 Spec 并交审"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.82.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:a7250eb07aa49291144a57975dfe35ef26d17eb3"
+      },
+      "observedAt": "2026-10-21T16:00:00Z",
+      "evidence": [
+        "result:the v0.82.0 annotated tag resolves to merge commit a7250eb07aa49291144a57975dfe35ef26d17eb3 (pull request #397); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip 56c5672",
+        "result:pull request #397's check validate (ubuntu-latest) passed before the merge",
+        "result:requirement-confirm (#395 merge e29d8c9, rework #396 merge 2d48bad): before a new requirement from the user's conversation enters the capability map (add-module, or the first Spec when there is no map or only a map), summarise it and ask whether the user is done; only an explicit confirmation counts, the turn then stops, and the map row and Spec are reviewed together next turn; the DONE, MAP_ONLY and IDLE next steps now say so; interface.json unchanged (1.6)",
+        "result:the release was made after the user said the 阶段丙-2 freeze was lifted",
+        "result:verify-and-commit full tier and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57 on d373684"
+      ]
+    }
+  ]
+}
