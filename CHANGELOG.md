@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.83.0] - 2026-10-22
+
+本版 1 个模块：`gate-tick`。新增给使用方插件用的命令 `gateTick`，按 spec-guard 自己的判据勾选模块的最终验收；`interface.json` 升到 1.7。
+
+### 新增
+
+- **`gateTick`：勾选模块的最终验收。** `python3 -B hooks/gate_tick.py --project <项目根> --module <模块 id> [--confirm]`，默认只预览，
+  加 `--confirm` 才写。只在模块第一个未勾项正是最后一个 gate 检查点时勾那一格，判据与阶段提示的「最终 gate」同一处（中文写法也认），
+  行内其他文字和行尾原样保留，后面的普通任务不动并报出剩几项；不提交。已勾过时不改、退出码 0；不在最终验收、没有 gate、todo
+  缺失或读不了、模块不在能力图里时退出码 2，打印短码。它不判断用户有没有批准验收，调用方须已有这份批准。给合并流程（例如
+  module-crew）用，替代各自按「唯一未勾项」猜。`interface.json` 升到 1.7，新增 `gateTick` 一节，已有字段不变。
+
 ## [0.82.0] - 2026-10-21
 
 本版 1 个模块：`requirement-confirm`。新需求进入能力图前，先总结需求并问用户是否说完；阶段提示 DONE、MAP_ONLY、IDLE 的建议下一步同步改为先确认需求。`interface.json` 不变（1.6）。

@@ -17,7 +17,7 @@ import module_scope  # noqa: E402
 import module_stage  # noqa: E402
 import project_config  # noqa: E402
 
-ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark")  # crew-interface: interface 1.1
+ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick")  # crew-interface: 1.1; gate-tick: 1.7
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
 REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
@@ -83,6 +83,7 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
         return found + ["缺少入口 %s" % key for key in missing]
     found += _scripts(path, "scopeCheck.command", data["scopeCheck"].get("command"))
     found += _scripts(path, "reviewMark.command", data["reviewMark"].get("command"))
+    found += _scripts(path, "gateTick.command", data["gateTick"].get("command"))
     commands = data["checkoutRole"].get("commands")
     for name, command in (commands.items() if isinstance(commands, dict) and commands else [("commands", None)]):
         found += _scripts(path, "checkoutRole.commands.%s" % name, command)

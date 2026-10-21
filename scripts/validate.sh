@@ -150,6 +150,7 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_module_suspend.py' \
   'python3 -B plugins/spec-guard/hooks/test_map_view.py' \
   'python3 -B plugins/spec-guard/hooks/test_review_marker.py' \
+  'python3 -B plugins/spec-guard/hooks/test_gate_tick.py' \
   'python3 -B plugins/spec-guard/hooks/test_project_link.py' \
   'python3 -B plugins/spec-guard/hooks/test_tracker_default.py' \
   'python3 -B plugins/spec-guard/hooks/test_project_config.py' \

@@ -1,5 +1,5 @@
 {
-  "interface": "1.6",
+  "interface": "1.7",
   "mapView": {
     "command": [
       "python3",
@@ -38,7 +38,7 @@
         "startedAt": "per module; commit time (%cI) of the first commit in HEAD's history that added spec/<id>.md; null when the Spec was never committed or history is unavailable; in a shallow clone it may be the first commit after the shallow boundary; it is a commit time, not when writing began, so a project that commits the Spec only after approval gets a later time than the actual start",
         "head.committedAt": "commit time (%cI) of HEAD of this checkout, for the whole checkout and not per module; null without commits",
         "reviewCadence": "top level; {\"value\", \"source\"}, the same effective value and source /spec-guard:config shows; source is .agent/config.json, default, or default (config invalid)",
-      "gates": "per module (interface 1.3, spec/map-gate-count.md; criterion changed in 1.4, spec/checkpoint-default-report.md; checkpoint forms widened in 1.6, spec/cn-checkpoint-gates.md); {\"total\", \"done\"}: the gate checkpoints in this checkout's working-tree tasks/<id>/todo.md and how many of them are checked; a checkbox item is a checkpoint when it starts with Checkpoint or 检查点, or when the part before its first colon (the whole item when there is none) carries a tier such as 最终验收（gate） (since 1.6; before 1.6 only Checkpoint items counted, so total may be larger than under 1.5); the tier is read before the first colon: (gate) counts, (report) does not, and an untiered checkpoint counts only when it is the last checkpoint of the todo (since 1.4 untiered middle checkpoints are reports and no longer counted, so total may be smaller than under 1.3); the same criterion as nextGate; the final acceptance is normally the last gate and is already in total, so do not add it again when counting a baseline; null when the todo does not exist; does not need git history"
+        "gates": "per module (interface 1.3, spec/map-gate-count.md; criterion changed in 1.4, spec/checkpoint-default-report.md; checkpoint forms widened in 1.6, spec/cn-checkpoint-gates.md); {\"total\", \"done\"}: the gate checkpoints in this checkout's working-tree tasks/<id>/todo.md and how many of them are checked; a checkbox item is a checkpoint when it starts with Checkpoint or 检查点, or when the part before its first colon (the whole item when there is none) carries a tier such as 最终验收（gate） (since 1.6; before 1.6 only Checkpoint items counted, so total may be larger than under 1.5); the tier is read before the first colon: (gate) counts, (report) does not, and an untiered checkpoint counts only when it is the last checkpoint of the todo (since 1.4 untiered middle checkpoints are reports and no longer counted, so total may be smaller than under 1.3); the same criterion as nextGate; the final acceptance is normally the last gate and is already in total, so do not add it again when counting a baseline; null when the todo does not exist; does not need git history"
       },
       "values": {
         "reviewCadence": {
@@ -262,5 +262,23 @@
     "commonLinesNote": "separate lines after the sections, not sections themselves; 注意 says 无 when empty",
     "rules": "references/workflow-checkpoints.md",
     "contract": "spec/review-card-sections.md"
+  },
+  "gateTick": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/gate_tick.py",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>"
+    ],
+    "confirm": "only previews unless --confirm is added",
+    "exitCodes": {
+      "0": "ok: preview, ticked, or the final gate is already ticked (no change)",
+      "2": "refused, nothing changed; the output starts with not-a-module-id, map-unreadable, not-in-map, todo-missing, todo-unreadable, no-gate, or not-at-final-gate (the first unchecked item is not the module's last gate; the item is printed)"
+    },
+    "notes": "interface 1.7; ticks only the final gate's checkbox in tasks/<id>/todo.md, by the same criterion as the stage hint's final gate (gates and nextGate use it too, Chinese checkpoint forms included); ordinary items after it are left and counted; the rest of the line and its line ending are kept; never commits; the caller must already hold the user's approval of the final acceptance, as with reviewMark",
+    "contract": "spec/gate-tick.md"
   }
 }

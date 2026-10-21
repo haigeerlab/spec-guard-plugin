@@ -736,7 +736,7 @@ want pass "tests-registered: 读不到运行器时说的是没找到，不是把
 IFC="$ROOT/scripts/check-interface.py"
 mkifc() {  # $1=目录 $2=python 表达式，对 data（正确的 interface.json）做的改动，空=不改
   rm -rf "$1"; mkdir -p "$1/hooks"
-  for script in map_view module_scope checkout_role review_mark; do : > "$1/hooks/$script.py"; done
+  for script in map_view module_scope checkout_role review_mark gate_tick; do : > "$1/hooks/$script.py"; done
   mkdir -p "$1/references"; cp "$ROOT/plugins/spec-guard/references/workflow-checkpoints.md" "$1/references/"
   python3 - "$ROOT/plugins/spec-guard/interface.json" "$1/interface.json" "${2:-}" <<'PY'
 import json, sys
@@ -777,6 +777,11 @@ mkifc "$TMP/ifc-v10" 'del data["mapView"]["contract"]'
 want fail "interface: mapView 缺 1.0 的键 → 报错" python3 "$IFC" "$TMP/ifc-v10/interface.json"
 mkifc "$TMP/ifc-conc" 'del data["mapView"]["concurrency"]'
 want fail "interface: mapView 缺 concurrency 说明 → 报错" python3 "$IFC" "$TMP/ifc-conc/interface.json"
+# gate-tick：interface 1.7 的 gateTick 入口与它指向的脚本。
+mkifc "$TMP/ifc-tick" 'del data["gateTick"]'
+want fail "interface: 缺 1.7 的 gateTick 入口 → 报错" python3 "$IFC" "$TMP/ifc-tick/interface.json"
+mkifc "$TMP/ifc-tick-script"; rm "$TMP/ifc-tick-script/hooks/gate_tick.py"
+want fail "interface: gateTick 指向的脚本不存在 → 报错" python3 "$IFC" "$TMP/ifc-tick-script/interface.json"
 # review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
 mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
 want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"
