@@ -203,6 +203,7 @@ silent "正文里提到标记不激活" "$WORK/prose"
 mkdir -p "$WORK/idle/.agent"
 printf '%s\n' '{"activeModule":""}' > "$WORK/idle/.agent/state.json"
 injects "setup 写下的 state.json 激活并报告 IDLE" "$WORK/idle" "IDLE"
+injects "requirement-confirm：IDLE 先确认需求" "$WORK/idle" "Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning."
 
 # activeModule 是这个文件存在的唯一理由，因此它才是激活证据；已退役的 tracker 字段不是。
 mkdir -p "$WORK/legacy-state/.agent"
@@ -222,6 +223,7 @@ injects "有值的 activeModule 同样激活" "$WORK/active-pointer" "MAP_ONLY"
 
 build_fixture crlf
 injects "CRLF 声明块激活并报告 MAP_ONLY" "$WORK/crlf" "MAP_ONLY"
+injects "requirement-confirm：MAP_ONLY 先确认需求" "$WORK/crlf" "Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`."
 lacks "MAP_ONLY 没有模块完成行" "$WORK/crlf" "Module boundary"
 
 build_fixture local
@@ -292,6 +294,8 @@ printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
 injects "全部完成时报告 DONE" "$stages" "当前阶段: **DONE**"
 injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
+# requirement-confirm：DONE 先总结需求、问用户是否说完，再插入模块。
+injects "DONE 先确认需求再插入模块" "$stages" "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with /spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
 boundary "DONE 有模块完成行" "$stages"
@@ -309,6 +313,7 @@ lacks "全部完成且无 activeModule 时无清除提示" "$stages" "can be cle
 boundary "DONE 且无 activeModule 时有模块完成行" "$stages"
 rm "$stages/spec/beta.md"
 injects "缺 Spec 的模块报告 NEEDS_SPEC" "$stages" "当前阶段: **NEEDS_SPEC**"
+lacks "requirement-confirm：NEEDS_SPEC 不提确认需求" "$stages" "whether it is complete"
 lacks "NEEDS_SPEC 没有模块完成行" "$stages" "Module boundary"
 printf '%s\n' '| alpha | x | — |' > "$stages/spec/CAPABILITY-MAP.md"
 injects "能力图无效时报告 MAP_INVALID" "$stages" "当前阶段: **MAP_INVALID**"
@@ -639,6 +644,7 @@ git -C "$um_done" fetch -q origin
 two_commits "$um_done"
 injects "DONE 且领先远端默认分支时报告未合并提交" "$um_done" "$HINT"
 injects "DONE 且领先时建议先推送合并" "$um_done" "$PUSHFIRST"
+injects "DONE 且领先时也先确认需求" "$um_done" "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with"
 injects "DONE 且领先时仍保留 add-module 与 Proposal 指引" "$um_done" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 且领先时仍报告 DONE" "$um_done" "当前阶段: **DONE**"
 boundary "DONE 且领先时有模块完成行" "$um_done"
@@ -1957,7 +1963,8 @@ ENGLISH_ONLY=(-"Suggested next step" -"Capability map:" -"Module specs:" -"Curre
 zh="$WORK/zh"; lang_project "$zh" zh-CN
 zh_check "zh-CN：IDLE 的配置行与位置行是中文" "$zh" +"## spec-guard local workflow" +"当前阶段: **IDLE**" \
   +"- 产物语言: \`zh-CN\` — 新写的 spec、plan、todo 正文用这种语言；结构关键字保持原定义。" \
-  +"位置: 分支 \`main\` · worktree \`" +"请用户审阅或确认时，向用户说明这个位置。" "${ENGLISH_ONLY[@]}"
+  +"位置: 分支 \`main\` · worktree \`" +"请用户审阅或确认时，向用户说明这个位置。" \
+  +"建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。" "${ENGLISH_ONLY[@]}"
 for tag in zh-TW zh-Hans en ja; do
   d="$WORK/lang-$tag"; lang_project "$d" "$tag"
   zh_check "${tag}：仍是英文" "$d" +"- Artifact language: \`$tag\`" +"Location: branch \`main\`" +"State this location" \
@@ -2008,20 +2015,20 @@ SG_INPUT="$WORK/zh-input" zh_check "zh-CN：会话上下文超阈值" "$zm" \
 printf '%s\n' '- [x] a' '- [ ] later' '<!-- spec-guard: suspended -->' > "$zm/tasks/beta/todo.md"
 zh_check "zh-CN：DONE，含挂起" "$zm" +"当前阶段: **DONE**" +"· 挂起 1" \
   +"- 挂起: \`beta\`（1 个未勾选项）；用 \`/spec-guard:module-suspend --resume beta\` (Codex: spec-guard-ops module-suspend) 恢复。" \
-  +"建议下一步: 除挂起的模块外都已完成；挂起 1 个（等待结束后恢复其中一个）。" "${ENGLISH_ONLY[@]}"
+  +"建议下一步: 除挂起的模块外都已完成；挂起 1 个（等待结束后恢复其中一个）。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用" "${ENGLISH_ONLY[@]}"
 printf '%s\n' '- [x] a' '- [x] b' > "$zm/tasks/beta/todo.md"
 zh_check "boundary-hint-unknown-size：zh-CN DONE 读不到大小时不出模块边界行" "$zm" +"当前阶段: **DONE**" -"模块边界" "${ENGLISH_ONLY[@]}"
 transcript "$WORK/zh-done-700k.jsonl" 699999
 printf '{"session_id":"s","transcript_path":"%s","prompt":"p"}' "$WORK/zh-done-700k.jsonl" > "$WORK/zh-done-input"
 SG_INPUT="$WORK/zh-done-input" zh_check "zh-CN：DONE" "$zm" +"当前阶段: **DONE**" \
   +"- 模块边界: 本会话上下文约 700 k token（达到或超过 700 k）；这是释放上下文的好时机。给用户一条可直接复制的命令" \
-  +"建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，在这个检查点用 /spec-guard:add-module (Codex: spec-guard-ops add-module) 插入一个模块；" \
+  +"建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 /spec-guard:add-module (Codex: spec-guard-ops add-module) 插入一个模块；" \
   "${ENGLISH_ONLY[@]}"
 git -C "$zm" add -A >/dev/null; git -C "$zm" -c user.name=t -c user.email=t@e -c commit.gpgsign=false commit -qm a
 git -C "$zm" update-ref refs/remotes/origin/main HEAD
 git -C "$zm" -c user.name=t -c user.email=t@e -c commit.gpgsign=false commit -qm b --allow-empty
 zh_check "zh-CN：DONE，有未合并提交" "$zm" +"- 这个分支有 1 个提交还不在 \`origin/main\` 里（按上次 fetch 的结果）。" \
-  +"先推送这个分支，把它的 1 个提交合并进 \`origin/main\`；然后要做新工作" "${ENGLISH_ONLY[@]}"
+  +"先推送这个分支，把它的 1 个提交合并进 \`origin/main\`；然后要做新工作，先总结需求、问用户是否说完，确认后再用" "${ENGLISH_ONLY[@]}"
 printf '{"activeModule": "alpha"}\n' > "$zm/.agent/state.json"
 rm "$zm/tasks/beta/todo.md" "$zm/tasks/beta/plan.md"
 zh_check "zh-CN：MODULE_DONE" "$zm" +"当前阶段: **MODULE_DONE**" +"- 当前模块: \`alpha\`（activeModule）" \
@@ -2048,7 +2055,7 @@ SG_HOST=claude SG_CLAUDE_HOME="$zch" zh_check "zh-CN：外部审查行" "$zd" \
 # phase-guard.sh 自己输出的几句（MAP_ONLY、读不到能力图、阶段算不出来、关联项目、压缩后提醒）。
 zo="$WORK/zh-maponly"; lang_project "$zo" zh-CN; map "$zo"
 zh_check "zh-CN：MAP_ONLY" "$zo" +"当前阶段: **MAP_ONLY**" +"- 能力图: 已有" +"- 模块 Spec: 没有" \
-  +"建议下一步: 在 \`spec/\` 下写第一份模块 Spec 并交审。" "${ENGLISH_ONLY[@]}"
+  +"建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。" "${ENGLISH_ONLY[@]}"
 SG_EVENT=SessionStart zh_check "zh-CN：压缩后提醒" "$zo" \
   +"上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对 todo 和状态记录，核对后接着做上面的建议下一步（有的话），不要就此结束这一轮。" \
   "${ENGLISH_ONLY[@]}"

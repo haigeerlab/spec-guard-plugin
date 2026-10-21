@@ -35,6 +35,8 @@
   按需求批量前置审与 UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
 - 批 Plan 即按已批准范围授权：改本仓库文件、跑测试与构建、本地提交与构建需要的装包（默认放行），不按次数；只问用户的情形见
   `spec-guard:spec-guard-ops` 的共享检查点规则
+- 用户在对话里提出的新需求，插入能力图或写第一份 Spec 之前，先总结需求并问用户是否说完，确认后再动手；细则见
+  `spec-guard:spec-guard-ops` 的共享检查点规则「需求确认」
 - 交审 Spec 或 Plan 时在对话里呈现内容要点并写明这次批准授权什么，只给链接不算交审；细则见
   `spec-guard:spec-guard-ops` 的共享检查点规则
 - Spec、Plan 交审或最终验收值得另一个 agent 复核时，若装了 delegate 插件，可提议用 `/delegate:review` 做只读审查，
