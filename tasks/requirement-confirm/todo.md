@@ -4,4 +4,4 @@
 - [x] Task 2：三处建议下一步（先红） — 新增 5 例（英文 DONE、DONE 领先、IDLE、MAP_ONLY 先确认需求；NEEDS_SPEC 不提确认的反例），先红；原有逐字断言按新措辞改 5 处：zh DONE（普通）、zh DONE（领先）、zh DONE（挂起，补全句）、zh MAP_ONLY、zh IDLE（补一句）。改 `module_stage.py` DONE 六处文案与 `phase-guard.sh` MAP_ONLY、IDLE 中英四处，428 例全过；文档里没有引用旧原文。
 - [x] Task 3：CHANGELOG — 新开「[未发布]」段加一条；两份 `plugin.json` 仍为 0.81.0。
 - [x] Checkpoint 1（report）：变异核对 — 用 `git archive HEAD` 的完整仓库副本：未改时规则测试 65 例全过；删掉「需求确认」一节后正好 `RequirementConfirmTests` 4 例变红（只取插件目录的副本会因缺仓库层文件多报 23 个无关错误，不计）。删掉 DONE 那句后「DONE 先确认需求再插入模块」「DONE 且领先时也先确认需求」「zh-CN：DONE，含挂起」等变红；删掉 MAP_ONLY 那句后「MAP_ONLY 先确认需求」「zh-CN：MAP_ONLY」变红。
-- [ ] Checkpoint 2（gate）：模块最终验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：模块最终验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-21 按交审小项呈现：做了什么、AC1～AC5 逐条证据、变异核对、原有期望改动 5 处、文档改动表（2 个）、其他改动表（超出 Plan 的 `docs/convention-block.md` 已说明）、「新增依赖、锁文件改动：无」、提交表（3044432、0fe8761、9c6cd4e，勾选本 gate 为待提交）、Spec 批准后只补了跳过范围并重新记批准、注意（真实会话未验证；未做独立评审；冻结期间不发版）；用户回复「验收通过，推送并开 PR」。版本号不变。
