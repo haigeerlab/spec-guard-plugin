@@ -786,6 +786,15 @@ class RequirementConfirmTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
 
+    def test_summary_comes_first_and_map_row_goes_with_spec(self):
+        # Rework 1: "already settled" before the summary still gets the summary; map row and Spec are reviewed together.
+        for phrase in ("还没看过总结", "先给总结再确认", "能力图新行和 Spec 一起交审", "不为能力图新行单独停一次"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+        for rel in ("commands/add-module.md", "skills/spec-guard-ops/SKILL.md"):
+            with self.subTest(rel=rel):
+                self.assertIn("和 Spec 一起交审", (self.plugin / rel).read_text(encoding="utf-8"))
+
     def test_section_names_what_does_not_trigger(self):
         for phrase in ("改 bug", "已批准范围内", "验收后接着写下一份 Spec"):
             with self.subTest(phrase=phrase):
