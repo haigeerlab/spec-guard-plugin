@@ -1,6 +1,8 @@
 # Changelog
 
-## [未发布]
+## [0.82.0] - 2026-10-21
+
+本版 1 个模块：`requirement-confirm`。新需求进入能力图前，先总结需求并问用户是否说完；阶段提示 DONE、MAP_ONLY、IDLE 的建议下一步同步改为先确认需求。`interface.json` 不变（1.6）。
 
 ### 变更
 
