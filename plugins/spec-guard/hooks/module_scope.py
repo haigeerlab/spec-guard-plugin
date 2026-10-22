@@ -125,6 +125,20 @@ def covers(scope: Scope, module_id: str, path: str) -> str:
     return outside
 
 
+def overlap(a: Scope, b: Scope) -> list:
+    """Exclusive paths the two boundaries share: equal, or one inside the other's directory (the narrower one)."""
+    found = set()
+    for left in a.exclusive:
+        for right in b.exclusive:
+            if left == right:
+                found.add(left)
+            elif left.endswith("/") and right.startswith(left):
+                found.add(right)
+            elif right.endswith("/") and left.startswith(right):
+                found.add(left)
+    return sorted(found)
+
+
 def _git(root: Path, *args: str) -> str | None:
     done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=False)
     return done.stdout.decode("utf-8", "surrogateescape") if done.returncode == 0 else None

@@ -26,7 +26,7 @@ from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, external_review_state, file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
-from module_scope import Scope, ScopeError, parse as parse_scope
+from module_scope import Scope, ScopeError, overlap, parse as parse_scope
 from project_config import module_concurrency, summary as config_summary
 
 SCHEMA_VERSION = 1
@@ -200,20 +200,6 @@ def _scope(root: Path, module: str) -> dict | None:
     return None if scope is None else {"exclusive": list(scope.exclusive), "shared": list(scope.shared)}
 
 
-def _overlap(a: Scope, b: Scope) -> list:
-    """Exclusive paths the two boundaries share: equal, or one inside the other's directory (the narrower one)."""
-    found = set()
-    for left in a.exclusive:
-        for right in b.exclusive:
-            if left == right:
-                found.add(left)
-            elif left.endswith("/") and right.startswith(left):
-                found.add(right)
-            elif right.endswith("/") and left.startswith(right):
-                found.add(left)
-    return sorted(found)
-
-
 SCAN_BUDGET = 10.0  # seconds for one /map's worktree scan; later worktrees get path, branch and head only
 
 
@@ -308,7 +294,7 @@ def _concurrency(root: Path, parsed, modules: list) -> dict:
     conflicts = []
     for index, first in enumerate(open_):
         for second in open_[index + 1:]:
-            paths = _overlap(Scope(tuple(first["scope"]["exclusive"]), ()), Scope(tuple(second["scope"]["exclusive"]), ()))
+            paths = overlap(Scope(tuple(first["scope"]["exclusive"]), ()), Scope(tuple(second["scope"]["exclusive"]), ()))
             if paths:
                 conflicts.append({"modules": [first["id"], second["id"]], "paths": paths})
     return {

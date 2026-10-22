@@ -855,12 +855,11 @@ class ConcurrencyOnJson(unittest.TestCase):
         self.assertEqual(self.data(extra)["startable"]["conflicts"], [])
 
     def test_overlap_paths_and_order(self):
-        from map_view import _overlap
-        from module_scope import Scope
+        from module_scope import Scope, overlap
         a = Scope(("apps/x/", "docs/a.md", "lib/"), ())
         b = Scope(("apps/x/y/", "docs/a.md", "libs/", "lib/z.py"), ())
-        self.assertEqual(_overlap(a, b), ["apps/x/y/", "docs/a.md", "lib/z.py"])
-        self.assertEqual(_overlap(b, a), ["apps/x/y/", "docs/a.md", "lib/z.py"])
+        self.assertEqual(overlap(a, b), ["apps/x/y/", "docs/a.md", "lib/z.py"])
+        self.assertEqual(overlap(b, a), ["apps/x/y/", "docs/a.md", "lib/z.py"])
 
 
 class ConcurrencyOnTable(unittest.TestCase):
