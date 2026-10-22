@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.83.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:e1f95ee2aa892babcb1cf502feffbcdb0ab0f07e"
+      },
+      "observedAt": "2026-10-22T07:20:00Z",
+      "evidence": [
+        "result:the v0.83.2 annotated tag resolves to merge commit e1f95ee2aa892babcb1cf502feffbcdb0ab0f07e (pull request #406); merged==true and main==merge sha were checked as a separate step before tagging, and CI on the merge commit succeeded; the merge commit's tree is identical to the accepted branch tip (tree 359c4fb)",
+        "result:map-startable rework 1 (#406): with moduleConcurrency on, a current module that is only the next one in Build order (no activeModule, no Spec, no Plan) counts as ready and is listed in startable; an activeModule stays in progress; top-level activeModule, stage and the phase hint unchanged; off unchanged; interface.json 1.7 -> 1.8 (startable description only)",
+        "result:verify-and-commit full tier passed before pushing #406, and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57"
+      ]
+    }
+  ]
+}
