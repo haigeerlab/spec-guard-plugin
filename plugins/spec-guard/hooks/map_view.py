@@ -376,7 +376,11 @@ def build(root: Path) -> dict:
             states.append(module_state(root, module))
         except (OSError, UnicodeError) as error:
             raise Unreadable("tasks/%s: %s" % (module, error))
-    stage, current, _source, _pending = project_stage(states, active_module(root))
+    stage, current, source, _pending = project_stage(states, active_module(root))
+    concurrent = module_concurrency(root)
+    # startable-current-module: with the switch on, a current module that is only the next one in Build order
+    # (no Spec, no Plan, no activeModule) has not been started by anyone, so it stays ready and can be picked.
+    claimed = current if current is not None and (source == "activeModule" or not concurrent) else None
     by_id = {state["id"]: state for state in states}
     deps = {module: list(rows[module].depends_on) for module in order}
     dependents = {module: [] for module in order}
@@ -392,7 +396,7 @@ def build(root: Path) -> dict:
             status[module] = "done"
         elif state["suspended"]:
             status[module] = "suspended"
-        elif state["spec"] or state["plan"] or (current is not None and current["id"] == module):
+        elif state["spec"] or state["plan"] or (claimed is not None and claimed["id"] == module):
             status[module] = "in_progress"
     for module in order:
         if module in status:
@@ -465,7 +469,7 @@ def build(root: Path) -> dict:
         "history": state,
         "reviewCadence": _review_cadence(root),
     }
-    if module_concurrency(root):
+    if concurrent:
         data.update(_concurrency(root, parsed, modules))
     return data
 

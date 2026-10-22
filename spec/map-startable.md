@@ -1,6 +1,6 @@
 # Spec: map-startable
 
-<!-- spec-guard: review approved aaf275ac9776 -->
+<!-- spec-guard: review approved 98eb98fae8a8 -->
 
 ## Objective
 
@@ -30,6 +30,9 @@
    - 按现有判定，模块一有 Spec 就算进行中，所以就绪的模块一定还没有 Spec，也就没有并行边界，`scope` 为 `null`，不按冲突排除。冲突检查发生在
      协调会话让这些模块写完 Spec、批量审过之后：那时它们已是进行中，重叠出现在 `conflicts` 里，由协调会话决定谁先开始构建。
    - 取前几个（上限）由 module-crew 决定，spec-guard 不截断。
+   - 开关为 `on` 时，「当前模块」只是 Build order 里第一个没完成的模块（`.agent/state.json` 没有 `activeModule`），又没有 Spec 与 Plan
+     时，没有人开工，按就绪算并列入 `startable.modules`；`activeModule` 指定的模块照旧算进行中。顶层 `activeModule`、`stage` 与阶段提示不变。
+     开关为 `off` 时与原来相同。
 5. **冲突的定义。** 两个未完成模块（进行中或就绪）都有格式正确的并行边界，且独占路径重叠：相同，或一个是目录、另一个在它下面。`conflicts` 每项为
    `{"modules": [a, b], "paths": [...]}`，`a` 在 Build order 里排在 `b` 前面，`paths` 是重叠的路径（取较具体的那一个）。挂起与已完成的模块不参与。
 6. **表格改两处，只在开关为 `on` 时。**
@@ -121,3 +124,4 @@ python3 -B plugins/spec-guard/hooks/test_map_view.py
 
 - 2026-10-18：去掉「排除与进行中模块边界重叠的就绪模块」（假设 4），`startable.modules` 改为列出全部就绪模块；表格从「就绪格写与 X 重叠」改为在表格上方加一行「并行边界重叠」（假设 6），测试策略与成功标准同步。原因：开工实现时发现，按现有判定模块一有 Spec 就算进行中，就绪模块一定没有并行边界，原排除规则与那句说明永远不会触发。来源：本会话实现 Task 1 前自查发现，用户本人决定按建议修订（2026-10-18）。
 - 2026-10-18：`buildOrderGroups` 的来源从「解析器现成的 `order_groups`」改为「解析器多记一份原样的逗号分组（新属性 `declared_groups`）」；Contract 新增 `capability_map.py` 一节，测试策略加解析器的用例。原因：实现 Task 2 时发现解析器会把逗号组展开成串行步骤，`order_groups` 不保留逗号；改它的含义会改变依赖校验与 `capability-map.py` 的输出。来源：本会话实现中发现，用户本人选择做法 1（2026-10-18）。
+- 2026-10-22：假设 4 加一条：开关为 `on` 时，只是 Build order 推出来、没有 Spec 与 Plan 的当前模块按就绪算并列入 `startable.modules`；`activeModule` 指定的照旧算进行中，顶层 `activeModule`、`stage` 与阶段提示不变。原因：module-crew 试用中 `start plan` 列不出 Build order 的头一个模块，最长的依赖链开不了工（`map_view.py` 把推出来的当前模块一律判为进行中）。来源：本仓库修复批次的模块协调会话实测，用户本人决定发 0.83.2 热修（2026-10-22）。

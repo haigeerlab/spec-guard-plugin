@@ -1,5 +1,5 @@
 {
-  "interface": "1.7",
+  "interface": "1.8",
   "mapView": {
     "command": [
       "python3",
@@ -54,7 +54,7 @@
       "fields": {
         "moduleConcurrency": "top level; always \"on\" when present",
         "buildOrderGroups": "top level; the Build order as a list of groups, a comma group being one inner list",
-        "startable": "top level; {\"modules\": every ready module in Build order, \"conflicts\": [{\"modules\": [a, b], \"paths\": [...]}] for unfinished modules whose exclusive paths overlap, a before b in Build order}",
+        "startable": "top level; {\"modules\": every ready module in Build order, \"conflicts\": [{\"modules\": [a, b], \"paths\": [...]}] for unfinished modules whose exclusive paths overlap, a before b in Build order}; interface 1.8: with the switch on, a current module that is only the next one in Build order (no activeModule, no Spec, no Plan) counts as ready and is listed; an activeModule named in .agent/state.json stays in progress; top-level activeModule and stage are unchanged",
         "scope": "per module; null without a concurrency boundary section, {\"exclusive\": [...], \"shared\": [...]} when valid, {\"error\": \"<code>\"} when malformed",
         "worktree": "per module; null without a worktree carrying this module's role, else {\"path\", \"branch\", \"head\", \"progress\", \"todo\", \"dirty\", \"merged\"} plus \"duplicates\" when several worktrees claim it; merged is commit ancestry only (true, false, or null when unknown) and authorises nothing"
       },
