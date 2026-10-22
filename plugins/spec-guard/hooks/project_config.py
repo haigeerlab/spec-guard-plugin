@@ -125,10 +125,25 @@ def _ignored(root: Path) -> bool:
     return done.returncode == 0
 
 
-def render(values: dict[str, Any]) -> str:
-    """Canonical text, so rewriting the same values is a no-op diff."""
-    document = {"version": VERSION, **{key: values[key] for key in VALIDATORS if key in values}}
+def render(values: dict[str, Any], rest: dict[str, Any] | None = None) -> str:
+    """Canonical text, so rewriting the same values is a no-op diff.
+
+    config-per-key: `rest` holds the file's other keys (unknown keys, invalid values) in file order; they
+    are written back unchanged after the valid known keys, so a write never drops what it did not set.
+    """
+    document = {"version": VERSION, **{key: values[key] for key in VALIDATORS if key in values}, **(rest or {})}
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+
+
+def _rest(root: Path, values: dict[str, Any]) -> dict[str, Any]:
+    """The keys `load` did not return, in file order; only called when the file has no STRUCTURAL problem."""
+    text, _ = read_text(Path(root) / RELATIVE_PATH)
+    document = json.loads(text) if text is not None else {}
+    return {key: value for key, value in document.items() if key != "version" and key not in values}
+
+
+def _structural(problems: list[str]) -> bool:
+    return bool(set(problems) & set(STRUCTURAL))
 
 
 def _show(root: Path, as_json: bool) -> int:
@@ -144,9 +159,11 @@ def _show(root: Path, as_json: bool) -> int:
         if isinstance(value, dict):
             value = ", ".join("%s=%s" % pair for pair in sorted(value.items())) or "no convention block"
         print("%-16s %-24s source: %-26s edit: %s" % (item["key"], value, item["source"], item["editWith"]))
-    if problems:
+    if _structural(problems):
         print("\n%s is invalid (%s); its items fall back to defaults until it is fixed."
               % (RELATIVE_PATH, ", ".join(problems)))
+    elif problems:
+        print("\n%s: %s ignored; the other settings apply." % (RELATIVE_PATH, ", ".join(problems)))
     if ignored:
         print("\nwarning: %s is matched by .gitignore, so the team does not share this configuration."
               % RELATIVE_PATH)
@@ -168,7 +185,7 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
         print("%s-invalid: see spec/project-config.md for the accepted values" % key)
         return 2
     values, problems = load(root)
-    if problems:
+    if _structural(problems):
         print("%s is invalid (%s); fix or remove it before changing settings" % (RELATIVE_PATH, ", ".join(problems)))
         return 2
     directory = root / RELATIVE_PATH.parent
@@ -176,13 +193,15 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
         print("agent-directory-unsafe: %s is not a directory in this project" % RELATIVE_PATH.parent)
         return 2
     path = root / RELATIVE_PATH
-    before = render(values) if path.exists() else ""
+    rest = _rest(root, values) if path.exists() else {}
+    before = render(values, rest) if path.exists() else ""
+    rest.pop(key, None)
     updated = dict(values)
     if value is None:
         updated.pop(key, None)
     else:
         updated[key] = value
-    after = render(updated)
+    after = render(updated, rest)
     diff = "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
                                         fromfile=str(RELATIVE_PATH) + " (current)",
                                         tofile=str(RELATIVE_PATH) + " (proposed)"))
@@ -196,7 +215,7 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
     except OSError:
         print("config-unwritable: %s could not be written" % RELATIVE_PATH)
         return 2
-    if load(root) != (updated, []):
+    if load(root)[0] != updated or _rest(root, updated) != rest:
         print("config-readback-mismatch: %s does not read back as written" % RELATIVE_PATH)
         return 2
     print("\nwrote %s" % RELATIVE_PATH)
@@ -224,6 +243,10 @@ def main() -> int:
         return _show(root, args.format == "json")
     if args.command == "check":
         _, problems = load(root)
+        if problems == ["unknown-key"]:
+            # config-per-key: most likely a key from a newer spec-guard; it is ignored, not an error.
+            print("ok (ignored: unknown-key)")
+            return 0
         if problems:
             print("%s is invalid: %s" % (RELATIVE_PATH, ", ".join(problems)))
             return 1
