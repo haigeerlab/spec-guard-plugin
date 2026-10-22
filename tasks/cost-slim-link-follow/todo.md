@@ -1,6 +1,6 @@
 # Todo: cost-slim-link-follow
 
-- [ ] Task 0：提交已批准的 Spec 标记、Plan 与 todo
+- [x] Task 0：提交已批准的 Spec 标记、Plan 与 todo — Spec（C84，修订后标记 61b845f）与 Plan（C87／C97）由模块协调带批准标记提交到集成分支 30d5510；按开工通知 `module-crew sync`（HEAD 82d51fe，已含该提交）；validate、phase-guard（438 例）、verify-artifacts（74 例）全过。
 - [ ] Task 1：成本报告瘦身（C1）
 - [ ] Task 2：派活规则退役（C2）
 - [ ] Task 3：跟随解析（C3）
