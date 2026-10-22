@@ -172,6 +172,37 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题的�
   - 最终验收：做了什么；验收结果（按 AC 编号逐条给证据，以及完整检查的结果）；改了哪些文件（「最终验收列出实际改动的文件」那几张表，
     照旧用表格）；Spec 中途改过吗（改过就附差异，见「最终验收可以一并复审修订过的 Spec」）。
 
+  每个小项对应上游 agent-skills 的一节（本机 0.6.12：`spec-driven-development`、`planning-and-task-breakdown`、`commands/build.toml`、
+  `incremental-implementation`）；上游没有的标「附加」：
+
+  | 交审 | 小项 | 上游章节 |
+  |---|---|---|
+  | 能力图审阅 | 拆成哪些模块 | `spec-driven-development` Phase 0 的 Capability Map 模块表（Module id、Responsibility、Depends on） |
+  | 能力图审阅 | 先后顺序 | Capability Map 的 Build order |
+  | 能力图审阅 | 文档建议 | 附加 |
+  | Spec | 目标 | Objective |
+  | Spec | 边界（旧名做／不做） | Boundaries（总是做／先问／不做） |
+  | Spec | 要你确认的假设 | Phase 1 的 ASSUMPTIONS |
+  | Spec | 验收标准 | Success Criteria |
+  | Spec | 未决问题（旧名附带的小决定） | Open Questions |
+  | Spec | 文档建议 | 附加 |
+  | Plan | 架构决定 | `planning-and-task-breakdown` Plan 模板的 Architecture Decisions |
+  | Plan | 分几步 | Task List（Step 4 Write Tasks：Acceptance criteria、Verification） |
+  | Plan | 会改哪些文件 | 任务模板的 Files likely touched |
+  | Plan | 风险 | Risks and Mitigations |
+  | Plan | 中途会停下来问你的地方 | Step 5 Order and Checkpoint 的 Checkpoint，及 `/build auto` 第 6 步要停下问用户的情形 |
+  | Plan | 未决问题 | Plan 模板的 Open Questions |
+  | 中途 gate | 做到哪了 | Checkpoint 清单（测试通过、构建通过、主流程可用） |
+  | 中途 gate | 为什么停在这 | Checkpoint 的 Review with human before proceeding，及 `/build auto` 第 6 步 |
+  | 中途 gate | 接下来要做的那一步 | 附加 |
+  | 最终验收 | 做了什么 | `/build auto` 第 7 步 Summarize（完成的任务、加的测试、做的提交、跳过或留给用户的） |
+  | 最终验收 | 验收结果 | Success Criteria 逐条，及 `incremental-implementation` 的 Verification 清单 |
+  | 最终验收 | 改了哪些文件 | 提交表对应第 7 步的 commits made；文件表、依赖表为附加 |
+  | 最终验收 | Spec 中途改过吗 | Keeping the Spec Alive（决定或范围变了先改 Spec）；原样差异与一次批准为附加 |
+
+  新增或改动交审小项时，写明它对应上游的哪一节；对应不上的只能作为附加项追加在已对应的小项之后，不替换、不改名已对应的小项。
+  与上游冲突时以上游为准。
+
   小项之后另起两行：“注意：”写遗留建议、没验证到的和偏离计划的地方，没有写“无”；“批了会怎样：”写这次批准授权什么——
   批准 Spec 之后做什么；批准 Plan 之后连续执行到哪个 `gate`、是否含推送与开 PR；批准最终验收之后提交什么、还要另外问什么。
   `combined` 节奏下一次交审写 Spec 的五项再接 Plan 的四项，并说明一次批准同时批准 Spec 与 Plan。

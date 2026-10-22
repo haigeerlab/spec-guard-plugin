@@ -840,6 +840,25 @@ class NodeRulesTests(unittest.TestCase):
                     self.assertIn(phrase, text)
                     self.assertIn(phrase, self.contract)
 
+    def test_each_review_item_names_its_upstream_chapter(self):
+        # C105 / C7: every review item points at the agent-skills chapter it follows; unmatched ones are only appended.
+        start = self.contract.index("**交审要让用户看到内容。**")
+        item = self.contract[start:self.contract.index("**验收标准编号。**", start)]
+        for chapter in ("Objective", "Boundaries", "ASSUMPTIONS", "Success Criteria", "Open Questions", "Capability Map",
+                        "Build order", "Architecture Decisions", "Files likely touched", "Risks and Mitigations",
+                        "Checkpoint", "Keeping the Spec Alive", "附加"):
+            with self.subTest(chapter=chapter):
+                self.assertIn(chapter, item)
+        for phrase in ("对应上游的哪一节", "只能作为附加项追加", "以上游为准"):
+            self.assertIn(phrase, item)
+        for title, chapters in (("## Spec 交审", ("Objective", "Boundaries", "ASSUMPTIONS", "Success Criteria", "Open Questions")),
+                                ("## Plan 交审", ("Architecture Decisions", "Checkpoint", "Open Questions")),
+                                ("## 能力图审阅", ("Capability Map", "Build order"))):
+            text = self.section(title)
+            for chapter in chapters:
+                with self.subTest(title=title, chapter=chapter):
+                    self.assertIn("上游 " + chapter, text)
+
     def test_contract_points_at_the_stop_rules(self):
         head = self.contract[:self.contract.index("1. 已完成的具体成果")]
         self.assertIn("[停点规则](node-rules.md)", head)
