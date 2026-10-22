@@ -1,5 +1,7 @@
 # Plan: tracker-provider-unify
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/tracker-provider-unify.md`](../../spec/tracker-provider-unify.md)（2026-10-22 批准，事项 C5）。
 Spec 的两个待定问题按用户答复定为：**Open question 1 选 A**（Proposal 只读命令缺省主机 `github.com`／`gitlab.com`，与收尾一致，更新说明写明）；
 **Open question 2 选 A**（收尾一侧 GitLab 放宽为与目标 `web_url` 同一 scheme）。
