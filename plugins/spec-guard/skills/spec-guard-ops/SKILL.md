@@ -313,6 +313,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 条校验失败并停下。等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次；用户改了 id、
 responsibility、depends-on 或 anchor 中任何一项，都要先重新预览，不能对着旧预览直接确认。
 
+为同一个需求一次插入 2 个及以上模块时，最后一个写入成功后先用 `spec-guard-ops` 的 config 看 `moduleConcurrency`：是 `on` 就按共享检查点规则
+「并行评估」一节的「批量插入之后」评估一次；不是 `on` 不用管。
+
 写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
 Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
 并交审 `spec/<id>.md`，不是本命令的职责。需要留下经过审查的决定记录时改用 Proposal 流程；已接受的 Proposal 用下面的 `--proposal` 晋级。
