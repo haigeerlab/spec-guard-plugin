@@ -185,7 +185,7 @@
   "reviewKinds": {
     "appearsWhen": "always (interface 1.5); add-only: kinds and section names are never renamed or removed within 1.x",
     "description": "the kinds of user decision spec-guard's shared checkpoint rules produce, with the sections each one shows in the conversation, in order. Every kind needs a reply; the recommended reply sits in one copyable code block, except when a consumer plugin requires that the user's decisions be asked only in the hub (or relayed there through a coordinating session): then the content is still shown in full, but there is no copy block, only a line pointing to the hub (\"去决策收件箱答 #N\", or \"去决策收件箱答\" without an item number). Kinds spec-guard does not produce (go-to-session, interface proposals) are not listed",
-    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (contract v2.3); label is the value written there",
+    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (values defined in contract v2.3 and unchanged through v2.5); label is the value written there",
     "kinds": {
       "capability-map": {
         "label": "能力图审阅",

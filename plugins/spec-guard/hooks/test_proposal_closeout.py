@@ -565,10 +565,71 @@ class CloseTests(unittest.TestCase):
         self.assertEqual(entries[0].stat().st_mode & 0o777, 0o600)
         self.assertEqual(self.journal.stat().st_mode & 0o777, 0o700)
 
-    def test_a_finished_closeout_leaves_no_journal_entry_or_lock(self):
+    def test_a_finished_closeout_leaves_no_journal_entry_but_keeps_the_lock(self):
         adapter = WritingAdapter()
         self.assertEqual(closing(adapter, self.journal)["state"], "verified")
-        self.assertEqual(list(self.journal.iterdir()), [])
+        left = list(self.journal.iterdir())
+        self.assertEqual([item.suffix for item in left], [".lock"])
+        self.assertEqual(left[0].stat().st_mode & 0o777, 0o600)
+
+    def _lock(self):
+        locks = [item for item in self.journal.iterdir() if item.suffix == ".lock"]
+        self.assertEqual(len(locks), 1)
+        return locks[0].stat().st_ino
+
+    def test_the_lock_survives_every_return_path_with_the_same_inode(self):
+        """Deleting the lock on release is what let two writers in at once (F6): a
+        process already waiting holds the old inode while a newcomer creates a fresh
+        one and locks it at once.  The lock is only ever released, never removed."""
+        self.assertEqual(closing(WritingAdapter(), self.journal)["state"], "verified")
+        first = self._lock()
+        stale = closing(WritingAdapter(), self.journal,
+                        publication=Publication("absent", review_commit=REVIEW))
+        self.assertEqual(stale["state"], "preview-stale")
+        self.assertEqual(self._lock(), first)
+        with patch("proposal_closeout._close_locked", side_effect=OSError("disk")):
+            broken = closing(WritingAdapter(), self.journal)
+        self.assertEqual((broken["state"], broken["diagnostic"]),
+                         ("unknown", "journal-unavailable"))
+        self.assertEqual(self._lock(), first)
+
+    def test_a_waiter_and_a_newcomer_never_write_at_the_same_time(self):
+        import threading
+        import time
+        inside, peak = [0], [0]
+        guard = threading.Lock()
+        a_entered, a_release = threading.Event(), threading.Event()
+        holds = {"A": a_release.wait, "B": lambda: time.sleep(0.3),
+                 "C": lambda: time.sleep(0.3)}
+
+        def critical(*args, **kwargs):
+            with guard:
+                inside[0] += 1
+                peak[0] = max(peak[0], inside[0])
+            if threading.current_thread().name == "A":
+                a_entered.set()
+            holds[threading.current_thread().name]()
+            with guard:
+                inside[0] -= 1
+            return {"state": "verified"}
+
+        def run(name):
+            thread = threading.Thread(
+                name=name, target=lambda: closing(WritingAdapter(), self.journal))
+            thread.start()
+            return thread
+
+        with patch("proposal_closeout._close_locked", side_effect=critical):
+            a = run("A")
+            self.assertTrue(a_entered.wait(5))
+            b = run("B")
+            time.sleep(0.2)  # B is now blocked on the lock A holds
+            a_release.set()
+            a.join(5)
+            c = run("C")
+            b.join(5)
+            c.join(5)
+        self.assertEqual(peak[0], 1)
 
     def test_a_definite_platform_rejection_is_not_reported_as_uncertain(self):
         """403 is an answer: the write did not happen and retrying changes nothing.
