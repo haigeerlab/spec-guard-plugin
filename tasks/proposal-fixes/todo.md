@@ -7,7 +7,7 @@
 - [x] Task 4：F18 修复 — `proposal_publication.py` 加 `PROPOSAL_UNREADABLE` 与 `PROBE_CODES` 项 `snapshot-proposal-unreadable`，`read_published_pool` 在 `write_text` 前遇 `None` 返回 `unknown`；`references/proposal-publication.md` 候选池一节补一句。`test_proposal_publication.py`、`test_proposal_promotion_proof.py`、`test_proposal_submit.py`、`test_proposal_closeout.py` 全过；调用方未改代码。
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `tempfile.mkdtemp` 建的副本上各改一处：把 `unlink` 加回 → `test_proposal_closeout.py` 3 处红；去掉 `None` 检查 → `test_proposal_publication.py` 1 处错误；去掉 `PROBE_CODES` 新项 → `test_proposal_promotion_proof.py` 1 处红。
 - [x] Task 5：合入集成分支并跑完整检查 — 实现提交 0a88e05 走 `verify-and-commit.sh` 全套（validate 216s、phase-guard 435 例、verify-artifacts 74 例、repo-artifacts 0 失败）。工作区有改动时 sync 拒绝运行，所以先提交再 sync；按同步基线通知（C42）sync 到 35f85bd（HEAD 20183be），合入后 validate、phase-guard、verify-artifacts 三条再跑全过。
-- [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
