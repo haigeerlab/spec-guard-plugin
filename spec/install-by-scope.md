@@ -28,7 +28,7 @@ AI 事先列不全要装的包，强制列清单再逐项对比，只是换了�
    新增依赖」那半句。
 5. **SG-5b 去掉**：删除 `hooks/dependency_check.py`、`hooks/test_dependency_check.py`，以及 verify-artifacts 里「依赖改动」与
    「需要的外部条件」两段和它们的回归用例；`scripts/validate.sh` 的单测登记一并去掉。能力图里 `dependency-check` 那一行作为历史
-   保留，不改。
+   保留，不改。（2026-10-22 起由 `spec/fact-fixes.md` 取代：该行已移出能力图，归档见 `docs/retirements/dependency-check.md`。）
 6. **宿主确认（SG-8）**：保留通用的一条——停在宿主确认前告诉用户去哪个会话、点什么，这不算问用户做决定；去掉决定 61 那句「宿主
    分不出包在不在 Plan 里……开工时一条命令把 Plan 列出的包一次加完」。
 7. **SG-6（一次列全所需权限）与 SG-3 不变。**

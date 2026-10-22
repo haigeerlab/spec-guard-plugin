@@ -1,5 +1,7 @@
 # Spec: history-slim
 
+<!-- spec-guard: review approved 219b43092696 -->
+
 ## Objective
 
 决定 D16：每个项目只有一张能力图，能力历史不再产生新归档。能力历史只为还没迁完的旧布局项目保留两件事——

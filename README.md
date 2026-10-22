@@ -3,8 +3,9 @@
 简体中文 | [English](README.en.md)
 
 spec-guard 是 [agent-skills](https://github.com/addyosmani/agent-skills) 的配套插件，支持 Claude Code 和 Codex。
-agent-skills 默认一个项目只有一份 Spec 和一份 plan；spec-guard 让同一个项目可以拆成多个模块，每个模块各有自己的
-Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个模块、做到了哪一步。
+agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec，但 `/plan` 每次都写同一份 `tasks/plan.md`／`todo.md`，
+模块之间会互相覆盖，下一轮也不知道做到了哪。spec-guard 让每个模块各有自己的 Spec、Plan 和 todo，并在每轮对话开头
+告诉 agent 现在该做哪个模块、做到了哪一步。
 
 ## 使用场景与边界
 
@@ -161,7 +162,9 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
   启用本地事项账本时，用 `npm ci` 按随包的锁文件安装运行时。钩子和 `map`、`phase`、`verify-artifacts`、`review-mark`、
   `cost-report` 等其余命令不联网。
 - **统计与上传**：`cost-report` 离线读本机 Claude Code（`~/.claude/projects/`）和 Codex（`~/.codex/sessions/`）的会话
-  记录，只统计 token 与轮次，结果只打印在终端。插件没有遥测，不向任何地方上报数据。
+  记录，用到其中的 token 计数、用户提问时间、工具调用结果（判断被拒与交回时间）、编辑过的文件路径和子代理派生关系；
+  这些只在本次运行的内存里用来归到各个 task，输出只有计数，不打印会话内容，结果只显示在终端。插件没有遥测，不向任何
+  地方上报数据。
 
 细节见[设计与架构](docs/design.md)。
 
