@@ -1,5 +1,5 @@
 {
-  "interface": "1.8",
+  "interface": "1.9",
   "mapView": {
     "command": [
       "python3",
@@ -185,7 +185,7 @@
   "reviewKinds": {
     "appearsWhen": "always (interface 1.5); add-only: kinds and section names are never renamed or removed within 1.x",
     "description": "the kinds of user decision spec-guard's shared checkpoint rules produce, with the sections each one shows in the conversation, in order. Every kind needs a reply; the recommended reply sits in one copyable code block unless the installed collaboration plugin rules where the user answers. Kinds spec-guard does not produce (go-to-session, interface proposals) are not listed",
-    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (values defined in contract v2.3 and unchanged through v2.5); label is the value written there",
+    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (values defined in contract v2.3 and unchanged through v2.6); label is the value written there",
     "kinds": {
       "capability-map": {
         "label": "能力图审阅",
@@ -208,10 +208,12 @@
       "plan": {
         "label": "Plan",
         "sections": [
+          "架构决定",
           "分几步",
           "会改哪些文件",
           "风险",
-          "中途会停下来问你的地方"
+          "中途会停下来问你的地方",
+          "未决问题"
         ]
       },
       "spec-plan": {
@@ -222,10 +224,12 @@
           "要你确认的假设",
           "验收标准",
           "附带的小决定",
+          "架构决定",
           "分几步",
           "会改哪些文件",
           "风险",
-          "中途会停下来问你的地方"
+          "中途会停下来问你的地方",
+          "未决问题"
         ],
         "notes": "reviewCadence combined: the Spec sections, then the Plan sections, approved at once"
       },
@@ -261,7 +265,15 @@
     ],
     "commonLinesNote": "separate lines after the sections, not sections themselves; 注意 says 无 when empty",
     "rules": "references/workflow-checkpoints.md",
-    "contract": "spec/review-card-sections.md"
+    "contract": "spec/review-card-sections.md",
+    "renamedSections": {
+      "since": "1.9",
+      "map": {
+        "做／不做": "边界",
+        "附带的小决定": "未决问题"
+      },
+      "note": "session-protocol v2.6 upstream names; spec-guard writes the new names, both stay valid, the old names in kinds stay until 2.0"
+    }
   },
   "gateTick": {
     "command": [
