@@ -296,19 +296,19 @@ ${LOCATION}"
 if [ -n "$LINKED" ] && [ -n "$ZH" ] && [ "$LINK_SOURCE" = session ]; then
   HEADER="${HEADER}
 
-关联项目: \`${LINK_SHOWN}\` — 本会话在 \`${LINK_FROM}\` 下的 \`.agent/spec-guard-link.json\` 里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。运行 spec-guard 命令时把这个路径作为项目传入。"
+关联项目: \`${LINK_SHOWN}\` — 本会话在 \`${LINK_FROM}\` 下的 \`.agent/spec-guard-link.json\` 里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。spec-guard 命令会自动跟随到这个项目。"
 elif [ -n "$LINKED" ] && [ -n "$ZH" ]; then
   HEADER="${HEADER}
 
-关联项目: \`${LINK_SHOWN}\` — 本会话的目录 \`${LINK_FROM}\` 通过 \`.agent/spec-guard-link.json\` 指向它。运行 spec-guard 命令时把这个路径作为项目传入。这个指向对在该目录里运行的每个会话都生效；如果本会话做的是别的项目，忽略这里的阶段，传入你自己的项目路径。"
+关联项目: \`${LINK_SHOWN}\` — 本会话的目录 \`${LINK_FROM}\` 通过 \`.agent/spec-guard-link.json\` 指向它。spec-guard 命令会自动跟随到这个项目。这个指向对在该目录里运行的每个会话都生效；如果本会话做的是别的项目，忽略这里的阶段，用 \`link-project\` 给本会话登记自己的项目。"
 elif [ -n "$LINKED" ] && [ "$LINK_SOURCE" = session ]; then
   HEADER="${HEADER}
 
-Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. Pass this path as the project when you run spec-guard commands."
+Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. spec-guard commands follow it automatically."
 elif [ -n "$LINKED" ]; then
   HEADER="${HEADER}
 
-Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and pass your own project path."
+Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. spec-guard commands follow it automatically. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and register this session's own project with \`link-project\`."
 fi
 
 SPECS=0

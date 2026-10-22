@@ -1601,9 +1601,9 @@ text, project, session = sys.argv[1], os.path.realpath(sys.argv[2]), os.path.rea
 lines = [line for line in text.splitlines() if line.startswith("Linked project:")]
 assert len(lines) == 1, lines
 expected = ("Linked project: `%s` — this session's directory `%s` points to it through `.agent/spec-guard-link.json`. "
-            "Pass this path as the project when you run spec-guard commands. The link applies to every session that "
-            "runs in that directory; if this session works on a different project, ignore this stage and pass your own "
-            "project path." % (project, session))
+            "spec-guard commands follow it automatically. The link applies to every session that runs in that "
+            "directory; if this session works on a different project, ignore this stage and register this session's own "
+            "project with `link-project`." % (project, session))
 assert lines[0] == expected, (lines[0], expected)
 location = [line for line in text.splitlines() if line.startswith("Location:")]
 assert len(location) == 1 and project in location[0], location
@@ -1680,8 +1680,8 @@ text, project, session = sys.argv[1], os.path.realpath(sys.argv[2]), os.path.rea
 lines = [line for line in text.splitlines() if line.startswith("Linked project:")]
 assert len(lines) == 1, lines
 expected = ("Linked project: `%s` — this session is linked to it by its own entry in `.agent/spec-guard-link.json` under "
-            "`%s`; other sessions in that directory are not affected. Pass this path as the project when you run "
-            "spec-guard commands." % (project, session))
+            "`%s`; other sessions in that directory are not affected. spec-guard commands follow it "
+            "automatically." % (project, session))
 assert lines[0] == expected, (lines[0], expected)
 PY
 echo "  ✅ 会话登记的 Linked project 行恰好一行、内容正确"; PASS=$((PASS + 1))
@@ -1689,7 +1689,7 @@ echo "  ✅ 会话登记的 Linked project 行恰好一行、内容正确"; PASS
 link2 "{\"sess-a\": \"$prj2\"}" "$prj"
 as '{"session_id":"sess-a"}';  has "本会话的登记优先于目录级指向" 'Current module: `beta`'
 as '{"session_id":"sess-x"}';  has "没登记的会话跟随目录级指向" 'Current module: `alpha`'
-has "跟随目录级指向时 Linked project 行与 0.58.2 相同" 'points to it through `.agent/spec-guard-link.json`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory;'
+has "跟随目录级指向时 Linked project 行写明命令自动跟随（D18）" 'points to it through `.agent/spec-guard-link.json`. spec-guard commands follow it automatically. The link applies to every session that runs in that directory;'
 hasnt "跟随目录级指向时不说是本会话的登记" 'by its own entry'
 
 link2 "{\"sess-a\": \"$other\"}" "$prj"
@@ -2147,11 +2147,13 @@ chmod 644 "$zo/spec/CAPABILITY-MAP.md"
 zl="$WORK/zh-linked"; mkdir -p "$zl/.agent"
 printf '{"version": 1, "project": "%s"}\n' "$zh" > "$zl/.agent/spec-guard-link.json"
 zh_check "zh-CN：目录级关联项目（用目标项目的配置）" "$zl" +"关联项目: \`" \
-  +"通过 \`.agent/spec-guard-link.json\` 指向它。运行 spec-guard 命令时把这个路径作为项目传入。" "${ENGLISH_ONLY[@]}"
+  +"通过 \`.agent/spec-guard-link.json\` 指向它。spec-guard 命令会自动跟随到这个项目。" \
+  +"用 \`link-project\` 给本会话登记自己的项目。" -"作为项目传入" "${ENGLISH_ONLY[@]}"
 printf '{"session_id":"sess-zh"}' > "$WORK/zh-session"
 printf '{"version": 2, "sessions": {"sess-zh": "%s"}}\n' "$zh" > "$zl/.agent/spec-guard-link.json"
 SG_INPUT="$WORK/zh-session" zh_check "zh-CN：本会话登记的关联项目" "$zl" \
-  +"里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。" "${ENGLISH_ONLY[@]}"
+  +"里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。spec-guard 命令会自动跟随到这个项目。" \
+  -"作为项目传入" "${ENGLISH_ONLY[@]}"
 }
 
 part_19() {
