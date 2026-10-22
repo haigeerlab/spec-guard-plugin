@@ -1,5 +1,7 @@
 # Plan: proposal-fixes
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/proposal-fixes.md`](../../spec/proposal-fixes.md)（2026-10-22 批准，事项 C27）。
 Spec 的待定问题按用户答复定为：**F18 后半（`capability-history.py` 的 `event.at` 校验与 `imported` 补正）不在本模块，交给 history-slim**。
 

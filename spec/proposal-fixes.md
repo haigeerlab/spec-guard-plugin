@@ -1,5 +1,7 @@
 # Spec: proposal-fixes
 
+<!-- spec-guard: review approved 198b4376b3e0 -->
+
 ## Objective
 
 决定 D13 保留整条 Proposal 流程，只修它的正确性问题。本模块修两条审查发现（2026-10-22 多维审查）：
