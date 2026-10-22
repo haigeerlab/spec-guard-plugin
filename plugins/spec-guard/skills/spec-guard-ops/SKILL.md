@@ -184,7 +184,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
-- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
+- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；从本版起，新版本遇到不认识的键只忽略那个键。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 
@@ -193,9 +193,10 @@ python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key artifa
 python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key reviewCadence
 ```
 
-取值不合法、键不认识或属于只读汇总的两项时，退出码 2 且不写文件。文件无效（JSON 坏、`version` 不是 1、
-未知键、非法取值）时所有项按默认处理、`set`／`unset` 拒绝写入，照问题代码报告，不替用户猜值；`show` 提示
-文件被 `.gitignore` 忽略时照实转述。
+取值不合法、键不认识或属于只读汇总的两项时，退出码 2 且不写文件。文件本身坏了（读不了、JSON 坏、顶层不是对象、
+`version` 不是 1）时所有项按默认处理、`set`／`unset` 拒绝写入；个别键有问题（不认识的键、某个键取值不合法）时只有那个键失效，
+其余照常，`set`／`unset` 只改指定的键、其余键原样保留，只有不认识的键时 `check` 通过并提示 ignored。都照问题代码报告，
+不替用户猜值；`show` 提示文件被 `.gitignore` 忽略时照实转述。
 
 ## module-suspend
 

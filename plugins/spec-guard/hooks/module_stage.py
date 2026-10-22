@@ -17,7 +17,7 @@ import sys
 
 from capability_map import MODULE_ID, MapError, parse_map
 from checkout_role import role as checkout_role_of
-from project_config import load as load_config
+from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
@@ -406,11 +406,12 @@ def unreadable_map(reason: str, zh: bool = False) -> str:
 def config_lines(root: Path, host: str | None = None) -> list:
     """project-config: one line per set item that changes the agent's behaviour.
 
-    `separate` is the default and adds nothing.  An invalid file yields only its fixed problem
-    codes -- never a key or value from the file -- and no setting from it is applied.
+    `separate` is the default and adds nothing.  A file unusable as a whole yields only its fixed problem
+    codes -- never a key or value from the file -- and no setting from it is applied.  config-per-key: any
+    other problem drops only its key; the valid settings keep their lines and one line names what was ignored.
     """
     values, problems = load_config(root)
-    if problems:
+    if set(problems) & set(STRUCTURAL):
         return ["- Project config: invalid (%s) — run %s." % (", ".join(problems), COMMANDS[host]["config"])]
     zh = values.get("artifactLanguage") == "zh-CN"
     lines = []
@@ -424,16 +425,19 @@ def config_lines(root: Path, host: str | None = None) -> list:
                      "- Review cadence: combined — after the capability map is written, present the Spec "
                      "and the Plan together for one approval; split them when a new decision, unclear "
                      "scope or a high-risk change appears.")
+    if problems:
+        lines.append(("- 项目配置: 已忽略 (%s)——其余设置照常生效；用 %s 查看。" if zh else
+                      "- Project config: ignored (%s) — the other settings apply; run %s.")
+                     % (", ".join(problems), COMMANDS[host]["config"]))
     return lines
 
 
 def hint_language(root: Path) -> str:
-    """hint-language-follow: "zh-CN" when the project config is valid and artifactLanguage is exactly zh-CN, else "en".
+    """hint-language-follow: "zh-CN" when artifactLanguage is valid and exactly zh-CN, else "en".
 
     The one criterion for the language of the stage hint; phase-guard.sh asks for it with --hint-language.
     """
-    values, problems = load_config(root)
-    return "zh-CN" if not problems and values.get("artifactLanguage") == "zh-CN" else "en"
+    return "zh-CN" if load_config(root)[0].get("artifactLanguage") == "zh-CN" else "en"
 
 
 CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(\S.*)$")
@@ -542,8 +546,8 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     record = " When the user approves it, record that with %s." % cmd["review-mark"]
     if spec == "pending":
         line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
-        values, problems = load_config(root)
-        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+        values = load_config(root)[0]
+        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
@@ -574,8 +578,8 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
     record = "用户批准后，用 %s 记下来。" % cmd["review-mark"]
     if spec == "pending":
         line = "- 批准: Spec `%s` 正在等用户批准。" % spec_path
-        values, problems = load_config(root)
-        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+        values = load_config(root)[0]
+        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan

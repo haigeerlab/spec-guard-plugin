@@ -77,8 +77,9 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `reviewCadence` | `separate`／`combined` | `separate` |
 | `moduleConcurrency` | `off`／`on` | `off` |
 
-不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件无效时所有项按
-默认处理，阶段提示只多一行 `Project config: invalid`。同时只读汇总派活开关与默认事项后端的当前值和来源。
+不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件本身坏了时所有项按
+默认处理，阶段提示只多一行 `Project config: invalid`；个别键有问题时只有那个键失效、其余照常，阶段提示多一行
+`Project config: ignored`。同时只读汇总派活开关与默认事项后端的当前值和来源。
 
 ### `/spec-guard:module-suspend`
 

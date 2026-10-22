@@ -47,6 +47,7 @@
 - `artifactLanguage`：语言标签，形如 `zh-CN`、`en`、`ja`、`pt-BR`（`^[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?$`）。
 - `reviewCadence`：`separate` 或 `combined`。
 - 出现未知键、类型或取值不合法、JSON 解析失败，都算**配置无效**。无效时不按默认值静默处理（见下方注入与校验）。
+  （已由 config-per-key 改为逐键判定：未知键与非法取值只让那个键失效，见 [spec/config-per-key.md](config-per-key.md)。）
 
 ### `hooks/project_config.py`（唯一的读取与校验实现）
 
@@ -70,6 +71,7 @@
   - 设了 `reviewCadence = combined`：`Review cadence: combined — after the capability map is written, present the Spec and the Plan together for one approval; split them when a new decision, unclear scope or a high-risk change appears.`
   - `separate` 或未设置：不追加。
   - 配置无效：追加一行 `Project config: invalid (<原因>) — run /spec-guard:config.`，其余配置项一律不注入。
+    （已由 config-per-key 改为只在文件本身坏了时如此；个别键有问题时其余照常注入，另加一行 ignored，见 [spec/config-per-key.md](config-per-key.md)。）
 - 没有配置文件时，所有现有用例的输出逐字节不变。
 
 ### 规则文本
