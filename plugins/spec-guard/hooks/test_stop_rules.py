@@ -189,7 +189,7 @@ class DocumentationCheckLine(unittest.TestCase):
             (p.root / "docs/DOCUMENTATION-BASELINE.md").write_text(BASELINE["docs/DOCUMENTATION-BASELINE.md"],
                                                                    encoding="utf-8")
             full = describe(p.root)
-        self.assertNotIn("文档核验", bare)
+        self.assertNotIn("- 文档核验：", bare)
         lines = [line for line in full.split("\n") if not line.startswith("- 文档核验：")]
         self.assertEqual("\n".join(lines), bare)
 
@@ -199,7 +199,7 @@ class DocumentationCheckLine(unittest.TestCase):
                       building("- [ ] t\n", plan="# Plan\n\n<!-- spec-guard: review pending -->\n")):
             with self.subTest(files=sorted(files)):
                 with Project(dict(files, **BASELINE)) as p:
-                    self.assertNotIn("文档核验", describe(p.root))
+                    self.assertNotIn("- 文档核验：", describe(p.root))
 
     def test_module_checkout_gets_it_and_the_coordinator_does_not(self):
         files = dict(BASELINE, **{"tasks/beta/plan.md": APPROVED_PLAN, "tasks/beta/todo.md": self.FINAL})

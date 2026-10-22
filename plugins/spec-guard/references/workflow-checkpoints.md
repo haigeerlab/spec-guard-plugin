@@ -283,6 +283,16 @@ README 默认在候选里：能力图审阅与能力图全部完成这两处一�
 写进相应模块的 Plan 成为普通任务；能力图全部完成时采纳的，另开一个收尾模块按正常流程写，不在已完成的模块里补。用户拒绝的
 不再就同一层次重复提。建议不卡验收，是否先查资料由 agent 判断；不自动生成文档或 ADR，已完成的模块不补建议。
 
+项目有文档基线时（`docs/DOCUMENTATION-BASELINE.md`），建议、影响、核验接成一条链，保证模块改了代码、该更新的文档不漏：
+
+1. **Spec 交审**：按基线的关注点提建议，用户采纳的写进本 Spec 的 `Documentation impact` 表。
+2. **Plan 交审**：列出影响表里的 `update`、`create` 与 Plan 的 `Documentation delivery` 表，交付是 Plan 的普通任务。
+3. **最终验收**：阶段提示会提醒先跑文档核验（[文档交付核验](documentation-verification.md)），结果按状态写进验收结果：
+   现状类文档（基线状态不是 `target`）声明交付却没改过的，写明；`target` 文档改过的，把差异原样附上；外部文档写明未核验。
+
+基线状态为 `target` 的文档是已批准、还没完全实现的目标（顶层架构、需求愿景）。模块对它只能补充：标注已实现的部分、补充约束，
+不得删改未实现的目标。要改目标就是改需求，停下单独问用户，不算在模块的范围里。
+
 ## 并行评估（moduleConcurrency 为 on 时）
 
 先用 `/spec-guard:config`（Codex：`spec-guard-ops` 的 config）看 `moduleConcurrency`：不是 `on`（包括未设置、`off` 和配置无效）时
