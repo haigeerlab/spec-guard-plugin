@@ -1,6 +1,6 @@
 # Spec: doc-chain
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 10699a224de7 -->
 
 ## Objective
 

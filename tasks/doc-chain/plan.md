@@ -1,6 +1,6 @@
 # Plan: doc-chain
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/doc-chain.md`](../../spec/doc-chain.md)：2026-10-22 批准（事项 C190，Q1 A、Q2 A、Q3 A：影响表留在 Spec、Plan 交审摆出来；
 「文档核验」一行给串行与模块会话、不给协调会话；`ready` 不改名、改说明；D15 按 Spec 的写法确认）。同一答复定了与
