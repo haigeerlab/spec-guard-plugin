@@ -10,7 +10,7 @@
   `- 文档核验：项目有文档基线，最终验收前跑 \`/spec-guard:documentation-verification alpha\` (Codex: spec-guard-ops documentation)，把结果写进验收消息的「验收结果」：现状类 update 没改过、target 文档有删改、外部文档未核验的，逐条写明；attention 不卡验收。`
   （宿主未知时入口沿用表里不分宿主的那一格，与同表其他入口的写法一致）。本 worktree 的 `documentation_verification.py` 输出 `state: attention`；product-direction `changed`（+1／−0），developer-entry `unchanged`，architecture `target-changed`（+0／−1），integration-contract `unverified`；attention 两条：「architecture: target document docs/architecture.md has deletions; deleting or changing a goal not yet built is a requirement change and needs the user's separate approval」「developer-entry is declared delivered, but README.md has no change since spec/alpha.md was first committed」。
 - [x] Task 6：合入集成分支并跑完整检查 — 第一次单独 `module-crew sync` 时集成分支没有新提交（e41f7df）；随后 ledger-standalone-reminder 合入（C202，d2e92d2），收到同步基线通知后再单独 sync 到 9ab5bae（HEAD 0bcc5b8b，合入 11 个提交）。**按 C201 追加**：用户批准 ledger-standalone-reminder 最终验收时把 `docs/design.md` 第 66～76 行的激活说明交给本模块（经 sg-coord 告知，消息 #10420）——SessionStart `fresh` 那段写明只有账本、没启用约定的项目同样出读回提醒，压缩后只出账本版本的核对提醒；第 2 步「都没有时静默退出」改为同时看指向文件与 `.epiq/project.json`，只有账本时只出账本提醒（转来消息那一轮一行记账提醒，其余轮次直接退出 0），后面两处「有且有效」「有但失效」补上主语「指向文件」。随后 `validate.sh` 通过、phase-guard 502 例、verify-artifacts 74 例、`test_stop_rules.py`、`test_documentation_verification.py`、`test_workflow_checkpoints.py` 全过；`module_scope.py check --module doc-chain --base crew/fix-batch` 越界 0。相对集成分支 14 个文件。
-- [ ] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
