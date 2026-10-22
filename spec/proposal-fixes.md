@@ -15,7 +15,7 @@
 
 ## Assumptions
 
-1. **锁文件留在磁盘上是可以接受的。** 它在 journal 同一个 0700 私有目录里，每个 `proposalId + revision` 一个、空文件、0600；journal 本身也不删。修法就是不删，不另做清理（清理本身会重新引入同一个竞争）。仓库里其他用 `fcntl` 的地方（`hosted_ticket_actions.py`、`hosted_ticket_write.py`）也是不删锁文件，本修法与之一致。
+1. **锁文件留在磁盘上是可以接受的。** 它在 journal 同一个 0700 私有目录里，每个 `proposalId + revision` 一个、空文件、0600；journal 条目在收尾成功或平台明确拒绝时会删掉，锁文件则留下。修法就是不删，不另做清理（清理本身会重新引入同一个竞争）。仓库里其他用 `fcntl` 的地方（`hosted_ticket_actions.py`、`hosted_ticket_write.py`）也是不删锁文件，本修法与之一致。
 2. **`ls-tree` 列出却 `git show` 不出，是读取故障而不是数据无效。** 同一个快照里刚列出的路径读不出来，原因是 git 进程失败或超时（`_run` 返回 `None`），不能据此说 Proposal 不合规，所以结果是 `unknown`（可重试），不是 `invalid`，也不能静默跳过（跳过会让晋级证明在缺一份 Proposal 的池上下结论）。
 3. **诊断码走 `PROBE_CODES` 那一套。** 新增一个快照读取类事实及其稳定码 `snapshot-proposal-unreadable`，调用方已有的 `probe_code(...)` 映射会把它原样带出；不带出的调用方落回各自的 `proposal-pool-unknown`，行为不变。
 4. **F18 的后半（`capability-history.py` 不校验 `event.at`、迁移写入 `imported` 后无法补正）不在本模块。** 本模块的能力图条目只写了「候选池枚举在 git show 失败时给出稳定诊断」；后半若要修，由模块协调另行安排（或交给相关模块）。
@@ -61,6 +61,10 @@ python3 plugins/spec-guard/hooks/test_proposal_promotion_proof.py
 - 不改 `hosted_ticket_provider.py` 与 tracker-provider-unify 定下的读写接口；不改 `spec/proposal-closeout.md` 的契约（C7「`fcntl` 独占锁，按 proposal 串行化」本次正是把它落实）。
 - 不改 `read_published` 单个读取、`capability-history.py`、journal 格式、结果状态集合。
 - 不改 CHANGELOG 与版本号（由模块协调整批统一改，更新说明记在 todo 末尾）。
+
+## 并行边界
+
+- 独占：`plugins/spec-guard/hooks/proposal_closeout.py`、`plugins/spec-guard/hooks/proposal_publication.py`、`plugins/spec-guard/hooks/test_proposal_closeout.py`、`plugins/spec-guard/hooks/test_proposal_publication.py`、`plugins/spec-guard/hooks/test_proposal_promotion_proof.py`、`plugins/spec-guard/references/proposal-closeout.md`、`plugins/spec-guard/references/proposal-publication.md`
 
 ## Success criteria
 
