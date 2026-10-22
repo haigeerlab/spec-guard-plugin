@@ -6,7 +6,7 @@
 - [x] Task 3：README 中英与取代说明、退役说明 — README 中英第 5～8 行改写上游描述，cost-report 说明列出实际读取项；`spec/install-by-scope.md` 第 5 条末尾加取代句；新增 `docs/retirements/dependency-check.md`；`check-readme-sync.py` 通过。
 - [x] Checkpoint 1（report）：三套核心回归 — 合入集成分支 `1016639` 之后在 HEAD 上并行跑：`validate.sh` 校验通过、phase-guard 438 例、verify-artifacts 74 例全绿；ShellCheck 随 `b3a19e8` 的全档提交跑过（无告警），之后没有再改 `.sh`。本 checkout 的 verify-artifacts 0 失败，警告里新增 `spec/fact-fixes.md`、`spec/install-by-scope.md` 批准后已修订两条（见最终验收）。
 - [x] Task 4：公共变更落地后合入并核对 — `module-crew sync` 合入 `1016639`（HEAD `246bd16b`）。parse_map 通过、151 个模块、无 `dependency-check`；能力图里 `dependency-check` 只剩本模块职责行与变更记录；三份归档与 `188febb4` 原文件 blob 相同，原路径已不存在；`module-insert` 行无 `spec skeleton`（只在变更记录里出现）；`install-by-scope` 依赖为 `scope-authorization`；interface.json `interface` 仍为 1.8，只改一行；阶段注入「模块 151 · … 已完成 141」；verify-artifacts 0 失败。Spec 修订并行边界与 C7 读法，末尾写变更记录。
-- [ ] Checkpoint 2（gate）：最终验收
+- [x] Checkpoint 2（gate）：最终验收
 
 ## 更新说明
 
