@@ -1,6 +1,6 @@
 # Spec: batch-insert-concurrency-hint
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved bf2c1f39e5db -->
 
 ## Objective
 
