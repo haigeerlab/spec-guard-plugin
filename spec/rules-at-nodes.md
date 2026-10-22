@@ -1,7 +1,5 @@
 # Spec: rules-at-nodes
 
-<!-- spec-guard: review approved 5c607355746c -->
-
 ## Objective
 
 约定块（`templates/claude-block-local.md` 7.5KB、`codex-block-local.md` 7.1KB）一次写进三十多条流程规则，每轮都在上下文里，
@@ -14,11 +12,15 @@ spec-guard，但挂到它的节点上——
    由阶段注入（`phase-guard.sh` → `module_stage.py`）在当前模块处于对应节点时附上那一节的原文。
 3. **补授权两句（D19）。** ①项目自己的规则比 spec-guard 默认授权更严时，以项目为准；②最终 gate 列出的「拟回告」须是可原样发送的
    完整文字，批准 gate 即同意按此发送（对外渠道同样），内容变了要重新给用户看。
+4. **交审小项对上游章节（用户 C105 追加）。** spec-guard 只管自己的五种交审（能力图审阅、Spec、Plan、中途 gate、最终验收）；
+   每个小项写明对应上游 agent-skills 的哪一节，上游没有的只作附加项往后加；另加一条规则：「新增或改动小项须说明对应的上游章节，
+   对应不上的只能追加」。原则：不偏离上游，只做扩展，冲突时上游优先；推荐照常给，不加任何强制审查。
 
 登记：2026-10-22 修复批次 12 个模块之一，经用户批准事项 C100 开模块会话；能力图依赖 `sibling-rules-out`（已合入，它删了检查点
 规则里的收件枢纽话术，并把「约定块瘦身与按节点注入、补授权两句」留给本模块）。后续 `quiet-injection`（D5：平时只给一行、到停点
 才全量）与 `batch-insert-concurrency-hint` 依赖本模块；`doc-chain` 会往最终验收那一节追加文档核验。
-依据：`docs/reports/2026-10-22-feature-inventory/decisions.md`（D3、D4、D19）；审查报告 F1、F4（`docs/reports/2026-10-22-multidimension-audit.md`）。
+依据：`docs/reports/2026-10-22-feature-inventory/decisions.md`（D3、D4、D19）；审查报告 F1、F4（`docs/reports/2026-10-22-multidimension-audit.md`）；
+用户批准事项 C105 追加的范围（经 spec-guard 插件负责人转来，用户逐条确认）。
 
 ## Assumptions
 
@@ -62,6 +64,14 @@ spec-guard，但挂到它的节点上——
 10. **只改说明文字与阶段注入，不改判定。** `review_state`、`next_gate`、`at_final_gate`、`gate_checkpoints` 与指纹算法一行不改；
     新增的只是「按节点取一节文字附上」。
 11. **CHANGELOG 与版本号不在本模块改**，由模块协调整批合完后统一改；更新说明记在 todo 末尾。
+12. **上游章节以本机装的 agent-skills 0.6.12 为准**（`skills/spec-driven-development/SKILL.md`、`skills/planning-and-task-breakdown/SKILL.md`、
+    `commands/build.toml`、`skills/incremental-implementation/SKILL.md`），对照表见 C7。用户给出的对应（目标↔Objective、做／不做↔Boundaries、
+    要你确认的假设↔Phase 1 ASSUMPTIONS、验收标准↔Success Criteria、附带的小决定↔Open Questions、Plan 的分几步与中途停下的地方↔任务列表与
+    Checkpoint）原样采用；其余小项是我按上游原文补的对应，上游确实没有的标「附加」，照现行规则保留（例如最终验收的文件表、依赖表与
+    Spec 原样差异，能力图审阅的文档建议）。请逐行确认 C7 的表。
+13. **只写说明，不加检查。** 对照表和那条规则写进共享检查点规则与 `node-rules.md`，回归只断言这些文字在；不让 `verify-artifacts` 或
+    阶段注入去检查交审消息是否带了上游章节名。小项名称不改（session-protocol 契约 v2.3 的名称照用）；契约里的名称若对不上上游，是改契约
+    去贴上游，不归本模块。「注意」「推荐理由」「批了会怎样」、标题行、复制块与编号规则是 session-protocol 的公共骨架，不进对照表。
 
 ## Contract
 
@@ -126,7 +136,7 @@ spec-guard，但挂到它的节点上——
   内容变了要重新给用户看（D19②）；批准后先 review-mark 记 Spec（如修订过）、再勾选这个 gate 与状态记录并一并提交；推送、开 PR 另按
   gate 写明的授权；验收获批后下一个模块已在能力图里且用户没说停，直接写它的 Spec 并交审，验收消息预告这一步并提示可先 `/compact`。
 
-每节只写规则本身，不写示例；体积按假设 8。
+每节的小项名后用括号写对应的上游章节（按 C7，例如「目标（上游 Objective）」，附加项写「（附加）」）；只写规则本身，不写示例；体积按假设 8。
 
 ### C3 阶段注入附停点规则（`hooks/module_stage.py`，`phase-guard.sh` 的 IDLE／MAP_ONLY 分支）
 
@@ -175,8 +185,41 @@ spec-guard，但挂到它的节点上——
   `describe()` 在串行最终验收时含「停点规则（最终验收）：」与「可以原样发送的完整文字」，角色视图（模块、协调）不含；BUILDING 途中不含。
 - `hooks/test-phase-guard.sh`：`IDLE` 输出含「停点规则（能力图审阅）：」、`MAP_ONLY` 含「停点规则（Spec 交审）：」；把 `node-rules.md`
   挪走后两者都不出、退出码 0、JSON 合法。
+- C7：`test_workflow_checkpoints.py` 新增用例，断言「交审要让用户看到内容」条含对照表里每个上游章节名（Objective、Boundaries、ASSUMPTIONS、
+  Success Criteria、Open Questions、Capability Map、Build order、Files likely touched、Risks and Mitigations、Checkpoint、Keeping the Spec Alive）
+  与那条规则（「对应上游的哪一节」「只能作为附加项追加」）；`node-rules.md` 的 Spec 交审一节含 Objective、Boundaries、ASSUMPTIONS、
+  Success Criteria、Open Questions，Plan 交审一节含 Checkpoint。
 - `test_ticket_entry.py`、`test_hosted_ticket_entry.py`：只断言 `ticket`、`hosted-ticket-workflow` 入口仍在模板里，预计不用改；
   断言失败再按 C1 的保留条目调整。
+
+### C7 交审小项与上游章节对照（`references/workflow-checkpoints.md`「交审要让用户看到内容」条，`node-rules.md` 各节）
+
+在「交审要让用户看到内容」条的五类小项之后加一张表与一条规则（`node-rules.md` 各节按 C2 在小项名后括注）：
+
+| 交审 | 小项 | 上游 agent-skills 章节 |
+|---|---|---|
+| 能力图审阅 | 拆成哪些模块 | `spec-driven-development` Phase 0 的 Capability Map 模块表（Module id、Responsibility、Depends on） |
+| 能力图审阅 | 先后顺序 | Capability Map 的 Build order |
+| 能力图审阅 | 文档建议 | 附加 |
+| Spec | 目标 | Objective |
+| Spec | 做／不做 | Boundaries |
+| Spec | 要你确认的假设 | Phase 1 的 ASSUMPTIONS |
+| Spec | 验收标准 | Success Criteria |
+| Spec | 附带的小决定 | Open Questions |
+| Plan | 分几步 | `planning-and-task-breakdown` 的 Task List（Step 4 Write Tasks：Acceptance criteria、Verification） |
+| Plan | 会改哪些文件 | 任务模板的 Files likely touched |
+| Plan | 风险 | Risks and Mitigations |
+| Plan | 中途会停下来问你的地方 | Step 5 Order and Checkpoint 的 Checkpoint，及 `/build auto` 第 6 步要停下问用户的情形 |
+| 中途 gate | 做到哪了 | Checkpoint 清单（测试通过、构建通过、主流程可用） |
+| 中途 gate | 为什么停在这 | Checkpoint 的 Review with human before proceeding，及 `/build auto` 第 6 步 |
+| 中途 gate | 接下来要做的那一步 | 附加 |
+| 最终验收 | 做了什么 | `/build auto` 第 7 步 Summarize（完成的任务、加的测试、做的提交、跳过或留给用户的） |
+| 最终验收 | 验收结果 | Success Criteria 逐条，及 `incremental-implementation` 的 Verification 清单 |
+| 最终验收 | 改了哪些文件 | 提交表对应第 7 步的 commits made；文件表、依赖表为附加 |
+| 最终验收 | Spec 中途改过吗 | Keeping the Spec Alive（决定或范围变了先改 Spec）；原样差异与一次批准为附加 |
+
+规则（紧跟表后）：「新增或改动交审小项时，写明它对应上游的哪一节；对应不上的只能作为附加项追加在已对应的小项之后，不替换、不改名
+已对应的小项。与上游冲突时以上游为准。」
 
 ## 对使用者的影响
 
@@ -216,14 +259,20 @@ python3 scripts/check-readme-sync.py
   「文档改动：无」、从模板删去兜底一句、把「单独一张表放在最前」放回模板，对应断言各自变红。
 - **AC7** `review_state`、`next_gate`、`at_final_gate`、`gate_checkpoints`、`spec-digest.py` 未改（`git diff` 不含这些函数体的改动）。
 - **AC8** C6 列出的回归改动与新增用例全绿；`scripts/validate.sh`、`test-phase-guard.sh`、`test-verify-artifacts.sh` 全绿。
+- **AC9** 共享检查点规则「交审要让用户看到内容」条有 C7 的对照表（五种交审的每个小项各一行，上游章节或「附加」）与「新增或改动交审小项时，
+  写明它对应上游的哪一节；对应不上的只能作为附加项追加」规则；`node-rules.md` 各节小项名后括注上游章节；小项名称本身不变（与现行
+  session-protocol v2.3 的名称逐字相同）。
+- **AC10** 没有新增任何检查：`verify-artifacts`、`module_stage.py` 不读、不判交审消息里的上游章节名（`git diff` 里没有这样的代码）。
 
 ## Boundaries
 
-- **会做**：C1～C6；todo 末尾记更新说明与「对使用者的影响」。
+- **会做**：C1～C7；todo 末尾记更新说明与「对使用者的影响」。
 - **先问再做**：停点注入要改 `phase-guard.sh` 的 IDLE／MAP_ONLY 以外的结构；体积目标压不到假设 8；发现别的条目归属拿不准（停点还是常驻）。
 - **不做**：D5 的平时只给一行、状态变了才全量（归 `quiet-injection`）；D6 上下文提示（归 `quiet-injection`）；文档核验接进最终验收（归 `doc-chain`）；
   拆成可选规则包（审查 G2，不在 D4 范围）；停点规则的英文版；改 `review_state` 等判定与指纹算法；改 `rules-in-context` 等已完成模块的 Spec；
-  改 decision-inbox、module-crew、session-protocol 仓库；改版本号与 CHANGELOG；重装或更新本机 spec-guard。
+  改 decision-inbox、module-crew、session-protocol 仓库；开工、公共变更、卡住选做法三种多会话模板与合批排法（归 module-crew）；
+  标题行、三行说明（注意、推荐理由、批了会怎样）、复制块、编号规则的公共骨架（归 session-protocol）；为贴上游改契约里的小项名称（归 session-protocol）；
+  为对照表加强制检查；改版本号与 CHANGELOG；重装或更新本机 spec-guard。
 
 ## 并行边界
 
@@ -239,3 +288,9 @@ python3 scripts/check-readme-sync.py
 - 独占清单里 `node-rules.md`、`test_stop_rules.py` 是新建文件；`scripts/validate.sh` 只加登记一行。`interface.json` 不改：停点规则是
   插件内部文件，不进接口；CHANGELOG、两份 `plugin.json`、`marketplace.json`、`.agent/state.json` 由模块协调统一改。
 - `quiet-injection`（在本模块之后）也改 `phase-guard.sh`、`module_stage.py`：它用本模块的 `stop_node` 判「到停点」。
+
+## 变更记录
+
+- 2026-10-22：Objective 加第 4 条、假设加 12～13、Contract 加 C7（交审小项与上游章节对照表与规则）、C2 各节括注上游章节、C6 加 C7 的回归、
+  加 AC9～AC10、Boundaries 补不做项。原因：用户追加范围，要求 spec-guard 的每个交审小项都能指出对应的上游 agent-skills 章节，
+  新增或改动小项须说明对应章节、对应不上的只能追加。来源：用户批准事项 C105（经 spec-guard 插件负责人转来、模块协调 sg-coord 转达）
