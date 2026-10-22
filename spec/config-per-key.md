@@ -1,5 +1,7 @@
 # Spec: config-per-key
 
+<!-- spec-guard: review approved bb9d7a7df926 -->
+
 ## Objective
 
 `.agent/config.json` 现在是「一处不对、整份作废」：`project_config.load` 只要发现一个未知键或一个非法取值，
