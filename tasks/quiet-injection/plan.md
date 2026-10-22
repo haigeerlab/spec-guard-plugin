@@ -1,5 +1,7 @@
 # Plan: quiet-injection
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/quiet-injection.md`](../../spec/quiet-injection.md)：2026-10-22 批准（事项 C140，未决问题 Q1 A、Q2 A、Q3 A：停在节点上讨论时
 进入那轮完整、之后一行；Claude 窗口按读数推算；已完成模块的能力图行不改）。
 
