@@ -1,8 +1,8 @@
 # Plan: rules-at-nodes
 
-依据 [`spec/rules-at-nodes.md`](../../spec/rules-at-nodes.md)（2026-10-22 批准，事项 C102，11 条前提认可）。Spec 的附带小决定按用户答复
-「D12 A」选 A（Spec 交审时这一项编号写作 D1，只有这一个可选项）：兜底一句写「停在 gate 前、交审前或要停下问用户前，先读停点规则里
-对应的一节」。
+依据 [`spec/rules-at-nodes.md`](../../spec/rules-at-nodes.md)：2026-10-22 批准（事项 C102，11 条前提认可，附带小决定 D12 选 A：兜底一句写
+「停在 gate 前、交审前或要停下问用户前，先读停点规则里对应的一节」）；同日按事项 C105 修订、经 C107 复审批准（前提 12、13 认可，
+C7 对照表里我补的各行全部认可）。C105 时交审的上一版 Plan 作废，本版加入 C7。
 
 分支 `rules-at-nodes`，worktree `.claude/worktrees/current-plugin-owner-aa5b98-crew/rules-at-nodes`，从集成分支 `crew/fix-batch` 开出。
 module-crew 模块会话：只本地提交，不推送、不开 PR；合并由模块协调按用户原话做。CHANGELOG 与版本号由模块协调整批合完后统一改，
@@ -23,6 +23,8 @@ module-crew 模块会话：只本地提交，不推送、不开 PR；合并由�
 - **本仓库 `AGENTS.md`** 用工作区脚本 `bash plugins/spec-guard/hooks/setup-convention.sh local --host=codex --replace --dry-run` 先预览、
   再 `--replace --accept-removals`，本地段原样保留；不跑已安装版插件。
 - **体积**用 `wc -c` 量，写进 todo。
+- **C7 对照表照 Spec 的表逐行抄进检查点规则**，上游章节名保持英文原文（Objective、Boundaries 等），回归按这些原文断言；不加任何读取或判定
+  上游章节名的代码（AC10）。
 
 ## Task List
 
@@ -43,6 +45,17 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
 
 - 验收：新用例先红（文件与句子还不存在）后绿；`test_workflow_checkpoints.py` 其余用例照旧绿。
 - 验证：`python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py`。
+
+### Task 1b：交审小项对上游章节（C7）
+
+1. 先写回归（红）：「交审要让用户看到内容」条含 Spec C7 表里每个上游章节名（Objective、Boundaries、ASSUMPTIONS、Success Criteria、
+   Open Questions、Capability Map、Build order、Files likely touched、Risks and Mitigations、Checkpoint、Keeping the Spec Alive）与规则短语
+   「对应上游的哪一节」「只能作为附加项追加」；`node-rules.md` 的 Spec 交审一节含 Objective、Boundaries、ASSUMPTIONS、Success Criteria、
+   Open Questions，Plan 交审一节含 Checkpoint；小项名称与现行一致（现有 `CARD_SECTIONS` 用例照旧绿）。
+2. 在检查点规则「交审要让用户看到内容」条五类小项之后加 C7 表与规则；`node-rules.md` 各节小项名后括注上游章节。
+
+- 验收：新用例先红后绿；AC9；`git diff` 里没有读取上游章节名的代码（AC10）。
+- 验证：`python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py`；`wc -c` 复核各节体积。
 
 ### Task 2：阶段注入附停点规则（C3 `module_stage.py`）
 
@@ -98,7 +111,7 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
 
 ### 最终验收（gate）
 
-按停点规则「最终验收」一节交审：做了什么、AC1～AC8 逐条证据、改动文件／提交／依赖表、Spec 中途改过吗；「拟回告：无」（需求来自用户本人）。
+按停点规则「最终验收」一节交审：做了什么、AC1～AC10 逐条证据、改动文件／提交／依赖表、Spec 中途改过吗；「拟回告：无」（需求来自用户本人）。
 不含推送与开 PR；合并由模块协调按用户原话做。
 
 ## 风险
@@ -107,7 +120,9 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
   后合入的一方 sync 时手工合并；本模块的 `phase-guard.sh` 改动只在四个 `emit` 文本末尾，冲突面小。
 - **`test_workflow_checkpoints.py` 对模板的断言很多（十几个用例）。** 逐个迁到 `node-rules.md`，改前列出全部受影响用例名记进 todo，防止
   漏迁导致某条规则既不在模板也没被断言。
-- **体积目标压不到。** 先按 C1 表写，超了再压措辞；仍超就停下问（Spec 边界「先问再做」）。
+- **体积目标压不到。** 先按 C1 表写，超了再压措辞；仍超就停下问（Spec 边界「先问再做」）。括注上游章节会让 Spec、Plan 两节变长，最先可能超。
+- **sync 会把交审中的 Spec 盖回集成分支版本。** 本模块 Spec 修订交审期间那次 sync 已发生过一次，已按交审内容恢复（2d901fa）。
+  之后 sync 前先核对：集成分支里的 Spec 若已是 C107 批准版就无事；不是就先停下问模块协调。
 - **一轮中途到达节点时注入看不到。** 兜底一句覆盖，前提 4 已批准；不在本模块另加机制。
 
 ## 中途会停下来问你的地方
