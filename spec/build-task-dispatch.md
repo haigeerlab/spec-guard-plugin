@@ -1,5 +1,7 @@
 # Spec: build-task-dispatch
 
+<!-- spec-guard: review approved aaa6331b3313 -->
+
 ## Objective
 
 agent-skills 的 `/build`（含 `/build auto`）按设计在主会话里直接实现每个 task，从不调用 Agent 工具。
