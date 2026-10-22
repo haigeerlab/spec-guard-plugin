@@ -1,6 +1,6 @@
 # Spec: scope-overlap-interface
 
-<!-- spec-guard: review approved a6698bc9cbb1 -->
+<!-- spec-guard: review approved 7b7eaec381e6 -->
 
 ## Objective
 
@@ -166,10 +166,9 @@ python3 scripts/check-interface.py
 
 ## 未决问题
 
-- **Q1：项目里进行中、就绪的模块缺并行边界时，要不要也进 `errors`。** A（推荐）：进，`source` 为 `project`；调用方能看到「这个模块没法比」，
-  不会把没报冲突当成没冲突。B：不进，和 `/map` 的 `conflicts` 一样静默跳过；输出更短，但开关关着的项目里大量老模块没有这一节时，
-  漏比无从察觉。
-- **Q2：要不要给人看的文本输出。** A（推荐）：不要，只出 JSON，人看 `/map`。B：加 `--format text`；多一套输出和回归，暂时没有使用方。
+- **Q1（已定 A）：项目里进行中、就绪的模块缺并行边界时也进 `errors`**，`source` 为 `project`；调用方能看到「这个模块没法比」，
+  不会把没报冲突当成没冲突。
+- **Q2（已定 A）：不加文本输出**，只出 JSON，人看 `/map`。
 
 ## Boundaries
 
@@ -181,11 +180,16 @@ python3 scripts/check-interface.py
 
 ## 并行边界
 
-- 独占：`spec/scope-overlap-interface.md`、`tasks/scope-overlap-interface/plan.md`、`tasks/scope-overlap-interface/todo.md`、`plugins/spec-guard/hooks/module_scope.py`、`plugins/spec-guard/hooks/test_module_scope.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/test_map_view.py`、`scripts/check-interface.py`、`scripts/test-checkers.sh`、`docs/design.md`
+- 独占：`spec/scope-overlap-interface.md`、`tasks/scope-overlap-interface/plan.md`、`tasks/scope-overlap-interface/todo.md`、`plugins/spec-guard/hooks/module_scope.py`、`plugins/spec-guard/hooks/test_module_scope.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/test_map_view.py`、`scripts/check-interface.py`、`scripts/test-checkers.sh`
 - 公共：全局配置
 
 ## 与在开模块的重叠
 
-- `quiet-injection` 独占了 `docs/design.md`。按用户原话：本模块只往里追加（C5 一段，不改已有行），后合入的一方先 `module-crew sync`。
-  这一处重叠是已知的，不用为它排先后。
+- `docs/design.md`：只追加（quiet-injection 独占）。不在本模块独占清单里；本模块只往里追加 C5 一段、不改已有行，后合入的一方先
+  `module-crew sync`。最终验收的越界检查会把它列为超出边界，属已知、已批准的例外。
 - `interface.json` 不在独占里：它是公共文件，C3 的内容经【公共变更请求】由 sg-coord 落地（「公共：全局配置」即指它）。
+
+## 变更记录
+
+- 2026-10-22：Spec 批准（C162）时用户定 Q1 A、Q2 A；`docs/design.md` 从并行边界的独占清单移出，改写为「只追加（quiet-injection 独占）」，
+  见「与在开模块的重叠」。来源：用户本人，经模块协调 sg-coord 转达（消息 #10385）。
