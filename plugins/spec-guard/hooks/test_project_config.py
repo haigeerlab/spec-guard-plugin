@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_config import load, module_concurrency, summary
+from project_config import STRUCTURAL, load, module_concurrency, summary
 
 SCRIPT = str(Path(__file__).with_name("project_config.py"))
 CLAUDE_BLOCK = ("<!-- BEGIN:agent-skills-convention -->\n%s<!-- END:agent-skills-convention -->\n")
@@ -76,21 +76,31 @@ class Load(unittest.TestCase):
                              ({"moduleConcurrency": value}, []), value)
         for value in (True, "ON", 1, "", None, "yes"):
             self.assertEqual(self.check({"version": 1, "artifactLanguage": "en", "moduleConcurrency": value}),
-                             ({}, ["moduleConcurrency-invalid"]), value)
+                             ({"artifactLanguage": "en"}, ["moduleConcurrency-invalid"]), value)
 
-    def test_invalid_documents_return_no_values(self):
-        cases = {
-            "unknown-key": {"version": 1, "artifactLanguage": "en", "extra": 1},
-            "version-invalid": {"version": 2, "artifactLanguage": "en"},
-        }
-        for problem, payload in cases.items():
-            values, problems = self.check(payload)
-            self.assertEqual(values, {}, problem)
-            self.assertIn(problem, problems)
+    def test_structural_problems_return_no_values(self):
+        """config-per-key: only a file that is unusable as a whole drops every value."""
+        self.assertEqual(self.check({"version": 2, "artifactLanguage": "en"}), ({}, ["version-invalid"]))
         self.assertEqual(self.check({"artifactLanguage": "en"}), ({}, ["version-invalid"]))
         self.assertEqual(self.check({"version": True}), ({}, ["version-invalid"]))
         self.assertEqual(self.check(raw="{not json"), ({}, ["not-json"]))
         self.assertEqual(self.check(raw="[1, 2]"), ({}, ["not-an-object"]))
+        self.assertEqual(set(STRUCTURAL), {"unreadable", "not-json", "not-an-object", "version-invalid"})
+
+    def test_unknown_key_drops_only_itself(self):
+        self.assertEqual(self.check({"version": 1, "artifactLanguage": "en", "extra": 1}),
+                         ({"artifactLanguage": "en"}, ["unknown-key"]))
+
+    def test_invalid_value_drops_only_its_key(self):
+        self.assertEqual(self.check({"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both",
+                                     "moduleConcurrency": "on"}),
+                         ({"artifactLanguage": "zh-CN", "moduleConcurrency": "on"}, ["reviewCadence-invalid"]))
+
+    def test_key_problems_in_a_fixed_order(self):
+        payload = {"version": 1, "moduleConcurrency": "yes", "b": 1, "artifactLanguage": "EN", "a": 2,
+                   "reviewCadence": "combined"}
+        self.assertEqual(self.check(payload), ({"reviewCadence": "combined"},
+                                               ["unknown-key", "artifactLanguage-invalid", "moduleConcurrency-invalid"]))
 
     def test_unusable_file_is_reported_not_absent(self):
         with Project() as project:
@@ -115,12 +125,15 @@ class ModuleConcurrency(unittest.TestCase):
     def test_only_a_valid_on_is_true(self):
         self.assertIs(self.value({"version": 1, "moduleConcurrency": "on"}), True)
         self.assertIs(self.value({"version": 1, "artifactLanguage": "zh-CN", "moduleConcurrency": "on"}), True)
+        # config-per-key: a problem with another key leaves the switch as it is.
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "on", "extra": 1}), True)
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "on", "reviewCadence": "both"}), True)
 
     def test_everything_else_is_false(self):
         self.assertIs(self.value(), False)
         self.assertIs(self.value({"version": 1}), False)
         self.assertIs(self.value({"version": 1, "moduleConcurrency": "off"}), False)
-        self.assertIs(self.value({"version": 1, "moduleConcurrency": "on", "extra": 1}), False)
+        self.assertIs(self.value({"version": 1, "moduleConcurrency": "yes", "artifactLanguage": "en"}), False)
         self.assertIs(self.value({"version": 2, "moduleConcurrency": "on"}), False)
         self.assertIs(self.value(raw="{broken"), False)
         with Project() as project:
@@ -154,6 +167,23 @@ class Summary(unittest.TestCase):
         self.assertEqual((items["moduleConcurrency"]["value"], items["moduleConcurrency"]["source"]),
                          ("on", ".agent/config.json"))
         self.assertEqual(items["moduleConcurrency"]["editWith"], "/spec-guard:config")
+
+    def test_invalid_key_falls_back_alone(self):
+        with Project({"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "extra": 1}) as project:
+            items = {item["key"]: item for item in summary(project.root)}
+        self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
+                         ("zh-CN", ".agent/config.json"))
+        self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),
+                         ("separate", "default (config invalid)"))
+        self.assertEqual((items["moduleConcurrency"]["value"], items["moduleConcurrency"]["source"]),
+                         ("off", "default"))
+
+    def test_structural_problem_marks_every_item(self):
+        with Project({"version": 2, "artifactLanguage": "zh-CN"}) as project:
+            items = {item["key"]: item for item in summary(project.root)}
+        for key in ("artifactLanguage", "reviewCadence", "moduleConcurrency"):
+            self.assertEqual(items[key]["source"], "default (config invalid)", key)
+        self.assertEqual(items["artifactLanguage"]["value"], "unset")
 
     def test_dispatch_without_any_block(self):
         with Project() as project:

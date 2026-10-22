@@ -30,6 +30,9 @@ VERSION = 1
 LANGUAGE_TAG = re.compile(r"[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?\Z")
 CADENCES = ("separate", "combined")
 CONCURRENCY = ("off", "on")
+# config-per-key: a file with one of these problems is unusable as a whole; every other problem
+# belongs to one key and leaves the rest of the file in effect.
+STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
 DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off"}
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
@@ -47,7 +50,7 @@ DISPATCH_MARKER = "<!-- spec-guard: build-task-dispatch -->"
 
 
 def load(root: Path) -> tuple[dict[str, Any], list[str]]:
-    """(values, problems).  Any problem empties `values`: a half-valid file is not applied."""
+    """(values, problems).  A STRUCTURAL problem empties `values`; any other problem drops only its key."""
     text, state = read_text(Path(root) / RELATIVE_PATH)
     if state == "absent":
         return {}, []
@@ -59,24 +62,23 @@ def load(root: Path) -> tuple[dict[str, Any], list[str]]:
         return {}, ["not-json"]
     if not isinstance(document, dict):
         return {}, ["not-an-object"]
-    problems = []
     version = document.get("version")
     if isinstance(version, bool) or version != VERSION:
-        problems.append("version-invalid")
-    if set(document) - {"version"} - set(VALIDATORS):
-        problems.append("unknown-key")
+        return {}, ["version-invalid"]
+    problems = ["unknown-key"] if set(document) - {"version"} - set(VALIDATORS) else []
+    values = {}
     for key, valid in VALIDATORS.items():
-        if key in document and not valid(document[key]):
-            problems.append(key + "-invalid")
-    if problems:
-        return {}, problems
-    return {key: document[key] for key in VALIDATORS if key in document}, []
+        if key in document:
+            if valid(document[key]):
+                values[key] = document[key]
+            else:
+                problems.append(key + "-invalid")
+    return values, problems
 
 
 def module_concurrency(root: Path) -> bool:
-    """module-concurrency-switch: the only reader of the switch.  Unset, `off` or an invalid file is off."""
-    values, problems = load(root)
-    return not problems and values.get("moduleConcurrency") == "on"
+    """module-concurrency-switch: the only reader of the switch.  Unset, `off`, an invalid value or file is off."""
+    return load(root)[0].get("moduleConcurrency") == "on"
 
 
 def _dispatch(root: Path) -> dict[str, str]:
@@ -111,8 +113,8 @@ def summary(root: Path) -> list[dict[str, Any]]:
     items.append({"key": "trackerDefault",
                   "value": tracker.backend if tracker.state == "configured" else tracker.state,
                   "source": ".agent/tracker.json", "editWith": OWNED_ELSEWHERE["trackerDefault"]})
-    if problems:
-        for item in items[:len(VALIDATORS)]:
+    for item in items[:len(VALIDATORS)]:
+        if (set(problems) & set(STRUCTURAL)) or item["key"] + "-invalid" in problems:
             item["source"] = "default (config invalid)"
     return items
 

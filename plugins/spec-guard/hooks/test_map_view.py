@@ -753,10 +753,20 @@ class ConcurrencyOff(unittest.TestCase):
             (project.root / ".agent").mkdir(exist_ok=True)
             config = project.root / ".agent" / "config.json"
             for body in ('{"version": 1, "moduleConcurrency": "off"}', '{"version": 1}',
-                         '{"version": 1, "moduleConcurrency": "on", "x": 1}', '{"version": 1, "moduleConcurrency": "yes"}'):
+                         '{"version": 2, "moduleConcurrency": "on"}', '{"version": 1, "moduleConcurrency": "yes"}'):
                 with self.subTest(body=body):
                     config.write_text(body, encoding="utf-8")
                     self.assertEqual(snapshot(project), plain)
+
+    def test_problem_with_another_key_keeps_the_switch_on(self):
+        """config-per-key: an unknown key drops only itself, so `on` still reads as `on`."""
+        with Project(CON_ROWS, CON_ORDER, CON_FILES) as project:
+            (project.root / ".agent").mkdir(exist_ok=True)
+            config = project.root / ".agent" / "config.json"
+            config.write_text('{"version": 1, "moduleConcurrency": "on"}', encoding="utf-8")
+            on = snapshot(project)
+            config.write_text('{"version": 1, "moduleConcurrency": "on", "x": 1}', encoding="utf-8")
+            self.assertEqual(snapshot(project), on)
 
     def test_off_keeps_the_fixed_key_sets(self):
         with Project(CON_ROWS, CON_ORDER, CON_FILES) as project:
