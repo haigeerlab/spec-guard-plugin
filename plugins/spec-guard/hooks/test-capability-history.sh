@@ -124,124 +124,41 @@ if python3 "$HISTORY" verify "$EVIDENCE" "$PROJECT" >/dev/null 2>&1; then VERIFY
 printf 'tampered plan\n' > "$PROJECT/tasks/history/a/$CHECKPOINT/payment-api/plan.md"
 expect_unverified "反：历史 plan 被篡改时校验失败" "$EVIDENCE" "$PROJECT"
 
-AUDIT="$TMP/audit.json"
-write_history "$AUDIT" "{\"schemaVersion\":1,\"initiatives\":[{\"id\":\"a\",\"title\":\"A\",\"events\":[{\"type\":\"created\",\"at\":\"legacy-now\",\"checkpoint\":{\"id\":\"$CHECKPOINT\",\"map\":{\"path\":\"spec/history/a/$CHECKPOINT/CAPABILITY-MAP.md\",\"sha256\":\"$MAP_SHA\"},\"modules\":[{\"id\":\"payment-api\",\"responsibility\":\"Guessed API\",\"dependsOn\":[\"other\"],\"status\":\"completed\",\"issue\":101,\"spec\":null,\"plan\":null}]}}]}]}"
-AUDIT_BEFORE="$(shasum -a 256 "$AUDIT" | awk '{print $1}')"
-python3 "$HISTORY" audit "$AUDIT" "$PROJECT" > "$TMP/audit-report.json" || exit 1
-AUDIT_AFTER="$(shasum -a 256 "$AUDIT" | awk '{print $1}')"
-if [ "$AUDIT_BEFORE" = "$AUDIT_AFTER" ] && python3 - "$TMP/audit-report.json" <<'PY'
-import json, sys
-report = json.load(open(sys.argv[1], encoding="utf-8"))
-assert report["readOnly"] is True
-codes = {item["code"] for item in report["findings"]}
-assert {"responsibility-mismatch", "dependency-mismatch", "status-unsupported", "timestamp-unverified"} <= codes
-PY
-then
-  ok "正：语义审计报告猜测字段且不改写账本"
-else
-  bad "正：语义审计报告猜测字段且不改写账本"
-fi
+# 能力历史只保留 verify 与迁移导入（决定 D16）：audit、correct 已去掉；已有账本里的补正记录照常校验。
+printf 'plan evidence\n' > "$PROJECT/tasks/history/a/$CHECKPOINT/payment-api/plan.md"
+AUDIT_SHA="$(printf '%064d' 0)"
+LEGACY="$TMP/legacy.json"
+write_history "$LEGACY" "{\"schemaVersion\":1,\"initiatives\":[{\"id\":\"a\",\"title\":\"A\",\"events\":[{\"type\":\"created\",\"at\":\"imported\",\"checkpoint\":{\"id\":\"$CHECKPOINT\",\"map\":{\"path\":\"spec/history/a/$CHECKPOINT/CAPABILITY-MAP.md\",\"sha256\":\"$MAP_SHA\"},\"modules\":[{\"id\":\"payment-api\",\"responsibility\":\"Guessed API\",\"dependsOn\":[\"other\"],\"status\":\"completed\",\"issue\":101,\"spec\":{\"path\":\"spec/history/a/$CHECKPOINT/payment-api.md\",\"sha256\":\"$SPEC_SHA\"},\"plan\":{\"path\":\"tasks/history/a/$CHECKPOINT/payment-api/plan.md\",\"sha256\":\"$PLAN_SHA\"}}]}},{\"type\":\"completed\",\"at\":\"now\",\"checkpoint\":{\"id\":\"$CHECKPOINT\",\"map\":{\"path\":\"spec/history/a/$CHECKPOINT/CAPABILITY-MAP.md\",\"sha256\":\"$MAP_SHA\"},\"modules\":[]}}]}],\"corrections\":[{\"type\":\"history-correction\",\"initiativeId\":\"a\",\"eventIndex\":0,\"checkpointId\":\"$CHECKPOINT\",\"moduleId\":\"payment-api\",\"field\":\"status\",\"before\":\"completed\",\"after\":\"unknown\",\"auditedAt\":\"2026-09-05T12:00:00Z\",\"auditReportSha256\":\"$AUDIT_SHA\",\"sources\":[{\"kind\":\"audit-finding\",\"code\":\"status-unsupported\"}]},{\"type\":\"history-correction\",\"initiativeId\":\"a\",\"eventIndex\":1,\"checkpointId\":\"$CHECKPOINT\",\"moduleId\":null,\"field\":\"event.at\",\"before\":\"now\",\"after\":\"unknown\",\"auditedAt\":\"2026-09-05T12:00:00Z\",\"auditReportSha256\":\"$AUDIT_SHA\",\"sources\":[{\"kind\":\"audit-finding\",\"code\":\"timestamp-unverified\"}]}]}"
+expect_valid "正：带补正记录、at 为 imported／now 的旧账本仍合法" "$LEGACY"
+expect_verified "正：带补正记录、at 为 imported／now 的旧账本 verify 通过" "$LEGACY" "$PROJECT"
 
-RESUMED_AUDIT="$TMP/resumed-audit.json"
-python3 - "$AUDIT" "$RESUMED_AUDIT" <<'PY'
-import copy, json, sys
-ledger = json.load(open(sys.argv[1], encoding="utf-8"))
-events = ledger["initiatives"][0]["events"]
-paused = copy.deepcopy(events[0])
-paused["type"] = "paused"
-paused["at"] = "legacy-paused"
-events.append(paused)
-events.append({"type": "resumed", "at": "legacy-resumed"})
-json.dump(ledger, open(sys.argv[2], "w", encoding="utf-8"))
-PY
-if python3 "$HISTORY" audit "$RESUMED_AUDIT" "$PROJECT" | python3 -c 'import json,sys; report=json.load(sys.stdin); assert any(item["eventIndex"] == 2 and item["field"] == "event.at" for item in report["findings"])'; then
-  ok "正：语义审计覆盖无 checkpoint 的 resumed 时间"
-else
-  bad "正：语义审计覆盖无 checkpoint 的 resumed 时间"
-fi
-
+LEGACY_BEFORE="$(shasum -a 256 "$LEGACY" | awk '{print $1}')"
 CORRECTION="$TMP/correction.json"
-AUDIT_REPORT_SHA="$(shasum -a 256 "$TMP/audit-report.json" | awk '{print $1}')"
-write_history "$CORRECTION" "{\"type\":\"history-correction\",\"initiativeId\":\"a\",\"eventIndex\":0,\"checkpointId\":\"$CHECKPOINT\",\"moduleId\":\"payment-api\",\"field\":\"status\",\"before\":\"completed\",\"after\":\"unknown\",\"auditedAt\":\"2026-09-05T12:00:00Z\",\"auditReportSha256\":\"$AUDIT_REPORT_SHA\",\"sources\":[{\"kind\":\"audit-finding\",\"code\":\"status-unsupported\"}]}"
-CORRECTION_BEFORE="$(shasum -a 256 "$AUDIT" | awk '{print $1}')"
-if python3 "$HISTORY" correct --confirm "$AUDIT" "$TMP/audit-report.json" "$CORRECTION" >/dev/null 2>&1 \
-  && python3 "$HISTORY" validate "$AUDIT" >/dev/null 2>&1 \
-  && python3 - "$AUDIT" <<'PY'
-import json, sys
-ledger = json.load(open(sys.argv[1], encoding="utf-8"))
-assert ledger["initiatives"][0]["events"][0]["checkpoint"]["modules"][0]["status"] == "completed"
-assert ledger["corrections"][0]["after"] == "unknown"
-PY
-then
-  ok "正：确认的修正只追加证据事件，不重写 checkpoint"
+write_history "$CORRECTION" '{"type":"history-correction"}'
+python3 "$HISTORY" audit "$LEGACY" "$PROJECT" >/dev/null 2>&1
+rc_audit=$?
+python3 "$HISTORY" correct --confirm "$LEGACY" "$TMP/audit-report.json" "$CORRECTION" >/dev/null 2>&1
+rc_correct=$?
+if [ "$rc_audit" -eq 2 ] && [ "$rc_correct" -eq 2 ] \
+  && [ "$LEGACY_BEFORE" = "$(shasum -a 256 "$LEGACY" | awk '{print $1}')" ]; then
+  ok "反：已去掉的 audit、correct 被拒绝且不改动账本"
 else
-  bad "正：确认的修正只追加证据事件，不重写 checkpoint"
+  bad "反：已去掉的 audit、correct 被拒绝且不改动账本（audit rc=${rc_audit}，correct rc=${rc_correct}）"
 fi
 
-if python3 "$HISTORY" audit "$AUDIT" "$PROJECT" | python3 -c '
-import json, sys
-report = json.load(sys.stdin)
-assert report["summary"]["findings"] == 4
-assert report["summary"]["correctedFindings"] == 1
-assert report["summary"]["unresolvedFindings"] == 3
-assert report["summary"]["unresolvedByCode"] == {
-    "dependency-mismatch": 1,
-    "responsibility-mismatch": 1,
-    "timestamp-unverified": 1,
-}
-status = next(item for item in report["findings"] if item["field"] == "status")
-assert status["resolution"] == "corrected"
-assert status["correctionIndex"] == 0
-responsibility = next(item for item in report["findings"] if item["field"] == "responsibility")
-assert responsibility["resolution"] == "unresolved"
-assert "correctionIndex" not in responsibility
-'
-then
-  ok "正：已追加的补正标记对应 finding，未解决 finding 保持可见"
-else
-  bad "正：已追加的补正标记对应 finding，未解决 finding 保持可见"
-fi
-
-DEPENDENCY_CORRECTION="$TMP/dependency-correction.json"
-write_history "$DEPENDENCY_CORRECTION" "{\"type\":\"history-correction\",\"initiativeId\":\"a\",\"eventIndex\":0,\"checkpointId\":\"$CHECKPOINT\",\"moduleId\":\"payment-api\",\"field\":\"dependsOn\",\"before\":[\"other\"],\"after\":[],\"auditedAt\":\"2026-09-05T12:00:00Z\",\"auditReportSha256\":\"$AUDIT_REPORT_SHA\",\"sources\":[{\"kind\":\"audit-finding\",\"code\":\"dependency-mismatch\"}]}"
-if python3 "$HISTORY" correct --confirm "$AUDIT" "$TMP/audit-report.json" "$DEPENDENCY_CORRECTION" >/dev/null 2>&1 \
-  && python3 "$HISTORY" audit "$AUDIT" "$PROJECT" | python3 -c '
-import json, sys
-report = json.load(sys.stdin)
-assert report["summary"]["correctedFindings"] == 2
-assert report["summary"]["unresolvedFindings"] == 2
-dependency = next(item for item in report["findings"] if item["field"] == "dependsOn")
-assert dependency["resolution"] == "corrected"
-assert dependency["correctionIndex"] == 1
-'
-then
-  ok "正：依赖数组补正按完整列表精确匹配"
-else
-  bad "正：依赖数组补正按完整列表精确匹配"
-fi
-CORRECTION_AFTER="$(shasum -a 256 "$AUDIT" | awk '{print $1}')"
-BAD_CORRECTION="$TMP/bad-correction.json"
-write_history "$BAD_CORRECTION" "{\"type\":\"history-correction\",\"initiativeId\":\"a\",\"eventIndex\":0,\"checkpointId\":\"$CHECKPOINT\",\"moduleId\":\"payment-api\",\"field\":\"status\",\"before\":\"completed\",\"after\":\"completed\",\"auditedAt\":\"2026-09-05T12:00:00Z\",\"auditReportSha256\":\"$AUDIT_REPORT_SHA\",\"sources\":[{\"kind\":\"audit-finding\",\"code\":\"status-unsupported\"}]}"
-if [ "$CORRECTION_BEFORE" != "$CORRECTION_AFTER" ] \
-  && ! python3 "$HISTORY" correct "$AUDIT" "$TMP/audit-report.json" "$BAD_CORRECTION" >/dev/null 2>&1 \
-  && ! python3 "$HISTORY" correct --confirm "$AUDIT" "$TMP/audit-report.json" "$BAD_CORRECTION" >/dev/null 2>&1 \
-  && [ "$CORRECTION_AFTER" = "$(shasum -a 256 "$AUDIT" | awk '{print $1}')" ]; then
-  ok "反：未确认或把 unknown 升级为完成的修正均不写入"
-else
-  bad "反：未确认或把 unknown 升级为完成的修正均不写入"
-fi
-INVALID_LEDGER="$TMP/invalid-correction-ledger.json"
-python3 - "$AUDIT" "$INVALID_LEDGER" <<'PY'
+for mutation in event-index upgrade-status; do
+  INVALID_LEDGER="$TMP/invalid-$mutation.json"
+  python3 - "$LEGACY" "$INVALID_LEDGER" "$mutation" <<'PY'
 import json, sys
 ledger = json.load(open(sys.argv[1], encoding="utf-8"))
-ledger["corrections"][0]["eventIndex"] = 99
+if sys.argv[3] == "event-index":
+    ledger["corrections"][0]["eventIndex"] = 99
+else:
+    ledger["corrections"][0]["after"] = "completed"
 json.dump(ledger, open(sys.argv[2], "w", encoding="utf-8"))
 PY
-if ! python3 "$HISTORY" validate "$INVALID_LEDGER" >/dev/null 2>&1; then
-  ok "反：补正引用不存在的事件时 schema 拒绝账本"
-else
-  bad "反：补正引用不存在的事件时 schema 拒绝账本"
-fi
+  expect_invalid "反：补正记录写坏（${mutation}）时 schema 拒绝账本" "$INVALID_LEDGER"
+done
 
 NEW_INIT="$TMP/new-initiative.json"
 write_history "$NEW_INIT" '{"id":"new","title":"New","startedAt":"2026-09-02T09:00:00Z","events":[{"type":"created","at":"2026-09-02T09:00:00Z","checkpoint":{"id":"20260902T090000Z-0001","map":{"path":"spec/history/new/20260902T090000Z-0001/CAPABILITY-MAP.md","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"modules":[]}}]}'
