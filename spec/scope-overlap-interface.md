@@ -1,5 +1,7 @@
 # Spec: scope-overlap-interface
 
+<!-- spec-guard: review approved a6698bc9cbb1 -->
+
 ## Objective
 
 module-crew 的协调会话批量审 Spec（review batch）前，要知道这几份 Spec 的并行边界和已开模块有没有独占重叠。它现在借用
