@@ -33,6 +33,9 @@ TICKED = re.compile(r"^`([^`]*)`$")
 SEPARATORS = re.compile(r"\s*[、,]\s*")
 BAD_PATH_CHARS = set("*?[]\\")
 SCOPES = ("exclusive", "own", "outside")  # interface.json scopeCheck.values.scope
+# interface.json scopeOverlap.values.error: ScopeError codes, then the overlap command's own.
+OVERLAP_ERRORS = ("no-boundary", "missing-exclusive", "bad-path", "bad-category", "duplicate-section", "unknown-line",
+                  "unreadable", "no-capability-map", "map-unreadable")
 
 
 class ScopeError(ValueError):
@@ -231,6 +234,94 @@ def validate(root: Path) -> list:
     return (["ok %d" % valid] if valid else []) + lines
 
 
+def _scope_or_error(text: str | None) -> Scope | str:
+    if text is None:
+        return "unreadable"
+    try:
+        scope = parse(text)
+    except ScopeError as error:
+        return error.code
+    return "no-boundary" if scope is None else scope
+
+
+def _read(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _project_specs(root: Path) -> tuple:
+    """(Build order, {module: Spec text or None}) for the modules /map reports in_progress or ready, or an error code."""
+    from map_view import Unreadable, build  # map_view imports this module at its top
+
+    if not (root / "spec" / "CAPABILITY-MAP.md").is_file():
+        return [], {}, "no-capability-map"
+    try:
+        data = build(root)
+    except (MapError, Unreadable, OSError, UnicodeError):
+        return [], {}, "map-unreadable"
+    order = [m["id"] for m in data["modules"]]
+    specs = {m["id"]: _read(root / "spec" / ("%s.md" % m["id"])) for m in data["modules"]
+             if m["status"] in ("in_progress", "ready") and (root / "spec" / ("%s.md" % m["id"])).is_file()}
+    return order, specs, None
+
+
+def overlaps(entries: list, order: list) -> dict:
+    """scope-overlap-interface: entries are (module, source, Spec text or None); every pair of usable boundaries is compared.
+
+    Modules in `order` (Build order) come first in that order, the rest keep their entry order.
+    """
+    rank = {module: index for index, module in enumerate(order)}
+    entries = sorted(enumerate(entries), key=lambda item: (item[1][0] not in rank, rank.get(item[1][0], 0), item[0]))
+    usable, errors = [], []
+    for _, (module, source, text) in entries:
+        scope = _scope_or_error(text)
+        if isinstance(scope, str):
+            errors.append({"module": module, "source": source, "error": scope})
+        else:
+            usable.append((module, source, scope))
+    conflicts = []
+    for index, (first, first_source, first_scope) in enumerate(usable):
+        for second, second_source, second_scope in usable[index + 1:]:
+            paths = overlap(first_scope, second_scope)
+            if paths:
+                conflicts.append({"modules": [first, second], "paths": paths,
+                                  "sources": {first: first_source, second: second_source}})
+    return {"conflicts": conflicts, "errors": errors}
+
+
+def _overlap_command(specs: list, project: str | None) -> int:
+    if not specs and project is None:
+        print("usage: give at least one --spec <module-id>=<file> or --project <root>")
+        return 2
+    given = {}
+    for item in specs:
+        module, sep, source = item.partition("=")
+        if not sep or not source:
+            print("spec-arg-invalid: --spec takes <module-id>=<file>")
+            return 2
+        if not MODULE_ID.fullmatch(module):
+            print("module-id-invalid: not a capability-map module id")
+            return 2
+        if module in given:
+            print("module-repeated: a module id is given twice")
+            return 2
+        given[module] = source
+    root = Path(project) if project is not None else None
+    if root is not None and not root.is_dir():
+        print("project-not-a-directory: --project is not a directory")
+        return 2
+    order, from_project, problem = _project_specs(root) if root is not None else ([], {}, None)
+    entries = [(module, "project", text) for module, text in from_project.items() if module not in given]
+    entries += [(module, source, _read(Path(source))) for module, source in given.items()]
+    result = overlaps(entries, order)
+    if problem:
+        result["errors"].insert(0, {"module": None, "source": "project", "error": problem})
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Concurrency boundary of module Specs (read-only).")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -241,7 +332,12 @@ def main() -> int:
     check.add_argument("--project", default=".")
     checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")
     checker.add_argument("--project", default=".")
+    pairs = commands.add_parser("overlap", help="exclusive-path overlaps between given Specs and, with --project, open modules")
+    pairs.add_argument("--spec", action="append", default=[])
+    pairs.add_argument("--project")
     args = parser.parse_args()
+    if args.command == "overlap":
+        return _overlap_command(args.spec, args.project)
     root = Path(args.project)
     if args.command == "validate":
         for line in validate(root):
