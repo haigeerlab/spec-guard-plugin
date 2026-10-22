@@ -494,7 +494,7 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("「变更记录」", "原因：", "来源：", "会话 ID", "不贴原文", "先写记录，再呈现", "记录行不写批准状态",
                        "不等于用户批准", "`add-module` 插入新模块", "登记"):
             self.assertIn(phrase, section)
-        for phrase in ("回告", "用得上", "发版之后", "合入主线之后", "「拟回告」", "批准最终 gate 即批准回告",
+        for phrase in ("回告", "用得上", "发版之后", "合入主线之后", "「拟回告」", "批准最终 gate 即同意按这段文字发送",
                        "会话 ID 找人", "提醒用户", "转告", "不为回告安装或配置通信插件", "`todo.md` 的最后一项",
                        "不写进 Spec", "不阻塞模块完成"):
             self.assertIn(phrase, section)
@@ -768,6 +768,96 @@ class SiblingRulesOutTests(unittest.TestCase):
     def test_convention_blocks_carry_no_hub_wording(self):
         for path in (self.plugin / "templates").glob("*-block-*.md"):
             self.assertNotIn("收件枢纽", path.read_text(encoding="utf-8"), path.name)
+
+
+class NodeRulesTests(unittest.TestCase):
+    """rules-at-nodes: the stop rules the phase hint attaches at each node, kept in step with the full contract."""
+    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收")
+    LIMITS = {"## 最终验收": 3200}
+    # What each section must say (Spec C2).
+    ELEMENTS = {
+        "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "先后顺序", "文档建议", "README", "确认框之前",
+                      "只给链接", "不算合并交审", "可复制代码块", "以所装协作插件的规定为准"),
+        "## Spec 交审": ("目标", "边界", "总是做", "先问", "不做", "要你确认的假设", "验收标准", "AC1、AC2", "未决问题", "确认框之前",
+                       "只给链接", "“注意：”", "“批了会怎样：”", "`pending`", "review-mark", "一次交审只放一个模块",
+                       "按模块分组", "delegate", "不算用户批准", "可复制代码块", "以所装协作插件的规定为准", "有才提"),
+        "## Plan 交审": ("架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "`gate`", "`report`", "推送与开 PR",
+                       "`combined`", "批 Plan 按范围授权", "项目自己的规则更严时，以项目为准", "只在这几类情况停下问用户",
+                       "测试改不红", "权限被拒", "同一模块、同一目标"),
+        "## 中途 gate": ("做到哪了", "为什么停在这", "接下来要做的那一步", "开头的五件事落在这几项里", "同一模块、同一目标",
+                       "“出了什么事：”", "不按默认推荐继续重试", "宿主确认", "去哪个会话"),
+        "## 最终验收": ("做了什么", "验收结果", "改了哪些文件", "Spec 中途改过吗", "按 AC 编号逐条给证据", "单独一张表放在最前",
+                      "文档改动：无", "本模块的提交", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面", "Spec 的改动差异",
+                      "同时批准修订后的 Spec", "先用 review-mark", "拟回告", "可以原样发送的完整文字", "对外渠道同样",
+                      "重新给用户看", "agent-relay", "截图", "先勾这个 gate", "直接写它的 Spec", "/compact"),
+    }
+    # Phrases each section shares word for word with workflow-checkpoints.md, so the summary cannot drift from the contract.
+    SHARED = {
+        "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "新插入的标「新」", "不算合并交审"),
+        "## Spec 交审": ("要你确认的假设", "逐条全列", "不为了短而删减", "“继续”不会被记为批准", "一次交审只放一个模块",
+                       "按模块分组", "可复制代码块", "没装只认当前对话里的明确批准"),
+        "## Plan 交审": ("中途会停下来问你的地方", "没有中途 `gate` 写“无，做完直接交", "只在这几类情况停下问用户",
+                       "删除工作区外的文件", "下载脚本直接执行", "测试改不红"),
+        "## 中途 gate": ("接下来要做的那一步", "开头的五件事落在这几项里", "不按默认推荐继续重试", "去哪个会话"),
+        "## 最终验收": ("单独一张表放在最前", "文档改动：无", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面",
+                      "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec"),
+    }
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.rules = (self.plugin / "references" / "node-rules.md").read_text(encoding="utf-8")
+        self.contract = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def section(self, title):
+        start = self.rules.index(title + "\n")
+        end = self.rules.find("\n## ", start + len(title))
+        return self.rules[start:] if end < 0 else self.rules[start:end]
+
+    def test_five_sections_in_order_and_the_contract_wins(self):
+        positions = [self.rules.index(title + "\n") for title in self.TITLES]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(self.rules.count("\n## "), len(self.TITLES))
+        self.assertIn("[共享检查点规则](workflow-checkpoints.md)", self.rules)
+        self.assertIn("以后者为准", self.rules)
+
+    def test_each_section_stays_small(self):
+        for title in self.TITLES:
+            with self.subTest(title=title):
+                self.assertLessEqual(len(self.section(title).encode("utf-8")), self.LIMITS.get(title, 2600))
+
+    def test_each_section_carries_its_rules(self):
+        for title, phrases in self.ELEMENTS.items():
+            text = self.section(title)
+            for phrase in phrases:
+                with self.subTest(title=title, phrase=phrase):
+                    self.assertIn(phrase, text)
+
+    def test_sections_share_their_wording_with_the_contract(self):
+        for title, phrases in self.SHARED.items():
+            text = self.section(title)
+            for phrase in phrases:
+                with self.subTest(title=title, phrase=phrase):
+                    self.assertIn(phrase, text)
+                    self.assertIn(phrase, self.contract)
+
+    def test_contract_points_at_the_stop_rules(self):
+        head = self.contract[:self.contract.index("1. 已完成的具体成果")]
+        self.assertIn("[停点规则](node-rules.md)", head)
+        self.assertIn("以本文件为准", head)
+
+    def test_plan_approval_yields_to_stricter_project_rules(self):
+        # D19 1: the project's own rules win when they are stricter.
+        tiers = self.contract[self.contract.index("## Plan 检查点分级"):self.contract.index("## 批准节奏")]
+        item = tiers[tiers.index("**批 Plan 按范围授权。**"):tiers.index("**最终验收列出实际改动的文件。**")]
+        self.assertIn("项目自己的规则（项目的 `CLAUDE.md`／`AGENTS.md`、项目约定）比这里更严时，以项目为准", item)
+
+    def test_the_planned_answer_is_the_full_text(self):
+        # D19 2: the final gate lists the exact words to send; approving the gate agrees to send them.
+        section = self.contract[self.contract.index("## 需求来源与回告"):self.contract.index("## 未了的承诺")]
+        for phrase in ("可以原样发送的完整文字", "不写概述", "同意按这段文字发送", "对外渠道（邮件、公开评论等）同样",
+                       "重新给用户看"):
+            self.assertIn(phrase, section)
+        self.assertNotIn("批准最终 gate 即批准回告，到了用得上的时刻按批准的内容发", section)
 
 
 class RequirementConfirmTests(unittest.TestCase):
