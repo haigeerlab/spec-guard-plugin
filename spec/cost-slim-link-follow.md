@@ -1,6 +1,6 @@
 # Spec: cost-slim-link-follow
 
-<!-- spec-guard: review approved 36d7fb49ea39 -->
+<!-- spec-guard: review approved 61b845f014f2 -->
 
 ## Objective
 
