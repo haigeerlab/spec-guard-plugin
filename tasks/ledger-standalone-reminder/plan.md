@@ -1,5 +1,7 @@
 # Plan: ledger-standalone-reminder
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/ledger-standalone-reminder.md`](../../spec/ledger-standalone-reminder.md)：2026-10-22 批准（事项 C187，未决问题 Q1 A、Q2 A：
 只启用账本时三处提醒都出；卸载只写文档步骤，不加移除命令；仓库根 `CLAUDE.md` 与 `docs/design.md` 的不变量措辞按 Spec 改）。
 

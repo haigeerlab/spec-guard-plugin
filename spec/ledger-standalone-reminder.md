@@ -1,5 +1,7 @@
 # Spec: ledger-standalone-reminder
 
+<!-- spec-guard: review approved dc4ca1558049 -->
+
 ## Objective
 
 本地事项账本是「通用的持久记事本」（D10），留在 spec-guard、不拆（D11）。但它的读回提醒现在挂在多模块约定上：`phase-guard.sh`
