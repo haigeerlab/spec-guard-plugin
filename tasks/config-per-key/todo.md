@@ -1,6 +1,6 @@
 # Todo: config-per-key
 
-- [ ] Task 0：提交已批准的 Plan 与 todo
+- [x] Task 0：提交已批准的 Plan 与 todo — 2026-10-22 用户批准 Plan（事项 C9），模块协调在集成分支 `f6e1e77` 记批准标记并提交；`module-crew sync` 合入本分支。
 - [ ] Task 1：`load` 逐键判定与读取方（先红后绿）
 - [ ] Task 2：`check`、`set`／`unset` 与 `show` 文本（先红后绿）
 - [ ] Task 3：阶段提示与 verify-artifacts（先红后绿）
