@@ -1,6 +1,6 @@
 # Plan: batch-insert-concurrency-hint
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/batch-insert-concurrency-hint.md`](../../spec/batch-insert-concurrency-hint.md)。本仓库评审节奏为分开审：Spec 已于 2026-10-22
 单独批准（用户批准事项 C139，Q1 选 A：看本会话可用技能判断 module-crew，不写探测脚本），本 Plan 单独交审。分支
