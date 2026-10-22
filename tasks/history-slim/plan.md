@@ -1,5 +1,7 @@
 # Plan: history-slim
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/history-slim.md`](../../spec/history-slim.md)（2026-10-22 批准，事项 C53）。Spec 的两个待确认项按用户答复定为：
 **D7 A**——audit 与 correct 都去掉（逐字确认）；**D8 A**——`event.at` 不做格式校验，契约写明不作为时间证据。
 
