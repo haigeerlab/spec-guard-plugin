@@ -17,12 +17,17 @@ spec-guard，但挂到它的节点上——
 4. **交审小项对上游章节（用户 C105 追加）。** spec-guard 只管自己的五种交审（能力图审阅、Spec、Plan、中途 gate、最终验收）；
    每个小项写明对应上游 agent-skills 的哪一节，上游没有的只作附加项往后加；另加一条规则：「新增或改动小项须说明对应的上游章节，
    对应不上的只能追加」。原则：不偏离上游，只做扩展，冲突时上游优先；推荐照常给，不加任何强制审查。
+5. **跟上 session-protocol v2.6（用户构建中追加，SG-a、SG-b）。** SG-a：复制块一块只答一件事、用最短说法，spec-guard 自己产物的条目编号
+   避开 C、D、T、R；在哪里答复照旧「以所装协作插件的规定为准」，不写回「去决策收件箱答」。SG-b：小项名贴上游——Spec 的「做／不做」写作
+   「边界」、「附带的小决定」写作「未决问题」，Plan 开头加「架构决定」、末尾加「未决问题」；第 4 条的对照表随之更新。`interface.json`
+   升 1.9，由模块协调经【公共变更请求】落地。
 
 登记：2026-10-22 修复批次 12 个模块之一，经用户批准事项 C100 开模块会话；能力图依赖 `sibling-rules-out`（已合入，它删了检查点
 规则里的收件枢纽话术，并把「约定块瘦身与按节点注入、补授权两句」留给本模块）。后续 `quiet-injection`（D5：平时只给一行、到停点
 才全量）与 `batch-insert-concurrency-hint` 依赖本模块；`doc-chain` 会往最终验收那一节追加文档核验。
 依据：`docs/reports/2026-10-22-feature-inventory/decisions.md`（D3、D4、D19）；审查报告 F1、F4（`docs/reports/2026-10-22-multidimension-audit.md`）；
-用户批准事项 C105 追加的范围（经 spec-guard 插件负责人转来，用户逐条确认）。
+用户批准事项 C105 追加的范围（经 spec-guard 插件负责人转来，用户逐条确认）；session-protocol v2.6
+（该仓 `spec/review-display-unify.md`，提交 ecdcb1c，用户已批）与用户 2026-10-22 构建中的追加（SG-a、SG-b，经模块协调转来）。
 
 ## Assumptions
 
@@ -74,6 +79,24 @@ spec-guard，但挂到它的节点上——
 13. **只写说明，不加检查。** 对照表和那条规则写进共享检查点规则与 `node-rules.md`，回归只断言这些文字在；不让 `verify-artifacts` 或
     阶段注入去检查交审消息是否带了上游章节名。小项名称不改（session-protocol 契约 v2.3 的名称照用）；契约里的名称若对不上上游，是改契约
     去贴上游，不归本模块。「注意」「推荐理由」「批了会怎样」、标题行、复制块与编号规则是 session-protocol 的公共骨架，不进对照表。
+    （第 14 条起：契约 v2.6 已把小项名改为贴上游，spec-guard 跟着用新名，见 C9。）
+14. **新名是现行写法，旧名照认。** 契约 v2.6 只增不改：「边界」与「做／不做」、「未决问题」与「附带的小决定」两种名字都是规范写法。
+    spec-guard 的规则、停点规则、命令说明从此只写新名，另用一句写明「旧名『做／不做』『附带的小决定』照认」；`interface.json` 的
+    `reviewKinds` 在 1.x 内只增不改名不删，所以 `spec` 的旧节名保留到 2.0，另加「旧名→新名」对照（C10）。
+15. **「边界」按上游写三档。** Spec 交审的「边界」写总是做、先问、不做三档（上游 Boundaries 是对 agent 的行为三档），范围外的事写在「不做」里；
+    并行开关 on 时的并行边界仍写在这一项。「未决问题」只放还没定、要用户回答的事，每个写清选项；没有就不写。原来放在「附带的小决定」里的
+    文档建议改成 Spec 交审的附加项，排在已对应的小项之后（按 C7 的规则，对应不上的只能追加），有才提。
+16. **Plan 六项。** Plan 交审依次写：架构决定（上游 Architecture Decisions）、分几步、会改哪些文件、风险、中途会停下来问你的地方、未决问题
+    （上游 Open Questions，没有就不写）。`combined` 节奏下写 Spec 的五项再接 Plan 的六项。中途 gate、最终验收的小项不变（上游没有模板）。
+17. **复制块按契约 v2.6 写（SG-a）。** 一块只答一件事：有交审号时写「<编号> <字母>」（如「C16 A」），待定问题接「；<待定编号> <字母>」
+    （如「C16 A；C16-1 B」）；几件事就几块；另一种选择单独一块，写好就能直接发；不出带占位符的块，要改就一句提示「要改就直接写哪里要改」；
+    推翻或重申已定决定的问题单独一块。没有交审号（在本会话里交审）时：只是批准写「批准」，只是选项写「A」，批准且有待定问题写「批准；Q1 A」，
+    本会话内的待定问题编为 Q1、Q2…。原规则里的例子「批准；D1 A」改成「批准；Q1 A」。在哪里答复、放不放复制块，照旧以所装协作插件的规定为准。
+18. **条目编号避开契约前缀。** spec-guard 自己的产物（Spec、Plan、todo、交审正文）里的条目编号不用 C、D、T、R 开头，写「改动 1」「S1」「Q1」这类；
+    验收标准的 `AC1` 不受影响（AC 不是这几个前缀之一）。本规则从本次修订起对新写的条目生效；本 Spec 已有的 C1～C7、D19①② 等编号是否改名见
+    「待定 1」。
+19. **`interface.json` 升 1.9 由模块协调落地。** 本模块把要改的 JSON 逐字写在 C10，构建时发【公共变更请求】，「文件」列 `plugins/spec-guard/interface.json`；
+    `scripts/check-interface.py` 不改（它只要求每个小项名在共享检查点规则里出现，新旧名都会出现）。`docs/design.md` 的接口版本说明补一行 1.9。
 
 ## Contract
 
@@ -122,12 +145,12 @@ spec-guard，但挂到它的节点上——
 
 - `## 能力图审阅`：在对话正文、确认框之前给出三项（拆成哪些模块、先后顺序、文档建议，README 一定表态）；需求先确认说完；一次看全
   所有模块不算合并交审；怎么批准（选项与后果、推荐理由、推荐答复放一个可复制代码块；协作插件另有规定以它为准）。
-- `## Spec 交审`：五项（目标；做／不做；要你确认的假设；验收标准按 AC1、AC2… 逐条全列；附带的小决定）＋「注意：」「批了会怎样：」；
-  文档建议有才提；交审要点写在本轮正文、确认框之前，只给链接不算；文件标 `pending`，批准后先 review-mark 再动手；一次只放一个模块，
+- `## Spec 交审`：五项（目标；边界，写总是做／先问／不做三档；要你确认的假设；验收标准按 AC1、AC2… 逐条全列；未决问题，只放还没定的）
+  ＋附加项文档建议（有才提）＋「注意：」「批了会怎样：」；交审要点写在本轮正文、确认框之前，只给链接不算；文件标 `pending`，批准后先 review-mark 再动手；一次只放一个模块，
   合并交审按模块分组；值得复核时可提议 delegate 只读审查（不算批准）；怎么批准（同上）；批准来源以所装协作插件的规定为准，没装只认
   当前对话里的明确批准。
-- `## Plan 交审`：四项（分几步；会改哪些文件；风险；中途会停下来问你的地方，列出 `gate` 并写明是否含推送与开 PR）＋「注意：」
-  「批了会怎样：」（连续执行到哪个 `gate`）；`combined` 节奏下先写 Spec 五项；批 Plan 即按范围授权的内容与「项目自己的规则更严时
+- `## Plan 交审`：六项（架构决定；分几步；会改哪些文件；风险；中途会停下来问你的地方，列出 `gate` 并写明是否含推送与开 PR；未决问题）
+  ＋「注意：」「批了会怎样：」（连续执行到哪个 `gate`）；`combined` 节奏下先写 Spec 五项；批 Plan 即按范围授权的内容与「项目自己的规则更严时
   以项目为准」（D19①）；只在哪几类情况停下问用户（现行清单原样列出）；交审呈现、标记、一次一个模块、怎么批准同 Spec 交审（各写一句）。
 - `## 中途 gate`：三项（做到哪了；为什么停在这；接下来要做的那一步）＋「注意：」「批了会怎样：」；开头五件事落在这三项里；
   只问用户的情形；同一模块、同一目标第二次过不去时停下给选项与代价（挂起并先开可开工模块、接受风险、换方案、一次列全所需权限），
@@ -204,14 +227,17 @@ spec-guard，但挂到它的节点上——
 | 能力图审阅 | 先后顺序 | Capability Map 的 Build order |
 | 能力图审阅 | 文档建议 | 附加 |
 | Spec | 目标 | Objective |
-| Spec | 做／不做 | Boundaries |
+| Spec | 边界（旧名做／不做） | Boundaries（总是做／先问／不做） |
 | Spec | 要你确认的假设 | Phase 1 的 ASSUMPTIONS |
 | Spec | 验收标准 | Success Criteria |
-| Spec | 附带的小决定 | Open Questions |
+| Spec | 未决问题（旧名附带的小决定） | Open Questions |
+| Spec | 文档建议 | 附加 |
+| Plan | 架构决定 | `planning-and-task-breakdown` Plan 模板的 Architecture Decisions |
 | Plan | 分几步 | `planning-and-task-breakdown` 的 Task List（Step 4 Write Tasks：Acceptance criteria、Verification） |
 | Plan | 会改哪些文件 | 任务模板的 Files likely touched |
 | Plan | 风险 | Risks and Mitigations |
 | Plan | 中途会停下来问你的地方 | Step 5 Order and Checkpoint 的 Checkpoint，及 `/build auto` 第 6 步要停下问用户的情形 |
+| Plan | 未决问题 | Plan 模板的 Open Questions |
 | 中途 gate | 做到哪了 | Checkpoint 清单（测试通过、构建通过、主流程可用） |
 | 中途 gate | 为什么停在这 | Checkpoint 的 Review with human before proceeding，及 `/build auto` 第 6 步 |
 | 中途 gate | 接下来要做的那一步 | 附加 |
@@ -223,6 +249,40 @@ spec-guard，但挂到它的节点上——
 规则（紧跟表后）：「新增或改动交审小项时，写明它对应上游的哪一节；对应不上的只能作为附加项追加在已对应的小项之后，不替换、不改名
 已对应的小项。与上游冲突时以上游为准。」
 
+### C8 复制块与条目编号（SG-a：`references/workflow-checkpoints.md`「交审时说明怎么批准」条，`commands/review-mark.md`、`skills/spec-guard-ops/SKILL.md` 同句，`node-rules.md` 各节）
+
+- 「交审时说明怎么批准」条里「最后把推荐答复放进一个独立的可复制代码块……有附带的小决定时合成一行（例如“批准；D1 A”），不要求用户复述一整句」
+  改为假设 17 的写法：一块只答一件事；有交审号写「<编号> <字母>」、待定问题接「；<待定编号> <字母>」；没有交审号写「批准」「A」「批准；Q1 A」，
+  本会话内的待定问题编为 Q1、Q2…；几件事就几块；另一种选择单独一块；不出占位块；推翻或重申已定决定的问题单独一块。其余句子（不带 shell
+  语言标签、不用行内代码、有代码块就是要用户回答、“继续”不会被记为批准、所装协作插件另有规定以它为准）不变。
+- 同一条后加一句编号规则（假设 18）：「spec-guard 产物里的条目编号不用 C、D、T、R 开头（这几个是 session-protocol 契约的编号前缀），写「改动 1」
+  「S1」「Q1」这类。」
+- `review-mark.md`、`SKILL.md` 的同句照改；`node-rules.md` 各交审节「怎么批准」一句照改。
+- 不写回「去决策收件箱答 #N」：在哪里答复仍是「批准来源与在哪里答复以所装协作插件的规定为准」（`sibling-rules-out` 留下的通用句不动）。
+
+### C9 小项名贴上游（SG-b：`references/workflow-checkpoints.md`「交审要让用户看到内容」条，`commands/review-mark.md`、`skills/spec-guard-ops/SKILL.md`、`node-rules.md`）
+
+- 「交审要让用户看到内容」条的 Spec 一行改为：「目标；边界（总是做、先问、不做三档，范围外的事写在“不做”里，开关 on 时含并行边界）；
+  要你确认的假设（含关键决策与取舍）；验收标准（按 AC1、AC2… 编号），逐条全列；未决问题（还没定、要用户回答的事，每个写清选项；没有就不写）；
+  之后是附加项文档建议（有才提）。」Plan 一行改为：「架构决定；分几步（……）；会改哪些文件（……）；风险；中途会停下来问你的地方（……）；
+  未决问题（没有就不写）。」`combined` 那句改为「Spec 的五项再接 Plan 的六项」。
+- 同一条后加一句：「旧名「做／不做」「附带的小决定」照认（session-protocol v2.6 两种名字都是规范写法），新写的交审用新名。」
+- `review-mark.md`、`SKILL.md` 列小项的句子照改为新名与 Plan 六项。
+- 中途 gate、最终验收、能力图审阅的小项不变。
+
+### C10 `interface.json` 升 1.9（公共文件，经【公共变更请求】落地）
+
+逐字改动（其余字段与 `reviewKinds.kinds` 的其他类别不变）：
+
+- `"interface": "1.8"` → `"interface": "1.9"`。
+- `reviewKinds.field`：「(values defined in contract v2.3 and unchanged through v2.5)」→「(values defined in contract v2.3 and unchanged through v2.6)」。
+- `reviewKinds.kinds.plan.sections` → `["架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "未决问题"]`。
+- `reviewKinds.kinds.spec-plan.sections` → `["目标", "做／不做", "要你确认的假设", "验收标准", "附带的小决定", "架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "未决问题"]`
+  （`spec` 的小项再接 `plan` 的小项，`check-interface.py` 照旧核对）。
+- `reviewKinds` 新增键 `"renamedSections"`：
+  `{"since": "1.9", "map": {"做／不做": "边界", "附带的小决定": "未决问题"}, "note": "session-protocol v2.6 upstream names; spec-guard writes the new names, both stay valid, the old names in kinds stay until 2.0"}`。
+- `reviewKinds.kinds.spec.sections` 不变（旧名保留到 2.0）。
+
 ## 对使用者的影响
 
 - **已装项目要重跑 `setup-convention --replace` 才变短。** 不重跑时旧的长约定块照旧有效：规则与停点注入重复，多占上下文，但不互相矛盾
@@ -232,6 +292,8 @@ spec-guard，但挂到它的节点上——
 - **新行为**：阶段提示到能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收时多出一段「停点规则（…）」；串行项目才有，
   并行开关下标了角色的 checkout 没有。
 - **拟回告变严**：最终验收要给可原样发送的全文，不再只列「内容要点」。
+- **交审写法跟上 session-protocol v2.6**：Spec 的「做／不做」「附带的小决定」写作「边界」「未决问题」，Plan 多「架构决定」「未决问题」两项，
+  复制块一块一件事；旧名照认，已写好的 Spec、Plan 不用改。接口升 1.9，读 `reviewKinds` 的插件多一个 `renamedSections` 可用。
 - 更新说明记在 todo 末尾，供模块协调整批写 CHANGELOG。
 
 ## Commands
@@ -265,20 +327,34 @@ python3 scripts/check-readme-sync.py
   写明它对应上游的哪一节；对应不上的只能作为附加项追加」规则；`node-rules.md` 各节小项名后括注上游章节；小项名称本身不变（与现行
   session-protocol v2.3 的名称逐字相同）。
 - **AC10** 没有新增任何检查：`verify-artifacts`、`module_stage.py` 不读、不判交审消息里的上游章节名（`git diff` 里没有这样的代码）。
+- **AC11** 复制块（SG-a）：检查点规则「交审时说明怎么批准」条与 `review-mark.md`、`SKILL.md` 含「一块只答一件事」「C16 A；C16-1 B」「批准；Q1 A」
+  「另一种选择单独一块」「推翻或重申」，不再含「批准；D1 A」；含编号规则「不用 C、D、T、R 开头」；仍含「以所装协作插件的规定为准」，
+  不含「去决策收件箱答」。
+- **AC12** 小项名（SG-b）：检查点规则、`node-rules.md`、`review-mark.md`、`SKILL.md` 的 Spec 小项写「边界」「未决问题」，Plan 小项依次是
+  架构决定、分几步、会改哪些文件、风险、中途会停下来问你的地方、未决问题；检查点规则有「旧名「做／不做」「附带的小决定」照认」一句；
+  C7 对照表含「架构决定」「未决问题」行。现有按卡片顺序的回归（`CARD_SECTIONS`）按新名更新后全绿。
+- **AC13** `interface.json`（经【公共变更请求】落地后核对）：`interface` 为 1.9，`plan`、`spec-plan` 的 sections 与 C10 逐字一致，
+  `renamedSections` 与 C10 一致，`spec` 的 sections 未变；`scripts/check-interface.py` 通过；`docs/design.md` 有 1.9 的一行。
+
+## 未决问题
+
+- **待定 1：本 Spec 已有编号要不要改名（假设 18）。** A（推荐）：不改。C1～C10、D19①② 等编号写于新规则之前，是已批准内容的一部分，改名会让
+  已批准的部分整段变动、差异难读；新规则只管今后新写的条目。B：改。C1～C10 改为「改动 1～10」，Assumptions 与 AC 里的引用一并改，
+  差异会很长。
 
 ## Boundaries
 
-- **会做**：C1～C7；todo 末尾记更新说明与「对使用者的影响」。
+- **会做**：C1～C10（C10 经【公共变更请求】由模块协调落地）；todo 末尾记更新说明与「对使用者的影响」。
 - **先问再做**：停点注入要改 `phase-guard.sh` 的 IDLE／MAP_ONLY 以外的结构；体积目标压不到假设 8；发现别的条目归属拿不准（停点还是常驻）。
 - **不做**：D5 的平时只给一行、状态变了才全量（归 `quiet-injection`）；D6 上下文提示（归 `quiet-injection`）；文档核验接进最终验收（归 `doc-chain`）；
   拆成可选规则包（审查 G2，不在 D4 范围）；停点规则的英文版；改 `review_state` 等判定与指纹算法；改 `rules-in-context` 等已完成模块的 Spec；
   改 decision-inbox、module-crew、session-protocol 仓库；开工、公共变更、卡住选做法三种多会话模板与合批排法（归 module-crew）；
-  标题行、三行说明（注意、推荐理由、批了会怎样）、复制块、编号规则的公共骨架（归 session-protocol）；为贴上游改契约里的小项名称（归 session-protocol）；
+  标题行、三行说明（注意、推荐理由、批了会怎样）、复制块、编号规则的公共骨架（归 session-protocol）；改契约本身（v2.6 已由 session-protocol 改好，本模块只跟进）；
   为对照表加强制检查；改版本号与 CHANGELOG；重装或更新本机 spec-guard。
 
 ## 并行边界
 
-- 独占：`spec/rules-at-nodes.md`、`tasks/rules-at-nodes/plan.md`、`tasks/rules-at-nodes/todo.md`、`plugins/spec-guard/templates/claude-block-local.md`、`plugins/spec-guard/templates/codex-block-local.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`scripts/validate.sh`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test_ticket_entry.py`、`plugins/spec-guard/hooks/test_hosted_ticket_entry.py`、`docs/convention-block.md`、`AGENTS.md`
+- 独占：`spec/rules-at-nodes.md`、`tasks/rules-at-nodes/plan.md`、`tasks/rules-at-nodes/todo.md`、`plugins/spec-guard/templates/claude-block-local.md`、`plugins/spec-guard/templates/codex-block-local.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`scripts/validate.sh`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test_ticket_entry.py`、`plugins/spec-guard/hooks/test_hosted_ticket_entry.py`、`docs/convention-block.md`、`AGENTS.md`、`plugins/spec-guard/commands/review-mark.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`docs/design.md`
 - 公共：无
 
 ## 与在开模块的重叠
@@ -287,8 +363,9 @@ python3 scripts/check-readme-sync.py
   四个分支末尾附停点规则；它只改「关联项目」四段）、`plugins/spec-guard/hooks/test-phase-guard.sh`（只加 C6 那几条断言）、
   `plugins/spec-guard/commands/setup-convention.md`（只加 C5 一句）、`docs/workflow.md`（只改 C5 那一段）、`README.md`、`README.en.md`
   （预计不改）。后合入的一方先 `module-crew sync`，冲突以集成分支为底手工合并。
-- 独占清单里 `node-rules.md`、`test_stop_rules.py` 是新建文件；`scripts/validate.sh` 只加登记一行。`interface.json` 不改：停点规则是
-  插件内部文件，不进接口；CHANGELOG、两份 `plugin.json`、`marketplace.json`、`.agent/state.json` 由模块协调统一改。
+- 独占清单里 `node-rules.md`、`test_stop_rules.py` 是新建文件；`scripts/validate.sh` 只加登记一行。`interface.json` 只按 C10 改小项名与版本
+  （经【公共变更请求】）；停点规则是插件内部文件，不进接口；CHANGELOG、两份 `plugin.json`、`marketplace.json`、`.agent/state.json` 由模块协调统一改。
+- `cost-slim-link-follow` 已于 2026-10-22 合入集成分支（6c03ea1），上面列的重叠文件本分支已 sync 到它之后的版本。
 - `quiet-injection`（在本模块之后）也改 `phase-guard.sh`、`module_stage.py`：它用本模块的 `stop_node` 判「到停点」。
 
 ## 变更记录
@@ -296,3 +373,7 @@ python3 scripts/check-readme-sync.py
 - 2026-10-22：Objective 加第 4 条、假设加 12～13、Contract 加 C7（交审小项与上游章节对照表与规则）、C2 各节括注上游章节、C6 加 C7 的回归、
   加 AC9～AC10、Boundaries 补不做项。原因：用户追加范围，要求 spec-guard 的每个交审小项都能指出对应的上游 agent-skills 章节，
   新增或改动小项须说明对应章节、对应不上的只能追加。来源：用户批准事项 C105（经 spec-guard 插件负责人转来、模块协调 sg-coord 转达）
+- 2026-10-22：Objective 加第 5 条、假设加 14～19、Contract 加 C8（复制块与条目编号）、C9（小项名贴上游）、C10（`interface.json` 升 1.9）、
+  C2 的 Spec 与 Plan 两节改新小项名、C7 表更新（边界、未决问题、文档建议附加、Plan 的架构决定与未决问题）、加 AC11～AC13、并行边界加
+  `review-mark.md`、`SKILL.md`、`docs/design.md`（`interface.json` 是公共文件，写在「与在开模块的重叠」一节）。原因：session-protocol v2.6 统一复制块写法与编号、小项名贴上游，
+  用户要求 spec-guard 跟进并并进本模块。来源：用户构建中追加 SG-a、SG-b（经 spec-guard 插件负责人转来、模块协调 sg-coord 转达，消息 #10344）
