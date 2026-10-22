@@ -1,6 +1,6 @@
 # Spec: map-startable
 
-<!-- spec-guard: review approved aaf275ac9776 -->
+<!-- spec-guard: review approved 98eb98fae8a8 -->
 
 ## Objective
 

@@ -9,4 +9,5 @@
 - [x] Checkpoint 2（gate）：模块验收 — 2026-10-18 在对话正文列出：实际改动 9 个文件（+400/-29；`capability_map.py` 与其测试经复审后加入影响面）、演示项目开关为 on 时的表格与 JSON 原文、整份比对结果（16 组与本仓库真实能力图均逐字节相同）、验证结果、期间改正的测试期望、未验证项（module-crew 实际读取、已安装副本）。用户验收通过；回告 module-crew 实现与修订后的定稿一致；不推送、不开 PR，进入 checkout-role。
 - [x] Task 5：返工——推出来的当前模块在开关 on 时算就绪（先红） — `test_map_view.py` 改 `test_startable_lists_every_ready_module_in_build_order` 的期望（d 列入），新增 `test_named_active_module_stays_in_progress`、`test_inferred_current_module_keeps_active_module_field`、`test_off_keeps_the_inferred_current_module_in_progress`；先红 2 例；`map_view.py` 用 `project_stage` 返回的来源判断，只有 `activeModule` 指定或开关不是 on 时才把当前模块算进行中，开关只读一次。map 76 例全绿；本仓库修复批次的集成分支只读核对：`startable` 由 4 个变为 5 个，`fact-fixes` 列在第一，`activeModule` 与 `stage` 不变。
 - [x] Task 6：发 0.83.2 — 两份 plugin.json 与 README 的 --ref 改为 0.83.2，CHANGELOG 加 0.83.2 一节；interface.json 升到 1.8（只改 startable 说明），design.md 补一段。
-- [ ] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 3（gate）：返工验收 — 2026-10-22 在对话正文列出实际改动 12 个文件（+74/−11）、提交 `11dfb2a`、验证结果、未验证项（重装后协调会话实测 start plan）与修订后 Spec 的差异原文。用户原话「批准这次返工验收，同时批准修订后的 map-startable Spec；推送并开 PR。」review-mark 记下 Spec 批准后勾选；合并由用户进行。回告：发版后告诉 module-crew 负责人与协调会话，结果记在下一项。
+- [ ] 回告：0.83.2 发版后告诉 module-crew 负责人（接口 1.8、startable 会列出推出来的当前模块）与协调会话（重装后跑 status 与 start plan），记下结果
