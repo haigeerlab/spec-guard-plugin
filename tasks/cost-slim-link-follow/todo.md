@@ -5,9 +5,9 @@
 - [ ] Task 2：派活规则退役（C2）
 - [ ] Task 3：跟随解析（C3）
 - [ ] Checkpoint 1（report）：变异核对
-- [ ] Task 4：Claude 命令入口（C4，不含 `config.md`）
+- [ ] Task 4：Claude 命令入口（C4，不含 `config.md`、`review-mark.md`）
 - [ ] Task 5：等 `sibling-rules-out` 合入后同步
-- [ ] Task 6：重叠文件与 Codex 入口（C4 `config.md`、C5）
+- [ ] Task 6：重叠文件与 Codex 入口（C4 `config.md`、`review-mark.md`、C5）
 - [ ] Task 7：阶段注入措辞（C6）
 - [ ] Task 8：文档（C7）
 - [ ] Task 9：公共文件实查（C8）
