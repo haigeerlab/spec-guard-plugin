@@ -506,6 +506,72 @@ def at_final_gate(root: Path, module: str) -> bool:
     return not any(index in open_gates for index in open_items[1:])
 
 
+# rules-at-nodes: the stop rules the phase hint attaches at a node, one `## ` section per node in this file.
+NODE_RULES = Path(__file__).resolve().parent.parent / "references" / "node-rules.md"
+NODE_TITLES = {"map-review": "能力图审阅", "spec-review": "Spec 交审", "plan-review": "Plan 交审",
+               "mid-gate": "中途 gate", "final-gate": "最终验收"}
+NODE_LABELS_EN = {"map-review": "capability map review", "spec-review": "Spec review", "plan-review": "Plan review",
+                  "mid-gate": "middle gate", "final-gate": "final acceptance"}
+
+
+def first_open_is_gate(root: Path, module: str) -> bool:
+    """True when the module's first unchecked item is a `gate` checkpoint (the same criterion as `at_final_gate`)."""
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    open_gates = {index for index, _, checked in gate_checkpoints(text) if not checked}
+    open_items = [index for index, line in enumerate(text.splitlines()) if OPEN_ITEM.match(line)]
+    return bool(open_items) and open_items[0] in open_gates
+
+
+def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review: str) -> str | None:
+    """The node the current module is at: map-review, spec-review, plan-review, mid-gate, final-gate, or None.
+
+    Only existing facts are combined (review states, `at_final_gate`); when two apply the later one in that list wins.
+    A Spec waiting for review holds the Plan back unless the project reviews both at once.  map-review is
+    answered by phase-guard.sh itself (no capability map yet).
+    """
+    kind = None
+    final = stage == "BUILDING" and at_final_gate(root, module)
+    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final):
+        kind = "spec-review"
+    spec_waits = kind == "spec-review" and load_config(root)[0].get("reviewCadence") != "combined"
+    if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
+        kind = "plan-review"
+    if final:
+        kind = "final-gate"
+    elif stage == "BUILDING" and kind is None and first_open_is_gate(root, module):
+        kind = "mid-gate"
+    return kind
+
+
+def node_rules(kind: str) -> str:
+    """The `## ` section of node-rules.md for a node kind, up to the next section; "" when it cannot be had."""
+    title = NODE_TITLES.get(kind)
+    if title is None:
+        return ""
+    try:
+        text = NODE_RULES.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    head = "## %s\n" % title
+    start = text.find(head) if text.startswith(head) else text.find("\n" + head) + 1
+    if start <= 0 and not text.startswith(head):
+        return ""
+    end = text.find("\n## ", start + len(head))
+    return (text[start:] if end < 0 else text[start:end + 1]).strip() + "\n"
+
+
+def stop_rules_block(kind: str | None, zh: bool) -> str:
+    """The paragraph appended after the suggested next step at a node; empty when there is none to attach."""
+    section = node_rules(kind) if kind else ""
+    if not section:
+        return ""
+    label = ("停点规则（%s）：" % NODE_TITLES[kind]) if zh else ("Stop rules (%s):" % NODE_LABELS_EN[kind])
+    return "\n\n%s\n\n%s" % (label, section.rstrip("\n"))
+
+
 def file_review_state(path: Path, kind: str) -> str:
     """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
     if not path.is_file():
@@ -949,13 +1015,16 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     if role_kind in ("module", "coordinator"):
         role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step, zh)
         notes = notes + role_lines
+    # rules-at-nodes: a serial project at a node gets that node's stop rules; role views follow the collaboration plugin.
+    stop = (stop_rules_block(stop_node(root, module, stage, spec_review, plan_review), zh)
+            if role_kind not in ("module", "coordinator") else "")
     if zh:
-        return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s"
+        return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s%s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,
-                   "".join(n + "\n" for n in notes), next_step))
+                   "".join(n + "\n" for n in notes), next_step, stop))
     return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
-            "\nSuggested next step: %s" % (stage, module, source, counts,
-                                          "".join(n + "\n" for n in notes), next_step))
+            "\nSuggested next step: %s%s" % (stage, module, source, counts,
+                                            "".join(n + "\n" for n in notes), next_step, stop))
 
 
 if __name__ == "__main__":
@@ -970,7 +1039,11 @@ if __name__ == "__main__":
     # here so they come from the one implementation.
     parser.add_argument("--config-lines", action="store_true")
     parser.add_argument("--hint-language", action="store_true")
+    parser.add_argument("--node-rules", metavar="KIND")  # rules-at-nodes: phase-guard.sh asks for IDLE / MAP_ONLY
     args = parser.parse_args()
+    if args.node_rules is not None:
+        sys.stdout.write(node_rules(args.node_rules))
+        raise SystemExit(0)
     if args.hint_language:
         print(hint_language(Path(args.root)))
         raise SystemExit(0)
