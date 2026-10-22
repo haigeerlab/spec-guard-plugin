@@ -148,3 +148,36 @@ Codex：见未决问题 Q1。
   本机今天的真实 rollout（截取注入记录、去掉无关内容）喂给新 hook 证明格式认得，真正在 Codex 里连续两轮的核对放到发版后由模块协调做，
   最终验收里写明这一条未在 Codex 真机上做。B：两个宿主都放到发版后核对，本模块只交回归与真实记录片段。C：允许为核对临时把本 worktree 装进本机
   Codex（改宿主插件配置，核对完恢复）。
+
+## 返工 1（2026-10-23）
+
+0.84.0 发版后发现（账本 0W0ZWWT）：Claude 记录里没有窗口，`phase-guard.sh:345-350` 在读数不超过 200k 时按 200k 估算，所以 1M 窗口的会话
+在 140k～200k 之间必然收到「模块边界、建议 /compact」，DONE 阶段每轮都重复。2026-10-23 协调会话（1M，应用显示 18%）在 164k、179k
+各收到一次。已核实：Claude 会话记录只带 `model`（如 `claude-opus-5-5`），没有窗口或 1M 标记，读不出窗口。
+
+用户原话（2026-10-23，经负责人会话转达）：「0W0ZWWT 并进 0.84.1：Claude 读不到窗口时不再按 200k 估算触发模块边界提醒（读不准就不报，
+或读数过 200k 才按 1M 判），加回归；交协调会话一起做。」
+
+这一条改的是 Spec 的 Q2 A 与 AC6，属于已批准 Spec 的修订：批准本返工 Plan 即批准下面的 Spec 修订，验收时附原样差异。
+代价（请一并确认）：Claude 200k 窗口的会话读数到不了 200k 以上，**从此在模块边界收不到释放上下文的提醒**（回到 quiet-injection 之前
+A-18、A-80 的状态，交给宿主自己管理）；1M 会话在 700k 起照旧提醒。Codex 记录自带 `model_context_window`，不变。
+
+### Task 8：Claude 估算窗口只认 1M（先红后绿）
+
+- `test-phase-guard.sh`：原「DONE 140k 按 200k 窗口估算出行」「恰好 200k 仍按 200k 窗口估算」两条改为不出边界行；新增 Claude 估算窗口、
+  读数 164k → 没有边界行；读数超过 200k（尾部有 250k）→ 按 1M 判：300k 不出、750k 出「按 1000 k 窗口估算」的行。
+  Codex 带 `model_context_window` 的现有用例不改、照过。先在旧代码上确认新用例变红。
+- `phase-guard.sh`：Claude 没有窗口时，只有尾部有读数超过 200k 才设 `WINDOW=1000000` 与 `WINDOW_ESTIMATED`；否则不设窗口
+  （`module_stage.thresholds` 没有窗口就不出边界行，不用改）。改注释。
+- 变异核对：草稿副本里把 200k 那一支放回，新用例变红。
+- 验证：`verify-and-commit.sh` 全档。
+
+### Task 9：文档与 CHANGELOG
+
+- `spec/quiet-injection.md`：Q2 A 与 AC6 改为「尾部有读数超过 200k 时按 1M 估算（700k 起出边界行），否则不出边界行」；末尾写变更记录（用户原话）。
+- `docs/design.md:87`、`plugins/spec-guard/commands/phase.md:97` 删去「否则按 200k」的说法，写明 Claude 读不出窗口时不报。
+- CHANGELOG 0.84.1 段加一条修复（0.84.0 引入，来源 quiet-injection），写明 200k 会话不再有边界提醒。
+
+### Checkpoint 2（gate）：返工验收
+
+与 fact-fixes 返工 1 同一个分支、同一个 PR、同一次 0.84.1 发版；按模块分开交审（先 fact-fixes，再本模块）。推送与开 PR 由用户确认。

@@ -10,7 +10,7 @@
 - [x] Task 5：返工——预读超时算拿不准（先红后绿） — 本机 `brew install bash`（5.3.20，只在 `/opt/homebrew`）。实测 bash 5 超时返回 142 并保留已读部分，bash 3.2 返回 1 并丢掉。第 11 段加慢输入正反两例（7 万字节分两段、隔 1.5 秒，`slow_bash` 默认 `/bin/bash`）：未修代码上 bash 5 草稿副本红（正向无注入），`/bin/bash` 3.2 走「不挂住、输出合法」分支为绿；`phase-guard.sh` 记下 read 返回值，0 或 >128 设 RAW_MORE；修后两种 bash 都 503 例全过。变异核对（草稿副本删掉 >128 分支）：正向、反向各自变红——第一次核对发现反向的 python3 计数被正向那次污染，挪了清零位置后才真正生效。Spec 变更记录第 3 条。
 - [x] Task 6：返工——文档治理一节（EF4KWN4） — `docs/optional-features.md` 第 3 条「核验」补最终验收那一轮提示文档核验、核验按基线状态区分（用 CHANGELOG 0.84.0 doc-chain 的说法）；「不看 Git 历史推断文档状态」改为「不推断文档内容是否过期」。没有英文对照版。
 - [x] Task 7：返工——CHANGELOG 与版本号 0.84.1 — CHANGELOG 新开 0.84.1 段（修复写明 0.84.0 引入、来源 `b3a19e8`；文档一条）；两份 `plugin.json` 与中英 README 的 `--ref` 改为 0.84.1；interface 不变。bash 3.2 限制另记账。
-- [ ] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-23 呈现以前／现在对照、先红后绿（bash 5 与 3.2）、变异核对、全档校验、改动文件与提交表（062e8f8、3cdb9b3）、Spec 变更记录第 3 条的原样差异；用户回复「fact-fixes 返工验收也通过。两个都做完后一起推送开 PR」。Spec 批准标记已用 review-mark 更新。
 
 ## 更新说明
 
