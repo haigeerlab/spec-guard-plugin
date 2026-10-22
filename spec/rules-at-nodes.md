@@ -324,8 +324,7 @@ python3 scripts/check-readme-sync.py
 - **AC7** `review_state`、`next_gate`、`at_final_gate`、`gate_checkpoints`、`spec-digest.py` 未改（`git diff` 不含这些函数体的改动）。
 - **AC8** C6 列出的回归改动与新增用例全绿；`scripts/validate.sh`、`test-phase-guard.sh`、`test-verify-artifacts.sh` 全绿。
 - **AC9** 共享检查点规则「交审要让用户看到内容」条有 C7 的对照表（五种交审的每个小项各一行，上游章节或「附加」）与「新增或改动交审小项时，
-  写明它对应上游的哪一节；对应不上的只能作为附加项追加」规则；`node-rules.md` 各节小项名后括注上游章节；小项名称本身不变（与现行
-  session-protocol v2.3 的名称逐字相同）。
+  写明它对应上游的哪一节；对应不上的只能作为附加项追加」规则；`node-rules.md` 各节小项名后括注上游章节；小项名按 AC12。
 - **AC10** 没有新增任何检查：`verify-artifacts`、`module_stage.py` 不读、不判交审消息里的上游章节名（`git diff` 里没有这样的代码）。
 - **AC11** 复制块（SG-a）：检查点规则「交审时说明怎么批准」条与 `review-mark.md`、`SKILL.md` 含「一块只答一件事」「C16 A；C16-1 B」「批准；Q1 A」
   「另一种选择单独一块」「推翻或重申」，不再含「批准；D1 A」；含编号规则「不用 C、D、T、R 开头」；仍含「以所装协作插件的规定为准」，
@@ -377,3 +376,4 @@ python3 scripts/check-readme-sync.py
   C2 的 Spec 与 Plan 两节改新小项名、C7 表更新（边界、未决问题、文档建议附加、Plan 的架构决定与未决问题）、加 AC11～AC13、并行边界加
   `review-mark.md`、`SKILL.md`、`docs/design.md`（`interface.json` 是公共文件，写在「与在开模块的重叠」一节）。原因：session-protocol v2.6 统一复制块写法与编号、小项名贴上游，
   用户要求 spec-guard 跟进并并进本模块。来源：用户构建中追加 SG-a、SG-b（经 spec-guard 插件负责人转来、模块协调 sg-coord 转达，消息 #10344）
+- 2026-10-22：AC9「小项名称本身不变（与现行 session-protocol v2.3 的名称逐字相同）」改为「小项名按 AC12」。原因：SG-b 已改小项名，原句与 AC12 矛盾。来源：用户批准 C122 时的原话（经模块协调 sg-coord 转达，消息 #10346）
