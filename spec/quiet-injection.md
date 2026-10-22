@@ -140,8 +140,9 @@
 - **AC6**：Claude 记录尾部读数都不超过 200k 时按 200k 窗口推算（140k 起出边界行），有读数超过 200k 时按 1M（700k 起），边界行写明是估算。
 - **AC7**：产物语言不是 `zh-CN` 时，各阶段输出的阶段标题是 `Current stage:`，`hint-english-diff.sh` 的英文侧检查通过（除假设 11 的例外不含中日韩文字）；中文输出不变。
 - **AC8**：`project_link.py`、`codex-plugin-smoke.sh`、`module-namespace.sh` 认 `Current stage:`；`codex-plugin-smoke.sh` 的判决器自检通过。
-- **AC9**：真实宿主各跑一次（Claude Code 与 Codex 的临时消费者项目，`evals/codex-plugin-smoke.sh` 建的那种）：连续两轮发言，第一轮完整、第二轮一行；
-  记录手工核对的结果（会话记录里两次注入的原文片段）。
+- **AC9**：Claude Code 在临时消费者项目里用 `claude -p --plugin-dir <本 worktree 的插件>` 连续两轮发言，第一轮完整、第二轮一行，记录会话记录里
+  两次注入的原文片段；Codex 用本机真实 rollout 截取的注入记录喂给新 hook，证明格式认得；Codex 真机连续两轮的核对放到发版后由模块协调做，
+  最终验收写明这一条没在 Codex 真机上做。
 - **AC10**：`validate.sh`、`test-phase-guard.sh`、`test-verify-artifacts.sh` 全部通过；hook 输出仍是宿主接受的 JSON；不新增对 `jq` 的依赖。
 
 ## 未决问题
@@ -174,3 +175,9 @@
 - `ledger-standalone-reminder`（在本模块之后）改 `phase-guard.sh` 的账本读回提醒；`doc-chain`（在本模块之后）往最终验收的停点注入追加内容，
   会碰 `module_stage.py`。它们开工时本模块已合入，后开的一方先 `module-crew sync`。
 - `rules-at-nodes` 已合入集成分支，本分支从它之后切出；本模块不改它新增的 `node-rules.md` 与 `test_stop_rules.py`，只调用 `stop_node`。
+
+## 变更记录
+
+- 2026-10-22：AC9 由「Claude Code 与 Codex 真实宿主各连续两轮」改为「Claude 用 `claude -p --plugin-dir` 跑两轮；Codex 用真实 rollout 片段验证格式，
+  真机两轮放到发版后由模块协调做」。原因：本机两个宿主装的是已发布版，本 Spec 不许重装本机插件，Codex 没有不安装就加载工作区插件的办法。
+  来源：用户批准 Plan（事项 C145）时对 Plan 未决问题 Q1 选 A，并要求在此记一行（经模块协调 sg-coord 转达，消息 #10374）
