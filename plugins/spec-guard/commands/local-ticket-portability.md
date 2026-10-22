@@ -13,3 +13,11 @@ description: 只读核验或离线归档 Local 事项，明确指定目标后恢
 日志重绑定须先展示候选、来源证据、预览中的键核对结果和仓库身份限制，再取得
 针对该候选的明确确认；不可把 `journal-candidates` 的单个候选当作自动归属证明。
 绑定只在本机用户级目录写指针，不修改旧日志或远端；Git worktree 修复另行处理。
+
+脚本的 `--project` 传下面这条命令打印的路径（有项目指向时它跟随到被指向的项目，stderr 写明「本次操作的是被指向的项目」，
+回复用户时照原文转述；它退出 2 时照原文报告诊断，不要改用会话目录）：
+
+```bash
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+python3 -B "${CLAUDE_PLUGIN_ROOT}/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}"
+```

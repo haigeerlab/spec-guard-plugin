@@ -7,8 +7,12 @@ allowed-tools: Bash
 执行确定性安装脚本；它只支持本地文件式工作流，不会认证或访问远端 tracker。先预览：
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention.sh" $ARGUMENTS --dry-run
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "${CLAUDE_PLUGIN_ROOT}/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
+CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention.sh" $ARGUMENTS --dry-run
 ```
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 原样转述预览输出，并等待用户明确确认后，才去掉 `--dry-run` 再运行一次；用户参数里已有 `--dry-run` 时只预览。
 缺省模式为 `local`。`--replace` 仅替换已有受管声明块；已有声明块的标记重复、缺失或顺序错误时，脚本拒绝并

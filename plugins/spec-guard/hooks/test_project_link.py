@@ -485,5 +485,38 @@ class Follow(unittest.TestCase):
         self.assertEqual(self.follow(), (0, "%s\n" % self.dirs.session, ""))
 
 
+PLUGIN = Path(__file__).resolve().parent.parent
+SKILLS = ("spec-guard-ops", "ticket", "local-ticket-ledger-ops", "local-ticket-portability")
+# Task 4 of cost-slim-link-follow: these change after sibling-rules-out lands (Task 6 removes the exceptions).
+PENDING = {"commands/config.md", "commands/review-mark.md"} | {"skills/%s/SKILL.md" % name for name in SKILLS
+                                                               if name != "local-ticket-ledger-ops"}
+
+
+class EntryPointsFollow(unittest.TestCase):
+    """D18: every entry point except link-project takes its project from `follow`, with its own host's session id."""
+
+    def entries(self):
+        files = [path for path in sorted((PLUGIN / "commands").glob("*.md")) if path.name != "link-project.md"]
+        files += [PLUGIN / "skills" / name / "SKILL.md" for name in SKILLS]
+        return [path for path in files if str(path.relative_to(PLUGIN)) not in PENDING]
+
+    def test_every_entry_point_follows_with_its_hosts_session_id(self):
+        for path in self.entries():
+            text = path.read_text(encoding="utf-8")
+            claude = path.parent.name == "commands"
+            mine, other = (("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if claude
+                           else ("CODEX_THREAD_ID", "CLAUDE_CODE_SESSION_ID"))
+            self.assertIn('project_link.py" follow --from "$FROM" --session "${%s:-}"' % mine, text, path.name)
+            self.assertNotIn('--session "${%s' % other, text, path.name)
+            self.assertNotIn("--project .", text, path.name)
+            self.assertNotIn('PROJECT="${CLAUDE_PROJECT_DIR:-', text, path.name)
+            self.assertIn("本次操作的是被指向的项目", text, path.name)
+
+    def test_link_project_says_the_other_commands_follow(self):
+        text = (PLUGIN / "commands" / "link-project.md").read_text(encoding="utf-8")
+        self.assertNotIn("不会自动跟随", text)
+        self.assertIn("自动跟随", text)
+
+
 if __name__ == "__main__":
     unittest.main()
