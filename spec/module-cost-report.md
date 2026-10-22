@@ -213,3 +213,14 @@ scripts/validate.sh                                  -> 登记新测试
 
 Checkpoint 据此完成。派活省钱与否的结论记在 `spec/build-task-dispatch.md`。
 
+
+## 修订：D17 退役（2026-10-22，用户决定）
+
+功能盘点决定 D17 去掉派活实验相关部分，模块 `cost-slim-link-follow` 实现：
+
+- 去掉 C2 的派活次数、重派、收回、交回后主代理改动的文件数，以及 C4 的多模块对照；不再读编辑工具路径、`apply_patch` 文件名与工具
+  结果正文。
+- 子代理用量照旧计入发起它的 task；报错的 Agent 调用（只看 `is_error`）不计入，`subagents`／`subagents_unrecorded`／`coverage`
+  报子代理记录的覆盖。
+- 「无法统计的部分」去掉「交回后改」与「收回」两条，新增一条：在指向本项目的会话目录里运行的会话，记录存在那个目录名下，不计入。
+- 输出与命令描述改为「模块成本报告」。时间窗、去重、Codex 累计值求差、guardian 单列、收尾、价格与隐私口径不变。

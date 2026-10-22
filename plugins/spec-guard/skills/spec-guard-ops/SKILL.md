@@ -46,10 +46,13 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
-PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}")" || exit 2
 ```
 
-这段以退出码 2 停下时，按它给出的原因转述：那是定位失败，不代表插件未安装。
+这段以退出码 2 停下时，按它给出的原因转述：插件根目录定位失败不代表插件未安装；`follow` 报的是项目指向失效，不要改用会话目录重试。
+`$FROM` 是会话目录，`$PROJECT` 是要操作的项目：会话目录有指向（`.agent/spec-guard-link.json`）时 `follow` 跟随到被指向的项目，
+stderr 写明「本次操作的是被指向的项目」，回复用户时照原文转述这一句。下面各节的命令都用 `$PROJECT`。
 
 ## setup
 
@@ -59,9 +62,8 @@ PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local --host=codex --dry-run
 ```
 
-已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。用户要求把 `/build` 的 task 交给子代理执行时加 `--dispatch`（实验性：规则默认由主代理自己做，只派预计改动 3 个以上文件、验收明确的 task；派出后 wait_agent 一次等到完成、不短间隔轮询；省钱效果未证明，预览时说明）
-（默认关闭；开关存在块里，`--replace` 会保留已开启的状态，关闭须 `--no-dispatch`；转述预览中的
-`build-task-dispatch rule:` 行）。Codex 段写明 tier-guard 在 Codex 上只作建议。workspace-write 沙箱不允许写 `.git`，开启后主代理每次提交都要申请提权，预览时提醒用户。遗留 `.agent/state.json` 是历史记录，不得用
+已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时，`--replace` 会移除整段，预览单列一行
+`retired build-task-dispatch rule section will be removed`，不需要 `--accept-removals`，转述时不要省略。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
 
 ## teardown
@@ -173,7 +175,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
 行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency` 的生效值与来源，以及只在别处修改的
-`dispatch`（约定块标记，用 setup 的 `--dispatch`／`--no-dispatch`）和 `trackerDefault`（上一节）：
+`trackerDefault`（上一节）：
 
 ```bash
 python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
@@ -224,13 +226,14 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module
 不带 `--session` 的是目录级指向，对在这个目录里运行的每个会话生效。多个会话共用一个目录、各做不同项目时，各自按会话登记：
 给 `set`／`unset`／`show` 加 `--session "$CODEX_THREAD_ID"`（Claude 侧是 `"$CLAUDE_CODE_SESSION_ID"`；显式传入，命令不猜），
 登记只对这一个会话生效。钩子先用本会话的登记，其次目录级指向，都没有则静默；`Linked project` 行会说明是哪一种。
-`Linked project` 行里的项目不是本会话在做的项目时，忽略那段阶段提示并给本会话登记。这里 `$PROJECT` 是会话目录：
+有指向时本插件的其他命令（经 `follow`）与阶段注入都自动跟随它，输出写明操作的是被指向的项目；指向失效时命令停下并给出诊断。
+`Linked project` 行里的项目不是本会话在做的项目时，给本会话登记。这一节的命令操作的就是指向文件本身，用会话目录 `$FROM`、不经 `follow`：
 
 ```bash
-python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT"
-python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径>
-python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径> --confirm
-python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
+python3 -B "$ROOT/hooks/project_link.py" show --from "$FROM"
+python3 -B "$ROOT/hooks/project_link.py" set --from "$FROM" --project <项目路径>
+python3 -B "$ROOT/hooks/project_link.py" set --from "$FROM" --project <项目路径> --confirm
+python3 -B "$ROOT/hooks/project_link.py" unset --from "$FROM" --confirm
 ```
 
 `set`／`unset` 默认只预览，把预览给用户看过并确认后才加 `--confirm`；只写这一个文件，不动被指向的项目。路径可以是
@@ -238,8 +241,8 @@ python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
 项目不存在、那里没启用 spec-guard、会话目录自己已启用、项目就是会话目录、已有指向文件格式无效、解除时没有指向文件。
 指向失效时钩子每轮给一行诊断，用 `show` 看原因。
 
-**有指向时，本 skill 其他各节命令里的 `--project "$PROJECT"` 要换成被指向的项目路径**（`Linked project` 行给出的那个），
-它们不会自动跟随指向。在那个项目的阶段交接前，也可以手动运行 `SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR=<项目路径> bash
+**有指向时，本 skill 其他各节命令自动跟随它**：开头解析环境那段的 `follow` 已把 `$PROJECT` 换成被指向的项目，不用手动替换路径。
+在那个项目的阶段交接前，也可以手动运行 `SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$PROJECT" bash
 "$ROOT/hooks/phase-guard.sh" </dev/null` 读一次它的阶段。
 
 ## review-mark

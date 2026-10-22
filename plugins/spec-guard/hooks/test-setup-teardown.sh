@@ -35,6 +35,17 @@ snapshot() {  # 目录树与文件内容的指纹，用来证明“什么都没�
 
 markers() { grep -Ec "^[[:space:]]*($BEGIN|$END)[[:space:]]*$" "$1" || true; }
 
+# D17：派活规则段已退役。$1=文件 $2=END 标记 $3=规则模板：照旧版 setup --dispatch 的样子，把规则段插到块尾。
+add_retired_rule() { python3 - "$@" <<'PY'
+import sys
+path, end, rule = sys.argv[1:4]
+lines = [l for l in open(rule, encoding="utf-8").read().splitlines() if not l.startswith("<!-- spec-guard: retired")]
+text = open(path, encoding="utf-8").read()
+text = text.replace("\n" + end, "\n" + "\n".join(lines) + "\n\n" + end, 1)
+open(path, "w", encoding="utf-8").write(text)
+PY
+}
+
 # ── setup ──────────────────────────────────────────────
 project dry
 printf '# Mine\n' > "$P/CLAUDE.md"
@@ -374,7 +385,8 @@ ok "没有约定块时 --accept-removals 退出 2"
 project teardown-dispatch
 printf '# Mine\n' > "$P/CLAUDE.md"
 cp "$P/CLAUDE.md" "$WORK/dispatch-original"
-run setup-convention.sh local --dispatch
+run setup-convention.sh local
+add_retired_rule "$P/CLAUDE.md" "$END" "$TEMPLATES/claude-dispatch-rule.md"
 run teardown-convention.sh
 [ "$RC" -eq 0 ] && cmp -s "$P/CLAUDE.md" "$WORK/dispatch-original" || fail "只有派活规则段时 teardown 不需要接受，且逐字节还原
 $OUT"
@@ -406,44 +418,17 @@ grep -F 'MAP_ONLY' >/dev/null <<<"$(CLAUDE_PROJECT_DIR="$P" /bin/bash "$HOOKDIR/
   || fail "没有声明块时，仅凭 state.json 的 activeModule 应仍然激活"
 ok "仅凭 activeModule 激活，不依赖声明块"
 
-# ── build-task-dispatch 规则段模板 ──────────────────────
+# ── build-task-dispatch 规则段已退役（D17）──────────────
 DISPATCH_MARKER='<!-- spec-guard: build-task-dispatch -->'
+RETIRED_LINE='  • retired build-task-dispatch rule section will be removed'
 for host in claude codex; do
   tpl="$TEMPLATES/${host}-dispatch-rule.md"
-  [ -f "$tpl" ] || fail "缺少规则段模板 ${host}-dispatch-rule.md"
-  [ "$(head -n 1 "$tpl")" = "$DISPATCH_MARKER" ] || fail "${host} 规则段首行必须是开关标记"
-  [ "$(grep -Fxc "$DISPATCH_MARKER" "$tpl")" -eq 1 ] || fail "${host} 规则段的开关标记必须恰好出现一次"
-  for needle in 'Checkpoint' 'RED → GREEN' '<!-- tier-guard: tier=' 'failures=N' '不提交' '不勾选' '交回'; do
-    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
-  done
-  # 2026-10-05 验收：不等上一个 task 提交就派下一个；没装 tier-guard 时档位无统一依据。
-  grep -F '上一个 task 提交、勾选完再派下一个' "$tpl" >/dev/null || fail "${host} 规则段应要求上一个 task 提交、勾选完再派下一个"
-  # 交接内容与不派条件：todo 常只有一行，验收标准等在 plan.md 的任务块里；派活本身不省钱。
-  # 2026-10-05 tier-guard 对照实验：派活不减少主会话轮次，规格明确的小 task 派出去更贵，所以默认不派。
-  # 2026-10-06 ledgerlite 联调：只有「改多个文件、验收明确」的 task 派出去省钱；探索量小的 task 派了主会话轮次不降。
-  for needle in '默认由主代理自己做' '预计要改动 3 个以上文件、验收明确' '必要条件'; do
-    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
-  done
-  for needle in '完整任务块' 'plan.md' 'Architecture Decisions' '由主代理自己做、不派' '缺验收标准或验证步骤' 'L3' '不比你自己的模型便宜'; do
-    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少「${needle}」"
-  done
-  ! grep -F '写入该 task 原文' "$tpl" >/dev/null || fail "${host} 规则段不应只交 task 原文（todo 常只有一行）"
-  # 第二轮复验：提交被拦后主代理仍先派了下一个，事后才停掉。
-  grep -F '提交受阻时先解决提交或停下问人，不派下一个' "$tpl" >/dev/null || fail "${host} 规则段应写明提交受阻时不派下一个"
-  # 2026-10-05 联调：「L3 跨模块」漏了「取舍」，改 5 个文件但验收明确的 task 两次被判 L3 派给 opus，没有差价。
-  for needle in 'L1 机械、只读' 'L2 验收明确的实现，可以改多个文件' 'L3 需要跨模块取舍、有歧义、高风险或不可逆' '有 `tier-routing` 时以它为准'; do
-    grep -F -- "$needle" "$tpl" >/dev/null || fail "${host} 规则段缺少档位定义「${needle}」"
-  done
-  ok "${host} 规则段：首行标记，覆盖何时派、子代理四步不提交、tier-guard 标记与停止条件交回"
+  [ -f "$tpl" ] || fail "规则段模板 ${host}-dispatch-rule.md 应保留（只供识别旧声明块）"
+  grep -F 'retired' <<<"$(head -n 1 "$tpl")" >/dev/null || fail "${host} 规则段模板首行应注明已退役"
+  [ "$(grep -Fxc "$DISPATCH_MARKER" "$tpl")" -eq 1 ] || fail "${host} 规则段模板应仍含旧开关标记，供识别旧块"
 done
-grep -F 'Agent 工具' "$TEMPLATES/claude-dispatch-rule.md" >/dev/null || fail "claude 规则段应指明 Agent 工具"
-grep -F 'spawn_agent' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应指明 spawn_agent"
-grep -F '只作建议' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应写明 tier-guard 在 Codex 上只作建议"
-# 2026-10-06 联调：Codex 主代理每 10–40 秒 wait_agent 轮询一次，每次都是一轮主会话，吃掉了子代理的差价。
-grep -F '不要短间隔轮询' "$TEMPLATES/codex-dispatch-rule.md" >/dev/null || fail "codex 规则段应要求一次长等待、不要短间隔轮询"
-ok "规则段按宿主写明派活工具，Codex 段写明只作建议"
+ok "规则段模板保留且注明已退役"
 
-# ── setup-convention --dispatch / --no-dispatch（开关状态存在块里）──
 # $1=文件 $2=BEGIN $3=END：输出两条标记之间的正文（不含标记行）
 block_body() { awk -v b="$2" -v e="$3" '{s=$0; gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)} s==e{inb=0} inb{print} s==b{inb=1}' "$1"; }
 host_run() { run setup-convention.sh local ${HOSTARG:+"$HOSTARG"} "$@"; }
@@ -451,7 +436,7 @@ host_run() { run setup-convention.sh local ${HOSTARG:+"$HOSTARG"} "$@"; }
 block_is() { block_body "$P/$HT" "$HB" "$HE" > "$WORK/actual-body"; blank_lines_ok "$P/$HT" "$HB" "$HE" \
   && python3 -c 'import sys; t=lambda f: [l for l in open(f, encoding="utf-8").read().splitlines() if l.strip()]; sys.exit(t(sys.argv[1]) != t(sys.argv[2]))' \
      "$WORK/actual-body" "$1"; }
-# convention-block-blank-lines：$1=文件 $2=BEGIN $3=END。块标记、本地段标记与派活规则段注释前后各恰好一个空行
+# convention-block-blank-lines：$1=文件 $2=BEGIN $3=END。块标记与本地段标记前后各恰好一个空行
 # （文件开头与末尾除外；本地段只查外侧），标记前不留两个空行。
 blank_lines_ok() { python3 - "$@" <<'PY'
 import sys
@@ -484,73 +469,45 @@ for host in claude codex; do
     HB="$BEGIN"; HE="$END"; HT=CLAUDE.md; HOSTARG=""
   fi
   BASE="$TEMPLATES/${host}-block-local.md"; RULE="$TEMPLATES/${host}-dispatch-rule.md"
-  base_body="$WORK/${host}-base-body"; on_body="$WORK/${host}-on-body"
-  cat "$BASE" > "$base_body"; cat "$BASE" "$RULE" > "$on_body"
+  base_body="$WORK/${host}-base-body"
+  cat "$BASE" > "$base_body"
 
   project "${host}-dispatch-default"
   host_run
-  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：默认 setup 的块应与基础模板逐字相同
+  [ "$RC" -eq 0 ] && block_is "$base_body" && ! grep -F "$DISPATCH_MARKER" "$P/$HT" >/dev/null || fail "${host}：setup 的块应与基础模板逐字相同、不含派活标记
 $OUT"
-  ok "${host}：默认 setup 不含规则段，块与基础模板逐字相同"
+  ok "${host}：setup 不写规则段，块与基础模板逐字相同"
 
-  project "${host}-dispatch-on"
-  host_run --dispatch
-  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：--dispatch 应在基础模板之后接规则段
+  for flag in --dispatch --no-dispatch; do
+    project "${host}${flag}-retired"
+    before="$(snapshot)"
+    host_run "$flag"
+    [ "$RC" -eq 2 ] && [ "$(snapshot)" = "$before" ] && grep -F 'retired' >/dev/null <<<"$OUT" || fail "${host}：${flag} 应退出 2、说明已退役且不改文件
 $OUT"
-  ok "${host}：--dispatch 新建块＝基础模板＋规则段"
+  done
+  ok "${host}：--dispatch 与 --no-dispatch 都已退役，退出 2，不改文件"
 
+  project "${host}-dispatch-old-block"
+  host_run
+  add_retired_rule "$P/$HT" "$HE" "$RULE"
+  grep -Fx "$DISPATCH_MARKER" "$P/$HT" >/dev/null || fail "${host}：测试夹具应带旧规则段"
+  before="$(snapshot)"
+  host_run --replace --dry-run
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -Fx "$RETIRED_LINE" >/dev/null <<<"$OUT" \
+    && ! grep -F 'needs --accept-removals' >/dev/null <<<"$OUT" || fail "${host}：旧块带规则段时预览应单列退役行、不需要 --accept-removals
+$OUT"
   host_run --replace
-  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：开启的块 --replace 后应保持开启
+  [ "$RC" -eq 0 ] && block_is "$base_body" && grep -Fx "$RETIRED_LINE" >/dev/null <<<"$OUT" || fail "${host}：--replace 应移除旧规则段，块回到基础模板
 $OUT"
-  ok "${host}：开启的块 --replace 保持开启"
-
-  before="$(snapshot)"
-  host_run --dispatch --no-dispatch
-  [ "$RC" -eq 2 ] && [ "$(snapshot)" = "$before" ] || fail "${host}：--dispatch 与 --no-dispatch 同时给出应退出 2 且不改文件
-$OUT"
-  ok "${host}：--dispatch 与 --no-dispatch 互斥，退出 2，不改文件"
-
-  before="$(snapshot)"
-  host_run --no-dispatch
-  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -F -- 'only take effect together with --replace' >/dev/null <<<"$OUT" || fail "${host}：已有块且无 --replace 时开关不生效，应提示配合 --replace
-$OUT"
-  ok "${host}：已有块无 --replace 时开关不生效并提示"
-
-  before="$(snapshot)"
   host_run --replace --dry-run
-  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -Fx '  • build-task-dispatch rule: on (kept from existing block)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明沿用已有块的开启状态
+  ! grep -F "$RETIRED_LINE" >/dev/null <<<"$OUT" || fail "${host}：规则段移除后预览不应再有退役行
 $OUT"
-  host_run --replace --no-dispatch --dry-run
-  grep -Fx '  • build-task-dispatch rule: off (--no-dispatch)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明 --no-dispatch
-$OUT"
-  ok "${host}：预览写明规则段状态与来源，且不改文件"
+  ok "${host}：--replace 自动移除旧规则段，预览单列一行"
 
-  host_run --replace --no-dispatch
-  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：--replace --no-dispatch 后块应与基础模板逐字相同
-$OUT"
-  ok "${host}：--replace --no-dispatch 关闭，块回到基础模板"
-
-  host_run --replace --dry-run
-  grep -Fx '  • build-task-dispatch rule: off' >/dev/null <<<"$OUT" || fail "${host}：关闭的块预览应为 off
-$OUT"
-  host_run --replace --dispatch --dry-run
-  grep -Fx '  • build-task-dispatch rule: on (--dispatch)' >/dev/null <<<"$OUT" || fail "${host}：预览应写明 --dispatch
-$OUT"
-  host_run --replace --dispatch
-  [ "$RC" -eq 0 ] && block_is "$on_body" || fail "${host}：关闭的块 --replace --dispatch 应开启
-$OUT"
-  ok "${host}：关闭的块 --replace --dispatch 开启"
-
-  project "${host}-dispatch-fresh-dry"
-  before="$(snapshot)"
-  host_run --dispatch --dry-run
-  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && grep -Fx '  • build-task-dispatch rule: on (--dispatch)' >/dev/null <<<"$OUT" || fail "${host}：新项目 --dispatch --dry-run 应只预览开启状态
-$OUT"
-  ok "${host}：新项目 --dispatch --dry-run 只预览，不写文件"
-
-  # 标记行带缩进、文件是 CRLF 时，仍认作开启。
+  # 标记行带缩进、文件是 CRLF 时，仍认作旧规则段。
   project "${host}-dispatch-crlf"
-  host_run --dispatch
+  host_run
+  add_retired_rule "$P/$HT" "$HE" "$RULE"
   python3 - "$P/$HT" "$DISPATCH_MARKER" <<'PY'
 import sys
 from pathlib import Path
@@ -559,11 +516,11 @@ t = p.read_text(encoding="utf-8").replace(mark, "  " + mark + " ")
 p.write_bytes(t.replace("\n", "\r\n").encode("utf-8"))
 PY
   host_run --replace --dry-run
-  grep -Fx '  • build-task-dispatch rule: on (kept from existing block)' >/dev/null <<<"$OUT" || fail "${host}：CRLF 与缩进的标记行应仍认作开启
+  grep -Fx "$RETIRED_LINE" >/dev/null <<<"$OUT" || fail "${host}：CRLF 与缩进的标记行应仍认作旧规则段
 $OUT"
-  ok "${host}：CRLF 文件与带缩进的标记行仍认作开启"
+  ok "${host}：CRLF 文件与带缩进的标记行仍认作旧规则段"
 
-  # 正文里提到标记、或标记不在块内，都不算开启。
+  # 正文里提到标记、或标记不在块内，都不算旧规则段。
   project "${host}-dispatch-prose"
   host_run
   python3 - "$P/$HT" "$HE" "$DISPATCH_MARKER" <<'PY'
@@ -575,9 +532,9 @@ t = t.replace(end, "正文提到 `%s` 不算开启。\n%s" % (mark, end), 1) + "
 p.write_text(t, encoding="utf-8")
 PY
   host_run --replace --accept-removals
-  [ "$RC" -eq 0 ] && block_is "$base_body" || fail "${host}：块内行中提及或块外的标记不应算开启
+  [ "$RC" -eq 0 ] && block_is "$base_body" && ! grep -F "$RETIRED_LINE" >/dev/null <<<"$OUT" || fail "${host}：块内行中提及或块外的标记不应算旧规则段
 $OUT"
-  ok "${host}：块内正文提及或块外的标记不算开启"
+  ok "${host}：块内正文提及或块外的标记不算旧规则段"
 done
 
 # ── convention-block-blank-lines：标准空行写法、旧写法升级、本地段 ──
@@ -588,16 +545,15 @@ for host in claude codex; do
   else
     HB="$BEGIN"; HE="$END"; HT=CLAUDE.md; HOSTARG=""
   fi
-  for mode in off on; do
-    DARG=""; [ "$mode" = on ] && DARG=--dispatch
+  mode=off; {
     project "${host}-blank-${mode}-fresh"
-    host_run ${DARG:+"$DARG"}
+    host_run
     [ "$RC" -eq 0 ] && blank_lines_ok "$P/$HT" "$HB" "$HE" || fail "${host}/${mode}：新建文件里的块每条标记前后应各一个空行
 $(cat "$P/$HT")"
     cp "$P/$HT" "$WORK/${host}-${mode}-canonical"
     project "${host}-blank-${mode}-existing"
     printf '# Mine\n\ntext\n' > "$P/$HT"
-    host_run ${DARG:+"$DARG"}
+    host_run
     [ "$RC" -eq 0 ] && blank_lines_ok "$P/$HT" "$HB" "$HE" || fail "${host}/${mode}：追加到已有文件的块每条标记前后应各一个空行
 $(cat "$P/$HT")"
     ok "${host}/${mode}：新建块每条标记前后各一个空行"
@@ -637,7 +593,7 @@ $OUT"
     [ "$RC" -eq 0 ] && cmp -s "$P/$HT" "$WORK/canonical" || fail "${host}/${mode}：旧写法 --replace 后应与新建块逐字节相同
 $(diff "$WORK/canonical" "$P/$HT")"
     ok "${host}/${mode}：旧写法升级预览如实列出空行，写入后与新建块相同"
-  done
+  }
 
   # 本地段：旧写法紧贴着，--replace 后前后有空行、内部原样；内部已被格式化器补过空行时再替换不变。
   project "${host}-blank-local"

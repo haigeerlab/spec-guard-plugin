@@ -26,8 +26,15 @@ substituted `ROOT="${CLAUDE_PLUGIN_ROOT}"` — the Bash environment has no such 
 side-effect-free status operation:
 
 ```bash
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}")" || exit 2
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --project-dir "$PROJECT" --format json
 ```
+
+`follow` prints the project to operate on. When the session directory links to another project it follows the link and
+says so on stderr (`本次操作的是被指向的项目 …`); relay that sentence to the user verbatim. Exit 2 means the link is broken:
+report its diagnostic and do not retry against the session directory. In Claude Code pass `"$CLAUDE_CODE_SESSION_ID"` as
+`--session` instead.
 
 For a requested local data access check, run `storage-check --format json` through the same
 script. It reads only the effective `EPIQ_GLOBAL_DIR` directory metadata, never ticket content;
@@ -83,8 +90,10 @@ counts them, and when the count is above zero, back them up with the local-ticke
 archive.
 
 ```bash
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}")" || exit 2
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --project-dir "$PROJECT" --format json
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --project-dir "$PROJECT" --local-only \
   --confirm-initialize --user-name "<display name the user gave>" \
   --preferred-editor "<editor command the user gave>" --auto-sync "<true|false the user gave>" --format json
 # Omit each flag the machine already has; with all three set: initialize --local-only --confirm-initialize --format json

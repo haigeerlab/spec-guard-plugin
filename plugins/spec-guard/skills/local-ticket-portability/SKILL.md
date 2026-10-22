@@ -9,6 +9,17 @@ Use the current project's pinned Epiq runtime and the CLI in
 `hooks/local_ticket_portability.py`. Read `references/local-ticket-portability.md` for
 commands, outputs, and failure states before a restore or hosted handoff.
 
+Resolve the installed plugin root first (`ROOT`: in Codex, `spec-guard-ops`'s 解析环境 block; in Claude, the
+substituted `ROOT="${CLAUDE_PLUGIN_ROOT}"` — the Bash environment has no such variable). Pass as `--project` the path this prints (in Claude Code pass `"$CLAUDE_CODE_SESSION_ID"` as `--session` instead):
+
+```bash
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}"
+```
+
+When the session directory links to another project it follows the link and says so on stderr (`本次操作的是被指向的项目 …`);
+relay that sentence verbatim. Exit 2 means the link is broken: report its diagnostic, do not fall back to the session directory.
+
 Start with read-only `inventory`; `foreign` or `unknown` state worktree ownership is a stop,
 not an empty ledger. A valid archive preserves raw event and media bytes, including pending
 files. `verify --prove` uses disposable Git and Epiq state. It does not establish off-machine

@@ -15,14 +15,20 @@ allowed-tools: Bash
 `--dry-run` 预览。以下命令仅用于**原参数未含 `--dry-run`**的情况：
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS --dry-run
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "${CLAUDE_PLUGIN_ROOT}/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
+CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS --dry-run
 ```
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 预览失败时停止，不执行拆除。用户看过具体预览并明确确认后，才用相同的原参数
 去掉 `--dry-run` 执行一次，再原样转述脚本输出：
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "${CLAUDE_PLUGIN_ROOT}/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
+CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convention.sh" $ARGUMENTS
 ```
 
 ## 它做什么

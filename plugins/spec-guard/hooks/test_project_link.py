@@ -212,7 +212,9 @@ class Command(unittest.TestCase):
         code, out = self.run_cmd("set", "--project", str(self.dirs.project))
         self.assertEqual(code, 0, out)
         self.assertIn(note, out)
-        self.assertIn("do not link", out)
+        self.assertIn("follows it", out)                 # D18: commands follow the link too
+        self.assertIn("--session", out)                  # sharing sessions register their own entries
+        self.assertNotIn("do not link", out)
         code, out = self.run_cmd("set", "--project", str(self.dirs.project), "--confirm")
         self.assertEqual(code, 0, out)
         self.assertIn(note, out)
@@ -413,6 +415,104 @@ class Command(unittest.TestCase):
             done = subprocess.run(["/bin/bash", hook], stdin=subprocess.DEVNULL, capture_output=True, text=True,
                                   timeout=30, env=env)
             self.assertEqual(enabled(target), bool(done.stdout.strip()), name)
+
+
+class Follow(unittest.TestCase):
+    """D18: every command resolves its project through `follow`, the same resolution the phase hook uses."""
+
+    def setUp(self):
+        self.dirs = Dirs().__enter__()
+        self.addCleanup(self.dirs.__exit__)
+        (self.dirs.project / "CLAUDE.md").write_text(BLOCK, encoding="utf-8")
+        self.other = self.dirs.session.parent / "other project"
+        self.other.mkdir()
+        (self.other / "CLAUDE.md").write_text(BLOCK, encoding="utf-8")
+
+    def follow(self, *extra):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "follow", "--from", str(self.dirs.session), *extra],
+                              capture_output=True, text=True, timeout=30)
+        return done.returncode, done.stdout, done.stderr
+
+    def test_no_link_file_operates_on_the_session_directory_quietly(self):
+        self.assertEqual(self.follow(), (0, "%s\n" % self.dirs.session, ""))
+
+    def test_directory_link_is_followed_and_said_so(self):
+        self.dirs.link({"version": 1, "project": str(self.dirs.project)})
+        code, out, err = self.follow("--session", "s-1")
+        self.assertEqual((code, out), (0, "%s\n" % self.dirs.project))
+        self.assertIn("本次操作的是被指向的项目 `%s`" % self.dirs.project, err)
+        self.assertIn("目录级指向", err)
+        self.assertIn(str(self.dirs.session / LINK_PATH), err)
+
+    def test_this_sessions_entry_wins_over_the_directory_link(self):
+        self.dirs.link({"version": 2, "project": str(self.dirs.project), "sessions": {"s-1": str(self.other)}})
+        code, out, err = self.follow("--session", "s-1")
+        self.assertEqual((code, out), (0, "%s\n" % self.other))
+        self.assertIn("本会话的登记", err)
+        code, out, _ = self.follow("--session", "s-2")
+        self.assertEqual((code, out), (0, "%s\n" % self.dirs.project))
+        code, out, _ = self.follow("--session", "")        # host variable unset: directory level only
+        self.assertEqual((code, out), (0, "%s\n" % self.dirs.project))
+
+    def test_only_other_sessions_entries_operate_on_the_session_directory(self):
+        self.dirs.link({"version": 2, "sessions": {"s-9": str(self.other)}})
+        self.assertEqual(self.follow("--session", "s-1"), (0, "%s\n" % self.dirs.session, ""))
+
+    def test_broken_links_stop_instead_of_falling_back(self):
+        plain = self.dirs.session.parent / "plain"
+        plain.mkdir()
+        cases = {"not-enabled": ({"version": 1, "project": str(plain)}, "没有启用 spec-guard"),
+                 "missing": ({"version": 1, "project": str(plain / "gone")}, "不存在或不是目录"),
+                 "invalid": ("{not json", "格式无效")}
+        for name, (content, words) in cases.items():
+            self.dirs.link(content)
+            code, out, err = self.follow()
+            self.assertEqual((code, out), (2, ""), name)
+            self.assertIn(words, err, name)
+            self.assertIn("link-project", err, name)
+            self.assertNotIn("本次操作的是被指向的项目", err, name)
+
+    def test_broken_session_entry_says_it_is_this_sessions_entry(self):
+        self.dirs.link({"version": 2, "project": str(self.dirs.project),
+                        "sessions": {"s-1": str(self.dirs.session.parent / "gone")}})
+        code, out, err = self.follow("--session", "s-1")
+        self.assertEqual((code, out), (2, ""))
+        self.assertIn("本会话的登记", err)
+
+    def test_enabled_session_directory_is_not_followed(self):
+        (self.dirs.session / "CLAUDE.md").write_text(BLOCK, encoding="utf-8")
+        self.dirs.link({"version": 1, "project": str(self.dirs.project)})
+        self.assertEqual(self.follow(), (0, "%s\n" % self.dirs.session, ""))
+
+
+PLUGIN = Path(__file__).resolve().parent.parent
+SKILLS = ("spec-guard-ops", "ticket", "local-ticket-ledger-ops", "local-ticket-portability")
+
+
+class EntryPointsFollow(unittest.TestCase):
+    """D18: every entry point except link-project takes its project from `follow`, with its own host's session id."""
+
+    def entries(self):
+        files = [path for path in sorted((PLUGIN / "commands").glob("*.md")) if path.name != "link-project.md"]
+        files += [PLUGIN / "skills" / name / "SKILL.md" for name in SKILLS]
+        return files
+
+    def test_every_entry_point_follows_with_its_hosts_session_id(self):
+        for path in self.entries():
+            text = path.read_text(encoding="utf-8")
+            claude = path.parent.name == "commands"
+            mine, other = (("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if claude
+                           else ("CODEX_THREAD_ID", "CLAUDE_CODE_SESSION_ID"))
+            self.assertIn('project_link.py" follow --from "$FROM" --session "${%s:-}"' % mine, text, path.name)
+            self.assertNotIn('--session "${%s' % other, text, path.name)
+            self.assertNotIn("--project .", text, path.name)
+            self.assertNotIn('PROJECT="${CLAUDE_PROJECT_DIR:-', text, path.name)
+            self.assertIn("本次操作的是被指向的项目", text, path.name)
+
+    def test_link_project_says_the_other_commands_follow(self):
+        text = (PLUGIN / "commands" / "link-project.md").read_text(encoding="utf-8")
+        self.assertNotIn("不会自动跟随", text)
+        self.assertIn("自动跟随", text)
 
 
 if __name__ == "__main__":
