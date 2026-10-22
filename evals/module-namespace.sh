@@ -218,7 +218,7 @@ check_scaffold() {
   if ! python3 -c '
 import json, sys
 context = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
-assert "当前阶段: **NEEDS_PLAN**" in context
+assert "当前阶段: **NEEDS_PLAN**" in context or "Current stage: **NEEDS_PLAN**" in context
 ' <<< "$output"; then
     echo "  ❌ 有块脚手架未得到有效的 NEEDS_PLAN 阶段；评测无意义"
     return 1

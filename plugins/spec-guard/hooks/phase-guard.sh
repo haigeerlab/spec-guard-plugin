@@ -266,9 +266,22 @@ case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
 # 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
 WINDOW=""
 case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
-# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那两行。
-UNATTENDED=""
-case "$WINDOW" in *$'\n'unattended*) UNATTENDED=1 ;; esac
+# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那一行。
+# 第五行是宿主（codex 或空），第六行是 over-200k 或空（Claude 尾部有读数超过 200k，quiet-injection 按 1M 估算窗口），
+# 第七行是会话记录里最近一次 spec-guard 注入的状态码（quiet-injection；压缩之后、读不到或没有时为空）。
+UNATTENDED="" FACT_HOST="" OVER="" LAST=""
+REST="$WINDOW"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != unattended ] || UNATTENDED=1
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+FACT_HOST="${REST%%$'\n'*}"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != over-200k ] || OVER=1
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+LAST="${REST%%$'\n'*}"
+case "$LAST" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;; *) LAST="" ;; esac
+# 压缩后（SessionStart）总是给完整内容。
+[ "$EVENT" != SessionStart ] || LAST=""
 WINDOW="${WINDOW%%$'\n'*}"
 case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
@@ -279,15 +292,21 @@ LOCATION="${LOCATION%%$'\n'*}"
 case "${SPEC_GUARD_HOST:-}" in
   codex|claude) HOST="$SPEC_GUARD_HOST" ;;
   *)
-    case "$FACTS" in
-      *$'\n'codex) HOST=codex ;;
+    case "$FACT_HOST" in
+      codex) HOST=codex ;;
       *) if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude
          elif [ -n "${PLUGIN_ROOT:-}" ]; then HOST=codex
          else HOST=""; fi ;;
     esac ;;
 esac
+# quiet-injection（Q2 A）：Claude 的记录里没有窗口；有读数时按 200k 估算，尾部有读数超过 200k 就按 1M 估算，并在提示里写明是估算。
+WINDOW_ESTIMATED=""
+if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ]; then
+  WINDOW_ESTIMATED=1
+  if [ -n "$OVER" ]; then WINDOW=1000000; else WINDOW=200000; fi
+fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
-# 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
+# 位置行放在标题与阶段行（“当前阶段”／“Current stage”）之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
 [ -z "$LOCATION" ] || HEADER="${HEADER}
 
@@ -310,6 +329,10 @@ elif [ -n "$LINKED" ]; then
 
 Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. spec-guard commands follow it automatically. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and register this session's own project with \`link-project\`."
 fi
+
+# quiet-injection（D5）：状态码里本 hook 自己掌握的事实——位置行与跟随指向的项目；其余由 module_stage.py 算。
+STATE_EXTRA="${LOCATION}
+${LINKED:+${LINK_SOURCE}:${LINK_SHOWN}:${LINK_FROM}}"
 
 SPECS=0
 for spec in spec/*.md; do
@@ -334,7 +357,7 @@ if [ -e spec/CAPABILITY-MAP.md ] && { [ ! -f spec/CAPABILITY-MAP.md ] || [ ! -r 
   fi
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Capability map: present but unreadable (${REASON})
 - Module specs: ${SPECS}
@@ -371,6 +394,22 @@ ${LABEL}
 
 ${SECTION}"
   fi
+  # 状态码（module_stage.py --state-key，与其他阶段同一算法）接在最后；取不到时不加，输出与改前相同。
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then KEY_STAGE=IDLE; else KEY_STAGE=MAP_ONLY; fi
+  KEY="$(python3 "$HOOKDIR/module_stage.py" . --state-key --stage "$KEY_STAGE" --node "$NODE" --state-extra "$STATE_EXTRA" \
+    ${HOST:+--host "$HOST"} 2>/dev/null)" || KEY=""
+  BRIEF=""
+  case "$KEY" in *$'\n'*) BRIEF="${KEY#*$'\n'}"; KEY="${KEY%%$'\n'*}" ;; esac
+  case "$KEY" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+    # 状态码与上一次相同：只给一行（quiet-injection）。
+    if [ "$KEY" = "$LAST" ] && [ -n "$BRIEF" ]; then
+      emit "$BRIEF"
+      exit 0
+    fi
+    STOP_RULES="${STOP_RULES}
+
+<!-- spec-guard-state: ${KEY} -->" ;;
+  esac
 fi
 
 if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
@@ -388,7 +427,7 @@ fi
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
-当前阶段: **IDLE**
+Current stage: **IDLE**
 
 - Capability map: absent
 - Module specs: ${SPECS}${CONFIG_LINES}
@@ -412,7 +451,7 @@ fi
 if [ "$SPECS" -eq 0 ]; then
   emit "${HEADER}
 
-当前阶段: **MAP_ONLY**
+Current stage: **MAP_ONLY**
 
 - Capability map: present
 - Module specs: absent${CONFIG_LINES}
@@ -422,10 +461,13 @@ Suggested next step: confirm with the user that the first module's requirement i
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
-  emit "${HEADER}
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} --state-extra "$STATE_EXTRA" ${LAST:+--last-state "$LAST"} 2>/dev/null)"; then
+  case "$STAGE" in
+    'spec-guard: '*) emit "$STAGE" ;;  # quiet-injection：状态码与上一次相同，只给一行（后面可能附边界行）
+    *) emit "${HEADER}
 
-${STAGE}"
+${STAGE}" ;;
+  esac
 elif [ -n "$ZH" ]; then
   emit "${HEADER}
 
@@ -436,7 +478,7 @@ elif [ -n "$ZH" ]; then
 else
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Module specs: ${SPECS}
 - The module stage could not be computed; run ${VERIFY_CMD} for details."

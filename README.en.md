@@ -38,7 +38,8 @@ Limits:
 - **Module**: one row of the capability map. Each module has `spec/<module>.md` (the Spec) and
   `tasks/<module>/plan.md` and `todo.md`.
 - **Stage**: spec-guard infers progress from those files, e.g. `MAP_ONLY` (only a capability map), `NEEDS_PLAN`,
-  `BUILDING`, `MODULE_DONE`, `DONE`, and injects it for the agent every turn.
+  `BUILDING`, `MODULE_DONE`, `DONE`, and injects it for the agent: in full when the state changes, in a new session or
+  after compaction, as one line on the other turns.
 - **Quick insert and Proposal**: to add a requirement halfway, insert a module at a checkpoint; when the addition needs
   a recorded, reviewed decision, use the Proposal flow.
 
@@ -105,7 +106,7 @@ Once enabled, send the agent any message and it sees a stage hint like this in i
 ```text
 ## spec-guard local workflow
 
-当前阶段: **NEEDS_PLAN**
+Current stage: **NEEDS_PLAN**
 
 - Capability map: present
 - Current module: `billing` (next in Build order)

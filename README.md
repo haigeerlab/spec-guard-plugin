@@ -32,7 +32,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 - **能力图** `spec/CAPABILITY-MAP.md`：一张表列出全部模块、职责与依赖，外加一行 Build order（构建顺序）。
 - **模块**：能力图里的一行。每个模块有 `spec/<模块>.md`（Spec）和 `tasks/<模块>/plan.md`、`todo.md`。
 - **阶段**：spec-guard 根据这些文件推断当前进度，例如 `MAP_ONLY`（只有能力图）、`NEEDS_PLAN`、`BUILDING`、
-  `MODULE_DONE`、`DONE`，每轮注入给 agent。
+  `MODULE_DONE`、`DONE`，注入给 agent：状态变了、新会话或压缩后给完整说明，其余轮次只给一行。
 - **快速插入与 Proposal**：做到一半加需求，可以在检查点直接插入模块；需要留痕、审查时走 Proposal 流程。
 
 术语和设计理由见[设计理念与术语](docs/concepts.md)。
@@ -95,7 +95,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 ```text
 ## spec-guard local workflow
 
-当前阶段: **NEEDS_PLAN**
+Current stage: **NEEDS_PLAN**
 
 - Capability map: present
 - Current module: `billing` (next in Build order)

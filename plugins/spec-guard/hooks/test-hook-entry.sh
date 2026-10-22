@@ -35,11 +35,11 @@ mkdir -p "$P/.claude/hooks"
 printf '#!/bin/sh\ntouch "%s/project-script-ran"\n' "$WORK" > "$P/.claude/hooks/phase-guard.sh"
 
 entry PLUGIN_ROOT="$PLUGIN"
-[ "$RC" -eq 0 ] && grep -F '当前阶段' >/dev/null <<<"$(context)" || fail "PLUGIN_ROOT 下应注入阶段"
+[ "$RC" -eq 0 ] && grep -E 'Current stage|当前阶段' >/dev/null <<<"$(context)" || fail "PLUGIN_ROOT 下应注入阶段"
 ok "PLUGIN_ROOT（Codex）下运行插件自带的 phase-guard"
 
 entry CLAUDE_PLUGIN_ROOT="$PLUGIN"
-[ "$RC" -eq 0 ] && grep -F '当前阶段' >/dev/null <<<"$(context)" || fail "CLAUDE_PLUGIN_ROOT 下应注入阶段"
+[ "$RC" -eq 0 ] && grep -E 'Current stage|当前阶段' >/dev/null <<<"$(context)" || fail "CLAUDE_PLUGIN_ROOT 下应注入阶段"
 ok "CLAUDE_PLUGIN_ROOT（Claude Code）下运行插件自带的 phase-guard"
 
 entry

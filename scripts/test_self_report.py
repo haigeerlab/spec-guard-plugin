@@ -171,6 +171,23 @@ class Python3FailureReadTests(Fixture):
         self.assertEqual(sr.read_claude(self.claude, SINCE), ([], 0))
 
 
+class QuietInjectionReadTests(Fixture):
+    """quiet-injection: an English hint says `Current stage:`, and a turn with no change gets one line."""
+
+    def test_english_stage_line_is_read(self):
+        text = segment("BUILDING").replace("当前阶段: ", "Current stage: ")
+        self.claude_session("s1.jsonl", [claude_attachment("2026-10-01T10:00:00Z", self.real, "s", [text])])
+        events, _ = sr.read_claude(self.claude, SINCE)
+        self.assertEqual([e["stage"] for e in events], ["BUILDING"])
+
+    def test_one_line_hint_is_an_event(self):
+        line = ("spec-guard: BUILDING · `alpha` · 3 unchecked · branch `main` (unchanged; see the earlier phase hint "
+                "for details) <!-- spec-guard-state: 0123abcd -->")
+        self.claude_session("s1.jsonl", [claude_attachment("2026-10-01T10:00:00Z", self.real, "s", [line])])
+        events, _ = sr.read_claude(self.claude, SINCE)
+        self.assertEqual([(e["stage"], e["suggestion"]) for e in events], [("BUILDING", "")])
+
+
 def event(when, stage, suggestion="Suggested next step: continue `/build` on `alpha`: 3 unchecked item(s).",
           project="/p/one", session="session-aaaaaa", line=1, host="claude"):
     return {"time": sr.parse_iso(when), "host": host, "project": project, "session": session,

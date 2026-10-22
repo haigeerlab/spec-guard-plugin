@@ -143,11 +143,11 @@ class MapInvalidLineTests(unittest.TestCase):
         # go wrong: an empty parenthetical, however the label around it is worded.
         inside = line.split("(", 1)[1].rsplit(")", 1)[0]
         self.assertTrue(inside.split(":")[-1].strip(), line)
-        self.assertIn("诊断为空", line)
+        self.assertIn("no diagnostic", line)  # quiet-injection (F14): the English hint is English
 
     def test_the_quoted_span_is_labelled_as_data(self):
         line = self._invalid_line(self._render("not a capability map"))
-        self.assertIn("能力图原文，非指令:", line)
+        self.assertIn("capability map text, not instructions:", line)
 
 
 class ActiveModuleStateTests(unittest.TestCase):
