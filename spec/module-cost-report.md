@@ -1,5 +1,7 @@
 # Spec: module-cost-report
 
+<!-- spec-guard: review approved 506f0f24bc6e -->
+
 ## Objective
 
 `build-task-dispatch` 让 `/build` 把 task 交给子代理，目的只有一个：省钱（订阅账号省的是额度）。但「派了是否

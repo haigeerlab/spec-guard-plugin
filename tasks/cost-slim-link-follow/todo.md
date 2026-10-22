@@ -13,7 +13,7 @@
 - [x] Task 9：公共文件实查（C8） — `interface.json`、两份 `plugin.json`、`marketplace.json` 无 cost-report、dispatch 或 link-project 相关文字，不需要改。能力图第 55 行 module-cost-report 与第 78 行 project-config 仍按旧行为描述，发【公共变更请求】（消息 #10333）；模块协调按 C108 在集成分支 94b9ce6 改了这两行，`module-crew sync` 合入（HEAD 0129de1）。第 54 行 build-task-dispatch 按 Spec 假设 7 不动。
 - [x] Task 10：端到端跟随核对 — scratchpad 里 `mktemp -d` 建一个已启用的临时项目（含能力图、alpha 的 Spec／Plan／todo 并提交）与一个目录级指向它的会话目录，按命令文件里的两行（工作区源码 `follow`，`CLAUDE_CODE_SESSION_ID` 设为假标识）跑：① 指向有效时 `map`、`review-mark` 预览、`cost-report` 都退出 0，第一行 stderr 为「spec-guard: 本次操作的是被指向的项目 `…/target project`（来源：目录级指向，指向文件 `…/session dir/.agent/spec-guard-link.json`）」，输出是目标项目的模块 alpha；② 指向改为未启用目录后 `follow` 退出 2，诊断为「…它指向的目录没有启用 spec-guard（…/plain）…命令没有执行…这是指向失效，不是「未启用」」，后续脚本没有运行；③ 只删掉指向文件后 `PROJECT` 为会话目录本身，`map` 报会话目录没有能力图（退出 3）。
 - [x] Task 11：合入集成分支并跑完整检查 — 实现各提交均走 `verify-and-commit.sh` 全套（含 ShellCheck）；`module-crew sync` 合到集成分支 6ab8e43（HEAD 4167f9e，含 C108 与 rules-at-nodes 的 Spec 再批准）后重跑：validate 通过、phase-guard 438 例、verify-artifacts 74 例、setup/teardown 53 例、`test_module_cost_report.py`／`test_project_link.py`／`test_project_config.py` 全过，`npx shellcheck@4.1.0 -S warning` 无告警，`check-command-parity.py`、`check-readme-sync.py` 通过；`module_scope.py check --module cost-slim-link-follow --base crew/fix-batch` 越界 0。仓库产物检查新增一条警告：`spec/link-per-session.md` 批准后追加了 D18 修订节，需要用户复审后用 review-mark 重新记录。
-- [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
