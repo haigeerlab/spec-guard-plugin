@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.84.1] - 2026-10-23
+
+本版 1 处回归修复与 1 处文档补全（fact-fixes 返工 1）。`interface.json` 不变。
+
+### 修复
+
+- **hook 输入 1 秒内没读完时不再当作读完（0.84.0 引入，来源 fact-fixes `b3a19e8`）。** 0.84.0 起阶段注入先在 bash 里读 hook 输入的前 64KB，
+  只要 `read` 返回非零就当作读完。bash ≥ 4 读管道逐字节，机器慢或输入分段到达时 1 秒内读不完，超时返回 >128，只读到半截却被当成完整输入：
+  未启用判定用半截、python3 也只拿到半截，桌面版 worktree 会话（宿主目录未启用、会话目录已启用）丢阶段注入；CI 第 11 段「大输入应退回 python3
+  解析」因此时好时坏。现在超时与读满 64KB 一样算拿不准，已读部分与其余输入照常交给 python3。macOS 自带的 bash 3.2 超时同样返回 1 并丢掉已读部分，
+  分不出超时，输入超过 1 秒才到齐时与 0.83.2 一样拿不到输入，本版不变。
+
+### 文档
+
+- `docs/optional-features.md` 的文档治理一节补上 0.84.0 已落地的两点：有基线时最终验收那一轮提示跑文档核验；核验按基线状态区分。
+  去掉已不准确的「不看 Git 历史」。
+
 ## [0.84.0] - 2026-10-23
 
 本版 13 个模块（2026-10-22 多维度审查与需求核对的修复批次，决定 D1～D20，经 module-crew 并行开发）：fact-fixes、tracker-provider-unify、config-per-key、sibling-rules-out、proposal-fixes、history-slim、rules-at-nodes、cost-slim-link-follow、batch-insert-concurrency-hint、quiet-injection、scope-overlap-interface、ledger-standalone-reminder、doc-chain。`interface.json` 升到 1.10（1.9 的 `reviewKinds.renamedSections`、1.10 的 `scopeOverlap`）。

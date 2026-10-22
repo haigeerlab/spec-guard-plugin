@@ -58,7 +58,7 @@ has_ledger() {  # $1=目录，默认当前目录
 
 # fact-fixes：启动 python3 之前先在 bash 里判断 hook 输入可能指向的两个根目录（宿主给的 ROOT、输入 cwd 所在 git 仓库）
 # 是否都没有激活信号与指向文件；拿得准都没有时返回 0，调用方直接静默退出。bash 的 read 从管道逐字节读，大输入很慢，
-# 所以只读前 64KB（RAW_MORE=1 表示后面还有）：没读完、cwd 不是不含转义的普通字符串、或出现不止一次，都算拿不准
+# 所以只读前 64KB（RAW_MORE=1 表示后面还有，包括 1 秒内没读完）：没读完、cwd 不是不含转义的普通字符串、或出现不止一次，都算拿不准
 # （返回 1），交给 python3 照旧解析。拿得准只有账本时也返回 1，并设 PRE_LEDGER=1，留给调用方再判一次。
 inactive_before_python() {  # 读 RAW、RAW_MORE 与 ROOT
   local rest cwd top re='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
@@ -84,7 +84,10 @@ inactive_before_python() {  # 读 RAW、RAW_MORE 与 ROOT
 HOOK_INPUT=""
 if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
   RAW="" RAW_MORE=""
-  if IFS= read -r -n 65536 -d '' -t 1 RAW; then RAW_MORE=1; fi
+  # 读满 64KB 返回 0；1 秒内没读完（bash ≥ 4 返回 >128，已读部分留在 RAW）同样算后面还有。读到结尾返回 1。
+  # bash 3.2 超时也返回 1 并丢掉已读部分，分不出来，与 0.83.2 只等 1 秒的结果相同。
+  IFS= read -r -n 65536 -d '' -t 1 RAW; rc=$?
+  if [ "$rc" -eq 0 ] || [ "$rc" -gt 128 ]; then RAW_MORE=1; fi
   PRE_LEDGER=""
   inactive_before_python && exit 0
   # 只有账本时 UserPromptSubmit 只在别的会话转来消息那一轮有话说：提示词开头不是那个包装就不必启动 python3。

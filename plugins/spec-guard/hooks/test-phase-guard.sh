@@ -1095,6 +1095,35 @@ big_out="$(shim_run "$unrelated" "{\"cwd\":\"$wt_linked/src\",\"prompt\":\"$pad\
 [ -z "$big_out" ] || fail "超过 1MB 的输入不应改变根目录"
 echo "  ✅ cwd 含转义、出现多次或输入超过 64KB 时退回 python3 解析，结果与改前相同"; PASS=$((PASS + 1))
 
+# fact-fixes 返工 1：预读 1 秒内没读完（输入分段到达，或机器慢、bash 逐字节读管道）也算拿不准，半截交给 python3、其余由拷贝进程转过去。
+# bash ≥ 4 超时返回 >128 并保留已读部分；bash 3.2 超时返回 1 并丢掉已读部分，分不出超时，与 0.83.2 相同只能不挂住、输出合法。
+slow_bash=/bin/bash
+slow_run() {  # $1=CLAUDE_PROJECT_DIR $2=标准输入；前 35000 字节先到，隔 1.5 秒再到其余部分
+  local root="$1" input="$2"
+  { trap '' PIPE; printf '%s' "${input:0:35000}"; sleep 1.5; printf '%s' "${input:35000}"; true; } |
+    env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="$shim:$PATH" \
+      CLAUDE_PROJECT_DIR="$root" "$slow_bash" "$HOOKDIR/phase-guard.sh"
+}
+pad="$(printf '%070000d' 0)"
+slow_in="{\"cwd\":\"$wt_linked/src\",\"prompt\":\"$pad\"}"
+slow_off="{\"cwd\":\"$unrelated/sub\",\"prompt\":\"$pad\"}"
+slow_out="$(slow_run "$unrelated" "$slow_in")" || fail "输入分段到达时应退出 0"
+: > "$WORK/py-calls"
+slow_neg="$(slow_run "$unrelated" "$slow_off")" || fail "输入分段到达且未启用时应退出 0"
+if [ "$("$slow_bash" -c 'echo "${BASH_VERSINFO[0]}"')" -ge 4 ]; then
+  [ "$(printf '%s' "$slow_out" | context_of)" = "$(run_input "$wt_main" "$slow_in" | context_of)" ] ||
+    fail "输入分段到达、cwd 在已启用的 worktree 时应完整注入"
+  [ -z "$slow_neg" ] || fail "输入分段到达且未启用时应静默: ${slow_neg:0:300}"
+  [ "$(calls)" -gt 0 ] || fail "预读超时应退回 python3 解析，不能凭半截内容判定未启用"
+  echo "  ✅ 预读超时（输入分段到达）时退回 python3，worktree 照旧完整注入"; PASS=$((PASS + 1))
+else
+  for out in "$slow_out" "$slow_neg"; do
+    [ -z "$out" ] || printf '%s' "$out" | python3 -c 'import json, sys; json.load(sys.stdin)' ||
+      fail "bash 3.2 下输入分段到达时输出应为空或合法 JSON: ${out:0:300}"
+  done
+  echo "  ✅ bash 3.2 下输入分段到达时不挂住、输出合法（3.2 超时丢弃已读部分，与 0.83.2 相同）"; PASS=$((PASS + 1))
+fi
+
 
 # context-after-compact：session-handoff 已退役，原来的触发词照常注入阶段，不再被本地作答拦截。
 ho="$WORK/handoff"

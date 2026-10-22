@@ -45,11 +45,14 @@
    以及每份文档的状态；
 2. **影响**（`/spec-guard:documentation-impact`）：每个模块的 Spec 里写一张表，说明它对每份依据文档是遵循、补全、
    修改还是不涉及；
-3. **核验**（`/spec-guard:documentation-verification`）：交付前只读检查这些声明是否都已收口。
+3. **核验**（`/spec-guard:documentation-verification`）：交付前只读检查这些声明是否都已收口。有基线时，最终验收那一轮的
+   阶段提示多一行「文档核验」，提示验收前跑核验并把结果写进验收消息。核验按基线状态区分：现状类 `update` 须自本模块 Spec
+   首次提交以来确被改过；`target` 文档只列增删行数，有删除行时提醒须单独批准；外部文档标未核验（`unverified`）；git 查不了时
+   为 `unknown`。
 
 没有 `docs/DOCUMENTATION-BASELINE.md` 的项目视为未启用，不会收到任何提醒。
 
-**不做什么：** 不扫描代码，也不看 Git 历史推断文档状态；核验通过只说明声明已经收口，不代表文档内容正确。
+**不做什么：** 不扫描代码，也不推断文档内容是否过期；核验通过只说明声明已经收口，不代表文档内容正确。
 
 **详细说明：** [基线](../plugins/spec-guard/references/documentation-baseline.md)、
 [影响](../plugins/spec-guard/references/documentation-impact.md)、

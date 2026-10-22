@@ -7,9 +7,9 @@
 - [x] Checkpoint 1（report）：三套核心回归 — 合入集成分支 `1016639` 之后在 HEAD 上并行跑：`validate.sh` 校验通过、phase-guard 438 例、verify-artifacts 74 例全绿；ShellCheck 随 `b3a19e8` 的全档提交跑过（无告警），之后没有再改 `.sh`。本 checkout 的 verify-artifacts 0 失败，警告里新增 `spec/fact-fixes.md`、`spec/install-by-scope.md` 批准后已修订两条（见最终验收）。
 - [x] Task 4：公共变更落地后合入并核对 — `module-crew sync` 合入 `1016639`（HEAD `246bd16b`）。parse_map 通过、151 个模块、无 `dependency-check`；能力图里 `dependency-check` 只剩本模块职责行与变更记录；三份归档与 `188febb4` 原文件 blob 相同，原路径已不存在；`module-insert` 行无 `spec skeleton`（只在变更记录里出现）；`install-by-scope` 依赖为 `scope-authorization`；interface.json `interface` 仍为 1.8，只改一行；阶段注入「模块 151 · … 已完成 141」；verify-artifacts 0 失败。Spec 修订并行边界与 C7 读法，末尾写变更记录。
 - [x] Checkpoint 2（gate）：最终验收
-- [ ] Task 5：返工——预读超时算拿不准（先红后绿）
-- [ ] Task 6：返工——文档治理一节（EF4KWN4）
-- [ ] Task 7：返工——CHANGELOG 与版本号 0.84.1
+- [x] Task 5：返工——预读超时算拿不准（先红后绿） — 本机 `brew install bash`（5.3.20，只在 `/opt/homebrew`）。实测 bash 5 超时返回 142 并保留已读部分，bash 3.2 返回 1 并丢掉。第 11 段加慢输入正反两例（7 万字节分两段、隔 1.5 秒，`slow_bash` 默认 `/bin/bash`）：未修代码上 bash 5 草稿副本红（正向无注入），`/bin/bash` 3.2 走「不挂住、输出合法」分支为绿；`phase-guard.sh` 记下 read 返回值，0 或 >128 设 RAW_MORE；修后两种 bash 都 503 例全过。变异核对（草稿副本删掉 >128 分支）：正向、反向各自变红——第一次核对发现反向的 python3 计数被正向那次污染，挪了清零位置后才真正生效。Spec 变更记录第 3 条。
+- [x] Task 6：返工——文档治理一节（EF4KWN4） — `docs/optional-features.md` 第 3 条「核验」补最终验收那一轮提示文档核验、核验按基线状态区分（用 CHANGELOG 0.84.0 doc-chain 的说法）；「不看 Git 历史推断文档状态」改为「不推断文档内容是否过期」。没有英文对照版。
+- [x] Task 7：返工——CHANGELOG 与版本号 0.84.1 — CHANGELOG 新开 0.84.1 段（修复写明 0.84.0 引入、来源 `b3a19e8`；文档一条）；两份 `plugin.json` 与中英 README 的 `--ref` 改为 0.84.1；interface 不变。bash 3.2 限制另记账。
 - [ ] Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行
 
 ## 更新说明
