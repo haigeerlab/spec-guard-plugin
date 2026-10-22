@@ -2470,7 +2470,140 @@ printf '%s\n' '| alpha | x | — |' > "$idle/spec/CAPABILITY-MAP.md"; printf '# 
 echo "  ✅ MAP_INVALID 不带状态码"; PASS=$((PASS + 1))
 }
 
-PARTS=21
+part_22() {
+# quiet-injection（D5）改动 1 后半：会话记录里最近一次 spec-guard 注入的状态码与本轮相同，就只给一行；其余情况给完整内容。
+q="$WORK/brief"
+mkdir -p "$q/spec" "$q/tasks/alpha" "$q/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$q/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$q/spec/CAPABILITY-MAP.md"
+printf '# alpha\n' > "$q/spec/alpha.md"; printf '# Plan\n' > "$q/tasks/alpha/plan.md"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] three' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+git -C "$q" init -q -b main && git -C "$q" add -A && git -C "$q" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm base
+TR="$WORK/brief-transcript.jsonl"
+INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$TR\",\"prompt\":\"p\"}"
+claude_injected() {  # $1=文件 $2=注入原文：Claude 记下的 hook_additional_context 附件（覆盖写）
+  python3 -c 'import json, sys; print(json.dumps({"type": "attachment", "isSidechain": False, "attachment": {
+    "type": "hook_additional_context", "content": [sys.argv[2]], "hookName": "UserPromptSubmit",
+    "hookEvent": "UserPromptSubmit"}}))' "$1" "$2" > "$1"
+}
+codex_injected() {  # $1=文件 $2=注入原文：Codex rollout 里的 developer 消息（覆盖写）
+  python3 -c 'import json, sys; print(json.dumps({"type": "response_item", "payload": {"type": "message", "role": "developer",
+    "content": [{"type": "input_text", "text": sys.argv[2]}]}}))' "$1" "$2" > "$1"
+}
+code_in() { python3 -c 'import re, sys; f = re.findall(r"<!-- spec-guard-state: ([0-9a-f]{8}) -->", sys.stdin.read()); print(f[-1] if f else "")'; }
+is_full() {  # $1=用例名 $2=正文
+  case "$2" in *"## spec-guard local workflow"*) echo "  ✅ $1"; PASS=$((PASS + 1)) ;; *) fail "$1: 应是完整内容
+$2" ;; esac
+}
+is_line() {  # $1=用例名 $2=正文 $3=期望的整行（不含状态码）
+  python3 -c '
+import re, sys
+text, want = sys.argv[1:3]
+first = text.split("\n")[0]
+assert "## spec-guard local workflow" not in text, text
+assert re.fullmatch(re.escape(want) + r" <!-- spec-guard-state: [0-9a-f]{8} -->", first), (first, want)
+' "$2" "$3" || fail "$1
+$2"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+LINE_EN='spec-guard: BUILDING · `alpha` · 3 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+full="$(run "$q" | raw_of)"
+claude_injected "$TR" "$full"
+out="$(run_input "$q" "$INPUT" | raw_of)"
+is_line "Claude：上次注入的状态码相同，只给一行" "$out" "$LINE_EN"
+[ "$(code_in <<<"$out")" = "$(code_in <<<"$full")" ] || fail "一行形式应带与上一次相同的状态码"
+echo "  ✅ 一行形式带与上一次相同的状态码"; PASS=$((PASS + 1))
+[ "$(printf '%s' "$out" | wc -l | tr -d ' ')" = 0 ] || fail "没有附带事件时只有一行
+$out"
+echo "  ✅ 没有附带事件时只有一行"; PASS=$((PASS + 1))
+claude_injected "$TR" "$out"
+is_line "上一次是一行形式时照样认得状态码" "$(run_input "$q" "$INPUT" | raw_of)" "$LINE_EN"
+codex_injected "$TR" "$full"
+is_line "Codex：developer 消息里的状态码相同，只给一行" "$(run_input "$q" "$INPUT" | raw_of)" "$LINE_EN"
+printf '%s\n' '- [x] one' '- [x] two' '- [ ] three' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+is_line "未勾选数变了仍是一行，数字跟着变" "$(run_input "$q" "$INPUT" | raw_of)" \
+  'spec-guard: BUILDING · `alpha` · 2 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+
+printf '# Plan\n\n<!-- spec-guard: review pending -->\n' > "$q/tasks/alpha/plan.md"
+is_full "批准状态变了给完整内容" "$(run_input "$q" "$INPUT" | raw_of)"
+printf '# Plan\n' > "$q/tasks/alpha/plan.md"
+claude_injected "$TR" "$full"
+printf '%s\n' '{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":1,"postTokens":1}}' >> "$TR"
+is_full "Claude 压缩记录比上次注入新，给完整内容" "$(run_input "$q" "$INPUT" | raw_of)"
+codex_injected "$TR" "$full"
+printf '%s\n' '{"type":"compacted","payload":{}}' >> "$TR"
+is_full "Codex 压缩记录比上次注入新，给完整内容" "$(run_input "$q" "$INPUT" | raw_of)"
+python3 -c 'import json, sys; print(json.dumps({"type": "user", "message": {"role": "user", "content": sys.argv[1]}}))
+print(json.dumps({"type": "assistant", "isSidechain": False, "message": {"role": "assistant", "content": [{"type": "text", "text": sys.argv[1]}]}}))' \
+  "$full" > "$TR"
+is_full "状态码只出现在用户或助手消息里，不算" "$(run_input "$q" "$INPUT" | raw_of)"
+is_full "没有会话记录路径，给完整内容" "$(run_input "$q" '{"session_id":"s","prompt":"p"}' | raw_of)"
+is_full "会话记录不存在，给完整内容" "$(run_input "$q" "{\"transcript_path\":\"$WORK/missing.jsonl\"}" | raw_of)"
+printf '%s\n' 'not json' > "$TR"
+is_full "会话记录里没有注入，给完整内容" "$(run_input "$q" "$INPUT" | raw_of)"
+claude_injected "$TR" "$full"
+out="$(env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$q" \
+  /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$INPUT" | raw_of)"
+is_full "SessionStart（压缩后）总是完整内容" "$out"
+
+# 附带的事件：转来消息的记账提醒、模块边界行。
+mkdir -p "$q/.epiq"; printf '{"projectId":"x"}\n' > "$q/.epiq/project.json"
+ENV_INPUT="$(python3 -c 'import json, sys; print(json.dumps({"session_id": "s", "transcript_path": sys.argv[1], "prompt":
+  "<cross-session-message from-session=\"local_1\" from-name=\"A\">\nhi\n</cross-session-message>"}))' "$TR")"
+full_ledger="$(run "$q" | raw_of)"; claude_injected "$TR" "$full_ledger"
+out="$(run_input "$q" "$ENV_INPUT" | raw_of)"
+is_line "一行形式附记账提醒：第一行仍是一行形式" "$out" \
+  'spec-guard: BUILDING · `alpha` · 2 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+grep -F -- "- Message from another session (sender \`A\`, session \`local_1\`)" >/dev/null <<<"$out" || fail "一行形式后应附记账提醒
+$out"
+echo "  ✅ 一行形式后附记账提醒"; PASS=$((PASS + 1))
+rm -rf "$q/.epiq"
+printf '%s\n' '- [x] one' '- [x] two' '- [x] three' '- [x] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+printf '{"activeModule":"alpha"}\n' > "$q/.agent/state.json"
+full_done="$(run "$q" | raw_of)"; claude_injected "$TR" "$full_done"
+transcript "$WORK/usage.jsonl" 699999; cat "$WORK/usage.jsonl" >> "$TR"
+out="$(run_input "$q" "$INPUT" | raw_of)"
+is_line "MODULE_DONE 一行形式" "$out" 'spec-guard: MODULE_DONE · `alpha` · 0 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+[ "$(sed -n 2p <<<"$out")" = "$(sized_boundary 700 "$EST_1M")" ] || fail "一行形式后应另起一行附边界行
+$out"
+echo "  ✅ 一行形式后另起一行附边界行"; PASS=$((PASS + 1))
+rm -f "$q/.agent/state.json"
+
+# 停点：进入那一轮完整并附停点规则，同一节点下一轮一行（Q1 A）。
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+claude_injected "$TR" "$(run "$q" | raw_of)"
+printf '%s\n' '- [x] one' '- [x] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+out="$(run_input "$q" "$INPUT" | raw_of)"
+is_full "进入停点（最终验收）那一轮给完整内容" "$out"
+grep -F "Stop rules (final acceptance):" >/dev/null <<<"$out" || fail "进入停点时应附停点规则
+$out"
+echo "  ✅ 进入停点时附停点规则"; PASS=$((PASS + 1))
+claude_injected "$TR" "$out"
+is_line "同一节点下一轮给一行" "$(run_input "$q" "$INPUT" | raw_of)" \
+  'spec-guard: BUILDING · `alpha` · 1 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+
+# 中文、IDLE、非 git 目录、分离 HEAD。
+printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$q/.agent/config.json"
+claude_injected "$TR" "$(run "$q" | raw_of)"
+is_line "zh-CN 一行形式" "$(run_input "$q" "$INPUT" | raw_of)" \
+  'spec-guard: BUILDING · `alpha` · 未勾选 1 · 分支 `main`（状态未变，完整说明见此前的阶段提示）'
+rm -f "$q/.agent/config.json"
+git -C "$q" checkout -q --detach
+sha="$(git -C "$q" rev-parse --short HEAD)"
+claude_injected "$TR" "$(run "$q" | raw_of)"
+is_line "分离 HEAD 写短 sha" "$(run_input "$q" "$INPUT" | raw_of)" \
+  "spec-guard: BUILDING · \`alpha\` · 1 unchecked · detached at \`$sha\` (unchanged; see the earlier phase hint for details)"
+idle="$WORK/brief-idle"; mkdir -p "$idle"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle/CLAUDE.md"
+claude_injected "$TR" "$(run "$idle" | raw_of)"
+is_line "IDLE 不在 git 里：模块与未勾选数写「—」，没有分支段" "$(run_input "$idle" "$INPUT" | raw_of)" \
+  'spec-guard: IDLE · — · — (unchanged; see the earlier phase hint for details)'
+mkdir -p "$idle/spec"; printf '%s\n' '| alpha | x | — |' > "$idle/spec/CAPABILITY-MAP.md"; printf '# a\n' > "$idle/spec/a.md"
+claude_injected "$TR" "$(run "$idle" | raw_of)"
+is_full "MAP_INVALID 是诊断，每轮完整" "$(run_input "$idle" "$INPUT" | raw_of)"
+}
+
+PARTS=22
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

@@ -806,22 +806,42 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
             next_gate(root, module) if stage == "BUILDING" else None)
 
 
+def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
+    """quiet-injection: the one line given while the state code is unchanged -- stage, module, unchecked, branch."""
+    parts = [stage, "`%s`" % module if module else "—",
+             "—" if open_items is None else (("未勾选 %d" if zh else "%d unchecked") % open_items)]
+    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    sha = None if branch else _git(root, "rev-parse", "--short", "HEAD")
+    if branch:
+        parts.append(("分支 `%s`" if zh else "branch `%s`") % safe_fragment(branch))
+    elif sha:
+        parts.append(("分离于 `%s`" if zh else "detached at `%s`") % safe_fragment(sha))
+    tail = "（状态未变，完整说明见此前的阶段提示）" if zh else " (unchanged; see the earlier phase hint for details)"
+    return "spec-guard: " + " · ".join(parts) + tail + " " + STATE_MARK % code
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
              unattended: bool = False, host: str | None = None, window_estimated: bool = False,
-             state_extra: str | None = None) -> str:
+             state_extra: str | None = None, last_state: str | None = None) -> str:
     """The stage hint; with `state_extra` (the hook's own facts: location, linked project) it ends with the state code.
 
-    Diagnostics (an unreadable or invalid map) carry no code, so they are never shortened.
+    When `last_state` equals that code, only the one line comes back, followed by the module-boundary line if this
+    turn has one.  Diagnostics (an unreadable or invalid map) carry no code, so they are never shortened.
     """
-    facts: list = []
-    text = _describe_body(Path(root), context_tokens, context_window, unattended, host, window_estimated, facts)
-    if state_extra is None or not facts:
+    root = Path(root)
+    info: dict = {}
+    text = _describe_body(root, context_tokens, context_window, unattended, host, window_estimated, info)
+    if state_extra is None or "facts" not in info:
         return text
-    return text + "\n\n" + STATE_MARK % state_key(*facts, state_extra)
+    code = state_key(*info["facts"], state_extra)
+    if last_state != code:
+        return text + "\n\n" + STATE_MARK % code
+    line = brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
+    return line + ("\n" + info["boundary"] if info["boundary"] else "")
 
 
 def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
-                   host: str | None, window_estimated: bool, facts: list) -> str:
+                   host: str | None, window_estimated: bool, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
     cmd = commands(host, zh)
     try:
@@ -912,8 +932,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         hint = ""
     suspended_ids = tuple(s["id"] for s in suspended)
     if stage == "DONE":
-        facts[:] = ["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
-                    bool(unmerged and unmerged[0] > 0)]
+        info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
+                           bool(unmerged and unmerged[0] > 0)],
+                    stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
         notes.extend(suspended_lines)
         if no_todo_note:
             notes.append(no_todo_note)
@@ -1039,8 +1060,10 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # rules-at-nodes: a serial project at a node gets that node's stop rules; role views follow the collaboration plugin.
     node = stop_node(root, module, stage, spec_review, plan_review)
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
-    facts[:] = [stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
-                tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0)]
+    info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
+                       tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0)],
+                stage=stage, module=module, open=current["open"], zh=zh,
+                boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:
         return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s%s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,
@@ -1067,14 +1090,17 @@ if __name__ == "__main__":
     # quiet-injection: phase-guard.sh passes its own facts (location, linked project) to end the hint with the state
     # code; for IDLE / MAP_ONLY, which it answers itself, --state-key prints the code alone for --stage and --node.
     parser.add_argument("--state-extra")
+    parser.add_argument("--last-state")
     parser.add_argument("--state-key", action="store_true")
     parser.add_argument("--stage")
     parser.add_argument("--node")
     args = parser.parse_args()
     if args.state_key:
         root = Path(args.root)
-        print(state_key(args.stage, args.node, hint_language(root) == "zh-CN", tuple(config_lines(root, args.host)),
-                        args.state_extra or ""))
+        zh = hint_language(root) == "zh-CN"
+        code = state_key(args.stage, args.node, zh, tuple(config_lines(root, args.host)), args.state_extra or "")
+        print(code)
+        print(brief_line(root, args.stage, None, None, code, zh))  # phase-guard.sh gives it when the code is unchanged
         raise SystemExit(0)
     if args.node_rules is not None:
         sys.stdout.write(node_rules(args.node_rules))
@@ -1086,4 +1112,4 @@ if __name__ == "__main__":
         print("\n".join(config_lines(Path(args.root), args.host)))
         raise SystemExit(0)
     print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host,
-                   args.window_estimated, args.state_extra))
+                   args.window_estimated, args.state_extra, args.last_state))

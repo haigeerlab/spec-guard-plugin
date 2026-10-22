@@ -128,6 +128,46 @@ def over_standard_window(lines) -> bool:
     return any((_usage(record) or 0) > STANDARD_WINDOW for record in _records(lines or []))
 
 
+# quiet-injection (D5): the state code of the last spec-guard injection, so the hook can give one line when nothing
+# changed.  Only what a host recorded as injected context counts -- Claude's hook_additional_context attachment and
+# Codex's developer message -- never user or assistant text, where an agent may have quoted a code.  Only the code
+# leaves this module.
+_STATE = re.compile(r"<!-- spec-guard-state: ([0-9a-f]{8}) -->")
+_OURS = re.compile(r"(?m)^(## spec-guard local workflow|spec-guard: )")
+
+
+def _injected(record) -> list:
+    """The texts `record` holds as hook-injected context, newest last; [] for any other record."""
+    if not isinstance(record, dict):
+        return []
+    if record.get("type") == "attachment":
+        attachment = record.get("attachment")
+        if isinstance(attachment, dict) and attachment.get("type") == "hook_additional_context":
+            content = attachment.get("content")
+            return [text for text in (content if isinstance(content, list) else [content]) if isinstance(text, str)]
+    payload = record.get("payload") if record.get("type") == "response_item" else None
+    if isinstance(payload, dict) and payload.get("type") == "message" and payload.get("role") == "developer":
+        content = payload.get("content")
+        return [item.get("text") for item in (content if isinstance(content, list) else [])
+                if isinstance(item, dict) and item.get("type") == "input_text" and isinstance(item.get("text"), str)]
+    return []
+
+
+def last_state(lines) -> str | None:
+    """State code of the newest spec-guard injection in the tail; None when a compaction is newer or none is found.
+
+    An injection without a code (a diagnostic) also gives None, so the next turn is full again.
+    """
+    for record in _records(lines or []):
+        if _compacted(record) is not None:
+            return None
+        for text in reversed(_injected(record)):
+            if _OURS.search(text):
+                found = _STATE.findall(text)
+                return found[-1] if found else None
+    return None
+
+
 # A Codex rollout's first record carries the whole base instructions (19-24 KB measured on 2026-10-08); the read
 # stays bounded but leaves ample room (unattended-long-first-record).
 FIRST_RECORD_LIMIT = 1 << 20
@@ -312,8 +352,9 @@ def main() -> None:
         lines = tail_lines(path)
         usage = context_usage(path, lines)
         over = over_standard_window(lines)
+        last = last_state(lines)
     except Exception:
-        usage, over = None, False
+        usage, over, last = None, False, None
     try:
         nobody = unattended(path)
     except Exception:
@@ -334,6 +375,7 @@ def main() -> None:
         host = None
     print(host or "")
     print("over-200k" if over else "")
+    print(last or "")
 
 
 if __name__ == "__main__":
