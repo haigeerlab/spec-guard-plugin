@@ -76,6 +76,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 等用户对预览结果给出明确确认后，才在同一条命令后加 `--confirm` 重新运行一次（不要跳过预览直接确认）。用户
 改动了 id、responsibility、depends-on 或 anchor 中的任何一项，都要先重新跑预览，不能直接对着旧预览确认。
 
+为同一个需求一次插入 2 个及以上模块时，最后一个写入成功后先用 `/spec-guard:config` 看 `moduleConcurrency`：是 `on` 就按共享检查点规则
+「并行评估」一节的「批量插入之后」评估一次；不是 `on` 不用管。
+
 写入只改 `spec/CAPABILITY-MAP.md`；不创建 `spec/<id>.md`、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，
 不执行任何 Git 或远端操作。成功后原样转述写入结果与阶段提示；如果新模块因此成为当前模块，阶段会是
 `NEEDS_SPEC`——下一步是写并交审 `spec/<id>.md`（例如用 `/spec`），不是本命令的职责。
