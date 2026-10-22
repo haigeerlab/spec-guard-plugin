@@ -1,5 +1,7 @@
 # Plan: cost-slim-link-follow
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/cost-slim-link-follow.md`](../../spec/cost-slim-link-follow.md)（2026-10-22 批准，事项 C84／C85），假设 1～13 全部按原文认可。
 同一答复要求把并行边界里 `commands/`、`skills/` 两个整目录收窄到具体文件：已在 Spec 的「并行边界」一节改好（只改这一行，随本 Plan 一并交审）；
 与 `sibling-rules-out` 重叠的文件等它合入、`module-crew sync` 之后再改。
@@ -61,23 +63,23 @@ Plan 获批后由模块协调带批准标记提交到集成分支，`module-crew
 在 scratchpad 里 `mktemp -d` 建的副本上分别：`follow` 不优先查会话登记；`follow` 失效时退回会话目录；成本报告把报错的 Agent 调用计入 `subagents`；
 `--replace` 不再把规则模板当 `--known`。每种都应让对应断言变红，结果记进 todo。
 
-### Task 4：Claude 命令入口（C4，不含 `config.md`）
+### Task 4：Claude 命令入口（C4，不含 `config.md`、`review-mark.md`）
 
-改除 `config.md` 外的 24 个命令文件（`link-project.md` 只改第 67 行的跟随说明）；在 `test_project_link.py` 加入口扫描检查（此时 `config.md` 与
-四个 `SKILL.md` 暂列例外，Task 6 去掉例外）。
+改除 `config.md`、`review-mark.md` 外的 23 个命令文件（`link-project.md` 只改第 67 行的跟随说明）；在 `test_project_link.py` 加入口扫描检查（此时
+`config.md`、`review-mark.md` 与四个 `SKILL.md` 暂列例外，Task 6 去掉例外）。
 
 - 验收：`test_project_link.py`、`python3 scripts/check-command-parity.py`、`/bin/bash scripts/validate.sh --quick` 通过。
 
 ### Task 5：等 `sibling-rules-out` 合入后同步
 
-它合入前发【等待其他会话】给模块协调，不动 `config.md`、`SKILL.md`、`docs/commands.md`、`docs/workflow.md`；收到同步类通知或确认它已合入后，单独执行
+它合入前发【等待其他会话】给模块协调，不动 `config.md`、`review-mark.md`、`SKILL.md`、`docs/commands.md`、`docs/workflow.md`；收到同步类通知或确认它已合入后，单独执行
 `module-crew sync`，冲突按 sync 规则处理。
 
 - 验收：sync 退出码 0；本分支能看到 `sibling-rules-out` 的提交。
 
-### Task 6：重叠文件与 Codex 入口（C4 `config.md`、C5）
+### Task 6：重叠文件与 Codex 入口（C4 `config.md`、`review-mark.md`、C5）
 
-改 `commands/config.md`（取根两行、去掉 dispatch 一行）、四个 `SKILL.md`（取根、link-project 一节、setup 的 `--dispatch` 说明、config 一节的 dispatch）。
+改 `commands/config.md`（取根两行、去掉 dispatch 一行）、`commands/review-mark.md`（取根两行；用户批准 C87 时要求与 `config.md` 一起等 sync 后再改）、四个 `SKILL.md`（取根、link-project 一节、setup 的 `--dispatch` 说明、config 一节的 dispatch）。
 去掉 Task 4 里的例外。
 
 - 验收：`test_project_link.py`（无例外）、`check-command-parity.py`、`validate.sh --quick` 通过。
