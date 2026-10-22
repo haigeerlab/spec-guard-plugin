@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.84.0-upgrade-20261023"
+      },
+      "observedAt": "2026-10-22T17:05:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.83.2 to v0.84.0; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.84.0 enabled; the installed plugin directory is identical to the release asset; the smoke run exited 0 on codex-cli 0.162.1",
+        "result:quiet-injection AC9 on a real Codex host (deferred to after release by the user): codex exec then codex exec resume in a temporary project with the Codex convention block; the first turn's developer message was the full phase hint and the second was the one-line form, both with spec-guard-state 898f9af9",
+        "unverified:ledger-standalone-reminder on a real Codex host: the SessionStart startup|clear hook (session_start:1:0) has no trust record in this machine's Codex config, so Codex did not run it and no read-back reminder appeared; the installed hook itself gives the reminder when run directly; needs the user to trust that hook in Codex /hooks, then re-check"
+      ]
+    }
+  ]
+}

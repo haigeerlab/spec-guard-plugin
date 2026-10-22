@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:68521b655d2ad110d6beb82faaf06906236a9008"
+      },
+      "observedAt": "2026-10-22T17:05:00Z",
+      "evidence": [
+        "result:the v0.84.0 annotated tag resolves to merge commit 68521b655d2ad110d6beb82faaf06906236a9008 (pull request #408); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip 977f4ad (tree 8adafb2), whose pull_request CI succeeded; the push run on the merge commit did not start, so a workflow_dispatch run on main for the merge commit succeeded (run 39819402836)",
+        "result:fix batch of 13 modules (decisions D1-D20) developed in parallel with module-crew and merged one by one on the local integration branch crew/fix-batch after the user's final-acceptance approval; interface.json 1.8 -> 1.10 (reviewKinds.renamedSections in 1.9, scopeOverlap in 1.10)",
+        "result:verify-and-commit full tier passed on 977f4ad under macOS /bin/bash 3.2.57 (validate, phase-guard 502 cases, verify-artifacts 74 cases, repo-artifacts 0 failed); evals/codex-plugin-smoke.sh --selftest passed; ShellCheck 0.11.0 with the CI scope and -S warning reported nothing; the pre-push hook ran the full checks again before pushing crew/batch-211"
+      ]
+    }
+  ]
+}
