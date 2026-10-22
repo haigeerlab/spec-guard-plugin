@@ -340,7 +340,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 ## documentation
 
-文档基线、影响和验证仍是显式声明工具，不能扫描代码或 Git 历史来猜测状态：
+文档基线、影响和验证是显式声明工具，不扫描代码。核验只对声明 `update` 且 `delivered` 的仓库内文档用 git 看自本模块 Spec
+首次提交以来改没改过：现状类没改过、`target` 文档有删除行、git 查不了（`unknown`）都进 `attention`，外部文档标 `unverified`；
+`ready` 不表示文档内容正确。项目有基线时，最终验收前跑核验并把结果写进验收结果：
 
 ```bash
 python3 -B "$ROOT/hooks/documentation_baseline.py" --project "$PROJECT" --format json

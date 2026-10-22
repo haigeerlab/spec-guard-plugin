@@ -287,10 +287,12 @@ COMMANDS = {
                             "`%(doctor)s`)"),
         "checkout-role": "`/spec-guard:checkout-role` (Codex: spec-guard-ops checkout-role)",
         "map": "`/spec-guard:map` (Codex: spec-guard-ops map)",
+        "doc-verify": "`/spec-guard:documentation-verification %s` (Codex: spec-guard-ops documentation)",
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
     "delegate-review": "`%(review)s` (whether it can run is decided by `%(doctor)s`)",
+    "doc-verify": "`/spec-guard:documentation-verification %s`",
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
                   + SLASH_BLOCK + "; " + NO_PASTE
@@ -312,6 +314,7 @@ COMMANDS["codex"] = {
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
     "checkout-role": "`$spec-guard-ops` checkout-role",
     "map": "`$spec-guard-ops` map",
+    "doc-verify": "`$spec-guard-ops` documentation verification for `%s`",
 }
 
 # hint-language-follow: the same entries with Chinese prose, used only when hint_language is zh-CN.  Commands,
@@ -336,6 +339,7 @@ COMMANDS_ZH["claude"] = dict(COMMANDS_ZH[None], **{
 })
 COMMANDS_ZH["codex"] = dict(COMMANDS["codex"], **{
     "free-next": "给用户" + CODEX_COMPACT_ZH + CARRIES_OVER_ZH,
+    "doc-verify": "`$spec-guard-ops` 的 documentation 核验（模块 `%s`）",
     "delegate-review": "`delegate:delegate-routing`（能不能运行以 delegate 自己的体检为准）",
 })
 
@@ -711,6 +715,24 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
             % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
 
 
+def documentation_baseline_present(root: Path) -> bool:
+    """doc-chain: the project keeps a documentation baseline (a symlink counts; the check itself reports it invalid)."""
+    path = root / "docs" / "DOCUMENTATION-BASELINE.md"
+    return path.is_symlink() or path.exists()
+
+
+def documentation_check_line(module: str, cmd: dict, zh: bool) -> str:
+    """doc-chain (D15): the line a final gate gets when the project has a baseline -- run the check, report it."""
+    entry = cmd["doc-verify"] % module
+    if zh:
+        return ("- 文档核验：项目有文档基线，最终验收前跑 %s，把结果写进验收消息的「验收结果」：现状类 update 没改过、"
+                "target 文档有删改、外部文档未核验的，逐条写明；attention 不卡验收。" % entry)
+    return ("- Documentation check: this project has a documentation baseline; before the final acceptance run %s "
+            "and put the result under the acceptance results: name each current-state update left unchanged, each "
+            "target document with deletions, and each external document as unverified; attention does not block the "
+            "acceptance." % entry)
+
+
 def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict, review_step: str = "",
               zh: bool = False) -> tuple:
     """checkout-role: (lines, next step) for a checkout with a role; the project-wide selection is not touched.
@@ -769,6 +791,8 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
         return lines, (("写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s），交给协调会话请用户审。" if zh else
                         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
                         "coordinating session for review.") % (module, module, cmd["plan"]))
+    if stop_node(root, module, stage, _spec, _plan) == "final-gate" and documentation_baseline_present(root):
+        lines.append(documentation_check_line(module, cmd, zh))
     gate = next_gate(root, module)
     if gate:
         lines.append(("- `%s` 的下一个 gate: %s — 到那里停下，把模块交回协调会话。" if zh else
@@ -1060,6 +1084,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # rules-at-nodes: a serial project at a node gets that node's stop rules; role views follow the collaboration plugin.
     node = stop_node(root, module, stage, spec_review, plan_review)
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
+    if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
+        notes = notes + [documentation_check_line(module, cmd, zh)]
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0)],
                 stage=stage, module=module, open=current["open"], zh=zh,

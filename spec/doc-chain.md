@@ -100,7 +100,8 @@
 - 影响参考：「模块 Plan」一节加 `target` 只补充（假设 10）。
 - Codex 入口：documentation 一节同步结果说明（一两句）。
 - `docs/design.md:205`：`DOCUMENTATION-BASELINE.md` → `docs/DOCUMENTATION-BASELINE.md`；并在讲文档治理的地方（如有）补一句三段链与最终 gate 注入。
-- `docs/optional-features.md` 的文档治理一节：写明有基线时最终 gate 会提示跑核验，核验按状态区分。
+- `docs/optional-features.md`：归 `ledger-standalone-reminder` 独占（C190），本模块只改其中基线路径的说法；现有写法已是
+  `docs/DOCUMENTATION-BASELINE.md` 时不改。
 
 ### 改动 5 回归
 
@@ -170,12 +171,22 @@ python3 -B plugins/spec-guard/hooks/test_stop_rules.py
 
 ## 并行边界
 
-- 独占：`spec/doc-chain.md`、`tasks/doc-chain/plan.md`、`tasks/doc-chain/todo.md`、`plugins/spec-guard/hooks/documentation_verification.py`、`plugins/spec-guard/hooks/test_documentation_verification.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/documentation-verification.md`、`plugins/spec-guard/references/documentation-impact.md`、`plugins/spec-guard/commands/documentation-verification.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`docs/design.md`、`docs/optional-features.md`
+- 独占：`spec/doc-chain.md`、`tasks/doc-chain/plan.md`、`tasks/doc-chain/todo.md`、`plugins/spec-guard/hooks/documentation_verification.py`、`plugins/spec-guard/hooks/test_documentation_verification.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/documentation-verification.md`、`plugins/spec-guard/references/documentation-impact.md`、`plugins/spec-guard/commands/documentation-verification.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`docs/design.md`
 - 公共：无
 
 ## 与在开模块的重叠
 
 - `ledger-standalone-reminder`（同一波）改阶段注入的账本读回提醒，主要在 `phase-guard.sh`；本模块不碰 `phase-guard.sh`、`test-phase-guard.sh`。
   可能重叠的是 `module_stage.py`、`docs/design.md`，以及它若改共享检查点规则时的 `workflow-checkpoints.md`／`test_workflow_checkpoints.py`；
-  本模块对 `module_stage.py` 只加一个函数和 `describe()` 里一处 notes 追加，对 `docs/design.md` 只改第 205 行与一两句。重叠由模块协调核对后交用户定。
+  本模块对 `module_stage.py` 只加一个函数和 `describe()` 里一处 notes 追加，对 `docs/design.md` 只改第 205 行与一两句。
+  用户定的分工（C190）：`docs/design.md` 归本模块独占，对方只改不变量那一句；`docs/optional-features.md` 归对方独占，本模块只改基线路径的说法；
+  后合入的一方先 `module-crew sync`。
 - `quiet-injection`、`rules-at-nodes` 已合入，本模块只调用 `stop_node` 与状态码现有行为，不改它们。
+
+## 变更记录
+
+- 2026-10-23：`docs/optional-features.md` 从本模块独占清单中去掉，改动 4 对它只改基线路径的说法；「与在开模块的重叠」写明分工。
+  原因：用户批准 Spec（事项 C190）时定了与 `ledger-standalone-reminder` 的重叠分工。来源：用户答复 C190，经模块协调 sg-coord 转达，消息 #10406。
+- 2026-10-23：改动 4 加一项：`docs/design.md` 第 66～76 行的激活说明改成「只有本地事项账本、没启用约定的项目也出账本提醒」，与
+  `ledger-standalone-reminder` 合入后的行为一致。来源：用户批准 `ledger-standalone-reminder` 最终验收（事项 C201）时的原话「docs/design.md
+  第 66～76 行的激活说明交给 doc-chain 在本模块里顺手改成只有账本也出提醒。」，经模块协调 sg-coord 告知，消息 #10420。

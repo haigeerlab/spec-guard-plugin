@@ -47,6 +47,16 @@ python3 -B "$ROOT/hooks/documentation_verification.py" \
 
 有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
-`absent` 表示项目未启用基线，应静默跳过；`attention` 表示待决、未声明 outcome 或延后事项，属于提醒而非阻断；`ready` 仅表示所有需交付项已**声明** delivered；`invalid` 表示已有表格结构无效。不得把 `ready` 解释为文档内容、发布状态或代码符合度已经验证。
+`absent` 表示项目未启用基线，应静默跳过；`invalid` 表示已有表格结构无效；`attention` 是提醒而非阻断，逐条列在 `attention` 里；`ready` 表示没有未收口的声明，且声明 delivered 的现状类 `update` 文档确被改过。
 
-根据用户提供的真实交付事实预览 `Documentation outcome` 表；只有用户明确确认后才修改 Plan 或任何业务文档。不得扫描代码、Git diff、时间戳或权威文档正文来猜测文档状态。
+每个 outcome 的 `check` 说明按基线状态核到了什么（只对 `update` 且 `delivered` 的项核）：
+
+- `changed`／`unchanged`：现状类文档（基线状态不是 `target`）自本模块 Spec 首次提交以来改过／没改过；没改过会进 `attention`；
+- `target-changed`／`target-unchanged`：`target` 文档不要求改；改过时带 `added`、`removed` 行数，把这份文档的差异原样附进验收消息；有删除行会进 `attention`（删改未实现的目标即改需求，须单独交用户批准）；
+- `unverified`：外部文档（`Authority` 是 URL），只要求证据非空，没有核验；
+- `unknown`：git 查不了（不在仓库里、Spec 还没提交、命令失败），原因写在 `attention` 里，不能当作没改过；
+- `not-checked`：`create`、`deferred`、`pending`。
+
+不得把 `ready` 解释为文档内容正确、已对外发布或代码符合文档；外部文档始终是未核验。最终验收时把结果按上面几类写进验收结果。
+
+根据用户提供的真实交付事实预览 `Documentation outcome` 表；只有用户明确确认后才修改 Plan 或任何业务文档。核验只用 git 看声明要更新的文档改没改过，不读文档正文、不扫描代码；不要据此或凭时间戳另行猜测文档状态。

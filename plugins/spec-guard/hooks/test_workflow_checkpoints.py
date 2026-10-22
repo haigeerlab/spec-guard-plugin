@@ -240,6 +240,21 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertIn("能力图全部完成", self.node_rules("## 最终验收"))
         self.assertIn("有才提", self.node_rules("## Spec 交审"))
 
+    def test_the_documentation_chain_with_a_baseline(self):
+        # doc-chain (D15): suggestion at the Spec review -> impact at the Plan review -> check at the final gate.
+        section = self.section("## 文档建议")
+        for phrase in ("项目有文档基线时", "`Documentation impact`", "`Documentation delivery`", "文档核验",
+                       "`target`", "只能补充", "不得删改未实现的目标", "改目标就是改需求", "单独问用户",
+                       "现状类", "未核验"):
+            self.assertIn(phrase, section)
+        for title, phrases in (("## Spec 交审", ("项目有文档基线时", "`Documentation impact`")),
+                               ("## Plan 交审", ("项目有文档基线时", "文档影响", "`Documentation delivery`", "只补充",
+                                                "不删改未实现的目标")),
+                               ("## 最终验收", ("项目有文档基线时", "文档核验", "未核验", "差异原样附上"))):
+            for phrase in phrases:
+                with self.subTest(title=title, phrase=phrase):
+                    self.assertIn(phrase, self.node_rules(title))
+
     def test_the_final_gate_lists_the_changed_files(self):
         section = self.section("## Plan 检查点分级")
         for phrase in ("最终验收列出实际改动的文件", "最后一个 `gate`", "新增、修改、删除", "差异统计", "不凭记忆",
