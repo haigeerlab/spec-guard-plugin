@@ -2227,9 +2227,10 @@ EN_REMIND_LEDGER="$EN_REMIND_LEDGER$EN_ROOT"; ZH_REMIND_LEDGER="$ZH_REMIND_LEDGE
 out="$(oc_run "$local_project" SessionStart fresh)" || fail "没有账本时 fresh 应退出 0"
 [ -z "$out" ] || fail "没有账本时 fresh 应静默：$out"
 echo "  ✅ 没有账本时 SessionStart fresh 静默且退出 0"; PASS=$((PASS + 1))
+# ledger-standalone-reminder（D11）：未启用约定、只有账本文件的目录，fresh 照样出读回提醒（其余情形见第 23 段）。
 mkdir -p "$WORK/stray/.epiq"; printf '{}\n' > "$WORK/stray/.epiq/project.json"
-[ -z "$(oc_run "$WORK/stray" SessionStart fresh)" ] || fail "未激活的目录有账本文件也应静默"
-echo "  ✅ 未激活的目录有账本文件时 fresh 也静默"; PASS=$((PASS + 1))
+oc_run "$WORK/stray" SessionStart fresh | context_is "未启用约定、只有账本文件的目录 fresh 也出读回提醒" SessionStart \
+  "${EN_FRESH%"$EN_ROOT"} Pass \`repoRoot\` = \`$WORK/stray\` to every ledger tool call."
 plain_before="$(oc_run "$local_project")"
 compact_before="$(oc_run "$local_project" SessionStart)"
 
@@ -2606,7 +2607,79 @@ claude_injected "$TR" "$(run "$idle" | raw_of)"
 is_full "MAP_INVALID 是诊断，每轮完整" "$(run_input "$idle" "$INPUT" | raw_of)"
 }
 
-PARTS=22
+part_23() {
+# ledger-standalone-reminder（D11）：没有约定块、state、指向文件，只有 .epiq/project.json 的项目只出三处账本提醒——会话开始与清空后的
+# 读回提醒、压缩后的账本核对提醒、别的会话转来消息那一轮的记账提醒；其余轮次静默，输出不带阶段标题与状态码。
+lo_run() {  # $1=CLAUDE_PROJECT_DIR $2=标准输入文本，其余参数原样传给 phase-guard.sh
+  local dir="$1" input="$2"; shift 2
+  env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="${RUN_PATH:-$PATH}" \
+    CLAUDE_CONFIG_DIR="$WORK/no-claude-home" CODEX_HOME="$WORK/no-codex-home" CLAUDE_PROJECT_DIR="$dir" \
+    /bin/bash "$HOOKDIR/phase-guard.sh" "$@" <<<"$input"
+}
+lo_is() {  # $1=用例名 $2=期望事件名 $3=期望的完整注入文字；标准输入是 hook 输出
+  python3 -c '
+import json, sys
+output = json.loads(sys.stdin.read())["hookSpecificOutput"]
+assert output["hookEventName"] == sys.argv[1], output
+assert output["additionalContext"] == sys.argv[2], output["additionalContext"]
+assert "spec-guard-state" not in output["additionalContext"], output
+' "$2" "$3" || fail "$1"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+lo_silent() {  # $1=用例名；标准输入是 hook 输出
+  [ -z "$(cat)" ] || fail "$1: 应当静默"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+envelope() {  # Claude Code 转来消息时 hook 收到的输入
+  python3 -c 'import json; print(json.dumps({"session_id": "s", "hook_event_name": "UserPromptSubmit", "prompt":
+    "<cross-session-message from=\"uds:/tmp/x.sock\" from-session=\"local_ab\" from-name=\"peer\" from-mode=\"prompting\">\nhi\n</cross-session-message>"}))'
+}
+PLAIN='{"session_id":"s","hook_event_name":"UserPromptSubmit","prompt":"hello"}'
+lo="$WORK/ledger-only"; mkdir -p "$lo/.epiq"; printf '{"projectId":"x"}\n' > "$lo/.epiq/project.json"
+EN_ROOT=" Pass \`repoRoot\` = \`$lo\` to every ledger tool call."
+ZH_ROOT="调用账本工具时都传 \`repoRoot\` 为 \`$lo\`。"
+EN_FRESH='This project has the local ticket ledger enabled: first list the open issues tagged `waiting-on-me`, `waiting-on-them` or `waiting-on-user`; carry on with the `waiting-on-me` ones, follow up once on the `waiting-on-them` ones if needed, and hand the `waiting-on-user` ones to the user, then continue with what the user asked. If there are none, just continue.'
+ZH_FRESH='本项目启用了本地事项账本：先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的未关闭事项，`waiting-on-me` 的接着处理，`waiting-on-them` 的按需追问一次，`waiting-on-user` 的交给用户，再继续用户的请求；没有就直接继续。'
+EN_COMPACT='Context was just compacted: earlier requests in the summary may already be done; check the open `waiting-on-*` issues in the ledger before redoing anything.'
+ZH_COMPACT='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对账本里未关闭的 `waiting-on-*` 事项。'
+EN_HINT="- Message from another session (sender \`peer\`, session \`local_ab\`): record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call."
+ZH_HINT="- 这一轮是别的会话发来的消息（对方 \`peer\`，会话 \`local_ab\`）：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。"
+
+lo_is "只有账本：fresh 出读回提醒" SessionStart "$EN_FRESH$EN_ROOT" <<<"$(lo_run "$lo" "" SessionStart fresh)"
+lo_is "只有账本：压缩后只出账本核对提醒" SessionStart "$EN_COMPACT$EN_ROOT" <<<"$(lo_run "$lo" "" SessionStart)"
+lo_silent "只有账本：普通 UserPromptSubmit 静默" <<<"$(lo_run "$lo" "$PLAIN")"
+lo_run "$lo" "$PLAIN" >/dev/null || fail "只有账本：普通 UserPromptSubmit 应退出 0"
+lo_is "只有账本：转来的消息只出记账提醒一行" UserPromptSubmit "$EN_HINT$EN_ROOT" <<<"$(lo_run "$lo" "$(envelope)")"
+lo_silent "只有账本：正文中段提到包装仍静默" <<<"$(lo_run "$lo" '{"prompt":"看到 <cross-session-message from=\"x\"> 怎么办"}')"
+
+# 缺 python3：fresh 照旧给英文提醒，压缩后与转来的消息静默（这里本来没有阶段注入，不报缺 python3）。
+mkdir -p "$WORK/nopy"
+lo_is "只有账本、缺 python3：fresh 仍给英文提醒" SessionStart "$EN_FRESH$EN_ROOT" <<<"$(RUN_PATH="$WORK/nopy" lo_run "$lo" "" SessionStart fresh)"
+lo_silent "只有账本、缺 python3：压缩后静默" <<<"$(RUN_PATH="$WORK/nopy" lo_run "$lo" "" SessionStart)"
+lo_silent "只有账本、缺 python3：转来的消息静默" <<<"$(RUN_PATH="$WORK/nopy" lo_run "$lo" "$(envelope)")"
+
+# zh-CN（只有产物语言配置，不含 activeModule，不算启用约定）。
+mkdir -p "$lo/.agent"; printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$lo/.agent/config.json"
+lo_is "只有账本、zh-CN：fresh 出中文读回提醒" SessionStart "$ZH_FRESH$ZH_ROOT" <<<"$(lo_run "$lo" "" SessionStart fresh)"
+lo_is "只有账本、zh-CN：压缩后出中文账本核对提醒" SessionStart "$ZH_COMPACT$ZH_ROOT" <<<"$(lo_run "$lo" "" SessionStart)"
+lo_is "只有账本、zh-CN：转来的消息出中文记账提醒" UserPromptSubmit "$ZH_HINT$ZH_ROOT" <<<"$(lo_run "$lo" "$(envelope)")"
+
+# 宿主给的项目目录是别处，hook 输入的 cwd 在只有账本的 git 仓库子目录里：按 cwd 所在仓库认账本。
+repo="$WORK/ledger-repo"; mkdir -p "$repo/sub/dir" "$repo/.epiq" "$WORK/elsewhere"
+git -C "$repo" init -q; printf '{"projectId":"x"}\n' > "$repo/.epiq/project.json"
+real_repo="$(cd "$repo" && pwd -P)"
+cwd_input="$(python3 -c 'import json, sys; print(json.dumps({"session_id": "s", "cwd": sys.argv[1]}))' "$repo/sub/dir")"
+lo_is "cwd 在只有账本的仓库子目录里：fresh 认得" SessionStart \
+  "$EN_FRESH Pass \`repoRoot\` = \`$real_repo\` to every ledger tool call." <<<"$(lo_run "$WORK/elsewhere" "$cwd_input" SessionStart fresh)"
+
+# 既无账本也无其他信号：三种事件都静默。
+mkdir -p "$WORK/nothing"
+lo_silent "无账本无信号：fresh 静默" <<<"$(lo_run "$WORK/nothing" "" SessionStart fresh)"
+lo_silent "无账本无信号：压缩后静默" <<<"$(lo_run "$WORK/nothing" "" SessionStart)"
+lo_silent "无账本无信号：转来的消息也静默" <<<"$(lo_run "$WORK/nothing" "$(envelope)")"
+}
+
+PARTS=23
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
