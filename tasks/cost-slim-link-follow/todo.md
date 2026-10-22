@@ -11,7 +11,7 @@
 - [x] Task 7：阶段注入措辞（C6） — 先 `module-crew sync`（合入 b19fe11，只是 rules-at-nodes 的 Spec 批准，代码未合入，HEAD 6b3f3ac）。测试先改：目录级与会话登记两条 `Linked project` 全文、目录级包含断言、两条 zh-CN 关联项目用例改为新文字并断言不再含「作为项目传入」；原代码上第 14、18 段红。实现：`phase-guard.sh` 四段文字把「运行命令时把这个路径作为项目传入」换成「spec-guard 命令会自动跟随到这个项目」，目录级那句「传入你自己的项目路径」换成「用 `link-project` 给本会话登记自己的项目」；解析逻辑与失效诊断不变。phase-guard 438 例全过，ShellCheck 无告警。
 - [x] Task 8：文档（C7） — README 中英「统计与上传」收窄为 token 计数、用户提问时间（切模块收尾）、工具调用是否报错与子代理派生关系（接 fact-fixes 交接）；`commands/cost-report.md` 描述、读取项、无法统计的部分与多模块说明；`commands/setup-convention.md` 去掉 `--dispatch` 参数与实验性说明，换成退役说明；`docs/commands.md` setup 参数与退役条、config 汇总、link-project 自动跟随、cost-report 描述与对照表；`docs/workflow.md` 派活一段与「怎么看省没省钱」合为成本报告简述并链到退役说明；`docs/design.md` config 汇总一句、钩子解析后补命令侧 `follow`；`docs/troubleshooting.md` 两处改为自动跟随并加「本次操作的是被指向的项目」一行。新增 `docs/retirements/build-task-dispatch.md`；`spec/build-task-dispatch.md`、`spec/module-cost-report.md`、`spec/link-per-session.md` 各追加修订节。`check-readme-sync.py` 通过；验收 grep 在 README、四份 docs、命令与 skill 里只剩退役说明。
 - [ ] Task 9：公共文件实查（C8）
-- [ ] Task 10：端到端跟随核对
+- [x] Task 10：端到端跟随核对 — scratchpad 里 `mktemp -d` 建一个已启用的临时项目（含能力图、alpha 的 Spec／Plan／todo 并提交）与一个目录级指向它的会话目录，按命令文件里的两行（工作区源码 `follow`，`CLAUDE_CODE_SESSION_ID` 设为假标识）跑：① 指向有效时 `map`、`review-mark` 预览、`cost-report` 都退出 0，第一行 stderr 为「spec-guard: 本次操作的是被指向的项目 `…/target project`（来源：目录级指向，指向文件 `…/session dir/.agent/spec-guard-link.json`）」，输出是目标项目的模块 alpha；② 指向改为未启用目录后 `follow` 退出 2，诊断为「…它指向的目录没有启用 spec-guard（…/plain）…命令没有执行…这是指向失效，不是「未启用」」，后续脚本没有运行；③ 只删掉指向文件后 `PROJECT` 为会话目录本身，`map` 报会话目录没有能力图（退出 3）。
 - [ ] Task 11：合入集成分支并跑完整检查
 - [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
