@@ -158,5 +158,60 @@ class Describe(unittest.TestCase):
                 self.assertNotIn("停点规则", out)
 
 
+BASELINE = {"docs/DOCUMENTATION-BASELINE.md": "| Concern | Authority | Status | Rationale |\n|---|---|---|---|\n"}
+
+
+class DocumentationCheckLine(unittest.TestCase):
+    """doc-chain (D15): at the final gate a project with a documentation baseline is told to run the check."""
+
+    FINAL = "- [x] t\n- [ ] 最终验收（gate）\n"
+
+    def test_serial_final_gate_in_both_languages_and_hosts(self):
+        for zh, host, want in ((True, "claude", "- 文档核验：项目有文档基线，最终验收前跑 `/spec-guard:documentation-verification alpha`"),
+                               (True, "codex", "- 文档核验：项目有文档基线，最终验收前跑 `$spec-guard-ops` 的 documentation 核验（模块 `alpha`）"),
+                               (False, "claude", "- Documentation check: this project has a documentation baseline; before the "
+                                                 "final acceptance run `/spec-guard:documentation-verification alpha`"),
+                               (False, "codex", "run `$spec-guard-ops` documentation verification for `alpha`")):
+            with self.subTest(zh=zh, host=host):
+                with Project(dict(building(self.FINAL), **BASELINE), zh=zh) as p:
+                    out = describe(p.root, host=host)
+                self.assertIn(want, out)
+        with Project(dict(building(self.FINAL), **BASELINE)) as p:
+            out = describe(p.root)
+        self.assertIn("「验收结果」", out)
+        self.assertIn("attention 不卡验收", out)
+        self.assertLess(out.index("- 文档核验："), out.index("建议下一步"))
+
+    def test_no_baseline_leaves_the_output_unchanged(self):
+        with Project(building(self.FINAL)) as p:
+            bare = describe(p.root)
+            (p.root / "docs").mkdir()
+            (p.root / "docs/DOCUMENTATION-BASELINE.md").write_text(BASELINE["docs/DOCUMENTATION-BASELINE.md"],
+                                                                   encoding="utf-8")
+            full = describe(p.root)
+        self.assertNotIn("文档核验", bare)
+        lines = [line for line in full.split("\n") if not line.startswith("- 文档核验：")]
+        self.assertEqual("\n".join(lines), bare)
+
+    def test_other_nodes_carry_no_line(self):
+        for files in ({}, {"spec/alpha.md": "# a\n"}, building("- [ ] t\n- [ ] 最终验收（gate）\n"),
+                      building("- [x] t\n- [ ] 检查点 1（gate）：中途\n- [ ] 最终验收（gate）\n"),
+                      building("- [ ] t\n", plan="# Plan\n\n<!-- spec-guard: review pending -->\n")):
+            with self.subTest(files=sorted(files)):
+                with Project(dict(files, **BASELINE)) as p:
+                    self.assertNotIn("文档核验", describe(p.root))
+
+    def test_module_checkout_gets_it_and_the_coordinator_does_not(self):
+        files = dict(BASELINE, **{"tasks/beta/plan.md": APPROVED_PLAN, "tasks/beta/todo.md": self.FINAL})
+        with View(files, "module beta\n") as v:
+            out = v.describe()
+        self.assertIn("- Documentation check: this project has a documentation baseline", out)
+        self.assertIn("`/spec-guard:documentation-verification beta`", out)
+        with View(files, "coordinator\n") as v:
+            self.assertNotIn("Documentation check", v.describe())
+        with View(dict(files, **{"tasks/beta/todo.md": "- [ ] a\n- [ ] 最终验收（gate）\n"}), "module beta\n") as v:
+            self.assertNotIn("Documentation check", v.describe())
+
+
 if __name__ == "__main__":
     unittest.main()
