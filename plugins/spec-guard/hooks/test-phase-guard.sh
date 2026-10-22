@@ -1026,7 +1026,8 @@ printf '%s\n' '- [ ] open' > "$pc/tasks/alpha/todo.md"
 plain_pc="$(run "$pc" | context_of)"
 LANG_LINE='- Artifact language: `pt-BR`'
 CADENCE_LINE='- Review cadence: combined'
-INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
+INVALID_LINE='- Project config: invalid (version-invalid)'
+IGNORED_LINE='- Project config: ignored (unknown-key, reviewCadence-invalid)'
 config_case() {  # $1=用例名 $2=config.json 内容 $3...=期望多出的行（前缀）
   local name="$1" body="$2" line rest; shift 2
   printf '%s\n' "$body" > "$pc/.agent/config.json"
@@ -1046,8 +1047,21 @@ config_case "设了产物语言：多出语言行" '{"version": 1, "artifactLang
 config_case "combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
 config_case "两项都设：两行都在" '{"version": 1, "artifactLanguage": "pt-BR", "reviewCadence": "combined"}' \
   "$LANG_LINE" "$CADENCE_LINE"
-config_case "无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
+# config-per-key：结构问题才整份失效（只出 invalid 行）；未知键与非法值只丢那个键，其余照常，另加一行 ignored。
+config_case "结构问题：只出 invalid 行" '{"version": 2, "artifactLanguage": "pt-BR", "reviewCadence": "combined"}' \
   "$INVALID_LINE"
+config_case "非 JSON：只出 invalid 行" '{broken' '- Project config: invalid (not-json)'
+config_case "逐键问题：语言行照常，节奏丢弃，加 ignored 行" \
+  '{"version": 1, "artifactLanguage": "pt-BR", "reviewCadence": "both", "x": 1}' "$LANG_LINE" "$IGNORED_LINE"
+config_case "只有未知键：节奏行照常，加 ignored 行" '{"version": 1, "reviewCadence": "combined", "x": 1}' \
+  "$CADENCE_LINE" '- Project config: ignored (unknown-key)'
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN", "x": 1}' > "$pc/.agent/config.json"
+out="$(run "$pc" | context_of)"
+grep -F -- '- 项目配置: 已忽略 (unknown-key)——其余设置照常生效；用 /spec-guard:config 查看。' >/dev/null <<<"$out" \
+  && grep -F -- '当前阶段' >/dev/null <<<"$out" && grep -F -- '- 产物语言: `zh-CN`' >/dev/null <<<"$out" \
+  || fail "未知键不应让 zh-CN 失效：应有中文提示与「已忽略」行
+$out"
+echo "  ✅ 未知键加 zh-CN：中文提示照常，出现「已忽略」行"; PASS=$((PASS + 1))
 printf '%s\n' '{"version": 1, "reviewCadence": "separate"}' > "$pc/.agent/config.json"
 out="$(run "$pc" | context_of)"
 [ "$out" = "$plain_pc" ] || fail "separate 不应注入任何内容
@@ -1242,9 +1256,12 @@ expect "Codex 挂起行：\$spec-guard-ops module-suspend --resume" 'resume with
 printf '%s\n' '- [x] built' > "$cw/tasks/alpha/todo.md"; rm "$cw/tasks/beta/todo.md"
 out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "缺 todo"
 expect "Codex 缺 todo 汇总：\$spec-guard-ops verify-artifacts" 'run `$spec-guard-ops` verify-artifacts to review'
-mkdir -p "$cw/.agent"; printf '%s\n' '{"version": 1, "x": 1}' > "$cw/.agent/config.json"
+mkdir -p "$cw/.agent"; printf '%s\n' '{"version": 2}' > "$cw/.agent/config.json"
 out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "配置无效"
 expect "Codex 配置无效行：\$spec-guard-ops config" '— run `$spec-guard-ops` config.'
+printf '%s\n' '{"version": 1, "x": 1}' > "$cw/.agent/config.json"
+out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "配置已忽略"
+expect "Codex 配置已忽略行：\$spec-guard-ops config" '— the other settings apply; run `$spec-guard-ops` config.'
 rm "$cw/.agent/config.json"
 cp "$cw/spec/CAPABILITY-MAP.md" "$WORK/cw-map.bak"; printf '%s\n' '| alpha | x | — |' > "$cw/spec/CAPABILITY-MAP.md"
 out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "MAP_INVALID"
@@ -1726,7 +1743,8 @@ part_16() {
 build_fixture ctx
 LANG_LINE='- Artifact language: `pt-BR`'
 CADENCE_LINE='- Review cadence: combined'
-INVALID_LINE='- Project config: invalid (unknown-key, reviewCadence-invalid)'
+INVALID_LINE='- Project config: invalid (version-invalid)'
+IGNORED_LINE='- Project config: ignored (unknown-key, reviewCadence-invalid)'
 run_start() {  # $1=项目目录 $2=标准输入文本：以 SessionStart 运行
   env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" \
     /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$2"
@@ -1824,8 +1842,9 @@ $plain_early"
   }
   early_case "$kind 设了产物语言：多出语言行" '{"version": 1, "artifactLanguage": "pt-BR"}' "$LANG_LINE"
   early_case "$kind combined：多出节奏行" '{"version": 1, "reviewCadence": "combined"}' "$CADENCE_LINE"
-  early_case "$kind 无效配置：只出 invalid 行" '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "both", "x": 1}' \
-    "$INVALID_LINE"
+  early_case "$kind 结构问题：只出 invalid 行" '{"version": 2, "artifactLanguage": "pt-BR"}' "$INVALID_LINE"
+  early_case "$kind 逐键问题：语言行照常，加 ignored 行" \
+    '{"version": 1, "artifactLanguage": "pt-BR", "reviewCadence": "both", "x": 1}' "$LANG_LINE" "$IGNORED_LINE"
   printf '%s\n' '{"version": 1, "reviewCadence": "separate"}' > "$early/.agent/config.json"
   [ "$(run "$early" | context_of)" = "$plain_early" ] || fail "$kind separate 不应注入任何内容"
   echo "  ✅ $kind separate：输出逐字不变"; PASS=$((PASS + 1))
@@ -1971,7 +1990,8 @@ for tag in zh-TW zh-Hans en ja; do
     +"Suggested next step" -"产物语言" -"位置: " -"建议下一步"
 done
 bad="$WORK/lang-bad"; lang_project "$bad" zh_CN
-zh_check "配置无效：英文并报告 invalid" "$bad" +"- Project config: invalid (" +"Suggested next step" -"项目配置" -"建议下一步"
+zh_check "语言标签非法：英文并报告 ignored" "$bad" +"- Project config: ignored (artifactLanguage-invalid)" \
+  +"Suggested next step" -"项目配置" -"建议下一步"
 
 # 模块阶段（module_stage.describe）：alpha 已完成，beta 按场景改。
 ENGLISH_ONLY+=(-"Modules " -"Suspended" -"Paused" -"Plan without todo" -"This branch has" -"unchecked item" -"is done"

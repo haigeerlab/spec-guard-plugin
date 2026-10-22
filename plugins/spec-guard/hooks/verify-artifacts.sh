@@ -105,7 +105,10 @@ if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
   else
     CONFIG_OUT="$(python3 -B "$HOOKDIR/project_config.py" check --project . 2>/dev/null </dev/null)"
     CONFIG_RC=$?
-    if [ "$CONFIG_RC" -eq 0 ]; then
+    if [ "$CONFIG_RC" -eq 0 ] && [ "${CONFIG_OUT#*ignored}" != "$CONFIG_OUT" ]; then
+      # config-per-key：只有不认识的键时 check 退出 0 并写 ignored；其余设置照常生效。
+      warn '项目配置里有不认识的键，已忽略（可能来自更新版本的 spec-guard）'
+    elif [ "$CONFIG_RC" -eq 0 ]; then
       ok '项目配置有效'
     elif [ "$CONFIG_RC" -eq 1 ]; then
       bad "项目配置无效: ${CONFIG_OUT#*invalid: }（用 /spec-guard:config 查看）"
