@@ -1,6 +1,6 @@
 # Spec: scope-overlap-interface
 
-<!-- spec-guard: review approved a6698bc9cbb1 -->
+<!-- spec-guard: review approved 7b7eaec381e6 -->
 
 ## Objective
 
