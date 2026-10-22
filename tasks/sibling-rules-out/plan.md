@@ -1,6 +1,6 @@
 # Plan: sibling-rules-out
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/sibling-rules-out.md`](../../spec/sibling-rules-out.md)（2026-10-22 批准，事项 C70）。Spec 的三个待定项按用户答复都选 A
 （协调的编号 D9、D10、D11 对应 Spec「待定」第 1、2、3 条）：
