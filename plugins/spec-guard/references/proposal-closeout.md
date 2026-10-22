@@ -154,7 +154,9 @@ journal 里，**绝不重发**；重跑是重新读取并报告，不是重试�
 
 journal 位于 `~/.local/state/spec-guard/proposal-closeout/`，文件 0600、父目录 0700、按
 `sha256(proposalId + revision)` 取 `fcntl` 独占锁。记录的绑定若指向另一个目标，结果是 `conflict`，
-不是静默改用新目标。**收尾成功会删掉自己的条目**，所以 journal 里还有东西 = 有一次没收完的尝试。
+不是静默改用新目标。**收尾成功会删掉自己的条目**，所以 journal 里还有 `.json` 条目 = 有一次没收完的尝试。
+锁文件（同名加 `.lock`，空文件、0600）**释放时不删**，会一直留在目录里：已经在等锁的进程持有旧 inode，
+删掉它会让新来的进程新建一个锁文件并立即拿到锁，两个进程同时写远端。
 
 **诚实的局限**：插件无法扫描所有容器，因此**不能证明**同一个 Proposal 没有在另一个 Tracker 里也存在
 一条。journal 丢失后仍须靠 marker 重新对账。这与 `local-ticket-portability` 对同一问题的表述一致。

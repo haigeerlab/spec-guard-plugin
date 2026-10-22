@@ -32,7 +32,9 @@ Proposal's baseline commit no longer exists.
 
 Everything else is unchanged: parse failures, failures of a Proposal not yet promoted,
 duplicate ids, a missing or invalid capability map and the pool size limit still make the
-pool invalid or unknown. Healthy promoted Proposals stay in the pool. The pool never reads a mainline policy file
+pool invalid or unknown. A file the snapshot lists but `git show` cannot read is a failed
+read, not an invalid Proposal: the whole pool is `unknown` with the stable code
+`snapshot-proposal-unreadable` (run it again), and the file is never skipped. Healthy promoted Proposals stay in the pool. The pool never reads a mainline policy file
 or acceptance records: every publication's `review_commit` is the observed remote-default
 commit. An excluded Proposal is reported in the pool's `skipped` list; querying it by id behaves as if it were not
 in the pool.

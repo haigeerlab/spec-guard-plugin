@@ -297,6 +297,24 @@ Gamma is separate.
         self.assertEqual([item.proposal.proposal_id for item in pool.publications], ["gamma"])
         self.assertEqual(pool.skipped, ())
 
+    def test_pool_with_a_listed_proposal_that_cannot_be_read_is_unknown(self):
+        """`ls-tree` listed it, `git show` could not read it: a failed read, not an
+        invalid Proposal and not one to skip, so the whole pool is a retry (F18)."""
+        real_show = proposal_publication._show
+
+        def failing_show(repo, commit, path):
+            if path == "spec/proposals/gamma.md":
+                return None
+            return real_show(repo, commit, path)
+
+        with patch("proposal_publication._show", side_effect=failing_show):
+            pool = read_published_pool(self.consumer)
+        self.assertEqual(pool.state, "unknown")
+        self.assertEqual(pool.diagnostic, proposal_publication.PROPOSAL_UNREADABLE)
+        self.assertEqual(proposal_publication.probe_code(pool.diagnostic),
+                         "snapshot-proposal-unreadable")
+        self.assertEqual(pool.publications, ())
+
     def test_pool_without_bad_proposals_has_no_skipped_entries(self):
         pool = read_published_pool(self.consumer)
         self.assertEqual(pool.state, "published")
