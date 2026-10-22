@@ -104,7 +104,12 @@ python3 -B plugins/spec-guard/hooks/test_proposal_closeout_providers.py
 - **会做**：Assumptions 与 Contract 列出的代码、测试、命令与参考文档、两份接口 Spec 的事实句。
 - **先问**：改结果模型或错误短码；让 Proposal 读取命令从 tracker-default 取主机；删除或改名交接／收尾适配类；支持 GitHub/GitLab 以外的平台；改版本号。
 - **不做**：任何真实远端写入；改 Local（Epiq）后端、`ticket` 受理、tracker-default 解析；Proposal 锁与候选池诊断（`proposal-fixes` 的范围）；能力图目标段改写（`fact-fixes` 的范围）。
+- **并行边界**：下面一节按 Plan 批准时的用户答复（D3 A）补入，与 Plan 同名一节一致；`scripts/validate.sh`（登记新测试一行）与 `plugins/spec-guard/skills/spec-guard-ops/SKILL.md`（补 `--host`）各改一小段、可能与同批模块重叠，不列独占。
 - **公共文件**：新测试登记到 `scripts/validate.sh`、写 CHANGELOG，如属公共文件，按【公共变更请求】提给模块协调。
+
+## 并行边界
+
+- 独占：`plugins/spec-guard/hooks/hosted_ticket_provider.py`、`plugins/spec-guard/hooks/local_ticket_provider.py`、`plugins/spec-guard/hooks/local_ticket_github.py`、`plugins/spec-guard/hooks/local_ticket_gitlab.py`、`plugins/spec-guard/hooks/local_ticket_preview.py`、`plugins/spec-guard/hooks/proposal_tracker_read.py`、`plugins/spec-guard/hooks/proposal_closeout_github.py`、`plugins/spec-guard/hooks/proposal_closeout_gitlab.py`、`plugins/spec-guard/hooks/proposal_review.py`、`plugins/spec-guard/hooks/proposal_promotion_proof.py`、`plugins/spec-guard/hooks/test_tracker_provider_contract.py`、`plugins/spec-guard/hooks/test_hosted_ticket_read.py`、`plugins/spec-guard/hooks/test_hosted_ticket_write.py`、`plugins/spec-guard/hooks/test_hosted_ticket_actions.py`、`plugins/spec-guard/hooks/test_local_ticket_providers.py`、`plugins/spec-guard/hooks/test_local_ticket_publish.py`、`plugins/spec-guard/hooks/test_proposal_tracker_read.py`、`plugins/spec-guard/hooks/test_proposal_closeout_providers.py`、`plugins/spec-guard/hooks/test_proposal_review.py`、`plugins/spec-guard/hooks/test_proposal_promotion_proof.py`、`plugins/spec-guard/commands/proposal-review.md`、`plugins/spec-guard/commands/proposal-promotion-preflight.md`、`plugins/spec-guard/commands/proposal-promotion-proof.md`、`plugins/spec-guard/references/proposal-tracker-read.md`、`spec/proposal-tracker-read.md`、`spec/local-ticket-portability.md`
 
 ## Success criteria
 

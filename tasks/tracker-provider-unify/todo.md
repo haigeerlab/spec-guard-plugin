@@ -1,6 +1,6 @@
 # Todo: tracker-provider-unify
 
-- [ ] Task 0：提交已批准的 Spec 标记、Plan 与 todo
+- [x] Task 0：提交已批准的 Spec 标记、Plan 与 todo — Plan 批准（C10）后由模块协调带批准标记提交到集成分支 f6e1e77，`module-crew sync` 合入（1e81055）。按 D3 A 把 Plan 的并行边界一节补进 Spec（Boundaries 加一句说明），`module_scope.py check --base crew/fix-batch` 通过、越界 0；Spec 指纹因此改变，最终验收附差异复审。
 - [ ] Task 1：共享回归 `test_tracker_provider_contract.py`（先红）并登记
 - [ ] Task 2：共享层扩展（project id、labels、container），托管事项保持绿
 - [ ] Task 3：交接改用共享层，错误短码与发布器状态不变
