@@ -122,6 +122,11 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 1.9（rules-at-nodes）起，`reviewKinds` 跟上 session-protocol v2.6 的上游小项名：`plan` 与 `spec-plan` 多「架构决定」「未决问题」两项，
 另有 `renamedSections` 列「旧名→新名」（做／不做→边界，附带的小决定→未决问题）；`spec` 的旧节名照旧保留到 2.0，两种名字都有效。
 
+1.10（scope-overlap-interface）起另有 `scopeOverlap`：`module_scope.py overlap` 给几份 Spec 文件（`--spec <模块 id>=<文件>`，可选 `--project`
+并入项目里进行中、就绪的模块，传入的文件优先）返回两两的独占重叠与各自来源，不受多模块并行开关限制；解析与重叠判定和 `startable.conflicts`
+是同一份（`module_scope.parse` 与 `module_scope.overlap`）。用来在 Spec 还没落到集成分支时就查重叠。`check-interface.py` 核对它引用的脚本
+存在、错误码与代码一致。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
