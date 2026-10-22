@@ -150,7 +150,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `/spec-guard:documentation-baseline` | 预览或建立项目级文档基线 `docs/DOCUMENTATION-BASELINE.md`，不生成业务文档 |
 | `/spec-guard:documentation-impact` | 预览一个模块对文档基线的影响和计划交付物 |
 | `/spec-guard:documentation-verification` | 只读核验模块声明的文档交付状态；`ready` 只表示已声明交付，不代表内容已验证 |
-| `/spec-guard:history-integrity` | `audit` 只读输出历史证据的 JSON 报告；`correct --confirm <audit-report.json> <correction.json>` 在确认后追加补正记录 |
+| `/spec-guard:history-integrity` | 只读：`verify`（默认）核对旧布局项目归档文件的 SHA-256；`migration-preview` 预览旧证据的迁移 |
 
 ## 报告
 
@@ -191,7 +191,7 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
 | Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
 | 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
-| 能力历史（含审计与 `correct` 补正） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
+| 能力历史（verify 核对与迁移预览） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
 | 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | agent-relay 的 skill |
 | 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
 | 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | `local-ticket-portability` skill |

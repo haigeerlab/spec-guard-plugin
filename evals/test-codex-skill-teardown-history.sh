@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# spec-guard-ops（Codex 路由）必须能预览并执行 teardown，也必须有 history 的
-# correct 路由；否则 Codex 用户没有入口做 Claude 侧 /spec-guard:teardown-convention
-# 与 /spec-guard:history-integrity correct 能做的事（R4 前半）。
+# spec-guard-ops（Codex 路由）必须能预览并执行 teardown；否则 Codex 用户没有入口做 Claude 侧
+# /spec-guard:teardown-convention 能做的事（R4 前半）。能力历史两侧入口一致（决定 D16）：
+# Codex history 节与 Claude /spec-guard:history-integrity 都只给 verify 与迁移预览，
+# 不给 audit、correct，也不给 import --confirm。
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,14 +33,24 @@ HISTORY_SECTION="$(awk '/^## history$/{flag=1; next} /^## /{flag=0} flag' "$SKIL
   echo "spec-guard-ops lacks a history section" >&2
   exit 1
 }
-grep -Fq 'capability-history.py" correct --confirm' <<<"$HISTORY_SECTION" || {
-  echo "history section does not invoke capability-history.py correct --confirm" >&2
-  exit 1
-}
-grep -Fq '确认' <<<"$HISTORY_SECTION" || {
-  echo "history correct route does not require explicit user confirmation" >&2
-  exit 1
-}
+COMMAND="$REPO_ROOT/plugins/spec-guard/commands/history-integrity.md"
+[ -f "$COMMAND" ] || { echo "missing $COMMAND" >&2; exit 1; }
+for entry in "Codex history section:$HISTORY_SECTION" "Claude history-integrity:$(cat "$COMMAND")"; do
+  label="${entry%%:*}"
+  text="${entry#*:}"
+  for wanted in 'hooks/verify-history.sh' 'history-migration.py" preview'; do
+    grep -Fq "$wanted" <<<"$text" || {
+      echo "$label does not offer $wanted" >&2
+      exit 1
+    }
+  done
+  for removed in 'capability-history.py" audit' 'correct --confirm' 'import --confirm'; do
+    if grep -Fq "$removed" <<<"$text"; then
+      echo "$label still offers $removed" >&2
+      exit 1
+    fi
+  done
+done
 
 # 真实回环：在真实的 Codex（AGENTS.md）项目里，把 skill 给出的 teardown 命令行原样跑一遍，
 # 证明其中每个参数都是 teardown-convention.sh 实际接受的，而不是靠读脚本源码推断。

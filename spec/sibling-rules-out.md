@@ -1,6 +1,6 @@
 # Spec: sibling-rules-out
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 6ddd5e80bc72 -->
 
 ## Objective
 

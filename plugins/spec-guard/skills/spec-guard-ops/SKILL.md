@@ -418,27 +418,15 @@ python3 -B "$ROOT/hooks/proposal_closeout.py" scan --project "$PROJECT" \
 
 ## history
 
-历史验证与审计均为只读；导入或补正仍须单独确认：
+能力历史只为还没迁完的旧布局项目保留（Claude 侧为 `/spec-guard:history-integrity`），两件事都只读：
 
 ```bash
 /bin/bash "$ROOT/hooks/verify-history.sh" "$PROJECT"
-python3 "$ROOT/hooks/capability-history.py" audit "$PROJECT/spec/CAPABILITY-HISTORY.json" "$PROJECT"
 python3 "$ROOT/hooks/history-migration.py" preview "$PROJECT"
 ```
 
-审计报告中的 `unknown` 不是失败时可以猜测补齐的值，不得从当前 `activeModule`、文件名或当前
-时间推断责任、依赖、状态或历史时间。`correct` 是写操作，只有用户明确确认该次补正后才允许
-调用；它会向账本追加 `history-correction` 记录，绝不重写 checkpoint，只会标记原值、修正值与
-身份均精确匹配的 audit finding 为 `corrected`：
-
-```bash
-python3 "$ROOT/hooks/capability-history.py" correct --confirm \
-  "$PROJECT/spec/CAPABILITY-HISTORY.json" <audit-report.json> <correction.json>
-```
-
-`<audit-report.json>` 与 `<correction.json>` 必须是用户审阅过的文件，补正须包含原值、修正值、
-审计报告哈希、审计时间、`initiativeId`、`eventIndex`、对应的 `checkpointId`（无 checkpoint 时为
-`null`）与 audit finding。没有 `--confirm`、审计报告哈希不匹配、证据矛盾，或把 `unknown` 升级
-成 `completed` 的请求都会被拒绝，且不会写入。
+第一条核对账本登记的归档文件的 SHA-256 并拒绝未登记的历史目录，没有账本时报「未验证」并以 0 退出；第二条列出旧项目
+可导入的证据与冲突。verify 通过只说明归档文件逐字未改；事件的 `at` 是迁移时抄下的原值（可能是 `now`、`imported`），
+不作为时间证据。账本里已有的补正记录照常校验，但不再提供审计与追加补正；实际导入旧证据是维护者的内部操作，不在本 skill 里。
 
 历史快照与旧 state 是证据，不是恢复旧 tracker 工作流的授权。
