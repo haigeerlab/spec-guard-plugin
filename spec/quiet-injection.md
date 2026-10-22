@@ -1,6 +1,6 @@
 # Spec: quiet-injection
 
-<!-- spec-guard: review approved b969f65a309a -->
+<!-- spec-guard: review approved 4aa39004f921 -->
 
 ## Objective
 
