@@ -782,6 +782,11 @@ mkifc "$TMP/ifc-tick" 'del data["gateTick"]'
 want fail "interface: 缺 1.7 的 gateTick 入口 → 报错" python3 "$IFC" "$TMP/ifc-tick/interface.json"
 mkifc "$TMP/ifc-tick-script"; rm "$TMP/ifc-tick-script/hooks/gate_tick.py"
 want fail "interface: gateTick 指向的脚本不存在 → 报错" python3 "$IFC" "$TMP/ifc-tick-script/interface.json"
+# scope-overlap-interface：interface 1.10 的 scopeOverlap 入口，错误码与 module_scope.OVERLAP_ERRORS 一致。
+mkifc "$TMP/ifc-overlap" 'del data["scopeOverlap"]'
+want fail "interface: 缺 1.10 的 scopeOverlap 入口 → 报错" python3 "$IFC" "$TMP/ifc-overlap/interface.json"
+mkifc "$TMP/ifc-overlap-error" 'del data["scopeOverlap"]["values"]["error"]["map-unreadable"]'
+want fail "interface: scopeOverlap 的 error 少一个码 → 报错" python3 "$IFC" "$TMP/ifc-overlap-error/interface.json"
 # review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
 mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
 want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"
