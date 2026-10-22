@@ -1,6 +1,6 @@
 # Plan: rules-at-nodes
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/rules-at-nodes.md`](../../spec/rules-at-nodes.md)：2026-10-22 批准（事项 C102，11 条前提认可，附带小决定 D12 选 A：兜底一句写
 「停在 gate 前、交审前或要停下问用户前，先读停点规则里对应的一节」）；同日按事项 C105 修订、经 C107 复审批准（前提 12、13 认可，
