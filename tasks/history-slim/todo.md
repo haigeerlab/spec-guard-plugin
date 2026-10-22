@@ -5,7 +5,7 @@
 - [x] Task 2：去掉 audit 与 correct（C1） — 删 `audit()`、`load_json()`、`find_audit_finding()`、`append_correction()`、`correction_identity()` 与只被 audit 用的 `capability_map` 导入，动词集合与用法行去掉两项；`check_correction()` 及 `AUDIT_TIME`、`SHA256`、`MODULE_STATUS` 保留并加注释。三份历史测试全过；本仓库 `verify-history.sh .` 输出「历史证据校验通过」。
 - [x] Task 3：两侧入口对齐（C2） — `commands/history-integrity.md` 改为 `verify`（默认）与 `migration-preview`，插件根目录定位引导原样保留；`spec-guard-ops` 的 `## history` 节同样两条。实跑命令代码块：空参数与 verify 报「历史证据校验通过」，migration-preview 输出 JSON，未知参数打印用法退出 2。`check-command-names.py` 把 `) /bin/bash` 读成命令引用，改写为 `bash`（与 teardown 命令一致）。入口回归与 `validate.sh --quick` 通过。
 - [x] Task 4：接口 Spec 与文档（C3） — `spec/capability-history.md` 去掉审计与更正的契约、命令与边界，写明已有更正记录照常校验、`at` 不作为时间证据、两侧入口一致；`docs/commands.md` 两行与 `docs/optional-features.md`「能力历史」一节按新入口改写。三份文件中 audit／correct／审计／补正只剩「已去掉」「已有记录照常校验」与归档来源说明。
-- [ ] Checkpoint 1（report）：变异核对
+- [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的三份副本上各改一处：把 `audit` 加回动词集合 → `test-capability-history.sh` 1 处红（audit rc=0）；Codex history 节加回 `correct --confirm` 命令 → 入口回归报「Codex history section still offers correct --confirm」；`validate_data` 不再调 `check_correction` → 补正写坏两例都红。
 - [ ] Task 5：公共文件请求（C4）
 - [ ] Task 6：合入集成分支并跑完整检查
 - [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
