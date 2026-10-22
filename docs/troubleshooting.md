@@ -31,7 +31,7 @@ ls .agent/
 - 没有激活信号：运行 `/spec-guard:setup-convention`（先 `--dry-run` 预览）。
 - 会话目录不是项目目录：在会话里运行 `/spec-guard:link-project`（Codex：`spec-guard-ops` 的 link-project 一节），
   `set --project <项目路径>` 先预览、确认后写入 `.agent/spec-guard-link.json`。之后每轮都会收到那个项目的阶段提示，
-  多一行 `Linked project`。其他命令目前不自动跟随指向，要显式带上项目路径。
+  多一行 `Linked project`。其他命令也自动跟随指向，输出写明「本次操作的是被指向的项目」。
 - 有 `state.json.disabled`：确认要恢复后，把它改回 `.agent/state.json`。setup 在这种情况下会拒绝新建空状态，
   免得覆盖原来的 `activeModule`。
 - Claude Code：在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
@@ -125,7 +125,8 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有批准标记时只指出这个检查点，并提醒尚未批准就先等批准 |
 | 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
 | 升级插件后，命令的行为还是旧版本的（例如新加的参数报不认识） | Claude Code 在会话开始时定下插件目录，已开着的会话里命令仍调用旧版本的脚本。升级后重开会话；Codex 升级后开新会话，新增的钩子还要信任一次 |
-| `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。如果这个会话做的是别的项目，这段提示不适用——多个会话共用一个目录、各做不同项目时不要建立指向，用 `/spec-guard:link-project` 的 `unset` 解除，或把会话开在各自的项目目录里 |
+| `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。其他 spec-guard 命令也跟随它。如果这个会话做的是别的项目，用 `/spec-guard:link-project set --project <路径> --session <会话标识>` 给本会话登记自己的项目（本会话的登记优先于目录级指向），或把会话开在自己的项目目录里 |
+| `本次操作的是被指向的项目 …`（命令输出） | 会话目录有指向，命令跟随它操作了被指向的项目；不是你要的项目时同上一行给本会话登记 |
 | `本目录有指向文件 … 但它的格式无效` | 指向文件既不是版本 1（只含 `version` 与 `project`），也不是版本 2（含 `version`、`sessions`，可选 `project`）；`link-project unset --confirm` 后重新 `set` |
 | `本目录有指向文件 … 但它指向的目录不存在或不是目录` | 项目被移动或删除了；重新 `set --project <新路径>`，或 `unset` 解除 |
 | `本目录有指向文件 … 但它指向的目录没有启用 spec-guard` | 目标里没有约定块，也没有带 `activeModule` 的 `.agent/state.json`；在那个项目里运行 `/spec-guard:setup-convention`，或改指向别处 |

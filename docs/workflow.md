@@ -26,20 +26,10 @@
 
 整个过程中不用自己记进度，每轮对话开头 hook 都会告诉 agent 现在到了哪一步。
 
-**可选（实验性）：把 task 交给子代理执行。** agent-skills 的 `/build` 默认在主会话里直接实现每个 task。安装约定时加
-`--dispatch`，约定块会多一段规则：非 Checkpoint 的 task 交给一个子代理做 RED → GREEN → 回归 → 构建，
-派活 prompt 带一行 tier-guard 档位标记，验收 diff、提交、勾选和问人仍由主代理完成。装了
-[tier-guard](https://github.com/haigeerlab/tier-guard) 时它据此为子代理选模型；没装时标记只是一行注释。
-任务块不完整、属于停止条件、L3、或为子代理选的模型不比主会话便宜时，主代理自己做。这条规则只是引导，spec-guard
-不检测是否照做。省钱效果尚未证明：对照实验里派活没有减少主会话轮次，比不派贵 15%–54%，因此规则默认由主代理自己做，
-只派预计要改动 3 个以上文件、验收明确的 task。默认关闭；已开启的项目 `--replace` 升级时保持开启，
-关闭用 `--replace --no-dispatch`。Codex 上同样可用；Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你批准。派活正文在 Codex 上是加密的，档位标记无法从记录中核对，
-也没有程序读取，只作建议。
-
-**怎么看省没省钱。** `/spec-guard:cost-report <模块>`（Codex 里让 `spec-guard-ops` 跑 cost report）离线读取本机的
-Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 token、主会话轮次、派活次数与返工信号；加
-`--prices <价格文件>` 折算成等价金额（订阅账号省的是额度，金额只是统一的尺子）。派活省不省钱主要看它让主会话少跑了
-几轮，报告里的「主会话轮次」就是为此列出的。多个模块一起报告时附「有派活 / 没派活」的对照，只能看趋势。
+**怎么看一个模块花了多少。** `/spec-guard:cost-report <模块>`（Codex 里让 `spec-guard-ops` 跑 cost report）离线读取本机的
+Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 token 和主会话轮次；加 `--prices <价格文件>` 折算成
+等价金额（订阅账号省的是额度，金额只是统一的尺子）。原先可选的派活规则（`setup-convention --dispatch`）与报告里的
+派活、返工信号已经退役，见 [退役说明](retirements/build-task-dispatch.md)。
 
 若项目已明确采用可用的 Local 事项账本，并决定实施一个可追踪需求或修复，
 先用 `ticket` 入口查重并取得事项 ID，再开始编码；Spec 和 Plan 可随后细化。

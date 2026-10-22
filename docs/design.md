@@ -75,7 +75,9 @@ plugins/spec-guard/
    `Linked project`；有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
    也不连环跟随。hook 不从宿主的工作区设置或会话记录推断项目。指向文件可以按会话登记（版本 2 的 `sessions`）：hook 从输入里取
    会话标识（`session_id`，以及 `transcript_path` 文件名——两个宿主都用会话标识命名会话记录），先用本会话的登记，其次目录级
-   指向，都没有则静默。标识只用来查表，不读会话记录的内容。
+   指向，都没有则静默。标识只用来查表，不读会话记录的内容。命令侧用同一个解析：`project_link.py follow` 按入口所在宿主取会话
+标识（Claude 命令传 `CLAUDE_CODE_SESSION_ID`，Codex skill 传 `CODEX_THREAD_ID`），打印要操作的项目并在 stderr 写明跟随；
+指向失效时退出 2，不退回会话目录。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
    交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
    （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
@@ -181,7 +183,7 @@ Proposal 代码从不读它。已开工、在等外部条件的模块可以用 `
 phase-guard 与 `session_context.py` 的位置行都向它取，其他值的提示与 0.67.0 逐字节相同）、`reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）与
 `moduleConcurrency`（多模块并行开关，默认 `off`；规划层的并行规则只在 `on` 时生效，`off`、未设置、取值无效或文件无效时所有输出与
 引入开关前逐字相同）。其他代码只通过 `project_config.module_concurrency()` 读这个开关，不自己解析。
-派活开关与默认事项后端各有自己的位置，这里只汇总显示。
+默认事项后端有自己的位置，这里只汇总显示。
 
 ## 文件布局（File layout）
 

@@ -1,6 +1,6 @@
 ---
 description: 在当前项目落地本地多 Spec 目录约定
-argument-hint: "[local] [--dry-run] [--replace [--accept-removals]] [--dispatch|--no-dispatch]"
+argument-hint: "[local] [--dry-run] [--replace [--accept-removals]]"
 allowed-tools: Bash
 ---
 
@@ -18,18 +18,13 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention
 缺省模式为 `local`。`--replace` 仅替换已有受管声明块；已有声明块的标记重复、缺失或顺序错误时，脚本拒绝并
 不改动任何文件。项目自己的规则写进块内的本地段：独占一行的 `<!-- BEGIN:spec-guard-local -->` 与
 `<!-- END:spec-guard-local -->` 之间的行在 `--replace` 后原样保留在新块末尾（本地段最多一个，标记无效时拒绝）。
-`--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或派活规则段里时标着
+`--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或已退役的派活规则段里时标着
 `[needs --accept-removals]`，真正替换会拒绝并不改文件。原样转述这些行，让用户决定把它们移进本地段，还是明确同意
 删除后加 `--accept-removals` 重跑；从旧版模板升级时，旧模板的行同样需要这一步。
-块里每条标记（块标记、本地段标记、派活规则段注释）前后各留一个空行，符合 oxfmt、Prettier 等 Markdown 格式化器的规则；空行有变化时预览多一行 `will adjust blank lines: add N, remove M`，这不需要 `--accept-removals`；块完全不用改时才报 `block content unchanged`。本地段内部原样保留。
-**实验性**：省钱效果未经证明。对照实验里派活没有减少主会话轮次，opus 父代理加 sonnet 子代理仍比不派贵 15%–54%，所以规则默认由主代理自己做，只派预计要改动 3 个以上文件、验收明确的 task。
-`--dispatch` 在约定块的基础模板之后加一段可选规则：`/build` 把 todo 中非 Checkpoint 的 task 交给一个子代理做
-RED → GREEN → 回归 → 构建，交出完整任务块与 plan 的 Architecture Decisions，派活 prompt 带 tier-guard 档位标记；
-任务块不完整、属于停止条件、L3、或所选模型不比主会话便宜时不派；验收、提交、勾选与问人留在主代理。默认关闭，
-不带开关时约定块与基础模板逐字相同。开关状态存在块里（规则段首行 `<!-- spec-guard: build-task-dispatch -->`）：
-`--replace` 时块内有这一行就保持开启，关闭须显式 `--no-dispatch`；两者同时给出时拒绝。已有块不带 `--replace`
-时开关不生效。预览里的 `build-task-dispatch rule:` 一行写明状态与来源，转述时不要省略。规则只是引导，
-spec-guard 不检测、也不要求安装 tier-guard。Codex（`--host=codex`）上同样可用：Codex 默认的 workspace-write 沙箱不允许写 `.git`，主代理每次提交都会申请提权，需要你批准。
+块里每条标记（块标记、本地段标记）前后各留一个空行，符合 oxfmt、Prettier 等 Markdown 格式化器的规则；空行有变化时预览多一行 `will adjust blank lines: add N, remove M`，这不需要 `--accept-removals`；块完全不用改时才报 `block content unchanged`。本地段内部原样保留。
+派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝（退出 2，不写文件）。旧块里还带着规则段
+（首行 `<!-- spec-guard: build-task-dispatch -->`）时，`--replace` 移除整段、不需要 `--accept-removals`，预览单列一行
+`retired build-task-dispatch rule section will be removed`，转述时不要省略。
 GitHub 与 GitLab tracker 模式已退役，脚本会拒绝它们且不写文件。
 若 teardown 留有 .agent/state.json.disabled，setup 会在预览阶段拒绝新建空状态；确认要恢复时，
 先人工核对并将其改回 .agent/state.json。两个文件并存时也先人工核对，不自动选择副本。

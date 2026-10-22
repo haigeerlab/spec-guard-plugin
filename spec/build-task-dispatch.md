@@ -296,3 +296,10 @@ ledgerlite 联调结果（每组 2 次均值，价格按 tier-guard 口径；成
 联调用的种子项目、参考实现、隐藏测试、价格表与 18 次运行的 `--json` 成本输出存到
 [evals/dispatch-cost/](../evals/dispatch-cost/README.md)，以后验证新规则或「主会话上下文很大时」的回本条件时用同一套
 对照。插件行为不变，`--dispatch` 仍是实验性、默认关闭。
+
+
+## 修订：D17 退役（2026-10-22，用户决定）
+
+功能盘点决定 D17：派活规则退役。`setup-convention --dispatch`／`--no-dispatch` 被拒，`--replace` 移除旧块里的规则段，规则模板只为
+识别旧块保留；成本报告里为本实验服务的派活、重派、收回、交回后改与对照一并去掉。本文以上内容是当时的设计与实验记录，不再是现行行为；
+现行说明见 [`docs/retirements/build-task-dispatch.md`](../docs/retirements/build-task-dispatch.md)，实现见模块 `cost-slim-link-follow`。
