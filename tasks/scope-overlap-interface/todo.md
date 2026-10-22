@@ -7,7 +7,7 @@
 - [x] Task 3：接口文件经【公共变更请求】落地，`check-interface.py` 与夹具核对 `scopeOverlap`（AC6） — 【公共变更请求】#10393 附落地后整份文件（sha256:26fb6cfdd56a70bb）；模块协调以 C173 在集成分支提交 ad5866a，单独执行 `module-crew sync`（HEAD dc1e30f8）后本地 `interface.json` 与所备文件逐字节相同（1.10，`gateTick` 之后加 `scopeOverlap`）。`test-checkers.sh` 加两例（缺 `scopeOverlap` 入口、`values.error` 少 `map-unreadable`），改前 2 例红；`check-interface.py` 的 `ENTRIES` 加 `scopeOverlap`，核对 `scopeOverlap.command` 的脚本存在、`values.error` 与 `module_scope.OVERLAP_ERRORS` 一致。`check-interface.py` 通过，`test-checkers.sh` 147 例全过。
 - [x] Task 4：`docs/design.md` 追加 1.10 一段（AC6） — 「对外接口」一节 1.9 那段之后追加 1.10 一段（空行加 4 行），`git diff crew/fix-batch -- docs/design.md` 没有删除行；`validate.sh --quick` 随提交通过。
 - [x] Task 5：合入集成分支（`module-crew sync`）并跑完整检查与越界检查 — 单独执行 `module-crew sync`：已包含集成分支 ad5866a。Spec Commands 七条全过：`test_module_scope.py`（36 例）、`test_map_view.py`（77 例）、`check-interface.py`、`test-checkers.sh`（147 例）、`validate.sh`、phase-guard（443 例）、verify-artifacts（74 例）。`module_scope.py check --module scope-overlap-interface --base crew/fix-batch`：独占 6 个、本模块文件 1 个、超出边界 1 个（`docs/design.md`，C162 批准的只追加例外）。实跑 `overlap --project .`：本仓库两个在开模块不重叠，输出空；加一份独占 `docs/design.md`、`plugins/spec-guard/hooks/` 的探测 Spec，报出与 quiet-injection、scope-overlap-interface 的重叠，来源分别为 `project` 与传入文件，耗时约 0.8 秒。相对集成分支 8 个文件，+288／−28。
-- [ ] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
