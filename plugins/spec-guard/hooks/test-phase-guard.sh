@@ -101,9 +101,9 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
   printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
 }
 # context-hint-thresholds、quiet-injection（D6）：只有模块边界达到窗口 70% 才出带大小的 Module boundary 行，模块进行中不再有
-# 上下文行。Claude 没有窗口：尾部读数都不超过 200k 按 200k 估算，有读数超过 200k 按 1M 估算。transcript 写入的总量 = 第二个参数 + 1。
+# 上下文行。Claude 没有窗口：尾部有读数超过 200k 按 1M 估算，否则读不出窗口、不出边界行（quiet-injection 返工 1）。
+# transcript 写入的总量 = 第二个参数 + 1。
 EST_1M='at or over 70% of an estimated 1000 k window'
-EST_200K='at or over 70% of an estimated 200 k window'
 sized_boundary() {  # $1=N k $2=阈值说明
   printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or \`text\` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
@@ -835,16 +835,22 @@ done_has_only "DONE 低于 700k（699,999）时不出 Module boundary 行" ""
 transcript "$T" 499999
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "boundary-hint-70：DONE 500k 不再出 Module boundary 行" ""
-# quiet-injection（Q2 A）：尾部读数都不超过 200k 时按 200k 窗口估算，70% = 140k。
-transcript "$T" 139999
+# quiet-injection 返工 1（0W0ZWWT）：尾部读数都不超过 200k 时读不出窗口（1M 会话也会落在这里），不按 200k 估算、不出边界行。
+for reading in 139999 163999 199999; do
+  transcript "$T" "$reading"
+  out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+  done_has_only "Claude 读数不超过 200k（$((reading + 1))）：读不出窗口，DONE 不出 Module boundary 行" ""
+done
+transcript "$T" 250000
+transcript "$WORK/later.jsonl" 299999
+cat "$WORK/later.jsonl" >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 读数不超过 200k：DONE 140k 按 200k 窗口估算出行" "$(sized_boundary 140 "$EST_200K")"
-transcript "$T" 139998
+done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，300k 不出" ""
+transcript "$T" 250000
+transcript "$WORK/later.jsonl" 749999
+cat "$WORK/later.jsonl" >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 读数不超过 200k：DONE 差一个 token 到 140k 不出" ""
-transcript "$T" 199999
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 恰好 200k 仍按 200k 窗口估算" "$(sized_boundary 200 "$EST_200K")"
+done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，750k 出行" "$(sized_boundary 750 "$EST_1M")"
 transcript "$T" 250000
 transcript "$WORK/later.jsonl" 149999
 cat "$WORK/later.jsonl" >> "$T"
@@ -1094,6 +1100,35 @@ pad="$(printf '%01100000d' 0)"
 big_out="$(shim_run "$unrelated" "{\"cwd\":\"$wt_linked/src\",\"prompt\":\"$pad\"}")"
 [ -z "$big_out" ] || fail "超过 1MB 的输入不应改变根目录"
 echo "  ✅ cwd 含转义、出现多次或输入超过 64KB 时退回 python3 解析，结果与改前相同"; PASS=$((PASS + 1))
+
+# fact-fixes 返工 1：预读 1 秒内没读完（输入分段到达，或机器慢、bash 逐字节读管道）也算拿不准，半截交给 python3、其余由拷贝进程转过去。
+# bash ≥ 4 超时返回 >128 并保留已读部分；bash 3.2 超时返回 1 并丢掉已读部分，分不出超时，与 0.83.2 相同只能不挂住、输出合法。
+slow_bash=/bin/bash
+slow_run() {  # $1=CLAUDE_PROJECT_DIR $2=标准输入；前 35000 字节先到，隔 1.5 秒再到其余部分
+  local root="$1" input="$2"
+  { trap '' PIPE; printf '%s' "${input:0:35000}"; sleep 1.5; printf '%s' "${input:35000}"; true; } |
+    env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="$shim:$PATH" \
+      CLAUDE_PROJECT_DIR="$root" "$slow_bash" "$HOOKDIR/phase-guard.sh"
+}
+pad="$(printf '%070000d' 0)"
+slow_in="{\"cwd\":\"$wt_linked/src\",\"prompt\":\"$pad\"}"
+slow_off="{\"cwd\":\"$unrelated/sub\",\"prompt\":\"$pad\"}"
+slow_out="$(slow_run "$unrelated" "$slow_in")" || fail "输入分段到达时应退出 0"
+: > "$WORK/py-calls"
+slow_neg="$(slow_run "$unrelated" "$slow_off")" || fail "输入分段到达且未启用时应退出 0"
+if [ "$("$slow_bash" -c 'echo "${BASH_VERSINFO[0]}"')" -ge 4 ]; then
+  [ "$(printf '%s' "$slow_out" | context_of)" = "$(run_input "$wt_main" "$slow_in" | context_of)" ] ||
+    fail "输入分段到达、cwd 在已启用的 worktree 时应完整注入"
+  [ -z "$slow_neg" ] || fail "输入分段到达且未启用时应静默: ${slow_neg:0:300}"
+  [ "$(calls)" -gt 0 ] || fail "预读超时应退回 python3 解析，不能凭半截内容判定未启用"
+  echo "  ✅ 预读超时（输入分段到达）时退回 python3，worktree 照旧完整注入"; PASS=$((PASS + 1))
+else
+  for out in "$slow_out" "$slow_neg"; do
+    [ -z "$out" ] || printf '%s' "$out" | python3 -c 'import json, sys; json.load(sys.stdin)' ||
+      fail "bash 3.2 下输入分段到达时输出应为空或合法 JSON: ${out:0:300}"
+  done
+  echo "  ✅ bash 3.2 下输入分段到达时不挂住、输出合法（3.2 超时丢弃已读部分，与 0.83.2 相同）"; PASS=$((PASS + 1))
+fi
 
 
 # context-after-compact：session-handoff 已退役，原来的触发词照常注入阶段，不再被本地作答拦截。
