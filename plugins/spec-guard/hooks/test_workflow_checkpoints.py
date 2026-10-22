@@ -435,7 +435,7 @@ class CheckpointContractTests(unittest.TestCase):
                 self.assertEqual(positions, sorted(positions), line)
         for phrase in ("逐条全列", "照旧用表格", "不为了短而删减", "新插入的标「新」", "开头的五件事落在这几项里",
                        "“注意：”", "“批了会怎样：”", "没有写“无”", "Spec 的五项再接 Plan 的四项", "`reviewKinds`",
-                       "决策收件箱把这些缩成卡片"):
+                       "session-protocol 契约的交审小项"):
             self.assertIn(phrase, item)
 
     def test_how_to_approve_uses_one_copy_block(self):
@@ -444,11 +444,9 @@ class CheckpointContractTests(unittest.TestCase):
                        "不带 shell 语言标签", "不用行内代码", "最短的可接受说法", "合成一行", "有代码块就是要用户回答",
                        "不需要回答的内容", "不用代码块", "“继续”不会被记为批准", "不能替代内容"):
             self.assertIn(phrase, item)
-        # hub-only-reply: when a consumer plugin asks only in the hub, show the content but point to the hub instead of a copy block.
-        for phrase in ("只在收件枢纽问", "经协调会话送到那里问", "按意思认", "照常在正文里给全部小项", "不放推荐答复的复制块",
-                       "“去决策收件箱答 #N”", "不知道事项号就写“去决策收件箱答”", "“等决策收件箱答复”意思相同",
-                       "没有这种规定时照旧放复制块", "spec-guard 不判断项目接没接收件枢纽", "「经收件枢纽转来的批准」"):
-            self.assertIn(phrase, item)
+        # sibling-rules-out: where the user answers is left to the installed collaboration plugin, named by no plugin.
+        self.assertIn("所装协作插件对在哪里答复另有规定时", item)
+        self.assertIn("复制块按它的规定放或不放", item)
         stuck = self.section("## Plan 检查点分级")
         for phrase in ("“出了什么事：”", "代价是什么", "可复制代码块"):
             self.assertIn(phrase, stuck)
@@ -457,7 +455,7 @@ class CheckpointContractTests(unittest.TestCase):
         for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md", "../../docs/commands.md"):
             with self.subTest(path=relative):
                 text = (self.plugin / relative).read_text(encoding="utf-8")
-                for phrase in ("可复制代码块", "不会被记为批准", "去决策收件箱答"):
+                for phrase in ("可复制代码块", "不会被记为批准", "以所装协作插件的规定为准"):
                     self.assertIn(phrase, text)
         for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
             with self.subTest(path=relative):
@@ -689,11 +687,16 @@ class CoordinatorApprovalTests(unittest.TestCase):
     def test_section_states_every_floor(self):
         body = self.section()
         for phrase in ("唯一例外", "三个条件", "同一时刻只有一个", "集成基线", "交审", "一致", "转达",
-                       "模块分支", "集成分支", "提交", "重新", "一次只合一个", "Build order",
-                       "不变基", "不压缩", "不强推", "新提交撤回", "不 reset", "停止后续合并", "不自动重试",
-                       "不算完成", "冲突", "退回", "重新取得", "推送和远端合并", "只由用户"):
+                       "模块分支", "集成分支", "提交", "重新", "不改写已推送或已被同步的历史", "由运行时",
+                       "重新取得", "推送和远端合并", "只由用户"):
             self.assertIn(phrase, body)
         self.assertNotRegex(body, r"parallel[-_]")
+
+    def test_section_leaves_merge_steps_to_the_runtime(self):
+        # sibling-rules-out (D8): how to merge, check and recover belongs to the runtime, not to spec-guard.
+        body = self.section()
+        for phrase in ("新提交撤回", "不 reset", "一次只合一个", "合并后跑"):
+            self.assertNotIn(phrase, body)
 
     def test_coordinator_is_marked_by_checkout_role(self):
         body = self.section()
@@ -713,58 +716,58 @@ class CoordinatorApprovalTests(unittest.TestCase):
             self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"), path.name)
 
 
-class HubRelayedApprovalTests(unittest.TestCase):
-    """hub-relayed-approval: `approved` accepts the user's words relayed in the session-protocol format, no lower bar."""
+class SiblingRulesOutTests(unittest.TestCase):
+    """sibling-rules-out: rules that only make sense with a sibling plugin installed live in that plugin, not here (D2, D8, D9)."""
 
-    HEADING = "## 经收件枢纽转来的批准"
-    POINTER = "经收件枢纽转来的批准"
+    GENERAL = "以所装协作插件的规定为准"
+    SURFACES = (CONTRACT, "commands/review-mark.md", "skills/spec-guard-ops/SKILL.md", "../../docs/commands.md",
+                "../../docs/workflow.md")
 
     def setUp(self):
         self.plugin = Path(__file__).resolve().parents[1]
         self.text = (self.plugin / CONTRACT).read_text(encoding="utf-8")
 
-    def section(self):
-        start = self.text.index(self.HEADING)
-        return self.text[start:self.text.index("\n## ", start + 1)]
+    def test_no_hub_wording_or_relayed_approval_conditions(self):
+        for rel in self.SURFACES:
+            text = (self.plugin / rel).read_text(encoding="utf-8")
+            with self.subTest(rel=rel):
+                for phrase in ("收件枢纽", "去决策收件箱答", "经收件枢纽转来的批准"):
+                    self.assertNotIn(phrase, text)
+                self.assertIn(self.GENERAL, text)
+        self.assertNotIn("总协调", self.text)
 
-    def test_section_sits_before_the_coordinator_section(self):
-        self.assertLess(self.text.index(self.HEADING),
-                        self.text.index("## 协调会话的批准与合并（moduleConcurrency 为 on 时）"))
-
-    def test_section_states_every_condition(self):
-        body = self.section()
-        for phrase in ("【用户答复】", "事项号", "原消息号", "登记", "转自", "用户原话", "明确批准这一份",
-                       "回显核对", "`#H`", "指纹", "重新交审", "不解析"):
-            self.assertIn(phrase, body)
-
-    def test_section_lists_what_does_not_count(self):
-        body = self.section()
-        for phrase in ("【答复告知】", "【协调通知】", "自称", "没有契约格式", "含糊", "模块会话"):
-            self.assertIn(phrase, body)
-
-    def test_approved_rule_names_both_sources(self):
+    def test_approved_rule_keeps_one_general_source_sentence(self):
         start = self.text.index("- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，")
         rule = self.text[start:self.text.index("\n- **", start + 1)]
-        self.assertIn("当前对话", rule)
-        self.assertIn(self.POINTER, rule)
+        self.assertIn("批准来源以所装协作插件的规定为准；没装只认当前对话里的明确批准", rule)
         self.assertNotIn("用户于当前对话明确批准", self.text)
 
-    def test_coordinator_section_points_here_and_keeps_module_sessions_out(self):
+    def test_coordinator_section_keeps_module_sessions_out(self):
         start = self.text.index("**批准标记由协调会话写，先核对内容。**")
         body = self.text[start:self.text.index("**本地集成分支的合并。**", start)]
-        first = body.split("\n- ")[1]
-        self.assertIn(self.POINTER, first)
+        self.assertIn("按所装协作插件的规定转来", body.split("\n- ")[1])
         self.assertNotIn("用户在协调会话里明确批准", self.text)
         self.assertIn("不能因此自己写 `approved`", body)
 
-    def test_command_and_codex_skill_name_both_sources(self):
+    def test_command_and_codex_skill_keep_the_current_conversation(self):
         for rel in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
             text = (self.plugin / rel).read_text(encoding="utf-8")
             with self.subTest(rel=rel):
-                self.assertIn(self.POINTER, text)
                 self.assertIn("当前对话", text)
                 self.assertNotIn("用户于当前对话明确批准", text)
                 self.assertNotIn("只在用户于当前对话明确批准之后写", text)
+
+    def test_module_concurrency_does_not_control_the_coordinator(self):
+        for rel in ("commands/config.md", "skills/spec-guard-ops/SKILL.md"):
+            text = (self.plugin / rel).read_text(encoding="utf-8")
+            line = next(line for line in text.splitlines() if "`moduleConcurrency`" in line and "`off`" in line)
+            with self.subTest(rel=rel):
+                self.assertIn("不控制协调会话", line)
+                self.assertIn("`coordinator up`", line)
+
+    def test_convention_blocks_carry_no_hub_wording(self):
+        for path in (self.plugin / "templates").glob("*-block-*.md"):
+            self.assertNotIn("收件枢纽", path.read_text(encoding="utf-8"), path.name)
 
 
 class RequirementConfirmTests(unittest.TestCase):
