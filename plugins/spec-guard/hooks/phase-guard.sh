@@ -22,16 +22,6 @@ else
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
   [ -n "$ROOT" ] || ROOT="$(pwd)"
 fi
-# 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
-# 所在 git 仓库优先（session_context.py --resolve-root，最多等 1 秒）。标准输入只读这一次，原文留给后面的会话事实。
-# 输入不可用或缺 python3 时根目录不变。
-HOOK_INPUT=""
-if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
-  RESOLVED="$(python3 "$HOOKDIR/session_context.py" --resolve-root "$ROOT" 2>/dev/null)" || RESOLVED=""
-  case "$RESOLVED" in *$'\n'*) ROOT="${RESOLVED%%$'\n'*}"; HOOK_INPUT="${RESOLVED#*$'\n'}" ;; esac
-fi
-cd "$ROOT" 2>/dev/null || exit 0
-
 # 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或含
 # activeModule 的 state.json。正文里提到标记不算。注意判据是纯文本匹配：别的工具若在自己的
 # .agent/state.json 里也用 activeModule 这个键（包括嵌套位置），同样会激活——比此前那条按值匹配
@@ -48,20 +38,70 @@ file_has_line() {  # $1=文件 $2=正则
   return 1
 }
 
-has_block() {
-  file_has_line CLAUDE.md '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' ||
-    file_has_line AGENTS.md '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$'
+has_block() {  # $1=目录，默认当前目录
+  file_has_line "${1:-.}/CLAUDE.md" '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' ||
+    file_has_line "${1:-.}/AGENTS.md" '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$'
 }
 
-has_state() {
-  file_has_line .agent/state.json '"activeModule"[[:space:]]*:'
+has_state() {  # $1=目录，默认当前目录
+  file_has_line "${1:-.}/.agent/state.json" '"activeModule"[[:space:]]*:'
 }
+
+has_link() {  # $1=目录，默认当前目录
+  [ -e "${1:-.}/.agent/spec-guard-link.json" ] || [ -L "${1:-.}/.agent/spec-guard-link.json" ]
+}
+
+# fact-fixes：启动 python3 之前先在 bash 里判断 hook 输入可能指向的两个根目录（宿主给的 ROOT、输入 cwd 所在 git 仓库）
+# 是否都没有激活信号与指向文件；拿得准都没有时返回 0，调用方直接静默退出。bash 的 read 从管道逐字节读，大输入很慢，
+# 所以只读前 64KB（RAW_MORE=1 表示后面还有）：没读完、cwd 不是不含转义的普通字符串、或出现不止一次，都算拿不准
+# （返回 1），交给 python3 照旧解析。
+inactive_before_python() {  # 读 RAW、RAW_MORE 与 ROOT
+  local rest cwd top re='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+  if has_block "$ROOT" || has_state "$ROOT" || has_link "$ROOT"; then return 1; fi
+  [ -z "$RAW_MORE" ] || return 1
+  case "$RAW" in *'"cwd"'*) ;; *) return 0 ;; esac
+  rest="${RAW#*\"cwd\"}"
+  case "$rest" in *'"cwd"'*) return 1 ;; esac
+  [[ $RAW =~ $re ]] || return 1
+  cwd="${BASH_REMATCH[1]}"
+  [ -n "$cwd" ] && [ -d "$cwd" ] || return 0
+  top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" || return 0
+  [ -n "$top" ] || return 0
+  ! { has_block "$top" || has_state "$top" || has_link "$top"; }
+}
+
+# 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
+# 所在 git 仓库优先（session_context.py --resolve-root，最多等 1 秒、上限 1MB）。标准输入只读这一次：bash 读过的前缀
+# 与其余部分按原字节交给 python3（其余部分由一个同样最多等 1 秒的拷贝进程转过去），留给后面的会话事实。
+# 输入不可用或缺 python3 时根目录不变。
+HOOK_INPUT=""
+if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
+  RAW="" RAW_MORE=""
+  if IFS= read -r -n 65536 -d '' -t 1 RAW; then RAW_MORE=1; fi
+  inactive_before_python && exit 0
+  RESOLVED="$({ printf '%s' "$RAW"
+    [ -z "$RAW_MORE" ] || python3 -c '
+import os, select, time
+deadline = time.monotonic() + 1.0
+while True:
+    left = deadline - time.monotonic()
+    if left <= 0 or not select.select([0], [], [], left)[0]:
+        break
+    chunk = os.read(0, 65536)
+    if not chunk:
+        break
+    os.write(1, chunk)
+' 2>/dev/null
+  } | python3 "$HOOKDIR/session_context.py" --resolve-root "$ROOT" 2>/dev/null)" || RESOLVED=""
+  case "$RESOLVED" in *$'\n'*) ROOT="${RESOLVED%%$'\n'*}"; HOOK_INPUT="${RESOLVED#*$'\n'}" ;; esac
+fi
+cd "$ROOT" 2>/dev/null || exit 0
 
 # linked-project-root：会话目录自己没有激活信号时，只有本插件写下的指向文件算数（.agent/spec-guard-link.json，声明
 # 这里的工作对应别处的哪个项目）。没有它就照旧静默，而且在启动任何 python3 之前就退出；自己已启用时不看指向文件。
 LINKED=""
 if ! has_block && ! has_state; then
-  [ -e .agent/spec-guard-link.json ] || [ -L .agent/spec-guard-link.json ] || exit 0
+  has_link || exit 0
   LINKED=1
 fi
 

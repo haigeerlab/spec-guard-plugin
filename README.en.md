@@ -3,9 +3,10 @@
 [简体中文](README.md) | English
 
 spec-guard is a companion plugin for [agent-skills](https://github.com/addyosmani/agent-skills), for Claude Code and
-Codex. agent-skills assumes one Spec and one plan per project; spec-guard lets one project be split into modules, each
-with its own Spec, Plan and todo, and tells the agent at the start of every turn which module to work on and how far
-it has got.
+Codex. agent-skills' `/spec` can already split a requirement into a capability map and one Spec per module, but `/plan`
+always writes the same `tasks/plan.md` and `todo.md`, so modules overwrite each other and the next turn does not know how
+far the work has got. spec-guard gives each module its own Spec, Plan and todo, and tells the agent at the start of
+every turn which module to work on and how far it has got.
 
 Linked documents other than this README are in Chinese.
 
@@ -179,8 +180,10 @@ From 1.1 it also lists the entries used for developing several modules at once (
   its runtime with `npm ci` from the lock files shipped in the package. The hook and every other command, such as
   `map`, `phase`, `verify-artifacts`, `review-mark` and `cost-report`, stay offline.
 - **Usage statistics and uploads**: `cost-report` reads the local Claude Code (`~/.claude/projects/`) and Codex
-  (`~/.codex/sessions/`) session transcripts offline, counts only tokens and turns, and prints the result to the
-  terminal. The plugin has no telemetry and reports nothing anywhere.
+  (`~/.codex/sessions/`) session transcripts offline. It uses their token counts, user prompt times, tool results (to
+  tell denials and hand-back times), edited file paths and subagent spawns, only in memory during the run to attribute
+  them to tasks; the output is counts only, never session content, and is printed to the terminal. The plugin has no
+  telemetry and reports nothing anywhere.
 
 Details: [design and architecture](docs/design.md) (Chinese).
 

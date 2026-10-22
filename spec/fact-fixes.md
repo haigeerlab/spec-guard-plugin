@@ -97,11 +97,12 @@ explicit confirmation.`），其余不变。
 ### C7 未启用项目不启动 python3（`hooks/phase-guard.sh`）
 
 - 现在的顺序：确定 `ROOT` → **python3 读 hook 输入、按 `cwd` 修正根目录** → 判断激活信号 → 未启用则退出。
-- 改后：确定 `ROOT` → 在 bash 里读 hook 输入（等待上限与大小上限与 `session_context.read_hook_input` 相同：1 秒、1MB）→
-  在 `ROOT` 与输入 `cwd` 所在 git 仓库根两处查激活信号与指向文件（判据与现在的 `has_block`／`has_state`／指向文件相同）→
-  **两处都没有、且拿得准时直接 `exit 0`，不启动任何 python3** → 否则把已读到的输入原样交给 `session_context.py --resolve-root`，
-  后续一切照旧。
-- 「拿不准」包括：输入读不全或超限、`cwd` 不是不含转义的普通 JSON 字符串、`cwd` 不是目录。这些情况保持现在的行为。
+- 改后：确定 `ROOT` → 在 bash 里读 hook 输入的前 64KB（最多等 1 秒）→ 在 `ROOT` 与输入 `cwd` 所在 git 仓库根两处查激活信号
+  与指向文件（判据与现在的 `has_block`／`has_state`／指向文件相同）→ **两处都没有、且拿得准时直接 `exit 0`，不启动任何 python3**
+  → 否则把已读到的前缀与其余输入按原字节交给 `session_context.py --resolve-root`（其余部分由一个同样最多等 1 秒的拷贝进程转过去；
+  1 秒、1MB 的上限仍由 `session_context` 判），后续一切照旧。
+- 「拿不准」包括：输入超过 64KB（没读完）、`cwd` 不是不含转义的普通 JSON 字符串、`"cwd"` 出现不止一次。这些情况保持现在的行为；
+  `cwd` 不是目录或不在 git 仓库里时与 `session_context` 一样只看 `ROOT`。
 - 已启用项目、有指向文件的项目、桌面版 worktree 会话（宿主给主检出、`cwd` 在 linked worktree）的输出与现在逐字节相同。
 
 ## Acceptance criteria
@@ -129,7 +130,7 @@ explicit confirmation.`），其余不变。
 
 ## 并行边界
 
-- 独占：`spec/fact-fixes.md`、`spec/CAPABILITY-MAP.md`、`spec/install-by-scope.md`、`spec/dependency-check.md`、`tasks/dependency-check/`、`docs/retirements/dependency-check.md`、`docs/retirements/dependency-check/`、`README.md`、`README.en.md`、`plugins/spec-guard/interface.json`、`plugins/spec-guard/hooks/phase-guard.sh`、`plugins/spec-guard/hooks/test-phase-guard.sh`
+- 独占：`spec/fact-fixes.md`、`spec/install-by-scope.md`、`docs/retirements/dependency-check.md`、`README.md`、`README.en.md`、`plugins/spec-guard/hooks/phase-guard.sh`、`plugins/spec-guard/hooks/test-phase-guard.sh`
 - 公共：无
 
 ## 待定（请在批准时选）
@@ -145,3 +146,14 @@ explicit confirmation.`），其余不变。
 ## 文档建议
 
 只改 README（中英）与能力图、退役说明这些说明类文档；项目没有文档基线，不需要文档影响登记。
+
+## 变更记录
+
+- 2026-10-22（构建中，范围内修正）：
+  1. 并行边界按用户批准 Spec 时的答复（事项 C30：「spec/CAPABILITY-MAP.md 与 interface.json 是公共文件，改动发【公共变更请求】由模块协调落地」）
+     去掉 `spec/CAPABILITY-MAP.md`、`plugins/spec-guard/interface.json`，以及随能力图一起由模块协调移动的 `spec/dependency-check.md`、
+     `tasks/dependency-check/`、`docs/retirements/dependency-check/`；这些改动经【公共变更请求】C42 在集成分支落地（`d5e9423`、`35f85bd`）。
+     「公共」一行只收全局配置、锁文件、迁移、测试资源四类，能力图与接口文件不属其中，所以仍写「无」。
+  2. C7 的读法：实测 macOS `/bin/bash` 3.2 的 `read` 从管道逐字节读，1MB 要约 2 秒，超过 1 秒的等待上限，并且超时会丢掉已读部分；
+     照原写法读满 1MB，0.5MB～1MB 的输入会失去 `cwd` 修正和会话事实。改为 bash 只读前 64KB（约 0.04 秒），超出算拿不准，前缀与其余输入
+     按原字节交给 python3。目标、判据与「拿不准照旧走 python3」不变，已启用项目输出逐字节不变；回归覆盖约 70KB、约 900KB 与超过 1MB 三种大小。

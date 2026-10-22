@@ -1000,6 +1000,58 @@ echo "  ✅ cwd 为子目录、非 git、缺失或不可用时逐字不变"; PAS
 [ -z "$(run_input "$wt_main" "{\"cwd\":\"$unrelated/sub\"}")" ] || fail "cwd 在未启用的仓库里时应静默"
 echo "  ✅ cwd 在未启用的仓库里时静默"; PASS=$((PASS + 1))
 
+# fact-fixes：未启用项目在激活判定之前不启动 python3。PATH 最前放一个记录调用的 python3 替身。
+shim="$WORK/pyshim"; mkdir -p "$shim"
+printf '#!/bin/bash\necho call >> "%s"\nexec %q "$@"\n' "$WORK/py-calls" "$(command -v python3)" > "$shim/python3"
+chmod +x "$shim/python3"
+shim_run() {  # $1=CLAUDE_PROJECT_DIR $2=标准输入 $3...=phase-guard 参数；替身调用记在 $WORK/py-calls
+  local root="$1" input="$2"; shift 2
+  { trap '' PIPE; printf '%s' "$input"; true; } | env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST PATH="$shim:$PATH" \
+    CLAUDE_PROJECT_DIR="$root" /bin/bash "$HOOKDIR/phase-guard.sh" "$@"
+}
+calls() { [ -f "$WORK/py-calls" ] && wc -l < "$WORK/py-calls" | tr -d ' ' || echo 0; }
+for input in "{\"cwd\":\"$unrelated/sub\",\"prompt\":\"p\"}" "{\"cwd\":\"$WORK/empty\"}" '{}' 'not json'; do
+  for event in "" SessionStart "SessionStart fresh"; do
+    : > "$WORK/py-calls"
+    # shellcheck disable=SC2086
+    out="$(shim_run "$unrelated" "$input" $event)" || fail "未启用项目应退出 0（事件 ${event:-UserPromptSubmit}）"
+    [ -z "$out" ] || fail "未启用项目应静默（事件 ${event:-UserPromptSubmit}）: $out"
+    [ "$(calls)" = 0 ] || fail "未启用项目不应启动 python3（事件 ${event:-UserPromptSubmit}，输入 ${input:0:60}）"
+  done
+done
+echo "  ✅ 未启用项目在三种事件、四种输入下都不启动 python3"; PASS=$((PASS + 1))
+
+: > "$WORK/py-calls"
+[ "$(shim_run "$unrelated" "{\"cwd\":\"$wt_linked/src\"}" | context_of)" = \
+  "$(run_input "$wt_main" "{\"cwd\":\"$wt_linked/src\"}" | context_of)" ] || fail "宿主目录未启用、cwd 在已启用的 worktree 时应照旧按 worktree 注入"
+[ "$(calls)" -gt 0 ] || fail "已启用的 worktree 应交给 python3 解析"
+echo "  ✅ 宿主目录未启用、cwd 在已启用的 worktree 时照旧注入"; PASS=$((PASS + 1))
+
+: > "$WORK/py-calls"
+[ -z "$(shim_run "$unrelated" "{\"cwd\":\"$unrelated/a\\\"b\"}")" ] || fail "cwd 含转义且未启用时应静默"
+[ "$(calls)" -gt 0 ] || fail "cwd 含转义时应退回 python3 解析"
+: > "$WORK/py-calls"
+dup_out="$(shim_run "$unrelated" "{\"cwd\":\"$unrelated/sub\",\"x\":{\"cwd\":\"$wt_linked\"}}")"
+[ -z "$dup_out" ] || fail "cwd 出现两次且解析后未启用时应静默: $dup_out"
+[ "$(calls)" -gt 0 ] || fail "cwd 出现两次时应退回 python3 解析"
+# 输入超过 bash 预读的 64KB 时算拿不准：交给 python3，结果与改前相同（未启用静默；已启用时 cwd 与会话事实不丢）。
+pad="$(printf '%070000d' 0)"
+: > "$WORK/py-calls"
+big_out="$(shim_run "$unrelated" "{\"cwd\":\"$unrelated/sub\",\"prompt\":\"$pad\"}")"
+[ -z "$big_out" ] || fail "大输入且未启用时应静默: ${big_out:0:300}"
+[ "$(calls)" -gt 0 ] || fail "大输入应退回 python3 解析"
+for size in 70000 900000; do
+  pad="$(printf "%0${size}d" 0)"
+  got="$(shim_run "$unrelated" "{\"cwd\":\"$wt_linked/src\",\"prompt\":\"中$pad\"}" | context_of)"
+  want="$(run_input "$wt_main" "{\"cwd\":\"$wt_linked/src\",\"prompt\":\"中$pad\"}" | context_of)"
+  [ "$got" = "$want" ] || fail "输入约 ${size} 字节时应与宿主目录已启用时的结果相同"
+done
+# 超过 1MB 时 session_context 不用这份输入（与改前相同），根目录退回宿主目录：未启用就静默。
+pad="$(printf '%01100000d' 0)"
+big_out="$(shim_run "$unrelated" "{\"cwd\":\"$wt_linked/src\",\"prompt\":\"$pad\"}")"
+[ -z "$big_out" ] || fail "超过 1MB 的输入不应改变根目录"
+echo "  ✅ cwd 含转义、出现多次或输入超过 64KB 时退回 python3 解析，结果与改前相同"; PASS=$((PASS + 1))
+
 
 # context-after-compact：session-handoff 已退役，原来的触发词照常注入阶段，不再被本地作答拦截。
 ho="$WORK/handoff"
