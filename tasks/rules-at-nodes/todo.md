@@ -11,7 +11,7 @@
 - [x] Task 5：与 `cost-slim-link-follow` 重叠的说明文字（C5） — `cost-slim-link-follow` 已于 6c03ea1 合入并已 sync，不用再等。`docs/workflow.md`「最终验收少一轮确认」段改为：这几条在停点规则里、到最终验收附上，升级后重跑 `--replace` 约定块才变短、旧块照常有效；`commands/setup-convention.md` 加一句：从 0.83.2 及更早的模板升级时删掉的多是停点规则，已移到 `references/node-rules.md`，确认后加 `--accept-removals`，想留的先移进本地段。README 中英两份只链接约定块页面、不描述块内条目，不改。
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的四份副本（`git archive HEAD`，a364383）上各改一处：① `node-rules.md` 最终验收删去「没有写“文档改动：无”」→ `test_each_section_carries_its_rules`、`test_sections_share_their_wording_with_the_contract`、`test_the_final_gate_lists_the_changed_files` 红；② Claude 模板删去兜底一句 → `test_templates_point_at_checkpoint_tiers`、`test_the_convention_block_is_short`、`test_the_review_rules_reach_the_node` 红；③ 把「写给人读的文档单独一张表放在最前」放回 Claude 模板 → `test_the_final_gate_lists_the_changed_files` 红；④ `describe()` 附段条件改成角色视图也附 → `test_role_views_attach_nothing`（模块、协调两例）红。副本留在本会话 scratchpad，不在仓库里。
 - [x] Task 6：合入集成分支并跑完整检查 — 实现各提交都走 `verify-and-commit.sh`；sync 前核对集成分支里的 Spec 是 C122 批准版（标记 acbb03de976c），单独执行 `module-crew sync`（0.11.0 入口）：已包含集成分支 e4b4ace。之后 `validate.sh`、phase-guard（443 例）、verify-artifacts（74 例）、`test_stop_rules.py`（16 例）全过。`module_scope.py check --module rules-at-nodes --base crew/fix-batch`：越界 4 个，`docs/workflow.md`、`commands/setup-convention.md`、`hooks/phase-guard.sh`、`hooks/test-phase-guard.sh`，正是 Spec「与在开模块的重叠」列出的文件，只改了所列段落。相对集成分支 19 个文件，+708／−246。
-- [ ] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
