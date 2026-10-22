@@ -487,9 +487,6 @@ class Follow(unittest.TestCase):
 
 PLUGIN = Path(__file__).resolve().parent.parent
 SKILLS = ("spec-guard-ops", "ticket", "local-ticket-ledger-ops", "local-ticket-portability")
-# Task 4 of cost-slim-link-follow: these change after sibling-rules-out lands (Task 6 removes the exceptions).
-PENDING = {"commands/config.md", "commands/review-mark.md"} | {"skills/%s/SKILL.md" % name for name in SKILLS
-                                                               if name != "local-ticket-ledger-ops"}
 
 
 class EntryPointsFollow(unittest.TestCase):
@@ -498,7 +495,7 @@ class EntryPointsFollow(unittest.TestCase):
     def entries(self):
         files = [path for path in sorted((PLUGIN / "commands").glob("*.md")) if path.name != "link-project.md"]
         files += [PLUGIN / "skills" / name / "SKILL.md" for name in SKILLS]
-        return [path for path in files if str(path.relative_to(PLUGIN)) not in PENDING]
+        return files
 
     def test_every_entry_point_follows_with_its_hosts_session_id(self):
         for path in self.entries():
