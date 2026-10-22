@@ -1,5 +1,7 @@
 # Spec: quiet-injection
 
+<!-- spec-guard: review approved b969f65a309a -->
+
 ## Objective
 
 阶段注入（`phase-guard.sh` → `module_stage.py`）每轮用户发言都把几十行全量内容注入一遍（审查 A-01），
