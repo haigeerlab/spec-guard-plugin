@@ -10,5 +10,26 @@
 - [x] Task 4：约定块瘦身（C1） — 回归先迁：`test_templates_point_at_checkpoint_tiers`、`test_documentation_suggestions`、`test_the_final_gate_lists_the_changed_files`、`test_plan_approval_authorizes_by_scope`、`test_the_review_rules_live_in_the_convention_block`（改名 `test_the_review_rules_reach_the_node`）、`test_the_convention_block_names_sibling_plugins_conditionally`（改名 `test_the_stop_rules_name_sibling_plugins_conditionally`）、`test_an_external_blocker_goes_back_to_the_user`、`test_acceptance_criteria_are_numbered`、`test_a_review_handoff_shows_the_content`、`test_rules_follow_upstream_agent_skills`、`test_change_sources_are_recorded_and_answered`、`test_one_module_per_review_and_grouped_by_module` 的模板断言迁到 `node-rules.md` 对应一节，模板改断言常驻短句与「不含」已移出的条目；新增 `test_the_convention_block_is_short`（体积上限与常驻短句）。改前 23 处红。停点规则补了迁移时发现缺的几句（一起发版不等于一起审、delegate 只读审查与拒绝过不再提（不写斜杠入口：停点规则两个宿主共用，Codex 输出不许出现 `/delegate:`，入口由阶段提示的「外部审查」行按宿主给出；第一次提交时 phase-guard 第 17 段因此变红，改后通过）、不含工作区自己的包、推送或开 PR 时与提交清单不一致的单独列出、agent-relay 入口与提醒用户转告、能力图全部完成的收尾文档建议）。两份模板按 Spec C1 的表改写；块里原来那半句「按需求批量前置审……按共享检查点规则」随 Plan 分级条一起去掉（它不是节点规则，细则仍在共享检查点规则）。体积（字节）：Claude 7530→3831、Codex 7097→3342；停点规则各节 1064／1914／1477／775／2085。`docs/convention-block.md` 内嵌块同步（`check-readme-sync.py` 通过），并补一段说明停点规则在哪；本仓库 `AGENTS.md` 用工作区 `setup-convention.sh local --host=codex --replace` 先 `--dry-run`（删 24 行旧模板行、加新行、保留本地段 7 行）再 `--accept-removals`，块里含 Codex 模板全文。`test_workflow_checkpoints.py`、`test_ticket_entry.py`、`test_hosted_ticket_entry.py`、`test-setup-teardown.sh`（53 例）全过。
 - [x] Task 5：与 `cost-slim-link-follow` 重叠的说明文字（C5） — `cost-slim-link-follow` 已于 6c03ea1 合入并已 sync，不用再等。`docs/workflow.md`「最终验收少一轮确认」段改为：这几条在停点规则里、到最终验收附上，升级后重跑 `--replace` 约定块才变短、旧块照常有效；`commands/setup-convention.md` 加一句：从 0.83.2 及更早的模板升级时删掉的多是停点规则，已移到 `references/node-rules.md`，确认后加 `--accept-removals`，想留的先移进本地段。README 中英两份只链接约定块页面、不描述块内条目，不改。
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的四份副本（`git archive HEAD`，a364383）上各改一处：① `node-rules.md` 最终验收删去「没有写“文档改动：无”」→ `test_each_section_carries_its_rules`、`test_sections_share_their_wording_with_the_contract`、`test_the_final_gate_lists_the_changed_files` 红；② Claude 模板删去兜底一句 → `test_templates_point_at_checkpoint_tiers`、`test_the_convention_block_is_short`、`test_the_review_rules_reach_the_node` 红；③ 把「写给人读的文档单独一张表放在最前」放回 Claude 模板 → `test_the_final_gate_lists_the_changed_files` 红；④ `describe()` 附段条件改成角色视图也附 → `test_role_views_attach_nothing`（模块、协调两例）红。副本留在本会话 scratchpad，不在仓库里。
-- [ ] Task 6：合入集成分支并跑完整检查
+- [x] Task 6：合入集成分支并跑完整检查 — 实现各提交都走 `verify-and-commit.sh`；sync 前核对集成分支里的 Spec 是 C122 批准版（标记 acbb03de976c），单独执行 `module-crew sync`（0.11.0 入口）：已包含集成分支 e4b4ace。之后 `validate.sh`、phase-guard（443 例）、verify-artifacts（74 例）、`test_stop_rules.py`（16 例）全过。`module_scope.py check --module rules-at-nodes --base crew/fix-batch`：越界 4 个，`docs/workflow.md`、`commands/setup-convention.md`、`hooks/phase-guard.sh`、`hooks/test-phase-guard.sh`，正是 Spec「与在开模块的重叠」列出的文件，只改了所列段落。相对集成分支 19 个文件，+708／−246。
 - [ ] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+
+## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
+
+> **变更**：约定块瘦身为常驻短句（决定 D3、D4）。交审怎么呈现、各类要点、最终验收的几张表、何时问用户这类停点规则移到新文件
+> `references/node-rules.md`（能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收五节），阶段提示到了对应节点才附上那一节原文；
+> 约定块只留途中规则（UI 自验、任务完成报告、`report` 记入 todo、不可逆操作要停）和一句兜底：停在 gate 前、交审前或要停下问用户前先读对应一节。
+> Claude 约定块 7.5KB → 3.8KB，Codex 7.1KB → 3.3KB。并行开关下标了角色的 checkout 不附停点规则。
+> **变更**：授权补两句（D19）：项目自己的规则比默认授权更严时以项目为准；最终验收列出的拟回告须是可原样发送的完整文字，批准即同意按此发送，
+> 对外渠道同样，内容变了要重新给用户看。
+> **变更**：交审跟上 session-protocol v2.6：Spec 的「做／不做」「附带的小决定」写作「边界」「未决问题」，Plan 多「架构决定」「未决问题」两项，
+> 旧名照认；复制块一块只答一件事、写最短说法（「C16 A」「批准；Q1 A」）；spec-guard 产物的条目编号不用 C、D、T、R 开头；每个交审小项写明
+> 对应上游 agent-skills 的哪一节，对应不上的只能追加。接口升 1.9（`reviewKinds` 多 `renamedSections`，由模块协调经公共变更请求 C130 落地）。
+> **新增**：`module_stage.py` 的 `stop_node`、`node_rules` 两个函数与 `--node-rules <kind>`，供后续模块判「到停点」与取节点规则。
+
+## 对使用者的影响
+
+- 已装项目要重跑 `setup-convention --replace` 约定块才变短：先 `--dry-run`，删掉的旧模板行标 `[needs --accept-removals]`，想留的先移进本地段，
+  再加 `--accept-removals`（Codex 同样带 `--host=codex`）。不重跑时旧长块照常有效，只是和节点上附的规则重复。
+- 串行项目在五种节点上，阶段提示多一段「停点规则（…）」；英文提示的项目标签是英文、规则正文是中文。
+- 最终验收的拟回告要给可原样发送的全文。
+- 交审小项按新名写，旧名照认，已写好的 Spec、Plan 不用改。
