@@ -129,7 +129,16 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 
 1. 先在每个用过的项目里运行 `/spec-guard:teardown-convention`（先 `--dry-run` 预览），移除约定块并停用阶段提示；
    你的 `spec/`、`tasks/` 会保留。
-2. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
+2. 用过本地事项账本、并把它接入过宿主的，卸插件之前先移除账本写进宿主的配置（没接入过就跳过）：
+   - Claude Code：运行 `claude mcp remove --scope user spec-guard-local-ledger`，再从 `~/.claude/settings.json` 的
+     `permissions.ask` 里删掉以 `mcp__spec-guard-local-ledger__` 开头的 10 条规则；
+   - Codex：运行 `codex mcp remove spec_guard_local_ledger`（或手动删掉 `~/.codex/config.toml` 里
+     `[mcp_servers.spec_guard_local_ledger]` 那一整张表）；
+   - 不再用账本时，可以删掉受管运行时 `~/.spec-guard/local-ticket-ledger/runtime`（设了 `SPEC_GUARD_STATE_DIR` 时在那下面）。
+
+   账本数据（项目里的 `.epiq/`、`__epiq_state__` 状态 worktree、`~/.epiq-global`）是你的记录，卸载不需要删；要带走先用
+   `local-ticket-portability` 归档。
+3. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
    `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
    `codex plugin marketplace remove spec-guard-marketplace`。
 
@@ -154,7 +163,7 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 ## 数据与隐私
 
 - **读什么**：每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用
-  （不 fetch）；在交审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容。
+  （不 fetch）；在交审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容；没有启用约定、只有账本的项目，也会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒。
 - **写什么**：钩子不写任何文件。命令在你看过预览、明确确认后才写：项目里的 `spec/`、`tasks/`、`.agent/` 和
   `CLAUDE.md`／`AGENTS.md` 的约定块；本机状态写在 `~/.spec-guard/`（可用 `SPEC_GUARD_STATE_DIR` 改位置）。
 - **什么时候联网**：只在你明确调用下面这些功能时。Proposal 相关命令、选了 GitHub/GitLab 的 `ticket`、本地事项的

@@ -136,3 +136,21 @@ look for existing relevant tickets, then create or update a bug, requirement, in
 completion record as appropriate. Keep the interaction natural: do not force a fixed sequence,
 owner, or workflow state. For current commands and exact safety boundaries, read
 `references/local-ticket-ledger-runtime.md`.
+
+## Removing the host configuration
+
+When the user uninstalls Spec Guard or stops using the ledger in a host, give them these steps to run
+themselves (do not run them for the user; they change user-level configuration), before the plugin is
+removed:
+
+- Codex: `codex mcp remove spec_guard_local_ledger`, or delete the whole
+  `[mcp_servers.spec_guard_local_ledger]` table from `~/.codex/config.toml`; other settings are kept.
+- Claude Code: `claude mcp remove --scope user spec-guard-local-ledger`, then delete the 10 rules
+  starting with `mcp__spec-guard-local-ledger__` from `permissions.ask` in `~/.claude/settings.json`
+  (`mcp remove` does not touch them).
+- When the ledger is no longer used, the managed runtime `~/.spec-guard/local-ticket-ledger/runtime`
+  (under `SPEC_GUARD_STATE_DIR` when set) may be deleted.
+
+The ledger data (`.epiq/`, `__epiq_state__`, `~/.epiq-global`) is the user's record and does not need
+to be deleted; archive it with `local-ticket-portability` first to take it elsewhere. Restart the client
+afterwards.

@@ -46,7 +46,8 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convent
 不要自行追加。从旧版模板装的块，旧模板独有的行也会这样列出。
 
 **不碰**：`spec/`、`tasks/` 里的内容（那是用户的规格和计划），
-以及远端 Issue 与本地事项账本。
+以及远端 Issue 与本地事项账本。账本留着时，移除约定后会话开始、清空、压缩后和别的会话转来消息时仍会出账本提醒
+（只看 `.epiq/project.json` 在不在）；不想要了，见 README「卸载」里账本那一步。
 
 ## 为什么要动 state.json
 
