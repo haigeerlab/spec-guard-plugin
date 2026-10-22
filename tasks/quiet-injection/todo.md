@@ -12,7 +12,7 @@
 - [x] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 - [x] Task 8：返工——Claude 估算窗口只认 1M（先红后绿） — 第 9 段原「140k、200k 按 200k 估算出行」两条改为读数 140k、164k、200k 都不出边界行；新增尾部 250k 后读数 300k 不出、750k 出「estimated 1000 k window」行；删去 `EST_200K`。旧代码上 140k 一例先红；`phase-guard.sh` 只在 `OVER` 时设 1M 估算窗口；505 例全过。变异核对（草稿副本放回 200k 那一支）→ 新用例变红。途中踩到一次：用例循环变量叫 `n`，覆盖了外层分段循环的段号，第 9 段结果写进了 `pass-199999`，改名 `reading` 后正常。Codex 用例未改、照过。
 - [x] Task 9：返工——文档与 CHANGELOG — `spec/quiet-injection.md` 假设 10、Contract、AC6 改写并加变更记录（用户原话）；`docs/design.md:87`、`commands/phase.md:97` 删去按 200k 的说法；CHANGELOG 0.84.1 加一条修复（写明 200k 会话不再有边界提醒）。
-- [ ] Checkpoint 2（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行 — 2026-10-23 呈现做了什么、AC6 证据（先红后绿、变异核对、505 例）、文档与其他改动表、提交表（c268722、b95b575）、Spec 原样差异、拟回告原文；用户回复「quiet-injection 返工验收通过，推送、开 PR，按拟回告发给负责人」。Spec 批准标记已用 review-mark 更新。
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
