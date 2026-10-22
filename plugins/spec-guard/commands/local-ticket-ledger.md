@@ -141,3 +141,17 @@ GitHub/GitLab 恢复后，本功能不会自动创建、导入或持续同步远
 
 本阶段没有“删除账本”命令。不得为了停用而删除 `.epiq/`、`__epiq_state__`、受管运行时或 MCP 条目；这些
 动作会影响持久记录或其他项目，必须由单独的、可审查的移除设计处理。
+
+## 移除宿主配置
+
+用户要卸载 spec-guard、或不再在某个宿主里用账本时，把下面的步骤原样交给用户，由用户自己运行（不代为执行，
+它们改的是用户级配置）；先移除再卸插件，插件卸掉后本命令的脚本也不在了：
+
+- Claude Code：`claude mcp remove --scope user spec-guard-local-ledger`；再从 `~/.claude/settings.json` 的
+  `permissions.ask` 里删掉以 `mcp__spec-guard-local-ledger__` 开头的 10 条规则（`mcp remove` 不会删它们）。
+- Codex：`codex mcp remove spec_guard_local_ledger`，或手动删掉 `~/.codex/config.toml` 里
+  `[mcp_servers.spec_guard_local_ledger]` 那一整张表；别的配置不受影响。
+- 不再用账本时，受管运行时 `~/.spec-guard/local-ticket-ledger/runtime`（设了 `SPEC_GUARD_STATE_DIR` 时在那下面）可以删。
+
+账本数据（`.epiq/`、`__epiq_state__`、`~/.epiq-global`）是用户的记录，卸载不需要删；要带走先用
+`local-ticket-portability` 归档。改完重启对应客户端。

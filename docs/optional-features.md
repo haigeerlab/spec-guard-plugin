@@ -21,7 +21,8 @@
 
 **解决的问题：** 没有 GitHub/GitLab Issue 可用时，也能记录 bug、需求和讨论。同一个 Git 仓库的所有 worktree 共用一个账本。
 
-**启用：** 一次性运行 `/spec-guard:local-ticket-ledger`，确认后才会安装。
+**启用：** 一次性运行 `/spec-guard:local-ticket-ledger`，确认后才会安装。不用多模块约定也行：项目里有 `.epiq/project.json`
+就会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒，平时每轮不注入。接入过宿主的，卸载步骤见 README「卸载」。
 
 **使用：**
 

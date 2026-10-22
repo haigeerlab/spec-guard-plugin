@@ -141,7 +141,18 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
 
 1. In every project that used it, run `/spec-guard:teardown-convention` (preview with `--dry-run` first). It removes
    the convention block and stops the stage hint; your `spec/` and `tasks/` stay.
-2. Then remove the plugin: `claude plugin uninstall spec-guard@spec-guard-marketplace` for Claude Code;
+2. If you used the local ticket ledger and connected it to a host, remove what it wrote into the host configuration
+   before removing the plugin (skip this if you never connected it):
+   - Claude Code: run `claude mcp remove --scope user spec-guard-local-ledger`, then delete the 10 rules starting with
+     `mcp__spec-guard-local-ledger__` from `permissions.ask` in `~/.claude/settings.json`;
+   - Codex: run `codex mcp remove spec_guard_local_ledger` (or delete the whole `[mcp_servers.spec_guard_local_ledger]`
+     table from `~/.codex/config.toml` by hand);
+   - if you no longer use the ledger, you can delete the managed runtime `~/.spec-guard/local-ticket-ledger/runtime`
+     (under `SPEC_GUARD_STATE_DIR` when that is set).
+
+   The ledger data (`.epiq/` in the project, the `__epiq_state__` state worktree, `~/.epiq-global`) is your record and
+   does not need to be deleted; to take it elsewhere, archive it with `local-ticket-portability` first.
+3. Then remove the plugin: `claude plugin uninstall spec-guard@spec-guard-marketplace` for Claude Code;
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
@@ -171,7 +182,8 @@ From 1.1 it also lists the entries used for developing several modules at once (
   reads this machine's plugin records to see whether delegate is installed. From the session transcript the
   host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
   the conversation. In a project with the local ticket ledger enabled, the hook only checks whether
-  `.epiq/project.json` exists; it does not read the ledger.
+  `.epiq/project.json` exists; it does not read the ledger. A project with only the ledger and no convention still gets
+  the ledger reminders at session start, after a clear or a compaction, and when another session's message arrives.
 - **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
   `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
   goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).
