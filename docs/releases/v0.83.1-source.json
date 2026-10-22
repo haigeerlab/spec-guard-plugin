@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.83.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:9f633640cf2dc856a217855fae474f2e2dfa7fa2"
+      },
+      "observedAt": "2026-10-22T01:35:00Z",
+      "evidence": [
+        "result:the v0.83.1 annotated tag resolves to merge commit 9f633640cf2dc856a217855fae474f2e2dfa7fa2 (pull request #402); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip",
+        "result:gate-tick rework 1 (#401, merge 76e227e): the gateTick preview prints the line unchanged and, on a second line, what it would become; --confirm output, exit codes, criterion and writes unchanged; interface.json unchanged (1.7)",
+        "result:verify-and-commit full tier and evals/codex-plugin-smoke.sh --selftest passed under macOS /bin/bash 3.2.57 before pushing #402"
+      ]
+    }
+  ]
+}
