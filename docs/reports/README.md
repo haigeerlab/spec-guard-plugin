@@ -21,6 +21,7 @@
 
 ## 当前报告
 
+- [多维度审查与需求核对（2026-10-22）](2026-10-22-multidimension-audit.md)：v0.83.1 基线上的使用数据、上游对照、18 条已核实发现与评分；随后的[功能点清单与需求决定记录](2026-10-22-feature-inventory/README.md)逐项核对约 716 个功能点，19 条决定（[decisions.md](2026-10-22-feature-inventory/decisions.md)）取代报告里的候选去向与修复分组。
 - [多维度架构审查（2026-10-08）](2026-10-08-architecture-audit.md)：v0.52.0 基线上的六维只读审查（Codex 扫描、主会话核验），20 条发现与按模块归组的修复顺序；[审查计划](2026-10-08-architecture-audit-plan.md)。
 - [Native-only 协作收尾（2026-10-04）](2026-10-04-native-only-collaboration-closeout.md)：把兼容传输从现行产品面退役时的源码与单台 Mac 宿主证据（英文）。
 - [A10 native 转正就绪对账（2026-10-04）](2026-10-04-a10-native-promotion-readiness.md)：对照 xats 退役决策与 A10 单机门槛修订，判定 native 尚未达到提出“成为默认传输”Proposal 的门槛。
