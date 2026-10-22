@@ -51,23 +51,30 @@ has_link() {  # $1=目录，默认当前目录
   [ -e "${1:-.}/.agent/spec-guard-link.json" ] || [ -L "${1:-.}/.agent/spec-guard-link.json" ]
 }
 
+# ledger-standalone-reminder（D11）：本地事项账本不是激活信号，但有它时即使没启用约定也出三处账本提醒（见 LEDGER_ONLY）。
+has_ledger() {  # $1=目录，默认当前目录
+  [ -f "${1:-.}/.epiq/project.json" ]
+}
+
 # fact-fixes：启动 python3 之前先在 bash 里判断 hook 输入可能指向的两个根目录（宿主给的 ROOT、输入 cwd 所在 git 仓库）
 # 是否都没有激活信号与指向文件；拿得准都没有时返回 0，调用方直接静默退出。bash 的 read 从管道逐字节读，大输入很慢，
 # 所以只读前 64KB（RAW_MORE=1 表示后面还有）：没读完、cwd 不是不含转义的普通字符串、或出现不止一次，都算拿不准
-# （返回 1），交给 python3 照旧解析。
+# （返回 1），交给 python3 照旧解析。拿得准只有账本时也返回 1，并设 PRE_LEDGER=1，留给调用方再判一次。
 inactive_before_python() {  # 读 RAW、RAW_MORE 与 ROOT
   local rest cwd top re='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
   if has_block "$ROOT" || has_state "$ROOT" || has_link "$ROOT"; then return 1; fi
   [ -z "$RAW_MORE" ] || return 1
-  case "$RAW" in *'"cwd"'*) ;; *) return 0 ;; esac
+  ! has_ledger "$ROOT" || PRE_LEDGER=1
+  case "$RAW" in *'"cwd"'*) ;; *) [ -z "$PRE_LEDGER" ]; return ;; esac
   rest="${RAW#*\"cwd\"}"
   case "$rest" in *'"cwd"'*) return 1 ;; esac
   [[ $RAW =~ $re ]] || return 1
   cwd="${BASH_REMATCH[1]}"
-  [ -n "$cwd" ] && [ -d "$cwd" ] || return 0
-  top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" || return 0
-  [ -n "$top" ] || return 0
-  ! { has_block "$top" || has_state "$top" || has_link "$top"; }
+  { [ -n "$cwd" ] && [ -d "$cwd" ] && top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" && [ -n "$top" ]; } ||
+    { [ -z "$PRE_LEDGER" ]; return; }
+  if has_block "$top" || has_state "$top" || has_link "$top"; then PRE_LEDGER=""; return 1; fi
+  ! has_ledger "$top" || PRE_LEDGER=1
+  [ -z "$PRE_LEDGER" ]
 }
 
 # 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
@@ -78,7 +85,11 @@ HOOK_INPUT=""
 if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
   RAW="" RAW_MORE=""
   if IFS= read -r -n 65536 -d '' -t 1 RAW; then RAW_MORE=1; fi
+  PRE_LEDGER=""
   inactive_before_python && exit 0
+  # 只有账本时 UserPromptSubmit 只在别的会话转来消息那一轮有话说：提示词开头不是那个包装就不必启动 python3。
+  re='"prompt"[[:space:]]*:[[:space:]]*"<cross-session-message '
+  if [ -n "$PRE_LEDGER" ] && [ "$EVENT" = UserPromptSubmit ] && ! [[ $RAW =~ $re ]]; then exit 0; fi
   RESOLVED="$({ printf '%s' "$RAW"
     [ -z "$RAW_MORE" ] || python3 -c '
 import os, select, time
@@ -99,10 +110,12 @@ cd "$ROOT" 2>/dev/null || exit 0
 
 # linked-project-root：会话目录自己没有激活信号时，只有本插件写下的指向文件算数（.agent/spec-guard-link.json，声明
 # 这里的工作对应别处的哪个项目）。没有它就照旧静默，而且在启动任何 python3 之前就退出；自己已启用时不看指向文件。
-LINKED=""
+# 指向文件也没有、但有账本时，走下面只出账本提醒的分支（LEDGER_ONLY）。
+LINKED="" LEDGER_ONLY=""
 if ! has_block && ! has_state; then
-  has_link || exit 0
-  LINKED=1
+  if has_link; then LINKED=1
+  else has_ledger || exit 0; LEDGER_ONLY=1
+  fi
 fi
 
 # open-commitments：会话开始与清空后只出一句读回提醒，不出阶段摘要（随后的 UserPromptSubmit 会给）。只看项目根有没有
@@ -130,6 +143,53 @@ fresh_out() {
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"'"${text}"'"}}'
   exit 0
 }
+# receipt-hint-on-message：有账本、且这一轮是别的会话转来的消息时，建议下一步之前多一行当场记账的提醒。
+# 判定与清理在 session_context.py --received（只读提示词开头的包装与它的两个属性）；其他情形不出这一行。
+receipt_hint() {
+  [ "$EVENT" = UserPromptSubmit ] && [ -f .epiq/project.json ] || return 0
+  local got name session who
+  got="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" --received 2>/dev/null)" || return 0
+  case "$got" in received$'\t'*) ;; *) return 0 ;; esac
+  got="${got#received$'\t'}"; name="${got%%$'\t'*}"; session="${got#*$'\t'}"
+  if [ -n "$ZH" ]; then
+    who=""
+    [ -z "$name" ] || who="对方 \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}，}会话 \`${session}\`"
+    printf '%s' "- 这一轮是别的会话发来的消息${who:+（${who}）}：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。$(ledger_root_note zh)"
+  else
+    who=""
+    [ -z "$name" ] || who="sender \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}, }session \`${session}\`"
+    printf '%s' "- Message from another session${who:+ (${who})}: record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call.$(ledger_root_note)"
+  fi
+}
+# ledger-standalone-reminder（D11）：只有账本、没启用约定时只出账本提醒，不出阶段内容：会话开始与清空后是上面的读回提醒，
+# 压缩后是只讲账本的一句核对提醒，UserPromptSubmit 只在别的会话转来消息那一轮出记账提醒；其余静默。这里本来没有阶段注入，
+# 缺 python3 或生成 JSON 失败时也静默（fresh 除外，它不依赖 python3）。不带状态码，所以不会被当成上一次阶段注入。
+if [ -n "$LEDGER_ONLY" ]; then
+  [ -z "$FRESH" ] || fresh_out
+  command -v python3 >/dev/null 2>&1 || exit 0
+  ZH=""
+  [ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" != zh-CN ] || ZH=1
+  if [ "$EVENT" = SessionStart ]; then
+    if [ -n "$ZH" ]; then
+      LEDGER_TEXT='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对账本里未关闭的 `waiting-on-*` 事项。'"$(ledger_root_note zh)"
+    else
+      LEDGER_TEXT='Context was just compacted: earlier requests in the summary may already be done; check the open `waiting-on-*` issues in the ledger before redoing anything.'"$(ledger_root_note)"
+    fi
+  else
+    LEDGER_TEXT="$(receipt_hint)"
+  fi
+  [ -n "$LEDGER_TEXT" ] || exit 0
+  printf '%s' "$LEDGER_TEXT" | python3 -c '
+import json, sys
+print(json.dumps({"hookSpecificOutput": {
+    "hookEventName": sys.argv[1],
+    "additionalContext": sys.stdin.read(),
+}}))
+' "$EVENT" 2>/dev/null
+  exit 0
+fi
 if [ -n "$FRESH" ]; then
   [ -n "$LINKED" ] || fresh_out
   # 跟随指向要用 python3；缺 python3 或指向失效时静默，诊断留给随后的 UserPromptSubmit。
@@ -231,26 +291,6 @@ if [ -f .epiq/project.json ]; then
   fi
 fi
 
-# receipt-hint-on-message：有账本、且这一轮是别的会话转来的消息时，建议下一步之前多一行当场记账的提醒。
-# 判定与清理在 session_context.py --received（只读提示词开头的包装与它的两个属性）；其他情形不出这一行。
-receipt_hint() {
-  [ "$EVENT" = UserPromptSubmit ] && [ -f .epiq/project.json ] || return 0
-  local got name session who
-  got="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" --received 2>/dev/null)" || return 0
-  case "$got" in received$'\t'*) ;; *) return 0 ;; esac
-  got="${got#received$'\t'}"; name="${got%%$'\t'*}"; session="${got#*$'\t'}"
-  if [ -n "$ZH" ]; then
-    who=""
-    [ -z "$name" ] || who="对方 \`${name}\`"
-    [ -z "$session" ] || who="${who:+${who}，}会话 \`${session}\`"
-    printf '%s' "- 这一轮是别的会话发来的消息${who:+（${who}）}：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。$(ledger_root_note zh)"
-  else
-    who=""
-    [ -z "$name" ] || who="sender \`${name}\`"
-    [ -z "$session" ] || who="${who:+${who}, }session \`${session}\`"
-    printf '%s' "- Message from another session${who:+ (${who})}: record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call.$(ledger_root_note)"
-  fi
-}
 RECEIPT="$(receipt_hint)"
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。

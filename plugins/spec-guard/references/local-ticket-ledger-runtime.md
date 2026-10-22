@@ -261,6 +261,9 @@ python3 -B "$ROOT/hooks/local_ledger_adapters.py" codex
 
 迁移后重启对应客户端。升级 Epiq 版本时必须重新核对 `local_ledger_adapters.py` 中的工具清单。
 
+卸载 spec-guard 或不再在某个宿主里用账本时，按 `commands/local-ticket-ledger.md`「移除宿主配置」一节（Codex：
+`local-ticket-ledger-ops` 技能同名一节）由用户自己移除 MCP 条目、ask 规则与 Codex 表；`claude mcp remove` 不删 ask 规则。
+
 本阶段没有自动或手动的账本移除命令。不得把移除 MCP 配置理解为删除事项，也不得删除 `.epiq/`、
 `__epiq_state__` 或受管运行时来“重置”项目；这些路径可能承载其他 worktree 的持久记录，任何移除能力都必须
 另立可审查设计。
