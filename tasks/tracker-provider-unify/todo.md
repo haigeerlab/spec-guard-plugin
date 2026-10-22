@@ -11,4 +11,4 @@
   > **修复**：托管事项、本地事项交接、Proposal 读取与收尾改用同一套 GitHub/GitLab 读写（`hooks/hosted_ticket_provider.py`）。GitLab 列表一律只取普通 Issue，混入事件、任务等其他类型时整次读取判为不可信；所有请求都绑定主机；分页上限统一为 50 页 × 100；GitLab 的 `/-/work_items/` 地址也认作 Issue；本地交接的写入在读不到 HTTP 状态时报结果未知，不再当成功；收尾不再把 GitLab internal note 算作讨论。
   > **行为变化**：`proposal_review.py`、`proposal_promotion_proof.py` 新增 `--host`，缺省 `github.com`／`gitlab.com`，结果带 `host`；以前不给主机、靠 `gh`／`glab` 默认主机读自建 GitHub Enterprise 或 GitLab 的用法，升级后要显式加 `--host`。收尾一侧的 GitLab 由「只认 https」改为与目标 `web_url` 同一协议。
 - [x] Task 7：`module-crew sync` 合入集成分支并跑完整检查 — 开工时 sync 到 f6e1e77，按同步基线通知 sync 到 6161aeb（0.83.2）；实现提交前再 sync 为「已是最新」。`verify-and-commit.sh` 全套（validate、phase-guard 428 例、verify-artifacts 72 例、repo-artifacts、ShellCheck）全过，提交 e157a32。第一次全套被 `test_proposal_closeout.py` 写死参数表的一例拦下（见 Task 4）。
-- [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
