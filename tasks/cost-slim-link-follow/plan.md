@@ -1,5 +1,7 @@
 # Plan: cost-slim-link-follow
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/cost-slim-link-follow.md`](../../spec/cost-slim-link-follow.md)（2026-10-22 批准，事项 C84／C85），假设 1～13 全部按原文认可。
 同一答复要求把并行边界里 `commands/`、`skills/` 两个整目录收窄到具体文件：已在 Spec 的「并行边界」一节改好（只改这一行，随本 Plan 一并交审）；
 与 `sibling-rules-out` 重叠的文件等它合入、`module-crew sync` 之后再改。
