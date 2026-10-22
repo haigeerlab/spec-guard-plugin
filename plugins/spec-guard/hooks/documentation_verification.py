@@ -2,12 +2,16 @@
 import argparse
 import json
 from pathlib import Path
+import re
+import subprocess
 
-from documentation_baseline import _visible_lines
+from documentation_baseline import _visible_lines, parse_baseline
 from documentation_impact import ImpactError, _cells, _regular, _table, parse_impact
 
 
 OUTCOMES = frozenset(("delivered", "deferred", "pending"))
+# doc-chain (D15): an Authority with a scheme is an external document; git cannot see it.
+EXTERNAL = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
 
 
 class VerificationError(ValueError):
@@ -20,6 +24,9 @@ class Outcome(object):
         self.outcome = outcome
         self.evidence = evidence
         self.rationale = rationale
+        self.check = "not-checked"
+        self.added = None
+        self.removed = None
 
 
 class Verification(object):
@@ -69,6 +76,68 @@ def _outcomes(path, required):
     return entries
 
 
+def _git(project, *args):
+    """Run a read-only git command; (stdout, None) or (None, why it failed)."""
+    try:
+        done = subprocess.run(["git", "-C", str(project), *args], capture_output=True, text=True,
+                              timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        return None, "git could not run (%s)" % error
+    if done.returncode != 0:
+        return None, "git %s failed: %s" % (args[0], (done.stderr or "").strip() or done.returncode)
+    return done.stdout, None
+
+
+def _changes(project, module, path):
+    """(added, removed, None) for `path` since the module Spec first landed; (None, None, why) when git cannot tell."""
+    out, why = _git(project, "log", "--diff-filter=A", "--format=%H", "--", "spec/%s.md" % module)
+    if why:
+        return None, None, why
+    commits = out.split()
+    if not commits:
+        return None, None, "spec/%s.md is not committed yet" % module
+    out, why = _git(project, "diff", "--numstat", commits[-1], "--", path)
+    if why:
+        return None, None, why
+    added = removed = 0
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            return None, None, "unexpected git diff output"
+        if parts[0] == "-":  # binary: changed, line counts unknown
+            return -1, -1, None
+        added, removed = added + int(parts[0]), removed + int(parts[1])
+    return added, removed, None
+
+
+def _check(project, module, outcome, entry, attention):
+    """doc-chain (D15): what git says about one delivered update, by the baseline status of its document."""
+    authority = entry.authority or ""
+    if EXTERNAL.match(authority):
+        outcome.check = "unverified"
+        return
+    path = authority.split("#", 1)[0]
+    added, removed, why = _changes(project, module, path)
+    if why:
+        outcome.check = "unknown"
+        attention.append("%s: cannot tell whether %s changed: %s" % (outcome.concern, path, why))
+        return
+    changed = bool(added or removed)
+    if changed and added >= 0:
+        outcome.added, outcome.removed = added, removed
+    if entry.status == "target":
+        outcome.check = "target-changed" if changed else "target-unchanged"
+        if changed and removed != 0:
+            attention.append("%s: target document %s has deletions; deleting or changing a goal not yet built is a "
+                             "requirement change and needs the user's separate approval" % (outcome.concern, path))
+    elif changed:
+        outcome.check = "changed"
+    else:
+        outcome.check = "unchanged"
+        attention.append("%s is declared delivered, but %s has no change since spec/%s.md was first committed"
+                         % (outcome.concern, path, module))
+
+
 def verify_documentation(project, module):
     """Return conservative declared-document facts for a module."""
     project = Path(project)
@@ -82,6 +151,7 @@ def verify_documentation(project, module):
                    if decision.decision in ("update", "create"))
     plan = project / "tasks" / module / "plan.md"
     outcomes = _outcomes(plan, required)
+    baseline = parse_baseline(project / "docs" / "DOCUMENTATION-BASELINE.md")
     attention = []
     for concern, decision in sorted(impact.decisions.items()):
         if decision.decision == "pending":
@@ -92,6 +162,8 @@ def verify_documentation(project, module):
             attention.append("%s has no declared documentation outcome" % concern)
         elif outcome.outcome != "delivered":
             attention.append("%s is declared %s" % (concern, outcome.outcome))
+        elif impact.decisions[concern].decision == "update":
+            _check(project, module, outcome, baseline.entries[concern], attention)
     return Verification("attention" if attention else "ready", outcomes, attention)
 
 
@@ -102,6 +174,9 @@ def _as_json(result):
             "outcome": item.outcome,
             "evidence": item.evidence,
             "rationale": item.rationale,
+            "check": item.check,
+            "added": item.added,
+            "removed": item.removed,
         }) for concern, item in sorted(result.outcomes.items())),
         "attention": result.attention,
     }
