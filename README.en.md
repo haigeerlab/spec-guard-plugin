@@ -180,9 +180,9 @@ From 1.1 it also lists the entries used for developing several modules at once (
   its runtime with `npm ci` from the lock files shipped in the package. The hook and every other command, such as
   `map`, `phase`, `verify-artifacts`, `review-mark` and `cost-report`, stay offline.
 - **Usage statistics and uploads**: `cost-report` reads the local Claude Code (`~/.claude/projects/`) and Codex
-  (`~/.codex/sessions/`) session transcripts offline. It uses their token counts, user prompt times, tool results (to
-  tell denials and hand-back times), edited file paths and subagent spawns, only in memory during the run to attribute
-  them to tasks; the output is counts only, never session content, and is printed to the terminal. The plugin has no
+  (`~/.codex/sessions/`) session transcripts offline. It uses their token counts, user prompt times (to cut the module
+  wrap-up), whether a tool call errored and subagent spawns (to count a subagent's usage toward the task that started
+  it), only in memory during the run to attribute them to tasks; the output is counts only, never session content, and is printed to the terminal. The plugin has no
   telemetry and reports nothing anywhere.
 
 Details: [design and architecture](docs/design.md) (Chinese).

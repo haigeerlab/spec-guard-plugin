@@ -136,3 +136,15 @@ python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py
 ## Open questions
 
 - 压缩或恢复会话后会话标识是否变化：Task 1 实测。
+
+
+## 修订：D18 自动跟随（2026-10-22，用户决定）
+
+功能盘点决定 D18：有指向时所有 spec-guard 命令与阶段注入用同一套解析自动跟随。模块 `cost-slim-link-follow` 实现：
+
+- `project_link.py follow --from <会话目录> [--session <标识>]` 复用 `resolve_for`：打印要操作的项目，跟随时在 stderr 写「本次操作的是
+  被指向的项目 `<路径>`」与来源；指向失效时退出 2，不退回会话目录。会话目录自己已启用时不跟随。
+- 命令按入口所在宿主取会话标识（Claude 命令传 `CLAUDE_CODE_SESSION_ID`，Codex skill 传 `CODEX_THREAD_ID`），放宽了 Boundaries 里
+  「命令自己猜会话标识先问」那条：入口已经确定了宿主，不算猜。Assumptions 第 11 条「其他命令自动跟随指向」不做，由本修订取代。
+- 阶段注入的「关联项目」四段把「运行命令时把这个路径作为项目传入」改为「spec-guard 命令会自动跟随到这个项目」，目录级那句改为
+  「用 `link-project` 给本会话登记自己的项目」；因此「来源为 directory 时与 0.58.2 逐字相同」这一条不再成立。会话登记不自动清理，不变。

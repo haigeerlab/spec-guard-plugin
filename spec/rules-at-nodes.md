@@ -1,5 +1,7 @@
 # Spec: rules-at-nodes
 
+<!-- spec-guard: review approved 9ae2e2dfd94c -->
+
 ## Objective
 
 约定块（`templates/claude-block-local.md` 7.5KB、`codex-block-local.md` 7.1KB）一次写进三十多条流程规则，每轮都在上下文里，

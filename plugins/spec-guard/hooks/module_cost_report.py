@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only module cost and rework report.
+"""Read-only module cost report.
 
 Splits a module's build into per-task time windows from the git history of
 `tasks/<module>/todo.md`, then (in later layers) attributes host session usage to
@@ -132,23 +132,10 @@ def task_windows(root, module, now=None):
 
 CLAUDE_CATEGORIES = ("input", "cache_write_5m", "cache_write_1h", "cache_write", "cache_read", "output")
 DISPATCH_TOOLS = ("Agent", "Task")
-EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-HOOK_DENIAL = "hook error"
-RECLAIM_MARK = "第二次失败后的收回"
-PATCH_FILE = re.compile(r"\*\*\* (?:Update|Add|Delete) File: (.+?)(?=\\n|\n|$)")
-
-
-def _text(content):
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return " ".join(_text(item.get("text") if isinstance(item, dict) else item) for item in content)
-    return ""
-
-
 def _claude_events(path, in_project):
-    """Tool results (for denials and hand-back times), main-agent file edits and user-prompt times; never content."""
-    results, edits, seen, prompts = {}, [], set(), []
+    """Each tool call's error flag (an errored Agent call never started a subagent) and user-prompt times.
+    Result text is never read."""
+    errors, prompts = {}, []
     for row in _rows(path):
         if not in_project(row.get("cwd")):
             continue
@@ -164,14 +151,9 @@ def _claude_events(path, in_project):
         for block in content if isinstance(content, list) else []:
             if not isinstance(block, dict):
                 continue
-            if block.get("type") == "tool_result" and block.get("tool_use_id") not in results:
-                results[block.get("tool_use_id")] = (ts, bool(block.get("is_error")), _text(block.get("content")))
-            elif block.get("type") == "tool_use" and block.get("name") in EDIT_TOOLS and block.get("id") not in seen:
-                seen.add(block.get("id"))
-                target = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("notebook_path")
-                if isinstance(target, str):
-                    edits.append((ts, target))
-    return results, edits, sorted(prompts)
+            if block.get("type") == "tool_result" and block.get("tool_use_id") not in errors:
+                errors[block.get("tool_use_id")] = bool(block.get("is_error"))
+    return errors, sorted(prompts)
 
 
 def encode_project_dir(real_path):
@@ -254,7 +236,7 @@ def _project_matcher(project):
 
 
 def read_claude(claude_home, project, skipped=None):
-    """Main-session usage and dispatches, plus each subagent file's whole usage keyed by its toolUseId."""
+    """Main-session usage and Agent calls, plus each subagent file's whole usage keyed by its toolUseId."""
     folder = claude_project_dir(claude_home, project)
     in_project = _project_matcher(project)
 
@@ -273,9 +255,9 @@ def read_claude(claude_home, project, skipped=None):
             if link and transcript.is_file():
                 # Linked through toolUseId already; the subagent may run in another worktree, so no cwd filter.
                 subagents[link] = _claude_messages(transcript, lambda _cwd: True, skipped)[0]
-        results, edits, prompts = _claude_events(main, in_project)
-        sessions.append({"id": "claude:" + main.stem, "messages": messages, "dispatches": calls,
-                         "subagents": subagents, "results": results, "edits": edits, "prompts": prompts})
+        errors, prompts = _claude_events(main, in_project)
+        sessions.append({"id": "claude:" + main.stem, "messages": messages, "calls": calls,
+                         "subagents": subagents, "errors": errors, "prompts": prompts})
     return sessions
 
 
@@ -299,7 +281,7 @@ def _codex_categories(before, after):
 def _codex_thread(path, in_project, skipped=None):
     """One rollout as {"meta", "records": [(ts, model, categories)], "spawns": [(ts, call_id, task_name)]}.
     Cumulative token_count totals become per-snapshot deltas, each tagged with the model in effect."""
-    meta, model, previous, records, spawns, edits, prompts = None, "unknown", {}, [], [], [], []
+    meta, model, previous, records, spawns, prompts = None, "unknown", {}, [], [], []
     for row in _rows(path):
         kind, payload = row.get("type"), row.get("payload") or {}
         if kind == "session_meta":
@@ -330,13 +312,7 @@ def _codex_thread(path, in_project, skipped=None):
             except (ValueError, AttributeError):
                 task_name = None
             spawns.append((ts, payload.get("call_id"), task_name))
-        elif kind == "response_item" and payload.get("type") in ("custom_tool_call", "function_call"):
-            body = payload.get("input") if payload.get("type") == "custom_tool_call" else payload.get("arguments")
-            is_patch = payload.get("name") == "apply_patch" or (isinstance(body, str) and "tools.apply_patch(" in body)
-            if isinstance(body, str) and is_patch:
-                edits.extend((ts, target.strip()) for target in PATCH_FILE.findall(body))
-    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns, "edits": edits,
-                                      "prompts": prompts}
+    return None if meta is None else {"meta": meta, "records": records, "spawns": spawns, "prompts": prompts}
 
 
 def _is_guardian(meta):
@@ -368,9 +344,9 @@ def read_codex(codex_home, project, skipped=None):
             spawn = (child_source.get("subagent") or {}).get("thread_spawn") if isinstance(child_source, dict) else None
             if spawn and spawn.get("parent_thread_id") == thread_id:
                 children.setdefault((spawn.get("agent_path") or "").rsplit("/", 1)[-1], []).append(child)
-        dispatches, subagents = [], {}
+        calls, subagents = [], {}
         for ts, call_id, task_name in thread["spawns"]:
-            dispatches.append((ts, call_id))
+            calls.append((ts, call_id))
             queue = children.get(task_name or "", [])
             if queue:
                 subagents[call_id] = queue.pop(0)["records"]
@@ -379,8 +355,8 @@ def read_codex(codex_home, project, skipped=None):
                     and thread_id in (other["meta"].get("parent_thread_id"), other["meta"].get("session_id"))
                     for record in other["records"]]
         sessions.append({"id": "codex:" + str(thread_id), "messages": thread["records"],
-                         "dispatches": dispatches, "subagents": subagents, "guardian": guardian,
-                         "results": {}, "edits": thread["edits"], "prompts": thread["prompts"]})
+                         "calls": calls, "subagents": subagents, "guardian": guardian,
+                         "errors": {}, "prompts": thread["prompts"]})
     return sessions
 
 
@@ -399,9 +375,7 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
     for window in windows["tasks"]:
         start, end = window["start"], window["end"]
         inside = lambda ts: start < ts <= end  # noqa: E731
-        task = dict(window, main={}, sub={}, guardian={}, dispatches=0, dispatches_unrecorded=0, reclaims=0,
-                    main_turns=0, sessions={})
-        handbacks, edited = [], set()
+        task = dict(window, main={}, sub={}, guardian={}, subagents=0, subagents_unrecorded=0, main_turns=0, sessions={})
         for session in sessions:
             used = 0
             for ts, model, categories in session["messages"]:
@@ -409,21 +383,14 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
                     _add(task["main"], model, categories)
                     used += _total(categories)
                     task["main_turns"] += _total(categories) > 0
-            for ts, tool_id in session["dispatches"]:
-                if not inside(ts):
+            for ts, tool_id in session["calls"]:
+                if not inside(ts) or session["errors"].get(tool_id):
+                    # An errored call (e.g. denied by a hook) never started a subagent.
                     continue
-                result = session.get("results", {}).get(tool_id)
-                if result and result[1] and HOOK_DENIAL in result[2]:
-                    # Denied before the subagent existed: not a dispatch; a reclaim if tier-guard said so.
-                    task["reclaims"] += RECLAIM_MARK in result[2]
-                    continue
-                task["dispatches"] += 1
+                task["subagents"] += 1
                 records = session["subagents"].get(tool_id)
-                handback = result[0] if result else (records[-1][0] if records else None)
-                if handback is not None:
-                    handbacks.append(handback)
                 if records is None:
-                    task["dispatches_unrecorded"] += 1
+                    task["subagents_unrecorded"] += 1
                     continue
                 for _ts, model, categories in records:
                     _add(task["sub"], model, categories)
@@ -434,15 +401,7 @@ def build_report(project, module, claude_home=None, codex_home=None, now=None):
                     used += _total(categories)
             if used:
                 task["sessions"][session["id"]] = used
-        if handbacks:
-            last = max(handbacks)
-            todo = os.path.join("tasks", module, "todo.md")
-            for session in sessions:
-                edited.update(target for ts, target in session.get("edits", [])
-                              if last < ts <= end and not target.replace("\\", "/").endswith(todo))
-        task["redispatches"] = max(task["dispatches"] - 1, 0)
-        task["edits_after_handback"] = len(edited)
-        task["coverage"] = "%d/%d" % (task["dispatches"] - task["dispatches_unrecorded"], task["dispatches"])
+        task["coverage"] = "%d/%d" % (task["subagents"] - task["subagents_unrecorded"], task["subagents"])
         tasks.append(task)
     return {"module": module, "tasks": tasks, "skipped_rows": len(skipped), "wrap_up": _wrap_up(tasks, sessions)}
 
@@ -528,26 +487,6 @@ def _role_total(bucket, category=None):
     return sum((categories.get(category, 0) if category else _total(categories)) for categories in bucket.values())
 
 
-def comparison(modules):
-    groups = {"dispatched": {"tasks": 0, "tokens": 0, "cost": 0.0, "priced": True},
-              "not_dispatched": {"tasks": 0, "tokens": 0, "cost": 0.0, "priced": True}}
-    for module in modules:
-        for task in module.get("tasks", []):
-            group = groups["dispatched" if task["dispatches"] else "not_dispatched"]
-            group["tasks"] += 1
-            group["tokens"] += _role_total(task["main"]) + _role_total(task["sub"])
-            if "cost" in task:
-                group["cost"] += task["cost"]["main"] + task["cost"]["sub"]
-                group["priced"] = group["priced"] and not task["cost"]["unpriced"]
-            else:
-                group["priced"] = False
-    for group in groups.values():
-        group["avg_tokens"] = group["tokens"] / group["tasks"] if group["tasks"] else None
-        group["avg_cost"] = group["cost"] / group["tasks"] if group["tasks"] and group["priced"] else None
-    groups["note"] = "不同模块与 task 的规模不同，这里只能看趋势；派活是否省钱的因果结论须来自受控对照实验。"
-    return groups
-
-
 def _fmt(number):
     return "{:,}".format(int(number))
 
@@ -559,19 +498,17 @@ def render(report, priced):
             lines.append("模块 %s：无法归属——%s" % (module["module"], module["unattributable"]))
             continue
         lines.append("模块 %s" % module["module"])
-        header = "  %-28s %8s %14s %14s %14s %8s %4s %4s %6s" % (
-            "task", "主会话轮次", "主代理 token", "主会话缓存读", "子代理 token", "派活", "重派", "收回", "交回后改")
+        header = "  %-28s %8s %14s %14s %14s %8s" % (
+            "task", "主会话轮次", "主代理 token", "主会话缓存读", "子代理 token", "子代理记录")
         lines.append(header + ("   等价金额" if priced else ""))
-        totals = {"turns": 0, "main": 0, "read": 0, "sub": 0, "disp": 0, "money": 0.0, "partial": False}
+        totals = {"turns": 0, "main": 0, "read": 0, "sub": 0, "calls": 0, "money": 0.0, "partial": False}
         for task in module["tasks"]:
             main, read, sub = _role_total(task["main"]), _role_total(task["main"], "cache_read"), _role_total(task["sub"])
             label = task["title"][:28] + ("" if task["done"] else "（进行中）")
             if task.get("shared_with") is not None:
                 label += "（与第 %d 项同窗）" % (task["shared_with"] + 1)
-            row = "  %-28s %8d %14s %14s %14s %8s %4d %4d %6d" % (
-                label, task["main_turns"], _fmt(main), _fmt(read),
-                _fmt(sub), "%d(%s)" % (task["dispatches"], task["coverage"]), task["redispatches"], task["reclaims"],
-                task["edits_after_handback"])
+            row = "  %-28s %8d %14s %14s %14s %8s" % (
+                label, task["main_turns"], _fmt(main), _fmt(read), _fmt(sub), task["coverage"])
             if priced:
                 money = task["cost"]["main"] + task["cost"]["sub"]
                 totals["money"] += money
@@ -579,23 +516,23 @@ def render(report, priced):
                 row += "   %.4f%s" % (money, " *" if task["cost"]["unpriced"] else "")
             lines.append(row)
             for key, value in (("turns", task["main_turns"]), ("main", main), ("read", read), ("sub", sub),
-                               ("disp", task["dispatches"])):
+                               ("calls", task["subagents"])):
                 totals[key] += value
         lines.append("  %-28s %8d %14s %14s %14s %8d" % ("合计", totals["turns"], _fmt(totals["main"]), _fmt(totals["read"]),
-                                                        _fmt(totals["sub"]), totals["disp"]) +
-                     ("            %.4f%s" % (totals["money"], " *" if totals["partial"] else "") if priced else ""))
+                                                        _fmt(totals["sub"]), totals["calls"]) +
+                     ("   %.4f%s" % (totals["money"], " *" if totals["partial"] else "") if priced else ""))
         wrap = module.get("wrap_up")
         if wrap is not None:
             main = _role_total(wrap["main"])
             row = "  %-28s %8d %14s %14s" % ("模块完成后的收尾", wrap["turns"], _fmt(main), _fmt(_role_total(wrap["main"], "cache_read")))
             if priced:
                 money = wrap["cost"]["main"]
-                row += "%34s%.4f%s" % ("", money, " *" if wrap["cost"]["unpriced"] else "")
+                row += "%27s%.4f%s" % ("", money, " *" if wrap["cost"]["unpriced"] else "")
             lines.append(row)
             total = "  %-28s %8d %14s" % ("合计（含收尾）", totals["turns"] + wrap["turns"], _fmt(totals["main"] + main))
             if priced:
                 partial = totals["partial"] or bool(wrap["cost"]["unpriced"])
-                total += "%49s%.4f%s" % ("", totals["money"] + wrap["cost"]["main"], " *" if partial else "")
+                total += "%42s%.4f%s" % ("", totals["money"] + wrap["cost"]["main"], " *" if partial else "")
             lines.append(total)
         sessions = {}
         for task in module["tasks"]:
@@ -606,34 +543,26 @@ def render(report, priced):
             lines.extend("    %s  %s token" % (name, _fmt(used)) for name, used in sorted(sessions.items()))
         else:
             lines.append("  没有找到会话数据：时间窗内本项目没有 Claude transcript 或 Codex rollout。")
-        unknown = ["主代理通过 shell 命令（sed -i、脚本写文件等）改的文件不计入「交回后改」，只统计编辑工具与 apply_patch。",
-                   "子代理（含 Codex 子线程）的全部用量计到派出它的 task；之后续派（SendMessage / send_input）的用量不会移到后面的 task。",
-                   "「收回」只反映 Claude：tier-guard 在 Codex 上只作建议、不拦截，Codex 侧没有收回信号。"]
+        unknown = ["子代理（含 Codex 子线程）的全部用量计到发起它的 task；之后续派（SendMessage / send_input）的用量不会移到后面的 task。",
+                   "在指向本项目的会话目录（`.agent/spec-guard-link.json`）里运行的会话，记录存在那个目录名下，不计入本项目。"]
         renamed = [task["title"] for task in module["tasks"] if task.get("matched_by_position")]
         if renamed:
             unknown.append("这些项勾选后改过名，完成时间按行位置推断：" + "、".join(renamed))
         if module.get("skipped_rows"):
             unknown.append("%d 条会话记录的时间戳无法解析，已跳过。" % module["skipped_rows"])
-        unrecorded = sum(task["dispatches_unrecorded"] for task in module["tasks"])
+        unrecorded = sum(task["subagents_unrecorded"] for task in module["tasks"])
         if unrecorded:
-            unknown.append("%d 次派活宿主没有留下子代理记录，用量未知，未计入。" % unrecorded)
+            unknown.append("%d 次子代理调用宿主没有留下记录，用量未知，未计入。" % unrecorded)
         unpriced = sorted({label for task in module["tasks"] for label in task.get("cost", {}).get("unpriced", [])})
         if unpriced:
             unknown.append("未定价（金额不含这部分，带 * 的行受影响）：" + "、".join(unpriced))
         lines.append("  无法统计的部分：")
         lines.extend("    - " + item for item in unknown)
-    if "comparison" in report:
-        lines.append("对照（%s）" % report["comparison"]["note"])
-        for key, label in (("dispatched", "有派活的 task"), ("not_dispatched", "没有派活的 task")):
-            group = report["comparison"][key]
-            average = "-" if group["avg_tokens"] is None else _fmt(group["avg_tokens"])
-            money = "" if group["avg_cost"] is None else "，平均等价金额 %.4f" % group["avg_cost"]
-            lines.append("  %s：%d 个，平均 %s token%s" % (label, group["tasks"], average, money))
     return "\n".join(lines)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="只读的模块成本与返工报告")
+    parser = argparse.ArgumentParser(description="只读的模块成本报告")
     parser.add_argument("modules", nargs="+", metavar="MODULE")
     parser.add_argument("--project", default=".")
     parser.add_argument("--json", action="store_true")
@@ -664,8 +593,6 @@ def main(argv=None):
             if entry.get("wrap_up") is not None:
                 entry["wrap_up"]["cost"] = price_task(dict(entry["wrap_up"], sub={}), prices)
         report["modules"].append(entry)
-    if len(args.modules) > 1:
-        report["comparison"] = comparison(report["modules"])
     print(json.dumps(_jsonable(report), ensure_ascii=False, indent=2) if args.json else render(report, prices is not None))
     if failed:
         print("无法归属的模块不报告为 0；修正后重试。", file=sys.stderr)

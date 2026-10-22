@@ -14,7 +14,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:setup-convention`
 
-参数：`[local] [--dry-run] [--replace [--accept-removals]] [--dispatch|--no-dispatch]`
+参数：`[local] [--dry-run] [--replace [--accept-removals]]`
 
 在当前项目安装多模块约定：建 `spec/`、`tasks/`、`.agent/state.json`，在 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入
 [约定块](convention-block.md)。只支持本地文件式工作流，不访问远端。
@@ -23,7 +23,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 - `--replace` 升级已有约定块。块内本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`）
   原样保留；预览逐行列出 `will remove:`／`will add:`，不在现行模板里的删除行标 `[needs --accept-removals]`，
   不加这个参数时拒绝替换且不改文件。
-- `--dispatch`／`--no-dispatch`：开关可选的子代理派活规则（实验性，默认关闭）。
+- 派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时 `--replace` 移除整段，不需要 `--accept-removals`。
 - 已有 `.agent/state.json.disabled` 时拒绝新建空状态，先人工核对后改回原名。
 
 ### `/spec-guard:teardown-convention`
@@ -79,7 +79,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件本身坏了时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`；个别键有问题时只有那个键失效、其余照常，阶段提示多一行
-`Project config: ignored`。同时只读汇总派活开关与默认事项后端的当前值和来源。
+`Project config: ignored`。同时只读汇总默认事项后端的当前值和来源。
 
 ### `/spec-guard:module-suspend`
 
@@ -95,7 +95,8 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 `set`／`unset` 先预览、`--confirm` 才写，只动这一个文件。多个会话共用一个目录、各做不同项目时，三个动作都加
 `--session <会话标识>`（Claude Code 传 `"$CLAUDE_CODE_SESSION_ID"`，Codex 传 `"$CODEX_THREAD_ID"`），登记只对那一个会话生效；
 钩子先用本会话的登记，其次目录级指向，都没有则静默。会话目录自己已启用 spec-guard 时不需要指向；没有指向文件的
-无关目录照旧静默。其他命令目前不自动跟随指向，要显式带上项目路径。拒绝时退出 2、不写文件。
+无关目录照旧静默。其他命令与阶段注入用同一套解析自动跟随指向（`project_link.py follow`），输出写明「本次操作的是被指向的项目
+`<路径>`」；指向失效时命令退出 2 并给出诊断，不会改去操作会话目录。拒绝时退出 2、不写文件。
 
 ### `/spec-guard:review-mark`
 
@@ -171,7 +172,7 @@ git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一�
 参数：`<module-id> [更多模块] [--prices <价格文件>] [--json]`
 
 只读：离线读取本机 Claude Code 与 Codex 的会话记录，按 todo 的勾选提交切出每个 task 的时间窗，统计主代理与子代理
-的 token、主会话轮次、派活与返工信号。只有给了 `--prices` 才折算金额。退出码 2：todo 没有提交历史，时间窗切不出来
+的 token 与主会话轮次。只有给了 `--prices` 才折算金额。退出码 2：todo 没有提交历史，时间窗切不出来
 （不是用量为 0）。
 
 ## 命令对照
@@ -196,4 +197,4 @@ Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自�
 | 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
 | 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | `local-ticket-portability` skill |
 | 模块进度表（含关键卡点） | `/spec-guard:map` | `spec-guard-ops` skill 的 map 一节 |
-| 模块成本与返工报告 | `/spec-guard:cost-report` | `spec-guard-ops` skill 的 cost report 一节 |
+| 模块成本报告 | `/spec-guard:cost-report` | `spec-guard-ops` skill 的 cost report 一节 |

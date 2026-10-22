@@ -40,10 +40,14 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
-  --project . --proposal-id "<proposal-id>" \
+  --project "$PROJECT" --proposal-id "<proposal-id>" \
   --platform "<github|gitlab>" --target "<target>"
 ~~~
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 自建 GitHub Enterprise 或 GitLab 实例要加 `--host <主机>`；不给时读 `github.com`／`gitlab.com`，结果里的 `host` 写明读的是哪个实例。
 

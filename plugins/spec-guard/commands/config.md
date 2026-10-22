@@ -1,5 +1,5 @@
 ---
-description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关），并汇总派活开关与默认事项后端的当前值和来源
+description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关），并汇总默认事项后端的当前值和来源
 allowed-tools: Bash
 ---
 
@@ -38,9 +38,12 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
-PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
 python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 ```
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 ## 配置放在哪
 
@@ -60,11 +63,10 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 
 设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency` 例外：取什么值都不注入，它的效果只在相应规则的停点出现。
 
-只读汇总、不在这里修改的两项：
+只读汇总、不在这里修改的一项：
 
 | 项 | 存在哪 | 用什么改 |
 |---|---|---|
-| `dispatch`（子代理派活规则） | `CLAUDE.md`／`AGENTS.md` 约定块里的标记行 | `/spec-guard:setup-convention --replace --dispatch`（关闭用 `--no-dispatch`） |
 | `trackerDefault`（默认事项后端） | `.agent/tracker.json` | `/spec-guard:tracker-default` |
 
 ## 设置或取消
