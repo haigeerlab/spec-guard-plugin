@@ -1,7 +1,7 @@
 # Todo: cost-slim-link-follow
 
 - [x] Task 0：提交已批准的 Spec 标记、Plan 与 todo — Spec（C84，修订后标记 61b845f）与 Plan（C87／C97）由模块协调带批准标记提交到集成分支 30d5510；按开工通知 `module-crew sync`（HEAD 82d51fe，已含该提交）；validate、phase-guard（438 例）、verify-artifacts（74 例）全过。
-- [ ] Task 1：成本报告瘦身（C1）
+- [x] Task 1：成本报告瘦身（C1） — 测试先改：返工信号四个用例与 Codex apply_patch 用例换成「报错调用不计入 `subagents`（正文含收回原因或其他文字都一样）」「成功调用的正文含收回文字也照常计入」「task 与 Codex task 不再有 `dispatches`／`redispatches`／`reclaims`／`edits_after_handback`」，多模块对照用例改为断言 JSON 无 `comparison`，表格断言含「子代理记录」、不含派活／重派／收回／交回后改／对照／返工，无法统计的部分提到 `spec-guard-link.json`；在原代码上 7 失败 27 错误。实现：删 `EDIT_TOOLS`、`HOOK_DENIAL`、`RECLAIM_MARK`、`PATCH_FILE`、`_text` 与 `comparison()`，`_claude_events` 只取错误标记与提问时间，Codex 不再收集补丁路径；表格列与金额列对齐。默认 python3 与 `/usr/bin/python3` 3.9.6 各跑 138 例全过；全仓旧字段只剩 `evals/dispatch-cost/results/` 历史结果与报告。
 - [ ] Task 2：派活规则退役（C2）
 - [ ] Task 3：跟随解析（C3）
 - [ ] Checkpoint 1（report）：变异核对
