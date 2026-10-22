@@ -358,6 +358,8 @@ def close_preview(preview, project, adapter, confirm=False, journal_root=None,
     root = _private_root(journal_root or JOURNAL_ROOT)
     path = _journal_path(root, preview["proposalId"], preview["revision"])
 
+    # The lock file is never removed: a process already waiting holds the old inode,
+    # and unlinking it would let a newcomer create and lock a fresh one at once.
     lock = os.open(str(path) + ".lock",
                    os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0), 0o600)
     try:
@@ -370,11 +372,6 @@ def close_preview(preview, project, adapter, confirm=False, journal_root=None,
                                  remote, publication_reader, reader, prover)
     except OSError:
         return _blocked("unknown", "journal-unavailable")
-    finally:
-        try:
-            os.unlink(str(path) + ".lock")
-        except OSError:
-            pass
 
 
 def _close_locked(preview, project, adapter, path, backend, target, remote,

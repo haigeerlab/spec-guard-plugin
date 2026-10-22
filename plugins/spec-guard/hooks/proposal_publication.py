@@ -20,7 +20,8 @@ HEAD_UNAVAILABLE = "remote default branch is unavailable"
 FETCH_FAILED = "remote default branch fetch failed"
 TIP_MOVED = "remote default branch moved between observation and fetch"
 SNAPSHOT_FAILED = "temporary Git snapshot failed"
-# Stable codes for the same four facts.  Layers that emit only code-shaped
+PROPOSAL_UNREADABLE = "proposal listed in the snapshot could not be read"
+# Stable codes for the same five facts.  Layers that emit only code-shaped
 # diagnostics cannot carry the strings above, and folding them into one state code
 # loses what the snapshot just established: whether this is worth running again.
 PROBE_CODES = {
@@ -28,6 +29,7 @@ PROBE_CODES = {
     FETCH_FAILED: "snapshot-fetch-failed",
     TIP_MOVED: "snapshot-tip-moved",
     SNAPSHOT_FAILED: "snapshot-temp-repo-failed",
+    PROPOSAL_UNREADABLE: "snapshot-proposal-unreadable",
 }
 BASELINE_REMOTE_MISMATCH = "Proposal baseline remote or default branch differs"
 BASELINE_UNAVAILABLE = "Proposal baseline commit is not on remote default branch"
@@ -288,6 +290,11 @@ def read_published_pool(project, remote="origin"):
         for path in paths:
             proposal_path = Path(temp) / "proposal.md"
             proposal_text = _show(repo, observed_commit, path)
+            if proposal_text is None:
+                # Just listed, yet unreadable: a failed read, not an invalid Proposal,
+                # and skipping it would let a proof conclude on a partial pool.
+                return PublicationPool("unknown", review_commit=observed_commit,
+                                       diagnostic=PROPOSAL_UNREADABLE)
             proposal_path.write_text(proposal_text, encoding="utf-8")
             try:
                 proposal = parse_proposal(proposal_path)
