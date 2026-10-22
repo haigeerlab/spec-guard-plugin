@@ -4,13 +4,24 @@
 
 依据 [`spec/rules-at-nodes.md`](../../spec/rules-at-nodes.md)：2026-10-22 批准（事项 C102，11 条前提认可，附带小决定 D12 选 A：兜底一句写
 「停在 gate 前、交审前或要停下问用户前，先读停点规则里对应的一节」）；同日按事项 C105 修订、经 C107 复审批准（前提 12、13 认可，
-C7 对照表里我补的各行全部认可）。C105 时交审的上一版 Plan 作废，本版加入 C7。
+C7 对照表里我补的各行全部认可）；构建中按用户追加的 SG-a、SG-b 再修订，经 C122 复审批准（未决问题待定 1 选 A：本 Spec 已有编号不改名），
+批准时用户另把 AC9 改为「小项名按 AC12」（范围内措辞修正，已记进 Spec 变更记录，最终验收附这段差异）。C113 批准的上一版 Plan 由本版取代：
+加入 C8～C10 的任务与 AC11～AC13 的验证，交审小项按新名写。
 
 分支 `rules-at-nodes`，worktree `.claude/worktrees/current-plugin-owner-aa5b98-crew/rules-at-nodes`，从集成分支 `crew/fix-batch` 开出。
 module-crew 模块会话：只本地提交，不推送、不开 PR；合并由模块协调按用户原话做。CHANGELOG 与版本号由模块协调整批合完后统一改，
 本模块把拟写的更新说明记在 todo 末尾。
 
+契约以 session-protocol v2.6 定稿为准（该仓 main 提交 92309e7，第 2、3、6 节与 CHANGELOG 的 v2.6 条目）。
+
 所需工具：只改文字、Python 与 bash 回归，不需要浏览器或电脑操作；不访问远端，不新增依赖。
+
+## 架构决定
+
+- **停点规则放独立小文件 `references/node-rules.md`，由阶段注入按节点附原文**（Spec 前提 1）；`workflow-checkpoints.md` 仍是完整细则。
+- **节点判定只组合现有函数**（`review_hint`、`next_gate`、`at_final_gate`），新增 `stop_node`、`node_rules` 两个接口给后续模块用。
+- **小项新名是现行写法，旧名只在一句「照认」与 `interface.json` 的旧节名里出现**（Spec 前提 14）。
+- **`interface.json` 不由本模块改**：C10 的 JSON 原样写进【公共变更请求】，由模块协调落地后 sync。
 
 ## 实现要点
 
@@ -58,6 +69,27 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
 
 - 验收：新用例先红后绿；AC9；`git diff` 里没有读取上游章节名的代码（AC10）。
 - 验证：`python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py`；`wc -c` 复核各节体积。
+
+### Task 1c：复制块、条目编号与小项新名（C8、C9）
+
+1. 先改回归（红）：`test_workflow_checkpoints.py` 的 `CARD_SECTIONS` 换成新名（Spec：目标、边界、要你确认的假设、验收标准、未决问题；Plan：
+   架构决定、分几步、会改哪些文件、风险、中途会停下来问你的地方、未决问题）；`test_how_to_approve_uses_one_copy_block` 加 AC11 的短语、
+   断言不含「批准；D1 A」；`test_mirrors_follow_the_card_sections` 对 `review-mark.md`、`SKILL.md` 改断言新名与复制块新写法；新增：规则含
+   「旧名「做／不做」「附带的小决定」照认」、编号规则「不用 C、D、T、R 开头」，仍含「以所装协作插件的规定为准」、不含「去决策收件箱答」。
+2. 改 `workflow-checkpoints.md`「交审要让用户看到内容」与「交审时说明怎么批准」两条，`review-mark.md`、`SKILL.md` 同句；`node-rules.md` 的
+   Spec 交审、Plan 交审两节与各交审节「怎么批准」一句按新名、新写法改；C7 表加「架构决定」「未决问题」「文档建议（附加）」行。
+
+- 验收：新断言先红后绿（AC11、AC12）；`python3 scripts/check-interface.py` 照旧通过（`interface.json` 未改，旧节名仍在规则里）。
+- 验证：`python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py`；`python3 scripts/check-interface.py`。
+
+### Task 1d：`interface.json` 升 1.9 的公共变更请求（C10）
+
+Task 1c 提交后发【公共变更请求】：「文件」列 `plugins/spec-guard/interface.json`，「改什么」原样贴 Spec C10 的逐字改动，「为什么」写 session-protocol
+v2.6 与用户的 SG-b；不等答复，接着做 Task 2。同一任务里在 `docs/design.md` 的接口版本说明补 1.9 一行。模块协调落地后单独执行 `module-crew sync`，
+核对 AC13（`interface` 1.9、`plan` 与 `spec-plan` 的 sections、`renamedSections` 与 C10 逐字一致、`spec` 的 sections 未变、`check-interface.py` 通过），
+结果记进 todo。
+
+- 验收：AC13；答复与 sync 记进 todo。
 
 ### Task 2：阶段注入附停点规则（C3 `module_stage.py`）
 
@@ -113,7 +145,7 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
 
 ### 最终验收（gate）
 
-按停点规则「最终验收」一节交审：做了什么、AC1～AC10 逐条证据、改动文件／提交／依赖表、Spec 中途改过吗；「拟回告：无」（需求来自用户本人）。
+按停点规则「最终验收」一节交审：做了什么、AC1～AC13 逐条证据、改动文件／提交／依赖表、Spec 中途改过吗；「拟回告：无」（需求来自用户本人）。
 不含推送与开 PR；合并由模块协调按用户原话做。
 
 ## 风险
@@ -130,3 +162,7 @@ Plan 获批后由模块协调带批准标记提交到集成分支；开工通知
 ## 中途会停下来问你的地方
 
 没有中途 `gate`，做完直接交最终验收。只有 Spec「先问再做」里的三种情况（要改 `phase-guard.sh` 其他结构、体积压不到、条目归属拿不准）才停。
+
+## 未决问题
+
+无。

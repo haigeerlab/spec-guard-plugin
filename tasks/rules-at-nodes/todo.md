@@ -3,6 +3,8 @@
 - [ ] Task 0：同步批准标记、提交 Plan 与 todo
 - [ ] Task 1：停点规则与检查点规则（C2、C4）
 - [ ] Task 1b：交审小项对上游章节（C7）
+- [ ] Task 1c：复制块、条目编号与小项新名（C8、C9）
+- [ ] Task 1d：`interface.json` 升 1.9 的公共变更请求（C10）
 - [ ] Task 2：阶段注入附停点规则（C3 `module_stage.py`）
 - [ ] Task 3：IDLE／MAP_ONLY 附停点规则（C3 `phase-guard.sh`）
 - [ ] Task 4：约定块瘦身（C1）
