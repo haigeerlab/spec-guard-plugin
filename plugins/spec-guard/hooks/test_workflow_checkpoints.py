@@ -395,7 +395,7 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_a_review_handoff_shows_the_content(self):
         section = self.section("## 批准标记")
-        for phrase in ("交审要让用户看到内容", "目标", "范围内与范围外", "关键决策与取舍", "假设", "验收标准", "未决问题",
+        for phrase in ("交审要让用户看到内容", "目标", "总是做、先问、不做三档", "关键决策与取舍", "假设", "验收标准", "未决问题",
                        "验证方式", "检查点及其类型", "影响面", "风险", "只给链接", "不算交审", "授权什么",
                        "同时批准 Spec 与 Plan", "不记为 `approved`", "不能替代内容"):
             self.assertIn(phrase, section)
@@ -411,8 +411,8 @@ class CheckpointContractTests(unittest.TestCase):
     # review-card-sections: the sections of each kind, in the order of the decision-inbox card template.
     CARD_SECTIONS = (
         ("能力图审阅：", ("拆成哪些模块", "先后顺序", "文档建议")),
-        ("Spec：", ("目标", "做／不做", "要你确认的假设", "验收标准", "附带的小决定")),
-        ("Plan：", ("分几步", "会改哪些文件", "风险", "中途会停下来问你的地方")),
+        ("Spec：", ("目标", "边界", "要你确认的假设", "验收标准", "未决问题")),
+        ("Plan：", ("架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "未决问题")),
         ("中途 gate：", ("做到哪了", "为什么停在这", "接下来要做的那一步")),
         ("最终验收：", ("做了什么", "验收结果", "改了哪些文件", "Spec 中途改过吗")),
     )
@@ -434,16 +434,22 @@ class CheckpointContractTests(unittest.TestCase):
                 self.assertNotIn(-1, positions, line)
                 self.assertEqual(positions, sorted(positions), line)
         for phrase in ("逐条全列", "照旧用表格", "不为了短而删减", "新插入的标「新」", "开头的五件事落在这几项里",
-                       "“注意：”", "“批了会怎样：”", "没有写“无”", "Spec 的五项再接 Plan 的四项", "`reviewKinds`",
-                       "session-protocol 契约的交审小项"):
+                       "“注意：”", "“批了会怎样：”", "没有写“无”", "Spec 的五项再接 Plan 的六项", "`reviewKinds`",
+                       "session-protocol 契约的交审小项", "总是做、先问、不做三档",
+                       "旧名「做／不做」「附带的小决定」照认"):
             self.assertIn(phrase, item)
 
     def test_how_to_approve_uses_one_copy_block(self):
         item = self.handoff_item("**交审时说明怎么批准。**", "**没有标记的文件判定照旧**")
         for phrase in ("每个选项写清选了之后会怎样", "能不能撤回", "还要另外问用户", "“推荐理由：”", "可复制代码块",
-                       "不带 shell 语言标签", "不用行内代码", "最短的可接受说法", "合成一行", "有代码块就是要用户回答",
+                       "不带 shell 语言标签", "不用行内代码", "最短的可接受说法", "待定问题接在后面", "有代码块就是要用户回答",
                        "不需要回答的内容", "不用代码块", "“继续”不会被记为批准", "不能替代内容"):
             self.assertIn(phrase, item)
+        # rules-at-nodes C8: session-protocol v2.6 copy blocks -- one matter per block, the shortest answer.
+        for phrase in ("一块只答一件事", "“C16 A”", "“C16 A；C16-1 B”", "“批准；Q1 A”", "Q1、Q2", "另一种选择单独一块",
+                       "不出带占位符的块", "推翻或重申", "不用 C、D、T、R 开头"):
+            self.assertIn(phrase, item)
+        self.assertNotIn("批准；D1 A", item)
         # sibling-rules-out: where the user answers is left to the installed collaboration plugin, named by no plugin.
         self.assertIn("所装协作插件对在哪里答复另有规定时", item)
         self.assertIn("复制块按它的规定放或不放", item)
@@ -460,8 +466,10 @@ class CheckpointContractTests(unittest.TestCase):
         for relative in ("commands/review-mark.md", "skills/spec-guard-ops/SKILL.md"):
             with self.subTest(path=relative):
                 text = (self.plugin / relative).read_text(encoding="utf-8")
-                for phrase in ("做／不做", "要你确认的假设", "附带的小决定", "批了会怎样"):
+                for phrase in ("边界", "要你确认的假设", "未决问题", "架构决定", "批了会怎样", "一块只答一件事", "批准；Q1 A"):
                     self.assertIn(phrase, text)
+                for retired in ("做／不做（范围内与范围外）", "附带的小决定（未决问题"):
+                    self.assertNotIn(retired, text)
 
     def test_rework_goes_back_into_the_module(self):
         section = self.section("## 返工与小模块")
@@ -779,6 +787,7 @@ class NodeRulesTests(unittest.TestCase):
         "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "先后顺序", "文档建议", "README", "确认框之前",
                       "只给链接", "不算合并交审", "可复制代码块", "以所装协作插件的规定为准"),
         "## Spec 交审": ("目标", "边界", "总是做", "先问", "不做", "要你确认的假设", "验收标准", "AC1、AC2", "未决问题", "确认框之前",
+                       "一块只答一件事", "批准；Q1 A",
                        "只给链接", "“注意：”", "“批了会怎样：”", "`pending`", "review-mark", "一次交审只放一个模块",
                        "按模块分组", "delegate", "不算用户批准", "可复制代码块", "以所装协作插件的规定为准", "有才提"),
         "## Plan 交审": ("架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "`gate`", "`report`", "推送与开 PR",
