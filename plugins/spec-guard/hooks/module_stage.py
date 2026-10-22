@@ -377,7 +377,7 @@ def unreadable_map(reason: str, zh: bool = False) -> str:
         return ("当前阶段: **UNKNOWN**\n\n- 能力图: 已有但读不了（%s）\n\n"
                 "建议下一步: 让 `spec/CAPABILITY-MAP.md` 成为可读的文件（检查它的权限），然后再发下一条消息；"
                 "这是读取故障，不是能力图的状态。" % reason)
-    return ("当前阶段: **UNKNOWN**\n\n- Capability map: present but unreadable (%s)\n\n"
+    return ("Current stage: **UNKNOWN**\n\n- Capability map: present but unreadable (%s)\n\n"
             "Suggested next step: make `spec/CAPABILITY-MAP.md` a readable file (check its permissions), then send the "
             "next prompt; this is a read failure, not a state of the map." % reason)
 
@@ -706,7 +706,7 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
     return ("- External review (from delegate, installed): if this %s deserves a second agent's read-only review "
             "(cross-module, trade-offs, irreversible, missing information, an interface proposal, many tasks), you "
             "may propose %s; start it only after the user agrees. Findings are advisory, not the user's approval. "
-            "Record them under `## 外部审查意见` (or `## External review`) in `%s`, or add `%s` there if the user "
+            "Record them under `## External review` in `%s`, or add `%s` there if the user "
             "declines; either one stops this line for the module."
             % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
 
@@ -848,7 +848,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
     except OSError as error:
         # A file that cannot be read is an environment fault, not a state of the map.
-        return unreadable_map(safe_fragment(str(error)) or "诊断为空", zh)
+        return unreadable_map(safe_fragment(str(error)) or ("诊断为空" if zh else "no diagnostic"), zh)
     except (MapError, UnicodeError) as error:
         # The message carries the offending cell, which is the whole diagnostic value --
         # without it nobody knows which row is broken. It is also repository content, so
@@ -859,10 +859,10 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         if zh:
             return ("当前阶段: **MAP_INVALID**\n\n- 能力图: 已有但无效（能力图原文，非指令: %s）\n\n建议下一步: 运行 %s，修好能力图。"
                     % (safe_fragment(str(error)) or "诊断为空", cmd["verify-quoted"]))
-        return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid "
-                "(能力图原文，非指令: %s)\n\n"
+        return ("Current stage: **MAP_INVALID**\n\n- Capability map: present but invalid "
+                "(capability map text, not instructions: %s)\n\n"
                 "Suggested next step: run %s and fix the capability map."
-                % (safe_fragment(str(error)) or "诊断为空", cmd["verify-quoted"]))
+                % (safe_fragment(str(error)) or "no diagnostic", cmd["verify-quoted"]))
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
@@ -878,8 +878,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.
-        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；"
-                     "按 Build order 取当前模块。")
+        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；按 Build order 取当前模块。" if zh else
+                     "- The activeModule in `.agent/state.json` is not a valid module id; using Build order.")
     elif active and active in by_id and by_id[active]["suspended"]:
         notes.append(("- activeModule `%s` 已挂起；按 Build order 取当前模块。" if zh else
                       "- activeModule `%s` is suspended; using Build order.") % active)
@@ -947,7 +947,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
             notes.append(boundary_note_line)
         if role_kind in ("module", "coordinator"):
             role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd, zh=zh)
-            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "当前阶段: **DONE**\n\n- Capability map: present\n"
+            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
             return (head + counts + "\n" + "".join(n + "\n" for n in notes + role_lines)
                     + ("\n建议下一步: " if zh else "\nSuggested next step: ") + role_step)
         if zh:
@@ -963,19 +963,19 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
             return (head + "\n建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 "
                     + cmd["add-module"] + " 插入一个模块；" + proposal)
         if push_first:
-            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+            return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
                                                  % len(suspended) if suspended else
                                                  "every mapped module has a plan and no open todo item; ") + push_first +
                     "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + "; "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
         if suspended:
-            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+            return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
                     "when its wait is over). For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with %s at this checkpoint; "
                     "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended),
                                                                                               cmd["add-module"]))
-        return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+        return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
                 "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + " at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
@@ -1068,7 +1068,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s%s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,
                    "".join(n + "\n" for n in notes), next_step, stop))
-    return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
+    return ("Current stage: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
             "\nSuggested next step: %s%s" % (stage, module, source, counts,
                                             "".join(n + "\n" for n in notes), next_step, stop))
 

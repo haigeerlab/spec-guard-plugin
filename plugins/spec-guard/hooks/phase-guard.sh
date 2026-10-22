@@ -306,7 +306,7 @@ if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ]; then
   if [ -n "$OVER" ]; then WINDOW=1000000; else WINDOW=200000; fi
 fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
-# 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
+# 位置行放在标题与阶段行（“当前阶段”／“Current stage”）之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
 [ -z "$LOCATION" ] || HEADER="${HEADER}
 
@@ -357,7 +357,7 @@ if [ -e spec/CAPABILITY-MAP.md ] && { [ ! -f spec/CAPABILITY-MAP.md ] || [ ! -r 
   fi
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Capability map: present but unreadable (${REASON})
 - Module specs: ${SPECS}
@@ -427,7 +427,7 @@ fi
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
-当前阶段: **IDLE**
+Current stage: **IDLE**
 
 - Capability map: absent
 - Module specs: ${SPECS}${CONFIG_LINES}
@@ -451,7 +451,7 @@ fi
 if [ "$SPECS" -eq 0 ]; then
   emit "${HEADER}
 
-当前阶段: **MAP_ONLY**
+Current stage: **MAP_ONLY**
 
 - Capability map: present
 - Module specs: absent${CONFIG_LINES}
@@ -478,7 +478,7 @@ elif [ -n "$ZH" ]; then
 else
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Module specs: ${SPECS}
 - The module stage could not be computed; run ${VERIFY_CMD} for details."

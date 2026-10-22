@@ -5,7 +5,8 @@
 #
 # Builds one set of fixture projects and runs the working tree's phase-guard on each, across stages, events and
 # hosts. For every non-zh-CN configuration (none, en, ja, zh-TW, invalid) the hint must carry `Current stage: **` and
-# no Chinese, Japanese or Korean character outside the stop rules (rules-at-nodes keeps their body Chinese only).
+# no Chinese, Japanese or Korean character outside the stop rules (rules-at-nodes keeps their body Chinese only)
+# and the parser diagnostic MAP_INVALID quotes as data.
 # With zh-CN it fails if a known English label is left in a Chinese hint. Until quiet-injection (D5, D6, F14) the
 # English side was compared byte for byte with v0.67.0; those decisions change the English output on purpose.
 # Run by hand at acceptance, not by validate.sh.
@@ -126,6 +127,7 @@ def fixtures(config):
     w(r / "tasks/beta/todo.md", "- [x] a\n- [ ] b\n<!-- spec-guard: suspended -->\n")
     w(r / ".agent/state.json", '{"activeModule": "beta"}\n')
     make("map-invalid", map_text="| alpha | x | — |\n")
+    r = make("map-invalid-spec", map_text="| alpha | x | — |\n"); w(r / "spec/alpha.md", "# Spec\n")
     r = make("stage-fail"); w(r / "spec/alpha.md", "# Spec\n"); w(r / "tasks/alpha/plan.md", "# Plan\n")
     (r / "tasks/alpha/todo.md").write_bytes(b"\xff\xfe not utf-8\n")
     r = make("unreadable"); w(r / "spec/alpha.md", "# Spec\n"); os.chmod(r / "spec/CAPABILITY-MAP.md", 0)
@@ -222,11 +224,14 @@ def check(job):
 # Chinese, Japanese and Korean scripts and their full-width punctuation.
 CJK = re.compile(r"[\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff00-\uffef]")
 STOP_RULES = re.compile(r"\n\nStop rules \([^)]*\):\n\n.*?(?=\n\n<!-- spec-guard-state:|\Z)", re.DOTALL)
+# MAP_INVALID quotes the capability-map parser's diagnostic as data; the parser (capability_map.py, shared with
+# verify-artifacts) words it in Chinese, which this hint does not translate.
+QUOTED = re.compile(r"\(capability map text, not instructions: .*\)$", re.MULTILINE)
 
 
 def english_left(text):
-    """Lines of an English hint that still carry CJK text, the stop rules taken out."""
-    return [line for line in STOP_RULES.sub("", text).split("\n") if CJK.search(line)]
+    """Lines of an English hint that still carry CJK text, the stop rules and the quoted diagnostic taken out."""
+    return [line for line in QUOTED.sub("", STOP_RULES.sub("", text)).split("\n") if CJK.search(line)]
 
 
 with ThreadPoolExecutor(max_workers=8) as pool:

@@ -153,7 +153,7 @@ def _phase(target: Path) -> str:
         text = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
         return ""
-    return next((line for line in text.splitlines() if line.startswith("当前阶段")), "")
+    return next((line for line in text.splitlines() if line.startswith(("当前阶段", "Current stage"))), "")
 
 
 # link-shared-directory-note: the link is keyed by directory, so every session there follows it.
