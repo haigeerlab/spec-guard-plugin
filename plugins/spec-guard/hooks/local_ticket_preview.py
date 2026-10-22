@@ -8,11 +8,12 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import quote, urlparse
 
+from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError
 from local_ledger_runtime import state_worktree_status
 from local_ticket_handoff import snapshot_issue
 from local_ticket_inventory import InventoryError, worktree_roots
+from local_ticket_provider import call
 
 
 ISSUE_MARKER = "spec-guard-local-ticket:v1"
@@ -30,58 +31,47 @@ def _run(arguments: list[str]) -> str | None:
 
 
 def target_facts(platform: str, host: str, target: str,
-                 runner: Callable[[list[str]], str | None] = _run) -> dict[str, Any]:
-    """Require an exact, writable target with a known visibility before previewing."""
+                 runner: Callable[[list[str]], str | None] = _run,
+                 client: Any = None) -> dict[str, Any]:
+    """Require an exact, writable target with a known visibility before previewing.
+
+    The target is read through the shared GitHub/GitLab client (`client`, or one built on
+    `runner`); only the write-permission rule is Local's own.
+    """
     if not re.fullmatch(r"[A-Za-z0-9.-]+", host) or not target or any(
             part in ("", ".", "..") for part in target.split("/")):
         raise InventoryError("provider-unsupported: target or host is invalid")
     if platform == "github":
         if len(target.split("/")) != 2:
             raise InventoryError("provider-unsupported: GitHub target needs owner/repo")
-        raw = runner(["gh", "api", "--hostname", host, "repos/" + target])
-    elif platform == "gitlab":
-        raw = runner(["glab", "api", "--hostname", host,
-                      "projects/" + quote(target, safe="")])
-    else:
+    elif platform != "gitlab":
         raise InventoryError("provider-unsupported: platform is unsupported")
+    if client is None:
+        def read(arguments: list[str]) -> Any:
+            raw = runner(arguments)
+            try:
+                return json.loads(raw) if raw is not None else None
+            except ValueError:
+                return None
+        client = call(GitHubIssues if platform == "github" else GitLabIssues,
+                      host, target, read)
     try:
-        data = json.loads(raw) if raw is not None else None
-    except ValueError:
-        data = None
-    if not isinstance(data, dict):
-        raise InventoryError("provider-unavailable: target metadata is unavailable")
+        facts = client.target_facts()
+    except HostedTicketError as error:
+        raise InventoryError("provider-unavailable: %s target or write permission is unknown"
+                             % ("GitHub" if platform == "github" else "GitLab")) from error
+    rights = client.target_raw.get("permissions")
     if platform == "github":
-        rights = data.get("permissions")
-        if (data.get("full_name") != target or not isinstance(data.get("private"), bool)
-                or data.get("has_issues") is not True or not isinstance(rights, dict)
-                or not any(rights.get(key) is True for key in ("push", "maintain", "admin"))):
-            raise InventoryError("provider-unavailable: GitHub target or write permission is unknown")
-        visibility = "private" if data["private"] else "public"
-        identity = data.get("id")
+        writable = isinstance(rights, dict) and any(
+            rights.get(key) is True for key in ("push", "maintain", "admin"))
     else:
-        rights = data.get("permissions")
-        if not isinstance(rights, dict):
-            raise InventoryError("provider-unavailable: GitLab permission is unknown")
-        web_url = data.get("web_url")
-        address = urlparse(web_url) if isinstance(web_url, str) else None
-        levels = [entry.get("access_level") for entry in rights.values()
-                  if isinstance(entry, dict)]
-        if (data.get("path_with_namespace") != target or
-                data.get("visibility") not in ("private", "internal", "public") or
-                data.get("issues_enabled") is not True or
-                address is None or address.scheme not in ("http", "https") or
-                address.netloc != host or address.path != "/" + target or
-                address.query or address.fragment or
-                not any(isinstance(level, int) and level >= 30 for level in levels)):
-            raise InventoryError("provider-unavailable: GitLab target or write permission is unknown")
-        visibility = data["visibility"]
-        identity = data.get("id")
-    if not isinstance(identity, int) or identity <= 0:
-        raise InventoryError("provider-unavailable: target identity is unknown")
-    facts = {"platform": platform, "host": host, "target": target,
-             "targetId": identity, "visibility": visibility}
-    if platform == "gitlab":
-        facts["webScheme"] = address.scheme
+        levels = ([entry.get("access_level") for entry in rights.values()
+                   if isinstance(entry, dict)] if isinstance(rights, dict) else [])
+        writable = (client.target_raw.get("issues_enabled") is True and
+                    any(isinstance(level, int) and level >= 30 for level in levels))
+    if not writable:
+        raise InventoryError("provider-unavailable: %s target or write permission is unknown"
+                             % ("GitHub" if platform == "github" else "GitLab"))
     return facts
 
 

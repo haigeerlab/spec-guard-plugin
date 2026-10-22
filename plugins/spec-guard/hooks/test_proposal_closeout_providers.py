@@ -35,7 +35,8 @@ class Recorder:
 
     def writer(self, arguments, body):
         self.write_calls.append((list(arguments), body))
-        key = (arguments[arguments.index("--method") + 1], arguments[-1])
+        method = arguments.index("--method")
+        key = (arguments[method + 1], arguments[method + 2])
         if key not in self.writes:
             raise HostedTicketError("provider-unavailable: unexpected write %s" % (key,))
         value = self.writes[key]
@@ -45,13 +46,14 @@ class Recorder:
 
 
 def github_raw(number=7, labels=(ACCEPTED, "proposal"), state="open", body="body"):
-    return {"number": number, "state": state, "body": body,
+    return {"number": number, "title": "Proposal: gamma", "state": state, "body": body,
             "labels": [{"name": name} for name in labels],
             "html_url": "https://github.com/octo/repo/issues/%d" % number}
 
 
 def gitlab_raw(iid=9, labels=(ACCEPTED, "proposal"), state="opened", body="body"):
-    return {"iid": iid, "project_id": 17, "state": state, "description": body,
+    return {"iid": iid, "project_id": 17, "title": "Proposal: gamma", "state": state,
+            "description": body,
             "labels": list(labels),
             "web_url": "https://gitlab.example.com/octo/repo/-/issues/%d" % iid}
 
@@ -166,11 +168,18 @@ class GitHubCloseoutTests(unittest.TestCase):
         self.assertEqual(caught.exception.status_code, 403)
 
 
+GITLAB_PROJECT = {"id": 17, "path_with_namespace": "octo/repo", "visibility": "private",
+                  "issues_enabled": True, "web_url": "https://gitlab.example.com/octo/repo"}
+
+
 class GitLabCloseoutTests(unittest.TestCase):
     ISSUES = "projects/17/issues"
+    LIST = ISSUES + "?state=all&scope=all&issue_type=issue&per_page=100&page=1"
 
     def provider(self, reads=None, writes=None):
-        recorder = Recorder(reads, writes)
+        # Issue addresses are checked against the project's own path, so the project
+        # is always readable; a test that needs another project answer overrides it.
+        recorder = Recorder({"projects/17": GITLAB_PROJECT, **(reads or {})}, writes)
         return GitLabCloseout("gitlab.example.com", 17, recorder.runner,
                               recorder.writer), recorder
 
@@ -199,7 +208,7 @@ class GitLabCloseoutTests(unittest.TestCase):
 
     def test_list_issues_pages_until_a_short_page(self):
         provider, recorder = self.provider({
-            self.ISSUES + "?state=all&per_page=100&page=1": [gitlab_raw()]})
+            self.LIST: [gitlab_raw()]})
         listing = provider.list_issues()
         self.assertTrue(listing["complete"])
         self.assertEqual(listing["issues"][0]["iid"], 9)
@@ -208,10 +217,22 @@ class GitLabCloseoutTests(unittest.TestCase):
     def test_system_notes_are_not_discussion_evidence(self):
         endpoint = self.ISSUES + "/9/notes?per_page=100&page=1"
         provider, _ = self.provider({endpoint: [
-            {"body": MARKER, "system": False},
+            {"body": MARKER, "system": False, "internal": False},
             {"body": "changed the description", "system": True}]})
         self.assertEqual(provider.list_comments(9),
                          {"complete": True, "comments": [{"body": MARKER}]})
+
+    def test_internal_notes_are_not_discussion_and_a_marker_there_is_ambiguous(self):
+        endpoint = self.ISSUES + "/9/notes?per_page=100&page=1"
+        provider, _ = self.provider({endpoint: [
+            {"body": "public", "system": False, "internal": False},
+            {"body": "private", "system": False, "internal": True}]})
+        self.assertEqual(provider.list_comments(9),
+                         {"complete": True, "comments": [{"body": "public"}]})
+        provider, _ = self.provider({endpoint: [
+            {"body": MARKER, "system": False, "internal": True}]})
+        with self.assertRaises(HostedTicketError):
+            provider.list_comments(9)
 
     def test_set_stage_adds_and_removes_in_one_request(self):
         provider, recorder = self.provider(
@@ -226,7 +247,7 @@ class GitLabCloseoutTests(unittest.TestCase):
         own config decide where the call lands would make the authorized target a
         label rather than the destination."""
         provider, recorder = self.provider(
-            {self.ISSUES + "?state=all&per_page=100&page=1": [gitlab_raw()]},
+            {self.LIST: [gitlab_raw()]},
             {("PUT", self.ISSUES + "/9"): gitlab_raw(state="closed")})
         provider.list_issues()
         provider.set_closed(9)

@@ -43,6 +43,8 @@ python3 -B "$ROOT/hooks/proposal_review.py" \
   --platform "<github|gitlab>" --target "<owner/repo 或 GitLab project id>"
 ~~~
 
+自建 GitHub Enterprise 或 GitLab 实例要加 `--host <主机>`；不给时读 `github.com`／`gitlab.com`，结果里的 `host` 写明读的是哪个实例。
+
 原样报告 JSON。`awaiting-review` 与 `in-review` 表示可由人把 Issue 标签改成 `proposal-stage:accepted`；`stale` 表示能力图或基线已变化，
 需要作者按新基线重新发布；`in-map` 表示远端能力图里已经有这个模块（`proposal-module-already-present`）：若是本 Proposal
 已晋级，下一步运行 `/spec-guard:proposal-promotion-proof`，`proved` 后用 `/spec-guard:proposal-closeout` 收尾；若是与已有模块

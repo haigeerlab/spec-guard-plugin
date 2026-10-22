@@ -658,11 +658,23 @@ class PromotionProofCliTests(PromotionFixture):
                               proposal_id="gamma", platform="github", target="octo/spec-guard",
                               closed=closed)
         output = io.StringIO()
-        with patch("proposal_promotion_proof.read_tracker", return_value=tracker), \
+        with patch("proposal_promotion_proof.read_tracker", return_value=tracker) as read, \
                 redirect_stdout(output):
             self.assertEqual(main(["--project", str(self.consumer), "--platform", "github",
                                    "--target", "octo/spec-guard"] + list(extra)), 0)
-        return json.loads(output.getvalue())
+        result = json.loads(output.getvalue())
+        # Every answer names the instance it read; the tracker read was pinned to it.
+        host = result.pop("host")
+        self.assertEqual(host, extra[extra.index("--host") + 1] if "--host" in extra
+                         else "github.com")
+        for call in read.call_args_list:
+            self.assertEqual(call.kwargs.get("host"), host)
+        return result
+
+    def test_host_is_passed_to_the_tracker_read_and_reported(self):
+        for extra in ((), ("--prove",)):
+            with self.subTest(extra=extra):
+                self.run_cli("--proposal-id", "gamma", "--host", "ghe.example.com", *extra)
 
     def test_prove_cli_proves_the_merged_promotion_from_fresh_remote_facts(self):
         result = self.run_cli("--proposal-id", "gamma", "--prove")

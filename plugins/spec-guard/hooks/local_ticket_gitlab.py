@@ -1,100 +1,53 @@
-"""GitLab Issues transport for explicit Local ticket handoffs."""
+"""GitLab Issues for explicit Local ticket handoffs, over the shared transport."""
 from __future__ import annotations
 
-import json
 from typing import Any, Callable
-from urllib.parse import quote, urlparse
 
-from local_ticket_inventory import InventoryError
+from hosted_ticket_provider import GitLabIssues
 from local_ticket_preview import EVENT_MARKER, ISSUE_MARKER, target_facts
-from local_ticket_provider import pages, run_json
+from local_ticket_provider import call, split
 
 
 class GitLabHandoff:
     def __init__(self, host: str, target: str,
-                 runner: Callable[[list[str], dict[str, Any] | None], Any] = run_json):
-        self.host, self.target, self.runner = host, target, runner
-        self.base = "projects/" + quote(target, safe="") + "/issues"
-        self.target_id: int | None = None
-        self.web_scheme: str | None = None
+                 runner: Callable[[list[str], dict[str, Any] | None], Any] | None = None):
+        self.host, self.target = host, target
+        self.reader, self.writer = split(runner)
+        self._client: GitLabIssues | None = None
 
-    def _request(self, endpoint: str, method: str = "GET",
-                 body: dict[str, Any] | None = None) -> Any:
-        arguments = ["glab", "api", "--hostname", self.host, "--method", method,
-                     endpoint]
-        if body is not None:
-            arguments.extend(["--header", "Content-Type: application/json",
-                              "--input", "-"])
-        return self.runner(arguments, body)
+    @property
+    def client(self) -> GitLabIssues:
+        if self._client is None:
+            self._client = call(GitLabIssues, self.host, self.target, self.reader, self.writer)
+        return self._client
 
     def target_facts(self) -> dict[str, Any]:
-        facts = target_facts("gitlab", self.host, self.target,
-                             runner=lambda args: json.dumps(self.runner(args, None)))
-        self.target_id = facts["targetId"]
-        self.web_scheme = facts["webScheme"]
-        return facts
+        return target_facts("gitlab", self.host, self.target, client=self.client)
 
-    def _issue(self, raw: Any) -> dict[str, Any]:
-        if (not isinstance(raw, dict) or not isinstance(raw.get("iid"), int)
-                or raw["iid"] <= 0 or raw.get("project_id") != self.target_id
-                or not isinstance(raw.get("title"), str)
-                or (raw.get("description") is not None and
-                    not isinstance(raw.get("description"), str))
-                or raw.get("state") not in ("opened", "closed")
-                or not isinstance(raw.get("web_url"), str)):
-            raise InventoryError("provider-unavailable: GitLab issue response is incomplete")
-        address = urlparse(raw["web_url"])
-        if (address.scheme != self.web_scheme or address.netloc != self.host or
-                address.path != "/" + self.target + "/-/issues/" + str(raw["iid"])):
-            raise InventoryError("provider-unavailable: GitLab issue URL differs from target")
-        description = raw["description"] or ""
+    @staticmethod
+    def _issue(issue: dict[str, Any]) -> dict[str, Any]:
+        # GitLab drops the description's final newline; the snapshot digest keeps it.
+        description = issue["body"]
         if description and not description.endswith("\n"):
             description += "\n"
-        return {"id": raw["iid"], "title": raw["title"],
-                "body": description, "closed": raw["state"] == "closed",
-                "url": raw["web_url"]}
+        return {"id": issue["id"], "title": issue["title"], "body": description,
+                "closed": issue["closed"], "url": issue["url"]}
 
     def list_issues(self) -> dict[str, Any]:
-        raw = pages(lambda page: self._request(
-            self.base + "?state=all&scope=all&per_page=100&page=" + str(page),
-        ))
-        return {"complete": True, "issues": [self._issue(item) for item in raw]}
+        listing = call(self.client.list_issues)
+        return {"complete": True, "issues": [self._issue(item) for item in listing["issues"]]}
 
     def get_issue(self, issue_id: int) -> dict[str, Any]:
-        issue = self._issue(self._request(self.base + "/" + str(issue_id)))
-        if issue["id"] != issue_id:
-            raise InventoryError("provider-unavailable: GitLab issue IID differs")
-        return issue
+        return self._issue(call(self.client.get_issue, issue_id))
 
     def create_issue(self, title: str, body: str) -> dict[str, Any]:
-        return self._issue(self._request(self.base, "POST",
-                                         {"title": title, "description": body}))
+        return self._issue(call(self.client.create_issue, title, body))
 
     def list_comments(self, issue_id: int) -> dict[str, Any]:
-        endpoint = self.base + "/" + str(issue_id) + "/notes"
-        raw = pages(lambda page: self._request(
-            endpoint + "?per_page=100&page=" + str(page),
-        ))
-        comments = []
-        for item in raw:
-            body = item.get("body")
-            if not isinstance(body, str) or not isinstance(item.get("system"), bool):
-                raise InventoryError("provider-unavailable: GitLab note response is incomplete")
-            if item["system"]:
-                continue
-            if not isinstance(item.get("internal"), bool):
-                raise InventoryError("provider-unavailable: GitLab note visibility is unknown")
-            if item.get("internal") is True:
-                if ISSUE_MARKER in body or EVENT_MARKER in body:
-                    raise InventoryError("conflict: Local marker is in an internal GitLab note")
-                continue
-            comments.append({"body": body})
-        return {"complete": True, "comments": comments}
+        return call(self.client.list_comments, issue_id, (ISSUE_MARKER, EVENT_MARKER))
 
     def create_comment(self, issue_id: int, body: str) -> None:
-        self._request(self.base + "/" + str(issue_id) + "/notes", "POST",
-                      {"body": body})
+        call(self.client.create_comment, issue_id, body)
 
     def set_closed(self, issue_id: int, closed: bool) -> None:
-        self._request(self.base + "/" + str(issue_id), "PUT",
-                      {"state_event": "close" if closed else "reopen"})
+        call(self.client.set_closed, issue_id, closed)

@@ -1,12 +1,14 @@
 # Todo: tracker-provider-unify
 
-- [ ] Task 0：提交已批准的 Spec 标记、Plan 与 todo
-- [ ] Task 1：共享回归 `test_tracker_provider_contract.py`（先红）并登记
-- [ ] Task 2：共享层扩展（project id、labels、container），托管事项保持绿
-- [ ] Task 3：交接改用共享层，错误短码与发布器状态不变
-- [ ] Task 4：收尾改用共享层，GitLab scheme 跟随目标
-- [ ] Task 5：Proposal 读取改用共享层，`--host` 与 JSON `host`，50 页
-- [ ] Checkpoint 1（report）：变异核对（三种改坏都变红）
-- [ ] Task 6：文档与更新说明（拟写 CHANGELOG 条目记在此处）
-- [ ] Task 7：`module-crew sync` 合入集成分支并跑完整检查
+- [x] Task 0：提交已批准的 Spec 标记、Plan 与 todo — Plan 批准（C10）后由模块协调带批准标记提交到集成分支 f6e1e77，`module-crew sync` 合入（1e81055）。按 D3 A 把 Plan 的并行边界一节补进 Spec（Boundaries 加一句说明），`module_scope.py check --base crew/fix-batch` 通过、越界 0；Spec 指纹因此改变，最终验收附差异复审。
+- [x] Task 1：共享回归 `test_tracker_provider_contract.py`（先红）并登记 — 13 个用例，同一个假平台喂给托管事项、交接、收尾、Proposal 读取四个入口。先红 11 处失败 + 16 处错误，托管事项入口全绿（基准）：交接与收尾 GitLab 列表不带 `issue_type=issue`、混入 incident／task 照收（F11）；交接不认 `/-/work_items/`；收尾拒 http 实例；交接写入「退出码 0、无 HTTP 状态」当成功；Proposal 读取不接受 `host`（全部报错，F7）；结构检查列出 5 个直接调 gh/glab 的文件。未登记的测试文件会被 validate 的登记检查拦下（实测），登记前又必然红，所以这个文件与 Task 2～5 的实现一起在全绿时登记、提交。
+- [x] Task 2：共享层扩展（project id、labels、container），托管事项保持绿 — `hosted_ticket_provider.py`：GitLab 目标接受正整数 project id（按 `id` 比对，记下读回的 `path_with_namespace` 作地址比对）；Issue 多带 `labels`、`container`；GitLab 读写前若未核对目标先自动核对；`set_closed(closed=)` 可重新打开；`list_comments` 的私有 note 标记可由调用方给；新增 `write()` 供收尾写阶段标签。托管事项三份测试原样全过。
+- [x] Task 3：交接改用共享层，错误短码与发布器状态不变 — `local_ticket_provider.py` 只剩错误转换（`call`）、对共享传输的薄包装与 runner 拆分；`local_ticket_github.py`／`gitlab.py` 改包共享客户端（GitLab 正文补末尾换行、私有 note 里的 Local 标记仍报 `conflict:`）；`local_ticket_preview.target_facts` 经共享客户端读目标，只留写权限判断。`test_local_ticket_providers.py` 仅把 3 处 patch 目标改为 `hosted_ticket_provider.subprocess.run`；`test_local_ticket_publish.py`、`test_local_ticket_imports.py`、`test_local_ticket_portability.py`（52 例）原样全过。
+- [x] Task 4：收尾改用共享层，GitLab scheme 跟随目标 — 两个收尾适配改包共享客户端，返回形状取 `proposal_tracker_read.tracker_shape`；GitLab 的 `target_facts` 只回原来的五个键（旧预览的 exactTarget 仍相等）；`set_stage` 改走共享 `write()`。夹具更新：Issue 补 `title`、GitLab 补项目元数据与 `internal`、写入键按 `--method` 后一位取端点（GitLab 写入现带 Content-Type 头）；新增「internal note 不算讨论、其中有收尾标记即报错」用例。`test_proposal_closeout_providers.py` 22 例、`test_proposal_closeout.py` 94 例（其中「晋级证明命令没有写入开关」一例的期望参数表补上只读的 `--host`，该文件不在并行边界内）、`test_proposal_closeout_local.py` 18 例全过。
+- [x] Task 5：Proposal 读取改用共享层，`--host` 与 JSON `host`，50 页 — `read_tracker(..., host=None)` 经共享客户端读目标与候选集（GitHub 改走 `gh api`），删去自带的 `_run`／分页；`proposal_review.py`、`proposal_promotion_proof.py` 加 `--host`（缺省 `github.com`／`gitlab.com`），结果 JSON 带 `host`。`test_proposal_tracker_read.py` 传输用例按 REST 端点重写（含 GHE、自建 GitLab 主机两例），review 与 promotion-proof 的 CLI 测试核对 `host` 并各补一例。共享回归 13 例全绿（含结构检查），登记进 `scripts/validate.sh`。
+- [x] Checkpoint 1（report）：变异核对（三种改坏都变红） — 在 `mktemp -d` 新建的副本上各改一处跑共享回归：去掉 `issue_type=issue` → 8 处红（四个入口）；GitLab 请求去掉 `--hostname` → 8 处红；`read_tracker` 忽略 `host` → 14 处红；`MAX_PAGES` 改回 10 → 9 处红。
+- [x] Task 6：文档与更新说明（拟写 CHANGELOG 条目记在此处） — 三个 Proposal 命令说明与 Codex `spec-guard-ops` 技能补 `--host`；`references/proposal-tracker-read.md` 改为共享客户端、50 页、普通 Issue 判定；`spec/proposal-tracker-read.md`、`spec/local-ticket-portability.md` 各补一句事实。拟写的更新说明（由模块协调整批写入 CHANGELOG）：
+  > **修复**：托管事项、本地事项交接、Proposal 读取与收尾改用同一套 GitHub/GitLab 读写（`hooks/hosted_ticket_provider.py`）。GitLab 列表一律只取普通 Issue，混入事件、任务等其他类型时整次读取判为不可信；所有请求都绑定主机；分页上限统一为 50 页 × 100；GitLab 的 `/-/work_items/` 地址也认作 Issue；本地交接的写入在读不到 HTTP 状态时报结果未知，不再当成功；收尾不再把 GitLab internal note 算作讨论。
+  > **行为变化**：`proposal_review.py`、`proposal_promotion_proof.py` 新增 `--host`，缺省 `github.com`／`gitlab.com`，结果带 `host`；以前不给主机、靠 `gh`／`glab` 默认主机读自建 GitHub Enterprise 或 GitLab 的用法，升级后要显式加 `--host`。收尾一侧的 GitLab 由「只认 https」改为与目标 `web_url` 同一协议。
+- [x] Task 7：`module-crew sync` 合入集成分支并跑完整检查 — 开工时 sync 到 f6e1e77，按同步基线通知 sync 到 6161aeb（0.83.2）；实现提交前再 sync 为「已是最新」。`verify-and-commit.sh` 全套（validate、phase-guard 428 例、verify-artifacts 72 例、repo-artifacts、ShellCheck）全过，提交 e157a32。第一次全套被 `test_proposal_closeout.py` 写死参数表的一例拦下（见 Task 4）。
 - [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做

@@ -801,7 +801,8 @@ class ProofRemainsReadOnlyTests(unittest.TestCase):
         self.assertEqual(len(parsers), 1)
         options = sorted(option for action in parsers[0]._actions
                          for option in action.option_strings)
-        self.assertEqual(options, ["--help", "--platform", "--project",
+        # `--host` only names the instance to read (tracker-provider-unify); it writes nothing.
+        self.assertEqual(options, ["--help", "--host", "--platform", "--project",
                                    "--proposal-id", "--prove", "--remote", "--target",
                                    "-h"])
 

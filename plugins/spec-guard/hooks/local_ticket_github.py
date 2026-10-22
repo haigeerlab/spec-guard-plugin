@@ -1,78 +1,49 @@
-"""GitHub Issues transport for explicit Local ticket handoffs."""
+"""GitHub Issues for explicit Local ticket handoffs, over the shared transport."""
 from __future__ import annotations
 
-import json
 from typing import Any, Callable
-from urllib.parse import urlparse
 
-from local_ticket_inventory import InventoryError
+from hosted_ticket_provider import GitHubIssues
 from local_ticket_preview import target_facts
-from local_ticket_provider import PAGE_SIZE, pages, run_json
+from local_ticket_provider import call, split
 
 
 class GitHubHandoff:
     def __init__(self, host: str, target: str,
-                 runner: Callable[[list[str], dict[str, Any] | None], Any] = run_json):
-        self.host, self.target, self.runner = host, target, runner
-        self.base = "repos/" + target + "/issues"
+                 runner: Callable[[list[str], dict[str, Any] | None], Any] | None = None):
+        self.host, self.target = host, target
+        self.reader, self.writer = split(runner)
+        self._client: GitHubIssues | None = None
 
-    def _request(self, endpoint: str, method: str = "GET",
-                 body: dict[str, Any] | None = None) -> Any:
-        arguments = ["gh", "api", "--hostname", self.host, "--method", method,
-                     endpoint]
-        if body is not None:
-            arguments.extend(["--input", "-"])
-        return self.runner(arguments, body)
+    @property
+    def client(self) -> GitHubIssues:
+        if self._client is None:
+            self._client = call(GitHubIssues, self.host, self.target, self.reader, self.writer)
+        return self._client
 
     def target_facts(self) -> dict[str, Any]:
-        return target_facts("github", self.host, self.target,
-                            runner=lambda args: json.dumps(self.runner(args, None)))
+        return target_facts("github", self.host, self.target, client=self.client)
 
-    def _issue(self, raw: Any) -> dict[str, Any]:
-        if (not isinstance(raw, dict) or not isinstance(raw.get("number"), int)
-                or raw["number"] <= 0 or not isinstance(raw.get("title"), str)
-                or (raw.get("body") is not None and not isinstance(raw.get("body"), str))
-                or raw.get("state") not in ("open", "closed")
-                or not isinstance(raw.get("html_url"), str)):
-            raise InventoryError("provider-unavailable: GitHub issue response is incomplete")
-        address = urlparse(raw["html_url"])
-        if (address.scheme != "https" or address.hostname != self.host or
-                address.path != "/" + self.target + "/issues/" + str(raw["number"])):
-            raise InventoryError("provider-unavailable: GitHub issue URL differs from target")
-        return {"id": raw["number"], "title": raw["title"], "body": raw["body"] or "",
-                "closed": raw["state"] == "closed", "url": raw["html_url"],
-                "isPullRequest": "pull_request" in raw}
+    @staticmethod
+    def _issue(issue: dict[str, Any]) -> dict[str, Any]:
+        return {"id": issue["id"], "title": issue["title"], "body": issue["body"],
+                "closed": issue["closed"], "url": issue["url"], "isPullRequest": False}
 
     def list_issues(self) -> dict[str, Any]:
-        raw = pages(lambda page: self._request(
-            self.base + "?state=all&per_page=100&page=" + str(page),
-        ))
-        return {"complete": True, "issues": [self._issue(item) for item in raw
-                                               if "pull_request" not in item]}
+        listing = call(self.client.list_issues)
+        return {"complete": True, "issues": [self._issue(item) for item in listing["issues"]]}
 
     def get_issue(self, issue_id: int) -> dict[str, Any]:
-        issue = self._issue(self._request(self.base + "/" + str(issue_id)))
-        if issue["id"] != issue_id:
-            raise InventoryError("provider-unavailable: GitHub issue ID differs")
-        return issue
+        return self._issue(call(self.client.get_issue, issue_id))
 
     def create_issue(self, title: str, body: str) -> dict[str, Any]:
-        return self._issue(self._request(self.base, "POST", {"title": title, "body": body}))
+        return self._issue(call(self.client.create_issue, title, body))
 
     def list_comments(self, issue_id: int) -> dict[str, Any]:
-        endpoint = self.base + "/" + str(issue_id) + "/comments"
-        raw = pages(lambda page: self._request(
-            endpoint + "?per_page=100&page=" + str(page),
-        ))
-        if any(item.get("body") is not None and
-               not isinstance(item.get("body"), str) for item in raw):
-            raise InventoryError("provider-unavailable: GitHub comment response is incomplete")
-        return {"complete": True, "comments": [{"body": item.get("body") or ""}
-                                               for item in raw]}
+        return call(self.client.list_comments, issue_id)
 
     def create_comment(self, issue_id: int, body: str) -> None:
-        self._request(self.base + "/" + str(issue_id) + "/comments", "POST", {"body": body})
+        call(self.client.create_comment, issue_id, body)
 
     def set_closed(self, issue_id: int, closed: bool) -> None:
-        self._request(self.base + "/" + str(issue_id), "PATCH",
-                      {"state": "closed" if closed else "open"})
+        call(self.client.set_closed, issue_id, closed)
