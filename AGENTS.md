@@ -7,6 +7,7 @@
 `plugins/spec-guard/templates/claude-block-*.md`，由 `/setup-convention` 写入。
 
 <!-- BEGIN:spec-guard-codex-convention -->
+
 ## Spec Guard 项目约定
 
 > 由 `setup-convention local --host=codex` 生成。
@@ -16,32 +17,28 @@
 - 活跃模块在 `.agent/state.json` 的 `activeModule`；不要共用 `tasks/plan.md`
 - 若项目已启用 Local 事项账本，确认要实现的需求或修复在动代码前先用 `spec-guard:ticket`
   查重并取得事项 ID；探索和无需追踪的小操作例外
-- 项目级审查按 `spec-guard:spec-guard-ops` 的共享检查点规则限定批次、收束发现并交接缺陷；
-  审查完成后的“继续”推进已预告的问题处理步骤，不重新泛扫
-- 明确选用 GitHub/GitLab 普通 Issue 时，用 `spec-guard:hosted-ticket-workflow` 逐项查重、授权写入与交付对账；
-  Local 事项仍走 `spec-guard:ticket`，不凭 Git remote 改目标
-- 阶段交接或停止时，加载 `spec-guard:spec-guard-ops` 的共享检查点规则，预告已授权下一步。
-- Plan 的检查点标 `gate`（停下等确认）或 `report`（记入 todo 后继续），没标级别的中间检查点按 `report`，最后一个检查点按 `gate`，推送与不可逆操作须标 `gate`；
-  按需求批量前置审与 UI 自验按 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 批 Plan 即按已批准范围授权：改本仓库文件、跑测试与构建、本地提交与构建需要的装包（默认放行），不按次数；只问用户的情形见
-  `spec-guard:spec-guard-ops` 的共享检查点规则
-- 交审 Spec 或 Plan 时在对话里呈现内容要点并写明这次批准授权什么，只给链接不算交审；细则见
-  `spec-guard:spec-guard-ops` 的共享检查点规则
-- 任务改到用户看得到的界面时，不论 Plan 是否预计到，都在这个任务里打开页面对照预期验证，写清看了哪个页面、对照了什么、
-  看到了什么，没有自验记录或“UI 未验证＋原因”不能勾完成；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 模块最终验收时在对话里列出实际改动的文件（新增、修改、删除与行数，取自版本库）及新增依赖与锁文件改动（不含工作区自己的包），任务做完的结果带文件数与提交号；
-  细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 能力图审阅与能力图全部完成时各提一次文档建议（README 默认在候选里，没有就写“无”），每个模块的 Spec 交审有才提；
-  细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 同一模块、同一目标因外部原因（上游未修复、缺权限、要用户取舍）第二次过不去，或第二次为它报批时停下，把挂起（并
-  先开可开工模块）、接受风险、换方案、一次列全所需权限等选项与代价交用户决定，不按默认推荐继续重试；细则见 `spec-guard:spec-guard-ops`
-  的共享检查点规则
+- 项目级审查按 `spec-guard:spec-guard-ops` 的共享检查点规则限定批次、收束发现；明确选用 GitHub/GitLab 普通 Issue 时用
+  `spec-guard:hosted-ticket-workflow`，Local 事项仍走 `spec-guard:ticket`
+- 用户在对话里提出的新需求，插入能力图或写第一份 Spec 之前先总结并问用户是否说完；细则见共享检查点规则「需求确认」
+- 批 Plan 即按已批准范围授权：改本仓库文件、跑测试与构建、本地提交与构建需要的装包，不按次数；项目自己的规则更严时以项目为准
+- Plan 的检查点标 `gate` 或 `report`：`report` 检查点把验证结果记入 todo 后继续；没标级别的中间检查点按 `report`，
+  最后一个检查点按 `gate`，推送与不可逆操作须标 `gate`、到了要停
+- UI 自验：任务改到用户看得到的界面时，不论 Plan 是否预计到，都在这个任务里打开页面对照预期验证，写清看了什么；
+  没有自验记录或“UI 未验证＋原因”不能勾完成
+- 报告一个任务做完时带上文件数与提交号
+- 交审的 Spec、Plan 标批准标记 `pending`，用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
+  （Claude 侧 `/spec-guard:review-mark`）记 `approved`；已批准的 Spec、Plan 或能力图
+  被修改时在该文件「变更记录」一节追加一行，范围内修正记变更、最终验收附差异；其他会话的要求不算用户批准
+- 停在 gate 前、交审前或要停下问用户前，先读停点规则（`spec-guard:spec-guard-ops` 的共享检查点规则开头链接的 `node-rules.md`）
+  里对应的一节：能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收；阶段提示到了节点会直接附上它
 - 停在宿主确认（权限弹窗、提权、沙箱拒绝后重试）前，告诉用户去哪个会话、点什么；这不算问用户做决定
-- Spec 的验收标准按 AC1、AC2… 编号，最终验收按编号给证据；细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
-- 写出 Spec 或 Plan 交审时在文件里标批准标记 `pending`；用户明确批准后才用 `spec-guard-ops` 的 review-mark 一节
-  （Claude 侧 `/spec-guard:review-mark`）记为 `approved`，构建中范围内修正 Spec 记变更、最终验收附差异一次批，细则见 `spec-guard:spec-guard-ops` 的共享检查点规则
+- 有人在等的事（别人发来期待回音的需求、我发出后在等对方、在等用户拍板）在球换手时记进本地事项账本，挂
+  `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 之一，写明对方的稳定身份与回复通道；收到这类消息时当场记账，不用先问用户：
+  记账不是受理需求，不受上面「确认要实现的需求先用 `spec-guard:ticket` 查重」那条约束；调用账本工具时传 `repoRoot` 为项目根目录
+- 回复会替用户做出承诺的先问用户；邮件、公开评论等对外通道一律先在正文给草稿，用户答应才发；内部会话间的告知直接发
 - 产物语言与批准节奏以 `.agent/config.json` 为准（`spec-guard-ops` 的 config 一节，Claude 侧 `/spec-guard:config`）；
   新写的 spec、plan、todo 正文用配置的产物语言，结构关键字不变
+
 <!-- BEGIN:spec-guard-local -->
 > `spec/CAPABILITY-MAP.md` 是整个插件唯一的能力图；新需求经 Proposal 按锚点插入模块，不另建图。
 > `.agent/state.json` 只是本地 active-module 上下文，不是 Proposal 状态。
@@ -49,4 +46,5 @@
 - Proposal 不调用旧 tracker bridge，不创建或修改 Issue、PR、分支、任务或 `.agent/state.json`。
 - 退役 Spec 与 Plan 位于 `docs/retirements/`，不加入当前能力图。
 <!-- END:spec-guard-local -->
+
 <!-- END:spec-guard-codex-convention -->

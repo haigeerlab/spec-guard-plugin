@@ -197,7 +197,7 @@ class CheckpointContractTests(unittest.TestCase):
         for name in ("claude-block-local.md", "codex-block-local.md"):
             template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
             with self.subTest(name=name):
-                for phrase in ("`gate`", "`report`", "批量前置审", "UI 自验", "共享检查点规则"):
+                for phrase in ("`gate`", "`report`", "UI 自验", "共享检查点规则", "停点规则"):
                     self.assertIn(phrase, template)
 
     def test_slash_commands_are_not_shell_commands(self):
@@ -231,11 +231,12 @@ class CheckpointContractTests(unittest.TestCase):
         for path in (self.plugin / "commands" / "review-mark.md", self.plugin / "skills" / "spec-guard-ops" / "SKILL.md"):
             with self.subTest(path=path):
                 self.assertIn("文档建议", path.read_text(encoding="utf-8"))
-        for path in (self.plugin / "templates").glob("*-block-local.md"):
-            with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                for phrase in ("文档建议", "能力图全部完成", "README"):
-                    self.assertIn(phrase, text)
+        for title in ("## 能力图审阅", "## 最终验收"):
+            with self.subTest(title=title):
+                for phrase in ("文档建议", "README"):
+                    self.assertIn(phrase, self.node_rules(title))
+        self.assertIn("能力图全部完成", self.node_rules("## 最终验收"))
+        self.assertIn("有才提", self.node_rules("## Spec 交审"))
 
     def test_the_final_gate_lists_the_changed_files(self):
         section = self.section("## Plan 检查点分级")
@@ -251,12 +252,16 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("最终验收的提交包含勾选与状态记录", "先勾上这个 gate", "`.agent/state.json`", "列进待批准的提交清单",
                        "批准不含提交时"):
             self.assertIn(phrase, section)
+        final = self.node_rules("## 最终验收")
+        for phrase in ("改了哪些文件用表格", "取自版本库", "本模块的提交", "与这份提交清单不一致的单独列出", "单独一张表放在最前",
+                       "文档改动：无", "新增依赖、锁文件改动：无", "不含工作区自己的包"):
+            self.assertIn(phrase, final)
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("最终验收", "实际改动的文件", "本模块的提交（提交号＋一句话）", "与这份提交清单不一致的单独列出",
-                               "用表格列出", "单独一张表放在最前", "没有内容的写“无”"):
-                    self.assertIn(phrase, text)
+                self.assertIn("文件数与提交号", text)
+                for moved in ("本模块的提交（提交号＋一句话）", "单独一张表放在最前"):
+                    self.assertNotIn(moved, text)
 
     def test_plan_approval_authorizes_by_scope(self):
         tiers = self.section("## Plan 检查点分级")
@@ -282,8 +287,7 @@ class CheckpointContractTests(unittest.TestCase):
         for path in (self.plugin / "templates").glob("*-block-local.md"):
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("按已批准范围授权", "装包", "不按次数", "一次列全所需权限", "新增依赖与锁文件改动",
-                               "不含工作区自己的包", "宿主确认", "去哪个会话"):
+                for phrase in ("按已批准范围授权", "装包", "不按次数", "项目自己的规则更严时以项目为准", "宿主确认", "去哪个会话"):
                     self.assertIn(phrase, text)
                 self.assertNotIn("需要的外部条件", text)
 
@@ -302,30 +306,35 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("结束本轮的确认框", "确认框摘要", "本轮的对话正文"):
             self.assertIn(phrase, section)
 
-    def test_the_review_rules_live_in_the_convention_block(self):
-        # rules-in-context: agents rarely reread the rules file, so the block carries the rule text itself.
+    def test_the_review_rules_reach_the_node(self):
+        # rules-in-context put these three into the block; rules-at-nodes moves them into the stop rules the phase hint
+        # attaches at the node, so they are still in that turn's context without sitting in every turn.
+        for title in ("## Spec 交审", "## Plan 交审", "## 最终验收"):
+            with self.subTest(title=title):
+                self.assertIn("确认框之前", self.node_rules(title))
+        final = self.node_rules("## 最终验收")
+        for phrase in ("附上 Spec 的改动差异", "直接写它的 Spec"):
+            self.assertIn(phrase, final)
         paths = list((self.plugin / "templates").glob("*-block-local.md"))
         paths.append(self.plugin.parents[1] / "docs" / "convention-block.md")
         for path in paths:
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
                 for phrase in ("确认框之前", "附上 Spec 的改动差异", "直接写它的 Spec"):
-                    self.assertIn(phrase, text)
+                    self.assertNotIn(phrase, text)
+                self.assertIn("停在 gate 前、交审前或要停下问用户前", text)
 
-    def test_the_convention_block_names_sibling_plugins_conditionally(self):
-        # sibling-plugin-hints: a conditional hint per host, no probe; the entry points differ by host.
-        templates = self.plugin / "templates"
-        docs = self.plugin.parents[1] / "docs" / "convention-block.md"
-        entries = {
-            templates / "claude-block-local.md": ("/delegate:review",),
-            docs: ("/delegate:review",),
-            templates / "codex-block-local.md": ("delegate:delegate-routing", "agent-relay:session-routing"),
-        }
-        for path, host_entries in entries.items():
-            with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                for phrase in ("若装了 delegate 插件", "只读审查", "不算用户批准", "若装了 agent-relay 插件", *host_entries):
-                    self.assertIn(phrase, text)
+    def test_the_stop_rules_name_sibling_plugins_conditionally(self):
+        # sibling-plugin-hints: a conditional hint, no probe; the entry points differ by host. rules-at-nodes moved the
+        # hints from the convention block to the nodes where they apply (review sections and the final acceptance).
+        spec = self.node_rules("## Spec 交审")
+        for phrase in ("若装了 delegate 插件", "只读审查", "不算用户批准", "「外部审查」一行"):
+            self.assertIn(phrase, spec)
+        # The stop rules reach both hosts, so they name no slash entry; the phase hint's own line names the host's.
+        self.assertNotIn("/delegate:", self.node_rules())
+        final = self.node_rules("## 最终验收")
+        for phrase in ("若装了 agent-relay 插件", "agent-relay:session-routing", "提醒用户转告"):
+            self.assertIn(phrase, final)
 
     def test_user_facing_text_uses_the_shared_terms(self):
         # display-terms: 审查 for technical checks, 批准 for the user's decision, 验收 for the final acceptance.
@@ -345,6 +354,15 @@ class CheckpointContractTests(unittest.TestCase):
                         found.append("%s:%d %s" % (path.relative_to(repo), number, word))
         self.assertEqual(found, [], "\n".join(found))
 
+    def node_rules(self, title=None):
+        # rules-at-nodes: the stop rules moved out of the convention block into node-rules.md, one section per node.
+        text = (self.plugin / "references" / "node-rules.md").read_text(encoding="utf-8")
+        if title is None:
+            return text
+        start = text.index(title + "\n")
+        end = text.find("\n## ", start + len(title))
+        return text[start:] if end < 0 else text[start:end]
+
     def block_surfaces(self):
         # stop-rule-and-ac: every copy of the convention block, including this repository's own AGENTS.md.
         yield from (self.plugin / "templates").glob("*-block-local.md")
@@ -360,11 +378,13 @@ class CheckpointContractTests(unittest.TestCase):
                        "不按默认推荐继续重试"):
             self.assertIn(phrase, section)
         self.assertNotIn("同一个 gate 因外部原因", contract)
+        gate = self.node_rules("## 中途 gate")
+        for phrase in ("同一模块、同一目标", "第二次", "报批", "先开可开工模块", "由用户决定"):
+            self.assertIn(phrase, gate)
         for path in self.block_surfaces():
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("同一模块、同一目标", "第二次", "报批", "先开可开工模块", "交用户决定"):
-                    self.assertIn(phrase, text)
+                self.assertNotIn("同一模块、同一目标", text)
                 self.assertNotIn("同一个 gate 因外部原因", text)
 
     def test_checks_a_script_can_judge_may_be_report(self):
@@ -387,11 +407,11 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("**验收标准编号。**", "`AC<数字>`", "删掉的编号不复用", "按编号逐条给证据", "推荐写法"):
             self.assertIn(phrase, contract)
         self.assertNotIn("对未完成模块缺编号只提示", contract)  # align-upstream-rules: no verify-artifacts hint
+        self.assertIn("AC1、AC2", self.node_rules("## Spec 交审"))
+        self.assertIn("按 AC 编号逐条给证据", self.node_rules("## 最终验收"))
         for path in self.block_surfaces():
             with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                for phrase in ("AC1、AC2", "按编号给证据"):
-                    self.assertIn(phrase, text)
+                self.assertNotIn("AC1、AC2", path.read_text(encoding="utf-8"))
 
     def test_a_review_handoff_shows_the_content(self):
         section = self.section("## 批准标记")
@@ -402,11 +422,10 @@ class CheckpointContractTests(unittest.TestCase):
         cadence = self.section("## 批准节奏")
         for phrase in ("第一次交审时说明一次", "之后不再重复", "/spec-guard:config"):
             self.assertIn(phrase, cadence)
-        for path in (self.plugin / "templates").glob("*-block-local.md"):
-            with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                for phrase in ("在对话里呈现内容要点", "只给链接不算交审"):
-                    self.assertIn(phrase, text)
+        for title in ("## 能力图审阅", "## Spec 交审"):
+            with self.subTest(title=title):
+                for phrase in ("本轮对话正文里", "只给链接"):
+                    self.assertIn(phrase, self.node_rules(title))
 
     # review-card-sections: the sections of each kind, in the order of the decision-inbox card template.
     CARD_SECTIONS = (
@@ -494,7 +513,7 @@ class CheckpointContractTests(unittest.TestCase):
         for path in self.block_surfaces():
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("范围内修正", "最终验收附差异", "有才提"):
+                for phrase in ("范围内修正", "最终验收附差异"):
                     self.assertIn(phrase, text)
 
     def test_change_sources_are_recorded_and_answered(self):
@@ -513,9 +532,10 @@ class CheckpointContractTests(unittest.TestCase):
         for path in surfaces:
             with self.subTest(path=path):
                 text = path.read_text(encoding="utf-8")
-                for phrase in ("「变更记录」一节追加一行", "其他会话的要求不算用户批准", "回告来源", "拟回告",
-                               "提醒用户转告"):
+                for phrase in ("「变更记录」一节追加一行", "其他会话的要求不算用户批准"):
                     self.assertIn(phrase, text)
+        for phrase in ("拟回告", "来源是他人", "提醒用户转告"):
+            self.assertIn(phrase, self.node_rules("## 最终验收"))
 
     def test_open_commitments_are_recorded_when_the_ball_moves(self):
         # open-commitments: anything someone waits on is a ledger issue, written when the ball changes hands.
@@ -547,13 +567,12 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertIn("用户也要求一次审完时", rework)
         self.assertNotIn("确需各自成模块时，用「按需求批量前置审」\n  一次交审", rework)
         self.assertIn("按模块分组", self.section("## 协调会话的批准与合并（moduleConcurrency 为 on 时）"))
-        surfaces = list((self.plugin / "templates").glob("*-block-local.md"))
-        surfaces.append(self.plugin.parents[1] / "docs" / "convention-block.md")
-        for path in surfaces:
+        spec = self.node_rules("## Spec 交审")
+        for phrase in ("一次交审只放一个模块", "按模块分组", "不按产物类型横排", "一起发版不等于一起审"):
+            self.assertIn(phrase, spec)
+        for path in self.block_surfaces():
             with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                for phrase in ("交审一次只放一个模块", "并按模块分组", "不按产物类型横排", "一起发版不等于一起审"):
-                    self.assertIn(phrase, text)
+                self.assertNotIn("交审一次只放一个模块", path.read_text(encoding="utf-8"))
 
     def test_recording_on_receipt_is_not_accepting(self):
         # record-on-receipt: recording that someone waits needs no approval and is not taking the work on.
@@ -575,6 +594,18 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("`.agent/config.json`", "`reviewCadence`", "`separate`", "`combined`", "默认",
                        "一次批准", "新决策", "范围不清", "高风险", "合并永远由用户"):
             self.assertIn(phrase, cadence)
+
+    def test_the_convention_block_is_short(self):
+        # rules-at-nodes AC1: the block keeps the resident sentences, the stop rules sit in node-rules.md.
+        for name, limit in (("claude-block-local.md", 4000), ("codex-block-local.md", 3800)):
+            path = self.plugin / "templates" / name
+            with self.subTest(name=name):
+                self.assertLessEqual(len(path.read_bytes()), limit)
+                text = path.read_text(encoding="utf-8")
+                for phrase in ("`report` 检查点把验证结果记入 todo 后继续", "推送与不可逆操作须标 `gate`、到了要停",
+                               "停在 gate 前、交审前或要停下问用户前", "能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收",
+                               "项目自己的规则更严时以项目为准", "文件数与提交号", "`pending`", "`approved`"):
+                    self.assertIn(phrase, text)
 
     def test_templates_point_at_project_config(self):
         for name in ("claude-block-local.md", "codex-block-local.md"):
