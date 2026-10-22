@@ -101,9 +101,9 @@ transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creatio
   printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
 }
 # context-hint-thresholds、quiet-injection（D6）：只有模块边界达到窗口 70% 才出带大小的 Module boundary 行，模块进行中不再有
-# 上下文行。Claude 没有窗口：尾部读数都不超过 200k 按 200k 估算，有读数超过 200k 按 1M 估算。transcript 写入的总量 = 第二个参数 + 1。
+# 上下文行。Claude 没有窗口：尾部有读数超过 200k 按 1M 估算，否则读不出窗口、不出边界行（quiet-injection 返工 1）。
+# transcript 写入的总量 = 第二个参数 + 1。
 EST_1M='at or over 70% of an estimated 1000 k window'
-EST_200K='at or over 70% of an estimated 200 k window'
 sized_boundary() {  # $1=N k $2=阈值说明
   printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or \`text\` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
 }
@@ -835,16 +835,22 @@ done_has_only "DONE 低于 700k（699,999）时不出 Module boundary 行" ""
 transcript "$T" 499999
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
 done_has_only "boundary-hint-70：DONE 500k 不再出 Module boundary 行" ""
-# quiet-injection（Q2 A）：尾部读数都不超过 200k 时按 200k 窗口估算，70% = 140k。
-transcript "$T" 139999
+# quiet-injection 返工 1（0W0ZWWT）：尾部读数都不超过 200k 时读不出窗口（1M 会话也会落在这里），不按 200k 估算、不出边界行。
+for reading in 139999 163999 199999; do
+  transcript "$T" "$reading"
+  out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
+  done_has_only "Claude 读数不超过 200k（$((reading + 1))）：读不出窗口，DONE 不出 Module boundary 行" ""
+done
+transcript "$T" 250000
+transcript "$WORK/later.jsonl" 299999
+cat "$WORK/later.jsonl" >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 读数不超过 200k：DONE 140k 按 200k 窗口估算出行" "$(sized_boundary 140 "$EST_200K")"
-transcript "$T" 139998
+done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，300k 不出" ""
+transcript "$T" 250000
+transcript "$WORK/later.jsonl" 749999
+cat "$WORK/later.jsonl" >> "$T"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 读数不超过 200k：DONE 差一个 token 到 140k 不出" ""
-transcript "$T" 199999
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 恰好 200k 仍按 200k 窗口估算" "$(sized_boundary 200 "$EST_200K")"
+done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，750k 出行" "$(sized_boundary 750 "$EST_1M")"
 transcript "$T" 250000
 transcript "$WORK/later.jsonl" 149999
 cat "$WORK/later.jsonl" >> "$T"

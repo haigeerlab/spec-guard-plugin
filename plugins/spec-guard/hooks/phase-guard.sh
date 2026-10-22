@@ -342,11 +342,11 @@ case "${SPEC_GUARD_HOST:-}" in
          else HOST=""; fi ;;
     esac ;;
 esac
-# quiet-injection（Q2 A）：Claude 的记录里没有窗口；有读数时按 200k 估算，尾部有读数超过 200k 就按 1M 估算，并在提示里写明是估算。
+# quiet-injection（Q2 A，返工 1）：Claude 的记录里没有窗口；尾部有读数超过 200k 才能断定是 1M，按 1M 估算并在提示里写明是估算。
+# 读数都不超过 200k 时分不出 200k 还是 1M，不设窗口，也就不出边界行（按 200k 估算会让 1M 会话在 140k～200k 误报）。
 WINDOW_ESTIMATED=""
-if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ]; then
-  WINDOW_ESTIMATED=1
-  if [ -n "$OVER" ]; then WINDOW=1000000; else WINDOW=200000; fi
+if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ] && [ -n "$OVER" ]; then
+  WINDOW_ESTIMATED=1 WINDOW=1000000
 fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
 # 位置行放在标题与阶段行（“当前阶段”／“Current stage”）之间，所有阶段都带；不在 git 仓库里时没有这一行。

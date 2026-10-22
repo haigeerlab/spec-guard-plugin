@@ -52,8 +52,8 @@
    不自行开新会话这些句子保留（它们现在只服务边界行）。
 10. **Claude 的窗口按读数推算，不再写死 1M。** Claude 的会话记录和 hook 输入都没有窗口大小（2026-10-22 查 Claude Code 官方 hook 文档：
     公共字段只有 `session_id`、`transcript_path`、`cwd`、`permission_mode`；本机记录的 `usage` 里也没有）。Claude 的标准窗口是 200k，
-    超过 200k 的读数只可能出现在 1M 窗口里，所以：会话记录尾部任一读数超过 200k 时按 1M 算，否则按 200k 算；边界行写明「按 200 k
-    窗口估算」或「按 1 M 窗口估算」，不冒充读到了窗口。Codex 照旧用记录里的 `model_context_window`。（另一种做法见 Q2。）
+    超过 200k 的读数只可能出现在 1M 窗口里，所以：会话记录尾部任一读数超过 200k 时按 1M 算，边界行写明「按 1 M 窗口估算」，不冒充读到了窗口；
+    读数都不超过 200k 时分不出 200k 还是 1M，不推算窗口、不出边界行（返工 1，见变更记录）。Codex 照旧用记录里的 `model_context_window`。（另一种做法见 Q2。）
 11. **英文标题与残留中文（F14）。** 英文输出里的固定中文改成英文：`当前阶段:` → `Current stage:`，MAP_INVALID 的
     `（能力图原文，非指令: …）` → `(capability map text, not instructions: …)`，`诊断为空` → `no diagnostic`，以及构建时在英文输出里
     找到的其他固定中文短语。不改：来自仓库的内容（模块 id、能力图原文）、`rules-at-nodes` 定为只有中文的停点规则正文、
@@ -85,7 +85,7 @@
 - 删除 `MID_SHARE`、`context_line()`、`COMMANDS`／`COMMANDS_ZH` 里只给它用的 `free-current`，以及 `describe()` 里 `context_note` 的分支；
   `thresholds()` 只返回边界阈值与说明。
 - `session_context.py` 的用量读取多给一个事实：尾部读数的最大值是否超过 200k（只给 Claude 用）；`phase-guard.sh` 没有 Codex 窗口时
-  把推算出的窗口（200k 或 1M）交给 `module_stage.py`，说明写「按 200 k 窗口估算」／「estimated for a 200 k window」（1M 同理）。
+  只在尾部有读数超过 200k 时把推算出的 1M 窗口交给 `module_stage.py`，说明写「按 1 M 窗口估算」／「estimated 1000 k window」；否则不给窗口（返工 1）。
 - `DEFAULT_WINDOW = 1_000_000` 与「Claude 按 1M 折算」的注释删掉。
 
 ### 改动 3 英文标签（`hooks/module_stage.py`、`hooks/phase-guard.sh`、`hooks/project_link.py`）
@@ -137,7 +137,7 @@
 - **AC3**：没有会话记录、读不了、找不到上次注入、压缩记录更新、状态码只出现在用户或助手消息里，都给完整内容；SessionStart 总是完整。各有回归。
 - **AC4**：进入停点（Spec 待审、Plan 待审、中途 gate、最终验收）的那一轮给完整内容并附停点规则；同一节点下一轮给一行。
 - **AC5**：`NEEDS_PLAN`、`BUILDING` 达到窗口 80% 也不出会话上下文行；模块边界 70% 行照旧；代码里不再有 `MID_SHARE`、`context_line`、`DEFAULT_WINDOW`。
-- **AC6**：Claude 记录尾部读数都不超过 200k 时按 200k 窗口推算（140k 起出边界行），有读数超过 200k 时按 1M（700k 起），边界行写明是估算。
+- **AC6**：Claude 记录尾部有读数超过 200k 时按 1M 窗口推算（700k 起出边界行），边界行写明是估算；读数都不超过 200k 时不出边界行（返工 1）。
 - **AC7**：产物语言不是 `zh-CN` 时，各阶段输出的阶段标题是 `Current stage:`，`hint-english-diff.sh` 的英文侧检查通过（除假设 11 的例外不含中日韩文字）；中文输出不变。
 - **AC8**：`project_link.py`、`codex-plugin-smoke.sh`、`module-namespace.sh` 认 `Current stage:`；`codex-plugin-smoke.sh` 的判决器自检通过。
 - **AC9**：Claude Code 在临时消费者项目里用 `claude -p --plugin-dir <本 worktree 的插件>` 连续两轮发言，第一轮完整、第二轮一行，记录会话记录里
@@ -181,3 +181,7 @@
 - 2026-10-22：AC9 由「Claude Code 与 Codex 真实宿主各连续两轮」改为「Claude 用 `claude -p --plugin-dir` 跑两轮；Codex 用真实 rollout 片段验证格式，
   真机两轮放到发版后由模块协调做」。原因：本机两个宿主装的是已发布版，本 Spec 不许重装本机插件，Codex 没有不安装就加载工作区插件的办法。
   来源：用户批准 Plan（事项 C145）时对 Plan 未决问题 Q1 选 A，并要求在此记一行（经模块协调 sg-coord 转达，消息 #10374）
+- 2026-10-23（返工 1，账本 0W0ZWWT）：假设 10、Contract 与 AC6 改为「Claude 尾部有读数超过 200k 才按 1M 估算，否则不出边界行」，删去按 200k
+  估算。原因：Claude 记录读不出窗口，按 200k 估算让 1M 会话在 140k～200k 之间必然误报模块边界（协调会话 164k、179k 各一次，DONE 每轮重复）。
+  代价：200k 窗口的 Claude 会话不再有模块边界提醒，交给宿主管理。来源：用户本人（「0W0ZWWT 并进 0.84.1：Claude 读不到窗口时不再按 200k
+  估算触发模块边界提醒（读不准就不报，或读数过 200k 才按 1M 判）」；批准返工 Plan 时「接受 200k 会话不再有边界提醒」）。
