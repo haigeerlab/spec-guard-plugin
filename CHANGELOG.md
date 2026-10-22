@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.83.2] - 2026-10-22
+
+本版 1 处修复：多模块并行开关打开时，Build order 的头一个模块能列入可开工（map-startable 返工）。`interface.json` 升到 1.8，只改 `startable` 的说明。
+
+### 修复
+
+- **并行开关打开时，没人开工的当前模块算可开工。** `.agent/state.json` 没有 `activeModule` 时，`/map` 把 Build order 里第一个没完成的模块
+  一律判为进行中，即使它没有 Spec、没有 Plan；使用方插件按 `startable` 开工时，这个模块与依赖它的整条链都开不了。现在开关为 `on` 时它按就绪算并列入
+  `startable`；`activeModule` 指定的模块照旧算进行中，顶层 `activeModule`、`stage` 与阶段提示不变；开关为 `off` 时与原来相同。
+
 ## [0.83.1] - 2026-10-22
 
 本版 1 处修复：`gateTick` 的预览显示勾选前的原样（gate-tick 返工）。`interface.json` 不变（1.7）。

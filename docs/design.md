@@ -114,6 +114,9 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 只在模块第一个未勾项正是最后一个 gate 检查点时勾那一格；已勾过时不改、退出码 0；其他情形退出码 2 并打印短码。它不判断用户
 有没有批准验收，调用方须已有这份批准。`check-interface.py` 核对它引用的脚本存在。
 
+1.8（map-startable 返工）起，开关为 `on` 时，只是 Build order 推出来、没有 Spec 与 Plan 的当前模块按就绪算并列入 `startable`；
+`activeModule` 指定的仍算进行中，顶层 `activeModule`、`stage` 与阶段提示不变。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
