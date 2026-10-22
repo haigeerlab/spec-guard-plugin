@@ -1,5 +1,7 @@
 # Plan: scope-overlap-interface
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/scope-overlap-interface.md`](../../spec/scope-overlap-interface.md)。本仓库评审节奏为分开审：Spec 已于 2026-10-22 单独批准
 （用户批准事项 C162，Q1 A、Q2 A；`docs/design.md` 从独占清单移出，改为「只追加（quiet-injection 独占）」，已按原话改进 Spec 并记变更记录，
 修订后的 Spec 于用户批准事项 C165 批准），本 Plan 单独交审。分支 `scope-overlap-interface`，worktree
