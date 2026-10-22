@@ -8,5 +8,23 @@
 - [x] Task 5：说明文字（改动 4） — `commands/phase.md`：语言一段改为阶段行中英各写、去掉「与 0.67.0 逐字节相同」与 `- 会话上下文` 示例；新增一段说明状态码、一行形式的写法、什么时候给完整内容、本命令总是完整；上下文提醒改为只在模块边界、模块进行中不提醒（D6），Claude 窗口按读数估算。`docs/design.md` 第 3 步改为只有边界一档、Claude 估算窗口，并加一句平时只给一行的机制。`README.md`、`README.en.md`：示例阶段行改 `Current stage:`，核心概念里「每轮注入」改为「状态变了、新会话或压缩后给完整说明，其余轮次只给一行」。`check-readme-sync.py`、`validate.sh --quick` 通过。
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的四份副本（`git archive HEAD`，a350f12）上各改一处并跑 phase-guard 回归：① `last_state()` 也认助手消息 → 「状态码只出现在用户或助手消息里，不算」红；② 状态码算进未勾选数 → 「未勾选数变了码不变」「未勾选数变了仍是一行」红；③ 去掉压缩判定 → 「Claude 压缩记录比上次注入新，给完整内容」红（该段遇首个失败即停，Codex 那条未跑到）；④ 模块进行中也附边界行（等于放回进行中的上下文提示）→ 「D6：BUILDING 800k」「D6：Codex BUILDING 窗口 80%」「D6：BUILDING 850k」「D6：zh-CN BUILDING 850k」红。副本留在本会话 scratchpad，不在仓库里。
 - [x] Task 6：真实宿主核对（AC9） — **Claude Code 2.1.302 真机**：在 scratchpad 的临时消费者项目（两模块能力图，alpha 有 Spec、Plan、todo 未完成）里，用 `claude -p --model haiku --plugin-dir <本 worktree 的 plugins/spec-guard> --settings '{"enabledPlugins":{"spec-guard@spec-guard-marketplace":false}}'` 发第一轮，再 `--resume` 同一会话（8ac434a1）发第二轮。会话记录里每轮只有一条 spec-guard 注入（已装的那份没参与）：第一轮（记录行 14）是完整内容 `## spec-guard local workflow⏎⏎Location: branch \`main\` …`，末尾 `<!-- spec-guard-state: 87df7412 -->`；第二轮（记录行 42）是一行 `spec-guard: BUILDING · \`alpha\` · 2 unchecked · branch \`main\` (unchanged; see the earlier phase hint for details) <!-- spec-guard-state: 87df7412 -->`。**Codex 按 Q1 A 用真实记录**：取本机 2026-10-22 rollout（`rollout-2026-10-22T14-37-48-01a16254-….jsonl`）里那条 spec-guard 注入，结构为 `response_item` → `payload{type: message, role: developer, content:[{type: input_text, text}], internal_chat_message_metadata_passthrough{content_item_kinds:['hooks.additional_context']}}`（旧版正文无状态码）；保持结构、只把正文换成新 hook 对同一临时项目的完整输出，交给新 hook（Codex 宿主）作会话记录，得到一行形式、状态码同为 87df7412。Codex 真机连续两轮的核对按用户 C145 的答复放到发版后由模块协调做，本模块未在 Codex 真机上做。
-- [ ] Task 7：合入集成分支并跑完整检查
+- [x] Task 7：合入集成分支并跑完整检查 — 构建期间按协调通知单独 sync 共 4 次（7464fd4、4f84061、ad5866a 等），每次完整检查全过；最后一次单独 `module-crew sync`：已包含集成分支 ad5866a。随后 `validate.sh` 通过、phase-guard 488 例、verify-artifacts 74 例、`test_stop_rules.py`、`scripts/test_self_report.py` 通过；`hint-english-diff.sh` 英文 935/935、中文 187/187；`codex-plugin-smoke.sh --selftest` 通过。`module_scope.py check --module quiet-injection --base crew/fix-batch`：越界 5 个，均在上面各 Task 记过——`hooks/test_session_context.py`（会话事实行数）、`hooks/test_module_stage_sanitization.py`（英文诊断标签两条断言）、`hooks/test-hook-entry.sh`（两处阶段行 grep）、`scripts/self_report.py` 与 `scripts/test_self_report.py`（维护者自观察报告认英文标题与一行形式）；都是本模块改了输出格式后跟着改的识别或断言，没有别的模块在改它们。相对集成分支 21 个文件，+738／−258，提交 10 个。
 - [ ] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+
+## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
+
+> **变更**：阶段注入平时只给一行（决定 D5）。完整阶段提示末尾多一行状态码 `<!-- spec-guard-state: … -->`，由阶段、当前模块、Spec／Plan 批准状态、
+> 停点、checkout 角色、挂起与暂停的模块、有无未合进上游的提交、项目配置行、位置行、跟随指向的项目与提示语言算出（不含未勾选数与上下文用量）；
+> 每轮 hook 从会话记录里找最近一次 spec-guard 注入（Claude 的 hook_additional_context 附件、Codex 的 developer 消息），状态码相同就只给
+> `spec-guard: <阶段> · <模块> · <未勾选数> · <分支>` 一行，后面照样附模块边界行与记账提醒。新会话、压缩之后、读不到会话记录或状态变了时给完整内容；
+> 进入停点那一轮完整并附停点规则，同一节点下一轮一行；`MAP_INVALID`、`UNKNOWN` 等诊断每轮完整。不写任何文件；`/spec-guard:phase` 总是完整输出。
+> **变更**：上下文提醒只留模块边界一条（决定 D6）：模块进行中达到窗口 80% 的「会话上下文」行删除，上下文交给宿主管理；共享检查点规则同步删去那一句。
+> **修复**：Claude 的窗口不再按 1M 写死：会话记录尾部有读数超过 200k 按 1M 估算（700k 起提醒），否则按 200k（140k 起提醒），提醒里写明是估算。
+> **修复**：英文阶段提示的标题写 `Current stage:`，英文输出里不再夹固定中文（activeModule 无效的提示、外部审查行的中文节名、能力图无效时的标签与空诊断）；
+> 能力图无效时引用的解析器报错仍是中文（解析器与 verify-artifacts 共用，未改）。识别阶段行的地方（`project_link`、Codex smoke 判决器、评测）认两种标题。
+
+## 对使用者的影响
+
+- 同一会话里状态没变的轮次只看到一行 `spec-guard: …`；想随时看完整说明，用 `/spec-guard:phase`（Codex：`$spec-guard-ops` phase）。
+- 模块进行中不再有 80% 的上下文提醒；模块之间的提醒照旧。用 200k 窗口的 Claude 会话现在会在模块边界达到 140k 时收到提醒（原来按 1M 算，永远到不了）。
+- 产物语言不是 `zh-CN` 的项目，阶段标题从 `当前阶段:` 变成 `Current stage:`；自己写脚本解析这一行的使用者要跟着改。
