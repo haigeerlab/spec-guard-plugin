@@ -148,16 +148,13 @@ class Summary(unittest.TestCase):
             (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "dispatch",
-                                      "trackerDefault"})
+        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
         self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),
                          ("separate", "default"))
         self.assertEqual((items["moduleConcurrency"]["value"], items["moduleConcurrency"]["source"]),
                          ("off", "default"))
-        self.assertEqual(items["dispatch"]["value"], {"CLAUDE.md": "on", "AGENTS.md": "off"})
-        self.assertIn("setup-convention", items["dispatch"]["editWith"])
         self.assertEqual(items["trackerDefault"]["value"], "absent")
         self.assertIn("tracker-default", items["trackerDefault"]["editWith"])
 
@@ -185,10 +182,15 @@ class Summary(unittest.TestCase):
             self.assertEqual(items[key]["source"], "default (config invalid)", key)
         self.assertEqual(items["artifactLanguage"]["value"], "unset")
 
-    def test_dispatch_without_any_block(self):
+    def test_retired_dispatch_rule_is_not_listed(self):
+        # D17: the build-task-dispatch rule was retired; a leftover marker in a block is not a setting.
         with Project() as project:
+            (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(items["dispatch"]["value"], {})
+            code, out = project.run("show")
+        self.assertNotIn("dispatch", items)
+        self.assertEqual(code, 0)
+        self.assertNotIn("dispatch", out)
 
 
 class Cli(unittest.TestCase):
@@ -260,7 +262,6 @@ class Cli(unittest.TestCase):
         with Project() as project:
             code, out = project.run("set", "--key", "dispatch", "--value", "on", "--confirm")
             self.assertEqual(code, 2)
-            self.assertIn("setup-convention", out)
             code, out = project.run("set", "--key", "trackerDefault", "--value", "github", "--confirm")
             self.assertEqual(code, 2)
             self.assertIn("tracker-default", out)

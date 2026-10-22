@@ -40,13 +40,8 @@ VALIDATORS = {
     "moduleConcurrency": lambda value: value in CONCURRENCY,
 }
 OWNED_ELSEWHERE = {
-    "dispatch": "/spec-guard:setup-convention --replace --dispatch (or --no-dispatch)",
     "trackerDefault": "/spec-guard:tracker-default",
 }
-BLOCKS = (("CLAUDE.md", "<!-- BEGIN:agent-skills-convention -->", "<!-- END:agent-skills-convention -->"),
-          ("AGENTS.md", "<!-- BEGIN:spec-guard-codex-convention -->",
-           "<!-- END:spec-guard-codex-convention -->"))
-DISPATCH_MARKER = "<!-- spec-guard: build-task-dispatch -->"
 
 
 def load(root: Path) -> tuple[dict[str, Any], list[str]]:
@@ -81,21 +76,6 @@ def module_concurrency(root: Path) -> bool:
     return load(root)[0].get("moduleConcurrency") == "on"
 
 
-def _dispatch(root: Path) -> dict[str, str]:
-    """`on`/`off` per convention block present; the marker line is the switch."""
-    found = {}
-    for name, begin, end in BLOCKS:
-        text, _ = read_text(Path(root) / name)
-        if text is None:
-            continue
-        lines = [line.strip() for line in text.splitlines()]
-        if begin not in lines or end not in lines or lines.index(begin) > lines.index(end):
-            continue
-        block = lines[lines.index(begin) + 1:lines.index(end)]
-        found[name] = "on" if DISPATCH_MARKER in block else "off"
-    return found
-
-
 def summary(root: Path) -> list[dict[str, Any]]:
     """Every configurable item with its effective value and where that value comes from."""
     values, problems = load(root)
@@ -108,8 +88,6 @@ def summary(root: Path) -> list[dict[str, Any]]:
         items.append({"key": key, "value": value, "source": source,
                       "editWith": "/spec-guard:config"})
     tracker = read_default(root)
-    items.append({"key": "dispatch", "value": _dispatch(root), "source": "convention block",
-                  "editWith": OWNED_ELSEWHERE["dispatch"]})
     items.append({"key": "trackerDefault",
                   "value": tracker.backend if tracker.state == "configured" else tracker.state,
                   "source": ".agent/tracker.json", "editWith": OWNED_ELSEWHERE["trackerDefault"]})
@@ -155,10 +133,7 @@ def _show(root: Path, as_json: bool) -> int:
                          ensure_ascii=False, sort_keys=True))
         return 0
     for item in items:
-        value = item["value"]
-        if isinstance(value, dict):
-            value = ", ".join("%s=%s" % pair for pair in sorted(value.items())) or "no convention block"
-        print("%-16s %-24s source: %-26s edit: %s" % (item["key"], value, item["source"], item["editWith"]))
+        print("%-16s %-24s source: %-26s edit: %s" % (item["key"], item["value"], item["source"], item["editWith"]))
     if _structural(problems):
         print("\n%s is invalid (%s); its items fall back to defaults until it is fixed."
               % (RELATIVE_PATH, ", ".join(problems)))
