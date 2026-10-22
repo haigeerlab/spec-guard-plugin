@@ -202,7 +202,7 @@ spec-guard 写在哪里、谁能删什么。`scripts/check-state-paths.py` 确�
 
 | 类别 | 路径 | 入库 | 谁写 | 怎么删 |
 |---|---|---|---|---|
-| 项目产物 | `spec/`、`tasks/<id>/`、`CLAUDE.md`／`AGENTS.md` 里的约定块、`.agent/config.json`、`.agent/tracker.json`、`DOCUMENTATION-BASELINE.md`、`.epiq/project.json` | 是 | 预览并确认后的命令 | 通过命令；teardown 保留 Spec 与 Plan |
+| 项目产物 | `spec/`、`tasks/<id>/`、`CLAUDE.md`／`AGENTS.md` 里的约定块、`.agent/config.json`、`.agent/tracker.json`、`docs/DOCUMENTATION-BASELINE.md`、`.epiq/project.json` | 是 | 预览并确认后的命令 | 通过命令；teardown 保留 Spec 与 Plan |
 | 历史归档 | `spec/history/`、`tasks/history/`、`.agent/history/`、`spec/CAPABILITY-HISTORY.json` | 是 | 只有一次性的历史迁移 | 永不删除：账本按哈希固定每个文件 |
 | 每个 checkout 的状态 | `.agent/state.json`（当前模块）；新的状态一律放在 `$(git rev-parse --git-path spec-guard)` 下 | 否 | 构建流程；本地锁 | 随意 |
 | 本机状态 | `~/.spec-guard/` 或 `$SPEC_GUARD_STATE_DIR`：`local-ticket-ledger/runtime`、`local-ticket-portability`、`hosted-ticket-intents`、`proposal-closeout` | 否 | 账本安装、交接、托管事项写入、Proposal 收尾 | 运行时可重装；日志与意图只在没有待完成的写入时删，它们用来防重复 |
