@@ -105,3 +105,15 @@ JSON（去掉 `generatedAt`）与表格都和删掉配置文件时逐字节相�
 
 - 2026-10-18：Task 2 去掉「就绪且与进行中模块重叠的被排除」的用例，Task 3 改为「就绪格统一写可同时开工＋表格上方冲突一行」，架构决定同步。原因：随 Spec 修订（就绪模块一定没有并行边界，原排除规则永远不会触发）。来源：本会话实现前自查发现，用户本人决定按建议修订（2026-10-18）。
 - 2026-10-18：Task 2 加能力图解析器的用例与 `declared_groups` 实现，影响面加入 `capability_map.py` 与 `test_capability_map.py`，架构决定同步。原因：随 Spec 修订（解析器不保留逗号组）。来源：本会话实现中发现，用户本人选择做法 1（2026-10-18）。
+
+## 返工 1（2026-10-22）
+
+module-crew 试用实测：协调会话 `start plan` 列不出 Build order 的头一个模块。`map_view.py` 在 `.agent/state.json` 没有 `activeModule` 时，
+把 Build order 里第一个没完成的模块判为进行中，即使它没有 Spec、没有 Plan、也没人在做；module-crew 只开 `startable` 里的模块，最长的那条依赖链因此开不了工。
+用户决定发 0.83.2 热修（原话「你另开分支从 main 发 0.83.2 热修进度表判定」）。Spec 假设 4 随之补一条（见 Spec 变更记录），属「改变进行中判定」，
+已由用户这句决定答复。只改开关为 `on` 时进度表的状态判定，不改当前模块的选择、阶段计算与阶段提示；开关为 `off` 时不变。
+
+- Task 5：`test_map_view.py` 先改与加断言（推出来的当前模块在 on 时列入 `startable`；`activeModule` 指定的仍是进行中；顶层 `activeModule`、`stage` 不变；
+  off 时推出来的当前模块仍是进行中），确认失败；再改 `map_view.py`。验证：`test_map_view.py`、本仓库真实能力图只读核对与全档校验。
+- Task 6：发 0.83.2：两份 `plugin.json`、README 的 `--ref`、CHANGELOG。
+- Checkpoint 3（gate）：返工验收；推送与开 PR 在此由用户确认，合并由用户进行。

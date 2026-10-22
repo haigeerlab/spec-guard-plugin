@@ -758,6 +758,13 @@ class ConcurrencyOff(unittest.TestCase):
                     config.write_text(body, encoding="utf-8")
                     self.assertEqual(snapshot(project), plain)
 
+    def test_off_keeps_the_inferred_current_module_in_progress(self):
+        # startable-current-module: the change applies only with the switch on.
+        rows = [("a", "x", "—"), ("d", "x", "—")]
+        with Project(rows, ["d", "a"], {}) as project:
+            data = project.json()
+        self.assertEqual({m["id"]: m["status"] for m in data["modules"]}, {"d": "in_progress", "a": "ready"})
+
     def test_off_keeps_the_fixed_key_sets(self):
         with Project(CON_ROWS, CON_ORDER, CON_FILES) as project:
             data = project.json()
@@ -797,12 +804,32 @@ class ConcurrencyOnJson(unittest.TestCase):
     def test_startable_lists_every_ready_module_in_build_order(self):
         data = self.data()
         self.assertEqual(data["startable"]["modules"], ["shop"])
-        # d comes first and is therefore the current module (in progress), so it is not listed.
+        # startable-current-module: d is only the next module in Build order -- no Spec, no Plan, no activeModule --
+        # so with the switch on nobody is working on it yet and it is listed like any other ready module.
         rows = [("a", "x", "—"), ("b", "x", "—"), ("c", "x", "a"), ("d", "x", "—")]
         with Project(rows, ["d", "b, a", "c"], dict(ON)) as project:
             data = project.json()
-        self.assertEqual(data["startable"]["modules"], ["b", "a"])
+        self.assertEqual(data["startable"]["modules"], ["d", "b", "a"])
         self.assertEqual(data["buildOrderGroups"], [["d"], ["b", "a"], ["c"]])
+
+    def test_named_active_module_stays_in_progress(self):
+        # startable-current-module: an activeModule set in .agent/state.json still counts as in progress.
+        rows = [("a", "x", "—"), ("b", "x", "—"), ("c", "x", "a"), ("d", "x", "—")]
+        files = dict(ON, **{".agent/state.json": '{"activeModule": "d"}'})
+        with Project(rows, ["d", "b, a", "c"], files) as project:
+            data = project.json()
+        self.assertEqual({m["id"]: m["status"] for m in data["modules"]}["d"], "in_progress")
+        self.assertEqual(data["startable"]["modules"], ["b", "a"])
+        self.assertEqual(data["activeModule"], "d")
+
+    def test_inferred_current_module_keeps_active_module_field(self):
+        # startable-current-module: only the status changes; activeModule and the stage still name d.
+        rows = [("a", "x", "—"), ("d", "x", "—")]
+        with Project(rows, ["d", "a"], dict(ON)) as project:
+            data = project.json()
+        self.assertEqual({m["id"]: m["status"] for m in data["modules"]}["d"], "ready")
+        self.assertEqual(data["activeModule"], "d")
+        self.assertEqual(data["stage"], "NEEDS_SPEC")
 
     def test_conflicts_between_unfinished_modules(self):
         self.assertEqual(self.data()["startable"]["conflicts"],
