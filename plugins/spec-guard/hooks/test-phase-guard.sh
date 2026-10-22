@@ -226,6 +226,41 @@ injects "CRLF 声明块激活并报告 MAP_ONLY" "$WORK/crlf" "MAP_ONLY"
 injects "requirement-confirm：MAP_ONLY 先确认需求" "$WORK/crlf" "Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`."
 lacks "MAP_ONLY 没有模块完成行" "$WORK/crlf" "Module boundary"
 
+# rules-at-nodes：IDLE 附能力图审阅、MAP_ONLY 附 Spec 交审的停点规则；插件里没有 node-rules.md 时不附，其余输出逐字不变。
+injects "rules-at-nodes：IDLE 附能力图审阅的停点规则" "$WORK/idle" "Stop rules (capability map review):
+
+## 能力图审阅"
+injects "rules-at-nodes：MAP_ONLY 附 Spec 交审的停点规则" "$WORK/crlf" "Stop rules (Spec review):
+
+## Spec 交审"
+mkdir -p "$WORK/idle-zh/.agent"
+printf '%s\n' '{"activeModule":""}' > "$WORK/idle-zh/.agent/state.json"
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN"}' > "$WORK/idle-zh/.agent/config.json"
+injects "rules-at-nodes：中文 IDLE 附停点规则" "$WORK/idle-zh" "建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。
+
+停点规则（能力图审阅）：
+
+## 能力图审阅"
+cp -R "$WORK/crlf" "$WORK/crlf-zh"
+mkdir -p "$WORK/crlf-zh/.agent"
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN"}' > "$WORK/crlf-zh/.agent/config.json"
+injects "rules-at-nodes：中文 MAP_ONLY 附停点规则" "$WORK/crlf-zh" "停点规则（Spec 交审）：
+
+## Spec 交审"
+mkdir -p "$WORK/no-node-rules"
+cp -R "$HOOKDIR" "$WORK/no-node-rules/hooks"
+for project in "$WORK/idle" "$WORK/crlf" "$WORK/idle-zh" "$WORK/crlf-zh"; do
+  full="$(run "$project")"
+  bare="$(HOOKDIR="$WORK/no-node-rules/hooks" run "$project")" || fail "rules-at-nodes：缺 node-rules.md 时退出码非 0"
+  python3 -c '
+import json, sys
+full, bare = (json.loads(text)["hookSpecificOutput"]["additionalContext"] for text in sys.argv[1:3])
+assert "Stop rules" not in bare and "停点规则" not in bare, bare
+assert full.startswith(bare) and full != bare, (full, bare)
+' "$full" "$bare" || fail "rules-at-nodes：缺 node-rules.md 时应不附停点规则、其余输出不变（${project}）"
+done
+echo "  ✅ rules-at-nodes：缺 node-rules.md 时不附，输出是附段之前的原文"; PASS=$((PASS + 1))
+
 build_fixture local
 injects "Codex 声明块激活并提示首个 spec" "$local_project" 'spec/'
 touch "$local_project/spec/alpha.md"

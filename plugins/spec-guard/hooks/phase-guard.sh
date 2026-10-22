@@ -352,6 +352,27 @@ if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
 ${CONFIG_LINES}"
 fi
 
+# rules-at-nodes：IDLE 要写能力图、MAP_ONLY 要写第一份 Spec，各附那个节点的停点规则（取自 node-rules.md，经 module_stage.py）；
+# 取不到时为空，输出与改前逐字相同。标签的语言跟提示一致，规则正文只有中文。
+STOP_RULES=""
+if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then NODE='map-review'; else NODE='spec-review'; fi
+  SECTION="$(python3 "$HOOKDIR/module_stage.py" . --node-rules "$NODE" 2>/dev/null)" || SECTION=""
+  if [ -n "$SECTION" ]; then
+    case "$NODE${ZH:+-zh}" in
+      map-review-zh) LABEL='停点规则（能力图审阅）：' ;;
+      spec-review-zh) LABEL='停点规则（Spec 交审）：' ;;
+      map-review) LABEL='Stop rules (capability map review):' ;;
+      *) LABEL='Stop rules (Spec review):' ;;
+    esac
+    STOP_RULES="
+
+${LABEL}
+
+${SECTION}"
+  fi
+fi
+
 if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
   emit "${HEADER}
 
@@ -360,7 +381,7 @@ if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
 - 能力图: 没有
 - 模块 Spec: ${SPECS}${CONFIG_LINES}
 
-建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。"
+建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。${STOP_RULES}"
   exit 0
 fi
 
@@ -372,7 +393,7 @@ if [ ! -f spec/CAPABILITY-MAP.md ]; then
 - Capability map: absent
 - Module specs: ${SPECS}${CONFIG_LINES}
 
-Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning."
+Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning.${STOP_RULES}"
   exit 0
 fi
 
@@ -384,7 +405,7 @@ if [ "$SPECS" -eq 0 ] && [ -n "$ZH" ]; then
 - 能力图: 已有
 - 模块 Spec: 没有${CONFIG_LINES}
 
-建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。"
+建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。${STOP_RULES}"
   exit 0
 fi
 
@@ -396,7 +417,7 @@ if [ "$SPECS" -eq 0 ]; then
 - Capability map: present
 - Module specs: absent${CONFIG_LINES}
 
-Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`."
+Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`.${STOP_RULES}"
   exit 0
 fi
 
