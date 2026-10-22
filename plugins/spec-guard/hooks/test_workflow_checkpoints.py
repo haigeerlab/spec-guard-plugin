@@ -662,6 +662,35 @@ class ConcurrencyAssessmentTests(unittest.TestCase):
             with self.subTest(path=path.name):
                 self.assertNotIn("moduleConcurrency", path.read_text(encoding="utf-8"))
 
+    # batch-insert-concurrency-hint (D20): one assessment after a batch of add-module inserts.
+    def test_section_covers_a_batch_insert(self):
+        body = self.section(self.HEADING)
+        for phrase in ("**批量插入之后。**", "2 个及以上", "同一个需求", "最后一个", "只评估一次", "不建议并行",
+                       "插入单个模块不评估"):
+            self.assertIn(phrase, body)
+        self.assertNotIn("插入单个模块不算能力图审阅", body)
+
+    def test_batch_insert_names_module_crew_only_when_usable(self):
+        body = self.section(self.HEADING)
+        for phrase in ("module-crew", "crew-coordinator", "协调会话", "角色", "只给 Build order 建议"):
+            self.assertIn(phrase, body)
+
+    def test_add_module_points_to_the_batch_assessment(self):
+        command = (self.plugin / "commands" / "add-module.md").read_text(encoding="utf-8")
+        skill = (self.plugin / "skills" / "spec-guard-ops" / "SKILL.md").read_text(encoding="utf-8")
+        start = skill.index("## add-module")
+        skill_section = skill[start:skill.index("\n## ", start + 1)]
+        for name, text, config in (("add-module.md", command, "/spec-guard:config"),
+                                   ("SKILL.md", skill_section, "`spec-guard-ops` 的 config")):
+            with self.subTest(surface=name):
+                for phrase in ("2 个及以上", "moduleConcurrency", "批量插入之后", config):
+                    self.assertIn(phrase, text)
+
+    def test_stop_rules_never_mention_the_switch(self):
+        rules = (self.plugin / "references" / "node-rules.md").read_text(encoding="utf-8")
+        for phrase in ("moduleConcurrency", "module-crew"):
+            self.assertNotIn(phrase, rules)
+
 
 class ConcurrencyBoundaryTests(unittest.TestCase):
     """module-scope-boundary: the boundary section and the overreach mark apply only when moduleConcurrency is on."""
