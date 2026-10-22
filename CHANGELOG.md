@@ -1,6 +1,8 @@
 # Changelog
 
-## [未发布]
+## [0.83.1] - 2026-10-22
+
+本版 1 处修复：`gateTick` 的预览显示勾选前的原样（gate-tick 返工）。`interface.json` 不变（1.7）。
 
 ### 修复
 
