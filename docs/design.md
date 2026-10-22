@@ -67,12 +67,15 @@ plugins/spec-guard/
    但新的一项要用户单独信任一次。
    会话开始与清空后（matcher `startup|clear`）另有一项 `SessionStart`，调用 `phase-guard.sh SessionStart fresh`：项目根（跟随指向时为
    目标项目根）有 `.epiq/project.json` 时只输出一句读回提醒（先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的
-   未关闭事项），不输出阶段摘要（随后的 `UserPromptSubmit` 会给）；没有账本、未激活或指向失效时静默。钩子只判断这个文件在不在，
-   不读账本内容、不调 Epiq，提醒的 JSON 手写，不靠 python3 生成。压缩后的核对提醒在有账本时也补上账本里的这类事项，没有账本时不变。
+   未关闭事项），不输出阶段摘要（启用了约定的项目，随后的 `UserPromptSubmit` 会给）；只有账本、没有启用约定的项目同样出这一句；
+   没有账本或指向失效时静默。钩子只判断这个文件在不在，不读账本内容、不调 Epiq，提醒的 JSON 手写，不靠 python3 生成。
+   压缩后的核对提醒在有账本时也补上账本里的这类事项，没有账本时不变；只有账本的项目压缩后只出账本版本的核对提醒，不带阶段内容。
 2. `phase-guard.sh` 判断激活信号：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的
-   `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`：没有就静默退出 0
-   （这一步只用 bash 内建，不启动 python3）；有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行
-   `Linked project`；有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
+   `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`，以及项目根（或输入 cwd
+   所在 git 仓库根）有没有本地事项账本 `.epiq/project.json`：都没有就静默退出 0（这一步只用 bash 内建，不启动 python3）；只有账本时
+   只出账本提醒，不出阶段内容：别的会话转来消息的那一轮（提示词以 `<cross-session-message ` 开头，在 bash 里判）出一行记账提醒，
+   其余轮次直接退出 0；指向文件有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行
+   `Linked project`；指向文件有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
    也不连环跟随。hook 不从宿主的工作区设置或会话记录推断项目。指向文件可以按会话登记（版本 2 的 `sessions`）：hook 从输入里取
    会话标识（`session_id`，以及 `transcript_path` 文件名——两个宿主都用会话标识命名会话记录），先用本会话的登记，其次目录级
    指向，都没有则静默。标识只用来查表，不读会话记录的内容。命令侧用同一个解析：`project_link.py follow` 按入口所在宿主取会话
