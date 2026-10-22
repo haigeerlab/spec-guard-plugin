@@ -1,5 +1,7 @@
 # Spec: cost-slim-link-follow
 
+<!-- spec-guard: review approved 36d7fb49ea39 -->
+
 ## Objective
 
 两件事，来自 2026-10-22 功能盘点的用户决定：
