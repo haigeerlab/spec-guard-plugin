@@ -119,6 +119,9 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 1.8（map-startable 返工）起，开关为 `on` 时，只是 Build order 推出来、没有 Spec 与 Plan 的当前模块按就绪算并列入 `startable`；
 `activeModule` 指定的仍算进行中，顶层 `activeModule`、`stage` 与阶段提示不变。
 
+1.9（rules-at-nodes）起，`reviewKinds` 跟上 session-protocol v2.6 的上游小项名：`plan` 与 `spec-plan` 多「架构决定」「未决问题」两项，
+另有 `renamedSections` 列「旧名→新名」（做／不做→边界，附带的小决定→未决问题）；`spec` 的旧节名照旧保留到 2.0，两种名字都有效。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
