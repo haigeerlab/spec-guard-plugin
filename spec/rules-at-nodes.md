@@ -1,6 +1,6 @@
 # Spec: rules-at-nodes
 
-<!-- spec-guard: review approved 9ae2e2dfd94c -->
+<!-- spec-guard: review approved acbb03de976c -->
 
 ## Objective
 
