@@ -7,7 +7,7 @@
 - [x] Task 4：与已合入模块重叠的三个文件（C3、C5 后半） — `SKILL.md` review-mark 一节三处与 config 一节 moduleConcurrency 条；`docs/commands.md` review-mark 一段；`config.md` 配置表 moduleConcurrency 一行加「不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关」。`test_workflow_checkpoints.py` 67 例全过；未改 project_config.py、templates/、docs/convention-block.md。
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的三份副本（`git archive HEAD plugins docs`）上各改一处：协调会话一节放回「检查失败时：用一个新提交撤回这一次合并，不 reset」→ `test_section_leaves_merge_steps_to_the_runtime` 红；检查点规则放回「## 经收件枢纽转来的批准」节标题 → `test_no_hub_wording_or_relayed_approval_conditions`（workflow-checkpoints.md）红；`config.md` 删掉「不控制协调会话」那句 → `test_module_concurrency_does_not_control_the_coordinator`（config.md）红。三次另有同样 8 个 ERROR，是副本里缺 AGENTS.md 等根文件所致，与变异无关。副本的删除被宿主拒绝，留在本会话 scratchpad，不在仓库里。
 - [x] Task 5：公共变更请求（C4） — 发【公共变更请求】#10313；模块协调按 C88 在集成分支 76ac978 改了 `reviewKinds.description`，`module-crew sync` 合入（HEAD 6173266）。核对：JSON 合法；接口版本字段（实际字段名是 `interface`，Spec 写作 `version`）改前改后都是 1.8；描述不含「hub」「去决策收件箱答」；除这一个描述外其余字段与改前完全相同。
-- [ ] Task 6：合入集成分支并跑完整检查
+- [x] Task 6：合入集成分支并跑完整检查 — 实现提交 c35f7ec 走 `verify-and-commit.sh` 全套（validate 96s、phase-guard 438 例、verify-artifacts 74 例、repo-artifacts 0 失败）；sync 到 76ac978（HEAD 6173266）后 validate、phase-guard（438 例）、verify-artifacts（74 例）、`test_workflow_checkpoints.py`（67 例）再跑全过；`module_scope.py check --module sibling-rules-out --base crew/fix-batch` 越界 3：`docs/commands.md`、`commands/config.md`、`skills/spec-guard-ops/SKILL.md`，正是 Plan 待定 2 A 写明放在 Task 4 改的三个文件。
 - [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
