@@ -79,9 +79,11 @@ plugins/spec-guard/
 标识（Claude 命令传 `CLAUDE_CODE_SESSION_ID`，Codex skill 传 `CODEX_THREAD_ID`），打印要操作的项目并在 stderr 写明跟随；
 指向失效时退出 2，不退回会话目录。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
-   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
-   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
-   `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
+   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒只在模块边界
+   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 时出边界行，模块进行中不提醒；Claude 没有窗口，
+   按会话记录尾部的读数估算（有读数超过 200k 按 1M，否则按 200k）。平时只给一行（quiet-injection）：输出末尾的状态码由
+   `module_stage.py` 按「变了才需要完整说明」的事实算出，`session_context.py` 从会话记录里取最近一次 spec-guard 注入的状态码，
+   相同就只给阶段 · 模块 · 未勾选数 · 分支一行；新会话、压缩后、读不到或状态码不同时给完整内容；不写任何文件。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
    `module_stage.py --config-lines` 取得，与其他阶段同一实现。只在三个交审检查点（Spec 待审、Plan 待审、最终验收）且模块还没有
    外部审查记录时，`sibling_plugins.py` 再只读本机插件记录（Claude 的 `installed_plugins.json` 与 settings，Codex 的
    `config.toml` 与插件缓存目录），装了并启用 delegate 才多出一行外部审查提示；不调子进程，读不到按没装处理。
