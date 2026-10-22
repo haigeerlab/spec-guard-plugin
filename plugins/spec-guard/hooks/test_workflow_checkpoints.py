@@ -145,8 +145,10 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_batch_review_and_continuous_build(self):
         batch = self.section("## 按需求批量前置审")
-        for phrase in ("批量批准", "activeModule", "Build order", "80%", "不自行开新会话", "`/clear`"):
+        for phrase in ("批量批准", "activeModule", "Build order", "70%", "不自行开新会话", "`/clear`"):
             self.assertIn(phrase, batch)
+        # quiet-injection (D6): the middle of a module gets no context hint, so the rule names none.
+        self.assertNotIn("80%", batch)
         # context-hint-no-paste: one sentence, never the pasted handoff text.
         for phrase in ("/compact", "一句话", "不贴交接文本"):
             self.assertIn(phrase, batch)

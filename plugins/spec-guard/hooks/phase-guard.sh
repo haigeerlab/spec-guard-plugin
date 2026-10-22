@@ -266,9 +266,16 @@ case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
 # 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
 WINDOW=""
 case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
-# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那两行。
-UNATTENDED=""
-case "$WINDOW" in *$'\n'unattended*) UNATTENDED=1 ;; esac
+# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那一行。
+# 第五行是宿主（codex 或空），第六行是 over-200k 或空（Claude 尾部有读数超过 200k，quiet-injection 按 1M 估算窗口）。
+UNATTENDED="" FACT_HOST="" OVER=""
+REST="$WINDOW"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != unattended ] || UNATTENDED=1
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+FACT_HOST="${REST%%$'\n'*}"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != over-200k ] || OVER=1
 WINDOW="${WINDOW%%$'\n'*}"
 case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
@@ -279,13 +286,19 @@ LOCATION="${LOCATION%%$'\n'*}"
 case "${SPEC_GUARD_HOST:-}" in
   codex|claude) HOST="$SPEC_GUARD_HOST" ;;
   *)
-    case "$FACTS" in
-      *$'\n'codex) HOST=codex ;;
+    case "$FACT_HOST" in
+      codex) HOST=codex ;;
       *) if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude
          elif [ -n "${PLUGIN_ROOT:-}" ]; then HOST=codex
          else HOST=""; fi ;;
     esac ;;
 esac
+# quiet-injection（Q2 A）：Claude 的记录里没有窗口；有读数时按 200k 估算，尾部有读数超过 200k 就按 1M 估算，并在提示里写明是估算。
+WINDOW_ESTIMATED=""
+if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ]; then
+  WINDOW_ESTIMATED=1
+  if [ -n "$OVER" ]; then WINDOW=1000000; else WINDOW=200000; fi
+fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
 # 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
@@ -422,7 +435,7 @@ Suggested next step: confirm with the user that the first module's requirement i
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
   emit "${HEADER}
 
 ${STAGE}"

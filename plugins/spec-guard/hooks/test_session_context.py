@@ -199,7 +199,8 @@ class CommandLine(unittest.TestCase):
         self.assertEqual(out.split("\n")[2], "")  # Claude records carry no window
         self.assertEqual(out.split("\n")[3], "")  # attended (unattended-run-hint)
         self.assertEqual(out.split("\n")[4], "")  # the input does not say Codex (codex-command-wording)
-        self.assertEqual(out.count("\n"), 5)
+        self.assertEqual(out.split("\n")[5], "over-200k")  # quiet-injection: a 1M window's reading
+        self.assertEqual(out.count("\n"), 6)
 
     def test_prints_codex_as_the_fifth_line_for_a_turn_id(self):
         out = self.run_cli(json.dumps({"transcript_path": str(self.transcript), "turn_id": "t1"}))

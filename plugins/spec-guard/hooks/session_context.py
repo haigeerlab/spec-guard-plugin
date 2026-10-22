@@ -77,8 +77,8 @@ def context_tokens(transcript_path) -> int | None:
     return usage[0] if usage else None
 
 
-def context_usage(transcript_path) -> tuple | None:
-    """(context size, model context window or None) of the last main-session turn, from one record."""
+def tail_lines(transcript_path) -> list | None:
+    """The whole lines in the last TAIL_LIMIT bytes of the transcript, or None when it cannot be read."""
     if not isinstance(transcript_path, str) or not transcript_path:
         return None
     try:
@@ -90,13 +90,25 @@ def context_usage(transcript_path) -> tuple | None:
     except OSError:
         return None
     lines = tail.split(b"\n")
-    if start > 0:
-        lines = lines[1:]  # the first line was cut by the window
+    return lines[1:] if start > 0 else lines  # the first line was cut by the window
+
+
+def _records(lines):
+    """The JSON records among `lines`, newest first."""
     for line in reversed(lines):
         try:
-            record = json.loads(line)
+            yield json.loads(line)
         except ValueError:
             continue
+
+
+def context_usage(transcript_path, lines=None) -> tuple | None:
+    """(context size, model context window or None) of the last main-session turn, from one record."""
+    if lines is None:
+        lines = tail_lines(transcript_path)
+    if lines is None:
+        return None
+    for record in _records(lines):
         tokens = _usage(record)
         if tokens:  # zero is a synthetic record (e.g. after an interruption), not a reading
             return tokens, _window(record)
@@ -104,6 +116,16 @@ def context_usage(transcript_path) -> tuple | None:
         if compacted is not None:  # newer than any reading: the pre-compaction size no longer applies
             return compacted, None
     return None
+
+
+# quiet-injection (Q2 A): Claude records carry no window.  Its standard window is 200k, so a reading over that
+# can only come from a 1M window.
+STANDARD_WINDOW = 200_000
+
+
+def over_standard_window(lines) -> bool:
+    """True when any main-session reading in the tail is over STANDARD_WINDOW."""
+    return any((_usage(record) or 0) > STANDARD_WINDOW for record in _records(lines or []))
 
 
 # A Codex rollout's first record carries the whole base instructions (19-24 KB measured on 2026-10-08); the read
@@ -287,9 +309,11 @@ def main() -> None:
     except Exception:  # a hook helper must never break the stage injection
         text, path = "", None
     try:
-        usage = context_usage(path)
+        lines = tail_lines(path)
+        usage = context_usage(path, lines)
+        over = over_standard_window(lines)
     except Exception:
-        usage = None
+        usage, over = None, False
     try:
         nobody = unattended(path)
     except Exception:
@@ -309,6 +333,7 @@ def main() -> None:
     except Exception:
         host = None
     print(host or "")
+    print("over-200k" if over else "")
 
 
 if __name__ == "__main__":

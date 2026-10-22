@@ -281,8 +281,6 @@ COMMANDS = {
         "plan": "`/plan`",
         "build": "`/build`",
         "free-next": FREE_BOUNDARY,
-        "free-current": ("say in one sentence that the user can /compact with a focus on it, or /clear if the next "
-                         "work is unrelated; " + NO_PASTE + "."),
         # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
         "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
                             "`%(doctor)s`)"),
@@ -296,9 +294,6 @@ COMMANDS["claude"] = dict(COMMANDS[None], **{
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
                   + SLASH_BLOCK + "; " + NO_PASTE
                   + ". This stage summary carries over, the conversation does not need to."),
-    "free-current": ("give the user one ready-to-copy command in its own code block: /compact followed by a "
-                     "one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; "
-                     + SLASH_BLOCK + "; " + NO_PASTE + "."),
 })
 CODEX_COMPACT = ("one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), "
                  "or /clear if the next work is unrelated; " + SLASH_BLOCK + "; " + NO_PASTE + ".")
@@ -313,7 +308,6 @@ COMMANDS["codex"] = {
     "build": "`$incremental-implementation`",
     "free-next": ("Give the user " + CODEX_COMPACT
                   + " This stage summary carries over, the conversation does not need to."),
-    "free-current": "give the user " + CODEX_COMPACT,
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
     "checkout-role": "`$spec-guard-ops` checkout-role",
     "map": "`$spec-guard-ops` map",
@@ -331,7 +325,6 @@ COMMANDS_ZH = {
     None: dict(COMMANDS[None], **{
         "free-next": ("用一句话告诉用户：接着做下一个模块时可以用 /compact 并写明以它为重点，下一步工作不相关时用 /clear；"
                       + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
-        "free-current": "用一句话告诉用户：可以用 /compact 并写明以它为重点，下一步工作不相关时用 /clear；" + NO_PASTE_ZH + "。",
         "delegate-review": "`%(review)s`（Codex: `delegate:delegate-routing`）（能不能运行由 `%(doctor)s` 判定）",
     }),
 }
@@ -339,12 +332,9 @@ COMMANDS_ZH["claude"] = dict(COMMANDS_ZH[None], **{
     "delegate-review": "`%(review)s`（能不能运行由 `%(doctor)s` 判定）",
     "free-next": ("给用户一条可直接复制的命令，单独放在一个代码块里：/compact 后面跟一句写好的重点（下一个模块及其下一步），"
                   "下一步工作不相关时改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
-    "free-current": ("给用户一条可直接复制的命令，单独放在一个代码块里：/compact 后面跟一句写好的重点（当前任务），"
-                     "下一步工作不相关时改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。"),
 })
 COMMANDS_ZH["codex"] = dict(COMMANDS["codex"], **{
     "free-next": "给用户" + CODEX_COMPACT_ZH + CARRIES_OVER_ZH,
-    "free-current": "给用户" + CODEX_COMPACT_ZH,
     "delegate-review": "`delegate:delegate-routing`（能不能运行以 delegate 自己的体检为准）",
 })
 
@@ -353,28 +343,24 @@ def commands(host: str | None, zh: bool = False) -> dict:
     return (COMMANDS_ZH if zh else COMMANDS)[host]
 
 
-# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window, the middle of a
-# module only from 80% of it. Claude transcripts carry no window, so they use a 1M window's figures.
-BOUNDARY_SHARE, MID_SHARE = 0.7, 0.8
-DEFAULT_WINDOW = 1_000_000
+# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window.
+# quiet-injection (D6): the middle of a module gets no hint; the host manages context there.  Claude transcripts
+# carry no window, so phase-guard.sh passes an estimated one (200k, or 1M once a reading went over 200k) and says so.
 
 
 def _k(tokens: int) -> int:
     return (tokens + 500) // 1000
 
 
-def thresholds(window: int | None, zh: bool = False) -> tuple:
-    """(boundary tokens, mid-module tokens, boundary note, mid note) for a context window or the Claude default."""
-    if window:
-        boundary, mid = -(-window * 7 // 10), -(-window * 8 // 10)  # ceil, in integers
-        if zh:
-            return (boundary, mid, "达到或超过 %d k 窗口的 70%%" % _k(window), "达到或超过 %d k 窗口的 80%%" % _k(window))
-        return (boundary, mid, "at or over 70%% of the %d k window" % _k(window),
-                "at or over 80%% of the %d k window" % _k(window))
-    boundary, mid = int(DEFAULT_WINDOW * BOUNDARY_SHARE), int(DEFAULT_WINDOW * MID_SHARE)
-    if zh:
-        return boundary, mid, "达到或超过 %d k" % _k(boundary), "达到或超过 %d k" % _k(mid)
-    return boundary, mid, "at or over %d k" % _k(boundary), "at or over %d k" % _k(mid)
+def thresholds(window: int | None, zh: bool = False, estimated: bool = False) -> tuple:
+    """(boundary tokens, boundary note) for a context window; (None, "") when there is no window to judge by."""
+    if not window:
+        return None, ""
+    boundary = -(-window * 7 // 10)  # ceil, in integers
+    if estimated:
+        return boundary, (("达到或超过按 %d k 窗口估算的 70%%" if zh else "at or over 70%% of an estimated %d k window")
+                          % _k(window))
+    return boundary, ("达到或超过 %d k 窗口的 70%%" if zh else "at or over 70%% of the %d k window") % _k(window)
 
 
 def boundary_line(tokens: int, note: str, host: str | None = None, zh: bool = False) -> str:
@@ -383,14 +369,6 @@ def boundary_line(tokens: int, note: str, host: str | None = None, zh: bool = Fa
                 % (_k(tokens), note, COMMANDS_ZH[host]["free-next"]))
     return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to free context. %s"
             % (_k(tokens), note, COMMANDS[host]["free-next"]))
-
-
-def context_line(tokens: int, note: str, host: str | None = None, zh: bool = False) -> str:
-    if zh:
-        return ("- 会话上下文: 上一轮约 %d k token（%s）；每一轮都会重读它。先做完或记下当前任务，然后%s"
-                % (_k(tokens), note, COMMANDS_ZH[host]["free-current"]))
-    return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
-            "current task, then %s" % (_k(tokens), note, COMMANDS[host]["free-current"]))
 
 
 def unreadable_map(reason: str, zh: bool = False) -> str:
@@ -801,7 +779,7 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
 
 
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
-             unattended: bool = False, host: str | None = None) -> str:
+             unattended: bool = False, host: str | None = None, window_estimated: bool = False) -> str:
     root = Path(root)
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
     cmd = commands(host, zh)
@@ -849,14 +827,13 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                       "- activeModule `%s` is not in the capability map; using Build order.")
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
-    boundary_at, mid_at, boundary_note, mid_note = thresholds(context_window, zh)
-    context_note = (context_line(context_tokens, mid_note, host, zh)
-                    if context_tokens is not None and context_tokens >= mid_at else "")
+    boundary_at, boundary_note = thresholds(context_window, zh, window_estimated)
     # boundary-hint-unknown-size: no reading means no hint; a new session's first turn has no usage yet.
     boundary_note_line = (boundary_line(context_tokens, boundary_note, host, zh)
-                          if context_tokens is not None and context_tokens >= boundary_at else "")
+                          if context_tokens is not None and boundary_at is not None and context_tokens >= boundary_at
+                          else "")
     if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
-        context_note = boundary_note_line = ""
+        boundary_note_line = ""
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` 有 Plan 但没有 `tasks/%s/todo.md`，所以按已完成计；还有工作要做就补上 todo。"
@@ -966,8 +943,6 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         # acceptance commit usually switches activeModule, and MODULE_DONE is never seen.  An unknown size adds nothing.
         if boundary_note_line:
             notes.append(boundary_note_line)
-    elif context_note:
-        notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     if review_line and role_kind != "module":
         counts += "\n" + review_line
@@ -1033,6 +1008,7 @@ if __name__ == "__main__":
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--context-tokens", type=int)
     parser.add_argument("--context-window", type=int)
+    parser.add_argument("--window-estimated", action="store_true")  # quiet-injection: Claude's window is inferred
     parser.add_argument("--unattended", action="store_true")
     parser.add_argument("--host", choices=["claude", "codex"])
     # phase-hint-gaps: IDLE and MAP_ONLY are answered by phase-guard.sh itself; it asks for the project-config lines
@@ -1050,4 +1026,5 @@ if __name__ == "__main__":
     if args.config_lines:
         print("\n".join(config_lines(Path(args.root), args.host)))
         raise SystemExit(0)
-    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host))
+    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host,
+                   args.window_estimated))
