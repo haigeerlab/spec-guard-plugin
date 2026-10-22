@@ -1,5 +1,7 @@
 # Plan: config-per-key
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/config-per-key.md`](../../spec/config-per-key.md)（2026-10-22 用户批准，事项 C4）。评审节奏为分开审，本 Plan 单独交审。
 分支 `config-per-key`，worktree `.claude/worktrees/current-plugin-owner-aa5b98-crew/config-per-key`，从集成分支 `crew/fix-batch` 切出。
 
