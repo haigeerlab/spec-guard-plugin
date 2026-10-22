@@ -8,7 +8,7 @@
 - [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的三份副本上各改一处：把 `audit` 加回动词集合 → `test-capability-history.sh` 1 处红（audit rc=0）；Codex history 节加回 `correct --confirm` 命令 → 入口回归报「Codex history section still offers correct --confirm」；`validate_data` 不再调 `check_correction` → 补正写坏两例都红。
 - [x] Task 5：公共文件请求（C4） — 发【公共变更请求】（消息 #10296）；模块协调按 C67 在集成分支 3895dbe 改了能力图第 30 行，`module-crew sync` 合入（HEAD ed71366），本分支能力图该行已是新描述。
 - [x] Task 6：合入集成分支并跑完整检查 — 实现提交 58d16c0 走 `verify-and-commit.sh` 全套（validate 94s、phase-guard 438 例、verify-artifacts 74 例、repo-artifacts 0 失败、ShellCheck 无告警）；sync 到 3895dbe 后 validate、phase-guard、verify-artifacts、三份历史测试、入口回归与本仓库 `verify-history.sh .` 再跑全过；`module_scope.py check --module history-slim --base crew/fix-batch` 越界 0。
-- [ ] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+- [x] Checkpoint 2（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
 
 ## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
 
