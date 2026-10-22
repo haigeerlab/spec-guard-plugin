@@ -1,28 +1,25 @@
 #!/usr/bin/env bash
-# hint-language-follow acceptance: English stage hints must stay byte-identical to a baseline release.
+# hint-language-follow acceptance: the stage hint speaks one language.
 #
-# Usage: /bin/bash evals/hint-english-diff.sh [baseline-ref]   (default v0.67.0)
+# Usage: /bin/bash evals/hint-english-diff.sh
 #
-# Builds one set of fixture projects, runs the baseline's phase-guard (from `git archive <ref>`) and the working
-# tree's phase-guard on each, and compares additionalContext byte for byte for every non-zh-CN configuration
-# (none, en, ja, zh-TW, invalid) across stages, events and hosts. It also runs the working tree with zh-CN and
-# fails if a known English label is left in a Chinese hint. Needs the baseline ref in local git history, so it is
-# run by hand at acceptance, not by validate.sh.
+# Builds one set of fixture projects and runs the working tree's phase-guard on each, across stages, events and
+# hosts. For every non-zh-CN configuration (none, en, ja, zh-TW, invalid) the hint must carry `Current stage: **` and
+# no Chinese, Japanese or Korean character outside the stop rules (rules-at-nodes keeps their body Chinese only).
+# With zh-CN it fails if a known English label is left in a Chinese hint. Until quiet-injection (D5, D6, F14) the
+# English side was compared byte for byte with v0.67.0; those decisions change the English output on purpose.
+# Run by hand at acceptance, not by validate.sh.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF="${1:-v0.67.0}"
-git -C "$REPO" rev-parse --verify --quiet "${REF}^{commit}" >/dev/null || { echo "baseline ref not found: $REF" >&2; exit 2; }
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/hint-english-diff.XXXXXX")"
 case "$WORK" in */hint-english-diff.*) trap 'chmod -R u+rwx "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT ;; esac
-mkdir -p "$WORK/base"
-git -C "$REPO" archive "$REF" plugins/spec-guard/hooks | tar -x -C "$WORK/base"
 
-python3 - "$WORK" "$WORK/base/plugins/spec-guard/hooks" "$REPO/plugins/spec-guard/hooks" <<'PY'
-import json, os, subprocess, sys
+python3 - "$WORK" "$REPO/plugins/spec-guard/hooks" <<'PY'
+import json, os, re, subprocess, sys
 from pathlib import Path
 
-work, base_hooks, new_hooks = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+work, new_hooks = Path(sys.argv[1]), sys.argv[2]
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@e", "-c", "commit.gpgsign=false"]
 BLOCK = "<!-- BEGIN:agent-skills-convention -->\n"
 MAP2 = ("# Capability Map\n| Module id | Responsibility | Depends on |\n|---|---|---|\n| alpha | x | — |\n"
@@ -83,9 +80,9 @@ def fixtures(config):
     w(r / "spec/beta.md", "# Spec\n\n<!-- spec-guard: review pending -->\nx\n")
     r = make("building-approved"); alpha_done(r); w(r / "spec/beta.md", "# Spec\nx\n")
     w(r / "tasks/beta/plan.md", "# Plan\n\n<!-- spec-guard: review approved -->\n")
-    w(r / "tasks/beta/todo.md", "- [x] a\n- [ ] report Checkpoint 0（report）：x\n- [ ] Checkpoint 1（gate）：验收\n")
+    w(r / "tasks/beta/todo.md", "- [x] a\n- [ ] report Checkpoint 0 (report): x\n- [ ] Checkpoint 1 (gate): accept\n")
     r = make("building-none"); alpha_done(r); w(r / "spec/beta.md", "# Spec\nx\n")
-    w(r / "tasks/beta/plan.md", "# Plan\n"); w(r / "tasks/beta/todo.md", "- [ ] a\n- [ ] Checkpoint 1：验收\n")
+    w(r / "tasks/beta/plan.md", "# Plan\n"); w(r / "tasks/beta/todo.md", "- [ ] a\n- [ ] Checkpoint 1: accept\n")
     r = make("building-plan-pending"); alpha_done(r); w(r / "spec/beta.md", "# Spec\nx\n")
     w(r / "tasks/beta/plan.md", "# Plan\n\n<!-- spec-guard: review pending -->\n"); w(r / "tasks/beta/todo.md", "- [ ] a\n")
     for name, final in (("spec-revised", False), ("spec-revised-final", True)):
@@ -93,7 +90,7 @@ def fixtures(config):
         approve_spec(r, "beta")
         w(r / "spec/beta.md", (r / "spec/beta.md").read_text(encoding="utf-8") + "changed\n")
         w(r / "tasks/beta/plan.md", "# Plan\n\n<!-- spec-guard: review approved -->\n")
-        w(r / "tasks/beta/todo.md", "- [x] a\n- [ ] Checkpoint 2（gate）：验收\n" if final else "- [ ] a\n- [ ] b\n")
+        w(r / "tasks/beta/todo.md", "- [x] a\n- [ ] Checkpoint 2 (gate): accept\n" if final else "- [ ] a\n- [ ] b\n")
     r = make("marker-invalid"); alpha_done(r); w(r / "spec/beta.md", "# Spec\n\n<!-- spec-guard: review maybe -->\nx\n")
     r = make("module-done"); alpha_done(r); w(r / ".agent/state.json", '{"activeModule": "alpha"}\n')
     r = make("module-done-paused", map_text=MAP2.replace("| beta | y | alpha |\n", "| beta | y | alpha |\n| gamma | z | — |\n")
@@ -216,7 +213,20 @@ def check(job):
         if not new or "## spec-guard local workflow" not in new or "当前阶段: **" not in new or left:
             return "zh", label + ": %s" % (left or "missing heading or stage line")
         return "zh", None
-    return "en", None if run(base_hooks, root, name, variant) == new else label
+    left = english_left(new)
+    if not new or "Current stage: **" not in new or left:
+        return "en", label + ": %s" % (left or "missing stage line")
+    return "en", None
+
+
+# Chinese, Japanese and Korean scripts and their full-width punctuation.
+CJK = re.compile(r"[\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff00-\uffef]")
+STOP_RULES = re.compile(r"\n\nStop rules \([^)]*\):\n\n.*?(?=\n\n<!-- spec-guard-state:|\Z)", re.DOTALL)
+
+
+def english_left(text):
+    """Lines of an English hint that still carry CJK text, the stop rules taken out."""
+    return [line for line in STOP_RULES.sub("", text).split("\n") if CJK.search(line)]
 
 
 with ThreadPoolExecutor(max_workers=8) as pool:
@@ -226,9 +236,9 @@ zh_bad = [bad for kind, bad in results if kind == "zh" and bad]
 compared = sum(kind == "en" for kind, _ in results)
 same = compared - len(failures)
 zh_checked = sum(kind == "zh" for kind, _ in results)
-print("English byte-identical: %d/%d" % (same, compared))
+print("English hints in English only: %d/%d" % (same, compared))
 for item in failures:
-    print("  DIFFERS: " + item)
+    print("  CJK LEFT: " + item)
 print("zh-CN hints without English labels: %d/%d" % (zh_checked - len(zh_bad), zh_checked))
 for item in zh_bad:
     print("  ENGLISH LEFT: " + item)
