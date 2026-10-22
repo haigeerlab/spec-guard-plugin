@@ -27,7 +27,7 @@ Spec Guard 是 agent-skills 的配套插件。本图是整个插件的唯一能�
 | local-convention | Install and remove the local multi-module directory convention and its managed declaration block, without touching user specs or plans. | — |
 | phase-and-verification | Inject the current phase for activated projects and verify landed artifacts read-only, degrading to unverified when probes fail. | local-convention, proposal-contract |
 | module-insert | At a module checkpoint, validate and insert one new module into the capability map, after previewing and explicit confirmation. | local-convention, phase-and-verification |
-| capability-history | Keep verifiable history of archived capability maps and artifacts, with read-only verify and audit, append-only corrections, and migration preview. | proposal-contract |
+| capability-history | Keep verifiable history of archived capability maps and artifacts: read-only verify, migration preview and maintainer-only import; existing corrections stay validated. | proposal-contract |
 | documentation-baseline | 定义显式启用的项目级文档基线协议、解析事实和初始化入口 | — |
 | documentation-impact | 在模块 Spec、Plan 与交付前表达并收口对文档基线的遵循、补全、变更或不适用结论 | documentation-baseline |
 | documentation-verification | 提供只读核验、保守提醒和跨宿主回归，确保缺失或未知不被伪装为文档完成 | documentation-baseline, documentation-impact |
