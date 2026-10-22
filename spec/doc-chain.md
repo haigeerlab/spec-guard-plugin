@@ -187,3 +187,6 @@ python3 -B plugins/spec-guard/hooks/test_stop_rules.py
 
 - 2026-10-23：`docs/optional-features.md` 从本模块独占清单中去掉，改动 4 对它只改基线路径的说法；「与在开模块的重叠」写明分工。
   原因：用户批准 Spec（事项 C190）时定了与 `ledger-standalone-reminder` 的重叠分工。来源：用户答复 C190，经模块协调 sg-coord 转达，消息 #10406。
+- 2026-10-23：改动 4 加一项：`docs/design.md` 第 66～76 行的激活说明改成「只有本地事项账本、没启用约定的项目也出账本提醒」，与
+  `ledger-standalone-reminder` 合入后的行为一致。来源：用户批准 `ledger-standalone-reminder` 最终验收（事项 C201）时的原话「docs/design.md
+  第 66～76 行的激活说明交给 doc-chain 在本模块里顺手改成只有账本也出提醒。」，经模块协调 sg-coord 告知，消息 #10420。
