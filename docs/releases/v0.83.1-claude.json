@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.83.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:9f633640cf2dc856a217855fae474f2e2dfa7fa2"
+      },
+      "observedAt": "2026-10-22T01:35:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.83.0 to 0.83.1; installed_plugins.json records gitCommitSha 9f63364 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:the installed hooks/gate_tick.py preview on a temporary project printed the final gate line unchanged (- [ ] 最终验收（gate）) and then would become: - [x] 最终验收（gate）, exited 0, and left the todo unchanged"
+      ]
+    }
+  ]
+}
