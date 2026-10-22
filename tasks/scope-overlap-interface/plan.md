@@ -2,7 +2,7 @@
 
 依据 [`spec/scope-overlap-interface.md`](../../spec/scope-overlap-interface.md)。本仓库评审节奏为分开审：Spec 已于 2026-10-22 单独批准
 （用户批准事项 C162，Q1 A、Q2 A；`docs/design.md` 从独占清单移出，改为「只追加（quiet-injection 独占）」，已按原话改进 Spec 并记变更记录，
-随本 Plan 一起交审），本 Plan 单独交审。分支 `scope-overlap-interface`，worktree
+修订后的 Spec 于用户批准事项 C165 批准），本 Plan 单独交审。分支 `scope-overlap-interface`，worktree
 `.claude/worktrees/current-plugin-owner-aa5b98-crew/scope-overlap-interface`。不改版本号与 CHANGELOG、不推送、不开 PR；合并由模块协调按用户原话做。
 
 所需工具：无 UI 改动，不需要浏览器或电脑操作。不加新依赖。
