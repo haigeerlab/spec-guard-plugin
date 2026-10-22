@@ -149,7 +149,7 @@ By default spec-guard moves one module at a time. When there are many modules an
 one: spec-guard does the **planning**, and the companion plugin module-crew does the **running** (opening sessions, creating worktrees,
 messaging, merging). With the switch off none of this appears and nothing changes.
 
-1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid).
+1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid; from this version on, an unknown key is ignored on its own).
 2. At the capability-map review the agent adds a concurrency assessment: which modules could become comma groups in the Build order, which are worth moving up.
 3. Each module Spec gets a "并行边界" (concurrency boundary) section naming the directories it owns; `verify-artifacts` checks its format and the final acceptance marks files changed outside it.
 4. `/spec-guard:map` lists the modules that can start together, overlapping boundaries, and the progress in each module worktree.

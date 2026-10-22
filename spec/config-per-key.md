@@ -140,7 +140,7 @@ python3 -B plugins/spec-guard/hooks/test_map_view.py
 
 ## 并行边界
 
-- 独占：`spec/config-per-key.md`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`README.md`、`spec/project-config.md`
+- 独占：`spec/config-per-key.md`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`README.md`、`README.en.md`、`docs/design.md`、`docs/commands.md`、`spec/project-config.md`
 - 公共：无
 
 ## Success criteria
@@ -155,3 +155,9 @@ python3 -B plugins/spec-guard/hooks/test_map_view.py
 
 1. **CHANGELOG 与版本号**：本批 12 个模块都会写 CHANGELOG。本模块按惯例在 `CHANGELOG.md` 顶部未发布段加一条，
    还是由模块协调在发版时统一汇总？未定前本模块不改 `CHANGELOG.md` 与版本号。
+
+## 变更记录
+
+- 2026-10-22（构建中，范围内修正）：并行边界「独占」补上 `docs/design.md`、`docs/commands.md`、`README.en.md`。前两个在写 Plan 时发现也写着
+  「文件无效时所有项按默认」，Plan 批准时一并批准（事项 C9）；`README.en.md` 是 `README.md` 并行开关那一步的英文对应句，Task 4 时发现。
+  三处都属于 Contract「说明文字」的范围，没有改变范围或做法；最终验收时附这段差异。
