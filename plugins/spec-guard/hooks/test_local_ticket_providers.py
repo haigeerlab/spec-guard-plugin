@@ -93,7 +93,7 @@ class ApiFixture:
 class ProviderTests(unittest.TestCase):
     def test_cli_classifies_definite_rejection_without_exposing_body(self):
         response = CompletedProcess([], 1, "HTTP/2.0 422 Unprocessable Entity\r\n\r\n{\"detail\":\"private\"}", "secret")
-        with patch("local_ticket_provider.subprocess.run", return_value=response) as run:
+        with patch("hosted_ticket_provider.subprocess.run", return_value=response) as run:
             with self.assertRaises(ProviderRejected) as caught:
                 run_json(["gh", "api", "repos/team/repo/issues"], {"title": "bad"})
         self.assertEqual(caught.exception.status_code, 422)
@@ -103,13 +103,13 @@ class ProviderTests(unittest.TestCase):
 
     def test_cli_keeps_unknown_write_failure_uncertain(self):
         response = CompletedProcess([], 1, "", "connection reset")
-        with patch("local_ticket_provider.subprocess.run", return_value=response):
+        with patch("hosted_ticket_provider.subprocess.run", return_value=response):
             with self.assertRaisesRegex(InventoryError, "provider-unavailable"):
                 run_json(["glab", "api", "projects/1/issues"], {"title": "x"})
 
     def test_cli_reads_json_after_included_success_headers(self):
         response = CompletedProcess([], 0, "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\n\r\n{\"id\":1}", "")
-        with patch("local_ticket_provider.subprocess.run", return_value=response):
+        with patch("hosted_ticket_provider.subprocess.run", return_value=response):
             self.assertEqual(run_json(["glab", "api", "projects/1/issues"],
                                       {"title": "x"}), {"id": 1})
 

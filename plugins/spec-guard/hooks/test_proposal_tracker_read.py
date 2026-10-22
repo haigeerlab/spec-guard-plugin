@@ -33,10 +33,9 @@ def github_issue(number=42, body=None, labels=None, repository=None,
 class GithubStateCasingTests(unittest.TestCase):
     """`gh issue list --json state` answers OPEN/CLOSED, not the REST API's open/closed.
 
-    `_github_page` reads through `gh`, so uppercase is the shape this adapter actually
-    receives. The fixtures above were written with the REST spelling and nothing ever
-    compared them with a real response, so a lookup table keyed on lowercase passed
-    every test while failing against every real repository.
+    `read_tracker` used to read through `gh issue list`, and a lookup table keyed on
+    lowercase passed every fixture while failing against every real repository. It now
+    reads the REST API, but both spellings stay readable for callers that pass either.
     """
 
     def test_the_casing_gh_actually_returns_is_parsed(self):
@@ -261,85 +260,120 @@ class ProposalTrackerReadFixtures(unittest.TestCase):
         self.assertEqual(legacy.state, "invalid")
 
 
+def rest_github(number, body="plain text", host="github.com", pull=False):
+    item = github_issue(number=number, body=body)
+    item.pop("repository")
+    item["html_url"] = "https://%s/octo/spec-guard/issues/%d" % (host, number)
+    if pull:
+        item["pull_request"] = {"url": "https://api.github.com/repos/octo/spec-guard/pulls/%d" % number}
+    return item
+
+
+def rest_gitlab(iid, body="plain text", state="opened", host="gitlab.com"):
+    item = gitlab_issue(iid=iid, body=body, state=state)
+    item["web_url"] = "https://%s/octo/spec-guard/-/issues/%d" % (host, iid)
+    return item
+
+
 class ProposalTrackerTransportTests(unittest.TestCase):
-    def runner(self, *responses):
-        replies = iter(responses)
+    """`read_tracker` reads through the shared, host-pinned client (`gh api` / `glab api`)."""
+
+    def platform(self, platform, pages_of_issues, host=None):
+        host = host or ("github.com" if platform == "github" else "gitlab.com")
         calls = []
 
         def run(args):
             calls.append(args)
-            return next(replies)
+            endpoint = args[-1]
+            if endpoint == "repos/octo/spec-guard":
+                return {"full_name": "octo/spec-guard", "id": 42, "private": False,
+                        "has_issues": True}
+            if endpoint == "projects/17":
+                return {"id": 17, "path_with_namespace": "octo/spec-guard",
+                        "visibility": "public", "issues_enabled": True,
+                        "web_url": "https://%s/octo/spec-guard" % host}
+            if "search=" in endpoint:
+                return []
+            page = int(endpoint.rsplit("page=", 1)[1])
+            return pages_of_issues[page - 1] if page <= len(pages_of_issues) else []
 
         return run, calls
 
+    def assert_read_only(self, calls, cli, host):
+        for call in calls:
+            self.assertEqual(call[:4], [cli, "api", "--hostname", host], call)
+            self.assertNotIn("--method", call)
+            self.assertNotIn("-X", call)
+
     def test_github_reads_complete_repository_issue_set_using_read_only_argv(self):
-        issues = [github_issue(number=index, body="plain text")
-                  for index in range(1, 101)]
-        pull_request = github_issue(number=102)
-        pull_request["pull_request"] = {"url": "https://api.github.com/repos/octo/spec-guard/pulls/102"}
-        runner, calls = self.runner(
-            json.dumps(issues + [pull_request, github_issue(number=101)]),
-        )
+        first = [rest_github(index) for index in range(1, 101)]
+        runner, calls = self.platform("github", [
+            first, [rest_github(102, body=MARKER, pull=True), rest_github(101, body=MARKER)]])
         result = read_tracker(proposal(), "github", "octo/spec-guard", runner=runner)
         self.assertEqual((result.state, result.issue_id), ("verified", 101))
-        self.assertEqual(calls, [[
-            "gh", "issue", "list", "--repo", "octo/spec-guard", "--state", "all",
-            "--limit", "1000", "--json", "number,body,labels,state",
-        ]])
+        self.assert_read_only(calls, "gh", "github.com")
+        self.assertEqual([call[-1] for call in calls], [
+            "repos/octo/spec-guard",
+            "repos/octo/spec-guard/issues?state=all&per_page=100&page=1",
+            "repos/octo/spec-guard/issues?state=all&per_page=100&page=2"])
 
-    def test_github_result_at_the_read_limit_is_unknown(self):
-        runner, _ = self.runner(json.dumps([
-            github_issue(number=index, body="plain text") for index in range(1, 1001)
-        ]))
-        result = read_tracker(proposal(), "github", "octo/spec-guard", runner=runner)
-        self.assertEqual(result.state, "unknown")
+    def test_github_enterprise_host_is_pinned(self):
+        runner, calls = self.platform("github", [[rest_github(5, body=MARKER, host="ghe.example.com")]],
+                                      host="ghe.example.com")
+        result = read_tracker(proposal(), "github", "octo/spec-guard", runner=runner,
+                              host="ghe.example.com")
+        self.assertEqual((result.state, result.issue_id), ("verified", 5))
+        self.assert_read_only(calls, "gh", "ghe.example.com")
 
     def test_gitlab_reads_until_a_short_page_using_get_argv(self):
-        first_page = [gitlab_issue(iid=index, body="plain text")
-                      for index in range(1, 101)]
-        runner, calls = self.runner(
-            json.dumps(first_page), json.dumps([gitlab_issue(iid=101, state="closed")]))
+        first_page = [rest_gitlab(index) for index in range(1, 101)]
+        runner, calls = self.platform("gitlab", [
+            first_page, [rest_gitlab(101, body=MARKER, state="closed")]])
         result = read_tracker(proposal(), "gitlab", 17, runner=runner)
-        self.assertEqual((result.state, result.issue_id), ("verified", 101))
-        self.assertEqual(len(calls), 2)
-        self.assertTrue(all(call[:2] == ["glab", "api"] for call in calls))
-        self.assertTrue(all(call[2].startswith("projects/17/issues?") for call in calls))
-        self.assertTrue(all("search=" not in call[2] and "page=" in call[2] and "state=all" in call[2]
-                            for call in calls))
-        self.assertTrue(all("-X" not in call and "--method" not in call for call in calls))
+        self.assertEqual((result.state, result.issue_id, result.closed), ("verified", 101, True))
+        self.assert_read_only(calls, "glab", "gitlab.com")
+        listings = [call[-1] for call in calls[1:]]
+        self.assertEqual(len(listings), 2)
+        self.assertTrue(all(endpoint.startswith("projects/17/issues?") and "state=all" in endpoint
+                            and "issue_type=issue" in endpoint and "search=" not in endpoint
+                            for endpoint in listings))
+
+    def test_gitlab_self_managed_host_is_pinned(self):
+        """F7: without the host, glab's own default host decides which instance answers."""
+        runner, calls = self.platform("gitlab", [[rest_gitlab(3, body=MARKER, host="git.example.com")]],
+                                      host="git.example.com")
+        result = read_tracker(proposal(), "gitlab", 17, runner=runner, host="git.example.com")
+        self.assertEqual((result.state, result.issue_id), ("verified", 3))
+        self.assert_read_only(calls, "glab", "git.example.com")
 
     def test_gitlab_finds_the_marker_even_when_search_ignores_html_comments(self):
         # GitLab 15.3.2 (verified 2026-09-28): search= never matched text inside HTML
         # comments, so a marker search always came back empty. The reader must list and match locally.
-        issues = [gitlab_issue(iid=index, body="plain text") for index in range(1, 40)]
-        issues.append(gitlab_issue(iid=77))
-        calls = []
-
-        def search_blind_gitlab(argv):
-            calls.append(argv)
-            return "[]" if "search=" in argv[2] else json.dumps(issues)
-
-        result = read_tracker(proposal(), "gitlab", 17, runner=search_blind_gitlab)
+        issues = [rest_gitlab(index) for index in range(1, 40)] + [rest_gitlab(77, body=MARKER)]
+        runner, calls = self.platform("gitlab", [issues])
+        result = read_tracker(proposal(), "gitlab", 17, runner=runner)
         self.assertEqual((result.state, result.issue_id), ("verified", 77))
-        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls), 2)
 
     def test_gitlab_result_filling_every_page_is_unknown(self):
-        full_page = json.dumps([gitlab_issue(iid=index, body="plain text") for index in range(1, 101)])
-        runner, calls = self.runner(*([full_page] * 10))
+        full_page = [rest_gitlab(index) for index in range(1, 101)]
+        runner, calls = self.platform("gitlab", [full_page] * 50)
         result = read_tracker(proposal(), "gitlab", 17, runner=runner)
         self.assertEqual(result.state, "unknown")
-        self.assertEqual(len(calls), 10)
+        self.assertEqual(len(calls), 51)
 
     def test_transport_failure_or_incomplete_github_response_is_unknown(self):
-        failed, _ = self.runner(None)
+        from hosted_ticket_provider import HostedTicketError
+
+        def failed(args):
+            raise HostedTicketError("provider-unavailable: request failed")
         self.assertEqual(read_tracker(proposal(), "github", "octo/spec-guard",
                                       runner=failed).state, "unknown")
 
-        incomplete, _ = self.runner(json.dumps({
-            "total_count": 1, "incomplete_results": True, "items": [github_issue()],
-        }))
+        runner, _ = self.platform("github", [{
+            "total_count": 1, "incomplete_results": True, "items": [rest_github(1, MARKER)]}])
         self.assertEqual(read_tracker(proposal(), "github", "octo/spec-guard",
-                                      runner=incomplete).state, "unknown")
+                                      runner=runner).state, "unknown")
 
 
 class ProposalTrackerInvalidCodeTests(unittest.TestCase):

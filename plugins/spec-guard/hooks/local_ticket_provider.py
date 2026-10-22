@@ -1,17 +1,27 @@
-"""Small JSON CLI transport for explicit GitHub/GitLab handoff targets."""
+"""Local handoff's view of the shared GitHub/GitLab transport in hosted_ticket_provider.
+
+The transport, page limit and write verdict live there; this module only keeps the
+error vocabulary the Local publisher branches on (`InventoryError`, its own
+`ProviderRejected`, `publication-uncertain` for an incomplete listing).
+"""
 from __future__ import annotations
 
-import json
-import re
-import subprocess
 from typing import Any, Callable
 
+import hosted_ticket_provider as shared
+from hosted_ticket_provider import MAX_PAGES, PAGE_SIZE  # noqa: F401 - re-exported
 from local_ticket_inventory import InventoryError
 
 
-PAGE_SIZE = 100
-MAX_PAGES = 50
-DEFINITE_REJECTIONS = {400, 401, 403, 404, 405, 410, 413, 414, 422}
+# Shared messages whose Local wording differs; the prefix is what callers branch on.
+_LOCAL_WORDING = {
+    "provider-unavailable: malformed page": "publication-uncertain: provider page is malformed",
+    "provider-unavailable: pagination limit reached":
+        "publication-uncertain: provider pagination limit reached",
+    "comment-marker-ambiguous: marker is in private note":
+        "conflict: Local marker is in an internal GitLab note",
+}
+_LOCAL_PREFIX = {"target-invalid": "provider-unsupported", "target-unknown": "provider-unavailable"}
 
 
 class ProviderRejected(InventoryError):
@@ -20,42 +30,34 @@ class ProviderRejected(InventoryError):
         super().__init__(f"provider-rejected: API returned HTTP {status_code}")
 
 
-def _included_response(stdout: str) -> tuple[int | None, str]:
-    normalized = stdout.replace("\r\n", "\n")
-    header, separator, payload = normalized.partition("\n\n")
-    match = re.match(r"^HTTP/\S+\s+(\d{3})(?:\s|$)", header)
-    return (int(match.group(1)), payload) if match and separator else (None, stdout)
+def call(function: Callable[..., Any], *arguments: Any) -> Any:
+    """Run one shared-transport step, speaking the Local error vocabulary."""
+    try:
+        return function(*arguments)
+    except shared.ProviderRejected as error:
+        raise ProviderRejected(error.status_code) from error
+    except shared.HostedTicketError as error:
+        message = str(error)
+        code, _, detail = message.partition(": ")
+        message = _LOCAL_WORDING.get(message) or (
+            _LOCAL_PREFIX[code] + ": " + detail if code in _LOCAL_PREFIX else message)
+        raise InventoryError(message) from error
 
 
 def run_json(arguments: list[str], body: dict[str, Any] | None = None) -> Any:
-    """Return decoded JSON without exposing CLI stderr or credentials."""
-    command = [*arguments, "--include"] if body is not None else arguments
-    try:
-        result = subprocess.run(
-            command, input=json.dumps(body) if body is not None else None,
-            capture_output=True, text=True, timeout=30, check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise InventoryError("provider-unavailable: API request did not complete") from error
-    status, payload = _included_response(result.stdout) if body is not None else (None, result.stdout)
-    if result.returncode != 0:
-        if status in DEFINITE_REJECTIONS:
-            raise ProviderRejected(status)
-        raise InventoryError("provider-unavailable: API request failed")
-    try:
-        return json.loads(payload)
-    except ValueError as error:
-        raise InventoryError("provider-unavailable: API returned invalid JSON") from error
+    """Read, or write when a body is given, through the shared transport."""
+    if body is None:
+        return call(shared.run_json, arguments)
+    return call(shared.run_write_json, arguments, body)
 
 
 def pages(fetch: Callable[[int], Any]) -> list[dict[str, Any]]:
-    items: list[dict[str, Any]] = []
-    for number in range(1, MAX_PAGES + 1):
-        batch = fetch(number)
-        if not isinstance(batch, list) or len(batch) > PAGE_SIZE or any(
-                not isinstance(item, dict) for item in batch):
-            raise InventoryError("publication-uncertain: provider page is malformed")
-        items.extend(batch)
-        if len(batch) < PAGE_SIZE:
-            return items
-    raise InventoryError("publication-uncertain: provider pagination limit reached")
+    return call(shared.pages, fetch)
+
+
+def split(runner: Callable[[list[str], dict[str, Any] | None], Any] | None):
+    """A Local runner `(argv, body)` as the shared client's separate reader and writer."""
+    if runner is None:
+        return shared.run_json, shared.run_write_json
+    return (lambda arguments: runner(arguments, None),
+            lambda arguments, body: runner(arguments, body))

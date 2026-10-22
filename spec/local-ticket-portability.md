@@ -85,7 +85,9 @@ worktree，不推送远端。写入中断保留部分目标数据供诊断，不
    仅在受管正文的固定来源段和评论末尾认定有效标记；同样文本出现在其他位置时
    报歧义冲突，不能把它当成交接证据，也不能据此认定目标不存在后另建一条。
    创建前对目标做完整分页查找；未知或不完整的查找不能视为缺席。GitHub 搜索结果
-   中的 PR、GitLab 系统 notes 和平台自动关闭行为须分别处理。同一来源标记若匹配
+   中的 PR、GitLab 系统 notes 和平台自动关闭行为须分别处理。查找只认普通 Issue：读写经
+   `hooks/hosted_ticket_provider.py` 的共享客户端（`tracker-provider-unify`），GitLab 列表带 `issue_type=issue`、混入其他类型时
+   查找不可信，Issue 地址认 `/-/issues/` 与 `/-/work_items/` 两种写法。同一来源标记若匹配
    多条远端事项，或同一 `projectId + issueId` 的来源摘要已分叉，进入 `conflict`，
    不自动合并或选择一条。
    明确的远端 4xx 拒绝保留状态码且允许纠正后重试；无可靠响应或服务端失败仍按

@@ -352,11 +352,13 @@ Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 G
 ```bash
 # 任何分支：单个 Proposal 的新鲜度与阶段
 python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
-  --proposal-id <id> --platform <github|gitlab> --target <target>
+  --proposal-id <id> --platform <github|gitlab> --target <target> [--host <host>]
 # Issue 阶段标签 proposal-stage:accepted 加新鲜审查后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
-  --proposal-id <id> --platform <github|gitlab> --target <target>
+  --proposal-id <id> --platform <github|gitlab> --target <target> [--host <host>]
 ```
+
+`--host` 缺省为 `github.com`／`gitlab.com`；自建实例必须给，结果里的 `host` 写明读的是哪个实例。
 
 提交前先按 `references/proposal-contract.md` 写好草稿 `spec/proposals/<id>.md`，再补全基线与 revision 并校验（等价于 `/spec-guard:proposal-submit`）：
 

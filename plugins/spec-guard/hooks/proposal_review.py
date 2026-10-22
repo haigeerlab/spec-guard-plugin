@@ -169,21 +169,24 @@ def main(argv=None):
     """Read one published Proposal and its Issue, then print the review result."""
     # 读取层只在 CLI 中引入；review() 本身保持为不接触 Git 或 tracker 的纯函数。
     from proposal_publication import read_published
-    from proposal_tracker_read import read_tracker
+    from proposal_tracker_read import DEFAULT_HOSTS, read_tracker
 
     parser = argparse.ArgumentParser(description="Read-only Proposal freshness and stage review.")
     parser.add_argument("--project", default=".")
     parser.add_argument("--proposal-id", required=True)
     parser.add_argument("--platform", choices=("github", "gitlab"), required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--host", help="GitHub/GitLab host; github.com or gitlab.com by default")
     parser.add_argument("--remote", default="origin")
     args = parser.parse_args(argv)
     target = int(args.target) if args.platform == "gitlab" and args.target.isdigit() else args.target
+    host = args.host or DEFAULT_HOSTS[args.platform]
     publication = read_published(args.project, args.proposal_id, args.remote)
-    tracker = (read_tracker(publication.proposal, args.platform, target)
+    tracker = (read_tracker(publication.proposal, args.platform, target, host=host)
                if getattr(publication, "state", None) == "published" else None)
-    print(json.dumps(as_json(review(publication, tracker, args.platform, target)),
-                     ensure_ascii=False))
+    result = as_json(review(publication, tracker, args.platform, target))
+    result["host"] = host
+    print(json.dumps(result, ensure_ascii=False))
     return 0
 
 

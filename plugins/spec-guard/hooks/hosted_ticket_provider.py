@@ -1,4 +1,10 @@
-"""Narrow, Epiq-independent read transport for ordinary hosted Issues."""
+"""The one GitHub/GitLab transport: hosted tickets, Local handoff and Proposal read/closeout all use it.
+
+Only this module runs `gh` or `glab`. It owns the page limit, what counts as an ordinary
+Issue, host pinning, URL checks and the write verdict, so the callers cannot drift apart
+(test_tracker_provider_contract.py holds them to it). Callers keep only what is truly
+theirs: their error vocabulary, write permission checks and their own result shapes.
+"""
 from __future__ import annotations
 
 import json
@@ -110,8 +116,15 @@ def pages(fetch: Callable[[int], Any]) -> list[dict[str, Any]]:
     raise HostedTicketError("provider-unavailable: pagination limit reached")
 
 
-def _target(platform: str, host: str, target: str) -> None:
-    if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host) or
+def _target(platform: str, host: Any, target: Any) -> None:
+    # A GitLab target is a project path or, as the Proposal commands give it, a positive
+    # project id; either way the host is pinned on every request.
+    if (platform == "gitlab" and isinstance(target, int) and not isinstance(target, bool)
+            and target > 0 and isinstance(host, str) and
+            re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host)):
+        return
+    if (not isinstance(host, str) or not isinstance(target, str) or
+            not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]*", host) or
             not target or any(not re.fullmatch(r"[A-Za-z0-9_.-]+", part) or
                               part in (".", "..") for part in target.split("/")) or
             (platform == "github" and len(target.split("/")) != 2)):
@@ -136,6 +149,7 @@ class GitHubIssues:
                 not isinstance(raw.get("private"), bool) or
                 raw.get("has_issues") is not True):
             raise HostedTicketError("target-unknown: GitHub target is unavailable")
+        self.target_raw = raw
         return {"platform": "github", "host": self.host, "target": self.target,
                 "targetId": raw["id"],
                 "visibility": "private" if raw["private"] else "public"}
@@ -160,7 +174,8 @@ class GitHubIssues:
                 address.query or address.fragment or "pull_request" in item):
             raise HostedTicketError("provider-unavailable: invalid GitHub issue")
         return {"id": number, "title": item["title"], "body": item.get("body") or "",
-                "closed": item["state"] == "closed", "url": item["html_url"]}
+                "closed": item["state"] == "closed", "url": item["html_url"],
+                "labels": item.get("labels"), "container": self.target}
 
     def get_issue(self, issue_id: int) -> dict[str, Any]:
         issue = self._issue(self._get(self.base + "/" + str(issue_id)))
@@ -184,10 +199,15 @@ class GitHubIssues:
                      self.base + "/" + str(issue_id) + "/comments"]
         self.writer(arguments, {"body": body})
 
-    def set_closed(self, issue_id: int) -> None:
+    def write(self, method: str, endpoint: str, body: dict[str, Any]) -> Any:
+        """Any other write a caller owns (Proposal stage labels), with the host pinned."""
+        return self.writer(["gh", "api", "--hostname", self.host, "--method", method,
+                            endpoint], body)
+
+    def set_closed(self, issue_id: int, closed: bool = True) -> None:
         arguments = ["gh", "api", "--hostname", self.host, "--method", "PATCH",
                      self.base + "/" + str(issue_id)]
-        self.writer(arguments, {"state": "closed"})
+        self.writer(arguments, {"state": "closed" if closed else "open"})
 
     def get_delivery(self, number: int) -> dict[str, Any]:
         raw = self._get("repos/" + self.target + "/pulls/" + str(number))
@@ -215,7 +235,10 @@ class GitLabIssues:
                  writer: Callable[[list[str], dict[str, Any]], Any] = run_write_json):
         _target("gitlab", host, target)
         self.host, self.target, self.runner, self.writer = host, target, runner, writer
-        self.base = "projects/" + quote(target, safe="") + "/issues"
+        self.project = "projects/" + (str(target) if isinstance(target, int)
+                                      else quote(target, safe=""))
+        self.base = self.project + "/issues"
+        self.path: str | None = None if isinstance(target, int) else target
         self.project_id: int | None = None
         self.web_scheme: str | None = None
 
@@ -223,24 +246,36 @@ class GitLabIssues:
         return self.runner(["glab", "api", "--hostname", self.host, endpoint])
 
     def target_facts(self) -> dict[str, Any]:
-        raw = self._get("projects/" + quote(self.target, safe=""))
+        raw = self._get(self.project)
         address = urlparse(raw.get("web_url", "")) if isinstance(raw, dict) else None
-        if (not isinstance(raw, dict) or raw.get("path_with_namespace") != self.target or
+        named = isinstance(self.target, str)
+        if (not isinstance(raw, dict) or
+                not isinstance(raw.get("path_with_namespace"), str) or
+                not raw["path_with_namespace"] or
+                (named and raw["path_with_namespace"] != self.target) or
+                (not named and raw.get("id") != self.target) or
                 not isinstance(raw.get("id"), int) or raw["id"] <= 0 or
                 raw.get("visibility") not in ("public", "internal", "private") or
                 raw.get("issues_enabled") is False or
                 raw.get("issues_access_level") == "disabled" or address is None or
                 address.scheme not in ("http", "https") or address.netloc != self.host or
-                address.path != "/" + self.target or address.query or address.fragment):
+                address.path != "/" + raw["path_with_namespace"] or
+                address.query or address.fragment):
             raise HostedTicketError("target-unknown: GitLab target is unavailable")
         self.project_id, self.web_scheme = raw["id"], address.scheme
+        self.path, self.target_raw = raw["path_with_namespace"], raw
         return {"platform": "gitlab", "host": self.host, "target": self.target,
                 "targetId": raw["id"], "visibility": raw["visibility"],
                 "webScheme": address.scheme}
 
-    def list_issues(self) -> dict[str, Any]:
+    def _checked(self) -> None:
+        # Issue and MR addresses are checked against the target's own path and scheme,
+        # so the target is read first whenever a caller has not done it.
         if self.project_id is None or self.web_scheme is None:
-            raise HostedTicketError("target-unknown: GitLab target has not been checked")
+            self.target_facts()
+
+    def list_issues(self) -> dict[str, Any]:
+        self._checked()
         raw = pages(lambda page: self._get(
             self.base + "?state=all&scope=all&issue_type=issue&per_page=100&page=" + str(page)))
         return {"complete": True, "issues": [self._issue(item) for item in raw]}
@@ -259,26 +294,34 @@ class GitLabIssues:
                 item.get("type", "ISSUE") != "ISSUE" or
                 address.scheme != self.web_scheme or address.netloc != self.host or
                 address.path not in (
-                    "/" + self.target + "/-/issues/" + str(number),
-                    "/" + self.target + "/-/work_items/" + str(number)) or
+                    "/" + str(self.path) + "/-/issues/" + str(number),
+                    "/" + str(self.path) + "/-/work_items/" + str(number)) or
                 address.query or address.fragment):
             raise HostedTicketError("provider-unavailable: invalid GitLab issue")
         return {"id": number, "title": item["title"],
                 "body": item.get("description") or "",
-                "closed": item["state"] == "closed", "url": item["web_url"]}
+                "closed": item["state"] == "closed", "url": item["web_url"],
+                "labels": item.get("labels"), "container": self.project_id}
 
     def get_issue(self, issue_id: int) -> dict[str, Any]:
+        self._checked()
         issue = self._issue(self._get(self.base + "/" + str(issue_id)))
         if issue["id"] != issue_id:
             raise HostedTicketError("provider-unavailable: GitLab issue ID differs")
         return issue
 
     def create_issue(self, title: str, body: str) -> dict[str, Any]:
+        self._checked()
         arguments = ["glab", "api", "--hostname", self.host, "--method", "POST",
                      self.base, "--header", "Content-Type: application/json"]
         return self._issue(self.writer(arguments, {"title": title, "description": body}))
 
-    def list_comments(self, issue_id: int) -> dict[str, Any]:
+    def list_comments(self, issue_id: int,
+                      private_markers: tuple[str, ...] = ("spec-guard-hosted-comment:v1",)
+                      ) -> dict[str, Any]:
+        """Public discussion only: system notes are the platform's audit trail and internal
+        notes are not public, so neither counts; a caller's marker in an internal note is
+        ambiguous rather than absent."""
         endpoint = self.base + "/" + str(issue_id) + "/notes"
         raw = pages(lambda page: self._get(endpoint + "?per_page=100&page=" + str(page)))
         comments = []
@@ -291,7 +334,7 @@ class GitLabIssues:
             if not isinstance(item.get("internal"), bool):
                 raise HostedTicketError("provider-unavailable: GitLab note visibility unknown")
             if item["internal"]:
-                if "spec-guard-hosted-comment:v1" in item["body"]:
+                if any(marker in item["body"] for marker in private_markers):
                     raise HostedTicketError("comment-marker-ambiguous: marker is in private note")
                 continue
             comments.append({"body": item["body"]})
@@ -303,16 +346,20 @@ class GitLabIssues:
                      "--header", "Content-Type: application/json"]
         self.writer(arguments, {"body": body})
 
-    def set_closed(self, issue_id: int) -> None:
+    def write(self, method: str, endpoint: str, body: dict[str, Any]) -> Any:
+        """Any other write a caller owns (Proposal stage labels), with the host pinned."""
+        return self.writer(["glab", "api", "--hostname", self.host, "--method", method,
+                            endpoint, "--header", "Content-Type: application/json"], body)
+
+    def set_closed(self, issue_id: int, closed: bool = True) -> None:
         arguments = ["glab", "api", "--hostname", self.host, "--method", "PUT",
                      self.base + "/" + str(issue_id),
                      "--header", "Content-Type: application/json"]
-        self.writer(arguments, {"state_event": "close"})
+        self.writer(arguments, {"state_event": "close" if closed else "reopen"})
 
     def get_delivery(self, number: int) -> dict[str, Any]:
-        if self.project_id is None or self.web_scheme is None:
-            raise HostedTicketError("target-unknown: GitLab target has not been checked")
-        endpoint = "projects/" + quote(self.target, safe="") + "/merge_requests/" + str(number)
+        self._checked()
+        endpoint = self.project + "/merge_requests/" + str(number)
         raw = self._get(endpoint)
         address = urlparse(raw.get("web_url", "")) if isinstance(raw, dict) else None
         commit = raw.get("merge_commit_sha") if isinstance(raw, dict) else None
@@ -322,7 +369,7 @@ class GitLabIssues:
         if (not isinstance(raw, dict) or raw.get("iid") != number or
                 raw.get("project_id") != self.project_id or address is None or
                 address.scheme != self.web_scheme or address.netloc != self.host or
-                address.path != "/" + self.target + "/-/merge_requests/" + str(number) or
+                address.path != "/" + str(self.path) + "/-/merge_requests/" + str(number) or
                 raw.get("state") not in ("opened", "closed", "merged") or
                 (raw["state"] == "merged" and
                  (not isinstance(commit, str) or
@@ -332,8 +379,7 @@ class GitLabIssues:
             branch = raw.get("target_branch")
             if not isinstance(branch, str) or not branch:
                 raise HostedTicketError("provider-unavailable: GitLab target branch unknown")
-            endpoint = ("projects/" + quote(self.target, safe="") +
-                        "/repository/commits/" + commit + "/refs?type=branch&per_page=100&page=")
+            endpoint = (self.project + "/repository/commits/" + commit + "/refs?type=branch&per_page=100&page=")
             refs = pages(lambda page: self._get(endpoint + str(page)))
             if (any(ref.get("type") != "branch" or
                     not isinstance(ref.get("name"), str) for ref in refs) or

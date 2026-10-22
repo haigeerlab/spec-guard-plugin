@@ -44,6 +44,8 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
   --platform "<github|gitlab>" --target "<target>" --prove
 ~~~
 
+自建 GitHub Enterprise 或 GitLab 实例要加 `--host <主机>`；不给时读 `github.com`／`gitlab.com`，结果里的 `host` 写明读的是哪个实例。
+
 原样报告 JSON。只有 `proved` 才是晋级证明，并给出 promotion commit 与 module id。`proved` 时若同次读到事项的开闭，
 还带 `closeoutPending`：`true` 表示事项仍开着，下一步是 `/spec-guard:proposal-closeout` 预览并经授权收尾（只改标签
 不会关闭事项）；`false` 表示已关闭。`not-accepted`

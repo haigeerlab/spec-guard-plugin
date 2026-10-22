@@ -137,6 +137,7 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_read.py' \
   'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_write.py' \
   'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_actions.py' \
+  'python3 -B plugins/spec-guard/hooks/test_tracker_provider_contract.py' \
   'python3 -B plugins/spec-guard/hooks/test_host_config_removal.py' \
   'python3 -B plugins/spec-guard/hooks/test_agent_relay_probe.py' \
   'python3 -B plugins/spec-guard/hooks/test_sibling_plugins.py' \

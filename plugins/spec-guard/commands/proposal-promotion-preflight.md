@@ -45,6 +45,8 @@ python3 -B "$ROOT/hooks/proposal_promotion_proof.py" \
   --platform "<github|gitlab>" --target "<target>"
 ~~~
 
+自建 GitHub Enterprise 或 GitLab 实例要加 `--host <主机>`；不给时读 `github.com`／`gitlab.com`，结果里的 `host` 写明读的是哪个实例。
+
 仅当 JSON state 为 ready 时，baseCommit 才是人工创建 promotion 分支可使用的起点。找到 Proposal 后的结果都带 `moduleId`
 （要加入能力图的模块，可能与 `proposalId` 不同）。`in-map` 表示模块已在远端能力图里：
 已晋级的 Proposal 不需要再预检，改跑 `/spec-guard:proposal-promotion-proof`。
