@@ -67,19 +67,26 @@ plugins/spec-guard/
    但新的一项要用户单独信任一次。
    会话开始与清空后（matcher `startup|clear`）另有一项 `SessionStart`，调用 `phase-guard.sh SessionStart fresh`：项目根（跟随指向时为
    目标项目根）有 `.epiq/project.json` 时只输出一句读回提醒（先列出带 `waiting-on-me`／`waiting-on-them`／`waiting-on-user` 标签的
-   未关闭事项），不输出阶段摘要（随后的 `UserPromptSubmit` 会给）；没有账本、未激活或指向失效时静默。钩子只判断这个文件在不在，
-   不读账本内容、不调 Epiq，提醒的 JSON 手写，不靠 python3 生成。压缩后的核对提醒在有账本时也补上账本里的这类事项，没有账本时不变。
+   未关闭事项），不输出阶段摘要（启用了约定的项目，随后的 `UserPromptSubmit` 会给）；只有账本、没有启用约定的项目同样出这一句；
+   没有账本或指向失效时静默。钩子只判断这个文件在不在，不读账本内容、不调 Epiq，提醒的 JSON 手写，不靠 python3 生成。
+   压缩后的核对提醒在有账本时也补上账本里的这类事项，没有账本时不变；只有账本的项目压缩后只出账本版本的核对提醒，不带阶段内容。
 2. `phase-guard.sh` 判断激活信号：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的
-   `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`：没有就静默退出 0
-   （这一步只用 bash 内建，不启动 python3）；有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行
-   `Linked project`；有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
+   `.agent/state.json`。都没有时，再看会话目录有没有本插件写下的指向文件 `.agent/spec-guard-link.json`，以及项目根（或输入 cwd
+   所在 git 仓库根）有没有本地事项账本 `.epiq/project.json`：都没有就静默退出 0（这一步只用 bash 内建，不启动 python3）；只有账本时
+   只出账本提醒，不出阶段内容：别的会话转来消息的那一轮（提示词以 `<cross-session-message ` 开头，在 bash 里判）出一行记账提醒，
+   其余轮次直接退出 0；指向文件有且有效、目标自己带激活信号时，改以目标为项目根继续，并在注入里多一行
+   `Linked project`；指向文件有但失效（格式无效、目标不存在、目标未启用）时输出一行诊断。会话目录自己已启用时不读指向文件，
    也不连环跟随。hook 不从宿主的工作区设置或会话记录推断项目。指向文件可以按会话登记（版本 2 的 `sessions`）：hook 从输入里取
    会话标识（`session_id`，以及 `transcript_path` 文件名——两个宿主都用会话标识命名会话记录），先用本会话的登记，其次目录级
-   指向，都没有则静默。标识只用来查表，不读会话记录的内容。
+   指向，都没有则静默。标识只用来查表，不读会话记录的内容。命令侧用同一个解析：`project_link.py follow` 按入口所在宿主取会话
+标识（Claude 命令传 `CLAUDE_CODE_SESSION_ID`，Codex skill 传 `CODEX_THREAD_ID`），打印要操作的项目并在 stderr 写明跟随；
+指向失效时退出 2，不退回会话目录。
 3. 激活时读本地文件：能力图、`spec/`、`tasks/<id>/plan.md` 与 `todo.md`、`.agent/state.json`、`.agent/config.json`，
-   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒分两档：模块边界
-   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 出边界行；模块进行中（`NEEDS_PLAN`、
-   `BUILDING`）达到 80% 出上下文行。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
+   交给 `module_stage.py` 算出阶段；有会话记录时由 `session_context.py` 补上上下文大小。上下文提醒只在模块边界
+   （`MODULE_DONE`／`DONE`，以及当前模块还没有 Spec 的 `NEEDS_SPEC`）达到窗口 70% 时出边界行，模块进行中不提醒；Claude 没有窗口，
+   按会话记录尾部的读数估算（有读数超过 200k 按 1M，否则按 200k）。平时只给一行（quiet-injection）：输出末尾的状态码由
+   `module_stage.py` 按「变了才需要完整说明」的事实算出，`session_context.py` 从会话记录里取最近一次 spec-guard 注入的状态码，
+   相同就只给阶段 · 模块 · 未勾选数 · 分支一行；新会话、压缩后、读不到或状态码不同时给完整内容；不写任何文件。IDLE 与 MAP_ONLY 由 `phase-guard.sh` 自己作答，项目配置行另经
    `module_stage.py --config-lines` 取得，与其他阶段同一实现。只在三个交审检查点（Spec 待审、Plan 待审、最终验收）且模块还没有
    外部审查记录时，`sibling_plugins.py` 再只读本机插件记录（Claude 的 `installed_plugins.json` 与 settings，Codex 的
    `config.toml` 与插件缓存目录），装了并启用 delegate 才多出一行外部审查提示；不调子进程，读不到按没装处理。
@@ -117,6 +124,14 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 1.8（map-startable 返工）起，开关为 `on` 时，只是 Build order 推出来、没有 Spec 与 Plan 的当前模块按就绪算并列入 `startable`；
 `activeModule` 指定的仍算进行中，顶层 `activeModule`、`stage` 与阶段提示不变。
 
+1.9（rules-at-nodes）起，`reviewKinds` 跟上 session-protocol v2.6 的上游小项名：`plan` 与 `spec-plan` 多「架构决定」「未决问题」两项，
+另有 `renamedSections` 列「旧名→新名」（做／不做→边界，附带的小决定→未决问题）；`spec` 的旧节名照旧保留到 2.0，两种名字都有效。
+
+1.10（scope-overlap-interface）起另有 `scopeOverlap`：`module_scope.py overlap` 给几份 Spec 文件（`--spec <模块 id>=<文件>`，可选 `--project`
+并入项目里进行中、就绪的模块，传入的文件优先）返回两两的独占重叠与各自来源，不受多模块并行开关限制；解析与重叠判定和 `startable.conflicts`
+是同一份（`module_scope.parse` 与 `module_scope.overlap`）。用来在 Spec 还没落到集成分支时就查重叠。`check-interface.py` 核对它引用的脚本
+存在、错误码与代码一致。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：
@@ -144,7 +159,7 @@ spec-guard 不开会话、不建 worktree、不合并；hook 只读。开关不�
 
 ## 不变量
 
-- hook 默认不生效；没有激活信号的项目必须静默退出。会话目录的指向文件是第三种激活信号，同样只由本插件的命令写下；
+- hook 默认不生效；没有激活信号、也没有本地事项账本（`.epiq/project.json`）的项目必须静默退出；只有账本的项目只出账本提醒（会话开始与清空后、压缩后、别的会话转来消息时），不出阶段内容。会话目录的指向文件是第三种激活信号，同样只由本插件的命令写下；
   它失效时报诊断，因为用户已经声明过要用。
 - 探测失败必须降级，不能把环境故障说成链路断裂；“读不到”报 `unknown`，不当作“没有”。
 - hook 只报告事实和建议，不写文件、不改远端状态。
@@ -174,13 +189,14 @@ Proposal 代码从不读它。已开工、在等外部条件的模块可以用 `
 ## 项目配置
 
 `.agent/config.json` 是入库的项目配置，团队与两个宿主共用一份。`project_config.py` 是唯一解析器，阶段提示、
-`verify-artifacts` 与 `/spec-guard:config` 都调用它。文件不存在时什么都不变；文件无效时用固定的问题代码报告，所有
-设置都不生效，键和值不会进入注入上下文（它们是仓库内容）。目前的项有 `artifactLanguage`（新写的 Spec、Plan、todo
+`verify-artifacts` 与 `/spec-guard:config` 都调用它。文件不存在时什么都不变；问题用固定的问题代码报告，键和值不会进入
+注入上下文（它们是仓库内容）。只有文件本身坏了（`project_config.STRUCTURAL`：读不了、不是 JSON、顶层不是对象、`version`
+不对）才所有设置都不生效；不认识的键和取值不合法的键只让那个键失效，其余照常（`spec/config-per-key.md`）。目前的项有 `artifactLanguage`（新写的 Spec、Plan、todo
 正文的语言，结构关键字不变；恰好为 `zh-CN` 时阶段提示的说明文字也用中文，判据是 `module_stage.hint_language`，
 phase-guard 与 `session_context.py` 的位置行都向它取，其他值的提示与 0.67.0 逐字节相同）、`reviewCadence`（默认 `separate`，`combined` 时一个模块的 Spec 与 Plan 一起审）与
-`moduleConcurrency`（多模块并行开关，默认 `off`；规划层的并行规则只在 `on` 时生效，`off`、未设置或文件无效时所有输出与
+`moduleConcurrency`（多模块并行开关，默认 `off`；规划层的并行规则只在 `on` 时生效，`off`、未设置、取值无效或文件无效时所有输出与
 引入开关前逐字相同）。其他代码只通过 `project_config.module_concurrency()` 读这个开关，不自己解析。
-派活开关与默认事项后端各有自己的位置，这里只汇总显示。
+默认事项后端有自己的位置，这里只汇总显示。
 
 ## 文件布局（File layout）
 
@@ -189,7 +205,7 @@ spec-guard 写在哪里、谁能删什么。`scripts/check-state-paths.py` 确�
 
 | 类别 | 路径 | 入库 | 谁写 | 怎么删 |
 |---|---|---|---|---|
-| 项目产物 | `spec/`、`tasks/<id>/`、`CLAUDE.md`／`AGENTS.md` 里的约定块、`.agent/config.json`、`.agent/tracker.json`、`DOCUMENTATION-BASELINE.md`、`.epiq/project.json` | 是 | 预览并确认后的命令 | 通过命令；teardown 保留 Spec 与 Plan |
+| 项目产物 | `spec/`、`tasks/<id>/`、`CLAUDE.md`／`AGENTS.md` 里的约定块、`.agent/config.json`、`.agent/tracker.json`、`docs/DOCUMENTATION-BASELINE.md`、`.epiq/project.json` | 是 | 预览并确认后的命令 | 通过命令；teardown 保留 Spec 与 Plan |
 | 历史归档 | `spec/history/`、`tasks/history/`、`.agent/history/`、`spec/CAPABILITY-HISTORY.json` | 是 | 只有一次性的历史迁移 | 永不删除：账本按哈希固定每个文件 |
 | 每个 checkout 的状态 | `.agent/state.json`（当前模块）；新的状态一律放在 `$(git rev-parse --git-path spec-guard)` 下 | 否 | 构建流程；本地锁 | 随意 |
 | 本机状态 | `~/.spec-guard/` 或 `$SPEC_GUARD_STATE_DIR`：`local-ticket-ledger/runtime`、`local-ticket-portability`、`hosted-ticket-intents`、`proposal-closeout` | 否 | 账本安装、交接、托管事项写入、Proposal 收尾 | 运行时可重装；日志与意图只在没有待完成的写入时删，它们用来防重复 |

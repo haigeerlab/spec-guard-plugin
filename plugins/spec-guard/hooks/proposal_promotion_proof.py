@@ -1,6 +1,7 @@
 """Read-only remote-default proof that a Proposal module was promoted."""
 import argparse
 import copy
+import functools
 import json
 import re
 import subprocess
@@ -11,7 +12,7 @@ from proposal_contract import COMMIT
 from proposal_publication import (
     Publication, fixed_snapshot, probe_code, read_published_pool, skipped_as_json)
 from proposal_review import STAGES, Review, review
-from proposal_tracker_read import read_tracker
+from proposal_tracker_read import DEFAULT_HOSTS, read_tracker
 
 # 只有稳定诊断码可以出现在输出里；说明文字和原始异常一律退回 promotion-<state>。
 DIAGNOSTIC_CODE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
@@ -335,19 +336,24 @@ def main(argv=None):
     parser.add_argument("--proposal-id", required=True)
     parser.add_argument("--platform", choices=("github", "gitlab"), required=True)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--host", help="GitHub/GitLab host; github.com or gitlab.com by default")
     parser.add_argument("--remote", default="origin")
     parser.add_argument("--prove", action="store_true",
                         help="prove the merged promotion instead of previewing its base")
     args = parser.parse_args(argv)
     target = int(args.target) if args.platform == "gitlab" and args.target.isdigit() else args.target
+    host = args.host or DEFAULT_HOSTS[args.platform]
+    reader = functools.partial(read_tracker, host=host)
     if args.prove:
-        print(json.dumps(as_json(prove_from_remote(
-            args.project, args.proposal_id, args.platform, target, args.remote)),
-            ensure_ascii=False))
-        return 0
-    print(json.dumps(preflight_as_json(preflight(
-        args.project, args.proposal_id, args.platform, target, args.remote)),
-        ensure_ascii=False))
+        result = as_json(prove_from_remote(
+            args.project, args.proposal_id, args.platform, target, args.remote,
+            tracker_reader=reader))
+    else:
+        result = preflight_as_json(preflight(
+            args.project, args.proposal_id, args.platform, target, args.remote,
+            tracker_reader=reader))
+    result["host"] = host
+    print(json.dumps(result, ensure_ascii=False))
     return 0
 
 

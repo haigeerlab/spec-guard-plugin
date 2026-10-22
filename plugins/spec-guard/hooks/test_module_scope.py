@@ -262,5 +262,156 @@ class Validate(unittest.TestCase):
             (root / "spec/CAPABILITY-MAP.md").write_text("not a map\n", encoding="utf-8")
             self.assertEqual(self.run_validate(root), (0, ["unverified map"]))
 
+
+class Overlap(unittest.TestCase):
+    """scope-overlap-interface: `overlap` compares given Spec files, and with --project the open modules, pair by pair."""
+
+    MAP = ("# Capability Map: t\n\n## 目标\n\nt\n\n## 模块\n\n| Module id | Responsibility | Depends on |\n"
+           "| --- | --- | --- |\n| setup | x | — |\n| alpha | x | setup |\n| beta | x | setup |\n| gamma | x | setup |\n"
+           "| paused | x | setup |\n\nBuild order: setup → alpha → beta → gamma → paused\n")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def write(self, path, text):
+        target = self.base / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+        return str(target)
+
+    def file(self, name, *paths):
+        """A Spec file outside any project whose boundary owns `paths`; no paths means no boundary section."""
+        body = "# Spec: %s\n\n%s\n" % (name, HOSTILE)
+        if paths:
+            body += "\n## 并行边界\n\n- 独占：%s\n" % "、".join("`%s`" % path for path in paths)
+        return self.write("given/%s.md" % name, body)
+
+    def project(self, switch="on"):
+        """setup done, alpha and beta in progress and overlapping, gamma in progress without a boundary, paused suspended."""
+        root = self.base / "project"
+        if switch is not None:
+            self.write("project/.agent/config.json", json.dumps({"version": 1, "moduleConcurrency": switch}))
+        self.write("project/spec/CAPABILITY-MAP.md", self.MAP)
+        boundary = "# %s\n\n## 并行边界\n\n- 独占：%s\n"
+        self.write("project/spec/setup.md", boundary % ("setup", "`apps/a/`"))
+        self.write("project/tasks/setup/plan.md", "# Plan\n")
+        self.write("project/tasks/setup/todo.md", "- [x] done\n")
+        self.write("project/spec/alpha.md", boundary % ("alpha", "`apps/a/`、`docs/shared.md`"))
+        self.write("project/spec/beta.md", boundary % ("beta", "`apps/a/x.py`"))
+        self.write("project/spec/gamma.md", "# gamma\n")
+        self.write("project/spec/paused.md", boundary % ("paused", "`docs/shared.md`"))
+        from module_stage import SUSPEND_MARKER
+        self.write("project/tasks/paused/todo.md", "- [ ] one\n" + SUSPEND_MARKER + "\n")
+        return str(root)
+
+    def run_overlap(self, *args):
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "overlap", *args],
+                              capture_output=True, text=True, timeout=60, env=env, cwd=self.base)
+        return done.returncode, done.stdout
+
+    def result(self, *args):
+        code, out = self.run_overlap(*args)
+        self.assertEqual(code, 0, out)
+        return json.loads(out)
+
+    def test_same_path_is_a_conflict_with_sources(self):
+        a, b = self.file("a", "apps/s/"), self.file("b", "apps/s/", "docs/b.md")
+        self.assertEqual(self.result("--spec", "a=" + a, "--spec", "b=" + b),
+                         {"conflicts": [{"modules": ["a", "b"], "paths": ["apps/s/"], "sources": {"a": a, "b": b}}],
+                          "errors": []})
+
+    def test_directory_containment_lists_the_narrower_path(self):
+        a, b = self.file("a", "apps/s/"), self.file("b", "apps/s/deep/x.py")
+        self.assertEqual(self.result("--spec", "a=" + a, "--spec", "b=" + b)["conflicts"][0]["paths"], ["apps/s/deep/x.py"])
+
+    def test_same_name_prefix_is_not_a_conflict(self):
+        a, b = self.file("a", "apps/bill/"), self.file("b", "apps/billing/x.py", "apps/bill")
+        self.assertEqual(self.result("--spec", "a=" + a, "--spec", "b=" + b), {"conflicts": [], "errors": []})
+
+    def test_relative_spec_path_resolves_against_the_working_directory(self):
+        self.file("a", "apps/s/"), self.file("b", "apps/s/")
+        got = self.result("--spec", "a=given/a.md", "--spec", "b=given/b.md")
+        self.assertEqual(got["conflicts"][0]["sources"], {"a": "given/a.md", "b": "given/b.md"})
+
+    def test_project_adds_open_modules(self):
+        root, new = self.project(), self.file("new", "docs/shared.md")
+        got = self.result("--project", root, "--spec", "new=" + new)
+        self.assertEqual(got["conflicts"], [
+            {"modules": ["alpha", "beta"], "paths": ["apps/a/x.py"], "sources": {"alpha": "project", "beta": "project"}},
+            {"modules": ["alpha", "new"], "paths": ["docs/shared.md"], "sources": {"alpha": "project", "new": new}},
+        ])
+        self.assertEqual(got["errors"], [{"module": "gamma", "source": "project", "error": "no-boundary"}])
+
+    def test_given_file_replaces_the_project_copy(self):
+        root = self.project()
+        beta, gamma = self.file("beta", "apps/b/"), self.file("gamma", "apps/g/")
+        got = self.result("--project", root, "--spec", "beta=" + beta, "--spec", "gamma=" + gamma)
+        self.assertEqual(got, {"conflicts": [], "errors": []})
+
+    def test_given_module_is_ordered_by_build_order(self):
+        root = self.project()
+        first, beta = self.file("aaa", "apps/a/x.py"), self.file("beta", "apps/a/")
+        got = self.result("--project", root, "--spec", "aaa=" + first, "--spec", "beta=" + beta)
+        self.assertEqual([c["modules"] for c in got["conflicts"]], [["alpha", "beta"], ["alpha", "aaa"], ["beta", "aaa"]])
+
+    def test_modules_outside_a_map_keep_the_spec_order(self):
+        b, a = self.file("b", "apps/s/"), self.file("a", "apps/s/")
+        self.assertEqual(self.result("--spec", "b=" + b, "--spec", "a=" + a)["conflicts"][0]["modules"], ["b", "a"])
+
+    def test_bad_specs_go_to_errors_and_the_rest_are_compared(self):
+        a, b = self.file("a", "apps/s/"), self.file("b", "apps/s/")
+        bare = self.file("bare")
+        broken = self.write("given/broken.md", "# broken\n\n## 并行边界\n\n- 独占：apps/x/\n")
+        missing = str(self.base / "given" / "missing.md")
+        code, out = self.run_overlap("--spec", "a=" + a, "--spec", "bare=" + bare, "--spec", "broken=" + broken,
+                                     "--spec", "missing=" + missing, "--spec", "b=" + b)
+        self.assertEqual(code, 0)
+        self.assertNotIn(HOSTILE, out)
+        got = json.loads(out)
+        self.assertEqual([c["modules"] for c in got["conflicts"]], [["a", "b"]])
+        self.assertEqual(got["errors"], [{"module": "bare", "source": bare, "error": "no-boundary"},
+                                         {"module": "broken", "source": broken, "error": "bad-path"},
+                                         {"module": "missing", "source": missing, "error": "unreadable"}])
+
+    def test_project_problems_go_to_errors(self):
+        a, b = self.file("a", "apps/s/"), self.file("b", "apps/s/")
+        empty = self.base / "empty"
+        empty.mkdir()
+        got = self.result("--project", str(empty), "--spec", "a=" + a, "--spec", "b=" + b)
+        self.assertEqual(got["errors"], [{"module": None, "source": "project", "error": "no-capability-map"}])
+        self.assertEqual(len(got["conflicts"]), 1)
+        root = self.project()
+        Path(root, "spec", "CAPABILITY-MAP.md").write_text("not a map\n", encoding="utf-8")
+        got = self.result("--project", root, "--spec", "a=" + a, "--spec", "b=" + b)
+        self.assertEqual(got["errors"], [{"module": None, "source": "project", "error": "map-unreadable"}])
+        self.assertEqual(len(got["conflicts"]), 1)
+
+    def test_the_switch_does_not_matter(self):
+        new = self.file("new", "docs/shared.md")
+        results = []
+        for switch in ("on", "off", None):
+            self.tmp_project_reset()
+            results.append(self.result("--project", self.project(switch), "--spec", "new=" + new))
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[0], results[2])
+        self.assertEqual(len(results[0]["conflicts"]), 2)
+
+    def tmp_project_reset(self):
+        import shutil
+        project = self.base / "project"
+        if project.is_dir() and project.parent == self.base:
+            shutil.rmtree(project)
+
+    def test_usage_errors_exit_2_without_json(self):
+        a = self.file("a", "apps/s/")
+        for args in ((), ("--spec", "a"), ("--spec", "Bad_ID=" + a), ("--spec", "a=" + a, "--spec", "a=" + a),
+                     ("--spec", "a=" + a, "--project", str(self.base / "nowhere")), ("--spec", "a=")):
+            code, out = self.run_overlap(*args)
+            self.assertEqual(code, 2, args)
+            self.assertFalse(out.lstrip().startswith("{"), (args, out))
+
 if __name__ == "__main__":
     unittest.main()

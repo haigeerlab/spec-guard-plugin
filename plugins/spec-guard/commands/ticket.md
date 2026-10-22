@@ -17,8 +17,15 @@ description: 用自然语言受理开发需求或修复问题；按明确选择�
 评论、关闭等写工具只返回 ID 时，沿用写前读取的标题；
 标题无法读取就明确说明，不能凭编号猜测。
 
-调用 `epiq_*` 工具时都传 `repoRoot` 为当前项目根目录；不传时 Epiq 取 MCP 进程自己的当前目录，可能报
-“No .epiq/project.json found”，这不代表账本未启用。建事项时选非只读泳道，Closed 看板下的泳道只读。
+调用 `epiq_*` 工具时都传 `repoRoot` 为项目根目录：取下面这条命令打印的路径（有项目指向时它跟随到被指向的项目，stderr 写明
+「本次操作的是被指向的项目」，回复用户时照原文转述；它退出 2 时照原文报告诊断，不要改用会话目录）。不传时 Epiq 取 MCP 进程
+自己的当前目录，可能报“No .epiq/project.json found”，这不代表账本未启用。
+
+```bash
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+python3 -B "${CLAUDE_PLUGIN_ROOT}/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}"
+```
+建事项时选非只读泳道，Closed 看板下的泳道只读。
 
 用户用短编号请求评论、关闭等写操作时，先用 `epiq_issue_get` 取得完整 `value.id`，再将完整 ID
 传给写工具的 `issueId` 或 `issueIds`；不得把短编号直接传给写工具。写工具确认成功后才能报告成功；

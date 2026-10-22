@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.84.0] - 2026-10-23
+
+本版 13 个模块（2026-10-22 多维度审查与需求核对的修复批次，决定 D1～D20，经 module-crew 并行开发）：fact-fixes、tracker-provider-unify、config-per-key、sibling-rules-out、proposal-fixes、history-slim、rules-at-nodes、cost-slim-link-follow、batch-insert-concurrency-hint、quiet-injection、scope-overlap-interface、ledger-standalone-reminder、doc-chain。`interface.json` 升到 1.10（1.9 的 `reviewKinds.renamedSections`、1.10 的 `scopeOverlap`）。
+
+### 升级须知
+
+- **约定块变短要重跑一次。** 已装项目重跑 `setup-convention --replace` 后约定块才变短：先 `--dry-run`，删掉的旧模板行标 `[needs --accept-removals]`，想留的先移进本地段，再加 `--accept-removals`（Codex 同样带 `--host=codex`）。不重跑时旧长块照常有效，只是和节点上附的规则重复。
+- **自建 GitHub Enterprise／GitLab 要显式给主机。** `proposal_review.py`、`proposal_promotion_proof.py` 新增 `--host`，缺省 `github.com`／`gitlab.com`；以前靠 `gh`／`glab` 默认主机读自建实例的用法，升级后要加 `--host`。
+- **派活规则退役。** `setup-convention --dispatch`／`--no-dispatch` 会被拒；`--replace` 会移除旧约定块里的派活规则段。
+- **`cost-report --json` 字段变了。** 删 `dispatches`、`redispatches`、`reclaims`、`edits_after_handback`，`dispatches_unrecorded` 改名 `subagents_unrecorded`，新增 `subagents`。
+- **能力历史去掉 `audit` 与 `correct`。** 只保留 verify 核对与迁移预览；已有账本里的补正记录照常校验。
+- **英文阶段标题变了。** 产物语言不是 `zh-CN` 的项目，阶段标题从 `当前阶段:` 变成 `Current stage:`；自己写脚本解析这一行的要跟着改。
+- **接入过宿主的账本用户，卸载前多一步。** 按 README 移除账本的 Claude MCP 条目与 ask 规则、Codex MCP 表；账本数据不用删。
+
+### 新增
+
+- **`scopeOverlap`：比对几份 Spec 的独占重叠。** `python3 -B hooks/module_scope.py overlap [--project <项目根>] --spec <模块 id>=<文件> ...`，只读地给出两两之间的独占重叠与来源（可并入项目里进行中、就绪的模块），不受 `moduleConcurrency` 限制；判据与 `/map` 的 `startable.conflicts` 同一份。给使用方插件比对交审中的 Spec 用（O10）。
+- **停点规则文件与节点取规则。** 交审怎么呈现、各类要点、最终验收的几张表、何时问用户这类规则移到 `references/node-rules.md`（能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收五节）；`module_stage.py` 新增 `stop_node`、`node_rules` 与 `--node-rules <kind>`。
+
+### 变更
+
+- **阶段注入平时只给一行（D5）。** 完整阶段提示末尾多一行状态码 `<!-- spec-guard-state: … -->`；hook 从会话记录里找最近一次 spec-guard 注入，状态码相同就只给 `spec-guard: <阶段> · <模块> · <未勾选数> · <分支>` 一行，后面照样附模块边界行与记账提醒。新会话、压缩之后、读不到会话记录或状态变了时给完整内容；进入停点那一轮完整并附停点规则；诊断每轮完整。不写任何文件；`/spec-guard:phase` 总是完整输出。
+- **上下文提醒只留模块边界一条（D6）。** 模块进行中达到窗口 80% 的「会话上下文」行删除。
+- **约定块瘦身为常驻短句（D3、D4）。** Claude 约定块 7.5KB → 3.8KB，Codex 7.1KB → 3.3KB；停点规则改为到了对应节点由阶段提示附上那一节原文。并行开关下标了角色的 checkout 不附停点规则。
+- **授权补两句（D19）。** 项目自己的规则比默认授权更严时以项目为准；最终验收列出的拟回告须是可原样发送的完整文字，内容变了要重新给用户看。
+- **交审跟上 session-protocol v2.6。** Spec 的「做／不做」「附带的小决定」写作「边界」「未决问题」，Plan 多「架构决定」「未决问题」，旧名照认；复制块一块只答一件事、写最短说法；产物条目编号不用 C、D、T、R 开头；每个交审小项写明对应上游 agent-skills 的哪一节。
+- **共享检查点规则不再写只在姐妹插件存在时才有意义的规则（D2、D8、D9）。** 删去收件枢纽话术与「经收件枢纽转来的批准」一节，改为：批准来源与在哪里答复以所装协作插件的规定为准，没装只认当前对话里的明确批准；「协调会话的批准与合并」一节只留授权边界与不改写已推送历史的底线。
+- **批量插入后评估一次能否并行（D20）。** `moduleConcurrency` 为 `on` 时，为同一个需求一次插入 2 个及以上模块后，按「并行评估」规则评估一次并交用户选择；本机装了 module-crew 时提示可用其协调会话，没装只给 Build order 建议；开关不是 `on` 时一切不变。
+- **文档治理接成一条链（D14、D15）。** 项目有 `docs/DOCUMENTATION-BASELINE.md` 时：交审 Spec 的文档建议按基线提，Plan 交审列出文档影响与交付，最终验收那一轮的阶段提示多一行「文档核验」（串行与模块会话）。文档核验按基线状态区分：现状类 `update` 须自本模块 Spec 首次提交以来确被改过，`target` 文档只列增删行数、有删除行提醒须单独批准，外部文档标 `unverified`，git 查不了为 `unknown`；JSON 每项新增 `check`、`added`、`removed`。没有基线的项目不变。
+- **`cost-report` 只看 token 与主会话轮次（D17）。** 去掉派活、重派、收回、交回后改与「派过／没派过」对照。
+- **命令自动跟随项目指向（D18）。** 有项目指向时，除 `link-project` 外的命令自动跟随到被指向的项目并说明；指向失效时停下说明。
+- **能力历史只保留 verify 与迁移预览（D16）。**
+- **能力图与文档如实描述。** 能力图目标段写明需用户授权的远端写入、去掉已拆走的协作邮箱；`dependency-check` 退役并归档到 `docs/retirements/`；`module-insert` 不再说建 Spec 骨架；README 改写对上游 agent-skills 的描述。
+
+### 修复
+
+- **未启用的项目里阶段注入不再启动 python3。** 先在 bash 里读 hook 输入，判不出激活信号就静默退出；拿不准时照旧交给 python3。
+- **只有本地事项账本的项目也出账本提醒（D11）。** 项目根有 `.epiq/project.json`、没有启用约定时，会话开始与清空后出读回提醒，压缩后出账本核对提醒，别的会话转来消息那一轮出记账提醒；其余轮次在 bash 里静默退出。
+- **`.agent/config.json` 逐键容错。** 不认识的键只忽略这个键，取值不对的键按未设置处理，其余照常生效，阶段提示多一行「已忽略」；`set`／`unset` 只改目标键。
+- **托管事项与 Proposal 读写统一。** 托管事项、本地事项交接、Proposal 读取与收尾改用同一套 GitHub/GitLab 读写：GitLab 列表只取普通 Issue（混入其他类型时整次读取判为不可信），请求都绑定主机，分页上限统一 50 页 × 100，`/-/work_items/` 地址也认作 Issue，读不到 HTTP 状态时报结果未知，收尾不把 GitLab internal note 算作讨论。
+- **Proposal 收尾的锁与候选池。** 收尾不再在释放时删除锁文件，同一 Proposal 的多次收尾严格串行；候选池遇到读不出的文件时结果为 `unknown`（`snapshot-proposal-unreadable`），不再抛 `TypeError`。
+- **Claude 窗口不再按 1M 写死。** 会话记录里有读数超过 200k 按 1M 估算，否则按 200k，提醒里写明是估算。
+- **英文阶段提示不再夹固定中文。** 标题写 `Current stage:`；识别阶段行的地方认两种标题。能力图无效时引用的解析器报错仍是中文。
+- **设计文档里的基线路径统一为 `docs/DOCUMENTATION-BASELINE.md`（F17）。**
+
+### 文档
+
+- README 与本地事项账本说明补上卸载步骤（F8）。
+- 仓库根 `CLAUDE.md` 与 `docs/design.md` 的不变量改为：无激活信号、也没有 `.epiq/project.json` 的项目必须静默退出；只有账本的项目只出账本提醒。
+
 ## [0.83.2] - 2026-10-22
 
 本版 1 处修复：多模块并行开关打开时，Build order 的头一个模块能列入可开工（map-startable 返工）。`interface.json` 升到 1.8，只改 `startable` 的说明。

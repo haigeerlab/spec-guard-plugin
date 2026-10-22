@@ -46,10 +46,13 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
-PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}")" || exit 2
 ```
 
-这段以退出码 2 停下时，按它给出的原因转述：那是定位失败，不代表插件未安装。
+这段以退出码 2 停下时，按它给出的原因转述：插件根目录定位失败不代表插件未安装；`follow` 报的是项目指向失效，不要改用会话目录重试。
+`$FROM` 是会话目录，`$PROJECT` 是要操作的项目：会话目录有指向（`.agent/spec-guard-link.json`）时 `follow` 跟随到被指向的项目，
+stderr 写明「本次操作的是被指向的项目」，回复用户时照原文转述这一句。下面各节的命令都用 `$PROJECT`。
 
 ## setup
 
@@ -59,9 +62,8 @@ PROJECT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local --host=codex --dry-run
 ```
 
-已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。用户要求把 `/build` 的 task 交给子代理执行时加 `--dispatch`（实验性：规则默认由主代理自己做，只派预计改动 3 个以上文件、验收明确的 task；派出后 wait_agent 一次等到完成、不短间隔轮询；省钱效果未证明，预览时说明）
-（默认关闭；开关存在块里，`--replace` 会保留已开启的状态，关闭须 `--no-dispatch`；转述预览中的
-`build-task-dispatch rule:` 行）。Codex 段写明 tier-guard 在 Codex 上只作建议。workspace-write 沙箱不允许写 `.git`，开启后主代理每次提交都要申请提权，预览时提醒用户。遗留 `.agent/state.json` 是历史记录，不得用
+已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时，`--replace` 会移除整段，预览单列一行
+`retired build-task-dispatch rule section will be removed`，不需要 `--accept-removals`，转述时不要省略。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
 
 ## teardown
@@ -173,7 +175,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
 行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency` 的生效值与来源，以及只在别处修改的
-`dispatch`（约定块标记，用 setup 的 `--dispatch`／`--no-dispatch`）和 `trackerDefault`（上一节）：
+`trackerDefault`（上一节）：
 
 ```bash
 python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
@@ -184,7 +186,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `artifactLanguage`：语言标签（如 `zh-CN`、`en`）。新写的 Spec、Plan、todo 正文用它；结构关键字不变，已有产物不翻译。
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
-- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置。
+- `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；从本版起，新版本遇到不认识的键只忽略那个键。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 
@@ -193,9 +195,10 @@ python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key artifa
 python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key reviewCadence
 ```
 
-取值不合法、键不认识或属于只读汇总的两项时，退出码 2 且不写文件。文件无效（JSON 坏、`version` 不是 1、
-未知键、非法取值）时所有项按默认处理、`set`／`unset` 拒绝写入，照问题代码报告，不替用户猜值；`show` 提示
-文件被 `.gitignore` 忽略时照实转述。
+取值不合法、键不认识或属于只读汇总的两项时，退出码 2 且不写文件。文件本身坏了（读不了、JSON 坏、顶层不是对象、
+`version` 不是 1）时所有项按默认处理、`set`／`unset` 拒绝写入；个别键有问题（不认识的键、某个键取值不合法）时只有那个键失效，
+其余照常，`set`／`unset` 只改指定的键、其余键原样保留，只有不认识的键时 `check` 通过并提示 ignored。都照问题代码报告，
+不替用户猜值；`show` 提示文件被 `.gitignore` 忽略时照实转述。
 
 ## module-suspend
 
@@ -223,13 +226,14 @@ python3 -B "$ROOT/hooks/module_suspend.py" --project "$PROJECT" --resume <module
 不带 `--session` 的是目录级指向，对在这个目录里运行的每个会话生效。多个会话共用一个目录、各做不同项目时，各自按会话登记：
 给 `set`／`unset`／`show` 加 `--session "$CODEX_THREAD_ID"`（Claude 侧是 `"$CLAUDE_CODE_SESSION_ID"`；显式传入，命令不猜），
 登记只对这一个会话生效。钩子先用本会话的登记，其次目录级指向，都没有则静默；`Linked project` 行会说明是哪一种。
-`Linked project` 行里的项目不是本会话在做的项目时，忽略那段阶段提示并给本会话登记。这里 `$PROJECT` 是会话目录：
+有指向时本插件的其他命令（经 `follow`）与阶段注入都自动跟随它，输出写明操作的是被指向的项目；指向失效时命令停下并给出诊断。
+`Linked project` 行里的项目不是本会话在做的项目时，给本会话登记。这一节的命令操作的就是指向文件本身，用会话目录 `$FROM`、不经 `follow`：
 
 ```bash
-python3 -B "$ROOT/hooks/project_link.py" show --from "$PROJECT"
-python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径>
-python3 -B "$ROOT/hooks/project_link.py" set --from "$PROJECT" --project <项目路径> --confirm
-python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
+python3 -B "$ROOT/hooks/project_link.py" show --from "$FROM"
+python3 -B "$ROOT/hooks/project_link.py" set --from "$FROM" --project <项目路径>
+python3 -B "$ROOT/hooks/project_link.py" set --from "$FROM" --project <项目路径> --confirm
+python3 -B "$ROOT/hooks/project_link.py" unset --from "$FROM" --confirm
 ```
 
 `set`／`unset` 默认只预览，把预览给用户看过并确认后才加 `--confirm`；只写这一个文件，不动被指向的项目。路径可以是
@@ -237,8 +241,8 @@ python3 -B "$ROOT/hooks/project_link.py" unset --from "$PROJECT" --confirm
 项目不存在、那里没启用 spec-guard、会话目录自己已启用、项目就是会话目录、已有指向文件格式无效、解除时没有指向文件。
 指向失效时钩子每轮给一行诊断，用 `show` 看原因。
 
-**有指向时，本 skill 其他各节命令里的 `--project "$PROJECT"` 要换成被指向的项目路径**（`Linked project` 行给出的那个），
-它们不会自动跟随指向。在那个项目的阶段交接前，也可以手动运行 `SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR=<项目路径> bash
+**有指向时，本 skill 其他各节命令自动跟随它**：开头解析环境那段的 `follow` 已把 `$PROJECT` 换成被指向的项目，不用手动替换路径。
+在那个项目的阶段交接前，也可以手动运行 `SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$PROJECT" bash
 "$ROOT/hooks/phase-guard.sh" </dev/null` 读一次它的阶段。
 
 ## review-mark
@@ -254,12 +258,11 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state approved --confirm
 ```
 
-`pending` 在把 Spec 或 Plan 交给用户审阅时写，也可以写文件时直接带上这一行。交审时在对话正文里按小项呈现内容，名称与顺序同决策收件箱的卡片，
-每项写全（Spec：目标、做／不做（范围内与范围外）、要你确认的假设（含关键决策与取舍）、验收标准、附带的小决定（未决问题、文档建议）；
-Plan：分几步（任务与验证方式）、会改哪些文件（影响面）、风险、中途会停下来问你的地方（检查点及其类型）；短文件可贴全文），小项之后写
-“注意：”与“批了会怎样：”（这次批准授权什么）；只给链接或一句概述不算交审。再写各选项选了会怎样与推荐理由，推荐答复放进一个独立的可复制代码块、
-不用行内代码，不需要回答的内容不用代码块，“继续”不会被记为批准；使用方插件规定只在收件枢纽问时，内容照给、不放复制块，改写“去决策收件箱答 #N”。文档建议在能力图审阅与能力图全部完成时也各问一次，细则见共享检查点规则「文档建议」一节。`approved` 只在用户明确批准之后写：用户在当前对话里批准，或已登记的收件枢纽按 session-protocol 契约转来带事项号与用户原话的【用户答复】
-（条件见共享检查点规则「经收件枢纽转来的批准」一节）；
+`pending` 在把 Spec 或 Plan 交给用户审阅时写，也可以写文件时直接带上这一行。交审时在对话正文里按小项呈现内容，名称与顺序同 session-protocol 契约的交审小项，
+每项写全（Spec：目标、边界（总是做、先问、不做三档）、要你确认的假设（含关键决策与取舍）、验收标准、未决问题，之后是附加项文档建议；
+Plan：架构决定、分几步（任务与验证方式）、会改哪些文件（影响面）、风险、中途会停下来问你的地方（检查点及其类型）、未决问题；旧名「做／不做」「附带的小决定」照认；短文件可贴全文），小项之后写
+“注意：”与“批了会怎样：”（这次批准授权什么）；只给链接或一句概述不算交审。再写各选项选了会怎样与推荐理由，推荐答复放进可复制代码块、
+不用行内代码，一块只答一件事、写最短说法（有交审号写“C16 A”，没有写“批准”或“批准；Q1 A”，细则见共享检查点规则「交审时说明怎么批准」），不需要回答的内容不用代码块，“继续”不会被记为批准；所装协作插件对在哪里答复另有规定时（例如只在它的收件箱答），以它为准，复制块按它的规定放或不放。文档建议在能力图审阅与能力图全部完成时也各问一次，细则见共享检查点规则「文档建议」一节。`approved` 只在用户明确批准之后写，批准来源以所装协作插件的规定为准；没装只认当前对话里的明确批准；
 含糊的“继续”不算，先问清楚；获批后先写标记再动代码或写 Plan；不得为消除阶段提示自行批准，标记是给后续会话的记录，不是授权来源。合并审一次批准
 两份时用 `--target both`。拒绝时退出码 2 且不写文件：模块不在能力图上、文件不存在、标记无效、Spec 标着待批准／已修订／无效时单独批准 Plan
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
@@ -310,6 +313,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 条校验失败并停下。等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次；用户改了 id、
 responsibility、depends-on 或 anchor 中任何一项，都要先重新预览，不能对着旧预览直接确认。
 
+为同一个需求一次插入 2 个及以上模块时，最后一个写入成功后先用 `spec-guard-ops` 的 config 看 `moduleConcurrency`：是 `on` 就按共享检查点规则
+「并行评估」一节的「批量插入之后」评估一次；不是 `on` 不用管。
+
 写入只改 `spec/CAPABILITY-MAP.md`，不创建 Spec、不改 `tasks/`、`.agent/state.json` 或 Proposal 文件，不执行
 Git 或远端操作。成功后原样转述写入结果与阶段提示；新模块若因此成为当前模块，阶段是 `NEEDS_SPEC`——下一步是写
 并交审 `spec/<id>.md`，不是本命令的职责。需要留下经过审查的决定记录时改用 Proposal 流程；已接受的 Proposal 用下面的 `--proposal` 晋级。
@@ -334,7 +340,9 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 ## documentation
 
-文档基线、影响和验证仍是显式声明工具，不能扫描代码或 Git 历史来猜测状态：
+文档基线、影响和验证是显式声明工具，不扫描代码。核验只对声明 `update` 且 `delivered` 的仓库内文档用 git 看自本模块 Spec
+首次提交以来改没改过：现状类没改过、`target` 文档有删除行、git 查不了（`unknown`）都进 `attention`，外部文档标 `unverified`；
+`ready` 不表示文档内容正确。项目有基线时，最终验收前跑核验并把结果写进验收结果：
 
 ```bash
 python3 -B "$ROOT/hooks/documentation_baseline.py" --project "$PROJECT" --format json
@@ -352,11 +360,13 @@ Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 G
 ```bash
 # 任何分支：单个 Proposal 的新鲜度与阶段
 python3 -B "$ROOT/hooks/proposal_review.py" --project "$PROJECT" \
-  --proposal-id <id> --platform <github|gitlab> --target <target>
+  --proposal-id <id> --platform <github|gitlab> --target <target> [--host <host>]
 # Issue 阶段标签 proposal-stage:accepted 加新鲜审查后：promotion 分支的基点预检；合并后加 --prove 做晋级证明
 python3 -B "$ROOT/hooks/proposal_promotion_proof.py" --project "$PROJECT" \
-  --proposal-id <id> --platform <github|gitlab> --target <target>
+  --proposal-id <id> --platform <github|gitlab> --target <target> [--host <host>]
 ```
+
+`--host` 缺省为 `github.com`／`gitlab.com`；自建实例必须给，结果里的 `host` 写明读的是哪个实例。
 
 提交前先按 `references/proposal-contract.md` 写好草稿 `spec/proposals/<id>.md`，再补全基线与 revision 并校验（等价于 `/spec-guard:proposal-submit`）：
 
@@ -415,27 +425,15 @@ python3 -B "$ROOT/hooks/proposal_closeout.py" scan --project "$PROJECT" \
 
 ## history
 
-历史验证与审计均为只读；导入或补正仍须单独确认：
+能力历史只为还没迁完的旧布局项目保留（Claude 侧为 `/spec-guard:history-integrity`），两件事都只读：
 
 ```bash
 /bin/bash "$ROOT/hooks/verify-history.sh" "$PROJECT"
-python3 "$ROOT/hooks/capability-history.py" audit "$PROJECT/spec/CAPABILITY-HISTORY.json" "$PROJECT"
 python3 "$ROOT/hooks/history-migration.py" preview "$PROJECT"
 ```
 
-审计报告中的 `unknown` 不是失败时可以猜测补齐的值，不得从当前 `activeModule`、文件名或当前
-时间推断责任、依赖、状态或历史时间。`correct` 是写操作，只有用户明确确认该次补正后才允许
-调用；它会向账本追加 `history-correction` 记录，绝不重写 checkpoint，只会标记原值、修正值与
-身份均精确匹配的 audit finding 为 `corrected`：
-
-```bash
-python3 "$ROOT/hooks/capability-history.py" correct --confirm \
-  "$PROJECT/spec/CAPABILITY-HISTORY.json" <audit-report.json> <correction.json>
-```
-
-`<audit-report.json>` 与 `<correction.json>` 必须是用户审阅过的文件，补正须包含原值、修正值、
-审计报告哈希、审计时间、`initiativeId`、`eventIndex`、对应的 `checkpointId`（无 checkpoint 时为
-`null`）与 audit finding。没有 `--confirm`、审计报告哈希不匹配、证据矛盾，或把 `unknown` 升级
-成 `completed` 的请求都会被拒绝，且不会写入。
+第一条核对账本登记的归档文件的 SHA-256 并拒绝未登记的历史目录，没有账本时报「未验证」并以 0 退出；第二条列出旧项目
+可导入的证据与冲突。verify 通过只说明归档文件逐字未改；事件的 `at` 是迁移时抄下的原值（可能是 `now`、`imported`），
+不作为时间证据。账本里已有的补正记录照常校验，但不再提供审计与追加补正；实际导入旧证据是维护者的内部操作，不在本 skill 里。
 
 历史快照与旧 state 是证据，不是恢复旧 tracker 工作流的授权。

@@ -21,7 +21,8 @@
 
 **解决的问题：** 没有 GitHub/GitLab Issue 可用时，也能记录 bug、需求和讨论。同一个 Git 仓库的所有 worktree 共用一个账本。
 
-**启用：** 一次性运行 `/spec-guard:local-ticket-ledger`，确认后才会安装。
+**启用：** 一次性运行 `/spec-guard:local-ticket-ledger`，确认后才会安装。不用多模块约定也行：项目里有 `.epiq/project.json`
+就会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒，平时每轮不注入。接入过宿主的，卸载步骤见 README「卸载」。
 
 **使用：**
 
@@ -59,10 +60,12 @@
 **解决的问题：** 旧版 spec-guard 每批需求开一张新能力图，旧图归档在 `spec/history/`、`tasks/history/`，
 由 `spec/CAPABILITY-HISTORY.json` 记录每个文件的 SHA-256。能力历史用来核验这些归档没有被改动。
 
-**使用：** `/spec-guard:history-integrity`。
+**使用：** `/spec-guard:history-integrity`（Codex 为 `spec-guard-ops` 的 history 一节），两件事都只读：
 
-- 核验和审计只读；
-- 发现记录有误时，可以在你确认后**追加**一条更正，原记录不改；
-- 旧项目导入历史前，可以先只读预览。
+- `verify`（默认）：核对归档文件逐字未改，并拒绝未登记的历史目录；
+- `migration-preview`：旧项目导入历史前先预览可导入的证据与冲突。
+
+verify 通过不说明账本里的字段都对；事件时间 `at` 是迁移时抄下的原值，不作为时间证据。审计与追加补正已去掉，
+账本里已有的补正记录照常校验。
 
 现在每个项目只用一张能力图，不再产生新的归档。没有 `spec/CAPABILITY-HISTORY.json` 的项目用不到这项能力。

@@ -20,7 +20,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "plugins" / "spe
 from module_cost_report import parse_iso  # noqa: E402
 
 HEADINGS = ("## spec-guard ", "## agent-skills 链路状态")
-STAGE = re.compile(r"当前阶段: \*\*(.+?)\*\*")
+STAGE = re.compile(r"(?:当前阶段|Current stage): \*\*(.+?)\*\*")
+# quiet-injection: while the state code is unchanged the hint is one line, `spec-guard: <STAGE> · …`.
+BRIEF = re.compile(r"^spec-guard: ([A-Z_]+) · .*<!-- spec-guard-state: [0-9a-f]{8} -->")
 SUGGESTION_PREFIXES = ("Suggested next step:", "建议下一步:")
 # phase-guard's own fallback sentences when python3 is missing or cannot run (no heading).
 PYTHON3_PREFIX = "spec-guard: "
@@ -58,6 +60,9 @@ def _segment(text):
         return None
     if text.lstrip().startswith(PYTHON3_PREFIX) and "python3" in text:
         return PYTHON3_STAGE, ""
+    brief = BRIEF.match(text.lstrip())
+    if brief:
+        return brief.group(1), ""
     if not text.lstrip().startswith(HEADINGS):
         return None
     match = STAGE.search(text)

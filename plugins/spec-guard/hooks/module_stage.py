@@ -14,10 +14,11 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import zlib
 
 from capability_map import MODULE_ID, MapError, parse_map
 from checkout_role import role as checkout_role_of
-from project_config import load as load_config
+from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
 
 UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
@@ -281,24 +282,21 @@ COMMANDS = {
         "plan": "`/plan`",
         "build": "`/build`",
         "free-next": FREE_BOUNDARY,
-        "free-current": ("say in one sentence that the user can /compact with a focus on it, or /clear if the next "
-                         "work is unrelated; " + NO_PASTE + "."),
         # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
         "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
                             "`%(doctor)s`)"),
         "checkout-role": "`/spec-guard:checkout-role` (Codex: spec-guard-ops checkout-role)",
         "map": "`/spec-guard:map` (Codex: spec-guard-ops map)",
+        "doc-verify": "`/spec-guard:documentation-verification %s` (Codex: spec-guard-ops documentation)",
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
     "delegate-review": "`%(review)s` (whether it can run is decided by `%(doctor)s`)",
+    "doc-verify": "`/spec-guard:documentation-verification %s`",
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
                   "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
                   + SLASH_BLOCK + "; " + NO_PASTE
                   + ". This stage summary carries over, the conversation does not need to."),
-    "free-current": ("give the user one ready-to-copy command in its own code block: /compact followed by a "
-                     "one-sentence focus on the current task, filled in, or /clear if the next work is unrelated; "
-                     + SLASH_BLOCK + "; " + NO_PASTE + "."),
 })
 CODEX_COMPACT = ("one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), "
                  "or /clear if the next work is unrelated; " + SLASH_BLOCK + "; " + NO_PASTE + ".")
@@ -313,10 +311,10 @@ COMMANDS["codex"] = {
     "build": "`$incremental-implementation`",
     "free-next": ("Give the user " + CODEX_COMPACT
                   + " This stage summary carries over, the conversation does not need to."),
-    "free-current": "give the user " + CODEX_COMPACT,
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
     "checkout-role": "`$spec-guard-ops` checkout-role",
     "map": "`$spec-guard-ops` map",
+    "doc-verify": "`$spec-guard-ops` documentation verification for `%s`",
 }
 
 # hint-language-follow: the same entries with Chinese prose, used only when hint_language is zh-CN.  Commands,
@@ -331,7 +329,6 @@ COMMANDS_ZH = {
     None: dict(COMMANDS[None], **{
         "free-next": ("用一句话告诉用户：接着做下一个模块时可以用 /compact 并写明以它为重点，下一步工作不相关时用 /clear；"
                       + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
-        "free-current": "用一句话告诉用户：可以用 /compact 并写明以它为重点，下一步工作不相关时用 /clear；" + NO_PASTE_ZH + "。",
         "delegate-review": "`%(review)s`（Codex: `delegate:delegate-routing`）（能不能运行由 `%(doctor)s` 判定）",
     }),
 }
@@ -339,12 +336,10 @@ COMMANDS_ZH["claude"] = dict(COMMANDS_ZH[None], **{
     "delegate-review": "`%(review)s`（能不能运行由 `%(doctor)s` 判定）",
     "free-next": ("给用户一条可直接复制的命令，单独放在一个代码块里：/compact 后面跟一句写好的重点（下一个模块及其下一步），"
                   "下一步工作不相关时改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
-    "free-current": ("给用户一条可直接复制的命令，单独放在一个代码块里：/compact 后面跟一句写好的重点（当前任务），"
-                     "下一步工作不相关时改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。"),
 })
 COMMANDS_ZH["codex"] = dict(COMMANDS["codex"], **{
     "free-next": "给用户" + CODEX_COMPACT_ZH + CARRIES_OVER_ZH,
-    "free-current": "给用户" + CODEX_COMPACT_ZH,
+    "doc-verify": "`$spec-guard-ops` 的 documentation 核验（模块 `%s`）",
     "delegate-review": "`delegate:delegate-routing`（能不能运行以 delegate 自己的体检为准）",
 })
 
@@ -353,28 +348,24 @@ def commands(host: str | None, zh: bool = False) -> dict:
     return (COMMANDS_ZH if zh else COMMANDS)[host]
 
 
-# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window, the middle of a
-# module only from 80% of it. Claude transcripts carry no window, so they use a 1M window's figures.
-BOUNDARY_SHARE, MID_SHARE = 0.7, 0.8
-DEFAULT_WINDOW = 1_000_000
+# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window.
+# quiet-injection (D6): the middle of a module gets no hint; the host manages context there.  Claude transcripts
+# carry no window, so phase-guard.sh passes an estimated one (200k, or 1M once a reading went over 200k) and says so.
 
 
 def _k(tokens: int) -> int:
     return (tokens + 500) // 1000
 
 
-def thresholds(window: int | None, zh: bool = False) -> tuple:
-    """(boundary tokens, mid-module tokens, boundary note, mid note) for a context window or the Claude default."""
-    if window:
-        boundary, mid = -(-window * 7 // 10), -(-window * 8 // 10)  # ceil, in integers
-        if zh:
-            return (boundary, mid, "达到或超过 %d k 窗口的 70%%" % _k(window), "达到或超过 %d k 窗口的 80%%" % _k(window))
-        return (boundary, mid, "at or over 70%% of the %d k window" % _k(window),
-                "at or over 80%% of the %d k window" % _k(window))
-    boundary, mid = int(DEFAULT_WINDOW * BOUNDARY_SHARE), int(DEFAULT_WINDOW * MID_SHARE)
-    if zh:
-        return boundary, mid, "达到或超过 %d k" % _k(boundary), "达到或超过 %d k" % _k(mid)
-    return boundary, mid, "at or over %d k" % _k(boundary), "at or over %d k" % _k(mid)
+def thresholds(window: int | None, zh: bool = False, estimated: bool = False) -> tuple:
+    """(boundary tokens, boundary note) for a context window; (None, "") when there is no window to judge by."""
+    if not window:
+        return None, ""
+    boundary = -(-window * 7 // 10)  # ceil, in integers
+    if estimated:
+        return boundary, (("达到或超过按 %d k 窗口估算的 70%%" if zh else "at or over 70%% of an estimated %d k window")
+                          % _k(window))
+    return boundary, ("达到或超过 %d k 窗口的 70%%" if zh else "at or over 70%% of the %d k window") % _k(window)
 
 
 def boundary_line(tokens: int, note: str, host: str | None = None, zh: bool = False) -> str:
@@ -385,20 +376,12 @@ def boundary_line(tokens: int, note: str, host: str | None = None, zh: bool = Fa
             % (_k(tokens), note, COMMANDS[host]["free-next"]))
 
 
-def context_line(tokens: int, note: str, host: str | None = None, zh: bool = False) -> str:
-    if zh:
-        return ("- 会话上下文: 上一轮约 %d k token（%s）；每一轮都会重读它。先做完或记下当前任务，然后%s"
-                % (_k(tokens), note, COMMANDS_ZH[host]["free-current"]))
-    return ("- Session context: about %d k tokens in the last turn (%s); every turn re-reads it. Finish or record the "
-            "current task, then %s" % (_k(tokens), note, COMMANDS[host]["free-current"]))
-
-
 def unreadable_map(reason: str, zh: bool = False) -> str:
     if zh:
         return ("当前阶段: **UNKNOWN**\n\n- 能力图: 已有但读不了（%s）\n\n"
                 "建议下一步: 让 `spec/CAPABILITY-MAP.md` 成为可读的文件（检查它的权限），然后再发下一条消息；"
                 "这是读取故障，不是能力图的状态。" % reason)
-    return ("当前阶段: **UNKNOWN**\n\n- Capability map: present but unreadable (%s)\n\n"
+    return ("Current stage: **UNKNOWN**\n\n- Capability map: present but unreadable (%s)\n\n"
             "Suggested next step: make `spec/CAPABILITY-MAP.md` a readable file (check its permissions), then send the "
             "next prompt; this is a read failure, not a state of the map." % reason)
 
@@ -406,11 +389,12 @@ def unreadable_map(reason: str, zh: bool = False) -> str:
 def config_lines(root: Path, host: str | None = None) -> list:
     """project-config: one line per set item that changes the agent's behaviour.
 
-    `separate` is the default and adds nothing.  An invalid file yields only its fixed problem
-    codes -- never a key or value from the file -- and no setting from it is applied.
+    `separate` is the default and adds nothing.  A file unusable as a whole yields only its fixed problem
+    codes -- never a key or value from the file -- and no setting from it is applied.  config-per-key: any
+    other problem drops only its key; the valid settings keep their lines and one line names what was ignored.
     """
     values, problems = load_config(root)
-    if problems:
+    if set(problems) & set(STRUCTURAL):
         return ["- Project config: invalid (%s) — run %s." % (", ".join(problems), COMMANDS[host]["config"])]
     zh = values.get("artifactLanguage") == "zh-CN"
     lines = []
@@ -424,16 +408,19 @@ def config_lines(root: Path, host: str | None = None) -> list:
                      "- Review cadence: combined — after the capability map is written, present the Spec "
                      "and the Plan together for one approval; split them when a new decision, unclear "
                      "scope or a high-risk change appears.")
+    if problems:
+        lines.append(("- 项目配置: 已忽略 (%s)——其余设置照常生效；用 %s 查看。" if zh else
+                      "- Project config: ignored (%s) — the other settings apply; run %s.")
+                     % (", ".join(problems), COMMANDS[host]["config"]))
     return lines
 
 
 def hint_language(root: Path) -> str:
-    """hint-language-follow: "zh-CN" when the project config is valid and artifactLanguage is exactly zh-CN, else "en".
+    """hint-language-follow: "zh-CN" when artifactLanguage is valid and exactly zh-CN, else "en".
 
     The one criterion for the language of the stage hint; phase-guard.sh asks for it with --hint-language.
     """
-    values, problems = load_config(root)
-    return "zh-CN" if not problems and values.get("artifactLanguage") == "zh-CN" else "en"
+    return "zh-CN" if load_config(root)[0].get("artifactLanguage") == "zh-CN" else "en"
 
 
 CHECKPOINT = re.compile(r"^\s*[-*+]\s+\[([ xX])\]\s+(\S.*)$")
@@ -502,6 +489,72 @@ def at_final_gate(root: Path, module: str) -> bool:
     return not any(index in open_gates for index in open_items[1:])
 
 
+# rules-at-nodes: the stop rules the phase hint attaches at a node, one `## ` section per node in this file.
+NODE_RULES = Path(__file__).resolve().parent.parent / "references" / "node-rules.md"
+NODE_TITLES = {"map-review": "能力图审阅", "spec-review": "Spec 交审", "plan-review": "Plan 交审",
+               "mid-gate": "中途 gate", "final-gate": "最终验收"}
+NODE_LABELS_EN = {"map-review": "capability map review", "spec-review": "Spec review", "plan-review": "Plan review",
+                  "mid-gate": "middle gate", "final-gate": "final acceptance"}
+
+
+def first_open_is_gate(root: Path, module: str) -> bool:
+    """True when the module's first unchecked item is a `gate` checkpoint (the same criterion as `at_final_gate`)."""
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    open_gates = {index for index, _, checked in gate_checkpoints(text) if not checked}
+    open_items = [index for index, line in enumerate(text.splitlines()) if OPEN_ITEM.match(line)]
+    return bool(open_items) and open_items[0] in open_gates
+
+
+def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review: str) -> str | None:
+    """The node the current module is at: map-review, spec-review, plan-review, mid-gate, final-gate, or None.
+
+    Only existing facts are combined (review states, `at_final_gate`); when two apply the later one in that list wins.
+    A Spec waiting for review holds the Plan back unless the project reviews both at once.  map-review is
+    answered by phase-guard.sh itself (no capability map yet).
+    """
+    kind = None
+    final = stage == "BUILDING" and at_final_gate(root, module)
+    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final):
+        kind = "spec-review"
+    spec_waits = kind == "spec-review" and load_config(root)[0].get("reviewCadence") != "combined"
+    if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
+        kind = "plan-review"
+    if final:
+        kind = "final-gate"
+    elif stage == "BUILDING" and kind is None and first_open_is_gate(root, module):
+        kind = "mid-gate"
+    return kind
+
+
+def node_rules(kind: str) -> str:
+    """The `## ` section of node-rules.md for a node kind, up to the next section; "" when it cannot be had."""
+    title = NODE_TITLES.get(kind)
+    if title is None:
+        return ""
+    try:
+        text = NODE_RULES.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+    head = "## %s\n" % title
+    start = text.find(head) if text.startswith(head) else text.find("\n" + head) + 1
+    if start <= 0 and not text.startswith(head):
+        return ""
+    end = text.find("\n## ", start + len(head))
+    return (text[start:] if end < 0 else text[start:end + 1]).strip() + "\n"
+
+
+def stop_rules_block(kind: str | None, zh: bool) -> str:
+    """The paragraph appended after the suggested next step at a node; empty when there is none to attach."""
+    section = node_rules(kind) if kind else ""
+    if not section:
+        return ""
+    label = ("停点规则（%s）：" % NODE_TITLES[kind]) if zh else ("Stop rules (%s):" % NODE_LABELS_EN[kind])
+    return "\n\n%s\n\n%s" % (label, section.rstrip("\n"))
+
+
 def file_review_state(path: Path, kind: str) -> str:
     """A file's review state; `none` when it is absent, `unreadable` when it cannot be read."""
     if not path.is_file():
@@ -542,8 +595,8 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     record = " When the user approves it, record that with %s." % cmd["review-mark"]
     if spec == "pending":
         line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
-        values, problems = load_config(root)
-        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+        values = load_config(root)[0]
+        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
@@ -574,8 +627,8 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
     record = "用户批准后，用 %s 记下来。" % cmd["review-mark"]
     if spec == "pending":
         line = "- 批准: Spec `%s` 正在等用户批准。" % spec_path
-        values, problems = load_config(root)
-        if stage == "NEEDS_PLAN" and not problems and values.get("reviewCadence") == "combined":
+        values = load_config(root)[0]
+        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan
@@ -657,9 +710,27 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
     return ("- External review (from delegate, installed): if this %s deserves a second agent's read-only review "
             "(cross-module, trade-offs, irreversible, missing information, an interface proposal, many tasks), you "
             "may propose %s; start it only after the user agrees. Findings are advisory, not the user's approval. "
-            "Record them under `## 外部审查意见` (or `## External review`) in `%s`, or add `%s` there if the user "
+            "Record them under `## External review` in `%s`, or add `%s` there if the user "
             "declines; either one stops this line for the module."
             % (what, COMMANDS[host]["delegate-review"] % entry, where, EXTERNAL_REVIEW_DECLINED))
+
+
+def documentation_baseline_present(root: Path) -> bool:
+    """doc-chain: the project keeps a documentation baseline (a symlink counts; the check itself reports it invalid)."""
+    path = root / "docs" / "DOCUMENTATION-BASELINE.md"
+    return path.is_symlink() or path.exists()
+
+
+def documentation_check_line(module: str, cmd: dict, zh: bool) -> str:
+    """doc-chain (D15): the line a final gate gets when the project has a baseline -- run the check, report it."""
+    entry = cmd["doc-verify"] % module
+    if zh:
+        return ("- 文档核验：项目有文档基线，最终验收前跑 %s，把结果写进验收消息的「验收结果」：现状类 update 没改过、"
+                "target 文档有删改、外部文档未核验的，逐条写明；attention 不卡验收。" % entry)
+    return ("- Documentation check: this project has a documentation baseline; before the final acceptance run %s "
+            "and put the result under the acceptance results: name each current-state update left unchanged, each "
+            "target document with deletions, and each external document as unverified; attention does not block the "
+            "acceptance." % entry)
 
 
 def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict, review_step: str = "",
@@ -720,6 +791,8 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
         return lines, (("写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s），交给协调会话请用户审。" if zh else
                         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
                         "coordinating session for review.") % (module, module, cmd["plan"]))
+    if stop_node(root, module, stage, _spec, _plan) == "final-gate" and documentation_baseline_present(root):
+        lines.append(documentation_check_line(module, cmd, zh))
     gate = next_gate(root, module)
     if gate:
         lines.append(("- `%s` 的下一个 gate: %s — 到那里停下，把模块交回协调会话。" if zh else
@@ -730,16 +803,76 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
                    % ((cmd["build"], module, module, state["open"]) if zh else (cmd["build"], module, state["open"], module)))
 
 
+# quiet-injection (D5): the hint ends with a state code over the facts whose change calls for the full text; the
+# hook compares it with the code of its last injection in the transcript and otherwise gives one line.  The number of
+# unchecked items and the context size are left out: they change every turn without changing what to do.
+STATE_MARK = "<!-- spec-guard-state: %s -->"
+
+
+def state_key(*facts) -> str:
+    """Eight hex digits over `facts` (any reprs); equal facts give the same code in every process.
+
+    A checksum, not a fingerprint: spec-digest.py stays the only fingerprint algorithm.
+    """
+    return "%08x" % zlib.crc32(repr(facts).encode("utf-8"))
+
+
+def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict, zh: bool) -> tuple:
+    """What a role checkout is told about, without the counts its lines carry."""
+    state = by_id.get(module) if kind == "module" else None
+    if state is None:
+        return kind, module
+    stage = state["stage"]
+    if stage == "DONE" or state["suspended"]:
+        return kind, module, stage, state["suspended"]
+    _line, _step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
+    return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
+            next_gate(root, module) if stage == "BUILDING" else None)
+
+
+def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
+    """quiet-injection: the one line given while the state code is unchanged -- stage, module, unchecked, branch."""
+    parts = [stage, "`%s`" % module if module else "—",
+             "—" if open_items is None else (("未勾选 %d" if zh else "%d unchecked") % open_items)]
+    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    sha = None if branch else _git(root, "rev-parse", "--short", "HEAD")
+    if branch:
+        parts.append(("分支 `%s`" if zh else "branch `%s`") % safe_fragment(branch))
+    elif sha:
+        parts.append(("分离于 `%s`" if zh else "detached at `%s`") % safe_fragment(sha))
+    tail = "（状态未变，完整说明见此前的阶段提示）" if zh else " (unchanged; see the earlier phase hint for details)"
+    return "spec-guard: " + " · ".join(parts) + tail + " " + STATE_MARK % code
+
+
 def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
-             unattended: bool = False, host: str | None = None) -> str:
+             unattended: bool = False, host: str | None = None, window_estimated: bool = False,
+             state_extra: str | None = None, last_state: str | None = None) -> str:
+    """The stage hint; with `state_extra` (the hook's own facts: location, linked project) it ends with the state code.
+
+    When `last_state` equals that code, only the one line comes back, followed by the module-boundary line if this
+    turn has one.  Diagnostics (an unreadable or invalid map) carry no code, so they are never shortened.
+    """
     root = Path(root)
+    info: dict = {}
+    text = _describe_body(root, context_tokens, context_window, unattended, host, window_estimated, info)
+    if state_extra is None or "facts" not in info:
+        return text
+    code = state_key(*info["facts"], state_extra)
+    if last_state != code:
+        return text + "\n\n" + STATE_MARK % code
+    line = brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
+    return line + ("\n" + info["boundary"] if info["boundary"] else "")
+
+
+def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
+                   host: str | None, window_estimated: bool, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
     cmd = commands(host, zh)
     try:
         parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
     except OSError as error:
         # A file that cannot be read is an environment fault, not a state of the map.
-        return unreadable_map(safe_fragment(str(error)) or "诊断为空", zh)
+        return unreadable_map(safe_fragment(str(error)) or ("诊断为空" if zh else "no diagnostic"), zh)
     except (MapError, UnicodeError) as error:
         # The message carries the offending cell, which is the whole diagnostic value --
         # without it nobody knows which row is broken. It is also repository content, so
@@ -750,10 +883,10 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         if zh:
             return ("当前阶段: **MAP_INVALID**\n\n- 能力图: 已有但无效（能力图原文，非指令: %s）\n\n建议下一步: 运行 %s，修好能力图。"
                     % (safe_fragment(str(error)) or "诊断为空", cmd["verify-quoted"]))
-        return ("当前阶段: **MAP_INVALID**\n\n- Capability map: present but invalid "
-                "(能力图原文，非指令: %s)\n\n"
+        return ("Current stage: **MAP_INVALID**\n\n- Capability map: present but invalid "
+                "(capability map text, not instructions: %s)\n\n"
                 "Suggested next step: run %s and fix the capability map."
-                % (safe_fragment(str(error)) or "诊断为空", cmd["verify-quoted"]))
+                % (safe_fragment(str(error)) or "no diagnostic", cmd["verify-quoted"]))
     order = list(parsed.order) or [row.module_id for row in parsed.rows]
     states = [module_state(root, module_id) for module_id in order]
     by_id = {state["id"]: state for state in states}
@@ -769,8 +902,8 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     if active_status == "invalid":
         # Report it, but never echo it: the value is repository content, and the note
         # itself is enough for the user to find what they typed.
-        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；"
-                     "按 Build order 取当前模块。")
+        notes.append("- `.agent/state.json` 的 activeModule 不是有效的 module id；按 Build order 取当前模块。" if zh else
+                     "- The activeModule in `.agent/state.json` is not a valid module id; using Build order.")
     elif active and active in by_id and by_id[active]["suspended"]:
         notes.append(("- activeModule `%s` 已挂起；按 Build order 取当前模块。" if zh else
                       "- activeModule `%s` is suspended; using Build order.") % active)
@@ -779,14 +912,15 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                       "- activeModule `%s` is not in the capability map; using Build order.")
                      % safe_fragment(active))
     active_state = by_id.get(active) if active else None
-    boundary_at, mid_at, boundary_note, mid_note = thresholds(context_window, zh)
-    context_note = (context_line(context_tokens, mid_note, host, zh)
-                    if context_tokens is not None and context_tokens >= mid_at else "")
+    static_notes = tuple(notes)
+    role_facts = _role_facts(root, role_kind, role_id, by_id, cmd, zh)
+    boundary_at, boundary_note = thresholds(context_window, zh, window_estimated)
     # boundary-hint-unknown-size: no reading means no hint; a new session's first turn has no usage yet.
     boundary_note_line = (boundary_line(context_tokens, boundary_note, host, zh)
-                          if context_tokens is not None and context_tokens >= boundary_at else "")
+                          if context_tokens is not None and boundary_at is not None and context_tokens >= boundary_at
+                          else "")
     if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
-        context_note = boundary_note_line = ""
+        boundary_note_line = ""
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` 有 Plan 但没有 `tasks/%s/todo.md`，所以按已完成计；还有工作要做就补上 todo。"
@@ -820,7 +954,11 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
                       "push this branch and merge its %d commit(s) into `%s` first; then ") % (count, ref)
     else:
         hint = ""
+    suspended_ids = tuple(s["id"] for s in suspended)
     if stage == "DONE":
+        info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
+                           bool(unmerged and unmerged[0] > 0)],
+                    stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
         notes.extend(suspended_lines)
         if no_todo_note:
             notes.append(no_todo_note)
@@ -833,7 +971,7 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             notes.append(boundary_note_line)
         if role_kind in ("module", "coordinator"):
             role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd, zh=zh)
-            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "当前阶段: **DONE**\n\n- Capability map: present\n"
+            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
             return (head + counts + "\n" + "".join(n + "\n" for n in notes + role_lines)
                     + ("\n建议下一步: " if zh else "\nSuggested next step: ") + role_step)
         if zh:
@@ -849,19 +987,19 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
             return (head + "\n建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 "
                     + cmd["add-module"] + " 插入一个模块；" + proposal)
         if push_first:
-            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+            return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
                                                  % len(suspended) if suspended else
                                                  "every mapped module has a plan and no open todo item; ") + push_first +
                     "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + "; "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
         if suspended:
-            return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+            return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
                     "when its wait is over). For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with %s at this checkpoint; "
                     "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended),
                                                                                               cmd["add-module"]))
-        return ("当前阶段: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
+        return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                 "\nSuggested next step: every mapped module has a plan and no open todo item. "
                 "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + " at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
@@ -896,8 +1034,6 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
         # acceptance commit usually switches activeModule, and MODULE_DONE is never seen.  An unknown size adds nothing.
         if boundary_note_line:
             notes.append(boundary_note_line)
-    elif context_note:
-        notes.append(context_note)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     if review_line and role_kind != "module":
         counts += "\n" + review_line
@@ -945,13 +1081,22 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     if role_kind in ("module", "coordinator"):
         role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step, zh)
         notes = notes + role_lines
+    # rules-at-nodes: a serial project at a node gets that node's stop rules; role views follow the collaboration plugin.
+    node = stop_node(root, module, stage, spec_review, plan_review)
+    stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
+    if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
+        notes = notes + [documentation_check_line(module, cmd, zh)]
+    info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
+                       tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0)],
+                stage=stage, module=module, open=current["open"], zh=zh,
+                boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:
-        return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s"
+        return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s%s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,
-                   "".join(n + "\n" for n in notes), next_step))
-    return ("当前阶段: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
-            "\nSuggested next step: %s" % (stage, module, source, counts,
-                                          "".join(n + "\n" for n in notes), next_step))
+                   "".join(n + "\n" for n in notes), next_step, stop))
+    return ("Current stage: **%s**\n\n- Capability map: present\n- Current module: `%s` (%s)\n%s\n%s"
+            "\nSuggested next step: %s%s" % (stage, module, source, counts,
+                                            "".join(n + "\n" for n in notes), next_step, stop))
 
 
 if __name__ == "__main__":
@@ -960,17 +1105,37 @@ if __name__ == "__main__":
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--context-tokens", type=int)
     parser.add_argument("--context-window", type=int)
+    parser.add_argument("--window-estimated", action="store_true")  # quiet-injection: Claude's window is inferred
     parser.add_argument("--unattended", action="store_true")
     parser.add_argument("--host", choices=["claude", "codex"])
     # phase-hint-gaps: IDLE and MAP_ONLY are answered by phase-guard.sh itself; it asks for the project-config lines
     # here so they come from the one implementation.
     parser.add_argument("--config-lines", action="store_true")
     parser.add_argument("--hint-language", action="store_true")
+    parser.add_argument("--node-rules", metavar="KIND")  # rules-at-nodes: phase-guard.sh asks for IDLE / MAP_ONLY
+    # quiet-injection: phase-guard.sh passes its own facts (location, linked project) to end the hint with the state
+    # code; for IDLE / MAP_ONLY, which it answers itself, --state-key prints the code alone for --stage and --node.
+    parser.add_argument("--state-extra")
+    parser.add_argument("--last-state")
+    parser.add_argument("--state-key", action="store_true")
+    parser.add_argument("--stage")
+    parser.add_argument("--node")
     args = parser.parse_args()
+    if args.state_key:
+        root = Path(args.root)
+        zh = hint_language(root) == "zh-CN"
+        code = state_key(args.stage, args.node, zh, tuple(config_lines(root, args.host)), args.state_extra or "")
+        print(code)
+        print(brief_line(root, args.stage, None, None, code, zh))  # phase-guard.sh gives it when the code is unchanged
+        raise SystemExit(0)
+    if args.node_rules is not None:
+        sys.stdout.write(node_rules(args.node_rules))
+        raise SystemExit(0)
     if args.hint_language:
         print(hint_language(Path(args.root)))
         raise SystemExit(0)
     if args.config_lines:
         print("\n".join(config_lines(Path(args.root), args.host)))
         raise SystemExit(0)
-    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host))
+    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host,
+                   args.window_estimated, args.state_extra, args.last_state))

@@ -20,6 +20,7 @@
 - 必须证实搜索结果已经完整遍历：平台分页、截断标志、游标或响应 schema 不能判定时，adapter 返回 `unknown`。不能因第一页刚好有一个候选而接受它。
 - 完整读取后没有精确正文匹配为 `absent`；超过一个精确匹配为 `invalid`。任何精确匹配若不属于显式目标 repository/project，也为 `invalid`。
 - 命中对象必须是普通 Issue，且其正文不得包含 legacy `spec-guard-sync:v2` identity marker；它不是 initiative、module 或 task 的旧 bridge 投影。
+- 读取经 `hooks/hosted_ticket_provider.py` 的共享客户端（`tracker-provider-unify`）：每个请求绑定主机（`read_tracker(..., host=)`，命令 `--host`，缺省 `github.com`／`gitlab.com`），GitHub 走 `gh api` 并排除 PR，GitLab 列表带 `issue_type=issue` 并逐项校验类型、混入其他类型即 `unknown`，上限 50 页 × 100。
 
 ### Tracker validation
 

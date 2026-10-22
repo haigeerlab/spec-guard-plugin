@@ -46,8 +46,12 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --format json
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" status --project-dir "$PROJECT" --format json
 ```
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 需要检查 Epiq 用户级事项数据目录的本机访问位时，再运行 `storage-check --format json`。它只读地检查当前进程的 `EPIQ_GLOBAL_DIR`（缺省 `~/.epiq-global`），不会修复权限；`private-posix` 只证明 POSIX 所有者和权限位，不能证明 ACL 无额外访问。检查结果与上面的运行时 `status` 是两个独立事实，细则见运行时参考文档。需要收紧宽权限时先运行只读 `storage-protect --format json` 展示路径和 0700 目标；只有用户审查并明确授权这次真实目录写入后，才能加 `--confirm-protect`。它只改根目录权限，不创建目录或递归改事项文件。新生成的宿主片段与插件自己的初始化进程使用私有 umask；已有宿主 MCP 条目不会自动替换，需单独预览迁移。
 
@@ -95,8 +99,10 @@ python3 -B "$ROOT/hooks/local_ledger_runtime.py" install --confirm-install --rep
 用 `/spec-guard:local-ticket-portability` 的离线归档备份。
 
 ```bash
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --format json
-python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --local-only \
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" preflight --project-dir "$PROJECT" --format json
+python3 -B "$ROOT/hooks/local_ledger_runtime.py" initialize --project-dir "$PROJECT" --local-only \
   --confirm-initialize --user-name "用户提供的显示名" \
   --preferred-editor "用户提供的编辑器命令" --auto-sync "用户给的 true 或 false" --format json
 # 机器已设置的项省略对应参数，例如三项都已设置时只写 initialize --local-only --confirm-initialize --format json
@@ -135,3 +141,17 @@ GitHub/GitLab 恢复后，本功能不会自动创建、导入或持续同步远
 
 本阶段没有“删除账本”命令。不得为了停用而删除 `.epiq/`、`__epiq_state__`、受管运行时或 MCP 条目；这些
 动作会影响持久记录或其他项目，必须由单独的、可审查的移除设计处理。
+
+## 移除宿主配置
+
+用户要卸载 spec-guard、或不再在某个宿主里用账本时，把下面的步骤原样交给用户，由用户自己运行（不代为执行，
+它们改的是用户级配置）；先移除再卸插件，插件卸掉后本命令的脚本也不在了：
+
+- Claude Code：`claude mcp remove --scope user spec-guard-local-ledger`；再从 `~/.claude/settings.json` 的
+  `permissions.ask` 里删掉以 `mcp__spec-guard-local-ledger__` 开头的 10 条规则（`mcp remove` 不会删它们）。
+- Codex：`codex mcp remove spec_guard_local_ledger`，或手动删掉 `~/.codex/config.toml` 里
+  `[mcp_servers.spec_guard_local_ledger]` 那一整张表；别的配置不受影响。
+- 不再用账本时，受管运行时 `~/.spec-guard/local-ticket-ledger/runtime`（设了 `SPEC_GUARD_STATE_DIR` 时在那下面）可以删。
+
+账本数据（`.epiq/`、`__epiq_state__`、`~/.epiq-global`）是用户的记录，卸载不需要删；要带走先用
+`local-ticket-portability` 归档。改完重启对应客户端。

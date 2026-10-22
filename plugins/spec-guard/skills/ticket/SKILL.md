@@ -15,7 +15,16 @@ description: 在已启用的本地事项账本中受理开发需求或修复问�
 它不替代 Epiq 调用时的归属和并发保护。
 
 优先使用当前会话已连接的 `spec_guard_local_ledger` MCP 中的 `epiq_*` 工具，操作当前仓库。每次调用都传
-`repoRoot` 为当前项目根目录（`git rev-parse --show-toplevel`）：Epiq 不传时取 MCP 进程自己的当前目录，
+`repoRoot` 为项目根目录，取下面这条命令打印的路径（Claude Code 里 `--session` 改传 `"$CLAUDE_CODE_SESSION_ID"`）。有项目指向时
+它跟随到被指向的项目，stderr 写明「本次操作的是被指向的项目」，回复用户时照原文转述；退出 2 是指向失效，照原文报告诊断，
+不要改用会话目录：
+
+```bash
+FROM="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CODEX_THREAD_ID:-}"
+```
+
+Epiq 不传 `repoRoot` 时取 MCP 进程自己的当前目录，
 Claude 的用户级 MCP 进程不在会话目录里启动，会报 “No .epiq/project.json found”，这不代表账本未启用。已知事项
 短编号时直接 `epiq_issue_get`；查找或列出时用 `epiq_issue_list`，先用 `brief` 缩小范围。
 面向用户提到具体事项时，以工具读到的标题为主、短编号仅作定位：首次写成

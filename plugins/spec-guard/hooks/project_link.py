@@ -153,13 +153,13 @@ def _phase(target: Path) -> str:
         text = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
         return ""
-    return next((line for line in text.splitlines() if line.startswith("当前阶段")), "")
+    return next((line for line in text.splitlines() if line.startswith(("当前阶段", "Current stage"))), "")
 
 
 # link-shared-directory-note: the link is keyed by directory, so every session there follows it.
-SHARED = ("The link applies to every session that runs in this directory. When several sessions share it and work on "
-          "different projects, do not link: open each session in its own project directory, or pass the project path "
-          "explicitly.")
+SHARED = ("The link applies to every session that runs in this directory, and every spec-guard command run there follows "
+          "it. When several sessions share it and work on different projects, give each session its own entry with "
+          "--session.")
 
 WHY = {"invalid": "the file is neither `{version: 1, project}` nor `{version: 2, sessions, project?}` with valid paths and "
                   "session ids",
@@ -170,6 +170,41 @@ WHY = {"invalid": "the file is neither `{version: 1, project}` nor `{version: 2,
 
 ONE_SESSION = ("This entry applies to session %s only; other sessions in the directory are not affected. Take the id "
                "from CLAUDE_CODE_SESSION_ID in Claude Code or CODEX_THREAD_ID in Codex, and pass it explicitly.")
+
+
+# D18: what `follow` says.  The broken-link wording matches the phase hook's diagnostics in phase-guard.sh.
+FOLLOWED = "spec-guard: 本次操作的是被指向的项目 `%s`（来源：%s，指向文件 `%s`）。"
+SOURCE_NAME = {"session": "本会话的登记", "directory": "目录级指向"}
+BROKEN = {"invalid": "它的格式无效（应为 JSON 对象：版本 1 只含 version 与 project；版本 2 含 version、sessions，可选 project）",
+          "missing": "%s指向的目录不存在或不是目录（%s）",
+          "not-enabled": "%s指向的目录没有启用 spec-guard（%s）：那里没有约定块，也没有带 activeModule 的 `.agent/state.json`"}
+STOPPED = ("spec-guard: 本目录有指向文件 `.agent/spec-guard-link.json`，但%s，命令没有执行。用 `/spec-guard:link-project`"
+           "（Codex：`spec-guard-ops` 的 link-project 一节）查看、重新建立或解除指向。这是指向失效，不是「未启用」。")
+
+
+def follow(session_root, session_id: str | None = None) -> tuple:
+    """(exit code, project to operate on, message for stderr): the link-following every command shares.
+
+    A session directory that is enabled itself, or has no link that applies to this session, is the project.
+    A link that applies but is broken stops the command; it never falls back to the session directory.
+    """
+    from module_stage import safe_fragment
+
+    root = Path(session_root).resolve()
+    if enabled(root):
+        return 0, str(root), ""
+    ids = [session_id] if session_id and SESSION_ID.fullmatch(session_id) else []
+    state, target, source = resolve_for(root, ids)
+    if state == "none":
+        return 0, str(root), ""
+    which = "其中本会话的登记" if source == "session" else "它"
+    if state == "ok" and enabled(target):
+        return 0, str(target), FOLLOWED % (safe_fragment(str(target), PATH_SHOWN), SOURCE_NAME[source],
+                                           safe_fragment(str(root / LINK_PATH), PATH_SHOWN))
+    shown = safe_fragment(str(target), PATH_SHOWN) if target is not None else ""
+    reason = "not-enabled" if state == "ok" else state
+    why = BROKEN.get(reason, "没能读取它（检查没有正常运行）")
+    return 2, "", STOPPED % (why if reason == "invalid" or reason not in BROKEN else why % (which, shown))
 
 
 def _serialise(link: dict) -> str | None:
@@ -358,19 +393,27 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Link a session directory to the project it works on.")
     sub = parser.add_subparsers(dest="action", required=True)
     probe = sub.add_parser("resolve", help="for the phase hook: status, target, then both paths made safe to print")
+    follower = sub.add_parser("follow", help="for commands: print the project to operate on, following the link")
     show = sub.add_parser("show", help="report the link and whether it is valid")
     setter = sub.add_parser("set", help="write the link (preview unless --confirm)")
     setter.add_argument("--project", required=True)
     unsetter = sub.add_parser("unset", help="remove the link (preview unless --confirm)")
     probe.add_argument("--hook-input", action="store_true", help="read the hook input (JSON) from stdin for the session id")
-    for command in (probe, show, setter, unsetter):
+    for command in (probe, follower, show, setter, unsetter):
         command.add_argument("--from", dest="session", default=".")
     for command in (setter, unsetter):
         command.add_argument("--confirm", action="store_true")
-    for command in (show, setter, unsetter):
+    for command in (follower, show, setter, unsetter):
         command.add_argument("--session", dest="session_id", help="act on this session's own entry (the host's session id)")
     args = parser.parse_args(argv)
     session = Path(args.session).resolve()
+    if args.action == "follow":
+        code, project, message = follow(session, args.session_id)
+        if project:
+            print(project)
+        if message:
+            print(message, file=sys.stderr)
+        return code
     if args.action == "resolve":
         ids = session_ids_from_hook_input(sys.stdin.read()) if args.hook_input else []
         state, target, source = resolve_for(session, ids)

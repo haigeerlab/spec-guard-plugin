@@ -208,11 +208,16 @@ project config-valid; mkdir -p "$PROJECT/.agent"
 printf '{"version": 1, "artifactLanguage": "zh-CN", "reviewCadence": "combined"}\n' > "$PROJECT/.agent/config.json"
 check "合法的项目配置通过" 0 "项目配置有效"
 # hint-language-follow：阶段提示的语言与这里同一判据（project_config.load）。zh-CN 有效（上一例），不合规的
-# zh_CN 判无效——阶段提示在同一份配置下出英文并带 invalid 行。
+# zh_CN 判无效——阶段提示在同一份配置下出英文并带 ignored 行（config-per-key：只丢这个键）。
 printf '{"version": 1, "artifactLanguage": "zh_CN"}\n' > "$PROJECT/.agent/config.json"
 check "不合规的语言标签判无效" 1 "项目配置无效: artifactLanguage-invalid"
 printf '{"version": 1, "reviewCadence": "both", "extra": 1}\n' > "$PROJECT/.agent/config.json"
 check "无效的项目配置失败并列出原因" 1 "项目配置无效: unknown-key, reviewCadence-invalid"
+# config-per-key：只有不认识的键（多半来自更新版本）只警告；结构问题仍失败。
+printf '{"version": 1, "artifactLanguage": "en", "extra": 1}\n' > "$PROJECT/.agent/config.json"
+check "只有未知键时警告、不失败" 0 "项目配置里有不认识的键，已忽略（可能来自更新版本的 spec-guard）"
+printf '{"version": 2, "artifactLanguage": "en"}\n' > "$PROJECT/.agent/config.json"
+check "结构问题的项目配置失败" 1 "项目配置无效: version-invalid"
 printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
 check "并行开关 on 的项目配置通过" 0 "项目配置有效"
 printf '{"version": 1, "moduleConcurrency": "yes"}\n' > "$PROJECT/.agent/config.json"

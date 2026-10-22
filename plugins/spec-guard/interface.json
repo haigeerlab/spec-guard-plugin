@@ -1,5 +1,5 @@
 {
-  "interface": "1.8",
+  "interface": "1.10",
   "mapView": {
     "command": [
       "python3",
@@ -184,8 +184,8 @@
   },
   "reviewKinds": {
     "appearsWhen": "always (interface 1.5); add-only: kinds and section names are never renamed or removed within 1.x",
-    "description": "the kinds of user decision spec-guard's shared checkpoint rules produce, with the sections each one shows in the conversation, in order. Every kind needs a reply; the recommended reply sits in one copyable code block, except when a consumer plugin requires that the user's decisions be asked only in the hub (or relayed there through a coordinating session): then the content is still shown in full, but there is no copy block, only a line pointing to the hub (\"去决策收件箱答 #N\", or \"去决策收件箱答\" without an item number). Kinds spec-guard does not produce (go-to-session, interface proposals) are not listed",
-    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (contract v2.3); label is the value written there",
+    "description": "the kinds of user decision spec-guard's shared checkpoint rules produce, with the sections each one shows in the conversation, in order. Every kind needs a reply; the recommended reply sits in one copyable code block unless the installed collaboration plugin rules where the user answers. Kinds spec-guard does not produce (go-to-session, interface proposals) are not listed",
+    "field": "each key is the code of the session-protocol 【等待用户】「类型」 value (values defined in contract v2.3 and unchanged through v2.6); label is the value written there",
     "kinds": {
       "capability-map": {
         "label": "能力图审阅",
@@ -208,10 +208,12 @@
       "plan": {
         "label": "Plan",
         "sections": [
+          "架构决定",
           "分几步",
           "会改哪些文件",
           "风险",
-          "中途会停下来问你的地方"
+          "中途会停下来问你的地方",
+          "未决问题"
         ]
       },
       "spec-plan": {
@@ -222,10 +224,12 @@
           "要你确认的假设",
           "验收标准",
           "附带的小决定",
+          "架构决定",
           "分几步",
           "会改哪些文件",
           "风险",
-          "中途会停下来问你的地方"
+          "中途会停下来问你的地方",
+          "未决问题"
         ],
         "notes": "reviewCadence combined: the Spec sections, then the Plan sections, approved at once"
       },
@@ -261,7 +265,15 @@
     ],
     "commonLinesNote": "separate lines after the sections, not sections themselves; 注意 says 无 when empty",
     "rules": "references/workflow-checkpoints.md",
-    "contract": "spec/review-card-sections.md"
+    "contract": "spec/review-card-sections.md",
+    "renamedSections": {
+      "since": "1.9",
+      "map": {
+        "做／不做": "边界",
+        "附带的小决定": "未决问题"
+      },
+      "note": "session-protocol v2.6 upstream names; spec-guard writes the new names, both stay valid, the old names in kinds stay until 2.0"
+    }
   },
   "gateTick": {
     "command": [
@@ -280,5 +292,41 @@
     },
     "notes": "interface 1.7; ticks only the final gate's checkbox in tasks/<id>/todo.md, by the same criterion as the stage hint's final gate (gates and nextGate use it too, Chinese checkpoint forms included); ordinary items after it are left and counted; the rest of the line and its line ending are kept; never commits; the caller must already hold the user's approval of the final acceptance, as with reviewMark",
     "contract": "spec/gate-tick.md"
+  },
+  "scopeOverlap": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/module_scope.py",
+      "overlap",
+      "--project",
+      "<project-root>",
+      "--spec",
+      "<module-id>=<spec-file>"
+    ],
+    "readOnly": true,
+    "exitCodes": {
+      "0": "ok; stdout is {\"conflicts\": [{\"modules\": [a, b], \"paths\": [...], \"sources\": {a: <spec-file or \"project\">, b: ...}}], \"errors\": [{\"module\": <id or null>, \"source\": <spec-file or \"project\">, \"error\": <code>}]}; a Spec without a usable boundary is listed in errors and left out, the rest are still compared",
+      "2": "usage error, nothing compared: neither --spec nor --project, a --spec not in <module-id>=<file> form, an invalid or repeated module id, or --project is not a directory"
+    },
+    "values": {
+      "source": {
+        "<spec-file>": "the --spec file path as given; it replaces the project's spec/<id>.md for that module",
+        "project": "spec/<id>.md of a module that /map reports in_progress or ready in --project"
+      },
+      "error": {
+        "no-boundary": "the Spec has no concurrency boundary section",
+        "missing-exclusive": "the boundary section has no exclusive line",
+        "bad-path": "an exclusive path is malformed",
+        "bad-category": "an unknown shared-file category",
+        "duplicate-section": "two concurrency boundary sections",
+        "unknown-line": "a line in the boundary section that is neither exclusive nor shared",
+        "unreadable": "the Spec file cannot be read as UTF-8",
+        "no-capability-map": "--project has no spec/CAPABILITY-MAP.md; only the --spec files were compared",
+        "map-unreadable": "the capability map or a module file under --project cannot be read; only the --spec files were compared"
+      }
+    },
+    "notes": "interface 1.10; --spec is repeatable and --project is optional, at least one is required; relative --spec paths resolve against the working directory; runs whatever moduleConcurrency says; every pair is compared, overlap is the same rule as mapView startable.conflicts (equal paths, or one inside the other's directory; the narrower path is listed); modules are ordered by Build order, modules not in the map follow in --spec order",
+    "contract": "spec/scope-overlap-interface.md"
   }
 }

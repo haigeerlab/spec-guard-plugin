@@ -27,10 +27,15 @@ GitLab 的目标容器是正整数 project id：
 
 ```python
 result = read_tracker(published.proposal, "gitlab", 17)
+result = read_tracker(published.proposal, "gitlab", 17, host="git.example.com")  # 自建实例
 ```
 
-读取器用只读请求列出 Issue：GitHub 为 `gh issue list --state all --limit 1000`，GitLab 为
-`glab api projects/<id>/issues?state=all&per_page=100&page=<n>` 的默认 GET，逐页读取至短页，最多 10 页。
+读取器经 `hooks/hosted_ticket_provider.py` 的共享客户端只读列出 Issue（托管事项、本地交接、Proposal 收尾用的是同一份）：
+每个请求都带 `--hostname <host>`，`host` 缺省为 `github.com`／`gitlab.com`；先读目标本身，再读
+GitHub `gh api repos/<owner>/<repo>/issues?state=all&per_page=100&page=<n>`（排除 PR）或
+GitLab `glab api projects/<id>/issues?state=all&scope=all&issue_type=issue&per_page=100&page=<n>`，逐页读取至短页，最多 50 页。
+GitLab 只认普通 Issue：返回里混入事件、任务等其他类型时整次读取报 `unknown`；Issue 地址的主机与协议须与目标的 `web_url` 一致，
+`/-/issues/<iid>` 与 `/-/work_items/<iid>` 两种写法都认。
 两个平台都不依赖服务端搜索：最终身份只来自正文中单独一行的完整 Proposal marker，在本地逐行匹配。
 GitLab 的 `search=` 匹配不到 HTML 注释里的文字（GitLab 15.3.2 实测，2026-09-28），而 marker 正是一行
 HTML 注释。关闭的 Proposal Issue 同样会被读到。读满上限仍未结束、CLI、认证、网络、JSON 或容器字段

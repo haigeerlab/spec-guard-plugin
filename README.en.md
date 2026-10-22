@@ -3,9 +3,10 @@
 [简体中文](README.md) | English
 
 spec-guard is a companion plugin for [agent-skills](https://github.com/addyosmani/agent-skills), for Claude Code and
-Codex. agent-skills assumes one Spec and one plan per project; spec-guard lets one project be split into modules, each
-with its own Spec, Plan and todo, and tells the agent at the start of every turn which module to work on and how far
-it has got.
+Codex. agent-skills' `/spec` can already split a requirement into a capability map and one Spec per module, but `/plan`
+always writes the same `tasks/plan.md` and `todo.md`, so modules overwrite each other and the next turn does not know how
+far the work has got. spec-guard gives each module its own Spec, Plan and todo, and tells the agent at the start of
+every turn which module to work on and how far it has got.
 
 Linked documents other than this README are in Chinese.
 
@@ -37,7 +38,8 @@ Limits:
 - **Module**: one row of the capability map. Each module has `spec/<module>.md` (the Spec) and
   `tasks/<module>/plan.md` and `todo.md`.
 - **Stage**: spec-guard infers progress from those files, e.g. `MAP_ONLY` (only a capability map), `NEEDS_PLAN`,
-  `BUILDING`, `MODULE_DONE`, `DONE`, and injects it for the agent every turn.
+  `BUILDING`, `MODULE_DONE`, `DONE`, and injects it for the agent: in full when the state changes, in a new session or
+  after compaction, as one line on the other turns.
 - **Quick insert and Proposal**: to add a requirement halfway, insert a module at a checkpoint; when the addition needs
   a recorded, reviewed decision, use the Proposal flow.
 
@@ -57,7 +59,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.83.2` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.84.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction; after upgrading from 0.68.x, also trust the `SessionStart` hook for session start and clear once |
 
@@ -104,7 +106,7 @@ Once enabled, send the agent any message and it sees a stage hint like this in i
 ```text
 ## spec-guard local workflow
 
-当前阶段: **NEEDS_PLAN**
+Current stage: **NEEDS_PLAN**
 
 - Capability map: present
 - Current module: `billing` (next in Build order)
@@ -139,7 +141,18 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
 
 1. In every project that used it, run `/spec-guard:teardown-convention` (preview with `--dry-run` first). It removes
    the convention block and stops the stage hint; your `spec/` and `tasks/` stay.
-2. Then remove the plugin: `claude plugin uninstall spec-guard@spec-guard-marketplace` for Claude Code;
+2. If you used the local ticket ledger and connected it to a host, remove what it wrote into the host configuration
+   before removing the plugin (skip this if you never connected it):
+   - Claude Code: run `claude mcp remove --scope user spec-guard-local-ledger`, then delete the 10 rules starting with
+     `mcp__spec-guard-local-ledger__` from `permissions.ask` in `~/.claude/settings.json`;
+   - Codex: run `codex mcp remove spec_guard_local_ledger` (or delete the whole `[mcp_servers.spec_guard_local_ledger]`
+     table from `~/.codex/config.toml` by hand);
+   - if you no longer use the ledger, you can delete the managed runtime `~/.spec-guard/local-ticket-ledger/runtime`
+     (under `SPEC_GUARD_STATE_DIR` when that is set).
+
+   The ledger data (`.epiq/` in the project, the `__epiq_state__` state worktree, `~/.epiq-global`) is your record and
+   does not need to be deleted; to take it elsewhere, archive it with `local-ticket-portability` first.
+3. Then remove the plugin: `claude plugin uninstall spec-guard@spec-guard-marketplace` for Claude Code;
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
 
@@ -149,7 +162,7 @@ By default spec-guard moves one module at a time. When there are many modules an
 one: spec-guard does the **planning**, and the companion plugin module-crew does the **running** (opening sessions, creating worktrees,
 messaging, merging). With the switch off none of this appears and nothing changes.
 
-1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid).
+1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid; from this version on, an unknown key is ignored on its own).
 2. At the capability-map review the agent adds a concurrency assessment: which modules could become comma groups in the Build order, which are worth moving up.
 3. Each module Spec gets a "并行边界" (concurrency boundary) section naming the directories it owns; `verify-artifacts` checks its format and the final acceptance marks files changed outside it.
 4. `/spec-guard:map` lists the modules that can start together, overlapping boundaries, and the progress in each module worktree.
@@ -169,7 +182,8 @@ From 1.1 it also lists the entries used for developing several modules at once (
   reads this machine's plugin records to see whether delegate is installed. From the session transcript the
   host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
   the conversation. In a project with the local ticket ledger enabled, the hook only checks whether
-  `.epiq/project.json` exists; it does not read the ledger.
+  `.epiq/project.json` exists; it does not read the ledger. A project with only the ledger and no convention still gets
+  the ledger reminders at session start, after a clear or a compaction, and when another session's message arrives.
 - **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
   `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
   goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).
@@ -179,8 +193,10 @@ From 1.1 it also lists the entries used for developing several modules at once (
   its runtime with `npm ci` from the lock files shipped in the package. The hook and every other command, such as
   `map`, `phase`, `verify-artifacts`, `review-mark` and `cost-report`, stay offline.
 - **Usage statistics and uploads**: `cost-report` reads the local Claude Code (`~/.claude/projects/`) and Codex
-  (`~/.codex/sessions/`) session transcripts offline, counts only tokens and turns, and prints the result to the
-  terminal. The plugin has no telemetry and reports nothing anywhere.
+  (`~/.codex/sessions/`) session transcripts offline. It uses their token counts, user prompt times (to cut the module
+  wrap-up), whether a tool call errored and subagent spawns (to count a subagent's usage toward the task that started
+  it), only in memory during the run to attribute them to tasks; the output is counts only, never session content, and is printed to the terminal. The plugin has no
+  telemetry and reports nothing anywhere.
 
 Details: [design and architecture](docs/design.md) (Chinese).
 

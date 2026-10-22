@@ -1,5 +1,5 @@
 ---
-description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关），并汇总派活开关与默认事项后端的当前值和来源
+description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关），并汇总默认事项后端的当前值和来源
 allowed-tools: Bash
 ---
 
@@ -38,9 +38,12 @@ sys.exit(4)
 fi
 [ -n "$ROOT" ] || { echo "spec-guard 无法定位插件根目录：${WHY}。这是定位失败，不代表插件未安装。" >&2; exit 2; }
 [ -d "$ROOT" ] || { echo "spec-guard 插件根目录不存在：${ROOT}（插件可能刚更新或被移除，重开会话后再试）。" >&2; exit 2; }
-PROJECT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+FROM="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PROJECT="$(python3 -B "$ROOT/hooks/project_link.py" follow --from "$FROM" --session "${CLAUDE_CODE_SESSION_ID:-}")" || exit 2
 python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 ```
+
+有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 ## 配置放在哪
 
@@ -56,15 +59,14 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 |---|---|---|---|
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译。恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「批准节奏」 |
-| `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置 |
+| `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置；从本版起，新版本遇到不认识的键只忽略那个键 |
 
 设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency` 例外：取什么值都不注入，它的效果只在相应规则的停点出现。
 
-只读汇总、不在这里修改的两项：
+只读汇总、不在这里修改的一项：
 
 | 项 | 存在哪 | 用什么改 |
 |---|---|---|
-| `dispatch`（子代理派活规则） | `CLAUDE.md`／`AGENTS.md` 约定块里的标记行 | `/spec-guard:setup-convention --replace --dispatch`（关闭用 `--no-dispatch`） |
 | `trackerDefault`（默认事项后端） | `.agent/tracker.json` | `/spec-guard:tracker-default` |
 
 ## 设置或取消
@@ -84,6 +86,11 @@ python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key revi
 
 ## 配置无效时
 
-文件存在但不可用（JSON 坏、`version` 不是 1、有未知键、取值不合法）时，所有配置项按默认处理，
-`show` 列出问题代码，阶段提示只注入一行 `Project config: invalid`，`verify-artifacts` 判失败。
-这时 `set`／`unset` 拒绝写入：先照问题代码修好或删掉文件。问题代码是固定词表，不复述文件里的内容。
+问题分两类，问题代码都是固定词表，不复述文件里的内容。
+
+- **文件本身坏了**（读不了、JSON 坏、顶层不是对象、`version` 不是 1）：所有配置项按默认处理，`show` 列出问题代码，
+  阶段提示只注入一行 `Project config: invalid`，`verify-artifacts` 判失败。这时 `set`／`unset` 拒绝写入：先照问题代码修好或删掉文件。
+- **个别键有问题**（有不认识的键、某个键取值不合法）：只有那个键失效，取值不合法的键按默认处理，其余设置照常生效；
+  阶段提示多一行 `Project config: ignored (<问题代码>)`。只有不认识的键时 `check` 通过（输出 `ok (ignored: unknown-key)`）、
+  `verify-artifacts` 只警告——这种键多半来自更新版本的 spec-guard；有取值不合法的键时两者仍判失败。`set`／`unset` 照常可用，
+  只改指定的键，不认识的键和别的键的原值原样保留。

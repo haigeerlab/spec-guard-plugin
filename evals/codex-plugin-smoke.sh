@@ -116,7 +116,7 @@ except (OSError, UnicodeError, ValueError):
     raise SystemExit(2)
 
 observed = False
-stage = re.compile(r"当前阶段:\s*\*\*(?:IDLE|MAP_ONLY|NEEDS_SPEC|NEEDS_PLAN|BUILDING|MODULE_DONE|DONE)\*\*")
+stage = re.compile(r"(?:当前阶段|Current stage):\s*\*\*(?:IDLE|MAP_ONLY|NEEDS_SPEC|NEEDS_PLAN|BUILDING|MODULE_DONE|DONE)\*\*")
 for event in events:
     if not isinstance(event, dict):
         continue
@@ -193,6 +193,10 @@ selftest() {
   SMOKE_TMP="$(mktemp -d)"; trap 'rm -rf "$SMOKE_TMP"' EXIT
   printf '%s\n' '{"type":"hook.completed","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"## spec-guard local workflow\n当前阶段: **NEEDS_PLAN**"}}' > "$SMOKE_TMP/valid"
   grade "$SMOKE_TMP/valid"; rc=$?
+  [ "$rc" -eq 0 ] || return 1
+  # quiet-injection（F14）：产物语言不是 zh-CN 时阶段标题是英文。
+  printf '%s\n' '{"type":"hook.completed","hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"## spec-guard local workflow\nCurrent stage: **NEEDS_PLAN**"}}' > "$SMOKE_TMP/valid-en"
+  grade "$SMOKE_TMP/valid-en"; rc=$?
   [ "$rc" -eq 0 ] || return 1
   printf '%s\n' '{"type":"item.completed","item":{"type":"agent_message","text":"当前阶段：IDLE"}}' > "$SMOKE_TMP/model-echo"
   grade "$SMOKE_TMP/model-echo"; rc=$?

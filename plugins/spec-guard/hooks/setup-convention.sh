@@ -7,7 +7,6 @@ HOST="claude"
 DRY=false
 REPLACE=false
 ACCEPT_REMOVALS=false
-DISPATCH_ARG=""
 for arg in "$@"; do
   case "$arg" in
     local) : ;;
@@ -20,14 +19,10 @@ for arg in "$@"; do
     --replace) REPLACE=true ;;
     --accept-removals) ACCEPT_REMOVALS=true ;;
     --dispatch|--no-dispatch)
-      want=on; [ "$arg" = --no-dispatch ] && want=off
-      if [ -n "$DISPATCH_ARG" ] && [ "$DISPATCH_ARG" != "$want" ]; then
-        echo "--dispatch and --no-dispatch are mutually exclusive; no files were changed." >&2
-        exit 2
-      fi
-      DISPATCH_ARG="$want"
+      echo "${arg}: the build-task-dispatch rule was retired; no files were changed." >&2
+      exit 2
       ;;
-    *) echo "usage: setup-convention.sh [local] [--host=codex] [--dry-run] [--replace [--accept-removals]] [--dispatch|--no-dispatch]" >&2; exit 2 ;;
+    *) echo "usage: setup-convention.sh [local] [--host=codex] [--dry-run] [--replace [--accept-removals]]" >&2; exit 2 ;;
   esac
 done
 if [ "$ACCEPT_REMOVALS" = true ] && [ "$REPLACE" != true ]; then
@@ -54,7 +49,8 @@ else
 fi
 
 BLOCK_TOOL="$HERE/managed-block.py"
-# 可选的 build-task-dispatch 规则段：开关状态就是块内这一行标记（独占一行，去首尾空白后相等）。
+# 已退役的 build-task-dispatch 规则段（D17）：旧块里这一行标记（独占一行，去首尾空白后相等）表示还带着它；
+# 规则模板只作 --known 传给 managed-block.py，--replace 与 teardown 据此不需 --accept-removals 就移除整段。
 DISPATCH_MARKER='<!-- spec-guard: build-task-dispatch -->'
 
 # 标记必须独占一行（与 managed-block.py、phase-guard 相同）；正文里提到标记不算已有声明块。
@@ -73,7 +69,6 @@ if [ "$(marker_lines)" -gt 0 ]; then
   HAS_BLOCK=true
 fi
 
-# 期望的规则段状态：显式参数 > 已有块内的标记行 > 关。
 dispatch_in_block() {
   awk -v b="$BEGIN" -v e="$END" -v m="$DISPATCH_MARKER" '
     {s=$0; gsub(/^[ \t\r]+|[ \t\r]+$/, "", s)}
@@ -82,27 +77,15 @@ dispatch_in_block() {
     s==b {inb=1}
     END {exit found ? 0 : 1}' "$TARGET"
 }
-if [ -n "$DISPATCH_ARG" ]; then
-  DISPATCH="$DISPATCH_ARG"; DISPATCH_SOURCE=--dispatch
-  [ "$DISPATCH_ARG" = on ] || DISPATCH_SOURCE=--no-dispatch
-elif [ "$HAS_BLOCK" = true ] && dispatch_in_block; then
-  DISPATCH=on; DISPATCH_SOURCE="kept from existing block"
-else
-  DISPATCH=off; DISPATCH_SOURCE=""
-fi
-dispatch_status() {
-  if [ -n "$DISPATCH_SOURCE" ]; then
-    printf '  • build-task-dispatch rule: %s (%s)\n' "$DISPATCH" "$DISPATCH_SOURCE"
-  else
-    printf '  • build-task-dispatch rule: %s\n' "$DISPATCH"
-  fi
+RETIRED_RULE=false
+if [ "$HAS_BLOCK" = true ] && dispatch_in_block; then RETIRED_RULE=true; fi
+retired_status() {
+  [ "$RETIRED_RULE" = true ] || return 0
+  printf '  • retired build-task-dispatch rule section will be removed\n'
 }
-# 写入内容＝基础模板，开启时其后接规则段；新建与 --replace 共用。
-# convention-block-blank-lines：两段之间空一行；标记旁的空行由 managed-block.py compose／replace 统一排。
+# 写入内容＝基础模板；新建与 --replace 共用。标记旁的空行由 managed-block.py compose／replace 统一排。
 block_content() {
   cat "$TEMPLATE"
-  [ "$DISPATCH" = on ] && { printf '\n'; cat "$RULE"; }
-  return 0
 }
 
 # teardown 保留的状态不能被新的空 state 静默遮住；由用户先决定是否恢复。
@@ -119,7 +102,6 @@ install_block() {
   if [ "$HAS_BLOCK" = true ]; then
     if [ "$REPLACE" != true ]; then
       printf '  ⏭ %s already has a convention block (use --replace to update it)\n' "$TARGET"
-      [ -z "$DISPATCH_ARG" ] || printf '  ⏭ --dispatch/--no-dispatch only take effect together with --replace\n'
       return
     fi
     BODY="$(mktemp)"
@@ -128,7 +110,7 @@ install_block() {
     # convention-block-local-lines：本地段原样保留；删除模板以外的行须 --accept-removals（managed-block.py 判定）。
     if [ "$DRY" = true ]; then
       printf '  • replace the convention block in %s\n' "$TARGET"
-      dispatch_status
+      retired_status
       PREVIEW="$(python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$BODY" --known "$TEMPLATE" --known "$RULE" --dry-run)" || exit 1
       printf '%s\n' "$PREVIEW" | sed 's/^/    /'
       return
@@ -145,11 +127,11 @@ install_block() {
       exit 1
     fi
     printf '  ✅ updated %s\n' "$TARGET"
+    retired_status
     return
   fi
   if [ "$DRY" = true ]; then
     printf '  • append a convention block to %s\n' "$TARGET"
-    dispatch_status
     return
   fi
   BODY="$(mktemp)"

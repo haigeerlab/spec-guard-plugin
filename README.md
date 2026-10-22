@@ -3,8 +3,9 @@
 简体中文 | [English](README.en.md)
 
 spec-guard 是 [agent-skills](https://github.com/addyosmani/agent-skills) 的配套插件，支持 Claude Code 和 Codex。
-agent-skills 默认一个项目只有一份 Spec 和一份 plan；spec-guard 让同一个项目可以拆成多个模块，每个模块各有自己的
-Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个模块、做到了哪一步。
+agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec，但 `/plan` 每次都写同一份 `tasks/plan.md`／`todo.md`，
+模块之间会互相覆盖，下一轮也不知道做到了哪。spec-guard 让每个模块各有自己的 Spec、Plan 和 todo，并在每轮对话开头
+告诉 agent 现在该做哪个模块、做到了哪一步。
 
 ## 使用场景与边界
 
@@ -31,7 +32,7 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 - **能力图** `spec/CAPABILITY-MAP.md`：一张表列出全部模块、职责与依赖，外加一行 Build order（构建顺序）。
 - **模块**：能力图里的一行。每个模块有 `spec/<模块>.md`（Spec）和 `tasks/<模块>/plan.md`、`todo.md`。
 - **阶段**：spec-guard 根据这些文件推断当前进度，例如 `MAP_ONLY`（只有能力图）、`NEEDS_PLAN`、`BUILDING`、
-  `MODULE_DONE`、`DONE`，每轮注入给 agent。
+  `MODULE_DONE`、`DONE`，注入给 agent：状态变了、新会话或压缩后给完整说明，其余轮次只给一行。
 - **快速插入与 Proposal**：做到一半加需求，可以在检查点直接插入模块；需要留痕、审查时走 Proposal 流程。
 
 术语和设计理由见[设计理念与术语](docs/concepts.md)。
@@ -50,7 +51,7 @@ Spec、Plan 和 todo，并在每轮对话开头告诉 agent 现在该做哪个�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.83.2` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.84.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入；从 0.68.x 升级后，会话开始与清空后的那项 `SessionStart` 也要信任一次 |
 
@@ -94,7 +95,7 @@ Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用�
 ```text
 ## spec-guard local workflow
 
-当前阶段: **NEEDS_PLAN**
+Current stage: **NEEDS_PLAN**
 
 - Capability map: present
 - Current module: `billing` (next in Build order)
@@ -128,7 +129,16 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 
 1. 先在每个用过的项目里运行 `/spec-guard:teardown-convention`（先 `--dry-run` 预览），移除约定块并停用阶段提示；
    你的 `spec/`、`tasks/` 会保留。
-2. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
+2. 用过本地事项账本、并把它接入过宿主的，卸插件之前先移除账本写进宿主的配置（没接入过就跳过）：
+   - Claude Code：运行 `claude mcp remove --scope user spec-guard-local-ledger`，再从 `~/.claude/settings.json` 的
+     `permissions.ask` 里删掉以 `mcp__spec-guard-local-ledger__` 开头的 10 条规则；
+   - Codex：运行 `codex mcp remove spec_guard_local_ledger`（或手动删掉 `~/.codex/config.toml` 里
+     `[mcp_servers.spec_guard_local_ledger]` 那一整张表）；
+   - 不再用账本时，可以删掉受管运行时 `~/.spec-guard/local-ticket-ledger/runtime`（设了 `SPEC_GUARD_STATE_DIR` 时在那下面）。
+
+   账本数据（项目里的 `.epiq/`、`__epiq_state__` 状态 worktree、`~/.epiq-global`）是你的记录，卸载不需要删；要带走先用
+   `local-ticket-portability` 归档。
+3. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
    `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
    `codex plugin marketplace remove spec-guard-marketplace`。
 
@@ -137,7 +147,7 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 默认情况下 spec-guard 一次推进一个模块。模块多而且彼此独立时，可以让几个会话同时各做一个模块：spec-guard 负责**规划**，开会话、建 worktree、
 发消息、合并这些**运行**的事交给配套插件 module-crew。不打开开关时，下面这些都不出现，一切照旧。
 
-1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，旧版本会把整份配置判为无效）。
+1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，旧版本会把整份配置判为无效；从本版起，新版本遇到不认识的键只忽略那个键）。
 2. 能力图审阅时，agent 会多给一段并行评估：哪些模块可以写成 Build order 的逗号组、哪些值得往前挪。
 3. 每个模块的 Spec 加一节「并行边界」，写明它独占哪些目录；`verify-artifacts` 检查格式，最终验收时用越界检查标出改到边界外的文件。
 4. `/spec-guard:map` 列出可同时开工的模块、并行边界的重叠，以及各模块 worktree 的进度。
@@ -153,7 +163,7 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 ## 数据与隐私
 
 - **读什么**：每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用
-  （不 fetch）；在交审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容。
+  （不 fetch）；在交审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容；没有启用约定、只有账本的项目，也会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒。
 - **写什么**：钩子不写任何文件。命令在你看过预览、明确确认后才写：项目里的 `spec/`、`tasks/`、`.agent/` 和
   `CLAUDE.md`／`AGENTS.md` 的约定块；本机状态写在 `~/.spec-guard/`（可用 `SPEC_GUARD_STATE_DIR` 改位置）。
 - **什么时候联网**：只在你明确调用下面这些功能时。Proposal 相关命令、选了 GitHub/GitLab 的 `ticket`、本地事项的
@@ -161,7 +171,9 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
   启用本地事项账本时，用 `npm ci` 按随包的锁文件安装运行时。钩子和 `map`、`phase`、`verify-artifacts`、`review-mark`、
   `cost-report` 等其余命令不联网。
 - **统计与上传**：`cost-report` 离线读本机 Claude Code（`~/.claude/projects/`）和 Codex（`~/.codex/sessions/`）的会话
-  记录，只统计 token 与轮次，结果只打印在终端。插件没有遥测，不向任何地方上报数据。
+  记录，用到其中的 token 计数、用户提问时间（切出模块收尾）、工具调用是否报错与子代理派生关系（把子代理用量归到发起它的 task）；
+  这些只在本次运行的内存里用来归到各个 task，输出只有计数，不打印会话内容，结果只显示在终端。插件没有遥测，不向任何
+  地方上报数据。
 
 细节见[设计与架构](docs/design.md)。
 

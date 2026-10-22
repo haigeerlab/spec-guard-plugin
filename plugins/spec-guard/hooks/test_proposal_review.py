@@ -241,7 +241,10 @@ class ProposalReviewCliTests(unittest.TestCase):
                 redirect_stdout(output):
             self.assertEqual(main(["--proposal-id", "gamma"] + list(target or
                                    ("--platform", "github", "--target", "octo/spec-guard"))), 0)
-        return json.loads(output.getvalue()), read, tracker_read
+        result = json.loads(output.getvalue())
+        if tracker_read.called:
+            self.assertEqual(tracker_read.call_args.kwargs.get("host"), result["host"])
+        return result, read, tracker_read
 
     def test_cli_composes_publication_tracker_and_review(self):
         result, read, tracker_read = self.run_cli(published(), verified("proposal-stage:in-review"))
@@ -256,6 +259,16 @@ class ProposalReviewCliTests(unittest.TestCase):
                 result, _, tracker_read = self.run_cli(Publication(state), None)
                 self.assertEqual(result["state"], state)
                 tracker_read.assert_not_called()
+
+    def test_cli_pins_the_host_and_reports_it(self):
+        result, _, tracker_read = self.run_cli(published(), verified("proposal-stage:published"),
+                                               "--platform", "gitlab", "--target", "42")
+        self.assertEqual(result["host"], "gitlab.com")
+        result, _, tracker_read = self.run_cli(
+            published(), verified("proposal-stage:published"),
+            "--platform", "gitlab", "--target", "42", "--host", "git.example.com")
+        self.assertEqual((result["host"], tracker_read.call_args.kwargs["host"]),
+                         ("git.example.com", "git.example.com"))
 
     def test_cli_passes_a_numeric_gitlab_project_id(self):
         _, _, tracker_read = self.run_cli(published(), verified("proposal-stage:published"),

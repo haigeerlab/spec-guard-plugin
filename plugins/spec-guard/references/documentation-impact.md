@@ -42,7 +42,7 @@
 | integration-contract | `docs/api.md` | 发布新接口的契约。 |
 ```
 
-`update` 的 `Planned artifact` 必须等于基线中的 `Authority`；`create` 可指定新的预期交付物。这张表是计划，不是交付证据：它不能表示文档已更新、内容正确或代码符合文档。实际交付证据与交付前提醒由后续核验模块处理。
+`update` 的 `Planned artifact` 必须等于基线中的 `Authority`；`create` 可指定新的预期交付物。`update` 指向基线状态为 `target` 的文档时只能补充：标注已实现的部分、补充约束，不得删改未实现的目标；要改目标就是改需求，单独交用户批准。这张表是计划，不是交付证据：它不能表示文档已更新、内容正确或代码符合文档。实际交付证据与交付前提醒由后续核验模块处理。
 
 在 Spec 阶段、Plan 还没写时，影响表里只要有 `update` 或 `create`，检查就会报 `module plan must be a regular file`。这是预期结果：报到这一句说明 Spec 里的影响表已通过校验，只是 Plan 交付还没检查，不能当作完整的 `valid`。影响表里没有 `update`、`create`（全部为 `follow`、`pending` 或 `not-applicable`）时直接得到 `valid`。Plan 获批后要再跑一次，必须得到完整的 `valid`。Plan 已经写了还报这一句（例如它是符号链接），才是异常。
 

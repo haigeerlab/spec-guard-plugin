@@ -30,6 +30,9 @@ VERSION = 1
 LANGUAGE_TAG = re.compile(r"[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?\Z")
 CADENCES = ("separate", "combined")
 CONCURRENCY = ("off", "on")
+# config-per-key: a file with one of these problems is unusable as a whole; every other problem
+# belongs to one key and leaves the rest of the file in effect.
+STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
 DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off"}
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
@@ -37,17 +40,12 @@ VALIDATORS = {
     "moduleConcurrency": lambda value: value in CONCURRENCY,
 }
 OWNED_ELSEWHERE = {
-    "dispatch": "/spec-guard:setup-convention --replace --dispatch (or --no-dispatch)",
     "trackerDefault": "/spec-guard:tracker-default",
 }
-BLOCKS = (("CLAUDE.md", "<!-- BEGIN:agent-skills-convention -->", "<!-- END:agent-skills-convention -->"),
-          ("AGENTS.md", "<!-- BEGIN:spec-guard-codex-convention -->",
-           "<!-- END:spec-guard-codex-convention -->"))
-DISPATCH_MARKER = "<!-- spec-guard: build-task-dispatch -->"
 
 
 def load(root: Path) -> tuple[dict[str, Any], list[str]]:
-    """(values, problems).  Any problem empties `values`: a half-valid file is not applied."""
+    """(values, problems).  A STRUCTURAL problem empties `values`; any other problem drops only its key."""
     text, state = read_text(Path(root) / RELATIVE_PATH)
     if state == "absent":
         return {}, []
@@ -59,39 +57,23 @@ def load(root: Path) -> tuple[dict[str, Any], list[str]]:
         return {}, ["not-json"]
     if not isinstance(document, dict):
         return {}, ["not-an-object"]
-    problems = []
     version = document.get("version")
     if isinstance(version, bool) or version != VERSION:
-        problems.append("version-invalid")
-    if set(document) - {"version"} - set(VALIDATORS):
-        problems.append("unknown-key")
+        return {}, ["version-invalid"]
+    problems = ["unknown-key"] if set(document) - {"version"} - set(VALIDATORS) else []
+    values = {}
     for key, valid in VALIDATORS.items():
-        if key in document and not valid(document[key]):
-            problems.append(key + "-invalid")
-    if problems:
-        return {}, problems
-    return {key: document[key] for key in VALIDATORS if key in document}, []
+        if key in document:
+            if valid(document[key]):
+                values[key] = document[key]
+            else:
+                problems.append(key + "-invalid")
+    return values, problems
 
 
 def module_concurrency(root: Path) -> bool:
-    """module-concurrency-switch: the only reader of the switch.  Unset, `off` or an invalid file is off."""
-    values, problems = load(root)
-    return not problems and values.get("moduleConcurrency") == "on"
-
-
-def _dispatch(root: Path) -> dict[str, str]:
-    """`on`/`off` per convention block present; the marker line is the switch."""
-    found = {}
-    for name, begin, end in BLOCKS:
-        text, _ = read_text(Path(root) / name)
-        if text is None:
-            continue
-        lines = [line.strip() for line in text.splitlines()]
-        if begin not in lines or end not in lines or lines.index(begin) > lines.index(end):
-            continue
-        block = lines[lines.index(begin) + 1:lines.index(end)]
-        found[name] = "on" if DISPATCH_MARKER in block else "off"
-    return found
+    """module-concurrency-switch: the only reader of the switch.  Unset, `off`, an invalid value or file is off."""
+    return load(root)[0].get("moduleConcurrency") == "on"
 
 
 def summary(root: Path) -> list[dict[str, Any]]:
@@ -106,13 +88,11 @@ def summary(root: Path) -> list[dict[str, Any]]:
         items.append({"key": key, "value": value, "source": source,
                       "editWith": "/spec-guard:config"})
     tracker = read_default(root)
-    items.append({"key": "dispatch", "value": _dispatch(root), "source": "convention block",
-                  "editWith": OWNED_ELSEWHERE["dispatch"]})
     items.append({"key": "trackerDefault",
                   "value": tracker.backend if tracker.state == "configured" else tracker.state,
                   "source": ".agent/tracker.json", "editWith": OWNED_ELSEWHERE["trackerDefault"]})
-    if problems:
-        for item in items[:len(VALIDATORS)]:
+    for item in items[:len(VALIDATORS)]:
+        if (set(problems) & set(STRUCTURAL)) or item["key"] + "-invalid" in problems:
             item["source"] = "default (config invalid)"
     return items
 
@@ -123,10 +103,25 @@ def _ignored(root: Path) -> bool:
     return done.returncode == 0
 
 
-def render(values: dict[str, Any]) -> str:
-    """Canonical text, so rewriting the same values is a no-op diff."""
-    document = {"version": VERSION, **{key: values[key] for key in VALIDATORS if key in values}}
+def render(values: dict[str, Any], rest: dict[str, Any] | None = None) -> str:
+    """Canonical text, so rewriting the same values is a no-op diff.
+
+    config-per-key: `rest` holds the file's other keys (unknown keys, invalid values) in file order; they
+    are written back unchanged after the valid known keys, so a write never drops what it did not set.
+    """
+    document = {"version": VERSION, **{key: values[key] for key in VALIDATORS if key in values}, **(rest or {})}
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+
+
+def _rest(root: Path, values: dict[str, Any]) -> dict[str, Any]:
+    """The keys `load` did not return, in file order; only called when the file has no STRUCTURAL problem."""
+    text, _ = read_text(Path(root) / RELATIVE_PATH)
+    document = json.loads(text) if text is not None else {}
+    return {key: value for key, value in document.items() if key != "version" and key not in values}
+
+
+def _structural(problems: list[str]) -> bool:
+    return bool(set(problems) & set(STRUCTURAL))
 
 
 def _show(root: Path, as_json: bool) -> int:
@@ -138,13 +133,12 @@ def _show(root: Path, as_json: bool) -> int:
                          ensure_ascii=False, sort_keys=True))
         return 0
     for item in items:
-        value = item["value"]
-        if isinstance(value, dict):
-            value = ", ".join("%s=%s" % pair for pair in sorted(value.items())) or "no convention block"
-        print("%-16s %-24s source: %-26s edit: %s" % (item["key"], value, item["source"], item["editWith"]))
-    if problems:
+        print("%-16s %-24s source: %-26s edit: %s" % (item["key"], item["value"], item["source"], item["editWith"]))
+    if _structural(problems):
         print("\n%s is invalid (%s); its items fall back to defaults until it is fixed."
               % (RELATIVE_PATH, ", ".join(problems)))
+    elif problems:
+        print("\n%s: %s ignored; the other settings apply." % (RELATIVE_PATH, ", ".join(problems)))
     if ignored:
         print("\nwarning: %s is matched by .gitignore, so the team does not share this configuration."
               % RELATIVE_PATH)
@@ -166,7 +160,7 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
         print("%s-invalid: see spec/project-config.md for the accepted values" % key)
         return 2
     values, problems = load(root)
-    if problems:
+    if _structural(problems):
         print("%s is invalid (%s); fix or remove it before changing settings" % (RELATIVE_PATH, ", ".join(problems)))
         return 2
     directory = root / RELATIVE_PATH.parent
@@ -174,13 +168,15 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
         print("agent-directory-unsafe: %s is not a directory in this project" % RELATIVE_PATH.parent)
         return 2
     path = root / RELATIVE_PATH
-    before = render(values) if path.exists() else ""
+    rest = _rest(root, values) if path.exists() else {}
+    before = render(values, rest) if path.exists() else ""
+    rest.pop(key, None)
     updated = dict(values)
     if value is None:
         updated.pop(key, None)
     else:
         updated[key] = value
-    after = render(updated)
+    after = render(updated, rest)
     diff = "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
                                         fromfile=str(RELATIVE_PATH) + " (current)",
                                         tofile=str(RELATIVE_PATH) + " (proposed)"))
@@ -194,7 +190,7 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
     except OSError:
         print("config-unwritable: %s could not be written" % RELATIVE_PATH)
         return 2
-    if load(root) != (updated, []):
+    if load(root)[0] != updated or _rest(root, updated) != rest:
         print("config-readback-mismatch: %s does not read back as written" % RELATIVE_PATH)
         return 2
     print("\nwrote %s" % RELATIVE_PATH)
@@ -222,6 +218,10 @@ def main() -> int:
         return _show(root, args.format == "json")
     if args.command == "check":
         _, problems = load(root)
+        if problems == ["unknown-key"]:
+            # config-per-key: most likely a key from a newer spec-guard; it is ignored, not an error.
+            print("ok (ignored: unknown-key)")
+            return 0
         if problems:
             print("%s is invalid: %s" % (RELATIVE_PATH, ", ".join(problems)))
             return 1

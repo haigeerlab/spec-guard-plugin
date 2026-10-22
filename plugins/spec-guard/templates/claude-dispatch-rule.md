@@ -1,3 +1,4 @@
+<!-- spec-guard: retired (D17); never written, kept only so --replace and teardown recognise old blocks -->
 <!-- spec-guard: build-task-dispatch -->
 
 - `/build` 执行 `todo.md` 中非 Checkpoint 的 task 时**默认由主代理自己做**：派活不会减少主会话的轮次，规格明确的小 task

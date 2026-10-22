@@ -1,0 +1,35 @@
+# Todo: rules-at-nodes
+
+- [x] Task 0：同步批准标记、提交 Plan 与 todo — 按开工通知 C127 `module-crew sync` 到集成分支 e4b4ace（HEAD 450f32d）；Spec 带标记 acbb03de976c，与批准版只差 AC9 一句（用户批准 C122 时要求的范围内修正，已记变更记录，最终验收附差异）；三方合并保留了本分支 Plan 的 `pending` 行，改取集成分支带 `approved` 的版本（只差这一行）。validate、phase-guard（438 例）、verify-artifacts（74 例）全过。module-crew 入口按协调通知改用 0.11.0。
+- [x] Task 1：停点规则与检查点规则（C2、C4） — `test_workflow_checkpoints.py` 新增 `NodeRulesTests`（7 例：五节顺序与「以后者为准」、各节体积、各节规则要素、与检查点规则共用的短语、检查点规则开头的指向行、D19①、D19②），改前因 `node-rules.md` 不存在 7 例全红。新建 `references/node-rules.md`（Spec、Plan 两节直接用新小项名）；检查点规则开头加指向行、「批 Plan 按范围授权」条末加 D19①、「回告」段按 C4 改写；原用例 `test_change_sources_are_recorded_and_answered` 的「批准最终 gate 即批准回告」随 C4 改为「批准最终 gate 即同意按这段文字发送」。全文件通过。各节体积（字节）：能力图审阅 987、Spec 交审 1410、Plan 交审 1315、中途 gate 739、最终验收 1581。
+- [x] Task 1b：交审小项对上游章节（C7） — 新增 `test_each_review_item_names_its_upstream_chapter`，改前 14 个子断言红；检查点规则「交审要让用户看到内容」条加 C7 对照表（23 行，含 SG-b 的边界、未决问题、架构决定与文档建议附加）与「对应不上的只能作为附加项追加」规则，`node-rules.md` 各小项名后括注「上游 …」或「附加」。全文件通过；`check-interface.py` 通过；没有新增读取上游章节名的代码（只改 .md 与回归）。
+- [x] Task 1c：复制块、条目编号与小项新名（C8、C9） — 回归先改：`CARD_SECTIONS` 换新名（Spec 五项、Plan 六项）、`test_how_to_approve_uses_one_copy_block` 加 v2.6 写法与编号规则并断言不含「批准；D1 A」、`test_mirrors_follow_the_card_sections` 改断言新名与短写法、`NodeRulesTests` 的 Spec 节加复制块短语；改前 7 处红。随后改检查点规则「交审要让用户看到内容」（Spec、Plan 两行新名，`combined` 为五项接六项，加「旧名照认」一句）与「交审时说明怎么批准」（v2.6 复制块写法、编号规则），`review-mark.md`、`SKILL.md` 同句，`node-rules.md` 两处「怎么批准」。改中又按新意替换两条旧断言：「范围内与范围外」→「总是做、先问、不做三档」，「合成一行」→「待定问题接在后面」（v2.6 不再合成一行）。全文件通过；`check-interface.py` 通过（旧节名仍在「照认」一句与对照表里）；`validate.sh --quick` 通过；仍含「以所装协作插件的规定为准」，无「去决策收件箱答」。
+- [x] Task 1d：`interface.json` 升 1.9 的公共变更请求（C10） — 发【公共变更请求】#10353（模块协调编为 C130），内容逐字取自 C10；`docs/design.md` 补 1.9 一行（提交 dcbbc2b）。模块协调核对与 C10 一致，并实测：集成分支单独落地会让 `check-interface.py` 报「小项「架构决定」在共享检查点规则里找不到」，所以 C130 保持开着，等本模块最终验收批准、合入集成分支后再落地并跑检查（#10354）。AC13 在最终验收时写「待模块协调合入后落地 C130 再核对」。
+- [x] Task 2：阶段注入附停点规则（C3 `module_stage.py`） — 新建 `test_stop_rules.py`（16 例：五种节点与 None、读不了 todo、各节取文、缺文件／缺节／未知节点为空、命令行、`describe()` 附段位置与中英标签、缺文件时输出是改前的前缀、模块与协调角色视图不附），改前导入即失败；在 `validate.sh` 登记一行。`module_stage.py` 新增 `first_open_is_gate`、`stop_node`、`node_rules`、`stop_rules_block` 与 `--node-rules`，`describe()` 只在返回处追加附段；`git diff` 里删去的只有 `describe()` 返回的那几行，`review_state`、`next_gate`、`at_final_gate`、`gate_checkpoints`、`spec-digest.py` 未改（AC7）。节点判定按 Spec 前提 3：一轮只附一节，取靠后的；`separate` 节奏下 Spec 待批准时 NEEDS_PLAN 仍附 Spec 交审（Plan 要等 Spec），`combined` 才附 Plan 交审。`test_stop_rules.py`、`test_module_stage_sanitization.py`、`test_gate_tick.py`、`test_map_view.py`、`test_checkout_role.py`、`test_workflow_checkpoints.py`、`test_python_compat.py` 全过，phase-guard 438 例照旧通过。
+- [x] Task 3：IDLE／MAP_ONLY 附停点规则（C3 `phase-guard.sh`） — `test-phase-guard.sh` 第 1 段加 5 例（英文 IDLE、英文 MAP_ONLY、中文 IDLE 含建议下一步之后的位置、中文 MAP_ONLY、四个项目在缺 `node-rules.md` 的插件副本上不附且输出是附段之前的原文、退出码 0），改前第一例即红。`phase-guard.sh` 只在 IDLE／MAP_ONLY 那段配置行之后取一次停点规则，四个分支的建议下一步末尾拼上 `${STOP_RULES}`；「关联项目」四段未动。phase-guard 443 例全过；ShellCheck 由提交脚本按 CI 命令跑。
+- [x] Task 4：约定块瘦身（C1） — 回归先迁：`test_templates_point_at_checkpoint_tiers`、`test_documentation_suggestions`、`test_the_final_gate_lists_the_changed_files`、`test_plan_approval_authorizes_by_scope`、`test_the_review_rules_live_in_the_convention_block`（改名 `test_the_review_rules_reach_the_node`）、`test_the_convention_block_names_sibling_plugins_conditionally`（改名 `test_the_stop_rules_name_sibling_plugins_conditionally`）、`test_an_external_blocker_goes_back_to_the_user`、`test_acceptance_criteria_are_numbered`、`test_a_review_handoff_shows_the_content`、`test_rules_follow_upstream_agent_skills`、`test_change_sources_are_recorded_and_answered`、`test_one_module_per_review_and_grouped_by_module` 的模板断言迁到 `node-rules.md` 对应一节，模板改断言常驻短句与「不含」已移出的条目；新增 `test_the_convention_block_is_short`（体积上限与常驻短句）。改前 23 处红。停点规则补了迁移时发现缺的几句（一起发版不等于一起审、delegate 只读审查与拒绝过不再提（不写斜杠入口：停点规则两个宿主共用，Codex 输出不许出现 `/delegate:`，入口由阶段提示的「外部审查」行按宿主给出；第一次提交时 phase-guard 第 17 段因此变红，改后通过）、不含工作区自己的包、推送或开 PR 时与提交清单不一致的单独列出、agent-relay 入口与提醒用户转告、能力图全部完成的收尾文档建议）。两份模板按 Spec C1 的表改写；块里原来那半句「按需求批量前置审……按共享检查点规则」随 Plan 分级条一起去掉（它不是节点规则，细则仍在共享检查点规则）。体积（字节）：Claude 7530→3831、Codex 7097→3342；停点规则各节 1064／1914／1477／775／2085。`docs/convention-block.md` 内嵌块同步（`check-readme-sync.py` 通过），并补一段说明停点规则在哪；本仓库 `AGENTS.md` 用工作区 `setup-convention.sh local --host=codex --replace` 先 `--dry-run`（删 24 行旧模板行、加新行、保留本地段 7 行）再 `--accept-removals`，块里含 Codex 模板全文。`test_workflow_checkpoints.py`、`test_ticket_entry.py`、`test_hosted_ticket_entry.py`、`test-setup-teardown.sh`（53 例）全过。
+- [x] Task 5：与 `cost-slim-link-follow` 重叠的说明文字（C5） — `cost-slim-link-follow` 已于 6c03ea1 合入并已 sync，不用再等。`docs/workflow.md`「最终验收少一轮确认」段改为：这几条在停点规则里、到最终验收附上，升级后重跑 `--replace` 约定块才变短、旧块照常有效；`commands/setup-convention.md` 加一句：从 0.83.2 及更早的模板升级时删掉的多是停点规则，已移到 `references/node-rules.md`，确认后加 `--accept-removals`，想留的先移进本地段。README 中英两份只链接约定块页面、不描述块内条目，不改。
+- [x] Checkpoint 1（report）：变异核对 — 在 scratchpad 里 `mktemp -d` 建的四份副本（`git archive HEAD`，a364383）上各改一处：① `node-rules.md` 最终验收删去「没有写“文档改动：无”」→ `test_each_section_carries_its_rules`、`test_sections_share_their_wording_with_the_contract`、`test_the_final_gate_lists_the_changed_files` 红；② Claude 模板删去兜底一句 → `test_templates_point_at_checkpoint_tiers`、`test_the_convention_block_is_short`、`test_the_review_rules_reach_the_node` 红；③ 把「写给人读的文档单独一张表放在最前」放回 Claude 模板 → `test_the_final_gate_lists_the_changed_files` 红；④ `describe()` 附段条件改成角色视图也附 → `test_role_views_attach_nothing`（模块、协调两例）红。副本留在本会话 scratchpad，不在仓库里。
+- [x] Task 6：合入集成分支并跑完整检查 — 实现各提交都走 `verify-and-commit.sh`；sync 前核对集成分支里的 Spec 是 C122 批准版（标记 acbb03de976c），单独执行 `module-crew sync`（0.11.0 入口）：已包含集成分支 e4b4ace。之后 `validate.sh`、phase-guard（443 例）、verify-artifacts（74 例）、`test_stop_rules.py`（16 例）全过。`module_scope.py check --module rules-at-nodes --base crew/fix-batch`：越界 4 个，`docs/workflow.md`、`commands/setup-convention.md`、`hooks/phase-guard.sh`、`hooks/test-phase-guard.sh`，正是 Spec「与在开模块的重叠」列出的文件，只改了所列段落。相对集成分支 19 个文件，+708／−246。
+- [x] 最终验收（gate）：模块最终验收；不含推送与开 PR，合并由模块协调按用户原话做
+
+## 拟写的更新说明（由模块协调整批写入 CHANGELOG）
+
+> **变更**：约定块瘦身为常驻短句（决定 D3、D4）。交审怎么呈现、各类要点、最终验收的几张表、何时问用户这类停点规则移到新文件
+> `references/node-rules.md`（能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收五节），阶段提示到了对应节点才附上那一节原文；
+> 约定块只留途中规则（UI 自验、任务完成报告、`report` 记入 todo、不可逆操作要停）和一句兜底：停在 gate 前、交审前或要停下问用户前先读对应一节。
+> Claude 约定块 7.5KB → 3.8KB，Codex 7.1KB → 3.3KB。并行开关下标了角色的 checkout 不附停点规则。
+> **变更**：授权补两句（D19）：项目自己的规则比默认授权更严时以项目为准；最终验收列出的拟回告须是可原样发送的完整文字，批准即同意按此发送，
+> 对外渠道同样，内容变了要重新给用户看。
+> **变更**：交审跟上 session-protocol v2.6：Spec 的「做／不做」「附带的小决定」写作「边界」「未决问题」，Plan 多「架构决定」「未决问题」两项，
+> 旧名照认；复制块一块只答一件事、写最短说法（「C16 A」「批准；Q1 A」）；spec-guard 产物的条目编号不用 C、D、T、R 开头；每个交审小项写明
+> 对应上游 agent-skills 的哪一节，对应不上的只能追加。接口升 1.9（`reviewKinds` 多 `renamedSections`，由模块协调经公共变更请求 C130 落地）。
+> **新增**：`module_stage.py` 的 `stop_node`、`node_rules` 两个函数与 `--node-rules <kind>`，供后续模块判「到停点」与取节点规则。
+
+## 对使用者的影响
+
+- 已装项目要重跑 `setup-convention --replace` 约定块才变短：先 `--dry-run`，删掉的旧模板行标 `[needs --accept-removals]`，想留的先移进本地段，
+  再加 `--accept-removals`（Codex 同样带 `--host=codex`）。不重跑时旧长块照常有效，只是和节点上附的规则重复。
+- 串行项目在五种节点上，阶段提示多一段「停点规则（…）」；英文提示的项目标签是英文、规则正文是中文。
+- 最终验收的拟回告要给可原样发送的全文。
+- 交审小项按新名写，旧名照认，已写好的 Spec、Plan 不用改。

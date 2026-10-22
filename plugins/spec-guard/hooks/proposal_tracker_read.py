@@ -1,15 +1,11 @@
 """Recover one Proposal Issue from already-read, platform-normalized candidates."""
-import json
 import re
-import subprocess
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 
 from capability_map import _visible_lines
 from proposal_contract import ContractError, validate_tracker
 
 
-PAGE_SIZE = 100
-MAX_PAGES = 10
 # The Local container is a committed Epiq project id; the same expression validates it
 # in local_ledger_runtime, so the two cannot drift apart.
 LOCAL_PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}\Z")
@@ -75,10 +71,9 @@ def _closed(platform, issue):
         return value if isinstance(value, bool) else None
     state = issue.get("state")
     if platform == "github" and isinstance(state, str):
-        # `_github_page` reads through `gh issue list --json state`, which answers
-        # OPEN/CLOSED; the REST API answers open/closed. Uppercase is therefore the
-        # shape this adapter actually receives -- measured against github.com on
-        # 2026-10-04, where the lowercase-only table made every real read malformed.
+        # `gh issue list --json state` answers OPEN/CLOSED (measured against github.com
+        # on 2026-10-04); the REST API, which `read_tracker` now reads, answers
+        # open/closed. Both spellings stay readable for callers that pass either.
         # Not applied to gitlab: `glab api` returns the REST spelling, and loosening a
         # case this has not been measured against would be guessing.
         state = state.lower()
@@ -147,6 +142,21 @@ def issue_identity(platform, issue):
     return _issue_fields(platform, issue)
 
 
+def tracker_shape(platform, issue):
+    """A shared-client Issue in the platform shape `_issue_fields` reads.
+
+    `hosted_ticket_provider` already proved the item is an ordinary Issue of the target;
+    this only puts its fields back where the identity rules look for them.
+    """
+    if platform == "github":
+        return {"number": issue["id"], "state": "closed" if issue["closed"] else "open",
+                "body": issue["body"], "labels": issue["labels"], "url": issue["url"],
+                "repository": {"full_name": issue["container"]}}
+    return {"iid": issue["id"], "project_id": issue["container"],
+            "state": "closed" if issue["closed"] else "opened",
+            "description": issue["body"], "labels": issue["labels"], "url": issue["url"]}
+
+
 def _has_marker(body, marker):
     return any(line.strip() == marker for line in _visible_lines(body.splitlines()))
 
@@ -210,71 +220,28 @@ def recover_tracker_issue(proposal, platform, target, page):
                        closed=closed)
 
 
-def _run(args):
-    try:
-        result = subprocess.run(args, text=True, capture_output=True, timeout=20)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return result.stdout if result.returncode == 0 else None
+DEFAULT_HOSTS = {"github": "github.com", "gitlab": "gitlab.com"}
 
 
-def _json(raw):
-    try:
-        return json.loads(raw)
-    except (TypeError, ValueError):
-        return None
+def read_tracker(proposal, platform, target, runner=None, host=None):
+    """Read a complete candidate set through the shared, host-pinned GitHub/GitLab client.
 
+    `runner` is the shared transport's reader (argv -> decoded JSON); `host` defaults to
+    the public instance, as Proposal closeout does.
+    """
+    from hosted_ticket_provider import GitHubIssues, GitLabIssues, HostedTicketError, run_json
 
-def _github_page(target, runner):
-    # The only GitHub reader in this plugin that goes through the `gh` CLI rather than
-    # `gh api`. That matters for one field: `--json state` answers OPEN/CLOSED, while
-    # every `gh api` reader here (hosted_ticket_provider, local_ticket_github,
-    # proposal_closeout_github) gets the REST spelling. `_closed` lowercases for this
-    # reason; do not "simplify" that away.
-    response = _json(runner([
-        "gh", "issue", "list", "--repo", target, "--state", "all",
-        "--limit", str(PAGE_SIZE * MAX_PAGES), "--json", "number,body,labels,state",
-    ]))
-    if (not isinstance(response, list) or
-            len(response) >= PAGE_SIZE * MAX_PAGES):
-        return None
-    issues = []
-    for issue in response:
-        if not isinstance(issue, dict) or "pull_request" in issue:
-            continue
-        issue = dict(issue)
-        issue["repository"] = {"full_name": target}
-        issues.append(issue)
-    return {"complete": True, "issues": issues}
-
-
-def _gitlab_page(target, runner):
-    # List every Issue and match the marker locally, as for GitHub. GitLab's search= does not
-    # match text inside HTML comments (GitLab 15.3.2, verified 2026-09-28), and the marker is one.
-    issues = []
-    for page_number in range(1, MAX_PAGES + 1):
-        query = urlencode({"state": "all",
-                           "per_page": str(PAGE_SIZE), "page": str(page_number)})
-        response = _json(runner(["glab", "api", "projects/%s/issues?%s" %
-                                 (target, query)]))
-        if not isinstance(response, list) or len(response) > PAGE_SIZE:
-            return None
-        issues.extend(response)
-        if len(response) < PAGE_SIZE:
-            return {"complete": True, "issues": issues}
-    return None
-
-
-def read_tracker(proposal, platform, target, runner=None):
-    """Read a complete candidate set through GitHub/GitLab read-only CLI calls."""
-    runner = _run if runner is None else runner
+    runner = run_json if runner is None else runner
     if not callable(runner):
         return _unknown("tracker runner is unavailable")
-    if platform == "github":
-        page = _github_page(target, runner)
-    elif platform == "gitlab":
-        page = _gitlab_page(target, runner)
-    else:
+    if platform not in DEFAULT_HOSTS:
         return _unknown("unsupported tracker platform")
-    return _unknown("tracker candidate set is unavailable") if page is None else (
-        recover_tracker_issue(proposal, platform, target, page))
+    try:
+        client = (GitHubIssues if platform == "github" else GitLabIssues)(
+            host or DEFAULT_HOSTS[platform], target, runner)
+        client.target_facts()
+        issues = client.list_issues()["issues"]
+    except HostedTicketError:
+        return _unknown("tracker candidate set is unavailable")
+    page = {"complete": True, "issues": [tracker_shape(platform, issue) for issue in issues]}
+    return recover_tracker_issue(proposal, platform, target, page)

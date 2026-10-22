@@ -17,7 +17,8 @@ import module_scope  # noqa: E402
 import module_stage  # noqa: E402
 import project_config  # noqa: E402
 
-ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick")  # crew-interface: 1.1; gate-tick: 1.7
+ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
+           "scopeOverlap")  # crew-interface: 1.1; gate-tick: 1.7; scope-overlap-interface: 1.10
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
 REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
@@ -84,13 +85,16 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
     found += _scripts(path, "scopeCheck.command", data["scopeCheck"].get("command"))
     found += _scripts(path, "reviewMark.command", data["reviewMark"].get("command"))
     found += _scripts(path, "gateTick.command", data["gateTick"].get("command"))
+    found += _scripts(path, "scopeOverlap.command", data["scopeOverlap"].get("command"))
     commands = data["checkoutRole"].get("commands")
     for name, command in (commands.items() if isinstance(commands, dict) and commands else [("commands", None)]):
         found += _scripts(path, "checkoutRole.commands.%s" % name, command)
     checks = (("scopeCheck.values.scope", data["scopeCheck"].get("values", {}).get("scope"), set(module_scope.SCOPES), None),
               ("checkoutRole.values.role", data["checkoutRole"].get("values", {}).get("role"), set(checkout_role.ROLE_KINDS),
                lambda key: key.split()[0]),
-              ("moduleConcurrency.values", data["moduleConcurrency"].get("values"), set(project_config.CONCURRENCY), None))
+              ("moduleConcurrency.values", data["moduleConcurrency"].get("values"), set(project_config.CONCURRENCY), None),
+              ("scopeOverlap.values.error", data["scopeOverlap"].get("values", {}).get("error"),
+               set(module_scope.OVERLAP_ERRORS), None))
     for label, got, expected, keyed in checks:
         names = {(keyed or (lambda key: key))(key) for key in got} if isinstance(got, dict) else None
         if names != expected:

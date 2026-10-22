@@ -18,6 +18,7 @@ from proposal_publication import (
     FETCH_FAILED, HEAD_UNAVAILABLE, PROBE_CODES, Publication, PublicationPool, Snapshot,
     TIP_MOVED, read_published, skipped_as_json)
 import proposal_promotion_proof
+import proposal_publication
 from proposal_promotion_proof import (
     DIAGNOSTIC_CODE, Preflight, Proof, _matches, _mismatched_fields, as_json, main, preflight, preflight_as_json, promotion_base, prove)
 from proposal_tracker_read import TrackerRead
@@ -658,11 +659,23 @@ class PromotionProofCliTests(PromotionFixture):
                               proposal_id="gamma", platform="github", target="octo/spec-guard",
                               closed=closed)
         output = io.StringIO()
-        with patch("proposal_promotion_proof.read_tracker", return_value=tracker), \
+        with patch("proposal_promotion_proof.read_tracker", return_value=tracker) as read, \
                 redirect_stdout(output):
             self.assertEqual(main(["--project", str(self.consumer), "--platform", "github",
                                    "--target", "octo/spec-guard"] + list(extra)), 0)
-        return json.loads(output.getvalue())
+        result = json.loads(output.getvalue())
+        # Every answer names the instance it read; the tracker read was pinned to it.
+        host = result.pop("host")
+        self.assertEqual(host, extra[extra.index("--host") + 1] if "--host" in extra
+                         else "github.com")
+        for call in read.call_args_list:
+            self.assertEqual(call.kwargs.get("host"), host)
+        return result
+
+    def test_host_is_passed_to_the_tracker_read_and_reported(self):
+        for extra in ((), ("--prove",)):
+            with self.subTest(extra=extra):
+                self.run_cli("--proposal-id", "gamma", "--host", "ghe.example.com", *extra)
 
     def test_prove_cli_proves_the_merged_promotion_from_fresh_remote_facts(self):
         result = self.run_cli("--proposal-id", "gamma", "--prove")
@@ -813,6 +826,25 @@ class SnapshotProbeDiagnosticTests(PromotionFixture):
         self.assertEqual(retryable["diagnostic"], "snapshot-fetch-failed")
         self.assertEqual(moved["state"], "unknown")
         self.assertEqual(moved["diagnostic"], "snapshot-tip-moved")
+
+    def test_a_listed_proposal_that_cannot_be_read_is_a_retry(self):
+        """The pool itself, not a stub: `git show` failing on a listed file once raised
+        TypeError out of every caller (F18)."""
+        real_show = proposal_publication._show
+
+        def failing_show(repo, commit, path):
+            if path == "spec/proposals/gamma.md":
+                return None
+            return real_show(repo, commit, path)
+
+        with patch("proposal_publication._show", side_effect=failing_show):
+            proof = as_json(proposal_promotion_proof.prove_from_remote(
+                self.consumer, "gamma", "github", "octo/spec-guard"))
+            checked = preflight_as_json(preflight(self.consumer, "gamma", "github",
+                                                  "octo/spec-guard"))
+        for result in (proof, checked):
+            self.assertEqual((result["state"], result["diagnostic"]),
+                             ("unknown", "snapshot-proposal-unreadable"))
 
     def test_prove_still_folds_a_failure_that_is_not_a_known_probe(self):
         self.assertEqual(self.proof_json("Traceback: /tmp/x")["diagnostic"],

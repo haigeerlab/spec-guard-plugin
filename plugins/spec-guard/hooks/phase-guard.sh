@@ -22,16 +22,6 @@ else
   ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
   [ -n "$ROOT" ] || ROOT="$(pwd)"
 fi
-# 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
-# 所在 git 仓库优先（session_context.py --resolve-root，最多等 1 秒）。标准输入只读这一次，原文留给后面的会话事实。
-# 输入不可用或缺 python3 时根目录不变。
-HOOK_INPUT=""
-if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
-  RESOLVED="$(python3 "$HOOKDIR/session_context.py" --resolve-root "$ROOT" 2>/dev/null)" || RESOLVED=""
-  case "$RESOLVED" in *$'\n'*) ROOT="${RESOLVED%%$'\n'*}"; HOOK_INPUT="${RESOLVED#*$'\n'}" ;; esac
-fi
-cd "$ROOT" 2>/dev/null || exit 0
-
 # 激活信号必须是本插件写下的：独占一行的声明块标记（与 managed-block.py 相同），或含
 # activeModule 的 state.json。正文里提到标记不算。注意判据是纯文本匹配：别的工具若在自己的
 # .agent/state.json 里也用 activeModule 这个键（包括嵌套位置），同样会激活——比此前那条按值匹配
@@ -48,21 +38,84 @@ file_has_line() {  # $1=文件 $2=正则
   return 1
 }
 
-has_block() {
-  file_has_line CLAUDE.md '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' ||
-    file_has_line AGENTS.md '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$'
+has_block() {  # $1=目录，默认当前目录
+  file_has_line "${1:-.}/CLAUDE.md" '^[[:space:]]*<!-- BEGIN:agent-skills-convention -->[[:space:]]*$' ||
+    file_has_line "${1:-.}/AGENTS.md" '^[[:space:]]*<!-- BEGIN:spec-guard-codex-convention -->[[:space:]]*$'
 }
 
-has_state() {
-  file_has_line .agent/state.json '"activeModule"[[:space:]]*:'
+has_state() {  # $1=目录，默认当前目录
+  file_has_line "${1:-.}/.agent/state.json" '"activeModule"[[:space:]]*:'
 }
+
+has_link() {  # $1=目录，默认当前目录
+  [ -e "${1:-.}/.agent/spec-guard-link.json" ] || [ -L "${1:-.}/.agent/spec-guard-link.json" ]
+}
+
+# ledger-standalone-reminder（D11）：本地事项账本不是激活信号，但有它时即使没启用约定也出三处账本提醒（见 LEDGER_ONLY）。
+has_ledger() {  # $1=目录，默认当前目录
+  [ -f "${1:-.}/.epiq/project.json" ]
+}
+
+# fact-fixes：启动 python3 之前先在 bash 里判断 hook 输入可能指向的两个根目录（宿主给的 ROOT、输入 cwd 所在 git 仓库）
+# 是否都没有激活信号与指向文件；拿得准都没有时返回 0，调用方直接静默退出。bash 的 read 从管道逐字节读，大输入很慢，
+# 所以只读前 64KB（RAW_MORE=1 表示后面还有）：没读完、cwd 不是不含转义的普通字符串、或出现不止一次，都算拿不准
+# （返回 1），交给 python3 照旧解析。拿得准只有账本时也返回 1，并设 PRE_LEDGER=1，留给调用方再判一次。
+inactive_before_python() {  # 读 RAW、RAW_MORE 与 ROOT
+  local rest cwd top re='"cwd"[[:space:]]*:[[:space:]]*"([^"\\]*)"'
+  if has_block "$ROOT" || has_state "$ROOT" || has_link "$ROOT"; then return 1; fi
+  [ -z "$RAW_MORE" ] || return 1
+  ! has_ledger "$ROOT" || PRE_LEDGER=1
+  case "$RAW" in *'"cwd"'*) ;; *) [ -z "$PRE_LEDGER" ]; return ;; esac
+  rest="${RAW#*\"cwd\"}"
+  case "$rest" in *'"cwd"'*) return 1 ;; esac
+  [[ $RAW =~ $re ]] || return 1
+  cwd="${BASH_REMATCH[1]}"
+  { [ -n "$cwd" ] && [ -d "$cwd" ] && top="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null)" && [ -n "$top" ]; } ||
+    { [ -z "$PRE_LEDGER" ]; return; }
+  if has_block "$top" || has_state "$top" || has_link "$top"; then PRE_LEDGER=""; return 1; fi
+  ! has_ledger "$top" || PRE_LEDGER=1
+  [ -z "$PRE_LEDGER" ]
+}
+
+# 桌面版 worktree 会话里，宿主给的项目目录可能是主检出目录，而会话在 linked worktree 里：hook 输入的 cwd
+# 所在 git 仓库优先（session_context.py --resolve-root，最多等 1 秒、上限 1MB）。标准输入只读这一次：bash 读过的前缀
+# 与其余部分按原字节交给 python3（其余部分由一个同样最多等 1 秒的拷贝进程转过去），留给后面的会话事实。
+# 输入不可用或缺 python3 时根目录不变。
+HOOK_INPUT=""
+if [ ! -t 0 ] && command -v python3 >/dev/null 2>&1; then
+  RAW="" RAW_MORE=""
+  if IFS= read -r -n 65536 -d '' -t 1 RAW; then RAW_MORE=1; fi
+  PRE_LEDGER=""
+  inactive_before_python && exit 0
+  # 只有账本时 UserPromptSubmit 只在别的会话转来消息那一轮有话说：提示词开头不是那个包装就不必启动 python3。
+  re='"prompt"[[:space:]]*:[[:space:]]*"<cross-session-message '
+  if [ -n "$PRE_LEDGER" ] && [ "$EVENT" = UserPromptSubmit ] && ! [[ $RAW =~ $re ]]; then exit 0; fi
+  RESOLVED="$({ printf '%s' "$RAW"
+    [ -z "$RAW_MORE" ] || python3 -c '
+import os, select, time
+deadline = time.monotonic() + 1.0
+while True:
+    left = deadline - time.monotonic()
+    if left <= 0 or not select.select([0], [], [], left)[0]:
+        break
+    chunk = os.read(0, 65536)
+    if not chunk:
+        break
+    os.write(1, chunk)
+' 2>/dev/null
+  } | python3 "$HOOKDIR/session_context.py" --resolve-root "$ROOT" 2>/dev/null)" || RESOLVED=""
+  case "$RESOLVED" in *$'\n'*) ROOT="${RESOLVED%%$'\n'*}"; HOOK_INPUT="${RESOLVED#*$'\n'}" ;; esac
+fi
+cd "$ROOT" 2>/dev/null || exit 0
 
 # linked-project-root：会话目录自己没有激活信号时，只有本插件写下的指向文件算数（.agent/spec-guard-link.json，声明
 # 这里的工作对应别处的哪个项目）。没有它就照旧静默，而且在启动任何 python3 之前就退出；自己已启用时不看指向文件。
-LINKED=""
+# 指向文件也没有、但有账本时，走下面只出账本提醒的分支（LEDGER_ONLY）。
+LINKED="" LEDGER_ONLY=""
 if ! has_block && ! has_state; then
-  [ -e .agent/spec-guard-link.json ] || [ -L .agent/spec-guard-link.json ] || exit 0
-  LINKED=1
+  if has_link; then LINKED=1
+  else has_ledger || exit 0; LEDGER_ONLY=1
+  fi
 fi
 
 # open-commitments：会话开始与清空后只出一句读回提醒，不出阶段摘要（随后的 UserPromptSubmit 会给）。只看项目根有没有
@@ -90,6 +143,53 @@ fresh_out() {
   printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"'"${text}"'"}}'
   exit 0
 }
+# receipt-hint-on-message：有账本、且这一轮是别的会话转来的消息时，建议下一步之前多一行当场记账的提醒。
+# 判定与清理在 session_context.py --received（只读提示词开头的包装与它的两个属性）；其他情形不出这一行。
+receipt_hint() {
+  [ "$EVENT" = UserPromptSubmit ] && [ -f .epiq/project.json ] || return 0
+  local got name session who
+  got="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" --received 2>/dev/null)" || return 0
+  case "$got" in received$'\t'*) ;; *) return 0 ;; esac
+  got="${got#received$'\t'}"; name="${got%%$'\t'*}"; session="${got#*$'\t'}"
+  if [ -n "$ZH" ]; then
+    who=""
+    [ -z "$name" ] || who="对方 \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}，}会话 \`${session}\`"
+    printf '%s' "- 这一轮是别的会话发来的消息${who:+（${who}）}：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。$(ledger_root_note zh)"
+  else
+    who=""
+    [ -z "$name" ] || who="sender \`${name}\`"
+    [ -z "$session" ] || who="${who:+${who}, }session \`${session}\`"
+    printf '%s' "- Message from another session${who:+ (${who})}: record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call.$(ledger_root_note)"
+  fi
+}
+# ledger-standalone-reminder（D11）：只有账本、没启用约定时只出账本提醒，不出阶段内容：会话开始与清空后是上面的读回提醒，
+# 压缩后是只讲账本的一句核对提醒，UserPromptSubmit 只在别的会话转来消息那一轮出记账提醒；其余静默。这里本来没有阶段注入，
+# 缺 python3 或生成 JSON 失败时也静默（fresh 除外，它不依赖 python3）。不带状态码，所以不会被当成上一次阶段注入。
+if [ -n "$LEDGER_ONLY" ]; then
+  [ -z "$FRESH" ] || fresh_out
+  command -v python3 >/dev/null 2>&1 || exit 0
+  ZH=""
+  [ "$(python3 "$HOOKDIR/module_stage.py" . --hint-language 2>/dev/null)" != zh-CN ] || ZH=1
+  if [ "$EVENT" = SessionStart ]; then
+    if [ -n "$ZH" ]; then
+      LEDGER_TEXT='上下文刚被压缩：摘要里较早的请求可能已经做完；重做之前先核对账本里未关闭的 `waiting-on-*` 事项。'"$(ledger_root_note zh)"
+    else
+      LEDGER_TEXT='Context was just compacted: earlier requests in the summary may already be done; check the open `waiting-on-*` issues in the ledger before redoing anything.'"$(ledger_root_note)"
+    fi
+  else
+    LEDGER_TEXT="$(receipt_hint)"
+  fi
+  [ -n "$LEDGER_TEXT" ] || exit 0
+  printf '%s' "$LEDGER_TEXT" | python3 -c '
+import json, sys
+print(json.dumps({"hookSpecificOutput": {
+    "hookEventName": sys.argv[1],
+    "additionalContext": sys.stdin.read(),
+}}))
+' "$EVENT" 2>/dev/null
+  exit 0
+fi
 if [ -n "$FRESH" ]; then
   [ -n "$LINKED" ] || fresh_out
   # 跟随指向要用 python3；缺 python3 或指向失效时静默，诊断留给随后的 UserPromptSubmit。
@@ -191,26 +291,6 @@ if [ -f .epiq/project.json ]; then
   fi
 fi
 
-# receipt-hint-on-message：有账本、且这一轮是别的会话转来的消息时，建议下一步之前多一行当场记账的提醒。
-# 判定与清理在 session_context.py --received（只读提示词开头的包装与它的两个属性）；其他情形不出这一行。
-receipt_hint() {
-  [ "$EVENT" = UserPromptSubmit ] && [ -f .epiq/project.json ] || return 0
-  local got name session who
-  got="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" --received 2>/dev/null)" || return 0
-  case "$got" in received$'\t'*) ;; *) return 0 ;; esac
-  got="${got#received$'\t'}"; name="${got%%$'\t'*}"; session="${got#*$'\t'}"
-  if [ -n "$ZH" ]; then
-    who=""
-    [ -z "$name" ] || who="对方 \`${name}\`"
-    [ -z "$session" ] || who="${who:+${who}，}会话 \`${session}\`"
-    printf '%s' "- 这一轮是别的会话发来的消息${who:+（${who}）}：先把它记进本地事项账本——对方、来路与回路、内容、球在谁手里（\`waiting-on-me\`／\`waiting-on-user\`）——再决定要不要问用户；记账不是受理，要不要做仍由用户定。$(ledger_root_note zh)"
-  else
-    who=""
-    [ -z "$name" ] || who="sender \`${name}\`"
-    [ -z "$session" ] || who="${who:+${who}, }session \`${session}\`"
-    printf '%s' "- Message from another session${who:+ (${who})}: record it in the local ticket ledger first -- who sent it, the way it came and the way back, what it asks, whose move it is (\`waiting-on-me\` / \`waiting-on-user\`) -- then decide whether to ask the user; recording is not accepting it, and whether to do it is still the user's call.$(ledger_root_note)"
-  fi
-}
 RECEIPT="$(receipt_hint)"
 
 # 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
@@ -226,9 +306,22 @@ case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
 # 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
 WINDOW=""
 case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
-# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那两行。
-UNATTENDED=""
-case "$WINDOW" in *$'\n'unattended*) UNATTENDED=1 ;; esac
+# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那一行。
+# 第五行是宿主（codex 或空），第六行是 over-200k 或空（Claude 尾部有读数超过 200k，quiet-injection 按 1M 估算窗口），
+# 第七行是会话记录里最近一次 spec-guard 注入的状态码（quiet-injection；压缩之后、读不到或没有时为空）。
+UNATTENDED="" FACT_HOST="" OVER="" LAST=""
+REST="$WINDOW"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != unattended ] || UNATTENDED=1
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+FACT_HOST="${REST%%$'\n'*}"
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+[ "${REST%%$'\n'*}" != over-200k ] || OVER=1
+case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+LAST="${REST%%$'\n'*}"
+case "$LAST" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;; *) LAST="" ;; esac
+# 压缩后（SessionStart）总是给完整内容。
+[ "$EVENT" != SessionStart ] || LAST=""
 WINDOW="${WINDOW%%$'\n'*}"
 case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
 LOCATION="${LOCATION%%$'\n'*}"
@@ -239,15 +332,21 @@ LOCATION="${LOCATION%%$'\n'*}"
 case "${SPEC_GUARD_HOST:-}" in
   codex|claude) HOST="$SPEC_GUARD_HOST" ;;
   *)
-    case "$FACTS" in
-      *$'\n'codex) HOST=codex ;;
+    case "$FACT_HOST" in
+      codex) HOST=codex ;;
       *) if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then HOST=claude
          elif [ -n "${PLUGIN_ROOT:-}" ]; then HOST=codex
          else HOST=""; fi ;;
     esac ;;
 esac
+# quiet-injection（Q2 A）：Claude 的记录里没有窗口；有读数时按 200k 估算，尾部有读数超过 200k 就按 1M 估算，并在提示里写明是估算。
+WINDOW_ESTIMATED=""
+if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ]; then
+  WINDOW_ESTIMATED=1
+  if [ -n "$OVER" ]; then WINDOW=1000000; else WINDOW=200000; fi
+fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
-# 位置行放在标题与“当前阶段”之间，所有阶段都带；不在 git 仓库里时没有这一行。
+# 位置行放在标题与阶段行（“当前阶段”／“Current stage”）之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
 [ -z "$LOCATION" ] || HEADER="${HEADER}
 
@@ -256,20 +355,24 @@ ${LOCATION}"
 if [ -n "$LINKED" ] && [ -n "$ZH" ] && [ "$LINK_SOURCE" = session ]; then
   HEADER="${HEADER}
 
-关联项目: \`${LINK_SHOWN}\` — 本会话在 \`${LINK_FROM}\` 下的 \`.agent/spec-guard-link.json\` 里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。运行 spec-guard 命令时把这个路径作为项目传入。"
+关联项目: \`${LINK_SHOWN}\` — 本会话在 \`${LINK_FROM}\` 下的 \`.agent/spec-guard-link.json\` 里有自己的登记，指向这个项目；那个目录里的其他会话不受影响。spec-guard 命令会自动跟随到这个项目。"
 elif [ -n "$LINKED" ] && [ -n "$ZH" ]; then
   HEADER="${HEADER}
 
-关联项目: \`${LINK_SHOWN}\` — 本会话的目录 \`${LINK_FROM}\` 通过 \`.agent/spec-guard-link.json\` 指向它。运行 spec-guard 命令时把这个路径作为项目传入。这个指向对在该目录里运行的每个会话都生效；如果本会话做的是别的项目，忽略这里的阶段，传入你自己的项目路径。"
+关联项目: \`${LINK_SHOWN}\` — 本会话的目录 \`${LINK_FROM}\` 通过 \`.agent/spec-guard-link.json\` 指向它。spec-guard 命令会自动跟随到这个项目。这个指向对在该目录里运行的每个会话都生效；如果本会话做的是别的项目，忽略这里的阶段，用 \`link-project\` 给本会话登记自己的项目。"
 elif [ -n "$LINKED" ] && [ "$LINK_SOURCE" = session ]; then
   HEADER="${HEADER}
 
-Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. Pass this path as the project when you run spec-guard commands."
+Linked project: \`${LINK_SHOWN}\` — this session is linked to it by its own entry in \`.agent/spec-guard-link.json\` under \`${LINK_FROM}\`; other sessions in that directory are not affected. spec-guard commands follow it automatically."
 elif [ -n "$LINKED" ]; then
   HEADER="${HEADER}
 
-Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. Pass this path as the project when you run spec-guard commands. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and pass your own project path."
+Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. spec-guard commands follow it automatically. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and register this session's own project with \`link-project\`."
 fi
+
+# quiet-injection（D5）：状态码里本 hook 自己掌握的事实——位置行与跟随指向的项目；其余由 module_stage.py 算。
+STATE_EXTRA="${LOCATION}
+${LINKED:+${LINK_SOURCE}:${LINK_SHOWN}:${LINK_FROM}}"
 
 SPECS=0
 for spec in spec/*.md; do
@@ -294,7 +397,7 @@ if [ -e spec/CAPABILITY-MAP.md ] && { [ ! -f spec/CAPABILITY-MAP.md ] || [ ! -r 
   fi
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Capability map: present but unreadable (${REASON})
 - Module specs: ${SPECS}
@@ -312,6 +415,43 @@ if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
 ${CONFIG_LINES}"
 fi
 
+# rules-at-nodes：IDLE 要写能力图、MAP_ONLY 要写第一份 Spec，各附那个节点的停点规则（取自 node-rules.md，经 module_stage.py）；
+# 取不到时为空，输出与改前逐字相同。标签的语言跟提示一致，规则正文只有中文。
+STOP_RULES=""
+if [ ! -f spec/CAPABILITY-MAP.md ] || [ "$SPECS" -eq 0 ]; then
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then NODE='map-review'; else NODE='spec-review'; fi
+  SECTION="$(python3 "$HOOKDIR/module_stage.py" . --node-rules "$NODE" 2>/dev/null)" || SECTION=""
+  if [ -n "$SECTION" ]; then
+    case "$NODE${ZH:+-zh}" in
+      map-review-zh) LABEL='停点规则（能力图审阅）：' ;;
+      spec-review-zh) LABEL='停点规则（Spec 交审）：' ;;
+      map-review) LABEL='Stop rules (capability map review):' ;;
+      *) LABEL='Stop rules (Spec review):' ;;
+    esac
+    STOP_RULES="
+
+${LABEL}
+
+${SECTION}"
+  fi
+  # 状态码（module_stage.py --state-key，与其他阶段同一算法）接在最后；取不到时不加，输出与改前相同。
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then KEY_STAGE=IDLE; else KEY_STAGE=MAP_ONLY; fi
+  KEY="$(python3 "$HOOKDIR/module_stage.py" . --state-key --stage "$KEY_STAGE" --node "$NODE" --state-extra "$STATE_EXTRA" \
+    ${HOST:+--host "$HOST"} 2>/dev/null)" || KEY=""
+  BRIEF=""
+  case "$KEY" in *$'\n'*) BRIEF="${KEY#*$'\n'}"; KEY="${KEY%%$'\n'*}" ;; esac
+  case "$KEY" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+    # 状态码与上一次相同：只给一行（quiet-injection）。
+    if [ "$KEY" = "$LAST" ] && [ -n "$BRIEF" ]; then
+      emit "$BRIEF"
+      exit 0
+    fi
+    STOP_RULES="${STOP_RULES}
+
+<!-- spec-guard-state: ${KEY} -->" ;;
+  esac
+fi
+
 if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
   emit "${HEADER}
 
@@ -320,19 +460,19 @@ if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
 - 能力图: 没有
 - 模块 Spec: ${SPECS}${CONFIG_LINES}
 
-建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。"
+建议下一步: 先跟用户确认需求已说完，再写能力图并交审，然后做规划。${STOP_RULES}"
   exit 0
 fi
 
 if [ ! -f spec/CAPABILITY-MAP.md ]; then
   emit "${HEADER}
 
-当前阶段: **IDLE**
+Current stage: **IDLE**
 
 - Capability map: absent
 - Module specs: ${SPECS}${CONFIG_LINES}
 
-Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning."
+Suggested next step: confirm with the user that the requirement is complete, then create and review a capability map before planning.${STOP_RULES}"
   exit 0
 fi
 
@@ -344,27 +484,30 @@ if [ "$SPECS" -eq 0 ] && [ -n "$ZH" ]; then
 - 能力图: 已有
 - 模块 Spec: 没有${CONFIG_LINES}
 
-建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。"
+建议下一步: 先跟用户确认第一个模块的需求已说完，再在 \`spec/\` 下写第一份模块 Spec 并交审。${STOP_RULES}"
   exit 0
 fi
 
 if [ "$SPECS" -eq 0 ]; then
   emit "${HEADER}
 
-当前阶段: **MAP_ONLY**
+Current stage: **MAP_ONLY**
 
 - Capability map: present
 - Module specs: absent${CONFIG_LINES}
 
-Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`."
+Suggested next step: confirm with the user that the first module's requirement is complete, then write the first reviewed module spec under \`spec/\`.${STOP_RULES}"
   exit 0
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
-  emit "${HEADER}
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} --state-extra "$STATE_EXTRA" ${LAST:+--last-state "$LAST"} 2>/dev/null)"; then
+  case "$STAGE" in
+    'spec-guard: '*) emit "$STAGE" ;;  # quiet-injection：状态码与上一次相同，只给一行（后面可能附边界行）
+    *) emit "${HEADER}
 
-${STAGE}"
+${STAGE}" ;;
+  esac
 elif [ -n "$ZH" ]; then
   emit "${HEADER}
 
@@ -375,7 +518,7 @@ elif [ -n "$ZH" ]; then
 else
   emit "${HEADER}
 
-当前阶段: **UNKNOWN**
+Current stage: **UNKNOWN**
 
 - Module specs: ${SPECS}
 - The module stage could not be computed; run ${VERIFY_CMD} for details."
