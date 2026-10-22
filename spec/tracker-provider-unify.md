@@ -1,5 +1,7 @@
 # Spec: tracker-provider-unify
 
+<!-- spec-guard: review approved 9e36d79c0af5 -->
+
 ## Objective
 
 spec-guard 里有三套各自实现的 GitHub/GitLab 读写，已经出现分叉：
