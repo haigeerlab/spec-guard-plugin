@@ -1,5 +1,7 @@
 # Spec: fact-fixes
 
+<!-- spec-guard: review approved b27ff651a375 -->
+
 ## Objective
 
 2026-10-22 多维度审查与功能清单核出了几处「文档说的和实现做的不一致」，以及一处违背「无关项目静默退出」轻量精神的启动顺序。

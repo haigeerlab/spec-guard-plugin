@@ -1,5 +1,7 @@
 # Plan: fact-fixes
 
+<!-- spec-guard: review approved -->
+
 依据 [`spec/fact-fixes.md`](../../spec/fact-fixes.md)（2026-10-22 用户批准，事项 C30）。评审节奏为分开审，本 Plan 单独交审。
 分支 `fact-fixes`，worktree `.claude/worktrees/current-plugin-owner-aa5b98-crew/fact-fixes`，从集成分支 `crew/fix-batch` 切出。
 
