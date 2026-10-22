@@ -1,5 +1,5 @@
 {
-  "interface": "1.9",
+  "interface": "1.10",
   "mapView": {
     "command": [
       "python3",
@@ -292,5 +292,41 @@
     },
     "notes": "interface 1.7; ticks only the final gate's checkbox in tasks/<id>/todo.md, by the same criterion as the stage hint's final gate (gates and nextGate use it too, Chinese checkpoint forms included); ordinary items after it are left and counted; the rest of the line and its line ending are kept; never commits; the caller must already hold the user's approval of the final acceptance, as with reviewMark",
     "contract": "spec/gate-tick.md"
+  },
+  "scopeOverlap": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/module_scope.py",
+      "overlap",
+      "--project",
+      "<project-root>",
+      "--spec",
+      "<module-id>=<spec-file>"
+    ],
+    "readOnly": true,
+    "exitCodes": {
+      "0": "ok; stdout is {\"conflicts\": [{\"modules\": [a, b], \"paths\": [...], \"sources\": {a: <spec-file or \"project\">, b: ...}}], \"errors\": [{\"module\": <id or null>, \"source\": <spec-file or \"project\">, \"error\": <code>}]}; a Spec without a usable boundary is listed in errors and left out, the rest are still compared",
+      "2": "usage error, nothing compared: neither --spec nor --project, a --spec not in <module-id>=<file> form, an invalid or repeated module id, or --project is not a directory"
+    },
+    "values": {
+      "source": {
+        "<spec-file>": "the --spec file path as given; it replaces the project's spec/<id>.md for that module",
+        "project": "spec/<id>.md of a module that /map reports in_progress or ready in --project"
+      },
+      "error": {
+        "no-boundary": "the Spec has no concurrency boundary section",
+        "missing-exclusive": "the boundary section has no exclusive line",
+        "bad-path": "an exclusive path is malformed",
+        "bad-category": "an unknown shared-file category",
+        "duplicate-section": "two concurrency boundary sections",
+        "unknown-line": "a line in the boundary section that is neither exclusive nor shared",
+        "unreadable": "the Spec file cannot be read as UTF-8",
+        "no-capability-map": "--project has no spec/CAPABILITY-MAP.md; only the --spec files were compared",
+        "map-unreadable": "the capability map or a module file under --project cannot be read; only the --spec files were compared"
+      }
+    },
+    "notes": "interface 1.10; --spec is repeatable and --project is optional, at least one is required; relative --spec paths resolve against the working directory; runs whatever moduleConcurrency says; every pair is compared, overlap is the same rule as mapView startable.conflicts (equal paths, or one inside the other's directory; the narrower path is listed); modules are ordered by Build order, modules not in the map follow in --spec order",
+    "contract": "spec/scope-overlap-interface.md"
   }
 }
