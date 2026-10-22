@@ -324,6 +324,10 @@ elif [ -n "$LINKED" ]; then
 Linked project: \`${LINK_SHOWN}\` — this session's directory \`${LINK_FROM}\` points to it through \`.agent/spec-guard-link.json\`. spec-guard commands follow it automatically. The link applies to every session that runs in that directory; if this session works on a different project, ignore this stage and register this session's own project with \`link-project\`."
 fi
 
+# quiet-injection（D5）：状态码里本 hook 自己掌握的事实——位置行与跟随指向的项目；其余由 module_stage.py 算。
+STATE_EXTRA="${LOCATION}
+${LINKED:+${LINK_SOURCE}:${LINK_SHOWN}:${LINK_FROM}}"
+
 SPECS=0
 for spec in spec/*.md; do
   [ -e "$spec" ] || continue
@@ -384,6 +388,13 @@ ${LABEL}
 
 ${SECTION}"
   fi
+  # 状态码（module_stage.py --state-key，与其他阶段同一算法）接在最后；取不到时不加，输出与改前相同。
+  if [ ! -f spec/CAPABILITY-MAP.md ]; then KEY_STAGE=IDLE; else KEY_STAGE=MAP_ONLY; fi
+  KEY="$(python3 "$HOOKDIR/module_stage.py" . --state-key --stage "$KEY_STAGE" --node "$NODE" --state-extra "$STATE_EXTRA" \
+    ${HOST:+--host "$HOST"} 2>/dev/null)" || KEY=""
+  case "$KEY" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) STOP_RULES="${STOP_RULES}
+
+<!-- spec-guard-state: ${KEY} -->" ;; esac
 fi
 
 if [ ! -f spec/CAPABILITY-MAP.md ] && [ -n "$ZH" ]; then
@@ -435,7 +446,7 @@ Suggested next step: confirm with the user that the first module's requirement i
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} --state-extra "$STATE_EXTRA" 2>/dev/null)"; then
   emit "${HEADER}
 
 ${STAGE}"

@@ -88,7 +88,13 @@ run_input() {  # $1=项目目录 $2=标准输入文本；ATTENDED=<值> 时传�
     env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLAUDE_PROJECT_DIR="$1" /bin/bash "$HOOKDIR/phase-guard.sh" <<<"$2"
   fi
 }
-context_of() {  # 从 hook JSON 取 additionalContext
+context_of() {  # 从 hook JSON 取 additionalContext；quiet-injection 的状态码行（与它前面的空行）剥掉，其余逐字不变
+  python3 -c '
+import json, re, sys
+text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
+print(re.sub(r"\n\n<!-- spec-guard-state: [0-9a-f]{8} -->(?=\n|$)", "", text, count=1))'
+}
+raw_of() {  # 从 hook JSON 取 additionalContext 原文（含状态码）
   python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"])'
 }
 transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
@@ -252,8 +258,10 @@ for project in "$WORK/idle" "$WORK/crlf" "$WORK/idle-zh" "$WORK/crlf-zh"; do
   full="$(run "$project")"
   bare="$(HOOKDIR="$WORK/no-node-rules/hooks" run "$project")" || fail "rules-at-nodes：缺 node-rules.md 时退出码非 0"
   python3 -c '
-import json, sys
-full, bare = (json.loads(text)["hookSpecificOutput"]["additionalContext"] for text in sys.argv[1:3])
+import json, re, sys
+# quiet-injection：状态码行接在停点规则之后，比较前缀前先剥掉。
+full, bare = (re.sub(r"\n\n<!-- spec-guard-state: [0-9a-f]{8} -->$", "",
+                     json.loads(text)["hookSpecificOutput"]["additionalContext"]) for text in sys.argv[1:3])
 assert "Stop rules" not in bare and "停点规则" not in bare, bare
 assert full.startswith(bare) and full != bare, (full, bare)
 ' "$full" "$bare" || fail "rules-at-nodes：缺 node-rules.md 时应不附停点规则、其余输出不变（${project}）"
@@ -709,7 +717,7 @@ sans_location() {
   python3 -c '
 import json, sys
 text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
-print("\n".join(l for l in text.split("\n") if not l.startswith("Location: ")))'
+print("\n".join(l for l in text.split("\n") if not l.startswith(("Location: ", "<!-- spec-guard-state: "))))'
 }
 [ "$(run "$um_done" | sans_location)" = "$(run "$um_plain" | sans_location)" ] || fail "推送后的输出应与无远端时逐字相同"
 echo "  ✅ 推送后输出与无远端时逐字相同（位置行除外）"; PASS=$((PASS + 1))
@@ -2352,7 +2360,117 @@ assert text.index(hint) < text.index("建议下一步"), text
 echo "  ✅ zh-CN：中文提醒在建议下一步之前"; PASS=$((PASS + 1))
 }
 
-PARTS=20
+part_21() {
+# quiet-injection（D5）改动 1 前半：状态码。完整输出末尾带 <!-- spec-guard-state: 8 位十六进制 -->，由「状态变了才给完整」
+# 的那些事实算出；未勾选数、上下文用量不算。诊断类（MAP_INVALID、UNKNOWN）不带码。
+code_of() {  # $1=项目目录；可带 $2 为标准输入文本；打印状态码（没有为空）
+  local out
+  if [ -n "${2:-}" ]; then out="$(run_input "$1" "$2")"; else out="$(run "$1")"; fi
+  raw_of <<<"$out" | python3 -c '
+import re, sys
+found = re.findall(r"<!-- spec-guard-state: ([0-9a-f]{8}) -->", sys.stdin.read())
+print(found[-1] if found else "")'
+}
+same_code() {  # $1=用例名 $2 $3=两个码
+  [ -n "$2" ] && [ "$2" = "$3" ] || fail "$1: 状态码应相同且非空（$2 / $3）"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+diff_code() {  # $1=用例名 $2 $3=两个码
+  [ -n "$2" ] && [ -n "$3" ] && [ "$2" != "$3" ] || fail "$1: 状态码应不同且非空（$2 / $3）"
+  echo "  ✅ $1"; PASS=$((PASS + 1))
+}
+q="$WORK/quiet"
+mkdir -p "$q/spec" "$q/tasks/alpha" "$q/tasks/beta" "$q/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$q/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '| gamma | z | alpha |' '' 'Build order: alpha → beta → gamma' > "$q/spec/CAPABILITY-MAP.md"
+printf '# alpha\n' > "$q/spec/alpha.md"; printf '# Plan\n' > "$q/tasks/alpha/plan.md"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+git -C "$q" init -q -b main && git -C "$q" add -A && git -C "$q" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm base
+
+out="$(run "$q" | raw_of)"
+python3 -c '
+import re, sys
+t = sys.stdin.read().rstrip("\n")
+assert re.search(r"\n\n<!-- spec-guard-state: [0-9a-f]{8} -->$", t), t
+' <<<"$out" || fail "BUILDING 完整输出末尾应有状态码行
+$out"
+echo "  ✅ BUILDING 完整输出末尾有状态码行"; PASS=$((PASS + 1))
+base="$(code_of "$q")"
+same_code "同一状态两次算出的码相同" "$base" "$(code_of "$q")"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] three' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+same_code "未勾选数变了码不变" "$base" "$(code_of "$q")"
+transcript "$WORK/t10k.jsonl" 9999; transcript "$WORK/t50k.jsonl" 49999
+same_code "上下文用量变了码不变" "$(code_of "$q" "{\"transcript_path\":\"$WORK/t10k.jsonl\"}")" \
+  "$(code_of "$q" "{\"transcript_path\":\"$WORK/t50k.jsonl\"}")"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+
+printf '# alpha\n\n<!-- spec-guard: review pending -->\n' > "$q/spec/alpha.md"
+diff_code "Spec 批准状态变了码变" "$base" "$(code_of "$q")"
+printf '# alpha\n' > "$q/spec/alpha.md"
+printf '# Plan\n\n<!-- spec-guard: review pending -->\n' > "$q/tasks/alpha/plan.md"
+diff_code "Plan 批准状态变了码变" "$base" "$(code_of "$q")"
+printf '# Plan\n' > "$q/tasks/alpha/plan.md"
+same_code "改回原样码也回到原样" "$base" "$(code_of "$q")"
+
+printf '%s\n' '- [x] one' '- [x] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+gate="$(code_of "$q")"
+diff_code "走到停点（最终验收）码变" "$base" "$gate"
+printf '%s\n' '- [x] one' '- [x] two' '- [x] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+done_alpha="$(code_of "$q")"
+diff_code "阶段变了（alpha 做完、beta 还没 Spec）码变" "$gate" "$done_alpha"
+printf '{"activeModule":"gamma"}\n' > "$q/.agent/state.json"
+diff_code "当前模块变了码变" "$done_alpha" "$(code_of "$q")"
+rm -f "$q/.agent/state.json"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+
+printf '# beta\n' > "$q/spec/beta.md"; printf '# Plan\n' > "$q/tasks/beta/plan.md"
+printf '%s\n' '- [ ] later' '<!-- spec-guard: suspended -->' > "$q/tasks/beta/todo.md"
+diff_code "挂起的模块变了码变" "$base" "$(code_of "$q")"
+rm -f "$q/spec/beta.md"; rm -rf "$q/tasks/beta"; mkdir -p "$q/tasks/beta"
+same_code "去掉挂起码回到原样" "$base" "$(code_of "$q")"
+
+printf '{"version": 1, "artifactLanguage": "pt-BR"}\n' > "$q/.agent/config.json"
+diff_code "配置行变了码变" "$base" "$(code_of "$q")"
+printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$q/.agent/config.json"
+diff_code "提示语言变了码变" "$base" "$(code_of "$q")"
+rm -f "$q/.agent/config.json"
+same_code "去掉配置码回到原样" "$base" "$(code_of "$q")"
+
+git -C "$q" checkout -q -b other
+diff_code "位置（分支）变了码变" "$base" "$(code_of "$q")"
+git -C "$q" checkout -q main
+
+printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$q/.agent/config.json"
+on="$(code_of "$q")"
+marker="$(git -C "$q" rev-parse --git-path spec-guard/role)"; case "$marker" in /*) ;; *) marker="$q/$marker" ;; esac
+mkdir -p "$(dirname "$marker")"; printf '%s\n' 'module alpha' > "$marker"
+diff_code "checkout 角色变了码变" "$on" "$(code_of "$q")"
+rm -f "$marker"; rm -f "$q/.agent/config.json"
+
+lk="$WORK/quiet-link"; mkdir -p "$lk/.agent"
+printf '{"version": 1, "project": "%s"}\n' "$q" > "$lk/.agent/spec-guard-link.json"
+diff_code "跟随指向时（关联项目）码与直接打开不同" "$base" "$(code_of "$lk")"
+
+git -C "$q" update-ref refs/remotes/origin/main HEAD
+git -C "$q" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+printf '%s\n' '- [x] one' '- [x] two' '- [x] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+printf '{"activeModule":"alpha"}\n' > "$q/.agent/state.json"  # MODULE_DONE：只有它与 DONE 才看未合提交
+before="$(code_of "$q")"
+git -C "$q" add -A && git -C "$q" -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm ahead
+diff_code "有提交还没合进上游（有无）变了码变" "$before" "$(code_of "$q")"
+printf '%s\n' '- [x] one' '- [ ] two' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+
+idle="$WORK/quiet-idle"; mkdir -p "$idle"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle/CLAUDE.md"
+idle_code="$(code_of "$idle")"
+mkdir -p "$idle/spec"; cp "$q/spec/CAPABILITY-MAP.md" "$idle/spec/"
+diff_code "IDLE 与 MAP_ONLY 都带码且不同" "$idle_code" "$(code_of "$idle")"
+printf '%s\n' '| alpha | x | — |' > "$idle/spec/CAPABILITY-MAP.md"; printf '# a\n' > "$idle/spec/a.md"
+[ -z "$(code_of "$idle")" ] || fail "MAP_INVALID 不应带状态码"
+echo "  ✅ MAP_INVALID 不带状态码"; PASS=$((PASS + 1))
+}
+
+PARTS=21
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
