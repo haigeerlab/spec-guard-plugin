@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:f725ff7ccaf1d7744181f61cff4a1c3467a6d87a"
+      },
+      "observedAt": "2026-10-23T01:40:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.84.0 to 0.84.1; installed_plugins.json records gitCommitSha f725ff7 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:claude -p in a temporary project with the convention block, two turns in one session, the session loaded the 0.84.1 install path: the first UserPromptSubmit injection was the full phase hint ending in spec-guard-state f129d467, the second was the one-line form with the same state code"
+      ]
+    }
+  ]
+}

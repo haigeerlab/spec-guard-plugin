@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:f725ff7ccaf1d7744181f61cff4a1c3467a6d87a"
+      },
+      "observedAt": "2026-10-23T01:40:00Z",
+      "evidence": [
+        "result:the v0.84.1 annotated tag resolves to merge commit f725ff7ccaf1d7744181f61cff4a1c3467a6d87a (pull request #410); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip 573d350 (tree a8836a4); the push run on the merge commit succeeded (run 39835001876)",
+        "result:two regression fixes and one doc completion (fact-fixes rework 1: hook input read timeout counts as uncertain; quiet-injection rework 1: no 200k estimate when the Claude window cannot be read; docs/optional-features.md doc-governance text, closing follow-up EF4KWN4); interface.json unchanged at 1.10",
+        "result:on the merge tree under macOS /bin/bash 3.2.57: validate.sh passed, phase-guard 505 cases passed, verify-artifacts 74 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0"
+      ]
+    }
+  ]
+}
