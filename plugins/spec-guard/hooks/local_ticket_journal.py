@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from local_ledger_runtime import PROJECT_ID
 from local_ticket_inventory import InventoryError
 from local_ticket_lock import acquire_lock
 from state_paths import state_dir
@@ -43,7 +44,7 @@ def _common_dir(project: Path) -> Path:
 
 
 def journal_path(project: Path, project_id: str, root: Path | None = None) -> Path:
-    if not project_id or not project_id.isalnum():
+    if not isinstance(project_id, str) or not PROJECT_ID.fullmatch(project_id):
         raise InventoryError("journal-source-unknown: project identity is invalid")
     common = _common_dir(Path(project))
     partition = hashlib.sha256(str(common).encode("utf-8")).hexdigest()

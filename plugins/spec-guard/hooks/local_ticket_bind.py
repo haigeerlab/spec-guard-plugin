@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from local_ledger_runtime import state_worktree_status
+from local_ledger_runtime import PROJECT_ID, state_worktree_status
 from local_ticket_archive import verify_archive
 from local_ticket_handoff import _raw_events, _source_digest, snapshot_issue
 from local_ticket_journal import (PARTITION_NAME, default_journal_root,
@@ -209,7 +209,7 @@ def bind_journal(project: Path, preview_path: Path, runtime_dir: Path,
         project_id = preview["projectId"]
     except (KeyError, TypeError, ValueError) as error:
         raise InventoryError("journal-bind-preview-invalid: review artifact is unreadable") from error
-    if not isinstance(project_id, str) or not project_id.isalnum():
+    if not isinstance(project_id, str) or not PROJECT_ID.fullmatch(project_id):
         raise InventoryError("journal-bind-preview-invalid: project identity is invalid")
     project = Path(project).resolve()
     root = default_journal_root() if journal_root is None else Path(journal_root)
