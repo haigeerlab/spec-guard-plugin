@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:6098701b4097ffbd053255662d11d9869503746c"
+      },
+      "observedAt": "2026-10-24T16:40:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.84.1 to 0.84.2 on Claude Code 2.1.310; installed_plugins.json records gitCommitSha 6098701 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:claude -p in a temporary NEEDS_PLAN project, two turns in one session: the first UserPromptSubmit injection was the full phase hint and the second the one-line form, both with state code 69f3ec27; the installed 0.84.1 and 0.84.2 phase-guard give 16ac99c7 and 69f3ec27 for that project, so the session ran 0.84.2"
+      ]
+    }
+  ]
+}

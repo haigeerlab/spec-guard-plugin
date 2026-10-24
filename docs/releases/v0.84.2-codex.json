@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.84.2-upgrade-20261024"
+      },
+      "observedAt": "2026-10-24T16:40:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh </dev/null",
+        "result:the marketplace ref moved from v0.84.1 to v0.84.2; codex plugin marketplace upgrade exited 0; codex plugin list reports 0.84.2 enabled from the marketplace snapshot; the snapshot's plugins/spec-guard is identical to the release asset; the smoke run exited 0 on codex-cli 0.162.1; ~/.codex/config.toml differs from its pre-release backup only by that ref line",
+        "unverified:ledger-standalone-reminder on a real Codex host is still open from 0.84.0: the SessionStart startup|clear hook needs the user to trust it in Codex /hooks before it can be re-checked"
+      ]
+    }
+  ]
+}
