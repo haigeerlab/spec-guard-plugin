@@ -78,6 +78,7 @@ def main(argv):
         record = {"id": initiative_id, "title": title, "events": [{"type": "created", "at": "imported", "checkpoint": {"id": checkpoint, "map": {"path": "spec/history/%s/%s/CAPABILITY-MAP.md" % (initiative_id, checkpoint), "sha256": digest}, "modules": []}}]}
         canonical_map = os.path.join(project, "spec", "CAPABILITY-MAP.md")
         copied_canonical_map = False
+        event_path = None
         try:
             os.makedirs(destination)
             shutil.copyfile(map_path, os.path.join(destination, "CAPABILITY-MAP.md"))
@@ -93,6 +94,11 @@ def main(argv):
             print("imported legacy")
             return 0
         except (OSError, subprocess.CalledProcessError):
+            if event_path is not None:  # review-residual-fixes (C7): no temporary event file left in the project
+                try:
+                    os.unlink(event_path)
+                except OSError:
+                    pass
             shutil.rmtree(destination, ignore_errors=True)
             if copied_canonical_map:
                 os.unlink(canonical_map)
