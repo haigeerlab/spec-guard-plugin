@@ -1,6 +1,6 @@
 # Spec: review-residual-fixes
 
-<!-- spec-guard: review approved 1eee341fd0ee -->
+<!-- spec-guard: review approved 26f7d1a0a7ed -->
 
 ## Objective
 

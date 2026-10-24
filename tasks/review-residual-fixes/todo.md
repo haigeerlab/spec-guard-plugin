@@ -11,4 +11,4 @@
 - [x] Task 8：规则文字（C8、C9） — SKILL.md Proposal 一节改为「审查、预检、证明只读；只有收尾经用户针对这一条明确同意后写入」；workflow-checkpoints「批量插入之后」末尾补「只评估一次靠本会话记得……不主动重评，用户要求时再评」。`test_workflow_checkpoints.py` 加断言（新增 `test_proposal_section_names_the_closeout_write`，批量插入短语表加两条），改前 2 例红，改后 workflow-checkpoints 与 stop-rules 102 例全绿。
 - [x] Checkpoint 1（report）：三套核心回归 — Task 8 提交后并行跑：`validate.sh` 校验通过、phase-guard 507 例、verify-artifacts 74 例全绿；CI 同版 `npx shellcheck@4.1.0 -S warning`（hooks、scripts、evals 全部 .sh）无告警。
 - [x] Task 9：版本号与 CHANGELOG 0.84.2 — 两份 `plugin.json` 与 README 中英 `--ref` 改 0.84.2；CHANGELOG 新开 0.84.2（升级须知：状态码变一次；修复 6 条、文档 4 条）。`interface.json` 不变。假设 9 的 `documentation_baseline._visible_lines` 记账本 B5WE8BZ。
-- [ ] Checkpoint 2（gate）：最终验收；发版前告诉 ecosystem-lead，推送与开 PR 由用户确认，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；发版前告诉 ecosystem-lead，推送与开 PR 由用户确认，合并由用户进行 — 2026-10-24 呈现十项以前／现在、先红后绿（变异只对 C2 做）、全档结果、改动文件与 11 个提交、Spec 两条修订原样差异；用户回复「review-residual-fixes 验收通过，Spec 两条修订也同意」。Spec 批准标记已用 review-mark 重记。
