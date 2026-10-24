@@ -44,6 +44,16 @@ class Parse(unittest.TestCase):
         self.assertIsNone(parse(text))
         self.assertEqual(parse(text + "\n## 并行边界\n\n- 独占：`b/`\n").exclusive, ("b/",))
 
+    def test_fences_pair_like_markdown(self):
+        # review-residual-fixes (C5): a fence closes only on the same character, at least as long, with nothing after it.
+        fake = "## 并行边界\n\n- 独占：`fake/`\n"
+        real = "\n## 并行边界\n\n- 独占：`real/`\n"
+        for opening, inner, closing in (("~~~", "```", "~~~"), ("````", "```", "````"), ("```", "```python", "```")):
+            text = "# Spec: m\n\n%s\n%s\n%s%s\n%s\n" % (opening, inner, fake, inner, closing) + real
+            self.assertEqual(parse(text).exclusive, ("real/",), (opening, inner))
+        listed = "# Spec: m\n\n- example:\n\n    ```markdown\n    " + fake.replace("\n", "\n    ") + "```\n" + real
+        self.assertEqual(parse(listed).exclusive, ("real/",))
+
     def errors(self, text):
         with self.assertRaises(ScopeError) as caught:
             parse(text)

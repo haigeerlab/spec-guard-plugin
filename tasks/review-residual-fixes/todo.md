@@ -5,7 +5,7 @@
 - [x] Task 2：create 类文档核验（C2，先红后绿） — 新增 4 例（存在→present、不存在→missing 且 attention 含路径、目录／指向项目外的符号链接／`../` 路径→missing、URL→unverified），改前 4 例红；`_check_created` 只看是否项目内普通文件。原 `test_create_is_not_checked` 断言旧行为，改为 `test_create_only_checks_existence`；两份 documentation-verification 说明同步（Spec 变更记录）。文档类 44 例全绿；变异（草稿副本去掉 create 分支）→ 5 例红。
 - [x] Task 3：setup-convention 先校验（C3，先红后绿） — `test-setup-teardown.sh` 新增：新项目只带一份含手改行的 CLAUDE.md，`--replace` 不带 `--accept-removals` → 退出 1、快照不变、`spec/` `tasks/` `.agent/` 都不存在；改前红（目录已建）。`managed-block.py replace` 加 `--check`（只做拒绝判定，同一份 `_refuse`），setup-convention 在建目录前调用。54 例全绿；ShellCheck `-S warning`（与 CI 同级）无告警。
 - [x] Task 4：状态码含文档基线（C4，先红后绿；含 C10 注释） — `test-phase-guard.sh` 第 22 段新增：最终 gate 状态码不变时只给一行；新建 `docs/DOCUMENTATION-BASELINE.md` 后给完整内容且带「Documentation check」行。改前红（只给一行）；facts 末尾加 `documentation_baseline_present(root)` 后 507 例全绿。`module_stage.py` 窗口估算注释按 0.84.1 行为改写（HT9AJX2）。
-- [ ] Task 5：围栏配对（C5，先红后绿）
+- [x] Task 5：围栏配对（C5，先红后绿） — `test_module_scope.py` 新增 `test_fences_pair_like_markdown`：`~~~` 包 ```` ``` ````、四个反引号包三个、```` ``` ```` 包 ```` ```python ````，以及列表内缩进 4 格的围栏，示例里的假「并行边界」都不读、后面的真一节读到；改前红（duplicate-section）。`_visible` 记住开围栏，同字符、不短于它、后面只有空白才闭合；缩进照旧不限（偏离 Spec 一处，见 Spec 变更记录）。module_scope 与 map_view 114 例全绿。
 - [ ] Task 6：projectId 共用判据（C6，先红后绿）
 - [ ] Task 7：history-migration 清理（C7，先红后绿）
 - [ ] Task 8：规则文字（C8、C9）

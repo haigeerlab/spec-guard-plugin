@@ -26,7 +26,8 @@ EXCLUSIVE = ("独占", "Exclusive")
 SHARED = ("公共", "Shared")
 CATEGORIES = {"全局配置": "global-config", "锁文件": "lockfile", "迁移": "migration", "测试资源": "test-resource"}
 NONE = ("无", "none")
-FENCE = re.compile(r"^\s*(```|~~~)")
+# review-residual-fixes (C5): 3+ backticks or tildes; any indent, as before, so a fence inside a list item still counts.
+FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 SECTION_END = re.compile(r"^#{1,2}\s")
 FIELD = re.compile(r"^-\s+([^:：]+?)\s*[:：]\s*(.*)$")
 TICKED = re.compile(r"^`([^`]*)`$")
@@ -53,13 +54,19 @@ class Scope(NamedTuple):
 
 def _visible(text: str) -> list:
     """Lines outside fenced code blocks, so an example heading in a Spec is not a section."""
-    lines, fenced = [], False
+    lines, fence = [], None
     for line in text.splitlines():
-        if FENCE.match(line):
-            fenced = not fenced
+        match = FENCE.match(line)
+        if fence is None and match:
+            fence = match.group(1)
             lines.append("")
             continue
-        lines.append("" if fenced else line)
+        if (fence is not None and match and match.group(1)[0] == fence[0] and len(match.group(1)) >= len(fence)
+                and not line[match.end():].strip()):
+            fence = None
+            lines.append("")
+            continue
+        lines.append("" if fence is not None else line)
     return lines
 
 
