@@ -156,3 +156,7 @@ HT9AJX2）。本模块一次修完，发 0.84.2。每一条都是「现有行为
 只改规则说明（SKILL.md、workflow-checkpoints）与 CHANGELOG；项目没有文档基线，不需要文档影响登记。
 
 ## 变更记录
+
+- 2026-10-24（构建中，范围内补充）：C2 的说明同步。`commands/documentation-verification.md` 与 `references/documentation-verification.md`
+  原写「`create` 为 `not-checked`」，与 C2 冲突，按 C2 改为 `present`／`missing`／`unverified`；`test_documentation_verification.py` 原
+  `test_create_is_not_checked` 断言旧行为，改为 `test_create_only_checks_existence`。两份说明不在原并行边界里，是 C2 的直接后果，范围不变。
