@@ -681,7 +681,7 @@ class ConcurrencyAssessmentTests(unittest.TestCase):
     def test_section_covers_a_batch_insert(self):
         body = self.section(self.HEADING)
         for phrase in ("**批量插入之后。**", "2 个及以上", "同一个需求", "最后一个", "只评估一次", "不建议并行",
-                       "插入单个模块不评估"):
+                       "插入单个模块不评估", "靠本会话记得", "不主动重评"):
             self.assertIn(phrase, body)
         self.assertNotIn("插入单个模块不算能力图审阅", body)
 
@@ -689,6 +689,15 @@ class ConcurrencyAssessmentTests(unittest.TestCase):
         body = self.section(self.HEADING)
         for phrase in ("module-crew", "crew-coordinator", "协调会话", "角色", "只给 Build order 建议"):
             self.assertIn(phrase, body)
+
+    def test_proposal_section_names_the_closeout_write(self):
+        # review-residual-fixes (C8): review, preflight and proof are read-only; only the closeout writes, after consent.
+        skill = (self.plugin / "skills" / "spec-guard-ops" / "SKILL.md").read_text(encoding="utf-8")
+        start = skill.index("## proposal")
+        intro = skill[start:skill.index("```", start)]
+        self.assertNotIn("Proposal 步骤均为只读", intro)
+        for phrase in ("审查、预检、证明", "只读", "收尾", "明确同意"):
+            self.assertIn(phrase, intro)
 
     def test_add_module_points_to_the_batch_assessment(self):
         command = (self.plugin / "commands" / "add-module.md").read_text(encoding="utf-8")

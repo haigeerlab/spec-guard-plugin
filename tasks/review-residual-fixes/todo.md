@@ -8,7 +8,7 @@
 - [x] Task 5：围栏配对（C5，先红后绿） — `test_module_scope.py` 新增 `test_fences_pair_like_markdown`：`~~~` 包 ```` ``` ````、四个反引号包三个、```` ``` ```` 包 ```` ```python ````，以及列表内缩进 4 格的围栏，示例里的假「并行边界」都不读、后面的真一节读到；改前红（duplicate-section）。`_visible` 记住开围栏，同字符、不短于它、后面只有空白才闭合；缩进照旧不限（偏离 Spec 一处，见 Spec 变更记录）。module_scope 与 map_view 114 例全绿。
 - [x] Task 6：projectId 共用判据（C6，先红后绿） — `test_local_ledger_runtime.py` 新增 `ProjectIdTests`：`journal_path` 接受 `my-ledger_1`，拒 `a/b`、65 位、`é1`、空串；bind 与 journal 源码不含 `isalnum`、用 `PROJECT_ID.fullmatch`。改前红；`local_ledger_runtime.PROJECT_ID` 一份定义，runtime、bind、journal 共用。账本类 6 个测试文件 176 例全绿；`test_local_ticket_restore_acceptance` 要真实 Epiq 运行时（`SPEC_GUARD_EPIQ_RUNTIME`），本机未设，未跑。
 - [x] Task 7：history-migration 清理（C7，先红后绿） — `test-history-migration.sh` 新增：复制 hooks 到临时目录、把副本的 `capability-history.py` 换成退出 1 的替身，`import --confirm` 退出 1 且项目根无 `.history-migration-*`；改前红（留下临时文件）。失败分支先删临时事件文件（删除失败忽略），再照旧清理。迁移与能力历史回归全绿，ShellCheck 无告警。
-- [ ] Task 8：规则文字（C8、C9）
+- [x] Task 8：规则文字（C8、C9） — SKILL.md Proposal 一节改为「审查、预检、证明只读；只有收尾经用户针对这一条明确同意后写入」；workflow-checkpoints「批量插入之后」末尾补「只评估一次靠本会话记得……不主动重评，用户要求时再评」。`test_workflow_checkpoints.py` 加断言（新增 `test_proposal_section_names_the_closeout_write`，批量插入短语表加两条），改前 2 例红，改后 workflow-checkpoints 与 stop-rules 102 例全绿。
 - [ ] Checkpoint 1（report）：三套核心回归
 - [ ] Task 9：版本号与 CHANGELOG 0.84.2
 - [ ] Checkpoint 2（gate）：最终验收；发版前告诉 ecosystem-lead，推送与开 PR 由用户确认，合并由用户进行

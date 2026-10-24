@@ -354,8 +354,9 @@ python3 -B "$ROOT/hooks/documentation_verification.py" --project "$PROJECT" --mo
 
 ## proposal
 
-Proposal 步骤均为只读：共享事实只来自远端默认分支快照与 GitHub/GitLab Proposal Issue，
-不读取其他 worktree 或 `.agent/state.json`，也不写 Issue、标签、能力图、分支或任务。按需运行：
+Proposal 的审查、预检、证明都是只读：共享事实只来自远端默认分支快照与 GitHub/GitLab Proposal Issue，
+不读取其他 worktree 或 `.agent/state.json`，也不写 Issue、标签、能力图、分支或任务。只有「收尾」在用户针对这一条
+Proposal 明确同意后写收尾记录、改阶段并关闭事项（见下文「收尾」）。按需运行：
 
 ```bash
 # 任何分支：单个 Proposal 的新鲜度与阶段
