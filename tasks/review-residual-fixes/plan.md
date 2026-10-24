@@ -1,6 +1,6 @@
 # Plan: review-residual-fixes
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/review-residual-fixes.md`](../../spec/review-residual-fixes.md)（2026-10-24 用户在本会话批准：「批准 review-residual-fixes 的 Spec，
 假设 7～9 也同意」）。评审节奏为分开审，本 Plan 单独交审。分支 `claude/v0.84.2-residual-fixes`，worktree `distracted-morse-46ef70`，

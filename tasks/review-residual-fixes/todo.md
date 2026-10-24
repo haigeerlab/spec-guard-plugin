@@ -1,6 +1,6 @@
 # Todo: review-residual-fixes
 
-- [ ] Task 0：提交已批准的 Spec、Plan 草稿与能力图
+- [x] Task 0：提交已批准的 Spec、Plan 草稿与能力图 — 2026-10-24 用户批准 Plan（「批准 review-residual-fixes 的 Plan」）；Spec、能力图、Plan 草稿在 `400041f8` 提交，Plan 批准标记随本次提交。
 - [ ] Task 1：review-mark 提醒（C1，先红后绿）
 - [ ] Task 2：create 类文档核验（C2，先红后绿）
 - [ ] Task 3：setup-convention 先校验（C3，先红后绿）
