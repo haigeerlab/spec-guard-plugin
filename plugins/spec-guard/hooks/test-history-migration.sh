@@ -25,4 +25,18 @@ printf '{"initiative":{"title":"capability-history"}}' > "$TMP/current/.agent/st
 python3 "$MIGRATION" import --confirm "$TMP/current" >/dev/null
 python3 "$HOOKDIR/capability-history.py" verify "$TMP/current/spec/CAPABILITY-HISTORY.json" "$TMP/current" >/dev/null
 [ "$(python3 "$HOOKDIR/capability-history.py" status "$TMP/current/spec/CAPABILITY-HISTORY.json" capability-history)" = active ]
+
+# review-residual-fixes（C7）：capability-history.py create 失败时，迁移不在项目根留下临时事件文件。
+mkdir -p "$TMP/broken-hooks" "$TMP/broken/.agent"
+cp "$HOOKDIR"/*.py "$TMP/broken-hooks/"
+printf 'import sys\nsys.exit(1)\n' > "$TMP/broken-hooks/capability-history.py"
+printf '# map\n' > "$TMP/broken/CAPABILITY-MAP.md"
+printf '{}' > "$TMP/broken/.agent/state.json"
+set +e
+python3 "$TMP/broken-hooks/history-migration.py" import --confirm "$TMP/broken" >/dev/null 2>&1
+rc=$?
+set -e
+[ "$rc" -eq 1 ]
+leftover="$(find "$TMP/broken" -maxdepth 1 -name '.history-migration-*' -print)"
+[ -z "$leftover" ] || { echo "  ❌ 迁移失败后留下临时事件文件：$leftover" >&2; exit 1; }
 echo "  ✅ history migration regression passed"

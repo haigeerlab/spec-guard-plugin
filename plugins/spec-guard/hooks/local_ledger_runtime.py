@@ -21,6 +21,8 @@ MCP_RELATIVE_PATH = Path("node_modules") / PACKAGE_NAME / "dist" / "mcp.js"
 PROJECT_RELATIVE_PATH = Path(".epiq") / "project.json"
 STATE_BRANCH = "__epiq_state__"
 _NODE_VERSION = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+# review-residual-fixes (C6): the one Epiq projectId rule; binding and the offline journal use it too.
+PROJECT_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class RuntimeContractError(ValueError):
@@ -181,7 +183,7 @@ def project_status(project_dir: Path) -> dict[str, str]:
             raise RuntimeContractError("Epiq project configuration fields are invalid")
         if not all(isinstance(config[key], str) and config[key] for key in expected):
             raise RuntimeContractError("Epiq project configuration values are invalid")
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", config["projectId"]):
+        if not PROJECT_ID.fullmatch(config["projectId"]):
             raise RuntimeContractError("Epiq project ID is not a safe path component")
         if config["stateBranch"] != STATE_BRANCH:
             raise RuntimeContractError("Epiq state branch does not match the audited contract")

@@ -71,6 +71,53 @@ class DocumentationVerificationTests(unittest.TestCase):
         git(self.root, "commit", "-qm", "spec")
         self.write("docs/architecture.md", "goal\nadded\n")
 
+    def created(self, artifact):
+        """review-residual-fixes (C2): a `create` decision whose delivered outcome only names a planned artifact."""
+        self.write("docs/DOCUMENTATION-BASELINE.md", BASELINE)
+        self.write("spec/alpha.md", SPEC.replace("| developer-entry | follow |", "| developer-entry | create |"))
+        self.write("tasks/alpha/plan.md", PLAN + """| developer-entry | `%s` | New guide. |
+
+## Documentation outcome
+
+| Concern | Outcome | Evidence | Rationale |
+|---|---|---|---|
+| architecture | deferred | — | Later. |
+| developer-entry | delivered | `%s` | Guide written. |
+""" % (artifact, artifact))
+
+    def test_created_document_present_is_ready_for_it(self):
+        self.created("docs/guide.md#start")
+        self.write("docs/guide.md", "guide\n")
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual(result.outcomes["developer-entry"].check, "present")
+        self.assertFalse([item for item in result.attention if "developer-entry" in item])
+
+    def test_created_document_missing_is_attention(self):
+        self.created("docs/guide.md")
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual(result.state, "attention")
+        self.assertEqual(result.outcomes["developer-entry"].check, "missing")
+        self.assertTrue([item for item in result.attention if "docs/guide.md" in item and "does not exist" in item])
+
+    def test_created_document_must_be_a_regular_file_in_the_project(self):
+        self.created("docs/guide.md")
+        (self.root / "docs" / "guide.md").mkdir(parents=True)
+        self.assertEqual(verify_documentation(self.root, "alpha").outcomes["developer-entry"].check, "missing")
+        (self.root / "docs" / "guide.md").rmdir()
+        outside = tempfile.TemporaryDirectory(prefix="sg-doc-outside-")
+        self.addCleanup(outside.cleanup)
+        (Path(outside.name) / "guide.md").write_text("x\n", encoding="utf-8")
+        os.symlink(Path(outside.name) / "guide.md", self.root / "docs" / "guide.md")
+        self.assertEqual(verify_documentation(self.root, "alpha").outcomes["developer-entry"].check, "missing")
+        self.created("../outside.md")
+        self.assertEqual(verify_documentation(self.root, "alpha").outcomes["developer-entry"].check, "missing")
+
+    def test_created_external_document_is_unverified(self):
+        self.created("https://wiki.example.com/guide")
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual(result.outcomes["developer-entry"].check, "unverified")
+        self.assertFalse([item for item in result.attention if "developer-entry" in item])
+
     def test_absent_baseline_is_quiet(self):
         self.write("spec/alpha.md", SPEC)
         self.write("tasks/alpha/plan.md", PLAN)
@@ -344,14 +391,16 @@ class StatusAwareVerificationTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
 
-    def test_create_is_not_checked(self):
+    def test_create_only_checks_existence(self):
         self.project()
         self.write("spec/alpha.md", CHAIN_SPEC.replace("| developer-entry | update |", "| developer-entry | create |"))
         self.write("tasks/alpha/plan.md", (CHAIN_PLAN % ("delivered", "`docs/product.md#scope`"))
                    .replace("| developer-entry | `README.md` | Command. |", "| developer-entry | `docs/dev.md` | Command. |"))
         self.commit()
         result = verify_documentation(self.root, "alpha")
-        self.assertEqual(result.outcomes["developer-entry"].check, "not-checked")
+        self.assertEqual(result.outcomes["developer-entry"].check, "missing")  # review-residual-fixes (C2)
+        self.write("docs/dev.md", "dev\n")
+        self.assertEqual(verify_documentation(self.root, "alpha").outcomes["developer-entry"].check, "present")
 
     def test_json_carries_check_and_line_counts(self):
         self.project()

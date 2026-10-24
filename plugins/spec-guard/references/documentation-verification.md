@@ -33,7 +33,9 @@
 - **`target`**（已批准、未完全实现的目标）：不要求改。改过为 `target-changed` 并给出 `added`、`removed` 行数，验收消息里把差异原样附上由用户看；有删除行时另加一条提醒——删改未实现的目标即改需求，须单独交用户批准。没改过为 `target-unchanged`。
 - **其余状态**（现状类）：文件须确被改过。改过为 `changed`；没改过为 `unchanged` 并加一条提醒。
 
-“改过”的判据：自第一个加入 `spec/<module-id>.md` 的提交以来，工作区里这份文件与那次提交不同（`git diff --numstat <该提交> -- <路径>`，含之后的提交、暂存与未暂存改动；`Authority` 的 `#锚点` 先去掉）。不在 git 仓库里、Spec 还没提交、git 命令失败时为 `unknown` 并加一条写明原因的提醒，不当作没改过。`create`、`deferred`、`pending` 为 `not-checked`。
+“改过”的判据：自第一个加入 `spec/<module-id>.md` 的提交以来，工作区里这份文件与那次提交不同（`git diff --numstat <该提交> -- <路径>`，含之后的提交、暂存与未暂存改动；`Authority` 的 `#锚点` 先去掉）。不在 git 仓库里、Spec 还没提交、git 命令失败时为 `unknown` 并加一条写明原因的提醒，不当作没改过。`deferred`、`pending` 为 `not-checked`。
+
+决定为 `create` 且声明 `delivered` 的关注点只看文件在不在：Plan「Documentation delivery」表里的 `Planned artifact`（去掉 `#锚点`）是项目内的普通文件为 `present`；不存在、是目录、是符号链接或在项目外为 `missing` 并加一条提醒；外部文档（URL）为 `unverified`。不读内容、不看 git 差异。
 
 ## 核验状态
 

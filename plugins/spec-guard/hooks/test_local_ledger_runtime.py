@@ -16,6 +16,28 @@ REAL_LOCK_DIR = (
 )
 
 
+class ProjectIdTests(unittest.TestCase):
+    """review-residual-fixes (C6): one projectId rule for the runtime, binding and the offline journal."""
+
+    def test_one_rule_accepts_dash_and_underscore(self):
+        from local_ticket_inventory import InventoryError
+        from local_ticket_journal import journal_path
+        with tempfile.TemporaryDirectory(prefix="sg-project-id-") as tmp:
+            project = Path(tmp) / "project"
+            project.mkdir()
+            subprocess.run(["git", "-C", str(project), "init", "-q"], check=True)
+            self.assertEqual(journal_path(project, "my-ledger_1", Path(tmp) / "journal").parent.name, "my-ledger_1")
+            for bad in ("a/b", "x" * 65, "\u00e91", ""):
+                with self.assertRaises(InventoryError):
+                    journal_path(project, bad, Path(tmp) / "journal")
+        self.assertTrue(local_ledger_runtime.PROJECT_ID.fullmatch("my-ledger_1"))
+        here = Path(__file__).resolve().parent
+        for name in ("local_ticket_bind.py", "local_ticket_journal.py"):
+            source = (here / name).read_text(encoding="utf-8")
+            self.assertNotIn("isalnum", source, name)
+            self.assertIn("PROJECT_ID.fullmatch", source, name)
+
+
 class LocalLedgerRuntimeTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="sg-local-ledger-runtime-")

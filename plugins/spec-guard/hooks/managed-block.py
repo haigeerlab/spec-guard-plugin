@@ -73,9 +73,9 @@ def _blank_changes(old, new):
 
 
 def _options(rest, action):
-    """[--known FILE]... [--accept-removals] [--dry-run] -> (known, accept, dry)."""
+    """[--known FILE]... [--accept-removals] [--dry-run] [--check] -> (known, accept, dry, check)."""
     rest = list(rest)
-    known, accept, dry = [], False, False
+    known, accept, dry, check = [], False, False, False
     while rest:
         option = rest.pop(0)
         if option == "--known" and rest:
@@ -84,9 +84,11 @@ def _options(rest, action):
             accept = True
         elif option == "--dry-run":
             dry = True
+        elif option == "--check" and action == "replace":
+            check = True
         else:
             raise SystemExit("unknown %s option: %s" % (action, option))
-    return known, accept, dry
+    return known, accept, dry, check
 
 
 def _known(names):
@@ -139,12 +141,13 @@ def main(argv):
         print(finish - start + 1)
         return
     if action == "replace":
-        # replace <file> <begin> <end> <body> [--known FILE]... [--accept-removals] [--dry-run]
+        # replace <file> <begin> <end> <body> [--known FILE]... [--accept-removals] [--dry-run] [--check]
+        # --check (review-residual-fixes): only the refusal below -- exit 3 with the same message, else 0; writes nothing.
         # convention-block-local-lines: the local section is carried over verbatim at the end of the new block;
         # removing any other line that is not in a --known template needs --accept-removals.
         if len(argv) < 6:
             raise SystemExit("replace requires a template path")
-        known, accept, dry = _options(argv[6:], "replace")
+        known, accept, dry, check = _options(argv[6:], "replace")
         with open(argv[5], "r", encoding="utf-8", newline="") as handle:
             body = handle.readlines()
         if body and not body[-1].endswith(("\n", "\r")):
@@ -176,6 +179,8 @@ def main(argv):
             return
         if needs_accept and not accept:
             _refuse(needs_accept)
+        if check:
+            return
         atomic_write(path, "".join(lines[: start + 1] + inner + lines[finish:]))
         print(finish - start - 1)
         return
@@ -183,7 +188,7 @@ def main(argv):
         # remove <file> <begin> <end> [--known FILE]... [--accept-removals] [--dry-run]
         # teardown-local-section: the local section's lines stay where the block was (markers dropped);
         # removing any other line that is not in a --known template needs --accept-removals.
-        known, accept, dry = _options(argv[5:], "remove")
+        known, accept, dry, _check = _options(argv[5:], "remove")
         block = lines[start + 1:finish]
         section = local_section(block)
         inner = block[section[0] + 1:section[1]] if section else []

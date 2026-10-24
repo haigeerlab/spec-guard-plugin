@@ -1,7 +1,8 @@
 """Record where the review of a module's Spec or Plan stands, by one marker line (review-approval-marker).
 
 `pending` says the file is waiting for the user's review; `approved` records an approval the user
-gave in the conversation, or relayed in the session-protocol format by a registered decision hub (hub-relayed-approval).  A Spec approval carries the digest of the Spec's text, so a later edit
+gave -- where approvals may come from follows the installed collaboration plugin, else only the current conversation
+(review-residual-fixes).  A Spec approval carries the digest of the Spec's text, so a later edit
 reads back as `revised`.  The states are decided by `module_stage` alone; this script only adds or
 replaces the marker line, previews the change, and writes only with `--confirm`.  It cannot check
 that the user approved anything: the marker is a record for later sessions, not a source of authority.
@@ -131,10 +132,10 @@ def main() -> int:
         for kind in kinds:
             print("%s: %d line(s)" % (relative[kind], len(before[kind].splitlines())))
         print("Before --confirm, make sure the user has seen the content of %s in the conversation (or in the message "
-              "sent to the hub) -- its points, or the whole text when it is short. If they were given only a link or a one-line summary, that is not a "
+              "the installed collaboration plugin relays) -- its points, or the whole text when it is short. If they were given only a link or a one-line summary, that is not a "
               "review: show the content first and ask again." % " and ".join(relative[kind] for kind in kinds))
-        print("`approved` records the user's explicit approval: given in this conversation, or relayed by the registered "
-              "decision hub in the session-protocol format, with the hub's item number and the user's own words. Do not "
+        print("`approved` records the user's explicit approval: where approvals may come from follows the installed "
+              "collaboration plugin; without one, only an explicit approval in the current conversation counts. Do not "
               "write it to clear a phase hint; the marker is a record for later sessions, not a source of authority.")
     if not changed:
         return 0

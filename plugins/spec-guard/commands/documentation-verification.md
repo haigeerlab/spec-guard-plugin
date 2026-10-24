@@ -49,13 +49,14 @@ python3 -B "$ROOT/hooks/documentation_verification.py" \
 
 `absent` 表示项目未启用基线，应静默跳过；`invalid` 表示已有表格结构无效；`attention` 是提醒而非阻断，逐条列在 `attention` 里；`ready` 表示没有未收口的声明，且声明 delivered 的现状类 `update` 文档确被改过。
 
-每个 outcome 的 `check` 说明按基线状态核到了什么（只对 `update` 且 `delivered` 的项核）：
+每个 outcome 的 `check` 说明核到了什么（只核 `delivered` 的项：`update` 按基线状态看改没改过，`create` 只看文件在不在）：
 
 - `changed`／`unchanged`：现状类文档（基线状态不是 `target`）自本模块 Spec 首次提交以来改过／没改过；没改过会进 `attention`；
 - `target-changed`／`target-unchanged`：`target` 文档不要求改；改过时带 `added`、`removed` 行数，把这份文档的差异原样附进验收消息；有删除行会进 `attention`（删改未实现的目标即改需求，须单独交用户批准）；
 - `unverified`：外部文档（`Authority` 是 URL），只要求证据非空，没有核验；
 - `unknown`：git 查不了（不在仓库里、Spec 还没提交、命令失败），原因写在 `attention` 里，不能当作没改过；
-- `not-checked`：`create`、`deferred`、`pending`。
+- `present`／`missing`：`create` 的计划文档（Plan「Documentation delivery」表的 `Planned artifact`，去掉 `#锚点`）是／不是项目内的普通文件；不存在、是目录、是符号链接或在项目外都算 `missing` 并进 `attention`；只看存在，不读内容；外部文档（URL）为 `unverified`；
+- `not-checked`：`deferred`、`pending`。
 
 不得把 `ready` 解释为文档内容正确、已对外发布或代码符合文档；外部文档始终是未核验。最终验收时把结果按上面几类写进验收结果。
 

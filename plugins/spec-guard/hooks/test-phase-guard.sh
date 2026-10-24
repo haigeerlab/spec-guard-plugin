@@ -2586,6 +2586,20 @@ out="$(env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST CLA
   /bin/bash "$HOOKDIR/phase-guard.sh" SessionStart <<<"$INPUT" | raw_of)"
 is_full "SessionStart（压缩后）总是完整内容" "$out"
 
+# review-residual-fixes（C4）：停在最终 gate 时新建文档基线，状态码要变，下一轮给完整内容（含文档核验行）。
+printf '%s\n' '- [x] one' '- [x] two' '- [x] three' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+full_gate="$(run "$q" | raw_of)"; claude_injected "$TR" "$full_gate"
+case "$(run_input "$q" "$INPUT" | raw_of)" in *"## spec-guard local workflow"*) fail "最终 gate 状态没变时应只给一行" ;; esac
+mkdir -p "$q/docs"; printf '# Baseline\n' > "$q/docs/DOCUMENTATION-BASELINE.md"
+out="$(run_input "$q" "$INPUT" | raw_of)"
+is_full "最终 gate 新建文档基线后给完整内容" "$out"
+grep -F -- '- Documentation check:' >/dev/null <<<"$out" || fail "新建基线后的完整内容应带文档核验行
+$out"
+echo "  ✅ 新建基线后的完整内容带文档核验行"; PASS=$((PASS + 1))
+rm -r "$q/docs"
+printf '%s\n' '- [x] one' '- [x] two' '- [ ] three' '- [ ] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
+claude_injected "$TR" "$full"
+
 # 附带的事件：转来消息的记账提醒、模块边界行。
 mkdir -p "$q/.epiq"; printf '{"projectId":"x"}\n' > "$q/.epiq/project.json"
 ENV_INPUT="$(python3 -c 'import json, sys; print(json.dumps({"session_id": "s", "transcript_path": sys.argv[1], "prompt":

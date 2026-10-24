@@ -138,6 +138,24 @@ def _check(project, module, outcome, entry, attention):
                          % (outcome.concern, path, module))
 
 
+def _check_created(project, outcome, artifact, attention):
+    """review-residual-fixes (C2): a delivered `create` only claims the document exists; nothing about its content."""
+    if EXTERNAL.match(artifact):
+        outcome.check = "unverified"
+        return
+    path = artifact.split("#", 1)[0]
+    target = project / path
+    try:
+        inside = target.resolve().is_relative_to(project.resolve())
+    except (OSError, RuntimeError):
+        inside = False
+    if inside and not target.is_symlink() and target.is_file():
+        outcome.check = "present"
+        return
+    outcome.check = "missing"
+    attention.append("%s is declared delivered, but %s does not exist in the project" % (outcome.concern, path))
+
+
 def verify_documentation(project, module):
     """Return conservative declared-document facts for a module."""
     project = Path(project)
@@ -164,6 +182,8 @@ def verify_documentation(project, module):
             attention.append("%s is declared %s" % (concern, outcome.outcome))
         elif impact.decisions[concern].decision == "update":
             _check(project, module, outcome, baseline.entries[concern], attention)
+        else:
+            _check_created(project, outcome, impact.delivery[concern].artifact, attention)
     return Verification("attention" if attention else "ready", outcomes, attention)
 
 

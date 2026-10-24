@@ -350,7 +350,8 @@ def commands(host: str | None, zh: bool = False) -> dict:
 
 # context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window.
 # quiet-injection (D6): the middle of a module gets no hint; the host manages context there.  Claude transcripts
-# carry no window, so phase-guard.sh passes an estimated one (200k, or 1M once a reading went over 200k) and says so.
+# carry no window: only once a reading went over 200k does phase-guard.sh pass an estimated 1M window (and say so);
+# otherwise it passes none and no boundary line is given (quiet-injection rework 1).
 
 
 def _k(tokens: int) -> int:
@@ -1086,8 +1087,10 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
+    # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
-                       tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0)],
+                       tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
+                       documentation_baseline_present(root)],
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:

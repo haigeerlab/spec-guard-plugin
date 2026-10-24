@@ -96,6 +96,17 @@ run setup-convention.sh local --replace
   && grep -F -- '--accept-removals' >/dev/null <<<"$OUT" || fail "块内有手改行时 --replace 应拒绝、列出该行且不改文件
 $OUT"
 ok "--replace 遇到手改行：拒绝、列出该行、不改文件"
+# review-residual-fixes（C3）：会被拒时先判定再写，目录与状态文件也一个都不建。
+SAVED_P="$P"
+project replace-refused-fresh
+cp "$SAVED_P/CLAUDE.md" "$P/CLAUDE.md"
+before="$(snapshot)"
+run setup-convention.sh local --replace
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] && [ ! -e "$P/spec" ] && [ ! -e "$P/tasks" ] && [ ! -e "$P/.agent" ] \
+  && grep -F '被手改的能力图' >/dev/null <<<"$OUT" || fail "--replace 被拒时不应建 spec/、tasks/、.agent/
+$OUT"
+ok "--replace 被拒时不建目录与状态文件"
+P="$SAVED_P"
 run setup-convention.sh local --replace --accept-removals
 [ "$RC" -eq 0 ] || fail "--replace --accept-removals 失败
 $OUT"
