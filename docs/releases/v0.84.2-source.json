@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.84.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6098701b4097ffbd053255662d11d9869503746c"
+      },
+      "observedAt": "2026-10-24T16:40:00Z",
+      "evidence": [
+        "result:the v0.84.2 annotated tag resolves to merge commit 6098701b4097ffbd053255662d11d9869503746c (pull request #412); merged==true and main==merge sha were checked as a separate step before tagging; the merge commit's tree is identical to the accepted branch tip 1f2abba (tree f4c051d); the push run on the merge commit succeeded (run 40111085661)",
+        "result:one module, review-residual-fixes: nine residual issues verified after the 0.84.1 re-review plus one stale comment (create-type documents checked for existence, setup-convention --replace refuses before writing, the state code counts the documentation baseline, Markdown fence pairing in module_scope, one projectId rule, history-migration cleanup, review-mark approval-source wording, two rule texts); interface.json unchanged at 1.10",
+        "result:on the branch tip with the same tree under macOS /bin/bash 3.2.57: validate.sh passed, phase-guard 507 cases passed, verify-artifacts 74 cases passed, shellcheck@4.1.0 -S warning clean; evals/codex-plugin-smoke.sh --selftest exited 0",
+        "unverified:test_local_ticket_restore_acceptance needs a real Epiq runtime (SPEC_GUARD_EPIQ_RUNTIME) and was not run"
+      ]
+    }
+  ]
+}
