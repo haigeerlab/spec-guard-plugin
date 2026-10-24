@@ -251,15 +251,19 @@ class Mark(unittest.TestCase):
             self.assertIn(reminder, out)
             self.assertEqual(project.states(), ("approved", "approved"))  # a reminder, not a gate
 
-    def test_approving_names_both_sources(self):
-        # hub-relayed-approval: the user's words in this conversation, or relayed by a registered decision hub.
+    def test_approving_names_the_generic_source(self):
+        # review-residual-fixes (C1): the approval source follows the installed collaboration plugin, else this
+        # conversation -- the same sentence as commands/review-mark.md; no decision hub or session-protocol wording.
         with Project() as project:
             code, out = project.run("--module", "alpha", "--target", "spec", "--state", "approved")
             self.assertEqual(code, 0, out)
-            self.assertIn("decision hub", out)
-            self.assertIn("item number", out)
-            self.assertIn("the message sent to the hub", out)
-            self.assertNotIn("an approval the user gave in this conversation.", out)
+            self.assertIn("installed collaboration plugin", out)
+            self.assertIn("current conversation", out)
+            for stale in ("decision hub", "session-protocol", "item number", "sent to the hub"):
+                self.assertNotIn(stale, out)
+        source = (Path(__file__).resolve().parent / "review_mark.py").read_text(encoding="utf-8")
+        for stale in ("decision hub", "session-protocol", "item number"):
+            self.assertNotIn(stale, source)
 
     def test_marking_pending_carries_no_reminder(self):
         with Project() as project:
