@@ -146,6 +146,16 @@ install_block() {
 }
 
 echo '═══ Spec Guard local convention ═══'
+# review-residual-fixes（C3）：--replace 会被拒（要删模板外的行、没给 --accept-removals）时，在建任何目录或文件之前就停下。
+if [ "$HAS_BLOCK" = true ] && [ "$REPLACE" = true ] && [ "$DRY" != true ]; then
+  CHECK_FLAG=""
+  [ "$ACCEPT_REMOVALS" = true ] && CHECK_FLAG=--accept-removals
+  if ! python3 "$BLOCK_TOOL" replace "$TARGET" "$BEGIN" "$END" "$TEMPLATE" --known "$TEMPLATE" --known "$RULE" \
+      ${CHECK_FLAG:+"$CHECK_FLAG"} --check; then
+    printf '  ❌ %s was not changed; no files or directories were created\n' "$TARGET" >&2
+    exit 1
+  fi
+fi
 if [ "$DRY" = true ]; then
   echo '  • create spec/, tasks/, and .agent/ when absent'
   echo '  • create a local state file only when absent'
