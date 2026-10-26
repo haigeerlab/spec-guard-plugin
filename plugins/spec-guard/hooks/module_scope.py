@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import module_state
+from module_stage import module_state, review_state
 from project_config import module_concurrency
 
 HEADINGS = ("## 并行边界", "## Concurrency boundary")
@@ -37,6 +37,13 @@ SCOPES = ("exclusive", "own", "outside")  # interface.json scopeCheck.values.sco
 # interface.json scopeOverlap.values.error: ScopeError codes, then the overlap command's own.
 OVERLAP_ERRORS = ("no-boundary", "missing-exclusive", "bad-path", "bad-category", "duplicate-section", "unknown-line",
                   "unreadable", "no-capability-map", "map-unreadable")
+# pre-declared-scope: the Plan's `## 预先声明` section, written by the same rules as the boundary above.
+DECLARED_HEADINGS = ("## 预先声明", "## Pre-declared")
+DECLARED_LINES = {"公共路径": "public_paths", "Public paths": "public_paths", "外部依赖": "dependencies",
+                  "Dependencies": "dependencies", "质量与工作区配置": "configs", "Configs": "configs",
+                  "补丁": "patches", "Patches": "patches"}
+# interface.json declaredScope.values.error
+DECLARED_ERRORS = ("bad-path", "bad-dependency", "unknown-line", "duplicate-section", "unreadable")
 
 
 class ScopeError(ValueError):
@@ -50,6 +57,13 @@ class ScopeError(ValueError):
 class Scope(NamedTuple):
     exclusive: tuple
     shared: tuple
+
+
+class DeclaredScope(NamedTuple):
+    public_paths: tuple
+    dependencies: tuple  # (name, range) pairs
+    configs: tuple
+    patches: tuple
 
 
 def _visible(text: str) -> list:
@@ -124,6 +138,53 @@ def parse(text: str) -> Scope | None:
     return Scope(exclusive, shared or ())
 
 
+def _items(value: str) -> list:
+    items = [item for item in SEPARATORS.split(value.strip()) if item]
+    return [] if len(items) == 1 and items[0] in NONE else items
+
+
+def _dependency(item: str) -> tuple:
+    """`name@range`, split at the last `@` that does not start the name, so `@scope/pkg@^1` works."""
+    match = TICKED.match(item)
+    value = match.group(1) if match else ""
+    at = value.rfind("@")
+    name, version = (value[:at], value[at + 1:]) if at > 0 else ("", "")
+    if (not name or not version or any(char.isspace() for char in value)
+            or version.startswith("workspace:")):
+        raise ScopeError("bad-dependency")
+    return name, version
+
+
+def parse_declared(text: str) -> DeclaredScope | None:
+    """The Plan's pre-declared section, None without one, ScopeError when malformed; a missing line means none."""
+    lines = _visible(text)
+    starts = [index for index, line in enumerate(lines) if line.rstrip() in DECLARED_HEADINGS]
+    if not starts:
+        return None
+    if len(starts) > 1:
+        raise ScopeError("duplicate-section")
+    found = {}
+    for line in lines[starts[0] + 1:]:
+        if SECTION_END.match(line):
+            break
+        stripped = line.strip()
+        if not stripped or (stripped.startswith("<!--") and stripped.endswith("-->")):
+            continue
+        match = FIELD.match(stripped)
+        field = DECLARED_LINES.get(match.group(1)) if match else None
+        if field is None or field in found:
+            raise ScopeError("unknown-line")
+        items = _items(match.group(2))
+        if field == "dependencies":
+            values = [_dependency(item) for item in items]
+        else:
+            values = [_path(item) for item in items]
+            if field != "public_paths" and any(value.endswith("/") for value in values):
+                raise ScopeError("bad-path")  # configs and patches are listed file by file
+        found[field] = tuple(dict.fromkeys(values))
+    return DeclaredScope(*(found.get(field, ()) for field in DeclaredScope._fields))
+
+
 def covers(scope: Scope, module_id: str, path: str) -> str:
     """`own` for the module's flow files, `exclusive` inside its paths, otherwise `outside`."""
     exclusive, own, outside = SCOPES
@@ -152,6 +213,85 @@ def overlap(a: Scope, b: Scope) -> list:
 def _git(root: Path, *args: str) -> str | None:
     done = subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=False)
     return done.stdout.decode("utf-8", "surrogateescape") if done.returncode == 0 else None
+
+
+def _blob(root: Path, commit: str, path: str) -> bytes | None:
+    try:
+        done = subprocess.run(["git", "-C", str(root), "show", "%s:%s" % (commit, path)], capture_output=True,
+                              check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def _approved(blob: bytes | None) -> bool:
+    try:
+        return blob is not None and review_state(blob.decode("utf-8"), "plan") == "approved"
+    except UnicodeDecodeError:
+        return False
+
+
+def plan_approval(root: Path, module_id: str) -> tuple:
+    """pre-declared-scope: (planApproved, approvedCommit).  The commit is the latest one that made the Plan's marker
+    `approved`; the Plan counts as approved only while the working file is byte-for-byte that commit's version."""
+    path = "tasks/%s/plan.md" % module_id
+    try:
+        current = (root / path).read_bytes()
+    except OSError:
+        return False, None
+    if not _approved(current):
+        return False, None
+    try:
+        log = subprocess.run(["git", "-C", str(root), "log", "--format=%H", "--", path], capture_output=True,
+                             text=True, check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False, None
+    commits = log.stdout.split() if log.returncode == 0 else []
+    blobs = {}
+
+    def version(index):  # newest first; the version before the oldest commit does not exist
+        if index >= len(commits):
+            return None
+        if index not in blobs:
+            blobs[index] = _blob(root, commits[index], path)
+        return blobs[index]
+
+    for index, commit in enumerate(commits):
+        if _approved(version(index)) and not _approved(version(index + 1)):
+            return (True, commit) if version(index) == current else (False, None)
+    return False, None
+
+
+def _declared_command(root: Path, module_id: str) -> int:
+    if not MODULE_ID.fullmatch(module_id or ""):
+        print("invalid module id")
+        return 2
+    try:
+        modules = {row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows}
+    except (MapError, OSError, UnicodeDecodeError):
+        print("the capability map cannot be read")
+        return 2
+    if module_id not in modules:
+        print("module is not in the capability map")
+        return 2
+    plan = root / "tasks" / module_id / "plan.md"
+    declared = None
+    if plan.is_file():
+        try:
+            declared = parse_declared(plan.read_text(encoding="utf-8"))
+        except ScopeError as error:
+            print(json.dumps({"module": module_id, "error": error.code}))
+            return 4
+        except (OSError, UnicodeDecodeError):
+            print(json.dumps({"module": module_id, "error": "unreadable"}))
+            return 4
+    approved, commit = plan_approval(root, module_id)
+    scope = declared or DeclaredScope((), (), (), ())
+    print(json.dumps({"module": module_id, "planApproved": approved, "approvedCommit": commit,
+                      "declared": declared is not None, "publicPaths": list(scope.public_paths),
+                      "dependencies": [{"name": name, "range": version} for name, version in scope.dependencies],
+                      "configs": list(scope.configs), "patches": list(scope.patches)}, ensure_ascii=False))
+    return 0
 
 
 def changed_files(root: Path, base: str) -> list | None:
@@ -237,6 +377,34 @@ def validate(root: Path) -> list:
         if scope is None:
             lines.append("warn missing %s" % module_id)
         else:
+            valid += 1
+    return (["ok %d" % valid] if valid else []) + lines
+
+
+def validate_declared(root: Path) -> list:
+    """pre-declared-scope: verify-artifacts lines for Plans' pre-declared sections, whatever the switch says.
+
+    `ok <n>` counts valid sections, `bad <code> <id>` a malformed or unreadable one, `unverified map` when the
+    capability map cannot be read.  Finished modules, modules without a Plan and Plans without the section are skipped.
+    """
+    try:
+        modules = [row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows]
+    except (MapError, OSError, UnicodeDecodeError):
+        return ["unverified map"]
+    valid, lines = 0, []
+    for module_id in modules:
+        plan = root / "tasks" / module_id / "plan.md"
+        if not plan.is_file() or module_state(root, module_id)["stage"] == "DONE":
+            continue
+        try:
+            declared = parse_declared(plan.read_text(encoding="utf-8"))
+        except ScopeError as error:
+            lines.append("bad %s %s" % (error.code, module_id))
+            continue
+        except (OSError, UnicodeDecodeError):
+            lines.append("bad unreadable %s" % module_id)
+            continue
+        if declared is not None:
             valid += 1
     return (["ok %d" % valid] if valid else []) + lines
 
@@ -339,6 +507,11 @@ def main() -> int:
     check.add_argument("--project", default=".")
     checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")
     checker.add_argument("--project", default=".")
+    declared_checker = commands.add_parser("validate-declared", help="verify-artifacts lines for Plans' pre-declared sections")
+    declared_checker.add_argument("--project", default=".")
+    declared = commands.add_parser("declared", help="the Plan's pre-declared section and its approval (read-only)")
+    declared.add_argument("--module", required=True)
+    declared.add_argument("--project", default=".")
     pairs = commands.add_parser("overlap", help="exclusive-path overlaps between given Specs and, with --project, open modules")
     pairs.add_argument("--spec", action="append", default=[])
     pairs.add_argument("--project")
@@ -346,6 +519,15 @@ def main() -> int:
     if args.command == "overlap":
         return _overlap_command(args.spec, args.project)
     root = Path(args.project)
+    if args.command == "declared":
+        if not root.is_dir():
+            print("--project is not a directory")
+            return 2
+        return _declared_command(root, args.module)
+    if args.command == "validate-declared":
+        for line in validate_declared(root):
+            print(line)
+        return 0
     if args.command == "validate":
         for line in validate(root):
             print(line)

@@ -132,6 +132,11 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 是同一份（`module_scope.parse` 与 `module_scope.overlap`）。用来在 Spec 还没落到集成分支时就查重叠。`check-interface.py` 核对它引用的脚本
 存在、错误码与代码一致。
 
+1.11（pre-declared-scope）起另有 `declaredScope`：`module_scope.py declared --module <id>` 读 Plan 的「预先声明」一节（公共路径、外部依赖、
+质量与工作区配置、补丁，写法同并行边界），连同 Plan 的批准状态一起返回，不受多模块并行开关限制。Plan 的批准标记不带指纹，所以「批准后没改过」
+用 git 判断：工作区里的 Plan 与最近一次让标记变成 approved 的提交逐字节相同，才算 `planApproved`。读取方（module-crew）凭这份名单决定哪些公共改动
+不再逐次问用户；读不到这个入口时照旧问。
+
 ### 规划层与运行层
 
 多模块并行分两层，交接点只有 `interface.json` 列出的这些命令和 `/map --json`：

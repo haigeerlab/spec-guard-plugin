@@ -1,5 +1,5 @@
 {
-  "interface": "1.10",
+  "interface": "1.11",
   "mapView": {
     "command": [
       "python3",
@@ -328,5 +328,39 @@
     },
     "notes": "interface 1.10; --spec is repeatable and --project is optional, at least one is required; relative --spec paths resolve against the working directory; runs whatever moduleConcurrency says; every pair is compared, overlap is the same rule as mapView startable.conflicts (equal paths, or one inside the other's directory; the narrower path is listed); modules are ordered by Build order, modules not in the map follow in --spec order",
     "contract": "spec/scope-overlap-interface.md"
+  },
+  "declaredScope": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/module_scope.py",
+      "declared",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>"
+    ],
+    "readOnly": true,
+    "exitCodes": {
+      "0": "ok; stdout is {\"module\", \"planApproved\", \"approvedCommit\", \"declared\", \"publicPaths\": [...], \"dependencies\": [{\"name\", \"range\"}], \"configs\": [...], \"patches\": [...]}; declared is false when tasks/<id>/plan.md is missing or has no pre-declared section, and the four lists are then empty",
+      "2": "usage error, nothing read: invalid module id, the module is not in the capability map, the capability map cannot be read, or --project is not a directory",
+      "4": "the Plan's pre-declared section is malformed or the Plan cannot be read; stdout is {\"module\", \"error\": <code>} with no approval facts"
+    },
+    "values": {
+      "planApproved": {
+        "true": "the working-tree Plan's marker is approved and the file is byte-for-byte the version of approvedCommit",
+        "false": "anything else: not approved, edited after approval (committed or not), approval not committed, not a git repository, or the approving commit is not in the history"
+      },
+      "approvedCommit": "the latest commit that made the Plan's marker approved, only when planApproved is true; otherwise null",
+      "error": {
+        "bad-path": "a path is malformed (wildcard, absolute, .., not in backticks), or a config or patch is written as a directory",
+        "bad-dependency": "a dependency is not `name@range`, has an empty part or whitespace, or its range starts with workspace:",
+        "unknown-line": "a line that is none of the four, or one of them twice",
+        "duplicate-section": "two pre-declared sections",
+        "unreadable": "the Plan cannot be read as UTF-8"
+      }
+    },
+    "notes": "not limited by moduleConcurrency; deleting files, changing outward contracts and security exceptions cannot be pre-declared (rule text only, not detected here)",
+    "contract": "spec/pre-declared-scope.md"
   }
 }
