@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import module_state
+from module_stage import module_state, review_state
 from project_config import module_concurrency
 
 HEADINGS = ("## 并行边界", "## Concurrency boundary")
@@ -215,6 +215,85 @@ def _git(root: Path, *args: str) -> str | None:
     return done.stdout.decode("utf-8", "surrogateescape") if done.returncode == 0 else None
 
 
+def _blob(root: Path, commit: str, path: str) -> bytes | None:
+    try:
+        done = subprocess.run(["git", "-C", str(root), "show", "%s:%s" % (commit, path)], capture_output=True,
+                              check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def _approved(blob: bytes | None) -> bool:
+    try:
+        return blob is not None and review_state(blob.decode("utf-8"), "plan") == "approved"
+    except UnicodeDecodeError:
+        return False
+
+
+def plan_approval(root: Path, module_id: str) -> tuple:
+    """pre-declared-scope: (planApproved, approvedCommit).  The commit is the latest one that made the Plan's marker
+    `approved`; the Plan counts as approved only while the working file is byte-for-byte that commit's version."""
+    path = "tasks/%s/plan.md" % module_id
+    try:
+        current = (root / path).read_bytes()
+    except OSError:
+        return False, None
+    if not _approved(current):
+        return False, None
+    try:
+        log = subprocess.run(["git", "-C", str(root), "log", "--format=%H", "--", path], capture_output=True,
+                             text=True, check=False, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False, None
+    commits = log.stdout.split() if log.returncode == 0 else []
+    blobs = {}
+
+    def version(index):  # newest first; the version before the oldest commit does not exist
+        if index >= len(commits):
+            return None
+        if index not in blobs:
+            blobs[index] = _blob(root, commits[index], path)
+        return blobs[index]
+
+    for index, commit in enumerate(commits):
+        if _approved(version(index)) and not _approved(version(index + 1)):
+            return (True, commit) if version(index) == current else (False, None)
+    return False, None
+
+
+def _declared_command(root: Path, module_id: str) -> int:
+    if not MODULE_ID.fullmatch(module_id or ""):
+        print("invalid module id")
+        return 2
+    try:
+        modules = {row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows}
+    except (MapError, OSError, UnicodeDecodeError):
+        print("the capability map cannot be read")
+        return 2
+    if module_id not in modules:
+        print("module is not in the capability map")
+        return 2
+    plan = root / "tasks" / module_id / "plan.md"
+    declared = None
+    if plan.is_file():
+        try:
+            declared = parse_declared(plan.read_text(encoding="utf-8"))
+        except ScopeError as error:
+            print(json.dumps({"module": module_id, "error": error.code}))
+            return 4
+        except (OSError, UnicodeDecodeError):
+            print(json.dumps({"module": module_id, "error": "unreadable"}))
+            return 4
+    approved, commit = plan_approval(root, module_id)
+    scope = declared or DeclaredScope((), (), (), ())
+    print(json.dumps({"module": module_id, "planApproved": approved, "approvedCommit": commit,
+                      "declared": declared is not None, "publicPaths": list(scope.public_paths),
+                      "dependencies": [{"name": name, "range": version} for name, version in scope.dependencies],
+                      "configs": list(scope.configs), "patches": list(scope.patches)}, ensure_ascii=False))
+    return 0
+
+
 def changed_files(root: Path, base: str) -> list | None:
     """(status, path) for every change since `base`: committed, uncommitted, deleted and untracked.
 
@@ -400,6 +479,9 @@ def main() -> int:
     check.add_argument("--project", default=".")
     checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")
     checker.add_argument("--project", default=".")
+    declared = commands.add_parser("declared", help="the Plan's pre-declared section and its approval (read-only)")
+    declared.add_argument("--module", required=True)
+    declared.add_argument("--project", default=".")
     pairs = commands.add_parser("overlap", help="exclusive-path overlaps between given Specs and, with --project, open modules")
     pairs.add_argument("--spec", action="append", default=[])
     pairs.add_argument("--project")
@@ -407,6 +489,11 @@ def main() -> int:
     if args.command == "overlap":
         return _overlap_command(args.spec, args.project)
     root = Path(args.project)
+    if args.command == "declared":
+        if not root.is_dir():
+            print("--project is not a directory")
+            return 2
+        return _declared_command(root, args.module)
     if args.command == "validate":
         for line in validate(root):
             print(line)
