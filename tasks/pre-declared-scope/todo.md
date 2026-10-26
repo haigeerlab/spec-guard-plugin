@@ -8,7 +8,7 @@
 - [x] Task 5：规则文字（C4） — `workflow-checkpoints.md` 在「批 Plan 按范围授权」后加「预先声明」一条（何时写、四行写法、批准即授权、不能预先声明的三类、不得自加更严条款、没有这一节时不用写）；`node-rules.md`「Plan 交审」加一条（逐条列出、写 `无` 的行也列、「批准本 Plan 即授权以下公共改动」）。`test_workflow_checkpoints.py` 新增 `test_pre_declared_section`，节点规则的 ELEMENTS／SHARED 各加短语；改前 4 例红，改后 workflow-checkpoints 与 stop-rules 103 例全绿；Plan 交审一节仍在 2600 字节上限内。
 - [x] Checkpoint 1（report）：三套核心回归 — Task 5 的 verify-and-commit 全档（validate、phase-guard、verify-artifacts、本仓库 verify-artifacts）通过；CI 同版 `npx shellcheck@4.1.0 -S warning`（hooks、scripts、evals 全部 .sh）无告警。途中两次提交因本机负载（load average 22～43）计时用例超时被拦（phase-guard 第 9 段 stdin 用例、test_session_context 的 open stdin 用例），单独重跑与重试均通过，与改动无关。
 - [x] Task 6：CHANGELOG 未发布段与更新说明 — CHANGELOG 顶部新开「未发布」段，新增两条（预先声明一节、declaredScope 接口 1.11）；版本号不动，由 autonomy-tier 一起发 1.11。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-26 呈现做了什么、AC1～AC8 逐条证据、改动文件与 8 个提交、Spec 未改、拟回告全文；用户回复「pre-declared-scope 验收通过」。
 
 ## 更新说明
 
