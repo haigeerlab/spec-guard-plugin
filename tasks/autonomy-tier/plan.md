@@ -1,6 +1,6 @@
 # Plan: autonomy-tier
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/autonomy-tier.md`](../../spec/autonomy-tier.md)（2026-10-26 用户在本会话批准：「批准 autonomy-tier 的 Spec」）。评审节奏为分开审，
 本 Plan 单独交审。分支 `claude/s32-autonomy-tier`，worktree `distracted-morse-46ef70`，叠在 `claude/s32-interface-1.11`（PR #414）之上；

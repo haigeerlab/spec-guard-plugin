@@ -1,6 +1,6 @@
 # Todo: autonomy-tier
 
-- [ ] Task 0：提交已批准的 Spec 与 Plan 草稿
+- [x] Task 0：提交已批准的 Spec 与 Plan 草稿 — 2026-10-26 用户批准 Plan（「批准 autonomy-tier 的 Plan」）；Spec 与 Plan 草稿在 `269be3ba` 提交，Plan 批准标记随本次提交。
 - [ ] Task 1：配置项 `autonomyTier`（C1，先红后绿）
 - [ ] Task 2：接口条目（C3，先红后绿）
 - [ ] Task 3：底线规则与说明（C2、C4）
