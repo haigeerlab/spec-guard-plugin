@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:7115751463af3a79da038b1cfc4b622fe3e72043"
+      },
+      "observedAt": "2026-10-26T11:20:00Z",
+      "evidence": [
+        "result:the v0.85.0 annotated tag resolves to merge commit 7115751463af3a79da038b1cfc4b622fe3e72043 (pull request #415, which carries the version bump; #414 merged before it at 476ef50); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (run 40312808806)",
+        "result:two modules from S32 (incl. S29): pre-declared-scope (Plan pre-declared section, read-only declaredScope, verify-artifacts format check, review rules) and autonomy-tier (autonomyTier project config, floor rules); interface.json 1.10 -> 1.11 adding declaredScope and autonomyTier, nothing changed",
+        "result:on the branch after syncing main (same tree as the merge commit's second parent) under macOS /bin/bash 3.2.57: validate.sh passed, phase-guard 507 cases passed, verify-artifacts 78 cases passed, shellcheck@4.1.0 -S warning clean; evals/codex-plugin-smoke.sh --selftest exited 0"
+      ]
+    }
+  ]
+}

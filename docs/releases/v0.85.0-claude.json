@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:7115751463af3a79da038b1cfc4b622fe3e72043"
+      },
+      "observedAt": "2026-10-26T11:20:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.84.2 to 0.85.0; installed_plugins.json records gitCommitSha 7115751 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:claude -p in a temporary project stopped at a Plan review, two turns in one session: the first UserPromptSubmit injection was the full phase hint carrying the new Plan-review rule sentence, which exists only in the 0.85.0 install (references/node-rules.md and workflow-checkpoints.md), and the second the one-line form, both with state code 362e069f"
+      ]
+    }
+  ]
+}
