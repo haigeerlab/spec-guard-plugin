@@ -18,8 +18,8 @@ import module_stage  # noqa: E402
 import project_config  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
-           "scopeOverlap", "declaredScope")  # crew-interface: 1.1; gate-tick: 1.7; scope-overlap-interface: 1.10;
-# pre-declared-scope: 1.11
+           "scopeOverlap", "declaredScope", "autonomyTier")  # crew-interface: 1.1; gate-tick: 1.7;
+# scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
 REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
@@ -95,6 +95,7 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
               ("checkoutRole.values.role", data["checkoutRole"].get("values", {}).get("role"), set(checkout_role.ROLE_KINDS),
                lambda key: key.split()[0]),
               ("moduleConcurrency.values", data["moduleConcurrency"].get("values"), set(project_config.CONCURRENCY), None),
+              ("autonomyTier.values", data["autonomyTier"].get("values"), set(project_config.TIERS), None),
               ("scopeOverlap.values.error", data["scopeOverlap"].get("values", {}).get("error"),
                set(module_scope.OVERLAP_ERRORS), None),
               ("declaredScope.values.error", data["declaredScope"].get("values", {}).get("error"),

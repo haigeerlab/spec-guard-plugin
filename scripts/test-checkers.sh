@@ -792,6 +792,11 @@ mkifc "$TMP/ifc-declared" 'del data["declaredScope"]'
 want fail "interface: 缺 1.11 的 declaredScope 入口 → 报错" python3 "$IFC" "$TMP/ifc-declared/interface.json"
 mkifc "$TMP/ifc-declared-error" 'del data["declaredScope"]["values"]["error"]["bad-dependency"]'
 want fail "interface: declaredScope 的 error 少一个码 → 报错" python3 "$IFC" "$TMP/ifc-declared-error/interface.json"
+# autonomy-tier：interface 1.11 的 autonomyTier 入口，取值与 project_config.TIERS 一致。
+mkifc "$TMP/ifc-tier" 'del data["autonomyTier"]'
+want fail "interface: 缺 1.11 的 autonomyTier 入口 → 报错" python3 "$IFC" "$TMP/ifc-tier/interface.json"
+mkifc "$TMP/ifc-tier-less" 'del data["autonomyTier"]["values"]["relaxed"]'
+want fail "interface: autonomyTier 少一档 → 报错" python3 "$IFC" "$TMP/ifc-tier-less/interface.json"
 # review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
 mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
 want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"
