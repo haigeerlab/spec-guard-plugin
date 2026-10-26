@@ -241,6 +241,19 @@ check "并行开关 on：缺并行边界只警告" 0 "alpha 的 Spec 没有并�
 printf '{broken' > "$PROJECT/.agent/config.json"
 check "无法解析的项目配置失败" 1 "项目配置无效: not-json"
 
+# pre-declared-scope（C3）：Plan 的「预先声明」一节不看并行开关；未完成模块格式错判失败、格式对计数，没有这一节或已完成不提示。
+project declared; mkdir -p "$PROJECT/tasks/alpha"
+printf '%s\n' '- [ ] a' > "$PROJECT/tasks/alpha/todo.md"
+printf '%s\n' '# Plan' '' '## Task List' '' '- a' > "$PROJECT/tasks/alpha/plan.md"
+check_absent "没有预先声明一节时不提示" "预先声明"
+printf '%s\n' '# Plan' '' '## 预先声明' '' '- 外部依赖：`axe-core`' > "$PROJECT/tasks/alpha/plan.md"
+check "预先声明格式错时失败（开关没开也查）" 1 "alpha 的预先声明格式错误: bad-dependency"
+printf '%s\n' '# Plan' '' '## 预先声明' '' '- 外部依赖：`axe-core@^4`' '- 补丁：无' > "$PROJECT/tasks/alpha/plan.md"
+check "预先声明格式正确时计数" 0 "预先声明格式正确（1 个未完成模块）"
+printf '%s\n' '# Plan' '' '## 预先声明' '' '- 外部依赖：`axe-core`' > "$PROJECT/tasks/alpha/plan.md"
+printf '%s\n' '- [x] a' > "$PROJECT/tasks/alpha/todo.md"
+check_absent "已完成模块不追溯" "预先声明"
+
 # module-suspend：挂起标记只在 todo.md 中计数；重复判失败，过期（没有未勾选项）只警告。
 SUSPEND_LINE='<!-- spec-guard: suspended -->'
 project suspend-ok; mkdir -p "$PROJECT/tasks/alpha"

@@ -381,6 +381,34 @@ def validate(root: Path) -> list:
     return (["ok %d" % valid] if valid else []) + lines
 
 
+def validate_declared(root: Path) -> list:
+    """pre-declared-scope: verify-artifacts lines for Plans' pre-declared sections, whatever the switch says.
+
+    `ok <n>` counts valid sections, `bad <code> <id>` a malformed or unreadable one, `unverified map` when the
+    capability map cannot be read.  Finished modules, modules without a Plan and Plans without the section are skipped.
+    """
+    try:
+        modules = [row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows]
+    except (MapError, OSError, UnicodeDecodeError):
+        return ["unverified map"]
+    valid, lines = 0, []
+    for module_id in modules:
+        plan = root / "tasks" / module_id / "plan.md"
+        if not plan.is_file() or module_state(root, module_id)["stage"] == "DONE":
+            continue
+        try:
+            declared = parse_declared(plan.read_text(encoding="utf-8"))
+        except ScopeError as error:
+            lines.append("bad %s %s" % (error.code, module_id))
+            continue
+        except (OSError, UnicodeDecodeError):
+            lines.append("bad unreadable %s" % module_id)
+            continue
+        if declared is not None:
+            valid += 1
+    return (["ok %d" % valid] if valid else []) + lines
+
+
 def _scope_or_error(text: str | None) -> Scope | str:
     if text is None:
         return "unreadable"
@@ -479,6 +507,8 @@ def main() -> int:
     check.add_argument("--project", default=".")
     checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")
     checker.add_argument("--project", default=".")
+    declared_checker = commands.add_parser("validate-declared", help="verify-artifacts lines for Plans' pre-declared sections")
+    declared_checker.add_argument("--project", default=".")
     declared = commands.add_parser("declared", help="the Plan's pre-declared section and its approval (read-only)")
     declared.add_argument("--module", required=True)
     declared.add_argument("--project", default=".")
@@ -494,6 +524,10 @@ def main() -> int:
             print("--project is not a directory")
             return 2
         return _declared_command(root, args.module)
+    if args.command == "validate-declared":
+        for line in validate_declared(root):
+            print(line)
+        return 0
     if args.command == "validate":
         for line in validate(root):
             print(line)

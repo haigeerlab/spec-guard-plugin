@@ -201,6 +201,21 @@ if command -v python3 >/dev/null 2>&1 && [ -e .agent/config.json ]; then
   fi
 fi
 
+# 预先声明（pre-declared-scope）：判据只在 module_scope.py，不看并行开关；没有这一节的 Plan 不出现这一项。
+if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ] && [ -d tasks ]; then
+  if DECLARED_OUT="$(python3 -B "$HOOKDIR/module_scope.py" validate-declared --project . 2>/dev/null </dev/null)"; then
+    while IFS=' ' read -r kind first second; do
+      case "$kind" in
+        ok) ok "预先声明格式正确（${first} 个未完成模块）" ;;
+        bad) bad "${second} 的预先声明格式错误: ${first}" ;;
+        unverified) warn '未验证：能力图读不了，没有检查预先声明' ;;
+      esac
+    done <<<"$DECLARED_OUT"
+  else
+    warn '未验证：预先声明检查没有正常运行'
+  fi
+fi
+
 # 旁路清单（rework-in-place）：阶段判定只数 todo.md，所以 tasks/<id>/ 下别的清单文件里没做完的项没人看得见。
 # 只看直接子文件里的 *.md；判据是 module_stage.py 的 UNCHECKED。没有可报告的内容时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then
