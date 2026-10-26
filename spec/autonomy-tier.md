@@ -1,6 +1,6 @@
 # Spec: autonomy-tier
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved c5d687146220 -->
 
 ## Objective
 
