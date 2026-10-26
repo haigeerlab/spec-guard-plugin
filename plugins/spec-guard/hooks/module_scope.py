@@ -37,6 +37,13 @@ SCOPES = ("exclusive", "own", "outside")  # interface.json scopeCheck.values.sco
 # interface.json scopeOverlap.values.error: ScopeError codes, then the overlap command's own.
 OVERLAP_ERRORS = ("no-boundary", "missing-exclusive", "bad-path", "bad-category", "duplicate-section", "unknown-line",
                   "unreadable", "no-capability-map", "map-unreadable")
+# pre-declared-scope: the Plan's `## 预先声明` section, written by the same rules as the boundary above.
+DECLARED_HEADINGS = ("## 预先声明", "## Pre-declared")
+DECLARED_LINES = {"公共路径": "public_paths", "Public paths": "public_paths", "外部依赖": "dependencies",
+                  "Dependencies": "dependencies", "质量与工作区配置": "configs", "Configs": "configs",
+                  "补丁": "patches", "Patches": "patches"}
+# interface.json declaredScope.values.error
+DECLARED_ERRORS = ("bad-path", "bad-dependency", "unknown-line", "duplicate-section", "unreadable")
 
 
 class ScopeError(ValueError):
@@ -50,6 +57,13 @@ class ScopeError(ValueError):
 class Scope(NamedTuple):
     exclusive: tuple
     shared: tuple
+
+
+class DeclaredScope(NamedTuple):
+    public_paths: tuple
+    dependencies: tuple  # (name, range) pairs
+    configs: tuple
+    patches: tuple
 
 
 def _visible(text: str) -> list:
@@ -122,6 +136,53 @@ def parse(text: str) -> Scope | None:
     if not exclusive:
         raise ScopeError("missing-exclusive")
     return Scope(exclusive, shared or ())
+
+
+def _items(value: str) -> list:
+    items = [item for item in SEPARATORS.split(value.strip()) if item]
+    return [] if len(items) == 1 and items[0] in NONE else items
+
+
+def _dependency(item: str) -> tuple:
+    """`name@range`, split at the last `@` that does not start the name, so `@scope/pkg@^1` works."""
+    match = TICKED.match(item)
+    value = match.group(1) if match else ""
+    at = value.rfind("@")
+    name, version = (value[:at], value[at + 1:]) if at > 0 else ("", "")
+    if (not name or not version or any(char.isspace() for char in value)
+            or version.startswith("workspace:")):
+        raise ScopeError("bad-dependency")
+    return name, version
+
+
+def parse_declared(text: str) -> DeclaredScope | None:
+    """The Plan's pre-declared section, None without one, ScopeError when malformed; a missing line means none."""
+    lines = _visible(text)
+    starts = [index for index, line in enumerate(lines) if line.rstrip() in DECLARED_HEADINGS]
+    if not starts:
+        return None
+    if len(starts) > 1:
+        raise ScopeError("duplicate-section")
+    found = {}
+    for line in lines[starts[0] + 1:]:
+        if SECTION_END.match(line):
+            break
+        stripped = line.strip()
+        if not stripped or (stripped.startswith("<!--") and stripped.endswith("-->")):
+            continue
+        match = FIELD.match(stripped)
+        field = DECLARED_LINES.get(match.group(1)) if match else None
+        if field is None or field in found:
+            raise ScopeError("unknown-line")
+        items = _items(match.group(2))
+        if field == "dependencies":
+            values = [_dependency(item) for item in items]
+        else:
+            values = [_path(item) for item in items]
+            if field != "public_paths" and any(value.endswith("/") for value in values):
+                raise ScopeError("bad-path")  # configs and patches are listed file by file
+        found[field] = tuple(dict.fromkeys(values))
+    return DeclaredScope(*(found.get(field, ()) for field in DeclaredScope._fields))
 
 
 def covers(scope: Scope, module_id: str, path: str) -> str:

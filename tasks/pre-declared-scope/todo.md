@@ -1,7 +1,7 @@
 # Todo: pre-declared-scope
 
 - [x] Task 0：提交已批准的 Spec、能力图两行与 Plan 草稿 — 2026-10-26 用户批准 Plan（「批准 pre-declared-scope 的 Plan」）；Spec、能力图、Plan 草稿在 `4245cd57` 提交，Plan 批准标记随本次提交。
-- [ ] Task 1：「预先声明」解析与错误码（C1，先红后绿）
+- [x] Task 1：「预先声明」解析与错误码（C1，先红后绿） — `test_module_scope.py` 新增 `ParseDeclared` 8 例（中英标题与行名、缺行与全「无」、去重保序、围栏示例、`bad-path`／`bad-dependency`／`unknown-line`／`duplicate-section` 各种写法、错误不带文件文字）；改前红（导入失败）。`module_scope.py` 加 `DeclaredScope`、`parse_declared`、`DECLARED_ERRORS`，复用 `_visible`、`FIELD`、`_path`。45 例全绿；变异（去掉配置／补丁不许目录）→ 2 例红。
 - [ ] Task 2：批准判断与 `declared` 命令（C2，先红后绿）
 - [ ] Task 3：接口 1.11 与说明
 - [ ] Task 4：verify-artifacts 校验这一节（C3，先红后绿）
