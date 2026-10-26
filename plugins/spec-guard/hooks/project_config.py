@@ -30,14 +30,17 @@ VERSION = 1
 LANGUAGE_TAG = re.compile(r"[a-z]{2,3}(-[A-Z][a-z]{3})?(-[A-Z]{2})?\Z")
 CADENCES = ("separate", "combined")
 CONCURRENCY = ("off", "on")
+# autonomy-tier: what each tier allows is defined by module-crew; spec-guard only stores, reads and reports it.
+TIERS = ("strict", "standard", "relaxed")
 # config-per-key: a file with one of these problems is unusable as a whole; every other problem
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
-DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off"}
+DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "autonomyTier": "strict"}
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
     "reviewCadence": lambda value: value in CADENCES,
     "moduleConcurrency": lambda value: value in CONCURRENCY,
+    "autonomyTier": lambda value: value in TIERS,
 }
 OWNED_ELSEWHERE = {
     "trackerDefault": "/spec-guard:tracker-default",

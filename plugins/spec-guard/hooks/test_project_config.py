@@ -148,7 +148,8 @@ class Summary(unittest.TestCase):
             (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "trackerDefault"})
+        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "autonomyTier",
+                                      "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
         self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),
@@ -339,6 +340,46 @@ class Cli(unittest.TestCase):
             outputs = [project.run("show")[1], project.run("check")[1]]
         for out in outputs:
             self.assertNotIn(hostile, out)
+
+
+class AutonomyTier(unittest.TestCase):
+    """autonomy-tier (C1): stored, read and reported; spec-guard itself never changes with it."""
+
+    def test_three_tiers_round_trip(self):
+        for tier in ("strict", "standard", "relaxed"):
+            with Project() as project:
+                code, out = project.run("set", "--key", "autonomyTier", "--value", tier, "--confirm")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(load(project.root), ({"autonomyTier": tier}, []))
+                items = {item["key"]: item for item in summary(project.root)}
+                self.assertEqual((items["autonomyTier"]["value"], items["autonomyTier"]["source"]),
+                                 (tier, ".agent/config.json"))
+                code, out = project.run("unset", "--key", "autonomyTier", "--confirm")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(load(project.root), ({}, []))
+
+    def test_unset_reads_as_strict_from_default(self):
+        with Project() as project:
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual((items["autonomyTier"]["value"], items["autonomyTier"]["source"]), ("strict", "default"))
+
+    def test_invalid_values(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "autonomyTier", "--value", "fast", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertIn("autonomyTier-invalid", out)
+            self.assertFalse(project.config.exists())
+        with Project({"version": 1, "reviewCadence": "combined", "autonomyTier": "fast"}) as project:
+            self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, ["autonomyTier-invalid"]))
+            self.assertEqual(project.run("check")[0], 1)
+
+    def test_phase_hint_ignores_the_tier(self):
+        from module_stage import config_lines
+        with Project() as plain:
+            baseline = config_lines(plain.root)
+        for tier in ("strict", "standard", "relaxed"):
+            with Project({"version": 1, "autonomyTier": tier}) as project:
+                self.assertEqual(config_lines(project.root), baseline, tier)
 
 
 class MachineState(unittest.TestCase):
