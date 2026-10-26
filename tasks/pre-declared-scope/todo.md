@@ -1,6 +1,6 @@
 # Todo: pre-declared-scope
 
-- [ ] Task 0：提交已批准的 Spec、能力图两行与 Plan 草稿
+- [x] Task 0：提交已批准的 Spec、能力图两行与 Plan 草稿 — 2026-10-26 用户批准 Plan（「批准 pre-declared-scope 的 Plan」）；Spec、能力图、Plan 草稿在 `4245cd57` 提交，Plan 批准标记随本次提交。
 - [ ] Task 1：「预先声明」解析与错误码（C1，先红后绿）
 - [ ] Task 2：批准判断与 `declared` 命令（C2，先红后绿）
 - [ ] Task 3：接口 1.11 与说明

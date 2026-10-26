@@ -1,6 +1,6 @@
 # Plan: pre-declared-scope
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 依据 [`spec/pre-declared-scope.md`](../../spec/pre-declared-scope.md)（2026-10-26 用户在本会话批准：「批准；并行评估 B」）。评审节奏为分开审，
 本 Plan 单独交审。分支 `claude/s32-interface-1.11`，worktree `distracted-morse-46ef70`，从 `origin/main`（`a390e68`）切出；串行，在本会话做。
