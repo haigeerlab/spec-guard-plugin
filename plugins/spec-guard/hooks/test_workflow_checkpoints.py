@@ -280,6 +280,16 @@ class CheckpointContractTests(unittest.TestCase):
                 for moved in ("本模块的提交（提交号＋一句话）", "单独一张表放在最前"):
                     self.assertNotIn(moved, text)
 
+    def test_pre_declared_section(self):
+        # pre-declared-scope (C4): when to write it, what approval covers, what can never be pre-declared.
+        tiers = self.section("## Plan 检查点分级")
+        start = tiers.index("**预先声明。**")
+        item = tiers[start:tiers.index("\n- **", start)]
+        for phrase in ("`## 预先声明`", "公共路径", "外部依赖", "质量与工作区配置", "补丁", "批准本 Plan 即授权以下公共改动",
+                       "删除文件", "对外契约", "安全例外", "写了也不算", "比默认更严的选择", "没有这一节时不用写",
+                       "declaredScope"):
+            self.assertIn(phrase, item)
+
     def test_plan_approval_authorizes_by_scope(self):
         tiers = self.section("## Plan 检查点分级")
         for phrase in ("批 Plan 按范围授权", "已批准范围", "构建需要的装包", "默认放行", "不按次数", "改本仓库文件",
@@ -878,7 +888,7 @@ class NodeRulesTests(unittest.TestCase):
                        "按模块分组", "delegate", "不算用户批准", "可复制代码块", "以所装协作插件的规定为准", "有才提"),
         "## Plan 交审": ("架构决定", "分几步", "会改哪些文件", "风险", "中途会停下来问你的地方", "`gate`", "`report`", "推送与开 PR",
                        "`combined`", "批 Plan 按范围授权", "项目自己的规则更严时，以项目为准", "只在这几类情况停下问用户",
-                       "测试改不红", "权限被拒", "同一模块、同一目标"),
+                       "测试改不红", "权限被拒", "同一模块、同一目标", "「预先声明」", "写 `无` 的行也列"),
         "## 中途 gate": ("做到哪了", "为什么停在这", "接下来要做的那一步", "开头的五件事落在这几项里", "同一模块、同一目标",
                        "“出了什么事：”", "不按默认推荐继续重试", "宿主确认", "去哪个会话"),
         "## 最终验收": ("做了什么", "验收结果", "改了哪些文件", "Spec 中途改过吗", "按 AC 编号逐条给证据", "单独一张表放在最前",
@@ -892,7 +902,7 @@ class NodeRulesTests(unittest.TestCase):
         "## Spec 交审": ("要你确认的假设", "逐条全列", "不为了短而删减", "“继续”不会被记为批准", "一次交审只放一个模块",
                        "按模块分组", "可复制代码块", "没装只认当前对话里的明确批准"),
         "## Plan 交审": ("中途会停下来问你的地方", "没有中途 `gate` 写“无，做完直接交", "只在这几类情况停下问用户",
-                       "删除工作区外的文件", "下载脚本直接执行", "测试改不红"),
+                       "删除工作区外的文件", "下载脚本直接执行", "测试改不红", "批准本 Plan 即授权以下公共改动"),
         "## 中途 gate": ("接下来要做的那一步", "开头的五件事落在这几项里", "不按默认推荐继续重试", "去哪个会话"),
         "## 最终验收": ("单独一张表放在最前", "文档改动：无", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面",
                       "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec"),
