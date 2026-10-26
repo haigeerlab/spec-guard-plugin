@@ -174,7 +174,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 ## config
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
-行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency` 的生效值与来源，以及只在别处修改的
+行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency`、`autonomyTier` 的生效值与来源，以及只在别处修改的
 `trackerDefault`（上一节）：
 
 ```bash
@@ -187,6 +187,9 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；从本版起，新版本遇到不认识的键只忽略那个键。
+- `autonomyTier`：`strict`（默认）、`standard` 或 `relaxed`，自治档位，取什么值都不注入阶段提示；各档含义由 module-crew 定义，spec-guard
+  只存、读、报告来源。不联动 `reviewCadence`（要 Spec 与 Plan 一起审另设 `combined`）。设置或取消要用户在对话里的原话，`--confirm` 前引用。
+  任何档位都不低于共享检查点规则「自治档位与底线」。0.67.1 及更早版本会把含这个键的配置整份判为无效，0.68.0～0.84.2 只忽略它，团队都升级后再设置。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 
