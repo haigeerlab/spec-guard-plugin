@@ -6,7 +6,7 @@
 - [x] Task 3：底线规则与说明（C2、C4） — workflow-checkpoints 在「批准节奏」与「批准标记」之间新增「## 自治档位与底线」（档位与含义归属、不联动 reviewCadence、写入要原话、底线三项批准与三种必停、项目更严以项目为准）；`config.md` 表格加一行、「不注入」的例外加上它；SKILL.md config 一节同步。`test_workflow_checkpoints.py` 新增 `test_autonomy_tier_and_floor`，改前红，改后 104 例全绿。
 - [x] Checkpoint 1（report）：三套核心回归 — Task 3 提交时 verify-and-commit 全档（validate、phase-guard、verify-artifacts、本仓库 verify-artifacts）通过；CI 同版 `npx shellcheck@4.1.0 -S warning`（hooks、scripts、evals 全部 .sh）无告警。
 - [x] Task 4：版本号 0.85.0 与 CHANGELOG — 两份 `plugin.json` 与 README 中英 `--ref` 改为 0.85.0（`check-readme-sync.py` 通过）；CHANGELOG 顶部「未发布」段改为 `## [0.85.0] - 2026-10-26`，加本版范围、升级须知（旧版本对新键的处理、已有同名一节）与本模块条目。`interface.json` 版本不动（已是 1.11）。
-- [ ] Checkpoint 2（gate）：最终验收；通过后同步 main、推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后同步 main、推送并开本模块 PR，合并由用户进行 — 2026-10-26 呈现做了什么、AC1～AC6 逐条证据、改动文件与 7 个提交、Spec 未改、拟回告全文；用户回复「autonomy-tier 验收通过」。
 
 ## 更新说明
 
