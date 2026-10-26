@@ -1,13 +1,25 @@
 # Changelog
 
-## [未发布]
+## [0.85.0] - 2026-10-26
+
+本版 2 个模块（S32「多模块并行流畅与额度外包」中 spec-guard 的部分，含 S29）：pre-declared-scope、autonomy-tier。`interface.json` 升到 1.11
+（新增 `declaredScope`、`autonomyTier`），只增不改。
+
+### 升级须知
+
+- **团队都升级到 0.85.0 后再设 `autonomyTier`。** 0.68.0～0.84.2 不认识这个键，只忽略它并在阶段提示与 verify-artifacts 给一行提醒；
+  0.67.1 及更早会把整份 `.agent/config.json` 判为无效（连产物语言也失效）。不设这个键就没有任何影响。
+- **项目里若已有一节恰好叫「预先声明」（`## Pre-declared`）、用途不同**，升级后 verify-artifacts 可能报格式错，改个标题即可。
 
 ### 新增
 
+- **项目配置 `autonomyTier`（autonomy-tier）。** 取值 `strict`（默认，等于今天的做法）、`standard`、`relaxed`，用 `/spec-guard:config` 设置，
+  写入要用户在对话里的原话。各档放开什么由 module-crew 定义；spec-guard 只存、读、报告来源，自己的阶段提示、停点规则和交审节奏都不随它变，
+  也不联动 `reviewCadence`。共享检查点规则新增「自治档位与底线」：任何档位下能力图、Spec（可以和 Plan 一起批）、最终验收都要用户批，
+  测试改不红、Spec 没覆盖的决策、高风险不可逆改动必停。
 - **Plan 可以「预先声明」要改的公共文件与外部依赖（pre-declared-scope，S29）。** Plan 新增可选的一节 `## 预先声明`（`## Pre-declared`），
   四行列具体名单：公共路径、外部依赖（`` `名称@范围` ``）、质量与工作区配置、补丁，写法同「并行边界」。交审 Plan 时逐条列出，批准即授权这些公共改动；
   删除文件、改对外契约、安全例外不能预先声明。verify-artifacts 校验这一节的格式（不看并行开关），格式错判失败。没有这一节的 Plan 一切照旧。
-  注意：项目里若已有一节恰好叫「预先声明」、用途不同，升级后 verify-artifacts 可能报格式错，改个标题即可。
 - **只读接口 `declaredScope`（interface 1.11）。** `module_scope.py declared --module <id>` 返回这一节的四个名单和 Plan 的批准状态：
   Plan 的批准标记不带指纹，所以「批准后没改过」用 git 判断，工作区里的 Plan 与最近一次让标记变成 approved 的提交逐字节相同才算批准；
   格式错退出 4，只给固定错误码。多模块协作插件凭它决定哪些公共改动不再逐次问用户。

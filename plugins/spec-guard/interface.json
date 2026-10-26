@@ -362,5 +362,18 @@
     },
     "notes": "not limited by moduleConcurrency; deleting files, changing outward contracts and security exceptions cannot be pre-declared (rule text only, not detected here)",
     "contract": "spec/pre-declared-scope.md"
+  },
+  "autonomyTier": {
+    "config": ".agent/config.json",
+    "key": "autonomyTier",
+    "default": "strict",
+    "values": {
+      "strict": "default; today's behaviour",
+      "standard": "defined by module-crew",
+      "relaxed": "defined by module-crew"
+    },
+    "readFrom": "python3 -B hooks/project_config.py show --project <project-root> --format json: the item whose key is autonomyTier, with value and source; an invalid value reads as strict with source \"default (config invalid)\"",
+    "notes": "spec-guard only stores, reads and reports it; its own phase hints, stop rules and review cadence never change with it. It does not set reviewCadence: a tier that wants the Spec and Plan reviewed together needs reviewCadence=combined set separately. Writing it needs the user's own words. No tier goes below the floor in references/workflow-checkpoints.md (autonomy tier and floor). spec-guard 0.68.0-0.84.2 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
+    "contract": "spec/autonomy-tier.md"
   }
 }

@@ -136,6 +136,8 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 质量与工作区配置、补丁，写法同并行边界），连同 Plan 的批准状态一起返回，不受多模块并行开关限制。Plan 的批准标记不带指纹，所以「批准后没改过」
 用 git 判断：工作区里的 Plan 与最近一次让标记变成 approved 的提交逐字节相同，才算 `planApproved`。读取方（module-crew）凭这份名单决定哪些公共改动
 不再逐次问用户；读不到这个入口时照旧问。
+同在 1.11（autonomy-tier）的 `autonomyTier`：项目配置的自治档位（`strict` 默认、`standard`、`relaxed`），各档含义由 module-crew 定义；spec-guard
+只存、读、报告来源（读法是 `project_config.py show --format json`），自己的行为不随它变，也不联动 `reviewCadence`。
 
 ### 规划层与运行层
 
