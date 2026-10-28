@@ -13,5 +13,6 @@
   没用 config 说明里「结构关键字」那张清单（清单里没有阶段名），按实际读取方写。AC7：第 8 步后补图例链接（`commands.md#spec-guardmap`）、默认折叠与 `--all`、
   「判断不了」因为没有上游分支（`map_view.py` 114-117、580-581 行）。AC9：「先弄清」一节加 Codex 对应表，取自 agent-skills 的 `.claude/commands/{spec,plan,build}.md` 第 5 行与 `docs/codex-setup.md` 25、35 行。
   AC10：第 3 步后加 Spec 交审消息示意，按 node-rules「Spec 交审」小项与顺序，标明不是实跑输出。AC4 的链接：第 4 步链到 workflow「什么算批准」。链接检查 0 处问题。
-- [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
+- [x] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动） — `validate.sh` 通过；phase-guard 507 例、verify-artifacts 78 例通过；6 份改过的文档链接 0 处问题；插件包改动为空。
+  Spec AC6 理由按核对结果修订（Spec 变更记录 2026-10-28），最终验收附差异。
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
