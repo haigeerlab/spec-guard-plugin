@@ -27,6 +27,11 @@ initiative 状态，且来自已安装版插件，不是产品回归。用临时
 里看守这一点：漏登记、只写文件名或把那一步注释掉，校验都会失败并列出文件。需要外部运行时的测试按下文的
 验收测试命名（文件名含 `acceptance`），不进这张列表。
 
+读仓库自己文档（`docs/`、`README*.md`、`CHANGELOG.md`）的测试例外：它们列在 `scripts/validate.sh` 快档部分的
+`DOC_REGRESSIONS` 数组里，不在回归段，所以快档也会跑。只改文档的提交走快档、pre-push 又认快档记录，不这样放的话，
+改坏这些文档的提交要到 CI 才红（2026-10-28 踩过一次）。新增这类测试要加进这个数组；`scripts/check-doc-regressions-listed.py`
+按「从仓库根拼出文档路径」的写法找出它们，漏列就报错，临时目录里建 `docs/` 当夹具的不算。
+
 下列改动还必须运行相应聚焦检查：
 
 | 改动范围 | 必跑检查 |
@@ -149,8 +154,8 @@ git add <要提交的文件>
 提交里没有，漏了 `git add` 会让 CI 失败），但照常检查与提交。按已暂存路径分两档：
 
 - **快档**：暂存的全是 `spec/`、`tasks/`、`docs/` 下的文件，或 `plugins/`、`.github/`、`evals/` 以外的 `*.md`。跑
-  `validate.sh --quick`（只有结构检查与发布证据回归，不跑回归套件）、verify-artifacts 回归，以及对本仓库本身的
-  `verify-artifacts.sh`。
+  `validate.sh --quick`（结构检查、发布证据回归和读仓库文档的回归 `DOC_REGRESSIONS`，不跑其余回归套件）、
+  verify-artifacts 回归，以及对本仓库本身的 `verify-artifacts.sh`。
 - **全套**：其余任何情况。validate、phase-guard、verify-artifacts 回归与本仓库 `verify-artifacts.sh` 并行跑，暂存了
   `.sh` 时再加 CI 同款 ShellCheck。validate 已包含 setup/teardown 与 pre-push 回归，不再另跑。
 

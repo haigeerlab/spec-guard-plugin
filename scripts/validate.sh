@@ -80,6 +80,7 @@ python3 scripts/check-acceptance-wired.py || F=1
 python3 scripts/check-tests-registered.py || F=1
 python3 scripts/check-decision-supersession.py || F=1
 python3 scripts/check-collaboration-boundary.py || F=1
+python3 scripts/check-doc-regressions-listed.py || F=1
 
 echo ""
 
@@ -92,6 +93,26 @@ echo ""
 # 本机状态只经 state_paths.py（runtime-state-layout）；免费，所以进这一层。
 echo "═══ 本机状态路径 ═══"
 python3 scripts/check-state-paths.py || F=1
+echo ""
+
+# 读仓库自己文档（docs/、README、CHANGELOG）的回归（quick-tier-doc-regressions）：只改文档的提交走快档、pre-push 又认快档记录，
+# 不放在这一层的话，改坏这些文档的提交要到 CI 才红。都在两秒内跑完。新增读仓库文档的测试要列进这里，
+# 漏列由 check-doc-regressions-listed.py 拦下。
+DOC_REGRESSIONS=(
+  'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py'
+  'python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py'
+  '/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh'
+)
+echo "═══ 读仓库文档的回归 ═══"
+for step in "${DOC_REGRESSIONS[@]}"; do
+  if out="$(eval "$step" 2>&1)"; then
+    echo "  ✅ ${step}"
+  else
+    printf '%s\n' "$out"
+    echo "  ❌ 这一步失败：${step}"
+    F=1
+  fi
+done
 echo ""
 
 if [ "$QUICK" = false ]; then
@@ -127,7 +148,6 @@ python3 -B scripts/run_steps_parallel.py \
   "${SR_STEP}" \
   'python3 -B plugins/spec-guard/hooks/test_session_context.py' \
   'python3 -B plugins/spec-guard/hooks/test_ticket_entry.py' \
-  'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py' \
   'python3 -B plugins/spec-guard/hooks/test_local_ledger_adapters.py' \
   'python3 -B plugins/spec-guard/hooks/test_local_ledger_runtime.py' \
   'python3 -B scripts/run_tests_parallel.py plugins/spec-guard/hooks/test_local_ticket_portability.py' \
@@ -162,11 +182,8 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout.py' \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout_providers.py' \
   'python3 -B plugins/spec-guard/hooks/test_proposal_closeout_local.py' \
-  '/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh' \
   --section '═══ Capability history ledger regression ═══' \
   '/bin/bash plugins/spec-guard/hooks/test-capability-history.sh' \
-  --section '═══ Checkpoint contract discoverability ═══' \
-  'python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py' \
   --section '═══ Python 3.9 兼容（macOS 自带 python3）═══' \
   'python3 -B plugins/spec-guard/hooks/test_python_compat.py' \
   --section '═══ Hook 入口命令回归 ═══' \
