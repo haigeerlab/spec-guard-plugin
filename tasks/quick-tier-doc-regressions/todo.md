@@ -12,4 +12,4 @@
   `git diff --stat origin/main -- scripts/verified_trees.py scripts/verify-and-commit.sh .github plugins/spec-guard` 为空。
 - [x] Task 3：维护者文档（AC6） — `docs/maintainer-workflow.md` 测试登记一段后加「读仓库文档的测试例外」一段（DOC_REGRESSIONS、为什么、漏列由检查器拦、夹具不算），快档那条写明含 DOC_REGRESSIONS；
   `CLAUDE.md` 讲快档的那句补「含读仓库文档的回归」。本次提交只改文档，走的就是新快档。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么（含第一次变异假绿的经过）、AC1～AC7 逐条证据、前后耗时、文档与其他改动表、4 个提交、Spec 未改；用户回复「quick-tier-doc-regressions 验收通过」。
