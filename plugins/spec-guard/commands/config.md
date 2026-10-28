@@ -1,5 +1,5 @@
 ---
-description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关），并汇总默认事项后端的当前值和来源
+description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关、自治档位），并汇总默认事项后端的当前值和来源
 allowed-tools: Bash
 ---
 
@@ -59,7 +59,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 |---|---|---|---|
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译。恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「批准节奏」 |
-| `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置；从本版起，新版本遇到不认识的键只忽略那个键 |
+| `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键 |
 | `autonomyTier` | `strict`／`standard`／`relaxed` | `strict` | 自治档位：各档放开什么由 module-crew 定义；spec-guard 只存、读、报告来源，自己的行为不随它变。不联动 `reviewCadence`：要 Spec 与 Plan 一起审，另设 `reviewCadence=combined`。设置或取消要用户在对话里的原话（说明设成哪一档），`--confirm` 前引用。任何档位都不低于共享检查点规则「自治档位与底线」。0.67.1 及更早的 spec-guard 会把含这个键的配置整份判为无效，0.68.0～0.84.2 只忽略这个键；团队都升级后再设置 |
 
 设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency`、`autonomyTier` 例外：取什么值都不注入，它们的效果只在相应规则的停点或读取它的插件里出现。
