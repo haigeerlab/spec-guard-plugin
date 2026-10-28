@@ -39,7 +39,11 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 ## 前置条件
 
-- 已安装 [agent-skills](https://github.com/addyosmani/agent-skills) 插件；
+- 已安装 [agent-skills](https://github.com/addyosmani/agent-skills) 插件：`/spec`、`/plan`、`/build` 这些命令都来自它，spec-guard 不提供。安装方法以
+  [它的 README](https://github.com/addyosmani/agent-skills#quick-start) 为准，写这一段时（2026-10-28）是：
+  - Claude Code：`/plugin marketplace add addyosmani/agent-skills`，再 `/plugin install agent-skills@addy-agent-skills`；
+  - Codex：`codex plugin marketplace add addyosmani/agent-skills`，再 `codex plugin add agent-skills@agent-skills`。Codex 里没有这些斜杠命令，
+    用 `@spec-driven-development` 这类写法调用对应的 skill；
 - `bash`、`git`、`python3`（3.9 及以上，macOS 自带的即可）；
 - 宿主：Claude Code，或 Codex（CLI 或桌面 App）；
 - 可选：用 Proposal 或托管日常事项时需要登录 `gh`（GitHub）或 `glab`（GitLab）；用本地事项账本时需要 macOS 和
@@ -89,7 +93,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | | `/spec-guard:link-project` | 会话目录不是项目目录时，指向实际的项目 |
 | 加需求 | `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
 | | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | 需要在 Issue 上留痕时走 Proposal 流程：提交、审查、预检、证明、收尾 |
-| 事项 | `/spec-guard:ticket` | 用自然语言记 bug、需求；明确选 GitHub/GitLab 时走托管流程 |
+| 事项 | `/spec-guard:ticket` | 用自然语言记 bug、需求；明确选 GitHub/GitLab 时走托管流程。没启用本地事项账本时只做诊断、给出启用步骤，见[可选能力](docs/optional-features.md#本地事项账本) |
 | | `/spec-guard:local-ticket-ledger` | 查看或启用本地事项账本 |
 | | `/spec-guard:local-ticket-portability` | 核验、归档、恢复或交接本地事项 |
 | | `/spec-guard:tracker-default` | 设置项目默认的事项后端，只用于预填预览 |

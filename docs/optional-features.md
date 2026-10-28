@@ -29,6 +29,10 @@
 - Claude Code：`/spec-guard:ticket`，或直接说「看看本地事项」「记一个 bug」；
 - Codex：直接说 “show local tickets” 或 “record a bug”。
 
+**没启用时用 `ticket` 会怎样：** 不会自动安装运行时或初始化账本。不论只说 `/spec-guard:ticket` 还是带了要记的内容，它都只读地诊断一下，
+给出当前需要的一条下一步（通常是启用账本）；要记的事不会写进任何地方，报告里标「待入账」。明确选了 GitHub/GitLab 普通 Issue 时走托管流程，
+不需要本地账本。
+
 事项的短编号可以写进 agent-relay 的协作消息里。但另一个仓库里的 agent 看不到你的账本，发消息时要附上来源项目和问题摘要。
 
 **不做什么：** 不持续同步远端 Issue。需要备份、恢复或逐项迁移时，使用独立的
