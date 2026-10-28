@@ -61,7 +61,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 |---|---|
 | `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | Open a new session; after upgrading from 0.60.x, trust the new `SessionStart` hook once and restart Codex, or there is no injection after compaction; after upgrading from 0.68.x, also trust the `SessionStart` hook for session start and clear once |
+| Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | Open a new session |
 
 For Codex, use the version of the [latest release](https://github.com/haigeerlab/spec-guard-plugin/releases) as `--ref`.
 
@@ -92,7 +92,7 @@ The full flow, what each stage means, and the two ways to add requirements: [wor
 | `/spec-guard:phase` | Show the current stage and the suggested next step |
 | `/spec-guard:verify-artifacts` | Check the capability map format and that modules match their Specs |
 | `/spec-guard:add-module` | Insert a new requirement into the capability map as a module at a checkpoint (preview, then confirm) |
-| `/spec-guard:config` | View or set project config: artifact language and review cadence |
+| `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
 | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 
 Codex does not load slash commands; the same features are reached through skills in plain language (mainly
@@ -133,6 +133,10 @@ Self-check:
 Claude Code fixes the plugin directory when a session starts: without reopening, commands in an already open session
 keep calling the old version's scripts while the hook may already be the new one, so two versions mix.
 
+When Codex is upgraded from an older version, trust each newly added `SessionStart` hook once and restart Codex, or that
+injection is skipped without an error: coming from 0.60.x or earlier, the one injected after compaction; coming from
+0.68.x or earlier, also the one for session start and clear.
+
 In a project with an older convention block, preview `/spec-guard:setup-convention --replace --dry-run` after updating,
 and replace once you have confirmed. Keep your own rules inside the block's local section
 (`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`); replacing keeps it.
@@ -162,7 +166,7 @@ By default spec-guard moves one module at a time. When there are many modules an
 one: spec-guard does the **planning**, and the companion plugin module-crew does the **running** (opening sessions, creating worktrees,
 messaging, merging). With the switch off none of this appears and nothing changes.
 
-1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; older versions treat the whole configuration as invalid; from this version on, an unknown key is ignored on its own).
+1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; earlier versions treat the whole configuration as invalid; from 0.84.0 on, an unknown key is ignored on its own).
 2. At the capability-map review the agent adds a concurrency assessment: which modules could become comma groups in the Build order, which are worth moving up.
 3. Each module Spec gets a "并行边界" (concurrency boundary) section naming the directories it owns; `verify-artifacts` checks its format and the final acceptance marks files changed outside it.
 4. `/spec-guard:map` lists the modules that can start together, overlapping boundaries, and the progress in each module worktree.
@@ -172,18 +176,24 @@ Who records review approvals and who merges locally is set out in its own sectio
 
 ## External interface
 
-Other plugins that read progress and review state should use `interface.json` at the plugin root: it lists the read-only command, the format version, the exit codes and what each value means, so a reader can check the version.
-From 1.1 it also lists the entries used for developing several modules at once (the switch, the boundary check, the role marker, the review marker). See "对外接口" in [docs/design.md](docs/design.md).
+Other plugins that read progress and review state should use `interface.json` at the plugin root: for every entry it lists
+(the read-only commands, the switch and checks used for developing several modules at once, and so on) it gives the format
+version, the exit codes and what each value means, so a reader can check the interface version. See "对外接口" in [docs/design.md](docs/design.md).
 
 ## Data and privacy
 
-- **What it reads**: at the start of every turn the hook reads only this project's capability map, module Specs,
-  plans, todos, the settings under `.agent/` and local git refs (it never fetches); at a review checkpoint it also
-  reads this machine's plugin records to see whether delegate is installed. From the session transcript the
-  host provides it reads only the latest usage numbers, to warn when the context is nearly full; it does not read
-  the conversation. In a project with the local ticket ledger enabled, the hook only checks whether
-  `.epiq/project.json` exists; it does not read the ledger. A project with only the ledger and no convention still gets
-  the ledger reminders at session start, after a clear or a compaction, and when another session's message arrives.
+- **What it reads**:
+  - At the start of every turn the hook reads only this project's capability map, module Specs, plans, todos, the
+    settings under `.agent/` and local git refs (it never fetches).
+  - At a review checkpoint it also reads this machine's plugin records to see whether delegate is installed.
+  - From the session transcript the host provides it reads only the tail: the latest usage numbers (to suggest
+    freeing context at a module boundary), the state code of its own last injection (one line when nothing changed)
+    and compaction markers; on Codex it also reads the first record to tell an unattended run. It does not read the
+    conversation between you and the agent.
+  - In a project with the local ticket ledger enabled, the hook only checks whether `.epiq/project.json` exists; it
+    does not read the ledger.
+  - A project with only the ledger and no convention still gets the ledger reminders at session start, after a clear
+    or a compaction, and when another session's message arrives.
 - **What it writes**: the hook writes no files. Commands write only after you have seen a preview and confirmed:
   `spec/`, `tasks/`, `.agent/` and the convention block in `CLAUDE.md`／`AGENTS.md` inside the project; machine state
   goes to `~/.spec-guard/` (move it with `SPEC_GUARD_STATE_DIR`).

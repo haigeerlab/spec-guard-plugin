@@ -53,7 +53,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 |---|---|
 | `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | 开新会话即可；从 0.60.x 升级后，新增的 `SessionStart` 一项要信任一次并重启 Codex，否则压缩后没有注入；从 0.68.x 升级后，会话开始与清空后的那项 `SessionStart` 也要信任一次 |
+| 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | 开新会话即可 |
 
 Codex 的 `--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
 
@@ -82,7 +82,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
 | `/spec-guard:verify-artifacts` | 校验能力图格式、模块与 Spec 的对应关系 |
 | `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
-| `/spec-guard:config` | 查看或设置项目配置：产物语言、批准节奏 |
+| `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
 | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 
 Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令的参数、
@@ -122,6 +122,9 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 Claude Code 在会话开始时就定下了插件目录：不重开会话，已开着的会话里命令仍调用旧版本的脚本，钩子却可能已是新版本，
 两个版本混用。
 
+Codex 从旧版升级时，新增的 `SessionStart` hook 要信任一次并重启 Codex，否则对应的注入会被跳过、不报错：从 0.60.x 或更早升级的，
+是压缩后注入的那一项；从 0.68.x 或更早升级的，还有会话开始与清空后的那一项。
+
 已经装过旧版约定块的项目，更新插件后先预览 `/spec-guard:setup-convention --replace --dry-run`，确认后再替换。
 块里自己写的规则放进本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`），替换时会保留。
 
@@ -147,7 +150,7 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 默认情况下 spec-guard 一次推进一个模块。模块多而且彼此独立时，可以让几个会话同时各做一个模块：spec-guard 负责**规划**，开会话、建 worktree、
 发消息、合并这些**运行**的事交给配套插件 module-crew。不打开开关时，下面这些都不出现，一切照旧。
 
-1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，旧版本会把整份配置判为无效；从本版起，新版本遇到不认识的键只忽略那个键）。
+1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，更早的版本会把整份配置判为无效；0.84.0 起遇到不认识的键只忽略那个键）。
 2. 能力图审阅时，agent 会多给一段并行评估：哪些模块可以写成 Build order 的逗号组、哪些值得往前挪。
 3. 每个模块的 Spec 加一节「并行边界」，写明它独占哪些目录；`verify-artifacts` 检查格式，最终验收时用越界检查标出改到边界外的文件。
 4. `/spec-guard:map` 列出可同时开工的模块、并行边界的重叠，以及各模块 worktree 的进度。
@@ -157,13 +160,18 @@ Claude Code 在会话开始时就定下了插件目录：不重开会话，已�
 
 ## 对外接口
 
-其他插件要读进度和审查状态时，看插件根目录的 `interface.json`：只读命令、格式版本、退出码和取值含义都写在里面，按版本检查即可。
-1.1 起另外登记了多模块并行用到的入口（并行开关、越界检查、角色标记、批准标记）。说明见 [docs/design.md](docs/design.md)「对外接口」。
+其他插件要读进度和审查状态时，看插件根目录的 `interface.json`：登记的每个入口（只读命令、多模块并行用到的开关与检查等）的
+格式版本、退出码和取值含义都写在里面，按接口版本检查即可。说明见 [docs/design.md](docs/design.md)「对外接口」。
 
 ## 数据与隐私
 
-- **读什么**：每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用
-  （不 fetch）；在交审检查点还会读本机的插件记录，看 delegate 装没装。宿主给的会话记录只读最后一次的用量数字，用来提示上下文快满，不读对话内容。启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容；没有启用约定、只有账本的项目，也会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒。
+- **读什么**：
+  - 每轮对话开头，钩子只读当前项目里的能力图、模块 Spec、Plan、todo、`.agent/` 下的配置和本地 git 引用（不 fetch）。
+  - 在交审检查点，还会读本机的插件记录，看 delegate 装没装。
+  - 宿主给的会话记录只读尾部：最近的用量数字（在模块边界提示释放上下文）、钩子自己上一次注入的状态码（状态没变就只给一行）
+    和压缩标记；Codex 另读第一条记录，判断是不是无人值守运行。不读你和 agent 的对话内容。
+  - 启用了本地事项账本的项目，钩子只看 `.epiq/project.json` 在不在，不读账本内容。
+  - 没有启用约定、只有账本的项目，也会在会话开始、清空、压缩后和别的会话转来消息时出账本提醒。
 - **写什么**：钩子不写任何文件。命令在你看过预览、明确确认后才写：项目里的 `spec/`、`tasks/`、`.agent/` 和
   `CLAUDE.md`／`AGENTS.md` 的约定块；本机状态写在 `~/.spec-guard/`（可用 `SPEC_GUARD_STATE_DIR` 改位置）。
 - **什么时候联网**：只在你明确调用下面这些功能时。Proposal 相关命令、选了 GitHub/GitLab 的 `ticket`、本地事项的
