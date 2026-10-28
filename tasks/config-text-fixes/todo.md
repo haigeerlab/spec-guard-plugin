@@ -7,5 +7,5 @@
   `check-readme-sync.py`、`check-manifests.py` 通过。
 - [x] Checkpoint 1（report）：发布前完整检查（AC4） — 主机 macOS 15.7.3 arm64，系统 `/bin/bash` 3.2.57，HEAD `64750995`：`validate.sh` 通过；phase-guard 507 例、verify-artifacts 78 例通过；
   `evals/codex-plugin-smoke.sh --selftest` 通过；插件包改动只有 config.md、SKILL.md 与两份 plugin.json（+5 −5）。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么、AC1～AC4 证据（macOS 系统 bash）、改动与提交表、Spec 未改、合并后发版六步；用户回复「config-text-fixes 验收通过」，按 Spec Q1 A 同时授权合并后的发版。
 - [ ] 发版（合并后按 Q1 A 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR（AC5）
