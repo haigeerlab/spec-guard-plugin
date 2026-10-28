@@ -15,4 +15,4 @@
   AC10：第 3 步后加 Spec 交审消息示意，按 node-rules「Spec 交审」小项与顺序，标明不是实跑输出。AC4 的链接：第 4 步链到 workflow「什么算批准」。链接检查 0 处问题。
 - [x] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动） — `validate.sh` 通过；phase-guard 507 例、verify-artifacts 78 例通过；6 份改过的文档链接 0 处问题；插件包改动为空。
   Spec AC6 理由按核对结果修订（Spec 变更记录 2026-10-28），最终验收附差异。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么、AC1～AC11 逐条证据、文档与其他改动表、6 个提交、Spec AC6 修订差异；用户回复「user-docs-fixes 验收通过」，修订后的 Spec 一并批准并重新记批准标记。

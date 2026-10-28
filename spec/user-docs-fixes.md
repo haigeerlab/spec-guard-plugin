@@ -1,6 +1,6 @@
 # Spec: user-docs-fixes
 
-<!-- spec-guard: review approved 5067155ab19f -->
+<!-- spec-guard: review approved b35a0cbbbd92 -->
 
 ## 目标
 
