@@ -23,7 +23,8 @@
    - 写 `spec/<模块>.md` 并交审，验收标准按 AC1、AC2… 编号，最终验收按编号逐条给证据；
    - 用 `/plan` 生成 `tasks/<模块>/plan.md` 和 `todo.md`；
    - 用 `/build` 逐项实现，每完成一项勾掉一项。
-4. **切到下一个模块。** 当前模块的 todo 全部勾完后，把 `.agent/state.json` 的 `activeModule` 改成下一个模块。
+4. **切到下一个模块。** 当前模块验收获批、todo 全部勾完后，agent 按阶段提示把 `.agent/state.json` 的 `activeModule` 改成下一个模块，
+   接着写它的 Spec；你不用动手。
 
 整个过程中不用自己记进度，每轮对话开头 hook 都会告诉 agent 现在到了哪一步。
 
