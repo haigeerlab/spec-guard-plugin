@@ -826,6 +826,50 @@ want fail "interface: progressFacts 的评审节奏少一个取值 → 报错" p
 mkifc "$TMP/ifc-facts-gates" 'del data["mapView"]["progressFacts"]["fields"]["gates"]'
 want fail "interface: progressFacts 缺 gates 说明 → 报错" python3 "$IFC" "$TMP/ifc-facts-gates/interface.json"
 
+# ── check-doc-regressions-listed.py ──
+# quick-tier-doc-regressions（2026-10-28）：读仓库自己文档的测试不在快档里，只改文档的提交与推送都不跑它，
+# 改坏 docs/workflow.md 要到 CI 才红。反例同样要紧：临时目录里建 docs/ 当夹具的测试不算读仓库文档；
+# 注释掉的清单行不算列入。
+DOC="$ROOT/scripts/check-doc-regressions-listed.py"
+mkdoc() {  # $1=目录；一个已列入快档清单、读仓库 docs 的 python 测试
+  rm -rf "$1"
+  mkdir -p "$1/plugins/spec-guard/hooks" "$1/scripts"
+  printf '%s\n' 'text = (ROOT.parents[1] / "docs/workflow.md").read_text()' > "$1/plugins/spec-guard/hooks/test_listed.py"
+  printf '%s\n' '#!/usr/bin/env bash' 'DOC_REGRESSIONS=(' \
+    "  'python3 -B plugins/spec-guard/hooks/test_listed.py'" ')' > "$1/scripts/validate.sh"
+}
+
+mkdoc "$TMP/docok"
+want pass "doc-regressions: 读仓库文档的测试都已列入 → 放行" python3 "$DOC" "$TMP/docok"
+
+mkdoc "$TMP/docpy"
+printf '%s\n' 'readme = (self.plugin.parents[1] / "README.md").read_text()' > "$TMP/docpy/plugins/spec-guard/hooks/test_readme.py"
+want fail "doc-regressions: python 测试读 README 没列入 → 报错" python3 "$DOC" "$TMP/docpy"
+DOC_OUT="$(python3 "$DOC" "$TMP/docpy" 2>&1)"
+want pass "doc-regressions: 报错里有没列入文件的路径" \
+  grep -qF -- "plugins/spec-guard/hooks/test_readme.py" <<<"$DOC_OUT"
+
+mkdoc "$TMP/docsh"
+printf '%s\n' '#!/usr/bin/env bash' 'grep -n x "$ROOT/docs/design.md"' > "$TMP/docsh/scripts/test-design.sh"
+want fail "doc-regressions: shell 测试读 \$ROOT/docs 没列入 → 报错" python3 "$DOC" "$TMP/docsh"
+
+mkdoc "$TMP/docfixture"
+printf '%s\n' 'base = Path(tmp) / "docs" / "DOCUMENTATION-BASELINE.md"' 'base.write_text("x")' \
+  > "$TMP/docfixture/plugins/spec-guard/hooks/test_fixture.py"
+printf '%s\n' '#!/usr/bin/env bash' 'mkdir -p "$q/docs"; printf x > "$TMP/docs/a.md"' > "$TMP/docfixture/scripts/test-fixture.sh"
+want pass "doc-regressions: 临时目录里的 docs 夹具 → 不报" python3 "$DOC" "$TMP/docfixture"
+
+mkdoc "$TMP/doccomment"
+printf '%s\n' '#!/usr/bin/env bash' 'DOC_REGRESSIONS=(' \
+  "  # 'python3 -B plugins/spec-guard/hooks/test_listed.py'" ')' > "$TMP/doccomment/scripts/validate.sh"
+want fail "doc-regressions: 清单里被注释掉的条目不算列入 → 报错" python3 "$DOC" "$TMP/doccomment"
+
+mkdoc "$TMP/docnolist"
+printf '%s\n' '#!/usr/bin/env bash' 'echo no list' > "$TMP/docnolist/scripts/validate.sh"
+want fail "doc-regressions: validate.sh 里没有 DOC_REGRESSIONS → 报错" python3 "$DOC" "$TMP/docnolist"
+
+want pass "doc-regressions: 当前仓库通过" python3 "$DOC" "$ROOT"
+
 echo ""
 echo "  总计 $PASS 通过 / $FAIL 失败"
 [ "$FAIL" -eq 0 ] || exit 1

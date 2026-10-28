@@ -80,6 +80,7 @@ python3 scripts/check-acceptance-wired.py || F=1
 python3 scripts/check-tests-registered.py || F=1
 python3 scripts/check-decision-supersession.py || F=1
 python3 scripts/check-collaboration-boundary.py || F=1
+python3 scripts/check-doc-regressions-listed.py || F=1
 
 echo ""
 

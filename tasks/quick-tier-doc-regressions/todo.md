@@ -5,7 +5,9 @@
   改前 3 例红（快档放行坏文档、缺新一节两处）。`validate.sh` 快档部分加 `DOC_REGRESSIONS` 数组与新一节，全套回归段删掉这三行及变空的「Checkpoint contract discoverability」节标题（全仓库无别处引用）→ 5 例全绿；`check-tests-registered.py` 65 个测试文件都在。
   变异：第一次把数组清空成 `'true'`，用例仍绿——因为三个测试从 validate.sh 消失，`check-tests-registered` 报漏注册，快档另因此失败，是假绿；改为保留条目、循环里不执行（`if out="$(true)"`），用例变红，还原。
   耗时：改前 13.34／13.24／12.72 秒（中位 13.24），改后 14.70／14.97／14.68 秒（中位 14.70），多 1.46 秒。CI 同版 ShellCheck（`scripts/validate.sh`）无告警。
-- [ ] Task 2：漏列检查器（AC3、AC4，先红后绿）
+- [x] Task 2：漏列检查器（AC3、AC4，先红后绿） — `test-checkers.sh` 先加 8 例（已列入放行、python 读 README 漏列报错且报出路径、shell 读 `$ROOT/docs` 漏列报错、临时目录 docs 夹具不报、注释掉的清单行不算、没有清单报错、当前仓库通过）：
+  检查器不存在时 4 例红。新增 `scripts/check-doc-regressions-listed.py` 并接进 validate 快档（`check-collaboration-boundary.py` 之后）→ 159 例全绿；两个报错用例的输出核对过，是因为漏列而报错。
+  变异：`missing = []`（永远放行）→ 4 例红，还原。AC4：按同一写法扫现有测试只找出已列入的那 3 个（`test_workflow_checkpoints.py` 第 396 行的旧词回归也在其中），无需再加。
 - [ ] Checkpoint 1（report）：三套核心回归与 ShellCheck
 - [ ] Task 3：维护者文档（AC6）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
