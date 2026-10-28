@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.85.1] - 2026-10-28
+
+本版 2 个模块（「0.85.1 文档收尾」）：feature-guidance-examples、config-text-fixes。插件包里只改说明文字，行为不变；`interface.json` 不变（1.11）。
+同时发出 0.85.0 之后合进 `main` 的文档与维护者工具改进。
+
+### 变更
+
+- **config 说明不再写「从本版起」。** `/spec-guard:config` 与 `spec-guard-ops` 技能里 `moduleConcurrency` 一行说「从本版起，新版本遇到不认识的键只忽略那个键」，
+  已说不清是哪一版；改为「0.84.0 起」（逐键容错始于 0.84.0 的 config-per-key）。
+- **`/spec-guard:config` 的描述补上自治档位。** 宿主命令列表里显示的描述原来只列产物语言、批准节奏、多模块并行开关，漏了 0.85.0 新增的 `autonomyTier`。
+
+### 文档
+
+- **使用者文档对齐 0.85.0（#417）。** README 中英、命令参考、使用流程、术语、故障排查改掉与现行行为不符的说法：自治档位、Plan 的「预先声明」、
+  新需求先确认说完、上下文提醒只剩模块边界、阶段注入平时只给一行、配置逐键容错、hook 信任项、Proposal 收尾会写远端、verify-artifacts 的实际检查项；
+  README「数据与隐私」如实写出 hook 从会话记录读哪些内容。
+- **新增上手文档 `docs/getting-started.md`（#418）。** 用一个虚构的三模块项目从安装走到第一个模块验收，阶段提示均为实跑输出；附「你做什么、agent 做什么」
+  对照表与可选能力选用指引。README 的「常用命令」扩为列出全部命令的「功能一览」；术语表补 gate、激活信号、停点规则等 11 条；命令参考的 Codex 一列改为可以直接说的话。
+- **新手复测发现的问题（#419）。** README 写明 `/spec`、`/plan`、`/build` 来自 agent-skills 及其安装方法与 Codex 的 `@` 调用法；写清什么算批准、
+  哪些检查点必须标 `gate`、没启用账本时 `ticket` 的行为；上手文档补交审消息示意、`/map` 图例与 Codex 对应表。
+- **选用指引补具体场景（#421）。** Proposal 与文档治理两行各补判断方法和例子。
+
+### 维护者工具
+
+- **快档也跑读仓库文档的回归（#420）。** 只改文档的提交走快档、pre-push 又认快档记录，改坏 `docs/workflow.md` 这类被测试锁定的文档要到 CI 才红；
+  现在 `validate.sh --quick` 跑这类测试（`DOC_REGRESSIONS`），新增的 `check-doc-regressions-listed.py` 拦下漏列。
+
 ## [0.85.0] - 2026-10-26
 
 本版 2 个模块（S32「多模块并行流畅与额度外包」中 spec-guard 的部分，含 S29）：pre-declared-scope、autonomy-tier。`interface.json` 升到 1.11
