@@ -7,7 +7,12 @@
 - [x] Task 2：`docs/commands.md`（AC1、AC2、AC4、AC5、AC10、AC17） — config 表加 `autonomyTier` 与一段说明（核对 `interface.json` 的 `autonomyTier`、CHANGELOG 0.85.0）；
   phase 一节写平时一行与何时完整（`module_stage.describe`／`brief_line`）、模块边界只在 MODULE_DONE／DONE 达到 70%、Claude 读数超过 200k 才按 1M 估算（`module_stage.thresholds` 与 919-924 行、CHANGELOG 0.84.1）；
   verify-artifacts 改为 11 项检查表（逐项对 `verify-artifacts.sh` 的 ok／warn／bad，退出码只看 ❌）；开头不再指向源码；`/map --json` 字段说明改指 `interface.json` 的 `mapView`。
-- [ ] Task 3：`docs/workflow.md`（AC2、AC3、AC4、AC11、AC12、AC14、AC15、AC16）
+- [x] Task 3：`docs/workflow.md`（AC2、AC3、AC4、AC11、AC12、AC14、AC15、AC16） — 「新项目」一节加四个小标题（检查点交审与批准、其他情况、账本、成本、项目级审查），
+  步骤 1～4 连续；原第 84 行拆成「最终验收」「验收之后」「这些规则从哪来」三段，`--replace` 那段并进后者；新增「预先声明」一段（核对 workflow-checkpoints 77-81 行）；
+  需求确认写进步骤 2、快速插入步骤 0 与 DONE 行（核对 workflow-checkpoints「需求确认」、CHANGELOG 0.82.0）；上下文提示改为一行注入与模块边界；
+  「可以一次审完」两处加「你明确要求时」；补 AC 编号、中文检查点写法、验收表格与提交、复制块（CHANGELOG 0.74/0.81/0.80）；「项目级审查」压缩为三段并链到细则；Codex 说法两处统一为 spec-guard-ops。
+  压缩时删去、细则里仍有的句子：Critical/Required/Optional 与优先级分开记、稳定发现编号与可恢复报告、审查冻结后「继续」的走向、`rootCauseReviewRequired` 人工核对、
+  Proposal Issue 不能充当缺陷事项、旧远端 bridge 不恢复、关闭命令的 `verified` 不代替 CI 核对、后续批次改选目标不迁移（见 workflow-checkpoints 17-27 行与 hosted-ticket-workflow）。
 - [ ] Task 4：concepts、troubleshooting、convention-block（AC5、AC6、AC7、AC8、AC16、AC18、AC19）
 - [ ] Checkpoint 1（report）：整体检查（validate、链接、AC22）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
