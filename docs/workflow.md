@@ -124,10 +124,11 @@ Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 to
 **审查完成**：这不等于缺陷已入账、已修复或可以合并。你只要审查时，它只交报告，不建单也不改代码。
 
 发现的缺陷怎么入账：用了本地事项账本的走 `ticket` 查重和读回；明确选用 GitHub/GitLab 普通 Issue 的，按
-`hosted-ticket-workflow` 先给你看目标和内容，经你授权才创建；都没启用或结果未知时报“待入账”，不重复创建。
+`hosted-ticket-workflow` 先给你看目标和内容，经你授权才创建；查重结果为 `absent` 但带 `rootCauseReviewRequired` 时，
+仍要人工核对有没有同一根因、名字不同的事项；都没启用或结果未知时报“待入账”，不自动重发、不重复创建。
 修复时，简单 bug 先复现再修（agent-skills 的 `debugging-and-error-recovery` 与 TDD），多步修复才在相关模块的 plan 与 todo
-里切片，不为每个 bug 新建模块；是独立新能力时才按下文的快速插入或 Proposal 加模块。托管事项要等 PR/MR 合并、验证通过
-并经你授权才关闭，平台自动关闭、部分合并或待部署都不算完成。
+里切片，不为每个 bug 新建模块；是独立新能力时才按下文的快速插入或 Proposal 加模块。托管日常事项要等 PR/MR 合并、
+逐项核对 CI／验收与剩余范围、并经你授权才关闭，平台自动关闭、部分合并或待部署都不算完成。
 
 细则见[共享检查点规则](../plugins/spec-guard/references/workflow-checkpoints.md)的「项目级审查 → 缺陷处理」一节。
 

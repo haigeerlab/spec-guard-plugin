@@ -17,7 +17,9 @@
   （核对 `module-insert.py --confirm`、proposal-closeout 命令）；troubleshooting 新增「只看到一行 spec-guard 提示」（文案取自 `module_stage.brief_line` 844 行）、
   `Project config: ignored` 一行（`module_stage.py` 413-414 行，中英两种写法）、hook 信任改为三项（`hooks/hooks.json`）、`/compact` 一行去掉 0.57.1 来历；
   convention-block 去掉同步脚本说明。Codex 说法 troubleshooting 开头已是「用 spec-guard-ops …」，未改。
-- [ ] Checkpoint 1（report）：整体检查（validate、链接、AC22）
+- [x] Checkpoint 1（report）：整体检查（validate、链接、AC22） — 第一次 `validate.sh` 失败 1 步：`test_hosted_ticket_entry.py` 锁住 workflow.md 须含 `rootCauseReviewRequired`、
+  「托管日常事项」「不自动重发」「CI／验收」，Task 3 压缩时删掉了（快档提交不跑它，所以没被拦下）。改为在压缩后的那一节用使用者能读懂的话补回这四点，不改测试。
+  之后 `validate.sh`、`test-phase-guard.sh`（507 例）、`test-verify-artifacts.sh`（78 例）全过；scratchpad 链接检查 7 个文件 0 断链；`git diff --stat origin/main -- plugins/spec-guard` 为空。
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 
 ## 留给下一个发版模块
