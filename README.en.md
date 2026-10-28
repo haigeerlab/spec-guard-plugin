@@ -82,22 +82,36 @@ Write the capability map with agent-skills' `/spec`, then for each module write 
 **Shortest path**: install the plugin → run setup once in the project → talk to the agent as usual and follow the
 stage hint.
 
-The full flow, what each stage means, and the two ways to add requirements: [workflow](docs/workflow.md) (Chinese).
+The full flow, what each stage means, and the two ways to add requirements: [workflow](docs/workflow.md) (Chinese). Using it for the
+first time? Start with [getting started](docs/getting-started.md) (Chinese): a small example from install to the first module's
+acceptance, with the stage hint the agent sees at every step, a table of what you do and what the agent does, and when to turn on each optional feature.
 
-## Common commands
+## Features at a glance
 
-| Command (Claude Code) | What it does |
-|---|---|
-| `/spec-guard:setup-convention` | Install the multi-module convention in a project; `--replace` upgrades the block, `--dry-run` only previews |
-| `/spec-guard:phase` | Show the current stage and the suggested next step |
-| `/spec-guard:verify-artifacts` | Check the capability map format and that modules match their Specs |
-| `/spec-guard:add-module` | Insert a new requirement into the capability map as a module at a checkpoint (preview, then confirm) |
-| `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
-| `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
+| Area | Command (Claude Code) | What it does |
+|---|---|---|
+| Convention and stage | `/spec-guard:setup-convention` | Install the multi-module convention in a project; `--replace` upgrades the block, `--dry-run` only previews |
+| | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
+| | `/spec-guard:phase` | Show the current stage and the suggested next step |
+| | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers and other artifacts |
+| | `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
+| | `/spec-guard:review-mark` | Record whether a Spec or Plan is approved; the agent runs it after you approve |
+| | `/spec-guard:module-suspend` | Suspend or resume a module that is waiting on something outside |
+| | `/spec-guard:link-project` | Point a session whose folder is not the project at the actual project |
+| Adding requirements | `/spec-guard:add-module` | Insert a new requirement into the capability map as a module at a checkpoint (preview, then confirm) |
+| | `/spec-guard:proposal-submit`, `proposal-review`, `proposal-promotion-preflight`, `proposal-promotion-proof`, `proposal-closeout` | The Proposal flow when the decision must be on record in an Issue: submit, review, preflight, proof, closeout |
+| Tickets | `/spec-guard:ticket` | Record a bug or a request in plain language; the hosted flow when you choose GitHub/GitLab |
+| | `/spec-guard:local-ticket-ledger` | Inspect or enable the local ticket ledger |
+| | `/spec-guard:local-ticket-portability` | Verify, archive, restore or hand off local tickets |
+| | `/spec-guard:tracker-default` | Set the project's default ticket backend, used only to prefill previews |
+| Documentation and history | `/spec-guard:documentation-baseline`, `documentation-impact`, `documentation-verification` | The documentation baseline, a module's documentation impact, and the delivery check |
+| | `/spec-guard:history-integrity` | Verify the capability history left by older versions |
+| Reports | `/spec-guard:map` | Module progress table: status, review, what is blocking |
+| | `/spec-guard:cost-report` | Tokens of the main agent and subagents and main-session turns, per task |
+| Several modules at once | `/spec-guard:checkout-role` | Label each checkout's role when the switch is on |
 
-Codex does not load slash commands; the same features are reached through skills in plain language (mainly
-`spec-guard-ops`). Arguments and output of every command, and the Codex mapping: [command reference](docs/commands.md)
-(Chinese).
+Codex does not load slash commands; say one sentence to the agent instead, for example "use spec-guard-ops to show the stage".
+Arguments and output of every command, and what to say in Codex: [command reference](docs/commands.md) (Chinese).
 
 ## What it looks like, and a self-check
 
@@ -164,7 +178,8 @@ and replace once you have confirmed. Keep your own rules inside the block's loca
 
 By default spec-guard moves one module at a time. When there are many modules and several are independent, several sessions can each work on
 one: spec-guard does the **planning**, and the companion plugin module-crew does the **running** (opening sessions, creating worktrees,
-messaging, merging). With the switch off none of this appears and nothing changes.
+messaging, merging). spec-guard does not depend on it: without module-crew, turning the switch on gives only the planning-layer
+rules below. With the switch off none of this appears and nothing changes.
 
 1. Set `moduleConcurrency` to `on` with `/spec-guard:config` (only once everyone is on 0.68.0; earlier versions treat the whole configuration as invalid; from 0.84.0 on, an unknown key is ignored on its own).
 2. At the capability-map review the agent adds a concurrency assessment: which modules could become comma groups in the Build order, which are worth moving up.
@@ -226,6 +241,7 @@ More cases (what `UNKNOWN`, `Paused`, `Suspended` and other hints mean): [troubl
 
 **Users**
 
+- [Getting started](docs/getting-started.md): a real-run small example, who does what, choosing optional features
 - [Workflow](docs/workflow.md): from nothing to delivery, two ways to add requirements
 - [Command reference](docs/commands.md): arguments and output of every command, and the Codex mapping
 - [Troubleshooting](docs/troubleshooting.md)

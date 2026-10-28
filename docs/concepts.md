@@ -60,3 +60,14 @@ spec-guard 不替代 agent-skills，只在它外面补上三样东西：一个�
 | revision | Proposal 内容的 SHA-256。内容一改，revision 就变，旧的审查结论随之失效 |
 | 晋级 | 把已接受的 Proposal 按锚点插进能力图，并补上它的 Spec 和 Plan |
 | 收尾 | 晋级证明为 `proved` 后，经授权在 Proposal 事项上写一条带稳定标记的记录、把阶段改成 `promoted` 并关闭它。关闭只说明**设计决定已落地**，不代表模块已交付 |
+| 检查点 | todo 里以 `Checkpoint` 或 `检查点` 开头、或冒号前标了级别的待办项，例如 `Checkpoint 1（report）`、`最终验收（gate）`。级别分 `gate` 与 `report` |
+| gate | 要停下等你确认的检查点。没标级别时，todo 里最后一个检查点（最终验收）按 `gate`；推送与不可逆操作须标 `gate`。实现阶段的阶段提示用 `Next gate` 写出下一个 |
+| report | 不停下的检查点：agent 把验证结果记进 todo 后直接继续。没标级别的中间检查点按 `report` |
+| 激活信号 | hook 出声的条件，有其一即可：`CLAUDE.md`／`AGENTS.md` 里独占一行的约定块开始标记，或含 `activeModule` 的 `.agent/state.json`。都没有时完全静默（只有本地事项账本的项目只出账本提醒） |
+| 零足迹模式 | 项目里没有约定块、只有含 `activeModule` 的 `.agent/state.json`，hook 照样激活。`teardown-convention --keep-state` 会留下这种状态 |
+| 停点规则 | 交审怎么呈现、最终验收列哪几张表这类规则，在 `references/node-rules.md` 分五节（能力图审阅、Spec 交审、Plan 交审、中途 gate、最终验收）；到了对应节点，阶段提示把那一节原文附在末尾 |
+| 预先声明 | Plan 里可选的一节 `## 预先声明`：列出要改的公共路径、外部依赖、质量与工作区配置、补丁；批准 Plan 即授权这些改动，之后不再逐次问。删除文件、改对外契约、安全例外不能预先声明。`verify-artifacts` 校验格式 |
+| 并行边界 | `moduleConcurrency` 为 `on` 时，每个未完成模块的 Spec 里的一节 `## 并行边界`：写明独占哪些路径、预计碰哪类公共文件。`verify-artifacts` 校验格式，最终验收时标出改到边界外的文件 |
+| Build order 逗号组 | Build order 里用逗号分开的几个模块，例如 `a → b, c → d` 里的 `b, c`，表示可以同时进行。并行开关不是 `on` 时，按从左到右逐个推进 |
+| 自治档位 | `.agent/config.json` 的 `autonomyTier`（`strict` 默认、`standard`、`relaxed`），给 module-crew 用：各档放开什么由它定义，spec-guard 只存、读、报告来源，自己的停点不随它变。任何档位下能力图、Spec 与最终验收都要你批准 |
+| Epiq | 本地事项账本用的开源事项工具（[epiq](https://github.com/ljtn/epiq)，MIT），以 MCP 方式接入 Claude Code／Codex；账本数据在项目的 `.epiq/` 与 `__epiq_state__` 状态 worktree 里 |
