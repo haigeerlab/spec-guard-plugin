@@ -16,6 +16,20 @@
 - [x] Task 5：README 中英（AC1、AC9） — 「快速开始」末尾加上手文档入口；导航使用者一组首行加上手文档；原「常用命令」（6 条）改为「功能一览」，按 6 组列全 25 条命令
   （与其另起一节重复列出常用的 6 条，不如合成一处；偏离 AC9「新增」的字面，最终验收说明）；多模块并行一节加「spec-guard 不依赖 module-crew，没装时开关只打开规划层规则」，不写安装（module-crew 无公开仓库）。
   英文版同结构；`check-readme-sync.py` 通过；没有别处引用旧锚点 `#常用命令`；链接检查 0 处问题。
-- [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
-- [ ] Task 6：新手测试复跑（AC10）
+- [x] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动） — `validate.sh` 通过；`test-phase-guard.sh` 507 例、`test-verify-artifacts.sh` 78 例通过；
+  链接检查（README 中英、getting-started、concepts、commands）0 处问题；`git diff --stat origin/main -- plugins/spec-guard` 为空。每个 task 提交前也各跑了一次完整 validate，均通过。
+- [x] Task 6：新手测试复跑（AC10） — 派 sonnet 只读子代理，只给 README 路径、禁读源码与维护者文档。它照文档为「个人书签管理」写的能力图（`bookmark-store` → `bookmark-search` → `bookmark-cli`）
+  放进新临时项目跑 `verify-artifacts.sh`：3 通过 · 0 警告 · 0 失败（第一次 `cp` 被交互确认拦下没覆盖，改用 `/bin/cp -f` 并 `cmp` 确认后重跑）。
+  三样东西都找到：端到端例子在 getting-started「例子：记事工具 note-app」第 1～9 步；谁做什么在「你做什么，agent 自动做什么」（12 行，它评「够用」）；选用指引在「可选能力：什么时候开」。
+  Codex 用户「知道」该说什么，举了命令对照里的「用 spec-guard-ops 查看阶段」。
+  新发现（只列出，不在本模块处理）：
+  1. README 前置条件没给 agent-skills 的安装命令，也没说 `/spec`、`/plan`、`/build` 来自它；
+  2. workflow.md 新项目第 4 步「把 activeModule 改成下一个模块」主语不明，和 getting-started「agent 按阶段提示改」对不上；
+  3. 没装协作插件时哪些话算批准没有明确列表（「批准」算、「继续」不算）；
+  4. 「推送与不可逆操作须标 gate」时，新手不知道自己的检查点算不算不可逆；
+  5. 阶段名是英文、提示正文是中文，没有解释；
+  6. `/map` 输出的图例（🟢、○、折叠的「1 个未就绪」）没解释；
+  7. 未启用账本时 `ticket` 会怎样没说；
+  8. getting-started 叙述用 `/spec`、`/plan`、`/build`，Codex 里怎么对应没提；
+  9. 停点规则原文被省略，看不到交审消息的实际样子；没演示驳回或批准后修订；Proposal、文档治理的「该开」判断偏抽象。
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
