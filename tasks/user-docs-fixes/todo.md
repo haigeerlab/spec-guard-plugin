@@ -9,6 +9,9 @@
   README 功能一览 ticket 一行补一句并链过去。
 - [x] Task 3：`docs/workflow.md` 的批准与 gate（AC4、AC5） — 「批准要留下记录」加「什么算批准」：照 workflow-checkpoints「批准标记」13-15 行（明确批准才算，含糊的「继续」「看起来可以」不算，先问清楚；来源以协作插件为准）；
   「少停、该停的照停」加不可逆或高风险清单，照 node-rules「Plan 交审」停下清单原文（推送、发布、删除工作区外的文件、改全局配置、外发凭据、全局安装、下载脚本直接执行）。
-- [ ] Task 4：上手文档（AC6、AC7、AC9、AC10）
+- [x] Task 4：上手文档（AC6、AC7、AC9、AC10） — AC6 写在页首语言说明处：阶段名不翻译，因为 `/map --json` 顶层 `stage` 用同样的名字（对例子项目实跑 `map_view.py --json` 得 `NEEDS_SPEC`）；
+  没用 config 说明里「结构关键字」那张清单（清单里没有阶段名），按实际读取方写。AC7：第 8 步后补图例链接（`commands.md#spec-guardmap`）、默认折叠与 `--all`、
+  「判断不了」因为没有上游分支（`map_view.py` 114-117、580-581 行）。AC9：「先弄清」一节加 Codex 对应表，取自 agent-skills 的 `.claude/commands/{spec,plan,build}.md` 第 5 行与 `docs/codex-setup.md` 25、35 行。
+  AC10：第 3 步后加 Spec 交审消息示意，按 node-rules「Spec 交审」小项与顺序，标明不是实跑输出。AC4 的链接：第 4 步链到 workflow「什么算批准」。链接检查 0 处问题。
 - [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
