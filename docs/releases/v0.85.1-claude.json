@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:e9896cb57e527b39e0de0368f186cbfa3b79e408"
+      },
+      "observedAt": "2026-10-28T09:13:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.85.0 to 0.85.1; installed_plugins.json records version 0.85.1 and gitCommitSha e9896cb (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; its commands/config.md description lists the autonomy tier and skills/spec-guard-ops/SKILL.md no longer contains 'from this version' (facts this release changes)",
+        "result:claude -p (Claude Code 2.1.311) in a temporary project with a pending Spec: the UserPromptSubmit injection in the session transcript was the full phase hint at NEEDS_PLAN with the pending-approval line"
+      ]
+    }
+  ]
+}

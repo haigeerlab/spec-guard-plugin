@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:e9896cb57e527b39e0de0368f186cbfa3b79e408"
+      },
+      "observedAt": "2026-10-28T09:13:00Z",
+      "evidence": [
+        "result:the v0.85.1 annotated tag resolves to merge commit e9896cb57e527b39e0de0368f186cbfa3b79e408 (pull request #422, which carries the version bump; #421 feature-guidance-examples merged before it at 153a828); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 40658715253)",
+        "result:two modules (0.85.1 documentation wrap-up): feature-guidance-examples (getting-started guidance rows, docs only) and config-text-fixes (commands/config.md and skills/spec-guard-ops/SKILL.md wording: 'from this version' -> '0.84.0'; config description lists the autonomy tier); plugin behaviour unchanged; interface.json stays 1.11; also ships the docs and maintainer-tool changes merged since 0.85.0 (#417-#421)",
+        "result:on the branch before merge (HEAD 64750995, same plugin tree as the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 507 cases passed, verify-artifacts 78 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean on every .sh at quick-tier-doc-regressions (no .sh changed since)"
+      ]
+    }
+  ]
+}
