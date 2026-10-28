@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.2` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 

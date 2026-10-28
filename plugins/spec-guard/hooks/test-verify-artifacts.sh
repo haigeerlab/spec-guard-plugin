@@ -304,6 +304,11 @@ check "Spec 批准后被改只警告" 0 "spec/alpha.md 在批准后已修订，�
 rv_project review-fenced
 printf '# Spec: alpha\n\n```text\n%s\n%s\n```\n' "$RV_PENDING" "$RV_PENDING" > "$PROJECT/spec/alpha.md"
 check_absent "围栏代码块里的示例不算标记" "批准标记"
+rv_project review-fenced-nested
+printf '# Spec: alpha\n\n````text\n```\n%s\n%s\n````\n' "$RV_PENDING" "$RV_PENDING" > "$PROJECT/spec/alpha.md"
+check_absent "代码块（4 包 3）里的示例不算标记" "批准标记"
+printf '%s\n%s\n' "$RV_PENDING" "$RV_PENDING" >> "$PROJECT/spec/alpha.md"
+check "代码块（4 包 3）外的重复标记照常判无效" 1 "批准标记无效：spec/alpha.md"
 rv_project review-helper-fails; rv_approve both
 mkdir -p "$WORK/review-fails"
 cat > "$WORK/review-fails/python3" <<'SH'

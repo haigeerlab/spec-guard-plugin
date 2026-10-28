@@ -287,6 +287,14 @@ class ProposalSubmitTests(unittest.TestCase):
         self.assertEqual(outside_baseline(final), outside_baseline(original))
         parse_proposal(draft)
 
+    def test_fence_closes_only_on_a_matching_bare_fence(self):
+        import proposal_submit
+        for name, opener, inner in (("shorter fence inside a longer one", "````markdown", "```"),
+                                    ("info string is not a closing fence", "```markdown", "```python")):
+            with self.subTest(name):
+                lines = [opener, inner, "## Capability map baseline", opener[:len(opener) - len("markdown")], "## Change"]
+                self.assertEqual(list(proposal_submit._headings(lines)), [(4, "Change")])
+
     def test_confirm_writes_only_the_draft_and_is_idempotent(self):
         draft = self.write_draft(draft_text())
         code, preview, err = self.run_submit()

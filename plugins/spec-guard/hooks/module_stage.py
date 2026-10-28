@@ -16,7 +16,7 @@ import subprocess
 import sys
 import zlib
 
-from capability_map import MODULE_ID, MapError, parse_map
+from capability_map import MODULE_ID, MapError, _visible_lines, parse_map
 from checkout_role import role as checkout_role_of
 from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
@@ -34,7 +34,6 @@ REVIEW_APPROVED = "<!-- spec-guard: review approved -->"
 # plugin-interface: published in interface.json; scripts/check-interface.py keeps the two in step.
 REVIEW_STATES = ("none", "pending", "approved", "revised", "invalid")
 REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]{12}) -->")
-FENCES = ("```", "~~~")
 _DIGEST_MODULE = None
 
 
@@ -44,18 +43,8 @@ def review_approved_line(digest: str) -> str:
 
 def review_marker_lines(text: str) -> list:
     """Indexes (into `splitlines(keepends=True)`) of the marker lines.  A fenced code block holds examples, not markers."""
-    found, fence = [], None
-    for index, line in enumerate(text.splitlines(keepends=True)):
-        stripped = line.strip()
-        opener = stripped[:3] if stripped[:3] in FENCES else None
-        if fence:
-            if opener == fence:
-                fence = None
-        elif opener:
-            fence = opener
-        elif stripped.startswith(REVIEW_PREFIX):
-            found.append(index)
-    return found
+    return [index for index, line in enumerate(_visible_lines(text.splitlines(keepends=True)))
+            if line.strip().startswith(REVIEW_PREFIX)]
 
 
 def _review_split(text: str) -> tuple:

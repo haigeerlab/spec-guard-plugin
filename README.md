@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.2` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 

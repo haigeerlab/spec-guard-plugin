@@ -59,17 +59,10 @@ def _marker_line(lines):
 
 def _headings(lines):
     """Yield (index, title) for `## ` headings outside fenced code blocks."""
-    fence = None
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if fence is None and stripped.startswith(("```", "~~~")):
-            fence = stripped[:3]
-        elif fence is not None and stripped.startswith(fence):
-            fence = None
-        elif fence is None:
-            match = HEADING.match(stripped)
-            if match:
-                yield index, match.group(1)
+    for index, line in enumerate(_visible_lines(lines)):
+        match = HEADING.match(line.strip())
+        if match:
+            yield index, match.group(1)
 
 
 def _baseline_section(remote, snapshot, map_path):
