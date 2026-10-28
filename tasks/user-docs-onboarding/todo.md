@@ -8,7 +8,8 @@
   偏离 Plan 决定 2：除路径换成 `<项目目录>` 外，另删「外部审查（delegate）」一行（只在装了 delegate 时出现）、停点规则原文用一句代替，页首写明这三处处理。
   一行摘要的写法用 `module_stage.brief_line` 对例子项目实际生成后贴入（我起初手拼的少了反引号和「未勾选」）。/spec 与能力图关系核对 `docs/upstream-analysis.md` 3.3 节与 `templates/CAPABILITY-MAP.md`；链接检查 0 处问题。
   发现（先问，未改）：user-docs-align 写进 `docs/troubleshooting.md`「只看到一行 spec-guard 提示」的例子格式不对，同样少了反引号和「未勾选」。
-- [ ] Task 3：`docs/concepts.md` 术语（AC7）
+- [x] Task 3：`docs/concepts.md` 术语（AC7） — 术语表末尾加 11 条，已有条目未改。核对：workflow-checkpoints「Plan 检查点分级」（61-63 行）、「并行边界」（353 行起）、331 行逗号组与 `templates/CAPABILITY-MAP.md` 的串行展开注释；
+  激活信号对 `docs/workflow.md`；零足迹对 `commands/teardown-convention.md` 52-56 行；停点规则对 `references/node-rules.md` 五节；预先声明对 workflow-checkpoints 77-81 行；Epiq 对 `references/local-ticket-ledger-runtime.md` 4、19 行。
 - [ ] Task 4：`docs/commands.md` 的 Codex 话术（AC8）
 - [ ] Task 5：README 中英（AC1、AC9）
 - [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
