@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:742081a61bbf6324452e3b7011f5c8240d89cf2a"
+      },
+      "observedAt": "2026-10-28T13:59:00Z",
+      "evidence": [
+        "result:the v0.85.2 annotated tag resolves to merge commit 742081a61bbf6324452e3b7011f5c8240d89cf2a (pull request #425, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 40699575932)",
+        "result:one module (fence-pairing-fixes): documentation_baseline._visible_lines, module_stage.review_marker_lines and proposal_submit._headings now close a fenced code block only on a matching bare fence (same character, not shorter, only whitespace after) by reusing capability_map._visible_lines; interface.json unchanged; also ships the Codex 0.164 hook re-approval docs merged since 0.85.1 (#424)",
+        "result:all 327 Spec/Plan files in this repository compared between main's old review_marker_lines and the new one: 0 differences in review_state and marker line indexes (approved 170, none 153, revised 4)",
+        "result:on the branch before merge (HEAD 3826b00c, same plugin tree as the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 509 cases passed, verify-artifacts 80 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean on the two changed .sh files"
+      ]
+    }
+  ]
+}

@@ -9,4 +9,4 @@
 - [x] Checkpoint 1（report）：发布前完整检查（AC5） — 主机 macOS 15.7.3 arm64，系统 `/bin/bash` 3.2.57，HEAD `3826b00c`（verify-and-commit 完整档）：`validate.sh` 通过；phase-guard 509 例、verify-artifacts 80 例通过（各比 0.85.1 多 2 例）；
   两份改过的 `.sh` 按 CI 的参数（`shellcheck@4.1.0 -S warning`）无告警；`evals/codex-plugin-smoke.sh --selftest` 通过；仓库产物校验 0 失败、5 条警告（4 条是已有模块批准后修订，1 条是本模块 Spec 无并行边界一节）。
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么、AC1～AC5 证据（macOS 系统 bash）、改动与提交表、Spec 未改、ShellCheck 说法补上参数；用户回复「fence-pairing-fixes 验收通过」，合并后按 Spec Q3 A 发版。
-- [ ] 发版（合并后按 Q3 A 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、关闭账本 B5WE8BZ（AC6）
+- [x] 发版（合并后按 Q3 A 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、关闭账本 B5WE8BZ（AC6） — 2026-10-28：#425 merged==true、main==`742081a6` 后打 v0.85.2；发布包 sha256 `b60ca95f…e811`（670063），Release 为 latest；Claude、Codex 安装副本均与发布包一致；Claude `claude -p` 实测代码块（4 包 3）里的示例标记不算、外面的真标记照常提示；Codex 升级后用户在 /hooks 重新批准，smoke 首次即返回 0；Proposal 收尾扫描 pending 为空；证据见 `docs/releases/v0.85.2-*.json`；账本 B5WE8BZ 在收尾 PR 合并后关闭。

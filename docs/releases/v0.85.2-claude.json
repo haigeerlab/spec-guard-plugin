@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.85.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:742081a61bbf6324452e3b7011f5c8240d89cf2a"
+      },
+      "observedAt": "2026-10-28T13:59:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.85.1 to 0.85.2; installed_plugins.json records version 0.85.2 and gitCommitSha 742081a (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; its hooks/module_stage.py and hooks/documentation_baseline.py import _visible_lines from capability_map and FENCES is gone (facts this release changes)",
+        "result:claude -p (Claude Code 2.1.311) in a temporary project whose spec/alpha.md holds a pending marker only inside a ````text fence wrapping a ``` line: the UserPromptSubmit injection was the phase hint at NEEDS_PLAN with no Review line; after adding a real pending marker outside the fence the injection carried 'Spec `spec/alpha.md` is awaiting the user's review.'"
+      ]
+    }
+  ]
+}
