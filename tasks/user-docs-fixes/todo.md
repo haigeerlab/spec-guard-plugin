@@ -7,7 +7,8 @@
   均取自 `gh api repos/addyosmani/agent-skills/readme`（默认分支 main，2026-10-28 读取：README 75-79、179-188 行）与 `docs/codex-setup.md` 25、35 行，页内标注读取日期并链到其 Quick Start；
   账本未启用时 ticket 的行为写在 optional-features 账本一节，取自 `commands/ticket.md` 第 10-14 行与 `skills/ticket/SKILL.md` 96-98、48 行（只读诊断、一条下一步、不写、保持待入账）；
   README 功能一览 ticket 一行补一句并链过去。
-- [ ] Task 3：`docs/workflow.md` 的批准与 gate（AC4、AC5）
+- [x] Task 3：`docs/workflow.md` 的批准与 gate（AC4、AC5） — 「批准要留下记录」加「什么算批准」：照 workflow-checkpoints「批准标记」13-15 行（明确批准才算，含糊的「继续」「看起来可以」不算，先问清楚；来源以协作插件为准）；
+  「少停、该停的照停」加不可逆或高风险清单，照 node-rules「Plan 交审」停下清单原文（推送、发布、删除工作区外的文件、改全局配置、外发凭据、全局安装、下载脚本直接执行）。
 - [ ] Task 4：上手文档（AC6、AC7、AC9、AC10）
 - [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
