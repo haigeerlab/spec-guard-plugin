@@ -60,6 +60,16 @@ class DocumentationBaselineTests(unittest.TestCase):
 """)
         self.assertEqual(baseline.state, "valid")
 
+    def test_fence_closes_only_on_a_matching_bare_fence(self):
+        example = """| Concern | Authority | Status | Rationale |
+|---|---|---|---|
+| product-direction | `example.md` | pending | Example only. |
+"""
+        for name, fenced in (("shorter fence inside a longer one", "````markdown\n```\n" + example + "````\n"),
+                             ("info string is not a closing fence", "```markdown\n```python\n" + example + "```\n")):
+            with self.subTest(name):
+                self.assertEqual(self.write(VALID_BASELINE + "\n" + fenced).state, "valid")
+
     def test_broken_symlink_is_invalid_not_absent(self):
         self.path.symlink_to(self.path.parent / "missing.md")
         with self.assertRaisesRegex(BaselineError, "regular file"):

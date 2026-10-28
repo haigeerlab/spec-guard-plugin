@@ -199,6 +199,25 @@ class DocumentationVerificationTests(unittest.TestCase):
         self.committed_then_changed()
         self.assertEqual(verify_documentation(self.root, "alpha").state, "ready")
 
+    def test_fence_closes_only_on_a_matching_bare_fence(self):
+        example = """| Concern | Outcome | Evidence | Rationale |
+|---|---|---|---|
+| architecture | pending | — | Example only. |
+"""
+        for name, fenced in (("shorter fence inside a longer one", "````markdown\n```\n" + example + "````\n"),
+                             ("info string is not a closing fence", "```markdown\n```python\n" + example + "```\n")):
+            with self.subTest(name):
+                self.project("""
+## Documentation outcome
+
+| Concern | Outcome | Evidence | Rationale |
+|---|---|---|---|
+| architecture | delivered | `docs/architecture.md#alpha` | Boundary added. |
+
+""" + fenced)
+                self.committed_then_changed()
+                self.assertEqual(verify_documentation(self.root, "alpha").state, "ready")
+
 
 CHAIN_BASELINE = """| Concern | Authority | Status | Rationale |
 |---|---|---|---|

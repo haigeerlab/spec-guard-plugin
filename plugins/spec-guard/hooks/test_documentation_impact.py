@@ -153,6 +153,18 @@ class DocumentationImpactTests(unittest.TestCase):
 """)
         self.assertEqual(parse_impact(self.root, "alpha").state, "valid")
 
+    def test_fence_closes_only_on_a_matching_bare_fence(self):
+        example = """| Concern | Decision | Rationale |
+|---|---|---|
+| product-direction | pending | Example only. |
+"""
+        for name, fenced in (("shorter fence inside a longer one", "````markdown\n```\n" + example + "````\n"),
+                             ("info string is not a closing fence", "```markdown\n```python\n" + example + "```\n")):
+            with self.subTest(name):
+                self.valid_project()
+                self.write("spec/alpha.md", SPEC + "\n" + fenced)
+                self.assertEqual(parse_impact(self.root, "alpha").state, "valid")
+
     def test_cli_reports_absent_valid_and_invalid_without_writing(self):
         output = io.StringIO()
         with redirect_stdout(output):

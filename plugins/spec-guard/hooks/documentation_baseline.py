@@ -3,6 +3,8 @@ import argparse
 import json
 from pathlib import Path
 
+from capability_map import _visible_lines  # noqa: F401 -- re-exported to documentation_impact/verification
+
 
 UNIVERSAL_CONCERNS = frozenset((
     "product-direction", "architecture", "developer-entry",
@@ -38,23 +40,6 @@ def _cells(line):
     if text.endswith("|"):
         text = text[:-1]
     return [cell.strip() for cell in text.split("|")]
-
-
-def _visible_lines(lines):
-    visible = []
-    fence = None
-    for line in lines:
-        marker = line.lstrip()
-        if fence:
-            if marker.startswith(fence):
-                fence = None
-            visible.append("")
-        elif marker.startswith(("```", "~~~")):
-            fence = marker[:3]
-            visible.append("")
-        else:
-            visible.append(line)
-    return visible
 
 
 def _authority(value):
