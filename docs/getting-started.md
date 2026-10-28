@@ -411,10 +411,10 @@ Capability Map: note-app · 3 个模块 · ✅ 1 🔨 0 ⏸ 0 ⛔ 0 🟢 1 ○ 1
 
 | 能力 | 该开 | 别开 | 怎么开 |
 |---|---|---|---|
-| Proposal | 要在 Issue 上留下审查与接受的记录，或要多人确认一个新模块 | 新项目（还没有能力图）；个人项目、需求已经理顺 | 登录 `gh`／`glab`，按[使用流程](workflow.md#proposal需要留痕时)的四步走 |
+| Proposal | 要在 Issue 上留下「谁审查、谁接受了这个新模块」的记录。判断方法：事后有人会问「这个模块是谁批准加的」吗？例如需求是别的团队提的、要能查到是谁在 Issue 上接受的；或者一个新模块要几位维护者都点头 | 新项目（还没有能力图）；自己或小团队的项目、需求已经理顺，没人需要事后查批准记录——用快速插入，一次预览、一次确认就够了 | 登录 `gh`／`glab`，按[使用流程](workflow.md#proposal需要留痕时)的四步走 |
 | 本地事项账本 | 没有 GitHub/GitLab Issue 可用，想在本地记 bug 和需求；想让「有人在等的事」在会话清空后还找得回 | 已经在用 GitHub/GitLab Issue；不在 macOS 上 | `/spec-guard:local-ticket-ledger`，需要 macOS 与 Node.js 18+，见[可选能力](optional-features.md#本地事项账本) |
 | 多模块并行 | 模块多、彼此独立，想让几个会话同时各做一个 | 模块依赖成一条链；团队里还有人用 0.68.0 以前的版本 | `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`；开会话、建 worktree、合并这些运行层的事归 module-crew，见 [README](../README.md#多模块并行可选) |
-| 文档治理 | 需求文档、架构文档本身也要交付、要审查 | 文档只是代码的附带说明 | `/spec-guard:documentation-baseline` 建 `docs/DOCUMENTATION-BASELINE.md`，见[可选能力](optional-features.md#文档治理) |
+| 文档治理 | 需求文档、架构文档或使用手册本身也是交付物、也要审查。判断方法：改一个功能时，是不是必须同步改某份文档、并让人审过它？例如项目有对外的 API 文档或使用手册，每次改功能都要跟着改；或者需求文档是验收的依据 | 文档只是代码的附带说明：只有 README 和代码注释，没人单独审文档 | `/spec-guard:documentation-baseline` 建 `docs/DOCUMENTATION-BASELINE.md`，见[可选能力](optional-features.md#文档治理) |
 | 项目指向 | 会话开在需求文档之类的目录，实际改的是别处的仓库 | 能直接在项目目录里开会话 | `/spec-guard:link-project set --project <路径>` |
 | 挂起 | 已开工的模块剩下的都在等外部条件（例如上线后观察一周），想先做别的 | 模块还没开工（直接调整 Build order 或用 `add-module --interrupt` 插队） | `/spec-guard:module-suspend --suspend <模块> --reason "<原因>"` |
 
