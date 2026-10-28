@@ -45,8 +45,13 @@ ls .agent/
 
 ## 只看到一行 spec-guard 提示
 
-**现象**：阶段提示不是完整的一段，只有一行，例如 ``spec-guard: BUILDING · billing · 3 · 分支 `main`（状态未变，完整说明见此前的阶段提示）``
-（英文提示为 `(unchanged; see the earlier phase hint for details)`）。
+**现象**：阶段提示不是完整的一段，只有一行，例如：
+
+```text
+spec-guard: BUILDING · `billing` · 未勾选 3 · 分支 `main`（状态未变，完整说明见此前的阶段提示） <!-- spec-guard-state: 00000000 -->
+```
+
+英文提示的结尾是 `(unchanged; see the earlier phase hint for details)`。
 
 **原因**：这是正常的。状态和上一次完整提示相同时，hook 只给这一行，免得每轮重复同样的内容。新会话、压缩之后、
 读不到会话记录、状态变了、进入停点（交审、gate、最终验收）的那一轮，以及出诊断时，会给完整内容。

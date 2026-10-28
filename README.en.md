@@ -47,7 +47,11 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 ## Prerequisites
 
-- The [agent-skills](https://github.com/addyosmani/agent-skills) plugin;
+- The [agent-skills](https://github.com/addyosmani/agent-skills) plugin: `/spec`, `/plan` and `/build` come from it, not from spec-guard.
+  Its [README](https://github.com/addyosmani/agent-skills#quick-start) is the authority for installing it; when this was written (2026-10-28):
+  - Claude Code: `/plugin marketplace add addyosmani/agent-skills`, then `/plugin install agent-skills@addy-agent-skills`;
+  - Codex: `codex plugin marketplace add addyosmani/agent-skills`, then `codex plugin add agent-skills@agent-skills`. Codex has no such slash
+    commands; call the matching skill with `@`, for example `@spec-driven-development`;
 - `bash`, `git`, `python3` (3.9 or later; the one that ships with macOS is fine);
 - A host: Claude Code, or Codex (CLI or desktop app);
 - Optional: `gh` (GitHub) or `glab` (GitLab) logged in for the Proposal flow or hosted tickets; macOS and Node.js for
@@ -100,7 +104,7 @@ acceptance, with the stage hint the agent sees at every step, a table of what yo
 | | `/spec-guard:link-project` | Point a session whose folder is not the project at the actual project |
 | Adding requirements | `/spec-guard:add-module` | Insert a new requirement into the capability map as a module at a checkpoint (preview, then confirm) |
 | | `/spec-guard:proposal-submit`, `proposal-review`, `proposal-promotion-preflight`, `proposal-promotion-proof`, `proposal-closeout` | The Proposal flow when the decision must be on record in an Issue: submit, review, preflight, proof, closeout |
-| Tickets | `/spec-guard:ticket` | Record a bug or a request in plain language; the hosted flow when you choose GitHub/GitLab |
+| Tickets | `/spec-guard:ticket` | Record a bug or a request in plain language; the hosted flow when you choose GitHub/GitLab. Without the local ticket ledger enabled it only diagnoses and gives the step to enable it; see [optional features](docs/optional-features.md#本地事项账本) |
 | | `/spec-guard:local-ticket-ledger` | Inspect or enable the local ticket ledger |
 | | `/spec-guard:local-ticket-portability` | Verify, archive, restore or hand off local tickets |
 | | `/spec-guard:tracker-default` | Set the project's default ticket backend, used only to prefill previews |
