@@ -34,7 +34,7 @@ ls .agent/
   多一行 `Linked project`。其他命令也自动跟随指向，输出写明「本次操作的是被指向的项目」。
 - 有 `state.json.disabled`：确认要恢复后，把它改回 `.agent/state.json`。setup 在这种情况下会拒绝新建空状态，
   免得覆盖原来的 `activeModule`。
-- Claude Code：在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` hook，然后开新会话。
+- Claude Code：在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook，然后开新会话。
 
 **压缩后没有阶段注入**（0.61.0 起，上下文压缩后会多一次注入，末尾带一句压缩后的核对提醒）：
 
@@ -42,6 +42,16 @@ ls .agent/
   信任了仍没有注入时，重启 Codex：升级前就在运行的 Codex 不会加载新增的钩子。
 - 共用会话目录、各做不同项目时，会话要按会话登记自己的项目（`link-project set --session`），否则压缩后注入的是别的项目。
 - 压缩后提示的“下一项”来自 todo：任务做完就勾，否则提示的是旧的一项。
+
+## 只看到一行 spec-guard 提示
+
+**现象**：阶段提示不是完整的一段，只有一行，例如 ``spec-guard: BUILDING · billing · 3 · 分支 `main`（状态未变，完整说明见此前的阶段提示）``
+（英文提示为 `(unchanged; see the earlier phase hint for details)`）。
+
+**原因**：这是正常的。状态和上一次完整提示相同时，hook 只给这一行，免得每轮重复同样的内容。新会话、压缩之后、
+读不到会话记录、状态变了、进入停点（交审、gate、最终验收）的那一轮，以及出诊断时，会给完整内容。
+
+**解决**：不用处理。想看完整状态，运行 `/spec-guard:phase`。
 
 ## 阶段是 `MAP_INVALID`
 
@@ -118,12 +128,13 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 |---|---|
 | `` `.agent/state.json` 的 activeModule 不是有效的 module id `` | `activeModule` 的值不是能力图里的模块 id；按 Build order 取当前模块。改成正确的 id，或清空 |
 | `Project config: invalid (…)` | `.agent/config.json` 不可用，所有配置按默认处理；运行 `/spec-guard:config` 看问题代码 |
+| `Project config: ignored (…)`（中文提示为 `项目配置: 已忽略 (…)`） | `.agent/config.json` 里有不认识的键或取值不对的键，只有那个键按未设置处理，其余照常生效；常见于队友用了更新版本的 spec-guard。升级插件，或用 `/spec-guard:config` 查看后去掉那个键 |
 | `Paused: <模块>` | 有模块因插队被暂停，做完当前模块会回到它 |
 | `Review: Spec … is awaiting the user's review` | 当前模块的 Spec 或 Plan 标着待批准；你批准后让 agent 运行 `/spec-guard:review-mark` 记录 |
 | `Review: Spec … was edited after it was approved` | Spec 在批准后被改过；看过修订内容并批准后，重新运行 `/spec-guard:review-mark` |
 | `Review: the review marker in … is invalid` | 该文件的批准标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有批准标记时只指出这个检查点，并提醒尚未批准就先等批准 |
-| 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。0.57.1 之前的提示没有说明这一点，agent 可能把它放进带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可；升级到 0.57.1 后提示会要求代码块不带 shell 语言标签 |
+| 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。agent 把它放进了带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可 |
 | 升级插件后，命令的行为还是旧版本的（例如新加的参数报不认识） | Claude Code 在会话开始时定下插件目录，已开着的会话里命令仍调用旧版本的脚本。升级后重开会话；Codex 升级后开新会话，新增的钩子还要信任一次 |
 | `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。其他 spec-guard 命令也跟随它。如果这个会话做的是别的项目，用 `/spec-guard:link-project set --project <路径> --session <会话标识>` 给本会话登记自己的项目（本会话的登记优先于目录级指向），或把会话开在自己的项目目录里 |
 | `本次操作的是被指向的项目 …`（命令输出） | 会话目录有指向，命令跟随它操作了被指向的项目；不是你要的项目时同上一行给本会话登记 |
