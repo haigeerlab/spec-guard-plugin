@@ -18,6 +18,8 @@
 3. 运行过 teardown：`.agent/state.json` 被改名成了 `state.json.disabled`，约定块也删了。
 4. Claude Code 里还没信任 hook，或装好插件后没开新会话。
 5. Codex 里插件没安装或没启用（见下文“Codex 里没有 spec-guard”）。
+6. Codex 0.164 起，升级 spec-guard 后没有重新批准它的 hook。hook 的批准绑定在插件内容上，插件一变原来的批准就失效，
+   hook 被跳过、不报错。
 
 **检查**：
 
@@ -35,11 +37,14 @@ ls .agent/
 - 有 `state.json.disabled`：确认要恢复后，把它改回 `.agent/state.json`。setup 在这种情况下会拒绝新建空状态，
   免得覆盖原来的 `activeModule`。
 - Claude Code：在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook，然后开新会话。
+- Codex 0.164 起：启动命令行版 `codex`，在 `/hooks` 里批准 spec-guard 的 3 个 hook，然后开新会话（步骤见 README「更新与卸载」）。
+  桌面版可能不弹这个提示，所以批准要到命令行版里做。
 
 **压缩后没有阶段注入**（0.61.0 起，上下文压缩后会多一次注入，末尾带一句压缩后的核对提醒）：
 
-- Codex：升级后新增的 `SessionStart` 一项要单独信任一次，未信任时会被跳过、不报错；原有的 `UserPromptSubmit` 一项不受影响。
-  信任了仍没有注入时，重启 Codex：升级前就在运行的 Codex 不会加载新增的钩子。
+- Codex 0.164 起：每次升级后 3 个 hook 都要重新批准，包括原有的 `UserPromptSubmit`，未批准的会被跳过、不报错。
+  0.164 之前只有升级后新增的 `SessionStart` 一项要单独信任一次。批准了仍没有注入时，重启 Codex：升级前就在运行的 Codex
+  不会加载新增的钩子。
 - 共用会话目录、各做不同项目时，会话要按会话登记自己的项目（`link-project set --session`），否则压缩后注入的是别的项目。
 - 压缩后提示的“下一项”来自 todo：任务做完就勾，否则提示的是旧的一项。
 
@@ -140,7 +145,7 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Review: the review marker in … is invalid` | 该文件的批准标记多于一行或写法不符；运行 `/spec-guard:verify-artifacts` 查看，手工改成一行有效标记 |
 | `Next gate: …` | 实现阶段下一个要停下等你确认的检查点。Plan 已记为批准时，它之前的 task 与 `report` 检查点不停；Plan 没有批准标记时只指出这个检查点，并提醒尚未批准就先等批准 |
 | 点了 `/compact` 代码块的“运行”，终端报 `no such file or directory: /compact` | `/compact`、`/clear` 是发到对话消息输入框的斜杠命令，不是终端命令。agent 把它放进了带 `bash` 标签的代码块，宿主因此给了“运行”按钮。把这行复制到消息输入框发送即可 |
-| 升级插件后，命令的行为还是旧版本的（例如新加的参数报不认识） | Claude Code 在会话开始时定下插件目录，已开着的会话里命令仍调用旧版本的脚本。升级后重开会话；Codex 升级后开新会话，新增的钩子还要信任一次 |
+| 升级插件后，命令的行为还是旧版本的（例如新加的参数报不认识） | Claude Code 在会话开始时定下插件目录，已开着的会话里命令仍调用旧版本的脚本。升级后重开会话；Codex 升级后开新会话；Codex 0.164 起每次升级后都要在命令行版 `codex` 的 `/hooks` 重新批准 spec-guard 的 3 个 hook |
 | `Linked project: …` | 会话目录通过 `.agent/spec-guard-link.json` 指向了别处的项目；这一轮的阶段与位置行都是那个项目的。指向按目录生效：同一目录里的每个会话都会收到它。其他 spec-guard 命令也跟随它。如果这个会话做的是别的项目，用 `/spec-guard:link-project set --project <路径> --session <会话标识>` 给本会话登记自己的项目（本会话的登记优先于目录级指向），或把会话开在自己的项目目录里 |
 | `本次操作的是被指向的项目 …`（命令输出） | 会话目录有指向，命令跟随它操作了被指向的项目；不是你要的项目时同上一行给本会话登记 |
 | `本目录有指向文件 … 但它的格式无效` | 指向文件既不是版本 1（只含 `version` 与 `project`），也不是版本 2（含 `version`、`sessions`，可选 `project`）；`link-project unset --confirm` 后重新 `set` |
