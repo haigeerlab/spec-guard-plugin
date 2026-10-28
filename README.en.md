@@ -65,7 +65,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 |---|---|
 | `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.1` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | Open a new session |
+| Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
 For Codex, use the version of the [latest release](https://github.com/haigeerlab/spec-guard-plugin/releases) as `--ref`.
 
@@ -151,9 +151,21 @@ Self-check:
 Claude Code fixes the plugin directory when a session starts: without reopening, commands in an already open session
 keep calling the old version's scripts while the hook may already be the new one, so two versions mix.
 
-When Codex is upgraded from an older version, trust each newly added `SessionStart` hook once and restart Codex, or that
-injection is skipped without an error: coming from 0.60.x or earlier, the one injected after compaction; coming from
-0.68.x or earlier, also the one for session start and clear.
+From Codex 0.164, hook approval is bound to the plugin's contents: after every install or upgrade of spec-guard, its
+3 hooks (1 `UserPromptSubmit`, 2 `SessionStart`) must be approved again, or they are skipped without an error and the
+stage hint no longer appears. To approve:
+
+1. Start the command-line `codex` in a terminal; it reports that hooks need review ("Hooks need review");
+2. Open `/hooks` and approve spec-guard's 3 hooks;
+3. Open a new session. Reopen any session that was already open.
+
+The Codex desktop app may not show this prompt; if you use it and the stage hint is missing, approve under `/hooks` in
+the command-line `codex`. `codex plugin marketplace upgrade` updates every marketplace at once, so other plugins' hooks
+also show up in the list to approve.
+
+Before Codex 0.164, only a newly added `SessionStart` hook had to be trusted once, followed by a Codex restart: coming
+from 0.60.x or earlier, the one injected after compaction; coming from 0.68.x or earlier, also the one for session start
+and clear.
 
 In a project with an older convention block, preview `/spec-guard:setup-convention --replace --dry-run` after updating,
 and replace once you have confirmed. Keep your own rules inside the block's local section
@@ -233,7 +245,7 @@ Details: [design and architecture](docs/design.md) (Chinese).
 
 | Symptom | Check first |
 |---|---|
-| No stage hint appears | Has setup been run in this project? In Claude Code, is the hook trusted under `/hooks`? Did you open a new session after installing? |
+| No stage hint appears | Has setup been run in this project? In Claude Code, is the hook trusted under `/hooks`? From Codex 0.164, did you approve the hooks again under `/hooks` in the command-line `codex` after upgrading? Did you open a new session after installing? |
 | The stage is `MAP_INVALID` | Run `/spec-guard:verify-artifacts`; it points at what is wrong in the map, e.g. the header line of every module table when there is more than one |
 | The hint says python3 is unavailable or cannot run | Check that `python3 --version` is 3.9 or later and on the PATH the host starts with; the hint returns on the next turn once fixed |
 | spec-guard is missing in Codex | Run `codex plugin list` and check spec-guard is installed and enabled; after changing `ref`, run `codex plugin marketplace upgrade` |

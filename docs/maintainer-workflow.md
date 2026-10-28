@@ -117,8 +117,8 @@ codex plugin add spec-guard@spec-guard-marketplace
 
 若 `spec-guard-marketplace` 已指向一个发布版，不要在活跃会话中替换它来测试开发源码；应在
 隔离的 Codex 配置/机器中安装候选，或先明确备份并恢复原 marketplace。安装或升级后开启新会话，
-在 `/hooks` 查看并信任 `UserPromptSubmit`，再运行（Codex 桌面版不弹出钩子信任提示，信任只能在命令行版 `codex`
-里做；钩子命令一改，原来的信任就失效，要重新信任）：
+在 `/hooks` 查看并信任 spec-guard 的 3 个 hook，再运行（Codex 桌面版不弹出钩子信任提示，信任只能在命令行版 `codex`
+里做；钩子命令一改，原来的信任就失效，要重新信任，Codex 0.164 起插件内容任何改动都会让它失效）：
 
 ```bash
 /bin/bash evals/codex-plugin-smoke.sh \
@@ -127,7 +127,9 @@ codex plugin add spec-guard@spec-guard-marketplace
 ```
 
 退出码：`0` 为本次临时消费者项目的宿主机器记录含有效阶段注入，`1` 为已执行但输出无效，
-`2` 为未观察到执行或安装、登录、信任、来源不匹配。`codex exec --json` 未公开 hook 事件时，
+`2` 为未观察到执行或安装、登录、信任、来源不匹配。返回 `2` 时先查批准：Codex 0.164 起 hook 的批准绑定在插件内容上
+（`~/.codex/config.toml` 的 `[hooks.state]` 记着批准时的内容哈希），升级后 `codex exec` 会静默跳过未批准的 hook；
+启动命令行版 `codex`，若提示有 hook 需要审查（Hooks need review），在 `/hooks` 批准后重跑。`codex exec --json` 未公开 hook 事件时，
 smoke 只读取匹配本次 thread id 与项目路径的 Codex 会话记录；该宿主内部格式不可用或变化时保守返回 `2`。
 
 ## 提交前

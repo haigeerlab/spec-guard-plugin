@@ -180,6 +180,7 @@ if project and sessions and len(ids) == 1 and isinstance(ids[0], str) \
                 raise SystemExit(1)
 
 print("  ⏭  未观察到宿主 hook 事件或匹配的会话注入；模型复述不能证明 hook 执行")
+print("  提示: Codex 0.164 起升级插件后 hook 批准会失效、被静默跳过；启动命令行版 codex，在 /hooks 重新批准后重跑")
 types = sorted({event.get("type", "<missing>") for event in events
                 if isinstance(event, dict) and isinstance(event.get("type"), str)})
 if types:

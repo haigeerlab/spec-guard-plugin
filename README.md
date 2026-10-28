@@ -57,7 +57,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 |---|---|
 | `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.85.1` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
-| 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | 开新会话即可 |
+| 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
 Codex 的 `--ref` 填[最新发布版](https://github.com/haigeerlab/spec-guard-plugin/releases)的版本号。
 
@@ -140,7 +140,17 @@ Suggested next step: create `tasks/billing/plan.md` and `tasks/billing/todo.md` 
 Claude Code 在会话开始时就定下了插件目录：不重开会话，已开着的会话里命令仍调用旧版本的脚本，钩子却可能已是新版本，
 两个版本混用。
 
-Codex 从旧版升级时，新增的 `SessionStart` hook 要信任一次并重启 Codex，否则对应的注入会被跳过、不报错：从 0.60.x 或更早升级的，
+Codex 0.164 起，hook 的批准绑定在插件内容上：每次安装或升级 spec-guard 后，它的 3 个 hook（`UserPromptSubmit` 1 个、
+`SessionStart` 2 个）都要重新批准，否则会被跳过、不报错，阶段提示不再出现。做法：
+
+1. 在终端启动命令行版 `codex`，它会提示有 hook 需要审查（Hooks need review）；
+2. 进入 `/hooks`，批准 spec-guard 的 3 个 hook；
+3. 开新会话。已经开着的会话要重开。
+
+Codex 桌面版可能不弹这个提示；用桌面版时没有阶段提示，就到命令行版 `codex` 的 `/hooks` 里批准。
+`codex plugin marketplace upgrade` 会一起更新所有 marketplace，其他插件的 hook 也会出现在待批准列表里。
+
+Codex 0.164 之前，只有新增的 `SessionStart` hook 要信任一次并重启 Codex：从 0.60.x 或更早升级的，
 是压缩后注入的那一项；从 0.68.x 或更早升级的，还有会话开始与清空后的那一项。
 
 已经装过旧版约定块的项目，更新插件后先预览 `/spec-guard:setup-convention --replace --dry-run`，确认后再替换。
@@ -208,7 +218,7 @@ Codex 从旧版升级时，新增的 `SessionStart` hook 要信任一次并重�
 
 | 现象 | 先检查 |
 |---|---|
-| 阶段提示没有出现 | 这个项目运行过 setup 吗？Claude Code 里在 `/hooks` 信任 hook 了吗？装好插件后开新会话了吗？ |
+| 阶段提示没有出现 | 这个项目运行过 setup 吗？Claude Code 里在 `/hooks` 信任 hook 了吗？Codex 0.164 起升级后在命令行版 `codex` 的 `/hooks` 重新批准了吗？装好插件后开新会话了吗？ |
 | 阶段是 `MAP_INVALID` | 运行 `/spec-guard:verify-artifacts`，它会指出能力图哪里不对，例如模块表多于一张时列出每张表头的行号 |
 | 提示说“python3 不可用”或“python3 无法运行” | 确认 `python3 --version` 是 3.9 以上，且宿主启动时的 PATH 里能找到它；修好后下一轮自动恢复 |
 | Codex 里没有 spec-guard | 运行 `codex plugin list`，确认 spec-guard 已安装且启用；改了 `ref` 后要 `codex plugin marketplace upgrade` |
