@@ -3,8 +3,8 @@
 `/spec-guard:setup-convention` 会往 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入下面这段约定，告诉 agent 多模块的目录
 规则。不运行 setup 的人，也可以照着它手工遵守。
 
-下面这段与 `plugins/spec-guard/templates/claude-block-local.md` 逐字节一致，由 `scripts/check-readme-sync.py` 检查；
-改模板时同步改这里。Codex 版本见 `plugins/spec-guard/templates/codex-block-local.md`。块里可以有一个本地段
+下面这段就是插件模板 `plugins/spec-guard/templates/claude-block-local.md` 的原文；Codex 版本见
+`plugins/spec-guard/templates/codex-block-local.md`。块里可以有一个本地段
 （`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`），`--replace` 与 teardown 都会保留其中的行，
 详见 [使用流程](workflow.md)。
 

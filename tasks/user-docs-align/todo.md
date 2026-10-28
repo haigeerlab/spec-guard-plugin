@@ -13,7 +13,10 @@
   「可以一次审完」两处加「你明确要求时」；补 AC 编号、中文检查点写法、验收表格与提交、复制块（CHANGELOG 0.74/0.81/0.80）；「项目级审查」压缩为三段并链到细则；Codex 说法两处统一为 spec-guard-ops。
   压缩时删去、细则里仍有的句子：Critical/Required/Optional 与优先级分开记、稳定发现编号与可恢复报告、审查冻结后「继续」的走向、`rootCauseReviewRequired` 人工核对、
   Proposal Issue 不能充当缺陷事项、旧远端 bridge 不恢复、关闭命令的 `verified` 不代替 CI 核对、后续批次改选目标不迁移（见 workflow-checkpoints 17-27 行与 hosted-ticket-workflow）。
-- [ ] Task 4：concepts、troubleshooting、convention-block（AC5、AC6、AC7、AC8、AC16、AC18、AC19）
+- [x] Task 4：concepts、troubleshooting、convention-block（AC5、AC6、AC7、AC8、AC16、AC18、AC19） — concepts 设计原则 Proposal 一行如实写读取只读、晋级写能力图、收尾经授权改标签并关闭
+  （核对 `module-insert.py --confirm`、proposal-closeout 命令）；troubleshooting 新增「只看到一行 spec-guard 提示」（文案取自 `module_stage.brief_line` 844 行）、
+  `Project config: ignored` 一行（`module_stage.py` 413-414 行，中英两种写法）、hook 信任改为三项（`hooks/hooks.json`）、`/compact` 一行去掉 0.57.1 来历；
+  convention-block 去掉同步脚本说明。Codex 说法 troubleshooting 开头已是「用 spec-guard-ops …」，未改。
 - [ ] Checkpoint 1（report）：整体检查（validate、链接、AC22）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 
