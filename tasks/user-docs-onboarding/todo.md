@@ -32,4 +32,4 @@
   7. 未启用账本时 `ticket` 会怎样没说；
   8. getting-started 叙述用 `/spec`、`/plan`、`/build`，Codex 里怎么对应没提；
   9. 停点规则原文被省略，看不到交审消息的实际样子；没演示驳回或批准后修订；Proposal、文档治理的「该开」判断偏抽象。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么（含与 Plan 的三处差异）、AC1～AC11 逐条证据、文档与其他改动表、6 个提交、Spec 未改、新手测试的 9 条新发现；用户回复「user-docs-onboarding 验收通过」。
