@@ -1,7 +1,8 @@
 # 命令参考
 
 spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用，
-对照见文末的[命令对照](#命令对照)。每条命令的完整说明以 `plugins/spec-guard/commands/<命令>.md` 为准。
+对照见文末的[命令对照](#命令对照)。这一页面向使用者，写的是参数、效果和你会看到什么；agent 执行命令时另有更细的步骤，
+你不需要去读。
 
 几条共同规则：
 
@@ -39,7 +40,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:phase`
 
-查看当前阶段、当前模块、全局计数与建议的下一步（与每轮自动注入的内容相同）。没有输出表示这个项目没装约定。
+查看当前阶段、当前模块、全局计数与建议的下一步，总是给完整内容。没有输出表示这个项目没装约定。
+
+每轮自动注入的阶段提示平时只有一行：`spec-guard: <阶段> · <模块> · <未勾选数> · <分支>`，表示状态和上一次完整提示时相同。
+新会话、压缩之后、读不到会话记录、状态变了、进入停点（交审、gate、最终验收）那一轮，以及出诊断时，给完整内容。
 
 | 阶段 | 含义 |
 |---|---|
@@ -54,16 +58,30 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `UNKNOWN` | 阶段无法计算（例如任务文件读不了） |
 
 当前模块取 `.agent/state.json` 的 `activeModule`，否则取 Build order 里第一个未完成的模块。其他可能出现的行：
-`Location:`（分支与 worktree）、`Paused:`（插队时被暂停的模块）、`Suspended:`（挂起的模块）、上下文接近窗口上限时的
-`/compact`／`/clear` 提醒。
+`Location:`（分支与 worktree）、`Paused:`（插队时被暂停的模块）、`Suspended:`（挂起的模块）、`Linked project`（项目指向）、
+`Project config`（配置无效或有键被忽略）、模块边界提醒。模块边界提醒只在模块之间（`MODULE_DONE`、`DONE`）、会话上下文达到
+窗口 70% 时出现，建议 `/compact` 或 `/clear`；模块进行中不提醒。Claude 的会话记录不带窗口大小，只有读数超过 200k 时按 1M 窗口估算，
+否则不出这一行；读不到用量（例如新会话第一轮）也不出。
 
 ### `/spec-guard:verify-artifacts`
 
-校验已落地的产物：能力图存在并通过严格解析（唯一模块表、Build order、依赖）；`spec/` 下每个模块 Spec 都在能力图
-里；项目根目录没有 `SPEC*.md`。
+校验已落地的产物，逐项给出 ✅／⚠️／❌：
 
-- ❌ 是问题，逐条说明原因和改法，确认后再改；⚠️ 只是提醒（例如有 Plan 没 todo、`state.json` 里残留已退役的
-  `tracker` 字段）。
+| 检查 | 不通过时 |
+|---|---|
+| 能力图存在并通过严格解析（唯一模块表、Build order、依赖） | ❌（没有能力图只给 ⚠️） |
+| `spec/` 下每个模块 Spec 都在能力图里 | ❌ |
+| 项目根目录没有 `SPEC*.md` | ❌ |
+| `.agent/config.json` 有效 | 文件无效 ❌；只有不认识的键 ⚠️（已忽略） |
+| 有 Plan 没 todo 的模块 | ⚠️（按已完成计） |
+| 挂起标记 | 重复 ❌；已没有未勾选项 ⚠️ |
+| 批准标记 | 写法无效 ❌；批准后已修订、待批准却已有勾选 ⚠️ |
+| 并行边界格式（只在 `moduleConcurrency` 为 `on` 时） | 格式错 ❌；未完成模块的 Spec 缺这一节 ⚠️ |
+| Plan 的「预先声明」格式（有这一节时，不看并行开关） | ❌ |
+| 任务目录里 `plan.md`、`todo.md` 以外文件的未勾选项 | ⚠️（不计入阶段） |
+| `state.json` 里残留已退役的 `tracker` 字段 | ⚠️ |
+
+- ❌ 是问题，逐条说明原因和改法，确认后再改；⚠️ 只是提醒，不影响退出码。
 - 某部分写着“未验证”时不等于通过（例如 python3 不可用）。
 - 退出码 2：项目目录无法进入。没有能力图只给 ⚠️。
 
@@ -76,6 +94,11 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en` | 未设置 |
 | `reviewCadence` | `separate`／`combined` | `separate` |
 | `moduleConcurrency` | `off`／`on` | `off` |
+| `autonomyTier` | `strict`／`standard`／`relaxed` | `strict` |
+
+`autonomyTier`（自治档位）是给多模块协作插件 module-crew 用的：各档放开什么由它定义，spec-guard 只存、读、报告来源，自己的
+阶段提示和停点都不随它变，也不联动 `reviewCadence`。设置时要你在对话里说明设成哪一档；任何档位下，能力图、Spec 和最终验收
+都要你批准。团队都升级到 0.85.0 后再设。
 
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件本身坏了时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`；个别键有问题时只有那个键失效、其余照常，阶段提示多一行
@@ -164,7 +187,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 谁）、待批准、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见 [spec/map-view.md](../spec/map-view.md)），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`
