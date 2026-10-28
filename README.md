@@ -72,21 +72,35 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 
 **最短路径**：装插件 → 在项目里运行一次 setup → 正常和 agent 对话，跟着阶段提示走。
 
-完整流程、每个阶段的含义和两种加需求的方式见[使用流程](docs/workflow.md)。
+完整流程、每个阶段的含义和两种加需求的方式见[使用流程](docs/workflow.md)。第一次用，建议先看[上手：走完第一个模块](docs/getting-started.md)：
+用一个小例子从安装走到第一个模块验收，每一步都附 agent 收到的阶段提示，还有「你做什么、agent 做什么」对照表和可选能力的选用指引。
 
-## 常用命令
+## 功能一览
 
-| 命令（Claude Code） | 作用 |
-|---|---|
-| `/spec-guard:setup-convention` | 在项目里安装多模块约定；`--replace` 升级约定块，`--dry-run` 只预览 |
-| `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
-| `/spec-guard:verify-artifacts` | 校验能力图格式、模块与 Spec 的对应关系 |
-| `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
-| `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
-| `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
+| 类别 | 命令（Claude Code） | 作用 |
+|---|---|---|
+| 约定与阶段 | `/spec-guard:setup-convention` | 在项目里安装多模块约定；`--replace` 升级约定块，`--dry-run` 只预览 |
+| | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
+| | `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
+| | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记等产物 |
+| | `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
+| | `/spec-guard:review-mark` | 记录 Spec、Plan 的批准状态；你回复批准后由 agent 来用 |
+| | `/spec-guard:module-suspend` | 挂起或恢复在等外部条件的模块 |
+| | `/spec-guard:link-project` | 会话目录不是项目目录时，指向实际的项目 |
+| 加需求 | `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
+| | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | 需要在 Issue 上留痕时走 Proposal 流程：提交、审查、预检、证明、收尾 |
+| 事项 | `/spec-guard:ticket` | 用自然语言记 bug、需求；明确选 GitHub/GitLab 时走托管流程 |
+| | `/spec-guard:local-ticket-ledger` | 查看或启用本地事项账本 |
+| | `/spec-guard:local-ticket-portability` | 核验、归档、恢复或交接本地事项 |
+| | `/spec-guard:tracker-default` | 设置项目默认的事项后端，只用于预填预览 |
+| 文档治理与历史 | `/spec-guard:documentation-baseline`、`documentation-impact`、`documentation-verification` | 文档基线、模块的文档影响与交付核验 |
+| | `/spec-guard:history-integrity` | 核对旧版本留下的能力历史 |
+| 报告 | `/spec-guard:map` | 模块进度表：状态、审查、关键卡点 |
+| | `/spec-guard:cost-report` | 按 task 统计主代理与子代理的 token 与主会话轮次 |
+| 多模块并行 | `/spec-guard:checkout-role` | 并行开关打开时给每个 checkout 标角色 |
 
-Codex 不加载斜杠命令，同样的功能通过 skill 用自然语言调用（主要是 `spec-guard-ops`）。全部命令的参数、
-输出和 Codex 对照见[命令参考](docs/commands.md)。
+Codex 不加载斜杠命令，对 agent 说一句话即可，例如「用 spec-guard-ops 查看阶段」。每条命令的参数、输出和 Codex 里怎么说，
+见[命令参考](docs/commands.md)。
 
 ## 运行效果与自检
 
@@ -148,7 +162,8 @@ Codex 从旧版升级时，新增的 `SessionStart` hook 要信任一次并重�
 ## 多模块并行（可选）
 
 默认情况下 spec-guard 一次推进一个模块。模块多而且彼此独立时，可以让几个会话同时各做一个模块：spec-guard 负责**规划**，开会话、建 worktree、
-发消息、合并这些**运行**的事交给配套插件 module-crew。不打开开关时，下面这些都不出现，一切照旧。
+发消息、合并这些**运行**的事交给配套插件 module-crew。spec-guard 不依赖它：没装 module-crew 时，打开开关只得到下面这些规划层的规则。
+不打开开关时，下面这些都不出现，一切照旧。
 
 1. 用 `/spec-guard:config` 把 `moduleConcurrency` 设为 `on`（团队成员都升级到 0.68.0 以后再开，更早的版本会把整份配置判为无效；0.84.0 起遇到不认识的键只忽略那个键）。
 2. 能力图审阅时，agent 会多给一段并行评估：哪些模块可以写成 Build order 的逗号组、哪些值得往前挪。
@@ -200,6 +215,7 @@ Codex 从旧版升级时，新增的 `SessionStart` hook 要信任一次并重�
 
 **使用者**
 
+- [上手：走完第一个模块](docs/getting-started.md)：实跑的小例子、谁做什么、可选能力怎么选
 - [使用流程](docs/workflow.md)：从零到交付、两种加需求的方式
 - [命令参考](docs/commands.md)：全部命令的参数、输出与 Codex 对照
 - [故障排查](docs/troubleshooting.md)

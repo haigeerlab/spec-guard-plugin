@@ -13,7 +13,9 @@
 - [x] Task 4：`docs/commands.md` 的 Codex 话术（AC8） — 命令对照的 Codex 一列改为可直接说的话，表头改为「Codex（直接对 agent 说）」；每句点出 skill 名，动词对应 `spec-guard-ops/SKILL.md` 的小节
   （setup、teardown、phase and verify、tracker default、config、module-suspend、link-project、review-mark、checkout-role、add-module、documentation、proposal、history、map、cost report），
   本地事项对 `ticket`、`local-ticket-ledger-ops`、`local-ticket-portability` 的 description，会话协作对 agent-relay 的 collab skill。「skill 的 … 一节」写法 0 处；`check-command-table.py` 25 条命令都在。
-- [ ] Task 5：README 中英（AC1、AC9）
+- [x] Task 5：README 中英（AC1、AC9） — 「快速开始」末尾加上手文档入口；导航使用者一组首行加上手文档；原「常用命令」（6 条）改为「功能一览」，按 6 组列全 25 条命令
+  （与其另起一节重复列出常用的 6 条，不如合成一处；偏离 AC9「新增」的字面，最终验收说明）；多模块并行一节加「spec-guard 不依赖 module-crew，没装时开关只打开规划层规则」，不写安装（module-crew 无公开仓库）。
+  英文版同结构；`check-readme-sync.py` 通过；没有别处引用旧锚点 `#常用命令`；链接检查 0 处问题。
 - [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
 - [ ] Task 6：新手测试复跑（AC10）
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
