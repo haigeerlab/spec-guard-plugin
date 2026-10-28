@@ -200,24 +200,25 @@ git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一�
 
 ## 命令对照
 
-Codex 不加载插件的斜杠命令，对应功能通过 skill 调用，用自然语言描述要做的事即可。
+Codex 不加载插件的斜杠命令，对它说下面这些话即可；说法里点出 skill 名（多数是 `spec-guard-ops`），agent 会照那个 skill 里对应的一节去做。
+会写文件或远端的操作同样先给你看预览，你确认后才执行。
 
-| 功能 | Claude Code | Codex |
+| 功能 | Claude Code | Codex（直接对 agent 说） |
 |---|---|---|
-| 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | `spec-guard-ops` skill 的 setup、teardown 一节 |
-| 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | `spec-guard-ops` skill |
-| 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | `spec-guard-ops` skill 的 tracker default 一节 |
-| 查看或设置项目配置（产物语言、批准节奏、多模块并行开关） | `/spec-guard:config` | `spec-guard-ops` skill 的 config 一节 |
-| 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | `spec-guard-ops` skill 的 module-suspend 一节 |
-| 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | `spec-guard-ops` skill 的 link-project 一节 |
-| 记录 Spec 或 Plan 的批准状态 | `/spec-guard:review-mark` | `spec-guard-ops` skill 的 review-mark 一节 |
-| 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | `spec-guard-ops` skill 的 checkout-role 一节 |
-| 快速插入新模块 | `/spec-guard:add-module` | `spec-guard-ops` skill 的 add-module 一节 |
-| Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | `spec-guard-ops` skill 的 proposal 一节 |
-| 文档治理 | `/spec-guard:documentation-*` 三条命令 | `spec-guard-ops` skill |
-| 能力历史（verify 核对与迁移预览） | `/spec-guard:history-integrity` | `spec-guard-ops` skill 的 history 一节 |
-| 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | agent-relay 的 skill |
-| 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | `local-ticket-ledger-ops`、`ticket` skill |
-| 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | `local-ticket-portability` skill |
-| 模块进度表（含关键卡点） | `/spec-guard:map` | `spec-guard-ops` skill 的 map 一节 |
-| 模块成本报告 | `/spec-guard:cost-report` | `spec-guard-ops` skill 的 cost report 一节 |
+| 安装或移除约定 | `/spec-guard:setup-convention`、`/spec-guard:teardown-convention` | 「用 spec-guard-ops 在这个项目里安装约定」／「用 spec-guard-ops 移除这个项目的约定」 |
+| 查看阶段、校验产物 | `/spec-guard:phase`、`/spec-guard:verify-artifacts` | 「用 spec-guard-ops 查看阶段」／「用 spec-guard-ops 校验产物」 |
+| 查看或设置项目默认事项后端 | `/spec-guard:tracker-default` | 「用 spec-guard-ops 查看默认事项后端」 |
+| 查看或设置项目配置 | `/spec-guard:config` | 「用 spec-guard-ops 查看项目配置」／「用 spec-guard-ops 把批准节奏设为 combined」 |
+| 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | 「用 spec-guard-ops 挂起模块 <id>，原因是……」／「用 spec-guard-ops 恢复模块 <id>」 |
+| 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | 「用 spec-guard-ops 把这个会话指向项目 <路径>」 |
+| 记录 Spec 或 Plan 的批准状态 | `/spec-guard:review-mark` | 不用你说：你回复批准后，agent 自己用 spec-guard-ops 的 review-mark 记下 |
+| 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | 「用 spec-guard-ops 把这个 checkout 标为模块 <id>」／「……标为协调」 |
+| 快速插入新模块 | `/spec-guard:add-module` | 「用 spec-guard-ops 插入一个新模块」，再说清需求 |
+| Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | 「用 spec-guard-ops 提交 Proposal <id>」／「审查 Proposal <id>」／「证明 Proposal <id> 已晋级」／「收尾 Proposal <id>」 |
+| 文档治理 | `/spec-guard:documentation-*` 三条命令 | 「用 spec-guard-ops 预览文档基线」／「预览模块 <id> 的文档影响」／「核验模块 <id> 的文档交付」 |
+| 能力历史（verify 核对与迁移预览） | `/spec-guard:history-integrity` | 「用 spec-guard-ops 核对能力历史」 |
+| 会话协作（已移到 agent-relay） | 安装 agent-relay 后用 `/agent-relay:collaboration` | 安装 agent-relay 后说「加入本机联调」 |
+| 本地事项 | `/spec-guard:local-ticket-ledger`、`/spec-guard:ticket` | 「查看本地事项账本状态」／「看看本地事项」／「记一个 bug：……」 |
+| 本地事项核验、归档、恢复与交接 | `/spec-guard:local-ticket-portability` | 「核验本地事项账本」／「把本地事项归档到 <目录>」 |
+| 模块进度表（含关键卡点） | `/spec-guard:map` | 「用 spec-guard-ops 看模块进度表」 |
+| 模块成本报告 | `/spec-guard:cost-report` | 「用 spec-guard-ops 出模块 <id> 的成本报告」 |

@@ -10,7 +10,9 @@
   发现（先问，未改）：user-docs-align 写进 `docs/troubleshooting.md`「只看到一行 spec-guard 提示」的例子格式不对，同样少了反引号和「未勾选」。
 - [x] Task 3：`docs/concepts.md` 术语（AC7） — 术语表末尾加 11 条，已有条目未改。核对：workflow-checkpoints「Plan 检查点分级」（61-63 行）、「并行边界」（353 行起）、331 行逗号组与 `templates/CAPABILITY-MAP.md` 的串行展开注释；
   激活信号对 `docs/workflow.md`；零足迹对 `commands/teardown-convention.md` 52-56 行；停点规则对 `references/node-rules.md` 五节；预先声明对 workflow-checkpoints 77-81 行；Epiq 对 `references/local-ticket-ledger-runtime.md` 4、19 行。
-- [ ] Task 4：`docs/commands.md` 的 Codex 话术（AC8）
+- [x] Task 4：`docs/commands.md` 的 Codex 话术（AC8） — 命令对照的 Codex 一列改为可直接说的话，表头改为「Codex（直接对 agent 说）」；每句点出 skill 名，动词对应 `spec-guard-ops/SKILL.md` 的小节
+  （setup、teardown、phase and verify、tracker default、config、module-suspend、link-project、review-mark、checkout-role、add-module、documentation、proposal、history、map、cost report），
+  本地事项对 `ticket`、`local-ticket-ledger-ops`、`local-ticket-portability` 的 description，会话协作对 agent-relay 的 collab skill。「skill 的 … 一节」写法 0 处；`check-command-table.py` 25 条命令都在。
 - [ ] Task 5：README 中英（AC1、AC9）
 - [ ] Checkpoint 1（report）：整体检查（validate、两套回归、链接、插件包无改动）
 - [ ] Task 6：新手测试复跑（AC10）
