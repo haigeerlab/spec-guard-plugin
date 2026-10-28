@@ -1,6 +1,6 @@
 # Spec: user-docs-align
 
-<!-- spec-guard: review approved de0584f0a664 -->
+<!-- spec-guard: review approved 93bf7178042f -->
 
 ## 目标
 

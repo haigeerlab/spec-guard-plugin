@@ -20,7 +20,7 @@
 - [x] Checkpoint 1（report）：整体检查（validate、链接、AC22） — 第一次 `validate.sh` 失败 1 步：`test_hosted_ticket_entry.py` 锁住 workflow.md 须含 `rootCauseReviewRequired`、
   「托管日常事项」「不自动重发」「CI／验收」，Task 3 压缩时删掉了（快档提交不跑它，所以没被拦下）。改为在压缩后的那一节用使用者能读懂的话补回这四点，不改测试。
   之后 `validate.sh`、`test-phase-guard.sh`（507 例）、`test-verify-artifacts.sh`（78 例）全过；scratchpad 链接检查 7 个文件 0 断链；`git diff --stat origin/main -- plugins/spec-guard` 为空。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-10-28 呈现做了什么、AC1～AC22 逐条证据、文档与其他改动表、6 个提交、Spec 修订差异（AC20 与变更记录）、压缩删去的句子；用户回复「user-docs-align 验收通过」，Spec 修订一并批准并重新记批准标记。
 
 ## 留给下一个发版模块
 
