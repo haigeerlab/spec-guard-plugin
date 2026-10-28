@@ -1468,6 +1468,15 @@ out="$(ctx_of)"
 is "Spec 待审核：Review 行" '- Review: Spec `spec/alpha.md` is awaiting the user'"'"'s review.'
 is "Spec 待审核：不建议写 Plan" 'Suggested next step: wait for the user to review `spec/alpha.md`; do not write the Plan yet.'
 isnt "Spec 待审核：不再给出写 Plan 的建议" 'create `tasks/alpha/plan.md`'
+# fence-pairing-fixes：4 个反引号包着 3 个的代码块里的示例标记不算；代码块外的真标记照常识别
+FENCED_EXAMPLE="$(printf '````text\n```\n%s\n````' "$PENDING")"
+spec_file alpha '' "$FENCED_EXAMPLE"
+out="$(ctx_of)"
+isnt "代码块（4 包 3）里的示例标记不算待审核" '- Review:'
+spec_file alpha "$PENDING" "$FENCED_EXAMPLE"
+out="$(ctx_of)"
+is "代码块（4 包 3）外的真标记照常待审核" '- Review: Spec `spec/alpha.md` is awaiting the user'"'"'s review.'
+spec_file alpha "$PENDING"
 is "Spec 待审核：阶段名不变" 'Current stage: **NEEDS_PLAN**'
 printf '%s\n' '{"version": 1, "reviewCadence": "combined"}' > "$rv/.agent/config.json"
 out="$(ctx_of)"

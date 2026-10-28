@@ -69,6 +69,14 @@ class States(unittest.TestCase):
         tilde = SPEC + "~~~\n%s\n~~~\n" % REVIEW_PENDING
         self.assertEqual(review_state(tilde, "spec"), "none")
 
+    def test_fence_closes_only_on_a_matching_bare_fence(self):
+        for name, fenced in (("shorter fence inside a longer one", "````text\n```\n%s\n````\n"),
+                             ("info string is not a closing fence", "```text\n```python\n%s\n```\n")):
+            with self.subTest(name):
+                text = SPEC + fenced % REVIEW_PENDING
+                self.assertEqual(review_state(text, "spec"), "none")
+                self.assertEqual(review_state(with_marker(REVIEW_PENDING, text), "spec"), "pending")
+
 
 class ValueSets(unittest.TestCase):
     """plugin-interface: interface.json publishes these sets, so every state the code returns must be in them."""
