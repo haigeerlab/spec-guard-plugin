@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:92ec86ad23a1628cf7310d272480275f4813d4af"
+      },
+      "observedAt": "2026-11-02T08:24:00Z",
+      "evidence": [
+        "result:the v0.86.0 annotated tag resolves to merge commit 92ec86ad23a1628cf7310d272480275f4813d4af (pull request #428, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 41410633224)",
+        "result:one module (formal-deferral, S61): an unchecked todo item written `- [ ] 延期：<item>；恢复条件：<condition>` or `Deferred: <item>; Resume when: <condition>` is a formal deferral; module_stage.DEFERRED is the one criterion and UNCHECKED/OPEN_ITEM exclude it, so a module whose only unchecked items are deferrals is done and its dependents can be ready; the stage hint counts deferrals, /map lists them, map JSON adds deferred and deferredTotal (schemaVersion 1); interface.json 1.11 -> 1.12 (mapView.deferral); verify-artifacts fails a malformed or checkpoint deferral and warns on free-text and side-file deferrals",
+        "result:this repository's /map computed with main's old code and the new code: 164 modules, 0 differences in status and progress",
+        "result:on the branch before merge (HEAD 78b69a4c, the plugin tree is identical to the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 512 cases passed, verify-artifacts 88 cases passed, checker regression 161 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean; three mutations on draft copies (optional resume condition, UNCHECKED not excluding deferrals, DONE hint ignoring deferrals) each turned tests red"
+      ]
+    }
+  ]
+}
