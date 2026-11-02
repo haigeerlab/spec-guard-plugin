@@ -18,10 +18,11 @@ PENDING = "<!-- spec-guard: review pending -->"
 APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
-            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence"}
+            "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence",
+            "deferredTotal"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
-               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates"}
+               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -106,6 +107,47 @@ FILES = {
 def fixture():
     project = Project(ROWS, ORDER, FILES, active="h")
     return project
+
+
+class DeferralTest(unittest.TestCase):
+    """formal-deferral: a module whose only unchecked items are formal deferrals is done; its dependents can start.
+
+    b is next in Build order, so it is the current module (in progress); c also depends on a and is the one to read.
+    """
+    ROWS = [("a", "基础", "—"), ("b", "下游", "a"), ("c", "另一个下游", "a")]
+    TODO = ("- [x] one\n- [ ] 延期：故障注入；恢复条件：Mock 服务支持故障注入\n"
+            "- [ ] Deferred: real entry; Resume when: the backoffice entry ships\n")
+
+    def project(self, todo):
+        return Project(self.ROWS, ["a", "b", "c"], {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": todo})
+
+    def test_done_with_deferrals_and_downstream_ready(self):
+        with self.project(self.TODO) as project:
+            data = project.json()
+            a, b, c = data["modules"]
+            self.assertEqual((a["status"], b["status"], c["status"]), ("done", "in_progress", "ready"))
+            self.assertEqual(a["progress"], {"done": 1, "total": 1})
+            self.assertEqual(a["deferred"], [{"item": "故障注入", "resumeWhen": "Mock 服务支持故障注入"},
+                                             {"item": "real entry", "resumeWhen": "the backoffice entry ships"}])
+            self.assertEqual(b["deferred"], [])
+            self.assertEqual(data["deferredTotal"], 2)
+            out = project.run().stdout
+            self.assertIn("| 1 | a | 基础 | ✅ 已完成（延期 2） |", out)
+            self.assertIn("\n延期项：\n- a · 故障注入 · 恢复条件：Mock 服务支持故障注入\n"
+                          "- a · real entry · 恢复条件：the backoffice entry ships\n", out)
+
+    def test_deferral_without_condition_stays_in_progress(self):
+        with self.project("- [x] one\n- [ ] 延期：故障注入\n") as project:
+            data = project.json()
+            self.assertEqual([m["status"] for m in data["modules"]], ["in_progress", "not_ready", "not_ready"])
+            self.assertEqual(data["deferredTotal"], 0)
+            self.assertNotIn("延期项：", project.run().stdout)
+
+    def test_deferral_text_is_cleaned_in_the_table(self):
+        with self.project("- [x] one\n- [ ] 延期：a\x1b[31m|b；恢复条件：c\n") as project:
+            out = project.run().stdout
+            self.assertNotIn("\x1b", out)
+            self.assertIn("- a · a", out)
 
 
 class StatusTest(unittest.TestCase):
