@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.86.2-upgrade-20261102"
+      },
+      "observedAt": "2026-11-02T15:26:00Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "result:the marketplace ref moved from v0.86.1 to v0.86.2; codex plugin marketplace upgrade spec-guard-marketplace exited 0; codex plugin list reports 0.86.2 enabled; the marketplace snapshot is at the tag commit and its plugins/spec-guard and .claude-plugin/marketplace.json are identical to the release asset",
+        "result:codex-cli 0.164.0: the smoke exited 2 after the upgrade and again after a partial review (one SessionStart hook was still marked modified); the user re-approved all spec-guard hooks in /hooks of the Codex CLI",
+        "result:the smoke then exited 0 (spec-guard phase injection found in the session's machine record)"
+      ]
+    }
+  ]
+}
