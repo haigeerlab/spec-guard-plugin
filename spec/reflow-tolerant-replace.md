@@ -1,6 +1,6 @@
 # Spec: reflow-tolerant-replace
 
-<!-- spec-guard: review approved 92c7ddcc41fc -->
+<!-- spec-guard: review approved 057e327055ec -->
 
 ## 目标
 
