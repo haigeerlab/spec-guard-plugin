@@ -21,7 +21,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention
 `--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或已退役的派活规则段里时标着
 `[needs --accept-removals]`，真正替换会拒绝并不改文件。原样转述这些行，让用户决定把它们移进本地段，还是明确同意
 删除后加 `--accept-removals` 重跑；从旧版模板升级时，旧模板的行同样需要这一步。从 0.83.2 及更早的模板升级时，删掉的行大多是交审、验收这类停点规则：它们已移到插件的 `references/node-rules.md`，阶段提示到了节点会附上，确认后加 `--accept-removals` 即可；想留哪一行就先移进本地段。
-块里每条标记（块标记、本地段标记）前后各留一个空行，符合 oxfmt、Prettier 等 Markdown 格式化器的规则；空行有变化时预览多一行 `will adjust blank lines: add N, remove M`，这不需要 `--accept-removals`；块完全不用改时才报 `block content unchanged`。本地段内部原样保留。
+块里每条标记（块标记、本地段标记）前后各留一个空行，符合 oxfmt、Prettier 等 Markdown 格式化器的规则；空行有变化时预览多一行 `will adjust blank lines: add N, remove M`，这不需要 `--accept-removals`；列表项或段落只差空白或折行（比如格式化工具把续行拼成一行）时不算删减，汇总成一行 `will adjust whitespace or line wrapping: N paragraph(s)`，同样不需要 `--accept-removals`；块完全不用改时才报 `block content unchanged`。本地段内部原样保留。
 派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝（退出 2，不写文件）。旧块里还带着规则段
 （首行 `<!-- spec-guard: build-task-dispatch -->`）时，`--replace` 移除整段、不需要 `--accept-removals`，预览单列一行
 `retired build-task-dispatch rule section will be removed`，转述时不要省略。
