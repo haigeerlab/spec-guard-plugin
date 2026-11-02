@@ -572,7 +572,8 @@ $(cat "$P/$HT")"
     cp "$P/$HT" "$WORK/canonical"
     host_run --replace --dry-run
     [ "$RC" -eq 0 ] && grep -F 'block content unchanged' >/dev/null <<<"$OUT" && ! grep -F 'will adjust blank lines' >/dev/null <<<"$OUT" \
-      || fail "${host}/${mode}：标准写法再预览应为 block content unchanged
+      && ! grep -F 'will adjust whitespace' >/dev/null <<<"$OUT" \
+      || fail "${host}/${mode}：标准写法再预览应为 block content unchanged，不报空白调整
 $OUT"
     host_run --replace
     [ "$RC" -eq 0 ] && cmp -s "$P/$HT" "$WORK/canonical" || fail "${host}/${mode}：标准写法再 --replace 应逐字节不变"
@@ -705,7 +706,7 @@ while True:
 open(path, "w", encoding="utf-8").write(text)
 PY
 }
-wrap() {  # $1=文件：块里超过 60 字的行在第一个「；」或「，」后折开，续行缩进两格
+wrap() {  # $1=文件：块里超过 60 字的行在第一个「；」或「，」后折开，续行缩进两格；输出折开的行数
   python3 - "$1" <<'PY'
 import re, sys
 path = sys.argv[1]
@@ -717,6 +718,7 @@ for line in open(path, encoding="utf-8").read().split("\n"):
         line = line[:cut] + "\n" + ("> " if line.startswith(">") else "  ") + line[cut:]
     out.append(line)
 open(path, "w", encoding="utf-8").write("\n".join(out))
+print(sum(1 for line in out if "\n" in line))
 PY
 }
 edit_text() {  # $1=文件 $2=原文 $3=改成；原文必须存在
@@ -744,13 +746,18 @@ for side in claude codex; do
   host_run
   [ "$RC" -eq 0 ] || fail "夹具：${side} 侧 setup 失败
 $OUT"
-  wrap "$P/$HT"   # 模板已是每条一行：先折开（像旧模板），再像 oxfmt 那样拼回，中文标点后会多一个空格
+  cuts="$(wrap "$P/$HT")"   # 模板已是每条一行：先折开（像旧模板），再像 oxfmt 那样拼回，中文标点后会多一个空格
   reflow "$P/$HT"
   grep -Eq '[；，] ' "$P/$HT" || fail "夹具：${side} 侧拼回后应带上格式化工具加的空格"
   cp "$P/$HT" "$WORK/reflowed-$side"
   before="$(snapshot)"
   host_run --replace --dry-run
   no_accept_needed "${side} 侧：拼成单行后 --replace --dry-run"
+  # whitespace-only-preview：只差空白的段汇总成一行，个数等于改动的段数；不报 unchanged，也不列删除。
+  grep -Fx "    will adjust whitespace or line wrapping: ${cuts} paragraph(s)" >/dev/null <<<"$OUT" \
+    && ! grep -F 'block content unchanged' >/dev/null <<<"$OUT" && ! grep -F 'will remove:' >/dev/null <<<"$OUT" \
+    || fail "${side} 侧：拼成单行后预览应报 ${cuts} 段空白调整
+$OUT"
   host_run --replace
   [ "$RC" -eq 0 ] && block_is "$TEMPLATES/$side-block-local.md" || fail "${side} 侧：拼成单行后 --replace 应成功并写回模板
 $OUT"
@@ -777,11 +784,13 @@ for side in claude codex; do
   project "wrapped-$side"
   printf '# Mine\n' > "$P/$HT"
   host_run
-  wrap "$P/$HT"
+  cuts="$(wrap "$P/$HT")"
   grep -Eq '^  [^ -]' "$P/$HT" || fail "夹具：${side} 侧没有折出续行"
   before="$(snapshot)"
   host_run --replace --dry-run
   no_accept_needed "${side} 侧：有续行的旧块 --replace --dry-run"
+  grep -Fx "    will adjust whitespace or line wrapping: ${cuts} paragraph(s)" >/dev/null <<<"$OUT" || fail "${side} 侧：有续行的旧块预览应报 ${cuts} 段空白调整
+$OUT"
   run teardown-convention.sh ${HOSTARG:+"$HOSTARG"} --dry-run
   no_accept_needed "${side} 侧：有续行的旧块 teardown 预览"
   ok "${side} 侧：有续行的旧块升级到每条一行的模板、teardown 都不要求 --accept-removals"

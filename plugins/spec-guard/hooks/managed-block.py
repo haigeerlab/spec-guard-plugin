@@ -55,14 +55,15 @@ _FENCE = re.compile(r"(`{3,}|~{3,})")
 
 
 def _units(lines):
-    """reflow-tolerant-replace: [(shown, key)] per list item or paragraph, so a formatter that only re-wraps lines
+    """reflow-tolerant-replace: [(shown, key, raw)] per list item or paragraph, so a formatter that only re-wraps lines
     (or changes whitespace) removes nothing. shown joins the unit's lines with one space; key drops all whitespace
-    and the continuation lines' `>` prefixes. Lines inside a code fence are one unit each."""
+    and the continuation lines' `>` prefixes; raw is the unit as written (whitespace-only-preview counts the units
+    whose raw text differs). Lines inside a code fence are one unit each."""
     units, current, fence = [], None, None
     for raw in lines:
         line = raw.strip()
         if fence:
-            units.append(([line], False))
+            units.append(([line], False, [raw.rstrip("\r\n")]))
             current = None
             if line.startswith(fence) and not line.lstrip("`~").strip():
                 fence = None
@@ -73,23 +74,24 @@ def _units(lines):
         match = _FENCE.match(line)
         if match:
             fence = match.group(1)
-            units.append(([line], False))
+            units.append(([line], False, [raw.rstrip("\r\n")]))
             current = None
             continue
         quoted = line.startswith(">")
         content = line.lstrip("> ").strip() if quoted else line
         if current is not None and current[1] == quoted and not _UNIT_START.match(content):
             current[0].append(content)
+            current[2].append(raw.rstrip("\r\n"))
             continue
-        current = ([line], quoted)
+        current = ([line], quoted, [raw.rstrip("\r\n")])
         units.append(current)
         if content.startswith(("#", "|", "<!--")):
             current = None  # headings, table rows and comments never take continuation lines
-    return [(" ".join(rows), re.sub(r"\s+", "", "".join(rows))) for rows, _quoted in units]
+    return [(" ".join(rows), re.sub(r"\s+", "", "".join(rows)), "\n".join(raws)) for rows, _quoted, raws in units]
 
 
 def _keys(units):
-    return set(key for _shown, key in units)
+    return set(unit[1] for unit in units)
 
 
 def compose(body, local):
@@ -205,15 +207,20 @@ def main(argv):
         new_units, old_units = _units(body), _units(current)
         new_keys, old_keys = _keys(new_units), _keys(old_units)
         removed = [unit for unit in old_units if unit[1] not in new_keys]
-        added = [shown for shown, key in new_units if key not in old_keys]
+        added = [unit[0] for unit in new_units if unit[1] not in old_keys]
+        # whitespace-only-preview: units kept by the comparison above whose text as written still changes.
+        new_raws = set((unit[1], unit[2]) for unit in new_units)
+        rewrapped = sum(1 for unit in old_units if unit[1] in new_keys and (unit[1], unit[2]) not in new_raws)
         known_text = _known(known)
-        needs_accept = [shown for shown, key in removed if key not in known_text]
+        needs_accept = [unit[0] for unit in removed if unit[1] not in known_text]
         inner = compose(body, local)
         if dry:
-            for shown, key in removed:
+            for shown, key, _raw in removed:
                 print("will remove: %s%s" % (shown, "" if key in known_text else "   [needs --accept-removals]"))
             for line in added:
                 print("will add: %s" % line)
+            if rewrapped:
+                print("will adjust whitespace or line wrapping: %d paragraph(s)" % rewrapped)
             blank_added, blank_removed = _blank_changes(block, inner)
             if blank_added or blank_removed:
                 print("will adjust blank lines: add %d, remove %d" % (blank_added, blank_removed))
@@ -242,9 +249,9 @@ def main(argv):
             inner[-1] += "\n"
         known_text = _known(known)
         removed = _units(current)
-        needs_accept = [shown for shown, key in removed if key not in known_text]
+        needs_accept = [unit[0] for unit in removed if unit[1] not in known_text]
         if dry:
-            for shown, key in removed:
+            for shown, key, _raw in removed:
                 print("will remove: %s%s" % (shown, "" if key in known_text else "   [needs --accept-removals]"))
             if section:
                 print("keeps the local section in place (%d lines)" % len(_text(inner)))
