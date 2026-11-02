@@ -493,6 +493,15 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertIsNone(result["interrupted"])
         self.assertEqual(result["new_current"], "delta")
 
+    def test_module_with_only_deferred_items_left_does_not_block_insertion(self):
+        # formal-deferral: a module whose only unchecked items are formal deferrals is done, not half done.
+        self.make_done("alpha", "beta")
+        self.make_half("gamma")
+        self.write("tasks/gamma/todo.md", "- [x] one\n- [ ] 延期：two；恢复条件：the mock ships\n")
+        result = preview(self.root, "delta", "Fourth", "—", "end")
+        self.assertIsNone(result["interrupted"])
+        self.assertEqual(result["new_current"], "delta")
+
     def test_current_module_half_done_is_refused(self):
         self.write("tasks/alpha/todo.md", "- [x] done\n- [ ] pending\n")
         self.assert_no_write(lambda: preview(self.root, "delta", "Fourth", "—", "end"))

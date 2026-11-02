@@ -5,7 +5,9 @@ The current module is `.agent/state.json` activeModule when it names a mapped mo
 otherwise the first module in Build order that is not done. A module needs a spec
 (`spec/<id>.md`), then a plan (`tasks/<id>/plan.md`), then has open work while
 `tasks/<id>/todo.md` has unchecked items; it is done once a plan exists and no
-unchecked item remains. Read-only: this never writes a file.
+unchecked item remains. A formal deferral (`- [ ] 延期：<item>；恢复条件：<condition>`) is
+not an unchecked item: it is listed apart and does not keep the module open.
+Read-only: this never writes a file.
 """
 from __future__ import annotations
 import json
@@ -21,7 +23,15 @@ from checkout_role import role as checkout_role_of
 from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
 
-UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
+# formal-deferral: the one deferred-item criterion.  What follows an unchecked box: the 延期/Deferred prefix, an item
+# that is neither a checkpoint nor tiered, then 恢复条件/Resume when and a non-blank condition.  Anything short of that
+# stays an ordinary unchecked item.  UNCHECKED and OPEN_ITEM exclude it, so every caller counts the same way.
+DEFERRED_TAIL = (r"[ \t]+(?i:延期|deferred)[ \t]*[：:][ \t]*"
+                 r"(?!(?i:检查点|checkpoint(?![a-z])))(?![^：:；;\n]*[（(][ \t]*(?i:gate|report)[ \t]*[）)])"
+                 r"(?P<item>[^\n]*?[^\s；;][^\n]*?)[ \t]*[；;][ \t]*(?i:恢复条件|resume[ \t]+when)[ \t]*[：:]"
+                 r"[ \t]*(?P<resume>\S[^\n]*?)[ \t\r]*$")
+DEFERRED = re.compile(r"^\s*[-*+]\s+\[ \]" + DEFERRED_TAIL, re.MULTILINE)
+UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \](?!" + DEFERRED_TAIL + ")", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
 # module-suspend: one exact line in todo.md parks a started module until the user resumes it.
@@ -86,6 +96,11 @@ def review_state(text: str, kind: str) -> str:
     return "approved" if match.group(1) == review_digest(text) else "revised"
 
 
+def deferred_items(text: str) -> list:
+    """[(item, resume condition)] of the todo's formal deferrals, in order (see DEFERRED_TAIL)."""
+    return [(match.group("item").strip(), match.group("resume").strip()) for match in DEFERRED.finditer(text)]
+
+
 def module_state(root: Path, module_id: str) -> dict:
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
     plan = root / "tasks" / module_id / "plan.md"
@@ -106,6 +121,7 @@ def module_state(root: Path, module_id: str) -> dict:
         stage = "DONE"
     return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
             "half": half and not suspended, "suspended": suspended, "todo": todo.is_file(),
+            "deferred": deferred_items(text),
             "no_todo_declared": has_plan and not todo.is_file() and any(
                 line.strip() == NO_TODO_MARKER for line in plan.read_text(encoding="utf-8").splitlines())}
 
@@ -458,7 +474,7 @@ def gate_checkpoints(text: str) -> list:
             if tier == "gate" or (tier is None and position == last)]
 
 
-OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \]\s+")
+OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \](?!" + DEFERRED_TAIL + r")\s+")
 
 
 def at_final_gate(root: Path, module: str) -> bool:

@@ -84,6 +84,12 @@ class Suspend(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("nothing-open", out)
             self.assertNotIn(SUSPEND_MARKER, project.todo("beta"))
+        with Project(beta="- [x] start\n- [ ] 延期：check；恢复条件：the mock ships\n") as project:
+            code, out = project.run("--suspend", "beta", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertIn("nothing-open", out)
+            self.assertIn("1 deferred item(s) do not count", out)
+            self.assertNotIn(SUSPEND_MARKER, project.todo("beta"))
         with Project(alpha="- [ ] a\n%s\n" % SUSPEND_MARKER) as project:
             code, out = project.run("--suspend", "alpha", "--confirm")
             self.assertEqual(code, 2)
