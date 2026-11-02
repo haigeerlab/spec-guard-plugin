@@ -705,6 +705,20 @@ while True:
 open(path, "w", encoding="utf-8").write(text)
 PY
 }
+wrap() {  # $1=文件：块里超过 60 字的行在第一个「；」或「，」后折开，续行缩进两格
+  python3 - "$1" <<'PY'
+import re, sys
+path = sys.argv[1]
+out = []
+for line in open(path, encoding="utf-8").read().split("\n"):
+    match = re.search("[；，]", line[20:]) if len(line) > 60 and line.startswith(("- ", "> ")) else None
+    if match:
+        cut = 20 + match.end()
+        line = line[:cut] + "\n" + ("> " if line.startswith(">") else "  ") + line[cut:]
+    out.append(line)
+open(path, "w", encoding="utf-8").write("\n".join(out))
+PY
+}
 edit_text() {  # $1=文件 $2=原文 $3=改成；原文必须存在
   python3 - "$@" <<'PY'
 import sys
@@ -730,7 +744,9 @@ for side in claude codex; do
   host_run
   [ "$RC" -eq 0 ] || fail "夹具：${side} 侧 setup 失败
 $OUT"
+  wrap "$P/$HT"   # 模板已是每条一行：先折开（像旧模板），再像 oxfmt 那样拼回，中文标点后会多一个空格
   reflow "$P/$HT"
+  grep -Eq '[；，] ' "$P/$HT" || fail "夹具：${side} 侧拼回后应带上格式化工具加的空格"
   cp "$P/$HT" "$WORK/reflowed-$side"
   before="$(snapshot)"
   host_run --replace --dry-run
@@ -750,6 +766,29 @@ $OUT
 $(cat "$P/$HT")"
   ok "${side} 侧：格式化工具拼成单行后 teardown 不要求 --accept-removals"
 done
+
+# 有续行的旧块（0.86.1 及以前的模板、会把长行折开的格式化工具）升级到每条一行的模板，同样不报删减。
+for side in claude codex; do
+  if [ "$side" = codex ]; then
+    HOSTARG=--host=codex HT=AGENTS.md
+  else
+    HOSTARG='' HT=CLAUDE.md
+  fi
+  project "wrapped-$side"
+  printf '# Mine\n' > "$P/$HT"
+  host_run
+  wrap "$P/$HT"
+  grep -Eq '^  [^ -]' "$P/$HT" || fail "夹具：${side} 侧没有折出续行"
+  before="$(snapshot)"
+  host_run --replace --dry-run
+  no_accept_needed "${side} 侧：有续行的旧块 --replace --dry-run"
+  run teardown-convention.sh ${HOSTARG:+"$HOSTARG"} --dry-run
+  no_accept_needed "${side} 侧：有续行的旧块 teardown 预览"
+  ok "${side} 侧：有续行的旧块升级到每条一行的模板、teardown 都不要求 --accept-removals"
+done
+[ "$(grep -Ec '^  [^ -]' "$TEMPLATES/claude-block-local.md" "$TEMPLATES/codex-block-local.md" | awk -F: '{s+=$2} END{print s}')" -eq 0 ] \
+  || fail "约定块模板应每条规则一行，不留缩进续行"
+ok "约定块模板每条规则一行"
 
 # 反例：拼成单行后真删了字、删了整条规则，--replace 与 teardown 照旧拒绝；改一个词列出一删一增。
 HOSTARG='' HT=CLAUDE.md HB="$BEGIN" HE="$END"

@@ -28,7 +28,7 @@
 3. **真正删掉的文字照旧拦下**：旧块里有、新模板和 `--known` 里都没有的段，仍要 `--accept-removals`，否则拒绝且不改文件。
 4. **预览按段列出**：`will remove:` / `will add:` 每段一行，显示该段拼成一行后的文字。只差折行或空白的段两边都不列。
 5. **模板每条规则一行**：`claude-block-local.md`、`codex-block-local.md` 里缩进的续行拼到上一行，开头两行 `>` 引用拼成一行
-   （中文与中文之间不加空格，与英文、代码相邻时保留一个空格），文字不改；`docs/convention-block.md` 内嵌的块同步
+   （中文与中文之间、中文标点之后不加空格，其余与英文、代码相邻处保留一个空格），文字不改；`docs/convention-block.md` 内嵌的块同步
    （`check-readme-sync.py` 要求逐字节一致）。已退役的派活规则段模板不改（只作 `--known`）。单行文字在 `proseWrap: 'never'` 下
    不再被改动，所以拼接处加不加空格都稳定。
 6. **空行规则不变**（convention-block-blank-lines）：空行增减照旧单独报告；本地段原样保留；teardown 往返仍逐字节还原。
@@ -106,3 +106,4 @@ npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh
 ## 变更记录
 
 - 2026-11-02（Task 1）：成功标准与测试策略里「删掉整条规则仍要 `--accept-removals`」改为「预览列出加回，不要求接受」。原因：`--replace` 遇到旧块缺一条规则时只是把它加回，块里没有项目自己的文字被删，删减护栏本就不该拦；写测试时发现原说法有误。最终验收附差异。
+- 2026-11-02（Task 2）：模板拼行规则补「中文标点之后不加空格」。原因：照原规则拼会得到「`SPEC.md`、 `docs/SPEC.md`」这种标点后带空格的写法；只改空白，文字不变。最终验收附差异。
