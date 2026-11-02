@@ -94,6 +94,18 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("项目级审查", "审查批次", "审查完成", "待调查", "P0", "继续"):
             self.assertIn(phrase, checkpoint)
 
+    def test_formal_deferral_rule_and_template_lines(self):
+        # formal-deferral: the rule names the form, who decides, what cannot be deferred and how to resume.
+        checkpoint = self.target.read_text(encoding="utf-8")
+        for phrase in ("## 延期项", "- [ ] 延期：<事项>；恢复条件：<条件>", "Resume when:", "经用户同意", "检查点（`gate`／`report`）不能延期",
+                       "删掉「延期：」前缀", "与挂起的区别"):
+            self.assertIn(phrase, checkpoint)
+        for name in ("claude-block-local.md", "codex-block-local.md"):
+            template = (self.plugin / "templates" / name).read_text(encoding="utf-8")
+            with self.subTest(name=name):
+                self.assertIn("`- [ ] 延期：<事项>；恢复条件：<条件>`", template)
+                self.assertIn("共享检查点规则「延期项」", template)
+
     def test_audit_handoff_reuses_ticket_without_reviving_remote_bridge(self):
         checkpoint = self.target.read_text(encoding="utf-8")
         ticket = (self.plugin / "skills" / "ticket" / "SKILL.md").read_text(encoding="utf-8")

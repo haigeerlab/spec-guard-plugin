@@ -61,6 +61,8 @@ python3 -B "$ROOT/hooks/map_view.py" --project "$PROJECT" $ARGUMENTS
   `uncommittedTicks` 与 `startedAt`（第一次提交 Spec 的时间；Spec 批准后才提交的项目，它会比实际开工晚）、`head.committedAt`，以及顶层 `reviewCadence`（批准节奏的生效值
   与来源，和 `/spec-guard:config` 一致）。每个模块还有 `gates`：todo 里 gate 检查点的总数与已勾数（标 gate 的算，report 不计，没标级别的只有
   最后一个检查点算；最终验收通常已在其中；没有 todo 时为 `null`），表格不显示。含义见 `interface.json` 的 `progressFacts`。
+- 只剩延期项（`- [ ] 延期：<事项>；恢复条件：<条件>`）的模块显示「✅ 已完成（延期 n）」且不折叠，下游照常可以开始；
+  表后「延期项：」一节逐条列出模块、事项与恢复条件。JSON 里是每个模块的 `deferred` 与顶层 `deferredTotal`，见 `interface.json` 的 `deferral`。
 - 已完成与未就绪的模块默认折叠；`--all` 全部展开。
 - `--json` 给全量、不折叠的机器可读结果（`schemaVersion` 1，字段与稳定性承诺见 `spec/map-view.md` 的 Contract），
   供其他插件读取；给用户看时用表格。
