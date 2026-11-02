@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.86.3] - 2026-11-03
+
+本版 1 个模块：whitespace-only-preview。`interface.json` 不变（1.12）。
+
+### 修复
+
+- **`--replace --dry-run` 如实说明只差空白的段。** 0.86.2 起，块里某段与模板只差空白或折行时不算删减，但预览既不列它、
+  也不报 `block content unchanged`，真正写入却会改成模板的写法。现在预览另起一行 `will adjust whitespace or line wrapping: N paragraph(s)`；
+  和空行调整一样不需要 `--accept-removals`。判定与写入不变。
+
+### 文档
+
+- 命令说明、`spec-guard-ops` 与 `docs/commands.md` 讲预览的地方补上这一行。
+
 ## [0.86.2] - 2026-11-02
 
 本版 1 个模块（S63）：reflow-tolerant-replace。`interface.json` 不变（1.12）。
