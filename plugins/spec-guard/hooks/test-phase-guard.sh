@@ -1310,6 +1310,40 @@ $out
 --- plain
 $plain_su"
 echo "  ✅ 只有完全相等的一行才算挂起标记"; PASS=$((PASS + 1))
+
+# formal-deferral：只剩写明恢复条件的延期项的模块算完成，下一个模块成为当前模块；计数行与 DONE 建议说明延期。
+printf '%s\n' '- [x] built' '- [ ] Deferred: fault injection; Resume when: the mock supports it' > "$su/tasks/alpha/todo.md"
+printf '%s\n' '- [ ] start' > "$su/tasks/beta/todo.md"
+out="$(run "$su" | context_of)"
+grep -F 'Current module: `beta`' >/dev/null <<<"$out" || fail "只剩延期项的 alpha 应算完成，当前模块为 beta
+$out"
+grep -F ' · Done 1 · Deferred 1' >/dev/null <<<"$out" || fail "计数行应带 Deferred 1
+$out"
+echo "  ✅ 只剩延期项的模块算完成，计数行带延期数"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] start' > "$su/tasks/beta/todo.md"
+out="$(run "$su" | context_of)"
+grep -F 'Current stage: **DONE**' >/dev/null <<<"$out" || fail "只剩延期项时应为 DONE
+$out"
+grep -F 'every mapped module has a plan and no open todo item.' >/dev/null <<<"$out" && fail "有延期项时不应说没有任何未勾选项
+$out"
+grep -F 'every mapped module has a plan and no open todo item apart from 1 deferred item(s) waiting to resume (list them with `/spec-guard:map`' >/dev/null <<<"$out" || fail "DONE 建议应说明延期并指向 map
+$out"
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN"}' > "$su/.agent/config.json"
+out="$(run "$su" | context_of)"
+grep -F '能力图里每个模块都有 Plan，除 1 项延期（用 `/spec-guard:map`' >/dev/null <<<"$out" && grep -F ' · 已完成 2 · 延期 1' >/dev/null <<<"$out" || fail "中文 DONE 建议与计数行应说明延期
+$out"
+rm -f "$su/.agent/config.json"
+echo "  ✅ 只剩延期项：DONE，建议说明延期待恢复（中英）"; PASS=$((PASS + 1))
+
+printf '%s\n' '- [x] built' '- [ ] Deferred: fault injection' > "$su/tasks/alpha/todo.md"
+printf '%s\n' '- [ ] start' > "$su/tasks/beta/todo.md"
+out="$(run "$su" | context_of)"
+grep -F 'Current module: `alpha`' >/dev/null <<<"$out" || fail "没写恢复条件的延期项应照旧算未完成
+$out"
+grep -F 'Deferred 1' >/dev/null <<<"$out" && fail "不合格的延期项不应计入延期数
+$out"
+echo "  ✅ 没写恢复条件的延期项照旧算未完成"; PASS=$((PASS + 1))
 }
 
 part_12() {
