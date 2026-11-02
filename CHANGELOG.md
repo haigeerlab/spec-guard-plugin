@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.86.1] - 2026-11-02
+
+本版 1 个模块（S62）：replace-only-existing。`interface.json` 不变（1.12）。
+
+### 修复
+
+- **`setup-convention --replace` 只替换已有块，从不新建。** 原来目标文件（Claude 侧 `CLAUDE.md`、Codex 侧 `AGENTS.md`）里没有块时，
+  `--replace` 会照新建处理，往目标文件追加一个块，没有 `CLAUDE.md` 时还会新建一个；这与命令说明「仅替换已有受管声明块」不符，
+  块只放在 `AGENTS.md` 的项目照升级说明用默认方式运行，就会多出一份规则。现在没有块时在任何写入之前拒绝（退出 1，`--dry-run` 相同），
+  并提示该在哪一侧运行：块在另一侧就加或去掉 `--host=codex`，两侧都没有就去掉 `--replace` 来新建。提示文字给人看，不是接口。
+
+### 文档
+
+- **更正 0.86.0 的升级说明。** 「用 `--replace` 更新约定块」改为在块所在的一侧运行、两侧都有就各跑一次；README 中英、`docs/workflow.md`、
+  `docs/commands.md` 与命令说明同步。
+
 ## [0.86.0] - 2026-11-02
 
 本版 1 个模块（S61）：formal-deferral。todo 里有了正式的延期写法；`interface.json` 升到 1.12（新增 `mapView.deferral`），只增不改。
@@ -11,7 +27,8 @@
   没有延期项的项目没有任何变化。
 - **已有的自由文本延期照旧算未完成。** 「延期 X：……」「……未验；恢复需……」这类写法不改写就不放行；`verify-artifacts` 会逐行提示改写示例。
   挪到 `tasks/<id>/deferred.md` 之类旁路文件里的延期不被认可，提示挪回该模块的 `todo.md`。
-- **约定块多了一行。** 用 `/spec-guard:setup-convention --replace` 更新项目里的约定块即可；不更新也不影响判定。
+- **约定块多了一行。** 在约定块所在的一侧运行 `/spec-guard:setup-convention --replace` 更新（块在 `AGENTS.md` 加 `--host=codex`，
+  两侧都有就各跑一次）；不更新也不影响判定。（0.86.1 更正：原先只写了 `--replace`，没说要在块所在的一侧运行。）
 - **团队都升级后再用新写法。** 0.85.2 及更早把延期项当普通未勾选项，模块照旧算进行中（挡住下游，不会误放行）。
 
 ### 新增
