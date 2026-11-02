@@ -3,8 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from module_stage import (OPEN_ITEM, SUSPEND_MARKER, UNCHECKED, at_final_gate, deferred_items, first_open_is_gate,
-                          module_state)
+from module_stage import (OPEN_ITEM, SUSPEND_MARKER, UNCHECKED, at_final_gate, deferral_lint, deferred_items,
+                          first_open_is_gate, module_state)
 
 DEFERRED_FORMS = [
     "- [ ] 延期：故障注入用例；恢复条件：Mock 服务支持故障注入",
@@ -53,6 +53,20 @@ class Criterion(unittest.TestCase):
     def test_deferral_inside_a_code_block_is_still_an_ordinary_line(self):
         # The todo checklist has no code-block exemption today; a deferral there counts like any other line.
         self.assertEqual(len(deferred_items("```\n- [ ] 延期：a；恢复条件：b\n```\n")), 1)
+
+
+class Lint(unittest.TestCase):
+    def test_kinds_and_line_numbers(self):
+        text = ("- [x] 延期：done；恢复条件：x\n"
+                "- [ ] 延期：a；恢复条件：b\n"
+                "- [ ] 延期：a\n"
+                "- [ ] 延期：检查点 1：验收；恢复条件：b\n"
+                "- [ ] Deferred: final acceptance (gate); Resume when: b\n"
+                "- [ ] D1：延期未验\n"
+                "- [ ] ordinary\n"
+                "延期说明，不是清单项\n")
+        self.assertEqual(deferral_lint(text), [("formal", 2), ("malformed", 3), ("checkpoint", 4), ("checkpoint", 5),
+                                               ("informal", 6)])
 
 
 class Project:

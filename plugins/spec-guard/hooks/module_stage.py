@@ -101,6 +101,28 @@ def deferred_items(text: str) -> list:
     return [(match.group("item").strip(), match.group("resume").strip()) for match in DEFERRED.finditer(text)]
 
 
+DEFERRAL_PREFIX = re.compile(r"^\s*[-*+]\s+\[ \][ \t]+(?i:延期|deferred)[ \t]*[：:]")
+DEFERRAL_WORD = re.compile(r"(?i:延期|deferred)")
+CHECKPOINT_DEFERRAL = re.compile(DEFERRAL_PREFIX.pattern + r"[ \t]*(?:(?i:检查点|checkpoint(?![a-z]))"
+                                 r"|[^：:；;\n]*[（(][ \t]*(?i:gate|report)[ \t]*[）)])")
+
+
+def deferral_lint(text: str) -> list:
+    """[(kind, line number)] for verify-artifacts: formal, checkpoint, malformed (prefix without the full form),
+    informal (an unchecked item that mentions a deferral in free text).  The criterion itself is DEFERRED."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        if DEFERRED.match(line):
+            found.append(("formal", number))
+        elif CHECKPOINT_DEFERRAL.match(line):
+            found.append(("checkpoint", number))
+        elif DEFERRAL_PREFIX.match(line):
+            found.append(("malformed", number))
+        elif UNCHECKED.match(line) and DEFERRAL_WORD.search(line):
+            found.append(("informal", number))
+    return found
+
+
 def module_state(root: Path, module_id: str) -> dict:
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
     plan = root / "tasks" / module_id / "plan.md"
