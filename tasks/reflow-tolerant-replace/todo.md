@@ -1,7 +1,7 @@
 # Todo: reflow-tolerant-replace
 
 - [x] Task 0：提交能力图新行、已批准的 Spec 与 Plan 草稿 — 2026-11-02 用户批准能力图新行与 Spec（「批准」）、Plan（「Plan 批准」）；Spec 交审期间按 ecosystem-lead 转来的真实 oxfmt 结果补了「真实格式化结果」一节，批准的是补过的版本。
-- [ ] Task 1：删减判定按段比较（managed-block.py、test-setup-teardown.sh）
+- [x] Task 1：删减判定按段比较（managed-block.py、test-setup-teardown.sh） — `managed-block.py` 新增 `_units`／`_keys`：按列表项或段落切段（遇空行、列表标记、`#`、`|`、`<!--`、代码围栏开新段，标题、表格行、注释不接续行），键去掉全部空白与续行 `>` 前缀；`replace` 的删增、`--known`、`remove` 改用段比较，写入路径不动。回归加 6 例（两侧 × --replace 与 teardown 的拼单行正例、删几个字反例、删整条规则与改一个词），在旧代码上第一例即红（报 12 条需接受，与使用方报告一致）；改后 68 例通过，ShellCheck 无告警。写测试时发现 Spec 把「删掉整条规则」写成要接受，实际只是加回，已更正 Spec 与 Plan 并记变更记录（最终验收附差异）。
 - [ ] Task 2：模板每条规则一行与文档（两份模板、docs/convention-block.md）
 - [ ] Task 3：版本号 0.86.2 与 CHANGELOG
 - [ ] Checkpoint 1（report）：发布前完整检查、变异验证与真实结果比对

@@ -70,7 +70,8 @@ npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh
   - 0.86.1 旧块（有续行）被拼回单行后：Claude 侧与 Codex 侧 `--replace --dry-run` 不列需要接受的删减，`--replace` 成功；
     teardown 预览与移除都不要 `--accept-removals`；
   - 0.86.1 旧块原样（有续行）升级到每条一行的新模板：同上；
-  - 反例：拼回单行后再删掉一条规则里的几个字，或删掉整条规则：仍要 `--accept-removals`，不接受时拒绝且文件不变；
+  - 反例：拼回单行后再删掉一条规则里的几个字：仍要 `--accept-removals`，不接受时拒绝且文件不变；删掉整条规则：块里没有项目自己的
+    文字被删，预览列出把它加回（`will add`），不要求接受；
   - 反例：只在一条规则里改一个词（文字不同）：照旧算删减加新增；
   - 本地段、空行增减、往返逐字节还原：既有用例全部通过。
 - 变异：把比较改回逐行、去掉续行拼接，两处都必须让测试变红。
@@ -84,7 +85,7 @@ npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh
 ## 成功标准
 
 - 格式化工具只改折行与空白时，`--replace`（含 `--dry-run`、`--check`）与 teardown 不再要求 `--accept-removals`。
-- 真正删掉的文字（拼行之后少了字，或整条规则没了）仍要 `--accept-removals`。
+- 块里与模板文字不同的段（拼行之后少了字、改了词）仍要 `--accept-removals`；块里缺了整条规则时预览列出加回，不要求接受。
 - 两份约定块模板每条规则一行，`docs/convention-block.md` 同步，`check-readme-sync.py` 通过。
 - 有续行的 0.86.1 旧块升级到新模板不报删减。
 - 既有 setup/teardown 回归全部通过。
@@ -101,3 +102,7 @@ npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh
 ## 待定问题
 
 - 无。
+
+## 变更记录
+
+- 2026-11-02（Task 1）：成功标准与测试策略里「删掉整条规则仍要 `--accept-removals`」改为「预览列出加回，不要求接受」。原因：`--replace` 遇到旧块缺一条规则时只是把它加回，块里没有项目自己的文字被删，删减护栏本就不该拦；写测试时发现原说法有误。最终验收附差异。
