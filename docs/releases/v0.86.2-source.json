@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:4d045b4b4af85f15b4cf816076146efcca035337"
+      },
+      "observedAt": "2026-11-02T15:26:00Z",
+      "evidence": [
+        "result:the v0.86.2 annotated tag resolves to merge commit 4d045b4b4af85f15b4cf816076146efcca035337 (pull request #432, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 41470646699)",
+        "result:one module (reflow-tolerant-replace, S63): managed-block.py compares a block per list item or paragraph with all whitespace (and continuation `>` prefixes) removed, for replace (removed/added, --known, --dry-run, --check) and remove (teardown); a Markdown formatter that only re-wraps lines no longer triggers [needs --accept-removals], while text that is missing or changed still needs it; the write path is unchanged; claude-block-local.md and codex-block-local.md put each rule on one line with the text unchanged, docs/convention-block.md follows; interface.json unchanged (1.12)",
+        "result:on the branch before merge (HEAD a6215118, the plugin tree is identical to the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed (setup/teardown 71 cases, 9 new), phase-guard 512 cases passed, verify-artifacts 88 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean; two mutations on draft copies (continuation joining removed, whitespace kept in the key) each turned tests red",
+        "result:a block formatted by oxfmt 0.51.0 (proseWrap: 'never') in a consumer repository, holding only template text: 0.86.1 reported 12 (CLAUDE.md) and 8 (AGENTS.md) removals needing --accept-removals, the new code reports 0 on both sides and 0 in the teardown preview"
+      ]
+    }
+  ]
+}
