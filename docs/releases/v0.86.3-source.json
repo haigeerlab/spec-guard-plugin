@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:6a32956629f156d401e4cd398436126efe6cc026"
+      },
+      "observedAt": "2026-11-02T17:22:00Z",
+      "evidence": [
+        "result:the v0.86.3 annotated tag resolves to merge commit 6a32956629f156d401e4cd398436126efe6cc026 (pull request #434, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 41489505775)",
+        "result:one module (whitespace-only-preview): managed-block.py replace --dry-run prints `will adjust whitespace or line wrapping: N paragraph(s)` when N list items or paragraphs match the template after removing whitespace but differ as written; it needs no --accept-removals; the comparison, the write path and teardown are unchanged; `block content unchanged` still requires a byte-identical block; interface.json unchanged (1.12)",
+        "result:on the branch before merge (HEAD c490c9ef, the plugin tree is identical to the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed (setup/teardown 71 cases), phase-guard 512 cases passed, verify-artifacts 88 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean; two mutations on draft copies (the line not printed, every kept unit counted) each turned tests red",
+        "result:the oxfmt-formatted consumer block (template text only): CLAUDE.md preview reports 2 paragraphs (the two lines with a space after Chinese punctuation), AGENTS.md still reports block content unchanged"
+      ]
+    }
+  ]
+}
