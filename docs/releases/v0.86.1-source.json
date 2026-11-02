@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:ad00b43defea3ec12c96b7fe4625dea2e4720fc1"
+      },
+      "observedAt": "2026-11-02T13:12:00Z",
+      "evidence": [
+        "result:the v0.86.1 annotated tag resolves to merge commit ad00b43defea3ec12c96b7fe4625dea2e4720fc1 (pull request #430, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 41449389012)",
+        "result:one module (replace-only-existing, S62): setup-convention --replace only replaces an existing block and never creates one; when the target file (CLAUDE.md, or AGENTS.md with --host=codex) has no block it exits 1 before any write or mkdir and names the side that holds the block, or tells the user to drop --replace when neither side has one; --dry-run gives the same result; without --replace nothing changed; the 0.86.0 upgrade note in CHANGELOG, README (both languages) and docs/workflow.md now says to run --replace on the side that holds the block, once per side when both have one; interface.json unchanged (1.12)",
+        "result:on the branch before merge (HEAD de3020ef, the plugin tree is identical to the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed (setup/teardown 62 cases, 9 new), phase-guard 512 cases passed, verify-artifacts 88 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; shellcheck@4.1.0 -S warning clean; two mutations on draft copies (refusal branch removed, refusal moved after mkdir -p) each turned tests red"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:ad00b43defea3ec12c96b7fe4625dea2e4720fc1"
+      },
+      "observedAt": "2026-11-02T13:12:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.86.0 to 0.86.1; installed_plugins.json records version 0.86.1 and gitCommitSha ad00b43 (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker",
+        "result:in a temporary project whose block is only in AGENTS.md, the installed hooks/setup-convention.sh --replace exited 1 with the hint to use --host=codex and left the project unchanged; claude -p \"/spec-guard:setup-convention --replace\" (Claude Code 2.1.311) in the same project relayed the same refusal and created no CLAUDE.md"
+      ]
+    }
+  ]
+}
