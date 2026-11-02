@@ -216,27 +216,64 @@ if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ] && [ -d t
   fi
 fi
 
+# 延期写法（formal-deferral）：判据来自 module_stage.py 的 DEFERRED；格式不对与检查点延期判失败（照旧算未完成），
+# 像延期的自由文本只给改写提示。没有延期写法时不输出这一项。
+if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then
+  if DEFER_OUT="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import deferral_lint
+for todo in sorted(Path("tasks").glob("*/todo.md")):
+    found = deferral_lint(todo.read_text(encoding="utf-8"))
+    formal = sum(kind == "formal" for kind, _ in found)
+    if formal:
+        print("FORMAL %s %d" % (todo.parent.name, formal))
+    for kind, number in found:
+        if kind != "formal":
+            print("%s %s:%d 0" % (kind.upper(), todo.as_posix(), number))
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    EXAMPLE='- [ ] 延期：<事项>；恢复条件：<条件>（英文 Deferred: <item>; Resume when: <condition>）'
+    while IFS=' ' read -r kind item count; do
+      case "$kind" in
+        FORMAL) ok "延期项写法有效：${item}（${count} 项）" ;;
+        MALFORMED) bad "${item} 带延期前缀但格式不对（缺事项或恢复条件），照旧算未完成；正确写法：${EXAMPLE}" ;;
+        CHECKPOINT) bad "${item} 检查点不能延期，照旧算未完成" ;;
+        INFORMAL) warn "${item} 像是延期，但不是正式写法，照旧算未完成；要让它不挡下游，改成：${EXAMPLE}" ;;
+      esac
+    done <<<"$DEFER_OUT"
+  else
+    warn '未验证：延期写法检查没有正常运行'
+  fi
+fi
+
 # 旁路清单（rework-in-place）：阶段判定只数 todo.md，所以 tasks/<id>/ 下别的清单文件里没做完的项没人看得见。
-# 只看直接子文件里的 *.md；判据是 module_stage.py 的 UNCHECKED。没有可报告的内容时不输出这一项。
+# 只看直接子文件里的 *.md；判据是 module_stage.py 的 UNCHECKED（合格延期项另数，它们在这里同样不计入阶段）。
+# 没有可报告的内容时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then
   if SIDE_OUT="$(python3 -B -c '
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from module_stage import UNCHECKED
+from module_stage import DEFERRED, UNCHECKED, deferral_lint
 side_checklists = sorted(path for path in Path("tasks").glob("*/*.md") if path.name not in ("plan.md", "todo.md"))
 for path in side_checklists:
     try:
-        count = len(UNCHECKED.findall(path.read_text(encoding="utf-8")))
+        text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         print("UNREADABLE 0 %s" % path.as_posix())
         continue
+    count = len(UNCHECKED.findall(text)) + len(DEFERRED.findall(text))
     if count:
         print("OPEN %d %s" % (count, path.as_posix()))
+    deferrals = len(deferral_lint(text))
+    if deferrals:
+        print("DEFER %d %s" % (deferrals, path.as_posix()))
 ' "$HOOKDIR" 2>/dev/null </dev/null)"; then
     while IFS=' ' read -r kind count item; do
       case "$kind" in
         OPEN) warn "${item} 有 ${count} 个未勾选项，它们不计入阶段（阶段判定只数 todo.md）；返工或修订请写进该模块的 todo.md" ;;
+        DEFER) warn "${item} 有 ${count} 项延期写法，延期只在该模块的 todo.md 里才算数，这里不算延期；请挪回 todo.md" ;;
         UNREADABLE) warn "未验证：${item} 读取失败，没有检查它的清单项" ;;
       esac
     done <<<"$SIDE_OUT"

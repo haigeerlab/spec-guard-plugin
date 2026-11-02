@@ -100,7 +100,8 @@ def main() -> int:
     marked = any(line.strip() == SUSPEND_MARKER for line in before.splitlines())
     if suspending:
         if not state["open"]:
-            print("nothing-open: %s has no unchecked item; it already counts as done" % module_id)
+            deferred = ("; %d deferred item(s) do not count" % len(state["deferred"])) if state["deferred"] else ""
+            print("nothing-open: %s has no unchecked item%s; it already counts as done" % (module_id, deferred))
             return 2
         if marked and reason is None:
             print("already-suspended: %s already carries the marker" % module_id)

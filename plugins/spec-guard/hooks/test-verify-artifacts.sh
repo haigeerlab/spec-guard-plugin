@@ -377,4 +377,26 @@ check "未完成模块没有这一节、清单新增依赖时照常通过" 0 "0 
 check_absent "不再提示「需要的外部条件」" "需要的外部条件"
 check_absent "不再逐项报新增依赖" "依赖改动"
 
+# formal-deferral：todo.md 里的延期写法。合格的报有效；带前缀但格式不对、检查点写成延期的判失败；
+# 像延期的自由文本、旁路文件里的延期只警告，并说明照旧算未完成或不算延期。
+side_project deferral-ok
+printf '%s\n' '- [x] a' '- [ ] 延期：故障注入；恢复条件：Mock 上线' > "$PROJECT/tasks/alpha/todo.md"
+check "合格的延期项通过并报数" 0 "延期项写法有效：alpha（1 项）"
+side_project deferral-no-condition
+printf '%s\n' '- [x] a' '- [ ] 延期：故障注入' > "$PROJECT/tasks/alpha/todo.md"
+check "延期项缺恢复条件判失败并给行号" 1 "tasks/alpha/todo.md:2 带延期前缀但格式不对"
+check "延期项格式不对时给出正确写法" 1 "- [ ] 延期：<事项>；恢复条件：<条件>"
+side_project deferral-checkpoint
+printf '%s\n' '- [x] a' '- [ ] 延期：最终验收（gate）；恢复条件：以后' > "$PROJECT/tasks/alpha/todo.md"
+check "检查点写成延期判失败" 1 "tasks/alpha/todo.md:2 检查点不能延期"
+side_project deferral-informal
+printf '%s\n' '- [x] a' '- [ ] D1：延期未验——缺外部授权' > "$PROJECT/tasks/alpha/todo.md"
+check "像延期的自由文本只警告并给改写示例" 0 "tasks/alpha/todo.md:2 像是延期，但不是正式写法"
+side_project deferral-side
+printf '%s\n' '- [ ] 延期：故障注入；恢复条件：Mock 上线' '- [ ] 延期 X-02 缺 Mock' > "$PROJECT/tasks/alpha/deferred.md"
+check "旁路文件里的延期写法警告不算延期" 0 "tasks/alpha/deferred.md 有 2 项延期写法，延期只在该模块的 todo.md 里才算数"
+check "旁路文件里的合格延期仍按未勾选项报告" 0 "tasks/alpha/deferred.md 有 2 个未勾选项"
+side_project deferral-none
+check_absent "没有延期写法时不输出延期一节" "延期"
+
 echo "verify-artifacts regression passed ($PASS cases)"

@@ -1,5 +1,5 @@
 {
-  "interface": "1.11",
+  "interface": "1.12",
   "mapView": {
     "command": [
       "python3",
@@ -48,6 +48,14 @@
       },
       "notes": "facts only: spec-guard sets no threshold and makes no stalled judgement; readers decide how long is too long",
       "contract": "spec/map-progress-facts.md"
+    },
+    "deferral": {
+      "appearsWhen": "always, whatever moduleConcurrency is (interface 1.12, spec/formal-deferral.md)",
+      "fields": {
+        "deferred": "per module; [{\"item\", \"resumeWhen\"}] of the formal deferrals in this checkout's working-tree tasks/<id>/todo.md, in order; an unchecked item written `- [ ] 延期：<item>；恢复条件：<condition>` or `- [ ] Deferred: <item>; Resume when: <condition>` (prefixes case-insensitive, either colon and semicolon form, languages may mix); an item that is a checkpoint or has an empty condition is not a deferral; [] when there is none or no todo",
+        "deferredTotal": "top level; the sum of every module's deferred items"
+      },
+      "statusChange": "since 1.12 a formal deferral is not an unchecked item: a module whose only unchecked items are deferrals has status done (before 1.12 in_progress) and its dependents can be ready; progress.total and the stage hint's counts leave deferrals out; status values are unchanged; projects without deferrals see no change"
     },
     "concurrency": {
       "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear",

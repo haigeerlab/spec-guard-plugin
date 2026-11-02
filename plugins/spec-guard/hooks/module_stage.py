@@ -5,7 +5,9 @@ The current module is `.agent/state.json` activeModule when it names a mapped mo
 otherwise the first module in Build order that is not done. A module needs a spec
 (`spec/<id>.md`), then a plan (`tasks/<id>/plan.md`), then has open work while
 `tasks/<id>/todo.md` has unchecked items; it is done once a plan exists and no
-unchecked item remains. Read-only: this never writes a file.
+unchecked item remains. A formal deferral (`- [ ] 延期：<item>；恢复条件：<condition>`) is
+not an unchecked item: it is listed apart and does not keep the module open.
+Read-only: this never writes a file.
 """
 from __future__ import annotations
 import json
@@ -21,7 +23,15 @@ from checkout_role import role as checkout_role_of
 from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
 
-UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \]", re.MULTILINE)
+# formal-deferral: the one deferred-item criterion.  What follows an unchecked box: the 延期/Deferred prefix, an item
+# that is neither a checkpoint nor tiered, then 恢复条件/Resume when and a non-blank condition.  Anything short of that
+# stays an ordinary unchecked item.  UNCHECKED and OPEN_ITEM exclude it, so every caller counts the same way.
+DEFERRED_TAIL = (r"[ \t]+(?i:延期|deferred)[ \t]*[：:][ \t]*"
+                 r"(?!(?i:检查点|checkpoint(?![a-z])))(?![^：:；;\n]*[（(][ \t]*(?i:gate|report)[ \t]*[）)])"
+                 r"(?P<item>[^\n]*?[^\s；;][^\n]*?)[ \t]*[；;][ \t]*(?i:恢复条件|resume[ \t]+when)[ \t]*[：:]"
+                 r"[ \t]*(?P<resume>\S[^\n]*?)[ \t\r]*$")
+DEFERRED = re.compile(r"^\s*[-*+]\s+\[ \]" + DEFERRED_TAIL, re.MULTILINE)
+UNCHECKED = re.compile(r"^\s*[-*+]\s+\[ \](?!" + DEFERRED_TAIL + ")", re.MULTILINE)
 CHECKED = re.compile(r"^\s*[-*+]\s+\[[xX]\]", re.MULTILINE)
 NO_TODO_MARKER = "<!-- spec-guard: no-todo -->"
 # module-suspend: one exact line in todo.md parks a started module until the user resumes it.
@@ -86,6 +96,33 @@ def review_state(text: str, kind: str) -> str:
     return "approved" if match.group(1) == review_digest(text) else "revised"
 
 
+def deferred_items(text: str) -> list:
+    """[(item, resume condition)] of the todo's formal deferrals, in order (see DEFERRED_TAIL)."""
+    return [(match.group("item").strip(), match.group("resume").strip()) for match in DEFERRED.finditer(text)]
+
+
+DEFERRAL_PREFIX = re.compile(r"^\s*[-*+]\s+\[ \][ \t]+(?i:延期|deferred)[ \t]*[：:]")
+DEFERRAL_WORD = re.compile(r"(?i:延期|deferred)")
+CHECKPOINT_DEFERRAL = re.compile(DEFERRAL_PREFIX.pattern + r"[ \t]*(?:(?i:检查点|checkpoint(?![a-z]))"
+                                 r"|[^：:；;\n]*[（(][ \t]*(?i:gate|report)[ \t]*[）)])")
+
+
+def deferral_lint(text: str) -> list:
+    """[(kind, line number)] for verify-artifacts: formal, checkpoint, malformed (prefix without the full form),
+    informal (an unchecked item that mentions a deferral in free text).  The criterion itself is DEFERRED."""
+    found = []
+    for number, line in enumerate(text.splitlines(), 1):
+        if DEFERRED.match(line):
+            found.append(("formal", number))
+        elif CHECKPOINT_DEFERRAL.match(line):
+            found.append(("checkpoint", number))
+        elif DEFERRAL_PREFIX.match(line):
+            found.append(("malformed", number))
+        elif UNCHECKED.match(line) and DEFERRAL_WORD.search(line):
+            found.append(("informal", number))
+    return found
+
+
 def module_state(root: Path, module_id: str) -> dict:
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
     plan = root / "tasks" / module_id / "plan.md"
@@ -106,6 +143,7 @@ def module_state(root: Path, module_id: str) -> dict:
         stage = "DONE"
     return {"id": module_id, "stage": stage, "spec": has_spec, "plan": has_plan, "open": open_items,
             "half": half and not suspended, "suspended": suspended, "todo": todo.is_file(),
+            "deferred": deferred_items(text),
             "no_todo_declared": has_plan and not todo.is_file() and any(
                 line.strip() == NO_TODO_MARKER for line in plan.read_text(encoding="utf-8").splitlines())}
 
@@ -458,7 +496,7 @@ def gate_checkpoints(text: str) -> list:
             if tier == "gate" or (tier is None and position == last)]
 
 
-OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \]\s+")
+OPEN_ITEM = re.compile(r"^\s*[-*+]\s+\[ \](?!" + DEFERRED_TAIL + r")\s+")
 
 
 def at_final_gate(root: Path, module: str) -> bool:
@@ -924,6 +962,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     suspended = [s for s in states if s["suspended"]]
     if suspended:
         counts += (" · 挂起 %d" if zh else " · Suspended %d") % len(suspended)
+    deferred = sum(len(s["deferred"]) for s in states)
+    if deferred:
+        counts += (" · 延期 %d" if zh else " · Deferred %d") % deferred
     suspended_lines = [("- 挂起: `%s`（%d 个未勾选项）；用 %s 恢复。" if zh else
                         "- Suspended: `%s` (%d unchecked item(s)); resume with %s.")
                        % (s["id"], s["open"], cmd["resume"] % s["id"]) for s in suspended]
@@ -947,7 +988,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     suspended_ids = tuple(s["id"] for s in suspended)
     if stage == "DONE":
         info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
-                           bool(unmerged and unmerged[0] > 0)],
+                           bool(unmerged and unmerged[0] > 0), deferred],
                     stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
         notes.extend(suspended_lines)
         if no_todo_note:
@@ -964,33 +1005,43 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
             return (head + counts + "\n" + "".join(n + "\n" for n in notes + role_lines)
                     + ("\n建议下一步: " if zh else "\nSuggested next step: ") + role_step)
+        # formal-deferral: with deferred items left, "no open todo item" would read as nothing left at all.
+        all_done = (("能力图里每个模块都有 Plan，除 %d 项延期（用 %s 查看）外没有未勾选的 todo 项" % (deferred, cmd["map"])
+                     if deferred else "能力图里每个模块都有 Plan，且没有未勾选的 todo 项") if zh else
+                    ("every mapped module has a plan and no open todo item apart from %d deferred item(s) waiting to "
+                     "resume (list them with %s)" % (deferred, cmd["map"])
+                     if deferred else "every mapped module has a plan and no open todo item"))
+        also_deferred = ((("；另有 %d 项延期待恢复（用 %s 查看）" if zh else
+                           "; %d deferred item(s) waiting to resume (list them with %s)") % (deferred, cmd["map"]))
+                         if deferred else "")
         if zh:
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" + counts + "\n" + "".join(n + "\n" for n in notes)
             proposal = "新增需要留下经过审查的决定记录时，用 Proposal。"
             if push_first:
-                return (head + "\n建议下一步: " + ("除挂起的模块外都已完成；挂起 %d 个；" % len(suspended) if suspended else
-                                                "能力图里每个模块都有 Plan，且没有未勾选的 todo 项；") + push_first +
+                return (head + "\n建议下一步: " + ("除挂起的模块外都已完成；挂起 %d 个%s；" % (len(suspended), also_deferred)
+                                                if suspended else all_done + "；") + push_first +
                         "要做新工作，先总结需求、问用户是否说完，确认后再用 " + cmd["add-module"] + " 插入一个模块；" + proposal)
             if suspended:
-                return (head + "\n建议下一步: 除挂起的模块外都已完成；挂起 %d 个（等待结束后恢复其中一个）。要做新工作，"
-                        "先总结需求、问用户是否说完，确认后再在这个检查点用 %s 插入一个模块；%s" % (len(suspended), cmd["add-module"], proposal))
-            return (head + "\n建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 "
+                return (head + "\n建议下一步: 除挂起的模块外都已完成；挂起 %d 个（等待结束后恢复其中一个）%s。要做新工作，"
+                        "先总结需求、问用户是否说完，确认后再在这个检查点用 %s 插入一个模块；%s" % (len(suspended), also_deferred,
+                                                                          cmd["add-module"], proposal))
+            return (head + "\n建议下一步: " + all_done + "。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 "
                     + cmd["add-module"] + " 插入一个模块；" + proposal)
         if push_first:
             return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
-                    "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended; "
-                                                 % len(suspended) if suspended else
-                                                 "every mapped module has a plan and no open todo item; ") + push_first +
+                    "\nSuggested next step: " + ("every module that is not suspended is done; %d suspended%s; "
+                                                 % (len(suspended), also_deferred) if suspended else
+                                                 all_done + "; ") + push_first +
                     "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + "; "
                     "use a Proposal when the addition needs a recorded, reviewed decision.")
         if suspended:
             return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
                     "\nSuggested next step: every module that is not suspended is done; %d suspended (resume one "
-                    "when its wait is over). For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with %s at this checkpoint; "
-                    "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended),
+                    "when its wait is over)%s. For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with %s at this checkpoint; "
+                    "use a Proposal when the addition needs a recorded, reviewed decision." % (len(suspended), also_deferred,
                                                                                               cmd["add-module"]))
         return ("Current stage: **DONE**\n\n- Capability map: present\n" + counts + "\n" + "".join(n + "\n" for n in notes) +
-                "\nSuggested next step: every mapped module has a plan and no open todo item. "
+                "\nSuggested next step: " + all_done + ". "
                 "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with " + cmd["add-module"] + " at this checkpoint; "
                 "use a Proposal when the addition needs a recorded, reviewed decision.")
     module = current["id"]

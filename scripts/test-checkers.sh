@@ -787,6 +787,11 @@ mkifc "$TMP/ifc-overlap" 'del data["scopeOverlap"]'
 want fail "interface: 缺 1.10 的 scopeOverlap 入口 → 报错" python3 "$IFC" "$TMP/ifc-overlap/interface.json"
 mkifc "$TMP/ifc-overlap-error" 'del data["scopeOverlap"]["values"]["error"]["map-unreadable"]'
 want fail "interface: scopeOverlap 的 error 少一个码 → 报错" python3 "$IFC" "$TMP/ifc-overlap-error/interface.json"
+# formal-deferral：interface 1.12 的 mapView.deferral 说明，字段与 map_view.DEFERRAL_FIELDS 一致。
+mkifc "$TMP/ifc-deferral" 'del data["mapView"]["deferral"]'
+want fail "interface: mapView 缺 1.12 的 deferral 说明 → 报错" python3 "$IFC" "$TMP/ifc-deferral/interface.json"
+mkifc "$TMP/ifc-deferral-field" 'del data["mapView"]["deferral"]["fields"]["deferredTotal"]'
+want fail "interface: deferral 少一个字段 → 报错" python3 "$IFC" "$TMP/ifc-deferral-field/interface.json"
 # pre-declared-scope：interface 1.11 的 declaredScope 入口，错误码与 module_scope.DECLARED_ERRORS 一致。
 mkifc "$TMP/ifc-declared" 'del data["declaredScope"]'
 want fail "interface: 缺 1.11 的 declaredScope 入口 → 报错" python3 "$IFC" "$TMP/ifc-declared/interface.json"

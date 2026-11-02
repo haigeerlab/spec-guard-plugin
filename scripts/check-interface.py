@@ -48,7 +48,8 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return found + _progress_facts(view) + _concurrency(path, data, view) + _review_kinds(path, data)
+    return (found + _progress_facts(view) + _deferral(view) + _concurrency(path, data, view)
+            + _review_kinds(path, data))
 
 
 def _progress_facts(view: dict) -> list:
@@ -66,6 +67,17 @@ def _progress_facts(view: dict) -> list:
         found.append("mapView.progressFacts.values.reviewCadence 的取值为 %s，代码为 %s"
                      % (sorted(cadence) if isinstance(cadence, dict) else cadence, sorted(project_config.CADENCES)))
     return found
+
+
+def _deferral(view: dict) -> list:
+    """formal-deferral: interface 1.12 describes every deferral field map_view writes."""
+    block = view.get("deferral")
+    fields = block.get("fields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 deferral 说明"]
+    if set(fields) != set(map_view.DEFERRAL_FIELDS):
+        return ["mapView.deferral.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.DEFERRAL_FIELDS))]
+    return []
 
 
 def _scripts(path: Path, label: str, command) -> list:

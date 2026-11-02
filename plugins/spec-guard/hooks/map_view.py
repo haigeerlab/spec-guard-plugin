@@ -42,6 +42,7 @@ TODO_PATH = re.compile(r"^tasks/([^/\s]+)/todo\.md$")
 SPEC_PATH = re.compile(r"^spec/([^/\s]+)\.md$")
 COMMIT_SEP = "\x1e"
 PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence", "gates")  # interface.json progressFacts
+DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (formal-deferral, interface 1.12)
 
 
 class Unreadable(Exception):
@@ -417,6 +418,7 @@ def build(root: Path) -> dict:
             "review": _review(root, module),
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
+            "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
         })
 
     state, ticks, suspended_write = history(root)
@@ -454,6 +456,7 @@ def build(root: Path) -> dict:
         "modules": modules,
         "history": state,
         "reviewCadence": _review_cadence(root),
+        "deferredTotal": sum(len(m["deferred"]) for m in modules),
     }
     if concurrent:
         data.update(_concurrency(root, parsed, modules))
@@ -494,7 +497,7 @@ def _suspended_label(m: dict, now: datetime) -> str:
 def _status_cell(m: dict, now: datetime, concurrent: bool = False, head_at: str | None = None) -> str:
     value = m["status"]
     if value == "done":
-        return "✅ 已完成"
+        return "✅ 已完成（延期 %d）" % len(m["deferred"]) if m["deferred"] else "✅ 已完成"
     if value == "in_progress":
         if m["step"] == "spec":
             return "🔨 写 Spec"
@@ -593,7 +596,8 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     shown = []
     group = []
     for m in modules:
-        expand = expand_all or m["status"] in ("in_progress", "suspended", "blocked", "ready") or m["id"] == last_done
+        expand = (expand_all or m["status"] in ("in_progress", "suspended", "blocked", "ready") or m["id"] == last_done
+                  or bool(m["deferred"]))
         if expand:
             if group:
                 shown.append(group)
@@ -619,6 +623,10 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
                                                          _status_cell(by_id[item["id"]], now, concurrent, data["head"]["committedAt"])
                                                          + _worktree_suffix(item),
                                                          _review_cell(root, item)))
+    deferred = [(m["id"], d) for m in modules for d in m["deferred"]]
+    if deferred:
+        lines += ["", "延期项："] + ["- %s · %s · 恢复条件：%s" % (module, _responsibility(d["item"]), _responsibility(d["resumeWhen"]))
+                                   for module, d in deferred]
     return "\n".join(lines) + "\n"
 
 

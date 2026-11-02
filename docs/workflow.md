@@ -155,7 +155,7 @@ Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 to
 
 阶段**不是存起来的状态，而是每轮实时算出来的**：模块清单与顺序取自 `spec/CAPABILITY-MAP.md`，每个模块处在
 哪一步只看 `spec/<模块>.md`、`tasks/<模块>/plan.md`、`tasks/<模块>/todo.md` 是否存在以及 todo 里还有几个
-未勾选项。`.agent/state.json` 只存一样东西——`activeModule`，也就是当前焦点这个书签。所以它丢了也算得出阶段，
+未勾选项（写明恢复条件的延期项 `- [ ] 延期：<事项>；恢复条件：<条件>` 不算，见共享检查点规则「延期项」）。`.agent/state.json` 只存一样东西——`activeModule`，也就是当前焦点这个书签。所以它丢了也算得出阶段，
 只是会退化为「按 Build order 取第一个没完成的模块」。
 
 hook 是否出声由两个激活信号决定，有其一即可：`CLAUDE.md`／`AGENTS.md` 里独占一行的声明块，或含

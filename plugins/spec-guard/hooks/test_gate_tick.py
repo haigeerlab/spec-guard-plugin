@@ -52,6 +52,13 @@ class GateTick(unittest.TestCase):
         done = self.run_tick("--confirm").stdout.splitlines()
         self.assertEqual(done[0], "tasks/alpha/todo.md line 2: - [x] 最终验收（gate）")
 
+    def test_deferred_items_are_not_counted_as_left(self):
+        # formal-deferral: a deferral after the final gate leaves the module done once the gate is ticked.
+        self.write("- [x] Task 1\n- [ ] 最终验收（gate）\n- [ ] 延期：故障注入；恢复条件：Mock 上线\n")
+        done = self.run_tick("--confirm")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("ticked; 0 unchecked item(s) left", done.stdout)
+
     def test_confirm_ticks_only_that_box(self):
         self.write("# Todo\n\n- [x] Task 1\n- [ ] Checkpoint 1（gate）：最终验收 — 记 [ ] 原样\n")
         done = self.run_tick("--confirm")
