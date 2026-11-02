@@ -6,7 +6,7 @@
 - [x] Task 3：/map 与接口（map_view、interface.json 1.12） — JSON 每模块加 `deferred`、顶层加 `deferredTotal`（`DEFERRAL_FIELDS`）；表格「✅ 已完成（延期 n）」且有延期的已完成模块不折叠；表后「延期项：」一节逐条列模块 · 事项 · 恢复条件（经 clean 与截断）。`interface.json` 1.12 加 `mapView.deferral`（字段与口径变化），`check-interface.py` 核对字段。`test_map_view.py` 加 3 例并更新固定键集合（改前 4 失败 1 报错），`test-checkers.sh` 加 2 个反例（补说明后、加检查前为红），改后 map 80 例、检查器 161 例全部通过。用例发现：Build order 里紧跟的下游会被当作当前模块算进行中（现有规则），所以「可以开始」用排在后面的另一个下游验证。
 - [x] Task 4：verify-artifacts（失败与迁移提示，ShellCheck） — `module_stage` 加 `deferral_lint`（formal／checkpoint／malformed／informal 与行号，判据仍是 `DEFERRED`）；verify-artifacts 新增「延期写法」一节：合格的报有效，带前缀但格式不对与检查点延期判失败，像延期的自由文本警告并给改写示例；旁路清单的未勾选数把合格延期也算进去，另报「有 n 项延期写法……这里不算延期，请挪回 todo.md」。回归加 8 例（改前第一例即红），88 例通过；`test_formal_deferral.py` 加 lint 用例；改过的 5 份 `.sh` 按 CI 参数 ShellCheck 无告警；本仓库校验 0 失败。
 - [x] Task 5：规则、模板与文档 — 共享检查点规则新增「延期项」一节（写法、谁决定、不能延期的、怎么恢复、与挂起的区别）；两份约定块模板各加一行，约定块上限 4000 字节使第一版超了 126 字节，压成一行「等外部条件的项经用户同意写成 … 不挡下游；见共享检查点规则「延期项」」（Claude 3985 字节）；`docs/convention-block.md` 同步；`docs/design.md`、`docs/workflow.md`、`docs/concepts.md`、`commands/map.md`、`spec-guard-ops` map 一节补说明。`test_workflow_checkpoints.py` 加一例锁定规则与模板行，85 例通过；`check-readme-sync.py` 0 失败；`validate.sh --quick` 通过。
-- [ ] Task 6：版本号 0.86.0 与 CHANGELOG
+- [x] Task 6：版本号 0.86.0 与 CHANGELOG — 两份 `plugin.json` 改 0.86.0；README 中英 `--ref v0.86.0`；CHANGELOG 加 `## [0.86.0] - 2026-11-02`（升级须知：口径变化、自由文本照旧未完成、约定块多一行、团队都升级后再用；新增四条）。`check-readme-sync.py`、`check-manifests.py` 通过。
 - [ ] Checkpoint 1（report）：发布前完整检查、变异验证、给总负责人发口径变化通知
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 - [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、告诉总负责人
