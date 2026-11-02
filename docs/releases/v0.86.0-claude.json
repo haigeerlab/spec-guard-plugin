@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:92ec86ad23a1628cf7310d272480275f4813d4af"
+      },
+      "observedAt": "2026-11-02T08:24:00Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.85.2 to 0.86.0; installed_plugins.json records version 0.86.0 and gitCommitSha 92ec86a (the tag); the installed plugin directory is identical to the release asset apart from the runtime .in_use marker; its hooks/module_stage.py defines DEFERRED_TAIL (a fact this release adds)",
+        "result:claude -p (Claude Code 2.1.311) in a temporary project where alpha's todo has one checked item and one `Deferred: fault injection; Resume when: the mock supports it`: the UserPromptSubmit injection reported NEEDS_SPEC with current module `beta` and the counts line `Modules 2 · Specs 1 · Plans 1 · In progress 0 · Done 1 · Deferred 1`"
+      ]
+    }
+  ]
+}
