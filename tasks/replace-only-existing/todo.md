@@ -6,4 +6,4 @@
 - [x] Task 3：版本号 0.86.1 与 CHANGELOG（含改正 0.86.0 升级须知） — 两份 `plugin.json` 改 0.86.1；README 中英 `--ref v0.86.1`；CHANGELOG 加 `## [0.86.1] - 2026-11-02`（修复、文档），0.86.0 升级须知「约定块多了一行」改为在块所在的一侧运行并注明 0.86.1 更正。`check-readme-sync.py`、`check-manifests.py` 通过。
 - [x] Checkpoint 1（report）：发布前完整检查与变异验证 — 主机 macOS 15.7.3 arm64，系统 `/bin/bash` 3.2.57，HEAD `de3020ef`：`validate.sh` 通过（含 setup/teardown 62 例）；phase-guard 512 例、verify-artifacts 88 例通过；`evals/codex-plugin-smoke.sh --selftest` 通过；两份改过的 `.sh` 按 CI 参数 ShellCheck 无告警。变异（新建临时目录里的草稿副本）：去掉拒绝分支 → 第一例「块只在 AGENTS.md」失败；把拒绝挪到 `mkdir -p` 之后 → 「还没有目录：被拒时不建目录」失败。
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-02 用户「验收通过」；拟回告原文随验收一并批准。
-- [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、告诉总负责人
+- [x] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、告诉总负责人 — 2026-11-02 PR #430 合并于 `ad00b43`（先核对 merged 与 main 指向）；tag `v0.86.1`、Release 资产 sha256 `aca65260…56d1`（679472 字节），下载比对一致；Claude 0.86.1 实测拒绝；Codex 改 ref 升级后首次 smoke 退出 2，用户在 `/hooks` 重新批准后退出 0；证据 `docs/releases/v0.86.1-*.json`；Proposal 收尾扫描 `pending` 为空；按批准原文经 agent-relay 回告总负责人（#15682）。
