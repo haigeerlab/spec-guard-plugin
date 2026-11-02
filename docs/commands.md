@@ -24,6 +24,8 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 - `--replace` 升级已有约定块。块内本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`）
   原样保留；预览逐行列出 `will remove:`／`will add:`，不在现行模板里的删除行标 `[needs --accept-removals]`，
   不加这个参数时拒绝替换且不改文件。
+- `--replace` 只替换已有块、从不新建：目标文件（Claude 侧 `CLAUDE.md`、Codex 侧 `AGENTS.md`）里没有块时退出 1、不改任何文件和目录，
+  另一侧有块就提示改用那一侧（加或去掉 `--host=codex`），两侧都没有就提示去掉 `--replace` 新建；`--dry-run` 结论相同。
 - 派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时 `--replace` 移除整段，不需要 `--accept-removals`。
 - 已有 `.agent/state.json.disabled` 时拒绝新建空状态，先人工核对后改回原名。
 

@@ -40,12 +40,18 @@ if [ "$HOST" = codex ]; then
   RULE="$ROOT/templates/codex-dispatch-rule.md"
   BEGIN='<!-- BEGIN:spec-guard-codex-convention -->'
   END='<!-- END:spec-guard-codex-convention -->'
+  OTHER=CLAUDE.md
+  OTHER_BEGIN='<!-- BEGIN:agent-skills-convention -->'
+  OTHER_END='<!-- END:agent-skills-convention -->'
 else
   TARGET=CLAUDE.md
   TEMPLATE="$ROOT/templates/claude-block-local.md"
   RULE="$ROOT/templates/claude-dispatch-rule.md"
   BEGIN='<!-- BEGIN:agent-skills-convention -->'
   END='<!-- END:agent-skills-convention -->'
+  OTHER=AGENTS.md
+  OTHER_BEGIN='<!-- BEGIN:spec-guard-codex-convention -->'
+  OTHER_END='<!-- END:spec-guard-codex-convention -->'
 fi
 
 BLOCK_TOOL="$HERE/managed-block.py"
@@ -146,6 +152,23 @@ install_block() {
 }
 
 echo '═══ Spec Guard local convention ═══'
+# replace-only-existing：--replace 只替换已有块、从不新建。目标文件没有块时，在任何写入之前拒绝（--dry-run 同样），
+# 并按另一侧文件里有没有块提示该在哪一侧运行；另一侧只看标记是否独占一行，不校验它的结构。
+if [ "$REPLACE" = true ] && [ "$HAS_BLOCK" != true ]; then
+  OTHER_MARKERS=0
+  if [ -f "$OTHER" ]; then
+    OTHER_MARKERS="$(grep -Ec "^[[:space:]]*($OTHER_BEGIN|$OTHER_END)[[:space:]]*$" "$OTHER" || true)"
+  fi
+  if [ "$OTHER_MARKERS" -gt 0 ] && [ "$HOST" = codex ]; then
+    HINT='约定块在 CLAUDE.md：去掉 --host=codex（Claude 侧 /spec-guard:setup-convention --replace）'
+  elif [ "$OTHER_MARKERS" -gt 0 ]; then
+    HINT='约定块在 AGENTS.md：改用 --host=codex（Claude 侧 /spec-guard:setup-convention --replace --host=codex，Codex 侧 spec-guard-ops 的 setup-convention 一节）'
+  else
+    HINT='要新建约定块，去掉 --replace 再运行'
+  fi
+  printf '  ❌ %s 里没有约定块，--replace 只替换已有块；%s。未改动任何文件\n' "$TARGET" "$HINT" >&2
+  exit 1
+fi
 # review-residual-fixes（C3）：--replace 会被拒（要删模板外的行、没给 --accept-removals）时，在建任何目录或文件之前就停下。
 if [ "$HAS_BLOCK" = true ] && [ "$REPLACE" = true ] && [ "$DRY" != true ]; then
   CHECK_FLAG=""

@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.1` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
@@ -168,7 +168,9 @@ from 0.60.x or earlier, the one injected after compaction; coming from 0.68.x or
 and clear.
 
 In a project with an older convention block, preview `/spec-guard:setup-convention --replace --dry-run` after updating,
-and replace once you have confirmed. Keep your own rules inside the block's local section
+and replace once you have confirmed. Run it on the side that holds the block: add `--host=codex` when the block is in `AGENTS.md`,
+and run it once per side when both `CLAUDE.md` and `AGENTS.md` have one; with no block in the target file `--replace` refuses
+and names the side to use instead of creating one. Keep your own rules inside the block's local section
 (`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`); replacing keeps it.
 
 **Uninstall**

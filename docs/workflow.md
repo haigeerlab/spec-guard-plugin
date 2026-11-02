@@ -71,7 +71,8 @@ agent 会先问清楚。批准来源以所装协作插件的规定为准（例�
 
 **这些规则从哪来。** 交审怎么呈现、最终验收的几张表这类停点规则在[停点规则](../plugins/spec-guard/references/node-rules.md)里，
 阶段提示到了对应节点直接附上，不常驻约定块。已经装过旧版约定块的项目，升级插件后先预览
-`/spec-guard:setup-convention --replace --dry-run`，确认后再替换，约定块才会变短；安装插件新版本本身不会改写现有的
+`/spec-guard:setup-convention --replace --dry-run`，确认后再替换，约定块才会变短（在块所在的一侧运行：块在 `AGENTS.md` 加
+`--host=codex`，两侧都有就各跑一次；目标文件里没有块时 `--replace` 拒绝并提示该用哪一侧）；安装插件新版本本身不会改写现有的
 `CLAUDE.md` 或 `AGENTS.md`，旧的长块不改也照常有效，只是和节点上附的规则重复。项目自己的规则放进块内的本地段
 （`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`），替换时原样保留；预览会逐行列出将删除和新增的行，
 要删掉模板以外的行时，替换会拒绝，需看过后加 `--accept-removals`。

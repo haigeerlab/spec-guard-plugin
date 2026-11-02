@@ -640,4 +640,54 @@ $(diff "$WORK/formatted" "$P/$HT")"
   ok "${host}：格式化器整理过的本地段再 --replace 不变"
 done
 
+# replace-only-existing：--replace 只替换已有块、从不新建。目标文件没有块时拒绝（退出 1），文件与目录一个都不建，
+# 并提示该在哪一侧运行；--dry-run 给同样的结论。
+refused() {  # $1=用例名 $2=提示里必须有的文字 其余=setup 参数；要求退出 1 且 snapshot 不变
+  local name="$1" hint="$2"; shift 2
+  local before; before="$(snapshot)"
+  run setup-convention.sh "$@"
+  [ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] && grep -F -- "$hint" >/dev/null <<<"$OUT" \
+    && grep -F -- '--replace 只替换已有块' >/dev/null <<<"$OUT" && ! grep -F 'append a convention block' >/dev/null <<<"$OUT" \
+    || fail "${name}：应拒绝、提示「${hint}」且什么都不改
+$OUT"
+  ok "$name"
+}
+project replace-codex-only
+run setup-convention.sh local --host=codex
+[ "$RC" -eq 0 ] || fail "夹具：Codex 侧 setup 失败
+$OUT"
+cp "$P/AGENTS.md" "$WORK/agents-only"
+refused "块只在 AGENTS.md：Claude 侧 --replace 被拒并提示改用 --host=codex" '约定块在 AGENTS.md：改用 --host=codex' local --replace
+refused "块只在 AGENTS.md：Claude 侧 --replace --dry-run 同样被拒" '约定块在 AGENTS.md：改用 --host=codex' local --replace --dry-run
+[ ! -e "$P/CLAUDE.md" ] || fail "被拒后不应新建 CLAUDE.md"
+project replace-codex-only-fresh
+cp "$WORK/agents-only" "$P/AGENTS.md"
+refused "块只在 AGENTS.md、还没有目录：被拒时不建 spec/、tasks/、.agent/" '约定块在 AGENTS.md' local --replace
+[ ! -e "$P/spec" ] && [ ! -e "$P/tasks" ] && [ ! -e "$P/.agent" ] || fail "被拒时不应建目录"
+
+project replace-claude-only
+run setup-convention.sh local
+[ "$RC" -eq 0 ] || fail "夹具：Claude 侧 setup 失败
+$OUT"
+refused "块只在 CLAUDE.md：Codex 侧 --replace 被拒并提示去掉 --host=codex" '约定块在 CLAUDE.md：去掉 --host=codex' local --host=codex --replace
+[ ! -e "$P/AGENTS.md" ] || fail "被拒后不应新建 AGENTS.md"
+
+project replace-none
+printf '# Mine\n' > "$P/CLAUDE.md"
+refused "两侧都没有块：--replace 被拒并提示去掉 --replace" '要新建约定块，去掉 --replace 再运行' local --replace
+refused "两侧都没有块：--replace --dry-run 同样被拒" '要新建约定块，去掉 --replace 再运行' local --replace --dry-run
+refused "两侧都没有块：Codex 侧 --replace 同样被拒" '要新建约定块，去掉 --replace 再运行' local --host=codex --replace
+
+project replace-both
+run setup-convention.sh local && run setup-convention.sh local --host=codex
+[ "$RC" -eq 0 ] || fail "夹具：两侧 setup 失败
+$OUT"
+run setup-convention.sh local --replace
+[ "$RC" -eq 0 ] || fail "两侧都有块时 Claude 侧 --replace 应照常替换
+$OUT"
+run setup-convention.sh local --host=codex --replace
+[ "$RC" -eq 0 ] && [ "$(markers "$P/CLAUDE.md")" -eq 2 ] || fail "两侧都有块时 Codex 侧 --replace 应照常替换
+$OUT"
+ok "两侧都有块：两边各自 --replace 照常替换"
+
 echo "setup/teardown regression passed (${PASS} cases)"
