@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.86.2] - 2026-11-02
+
+本版 1 个模块（S63）：reflow-tolerant-replace。`interface.json` 不变（1.12）。
+
+### 修复
+
+- **格式化工具只改折行时，`--replace` 与 teardown 不再报删减。** 原来块内容逐行比对：项目的 Markdown 格式化工具（如 oxfmt、Prettier
+  的 `proseWrap: 'never'`）把模板里的续行拼成一行后，拼出的整行在模板里找不到，每次 `--replace` 都列出一批
+  「will remove … [needs --accept-removals]」，teardown 也一样。现在按列表项或段落比较，去掉空白再比；块里的文字真的少了或改了，
+  仍要 `--accept-removals`。预览按段列出，每段一行。
+
+### 文档
+
+- **约定块模板每条规则一行。** `claude-block-local.md`、`codex-block-local.md` 不再折行，文字不变；用 `proseWrap: 'never'` 的格式化工具
+  不会再改动约定块。`docs/convention-block.md` 同步，并说明格式化工具只改空白时不算删减。
+
 ## [0.86.1] - 2026-11-02
 
 本版 1 个模块（S62）：replace-only-existing。`interface.json` 不变（1.12）。
