@@ -690,4 +690,144 @@ run setup-convention.sh local --host=codex --replace
 $OUT"
 ok "两侧都有块：两边各自 --replace 照常替换"
 
+# reflow-tolerant-replace：格式化工具（proseWrap: 'never'）只改折行与空白时不算删减；真删了字照旧要 --accept-removals。
+reflow() {  # $1=文件：像 oxfmt 那样把每个软换行（续行缩进、相邻两行「>」之间）换成一个空格
+  python3 - "$1" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+text = re.sub(r"\n[ \t]+(?=\S)", " ", text)
+while True:
+    joined = re.sub(r"(?m)^(>[^\n]*)\n> ?", r"\1 ", text)
+    if joined == text:
+        break
+    text = joined
+open(path, "w", encoding="utf-8").write(text)
+PY
+}
+wrap() {  # $1=文件：块里超过 60 字的行在第一个「；」或「，」后折开，续行缩进两格
+  python3 - "$1" <<'PY'
+import re, sys
+path = sys.argv[1]
+out = []
+for line in open(path, encoding="utf-8").read().split("\n"):
+    match = re.search("[；，]", line[20:]) if len(line) > 60 and line.startswith(("- ", "> ")) else None
+    if match:
+        cut = 20 + match.end()
+        line = line[:cut] + "\n" + ("> " if line.startswith(">") else "  ") + line[cut:]
+    out.append(line)
+open(path, "w", encoding="utf-8").write("\n".join(out))
+PY
+}
+edit_text() {  # $1=文件 $2=原文 $3=改成；原文必须存在
+  python3 - "$@" <<'PY'
+import sys
+path, old, new = sys.argv[1:4]
+text = open(path, encoding="utf-8").read()
+assert old in text, old
+open(path, "w", encoding="utf-8").write(text.replace(old, new, 1))
+PY
+}
+no_accept_needed() {  # $1=用例名：预览成功、不改文件、不列需要接受的删减
+  [ "$RC" -eq 0 ] && [ "$(snapshot)" = "$before" ] && ! grep -F 'needs --accept-removals' >/dev/null <<<"$OUT" \
+    || fail "$1：只差折行与空白，不应要求 --accept-removals
+$OUT"
+}
+for side in claude codex; do
+  if [ "$side" = codex ]; then
+    HOSTARG=--host=codex HT=AGENTS.md HB='<!-- BEGIN:spec-guard-codex-convention -->' HE='<!-- END:spec-guard-codex-convention -->'
+  else
+    HOSTARG='' HT=CLAUDE.md HB="$BEGIN" HE="$END"
+  fi
+  project "reflow-$side"
+  printf '# Mine\n' > "$P/$HT"
+  host_run
+  [ "$RC" -eq 0 ] || fail "夹具：${side} 侧 setup 失败
+$OUT"
+  wrap "$P/$HT"   # 模板已是每条一行：先折开（像旧模板），再像 oxfmt 那样拼回，中文标点后会多一个空格
+  reflow "$P/$HT"
+  grep -Eq '[；，] ' "$P/$HT" || fail "夹具：${side} 侧拼回后应带上格式化工具加的空格"
+  cp "$P/$HT" "$WORK/reflowed-$side"
+  before="$(snapshot)"
+  host_run --replace --dry-run
+  no_accept_needed "${side} 侧：拼成单行后 --replace --dry-run"
+  host_run --replace
+  [ "$RC" -eq 0 ] && block_is "$TEMPLATES/$side-block-local.md" || fail "${side} 侧：拼成单行后 --replace 应成功并写回模板
+$OUT"
+  ok "${side} 侧：格式化工具拼成单行后 --replace 不要求 --accept-removals"
+
+  cp "$WORK/reflowed-$side" "$P/$HT"
+  before="$(snapshot)"
+  run teardown-convention.sh ${HOSTARG:+"$HOSTARG"} --dry-run
+  no_accept_needed "${side} 侧：拼成单行后 teardown 预览"
+  run teardown-convention.sh ${HOSTARG:+"$HOSTARG"}
+  [ "$RC" -eq 0 ] && [ "$(cat "$P/$HT")" = '# Mine' ] || fail "${side} 侧：拼成单行后 teardown 应移除整块
+$OUT
+$(cat "$P/$HT")"
+  ok "${side} 侧：格式化工具拼成单行后 teardown 不要求 --accept-removals"
+done
+
+# 有续行的旧块（0.86.1 及以前的模板、会把长行折开的格式化工具）升级到每条一行的模板，同样不报删减。
+for side in claude codex; do
+  if [ "$side" = codex ]; then
+    HOSTARG=--host=codex HT=AGENTS.md
+  else
+    HOSTARG='' HT=CLAUDE.md
+  fi
+  project "wrapped-$side"
+  printf '# Mine\n' > "$P/$HT"
+  host_run
+  wrap "$P/$HT"
+  grep -Eq '^  [^ -]' "$P/$HT" || fail "夹具：${side} 侧没有折出续行"
+  before="$(snapshot)"
+  host_run --replace --dry-run
+  no_accept_needed "${side} 侧：有续行的旧块 --replace --dry-run"
+  run teardown-convention.sh ${HOSTARG:+"$HOSTARG"} --dry-run
+  no_accept_needed "${side} 侧：有续行的旧块 teardown 预览"
+  ok "${side} 侧：有续行的旧块升级到每条一行的模板、teardown 都不要求 --accept-removals"
+done
+[ "$(grep -Ec '^  [^ -]' "$TEMPLATES/claude-block-local.md" "$TEMPLATES/codex-block-local.md" | awk -F: '{s+=$2} END{print s}')" -eq 0 ] \
+  || fail "约定块模板应每条规则一行，不留缩进续行"
+ok "约定块模板每条规则一行"
+
+# 反例：拼成单行后真删了字、删了整条规则，--replace 与 teardown 照旧拒绝；改一个词列出一删一增。
+HOSTARG='' HT=CLAUDE.md HB="$BEGIN" HE="$END"
+project reflow-cut
+cp "$WORK/reflowed-claude" "$P/CLAUDE.md"
+edit_text "$P/CLAUDE.md" '，**不跨模块取**' ''
+before="$(snapshot)"
+host_run --replace
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] && grep -F -- '--accept-removals' >/dev/null <<<"$OUT" \
+  || fail "拼成单行后删掉几个字：--replace 应拒绝且不改文件
+$OUT"
+run teardown-convention.sh
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] || fail "拼成单行后删掉几个字：teardown 应拒绝且不改文件
+$OUT"
+ok "拼成单行后删掉几个字：--replace 与 teardown 照旧拒绝"
+
+project reflow-drop
+cp "$WORK/reflowed-claude" "$P/CLAUDE.md"
+python3 - "$P/CLAUDE.md" <<'PY'
+import sys
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().split("\n")
+kept = [l for l in lines if not l.startswith("- 报告一个任务做完时")]
+assert len(kept) == len(lines) - 1
+open(path, "w", encoding="utf-8").write("\n".join(kept))
+PY
+before="$(snapshot)"
+host_run --replace --dry-run
+[ "$RC" -eq 0 ] && grep -F 'will add: - 报告一个任务做完时' >/dev/null <<<"$OUT" || fail "删掉整条规则后预览应列出把它加回
+$OUT"
+edit_text "$P/CLAUDE.md" '- 切换 `activeModule` 前' '- 切换 `activeModule` 之前'
+before="$(snapshot)"
+host_run --replace --dry-run
+[ "$RC" -eq 0 ] && grep -F 'will remove: - 切换 `activeModule` 之前' >/dev/null <<<"$OUT" \
+  && grep -F 'will add: - 切换 `activeModule` 前' >/dev/null <<<"$OUT" || fail "改一个词：预览应列出一删一增
+$OUT"
+host_run --replace
+[ "$RC" -eq 1 ] && [ "$(snapshot)" = "$before" ] || fail "改一个词：--replace 不带 --accept-removals 应拒绝
+$OUT"
+ok "拼成单行后删掉整条规则或改一个词：预览列出增删，改动的行照旧要接受"
+
 echo "setup/teardown regression passed (${PASS} cases)"
