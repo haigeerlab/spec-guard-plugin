@@ -15,7 +15,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/setup-convention
 有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
 原样转述预览输出，并等待用户明确确认后，才去掉 `--dry-run` 再运行一次；用户参数里已有 `--dry-run` 时只预览。
-缺省模式为 `local`。`--replace` 仅替换已有受管声明块；已有声明块的标记重复、缺失或顺序错误时，脚本拒绝并
+缺省模式为 `local`。`--replace` 仅替换已有受管声明块、从不新建：目标文件里没有块时脚本退出 1、不改任何文件，并提示该在哪一侧运行（块在 `AGENTS.md` 时用 `/spec-guard:setup-convention --replace --host=codex`；两侧都没有块时去掉 `--replace`），原样转述这一行；已有声明块的标记重复、缺失或顺序错误时，脚本拒绝并
 不改动任何文件。项目自己的规则写进块内的本地段：独占一行的 `<!-- BEGIN:spec-guard-local -->` 与
 `<!-- END:spec-guard-local -->` 之间的行在 `--replace` 后原样保留在新块末尾（本地段最多一个，标记无效时拒绝）。
 `--replace --dry-run` 逐行列出 `will remove:` 与 `will add:`；要删除的行不在现行模板或已退役的派活规则段里时标着

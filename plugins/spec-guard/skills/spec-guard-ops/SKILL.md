@@ -62,7 +62,7 @@ stderr 写明「本次操作的是被指向的项目」，回复用户时照原�
 CLAUDE_PROJECT_DIR="$PROJECT" /bin/bash "$ROOT/hooks/setup-convention.sh" local --host=codex --dry-run
 ```
 
-已有声明块要升级时追加 `--replace`：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时，`--replace` 会移除整段，预览单列一行
+已有声明块要升级时追加 `--replace`（只替换已有块、从不新建：`AGENTS.md` 里没有块时脚本退出 1、不改任何文件，并提示块在 `CLAUDE.md` 时去掉 `--host=codex`、都没有时去掉 `--replace`，原样转述）：块内 `<!-- BEGIN:spec-guard-local -->` 与 `<!-- END:spec-guard-local -->` 之间的本地段原样保留；预览逐行列出 `will remove:` / `will add:`，标着 `[needs --accept-removals]` 的行不在模板里，原样转述，由用户决定移进本地段或同意删除后追加 `--accept-removals`。派活规则段已退役：`--dispatch`／`--no-dispatch` 会被拒绝；旧块里带着它时，`--replace` 会移除整段，预览单列一行
 `retired build-task-dispatch rule section will be removed`，不需要 `--accept-removals`，转述时不要省略。遗留 `.agent/state.json` 是历史记录，不得用
 setup 覆盖。
 

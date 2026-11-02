@@ -168,7 +168,9 @@ from 0.60.x or earlier, the one injected after compaction; coming from 0.68.x or
 and clear.
 
 In a project with an older convention block, preview `/spec-guard:setup-convention --replace --dry-run` after updating,
-and replace once you have confirmed. Keep your own rules inside the block's local section
+and replace once you have confirmed. Run it on the side that holds the block: add `--host=codex` when the block is in `AGENTS.md`,
+and run it once per side when both `CLAUDE.md` and `AGENTS.md` have one; with no block in the target file `--replace` refuses
+and names the side to use instead of creating one. Keep your own rules inside the block's local section
 (`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`); replacing keeps it.
 
 **Uninstall**
