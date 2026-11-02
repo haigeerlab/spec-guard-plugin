@@ -1,7 +1,7 @@
 # Todo: replace-only-existing
 
 - [x] Task 0：提交能力图新行、已批准的 Spec 与 Plan 草稿 — 2026-11-02 用户批准能力图新行与 Spec（「批准」）、Plan（「Plan 批准」），能力图经预览确认后写入。
-- [ ] Task 1：拒绝分支（setup-convention.sh、test-setup-teardown.sh）
+- [x] Task 1：拒绝分支（setup-convention.sh、test-setup-teardown.sh） — 在「═══ Spec Guard local convention ═══」之后、C3 检查与 `mkdir -p` 之前加拒绝：`--replace` 而目标文件没有块时退出 1、不写任何东西，按另一侧（`OTHER`／`OTHER_BEGIN`／`OTHER_END`）有没有独占一行的标记给三种提示之一。回归加 9 例（只有 AGENTS.md、只有 AGENTS.md 且没目录、只有 CLAUDE.md、两侧都没有，含 `--dry-run` 与 Codex 侧；两侧都有时各自替换），在 Task 0 代码副本上第一例即红；第一版断言里 `grep -F '--replace …'` 把文字当成选项，补 `--` 后重测。改后 62 例通过，ShellCheck 无告警。其他回归与 evals 没有在没块的项目上用 `--replace` 并期望成功的用例（grep 结果为空）。
 - [ ] Task 2：文档（命令说明、Codex 技能、commands、workflow、README 中英）
 - [ ] Task 3：版本号 0.86.1 与 CHANGELOG（含改正 0.86.0 升级须知）
 - [ ] Checkpoint 1（report）：发布前完整检查与变异验证
