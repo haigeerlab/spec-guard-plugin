@@ -5,4 +5,4 @@
 - [x] Task 2：版本号 0.86.6 与 CHANGELOG — 两份 `plugin.json` 改 0.86.6；README 中英 `--ref v0.86.6`；CHANGELOG 加 `## [0.86.6] - 2026-11-04`（修复）。`check-readme-sync.py`、`check-manifests.py` 通过。
 - [x] Checkpoint 1（report）：发布前完整检查与变异验证 — 主机 macOS 15.7.3 arm64，系统 `/bin/bash` 3.2.57，HEAD `35073618`：Task 1、2 提交时走完整档（`validate.sh`、phase-guard 512 例、verify-artifacts 88 例）并通过；核验测试 31 例；`evals/codex-plugin-smoke.sh --selftest` 通过；未改 `.sh`。变异（新建临时目录里的草稿副本）：去掉这次的转换 → 5 个新用例（含 4 个 subTest）报错。临时项目命令行实跑只有表头的 outcome 表：输出 `{"state": "invalid", "error": "Documentation outcome table has no entries"}`，退出 1，没有堆栈。
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-04 用户「验收通过」；Spec 构建中未改；Proposal 收尾扫描 `pending` 为空；需求来自用户本人，无回告。
-- [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR
+- [x] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR — 2026-11-04 PR #440 合并于 `f10587e`（先核对 merged 与 main 指向）；tag `v0.86.6`、Release 资产 sha256 `39dc0939…ee72`（683527 字节），下载比对一致；Claude 更新到 0.86.6、缓存与发布包一致，用安装副本跑只有表头的 outcome 表输出 invalid、退出 1；Codex 改 ref 升级、副本与发布包一致，用户在新开 CLI 的提示里批准 hook 后 smoke 首次即退出 0；证据 `docs/releases/v0.86.6-*.json`；Proposal 收尾扫描 `pending` 为空；需求来自用户本人，无回告。
