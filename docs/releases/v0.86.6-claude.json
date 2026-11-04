@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.6"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:f10587e996f587c1dbed22e0f6301fb2cdedaaa7"
+      },
+      "observedAt": "2026-11-04T11:45:39Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.86.5 to 0.86.6; installed_plugins.json records version 0.86.6 and gitCommitSha f10587e (the tag); the installed plugin directory is identical to the release asset (Claude Code 2.1.311)",
+        "result:the installed 0.86.6 documentation_verification.py run on a temporary project whose Plan has a header-only outcome table prints {\"state\": \"invalid\", \"error\": \"Documentation outcome table has no entries\"} and exits 1, with no traceback"
+      ]
+    }
+  ]
+}
