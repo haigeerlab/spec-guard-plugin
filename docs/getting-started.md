@@ -20,6 +20,14 @@ agent-skills 的 `/spec` 在需求能拆成几块时会先做 Phase 0：列出�
 setup 写进 `CLAUDE.md`／`AGENTS.md` 的[约定块](convention-block.md)会把这些告诉 agent，所以你照常用 `/spec`、`/plan`、`/build` 就行，
 文件会落在上面这些位置。
 
+Spec、Plan、todo 的写法照上游：Spec 按 `spec-driven-development`，Plan 与 todo 按 `planning-and-task-breakdown`，spec-guard 不另给模板。
+它只多认这几样标记，下面的例子里都会出现：
+
+- 批准标记：Spec、Plan 里独占一行的 `<!-- spec-guard: review pending -->`／`review approved`，见[术语](concepts.md#术语)的「批准标记」；
+- 检查点档位：Plan 与 todo 里的 `Checkpoint N（gate）`／`（report）`，见[使用流程](workflow.md)的「检查点、交审与批准」；
+- 延期写法：todo 里的 `- [ ] 延期：<事项>；恢复条件：<条件>`，见[术语](concepts.md#术语)的「延期项」；
+- 不建 todo 的声明：`plan.md` 里独占一行的 `<!-- spec-guard: no-todo -->`，见[使用流程](workflow.md)的「阶段提示」。
+
 Codex 里没有这些斜杠命令，用 `@` 直接调用它们背后的 skill（见 agent-skills 的 Codex 说明）：
 
 | Claude Code | Codex |

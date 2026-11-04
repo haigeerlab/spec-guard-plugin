@@ -106,7 +106,8 @@ Proposal 与托管事项的远端读取只读；远端写入（关闭 Proposal �
 
 使用方从宿主的插件记录找到 spec-guard 的插件根目录，读 `interface.json`，按主版本号和 `schemaVersion` 判断能不能读，
 不读 spec-guard 的内部文件。spec-guard 读 agent-relay（`agent_relay_probe.py`）用的是同一方式。和其他插件的取值说法之间
-怎么对照，由使用方自己维护。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
+怎么对照，由使用方自己维护。`interface.json` 和本文里写的契约路径（`spec/map-view.md` 之类）相对源码仓库根目录，
+安装包里没有这些文件，到 [spec-guard-plugin 仓库](https://github.com/haigeerlab/spec-guard-plugin) 的 `spec/` 下看。`scripts/check-interface.py` 在 `validate.sh` 里核对这份文件与代码常量一致。
 
 1.1（crew-interface）起另有四个入口，都是多模块并行用的：`moduleConcurrency`（开关的位置、取值与读法：看 `/map --json` 顶层有没有
 `"moduleConcurrency": "on"`）、`scopeCheck`（越界检查）、`checkoutRole`（角色标记的四条命令）、`reviewMark`（批准标记）；`mapView.concurrency`

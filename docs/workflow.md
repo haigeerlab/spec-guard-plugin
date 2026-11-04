@@ -17,7 +17,7 @@
    ```
 
 2. **写能力图并审阅。** 动笔之前，agent 先在对话里总结需求（目标、给谁用、怎样算成功、限制、不做什么、还没定的），问你
-   说完没有，你明确确认后才写。然后用 agent-skills 的 `/spec` 做 Phase 0：列出模块、职责、依赖和一行 Build order。
+   说完没有，你明确确认后才写（想法还不成形时，先用 agent-skills 的 `idea-refine` 或 `interview-me` 理清）。然后用 agent-skills 的 `/spec` 做 Phase 0：列出模块、职责、依赖和一行 Build order。
    人工确认模块边界清楚、依赖单向无环，再往下走。
 3. **按 Build order 逐个模块推进。** 每个模块依次是：
    - 写 `spec/<模块>.md` 并交审，验收标准按 AC1、AC2… 编号，最终验收按编号逐条给证据；

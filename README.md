@@ -99,7 +99,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | | `/spec-guard:tracker-default` | 设置项目默认的事项后端，只用于预填预览 |
 | 文档治理与历史 | `/spec-guard:documentation-baseline`、`documentation-impact`、`documentation-verification` | 文档基线、模块的文档影响与交付核验 |
 | | `/spec-guard:history-integrity` | 核对旧版本留下的能力历史 |
-| 报告 | `/spec-guard:map` | 模块进度表：状态、审查、关键卡点 |
+| 报告 | `/spec-guard:map` | 模块进度表：状态、审查、关键卡点（只算挂起造成的阻塞） |
 | | `/spec-guard:cost-report` | 按 task 统计主代理与子代理的 token 与主会话轮次 |
 | 多模块并行 | `/spec-guard:checkout-role` | 并行开关打开时给每个 checkout 标角色 |
 
