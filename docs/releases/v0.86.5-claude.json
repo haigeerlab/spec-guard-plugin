@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.5"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:ecec0bf55f20e36019800cccd93c1a9992c1eaaf"
+      },
+      "observedAt": "2026-11-04T10:39:06Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.86.4 to 0.86.5; installed_plugins.json records version 0.86.5 and gitCommitSha ecec0bf (the tag); claude plugin list reports 0.86.5 enabled (Claude Code 2.1.311); the installed plugin directory is identical to the release asset",
+        "result:the installed 0.86.5 documentation_verification.py run on a temporary project whose Plan has a delivery table and no outcome table returns attention with the missing-table line first, followed by the per-concern line"
+      ]
+    }
+  ]
+}
