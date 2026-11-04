@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.4"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:358e53c5372ef219868636b2bb28ae46bb6551ff"
+      },
+      "observedAt": "2026-11-04T08:13:05Z",
+      "evidence": [
+        "result:the v0.86.4 annotated tag resolves to merge commit 358e53c5372ef219868636b2bb28ae46bb6551ff (pull request #436, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 41795942612)",
+        "result:one module (user-docs-gaps, documentation only): the capability-map template explains its review checklist is an unchecked self-check; activeModule is described everywhere as edited by the agent per the phase hint or by the user, with no dedicated command; setup-convention and teardown-convention argument hints list --host; five in-package references to the repository docs/ became GitHub links; contract paths, single-project scope, the key-blocker scope, idea-refine before requirement confirmation and the upstream Spec/Plan/todo formats are documented; no hook, interface.json (1.12) or phase logic changed",
+        "result:on the branch before merge (HEAD db918d53, the plugin tree is identical to the merge commit) under macOS 15.7.3 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 512 cases passed, verify-artifacts 88 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; no .sh changed; closing greps found 0 in-package relative references to the repository docs/, 0 old activeModule wordings, and argument hints matching the scripts"
+      ]
+    }
+  ]
+}
