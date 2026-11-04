@@ -1,4 +1,6 @@
 """Delivery reminders report declared facts without pretending to verify content."""
+import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -152,6 +154,29 @@ class DocumentationVerificationTests(unittest.TestCase):
         result = verify_documentation(self.root, "alpha")
         self.assertEqual(result.attention, ["architecture is declared deferred",
                                             "developer-entry has no declared documentation outcome"])
+
+    def test_malformed_outcome_table_is_invalid(self):
+        """outcome-table-invalid: every shape `_table` rejects becomes a VerificationError, not a stray ImpactError."""
+        header = "\n## Documentation outcome\n\n| Concern | Outcome | Evidence | Rationale |\n"
+        cases = {
+            "no entries": header + "|---|---|---|---|\n",
+            "missing its separator": header,
+            "invalid separator": header + "| x | x | x | x |\n| architecture | deferred | — | Later. |\n",
+            "incomplete row": header + "|---|---|---|---|\n| architecture | deferred |\n",
+        }
+        for message, outcome in cases.items():
+            with self.subTest(message):
+                self.project(outcome)
+                with self.assertRaisesRegex(VerificationError, "Documentation outcome table .*" + message):
+                    verify_documentation(self.root, "alpha")
+
+    def test_malformed_outcome_table_cli_prints_invalid(self):
+        self.project("\n## Documentation outcome\n\n| Concern | Outcome | Evidence | Rationale |\n|---|---|---|---|\n")
+        with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+            code = documentation_verification.main(["--project", str(self.root), "--module", "alpha"])
+        self.assertEqual(code, 1)
+        self.assertEqual(json.loads(out.getvalue()),
+                         {"state": "invalid", "error": "Documentation outcome table has no entries"})
 
     def test_no_required_outcome_does_not_name_the_table(self):
         self.write("docs/DOCUMENTATION-BASELINE.md", BASELINE)

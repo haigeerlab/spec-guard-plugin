@@ -58,9 +58,14 @@ def _outcomes(path, required):
     if count != 1:
         raise VerificationError("module plan must contain exactly one Documentation outcome table")
     entries = {}
-    for concern, outcome, evidence, rationale in _table(
+    try:
+        rows = _table(
             _regular(path, "module plan"),
-            ("Concern", "Outcome", "Evidence", "Rationale"), "Documentation outcome"):
+            ("Concern", "Outcome", "Evidence", "Rationale"), "Documentation outcome")
+    except ImpactError as error:
+        # outcome-table-invalid: a malformed table is a verification error, so the CLI reports `invalid`.
+        raise VerificationError(str(error))
+    for concern, outcome, evidence, rationale in rows:
         if concern in entries:
             raise VerificationError("duplicate outcome concern: %s" % concern)
         if concern not in required:
