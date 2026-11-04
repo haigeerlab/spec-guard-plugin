@@ -49,7 +49,8 @@
    以及每份文档的状态；
 2. **影响**（`/spec-guard:documentation-impact`）：每个模块的 Spec 里写一张表，说明它对每份依据文档是遵循、补全、
    修改还是不涉及；
-3. **核验**（`/spec-guard:documentation-verification`）：交付前只读检查这些声明是否都已收口。有基线时，最终验收那一轮的
+3. **核验**（`/spec-guard:documentation-verification`）：交付前只读检查这些声明是否都已收口。Plan 写了交付表的模块，最终验收前要在同一份 Plan 里
+   补一张 `Documentation outcome` 表，写明每项实际交付了什么；没有这张表，核验第一行就会点名缺表。有基线时，最终验收那一轮的
    阶段提示多一行「文档核验」，提示验收前跑核验并把结果写进验收消息。核验按基线状态区分：现状类 `update` 须自本模块 Spec
    首次提交以来确被改过；`target` 文档只列增删行数，有删除行时提醒须单独批准；外部文档标未核验（`unverified`）；git 查不了时
    为 `unknown`。

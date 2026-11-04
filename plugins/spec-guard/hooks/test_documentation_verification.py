@@ -127,7 +127,38 @@ class DocumentationVerificationTests(unittest.TestCase):
         self.project()
         result = verify_documentation(self.root, "alpha")
         self.assertEqual(result.state, "attention")
-        self.assertIn("architecture", result.attention[0])
+        self.assertIn("architecture has no declared documentation outcome", result.attention)
+
+    def test_missing_outcome_table_is_named_first(self):
+        """doc-outcome-hint: a Plan with no outcome table at all says so before the per-concern lines."""
+        self.project()
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual(result.attention[0],
+                         "tasks/alpha/plan.md has no Documentation outcome table; add one before final acceptance "
+                         "(format: references/documentation-verification.md)")
+        self.assertEqual(result.attention[1:], ["architecture has no declared documentation outcome"])
+
+    def test_table_missing_one_row_does_not_name_the_table(self):
+        self.write("docs/DOCUMENTATION-BASELINE.md", BASELINE)
+        self.write("spec/alpha.md", SPEC.replace("| developer-entry | follow |", "| developer-entry | update |"))
+        self.write("tasks/alpha/plan.md", PLAN + """| developer-entry | `README.md` | Commands. |
+
+## Documentation outcome
+
+| Concern | Outcome | Evidence | Rationale |
+|---|---|---|---|
+| architecture | deferred | — | Later. |
+""")
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual(result.attention, ["architecture is declared deferred",
+                                            "developer-entry has no declared documentation outcome"])
+
+    def test_no_required_outcome_does_not_name_the_table(self):
+        self.write("docs/DOCUMENTATION-BASELINE.md", BASELINE)
+        self.write("spec/alpha.md", SPEC.replace("| architecture | update |", "| architecture | follow |"))
+        self.write("tasks/alpha/plan.md", "# Plan: alpha\n")
+        result = verify_documentation(self.root, "alpha")
+        self.assertEqual((result.state, result.attention), ("ready", []))
 
     def test_delivered_outcome_with_evidence_is_ready(self):
         self.project("""

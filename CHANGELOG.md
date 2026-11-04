@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.86.5] - 2026-11-04
+
+本版 1 个模块（S80）：doc-outcome-hint。`interface.json` 不变（1.12）。
+
+### 修复
+
+- **文档核验在 Plan 没有 outcome 表时点名缺表。** 原来 Plan 里一张 `Documentation outcome` 表都没有时，核验只对每个关注点各报一行
+  `<concern> has no declared documentation outcome`，和表里漏了一行看不出区别，文档其实都改过也像是没交付。现在 `attention` 第一行写明
+  `tasks/<id>/plan.md has no Documentation outcome table`，并指出格式出处；逐项提示照旧，`attention`／`ready` 的判定不变。
+
+### 文档
+
+- `documentation-impact` 的 Documentation delivery 一节写明最终验收前要在同一份 Plan 补 `Documentation outcome` 表，并给出空模板；
+  文档链的 Plan 交审、最终验收两步，`optional-features` 与 `/spec-guard:documentation-verification` 说明同步。
+
 ## [0.86.4] - 2026-11-04
 
 本版 1 个模块（S71）：user-docs-gaps。只改文档与命令说明，插件行为不变；`interface.json` 不变（1.12）。

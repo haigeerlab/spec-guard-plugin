@@ -302,8 +302,9 @@ README 默认在候选里：能力图审阅与能力图全部完成这两处一�
 项目有文档基线时（`docs/DOCUMENTATION-BASELINE.md`），建议、影响、核验接成一条链，保证模块改了代码、该更新的文档不漏：
 
 1. **Spec 交审**：按基线的关注点提建议，用户采纳的写进本 Spec 的 `Documentation impact` 表。
-2. **Plan 交审**：列出影响表里的 `update`、`create` 与 Plan 的 `Documentation delivery` 表，交付是 Plan 的普通任务。
-3. **最终验收**：阶段提示会提醒先跑文档核验（[文档交付核验](documentation-verification.md)），结果按状态写进验收结果：
+2. **Plan 交审**：列出影响表里的 `update`、`create` 与 Plan 的 `Documentation delivery` 表，交付是 Plan 的普通任务；
+   最终验收前在同一份 Plan 里补 `Documentation outcome` 表（可写成最后一个普通任务，格式见[影响](documentation-impact.md)的空模板）。
+3. **最终验收**：先确认 Plan 里已有 `Documentation outcome` 表（没有时核验第一行点名缺表、整体判 `attention`），阶段提示会提醒再跑文档核验（[文档交付核验](documentation-verification.md)），结果按状态写进验收结果：
    现状类文档（基线状态不是 `target`）声明交付却没改过的，写明；`target` 文档改过的，把差异原样附上；外部文档写明未核验。
 
 基线状态为 `target` 的文档是已批准、还没完全实现的目标（顶层架构、需求愿景）。模块对它只能补充：标注已实现的部分、补充约束，

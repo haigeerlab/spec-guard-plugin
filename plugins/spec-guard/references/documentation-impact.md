@@ -44,6 +44,19 @@
 
 `update` 的 `Planned artifact` 必须等于基线中的 `Authority`；`create` 可指定新的预期交付物。`update` 指向基线状态为 `target` 的文档时只能补充：标注已实现的部分、补充约束，不得删改未实现的目标；要改目标就是改需求，单独交用户批准。这张表是计划，不是交付证据：它不能表示文档已更新、内容正确或代码符合文档。实际交付证据与交付前提醒由后续核验模块处理。
 
+表里有 `update` 或 `create` 时，最终验收前要在同一份 Plan 里补一张 `Documentation outcome` 表，写明每项实际交付了什么；
+没有这张表，[文档交付核验](documentation-verification.md)会判 `attention`，并在第一行点名缺表。可以把补表写成 Plan 最后一个普通任务。空模板：
+
+```markdown
+## Documentation outcome
+
+| Concern | Outcome | Evidence | Rationale |
+|---|---|---|---|
+| <concern> | delivered／deferred／pending | <证据指针，deferred、pending 写 —> | <说明> |
+```
+
+每个 `update`／`create` 关注点一行，取值与证据要求见[文档交付核验](documentation-verification.md)的「Plan outcome 表」。
+
 在 Spec 阶段、Plan 还没写时，影响表里只要有 `update` 或 `create`，检查就会报 `module plan must be a regular file`。这是预期结果：报到这一句说明 Spec 里的影响表已通过校验，只是 Plan 交付还没检查，不能当作完整的 `valid`。影响表里没有 `update`、`create`（全部为 `follow`、`pending` 或 `not-applicable`）时直接得到 `valid`。Plan 获批后要再跑一次，必须得到完整的 `valid`。Plan 已经写了还报这一句（例如它是符号链接），才是异常。
 
 解析器只读取基线、当前模块 Spec 和当前模块 Plan；不会读取业务代码、Git diff、时间戳或权威文档正文。
