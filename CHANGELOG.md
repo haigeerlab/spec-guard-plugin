@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.86.4] - 2026-11-04
+
+本版 1 个模块（S71）：user-docs-gaps。只改文档与命令说明，插件行为不变；`interface.json` 不变（1.12）。
+
+### 文档
+
+- 能力图模板「审阅记录」一节加注释、术语表加一条：这是第一次审能力图时的自查清单，勾不勾都行，工具不校验，批准以对话里的答复为准。
+- `activeModule` 由谁改统一成一个说法：agent 按阶段提示直接改 `.agent/state.json`，用户也可以自己改，没有专门的命令（`add-module`、`phase`、`spec-guard-ops`、使用流程、排障）。
+- `setup-convention` 的参数行补 `--host=codex`，`teardown-convention` 补 `--host=claude|--host=codex`，并说明什么时候用。
+- 安装包里的命令与技能对插件仓库 `docs/` 的 5 处引用改成 GitHub 链接，装好后也点得开。
+- 写明 `interface.json` 的契约路径相对源码仓库；写明 spec-guard 管一个项目目录，分仓时各装一份，跨仓接口写在提供方的 Spec 里。
+- 「关键卡点」的短描述补上「只算挂起造成的阻塞」（README 中英、`docs/commands.md`、`/spec-guard:map`）。
+- 需求确认前想法还不成形时，可先用 agent-skills 的 `idea-refine` 或 `interview-me`；上手文档说明 Spec、Plan、todo 的写法沿用上游，并列出 spec-guard 多认的 4 种标记及出处。
+
 ## [0.86.3] - 2026-11-03
 
 本版 1 个模块：whitespace-only-preview。`interface.json` 不变（1.12）。

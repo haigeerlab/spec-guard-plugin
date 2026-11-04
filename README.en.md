@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.3` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.4` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
@@ -110,7 +110,7 @@ acceptance, with the stage hint the agent sees at every step, a table of what yo
 | | `/spec-guard:tracker-default` | Set the project's default ticket backend, used only to prefill previews |
 | Documentation and history | `/spec-guard:documentation-baseline`, `documentation-impact`, `documentation-verification` | The documentation baseline, a module's documentation impact, and the delivery check |
 | | `/spec-guard:history-integrity` | Verify the capability history left by older versions |
-| Reports | `/spec-guard:map` | Module progress table: status, review, what is blocking |
+| Reports | `/spec-guard:map` | Module progress table: status, review, what is blocking (suspended modules only) |
 | | `/spec-guard:cost-report` | Tokens of the main agent and subagents and main-session turns, per task |
 | Several modules at once | `/spec-guard:checkout-role` | Label each checkout's role when the switch is on |
 

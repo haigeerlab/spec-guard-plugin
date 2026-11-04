@@ -11,8 +11,8 @@ allowed-tools: Bash
 **插队（`--interrupt`）**：当前模块做到一半、又在等外部条件而确需先做新模块时，才在预览命令后加 `--interrupt`，
 显式跳到队前；其他模块同时做到一半（并行推进）不影响插队。预览会写明被暂停的模块及进度（已勾/总数），
 以及插入后的当前模块——必须让用户看过并明确确认。当前模块没有做到一半时 `--interrupt` 不改变任何行为。
-预览提示“插入后当前模块仍是 `<被暂停模块>`”时，提醒用户把 `.agent/state.json` 的 `activeModule` 改为新模块再开始
-构建（本命令不写 state.json）。确认时同样带 `--interrupt --confirm`，会重新执行全部校验。
+预览提示“插入后当前模块仍是 `<被暂停模块>`”时，agent 直接把 `.agent/state.json` 的 `activeModule` 改为新模块再开始
+构建（用户也可以自己改；本命令不写 state.json，也没有专门写它的命令）。确认时同样带 `--interrupt --confirm`，会重新执行全部校验。
 
 这个需求是用户在对话里新提出的、还没确认过时，先按共享检查点规则「需求确认」总结需求，问用户是否说完，
 用户确认后的下一轮再往下做，能力图新行的预览和 Spec 一起交审；需求已确认过、或属于那一节的跳过情形时直接往下。
@@ -117,5 +117,5 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 先判断是不是该开新模块（细则见 `spec-guard-ops` 的共享检查点规则「返工与小模块」）：返工或修订已完成的模块，不开新模块，在它的 `todo.md` 追加任务；
 只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或与同类模块一次批量交审。
 
-如果这次新增需要留下经过审查的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
+如果这次新增需要留下经过审查的决定记录（而不只是快速插入），改用 Proposal 流程（见 [`docs/workflow.md`](https://github.com/haigeerlab/spec-guard-plugin/blob/main/docs/workflow.md)）；
 已接受的 Proposal 用上面的 `--proposal` 晋级。

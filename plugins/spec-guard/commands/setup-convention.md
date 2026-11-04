@@ -1,6 +1,6 @@
 ---
 description: 在当前项目落地本地多 Spec 目录约定
-argument-hint: "[local] [--dry-run] [--replace [--accept-removals]]"
+argument-hint: "[local] [--host=codex] [--dry-run] [--replace [--accept-removals]]"
 allowed-tools: Bash
 ---
 

@@ -15,12 +15,13 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:setup-convention`
 
-参数：`[local] [--dry-run] [--replace [--accept-removals]]`
+参数：`[local] [--host=codex] [--dry-run] [--replace [--accept-removals]]`
 
 在当前项目安装多模块约定：建 `spec/`、`tasks/`、`.agent/state.json`，在 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入
 [约定块](convention-block.md)。只支持本地文件式工作流，不访问远端。
 
 - 先 `--dry-run` 预览，确认后再正式运行。
+- `--host=codex`：在 Claude Code 里装 Codex 一侧，约定块写进 `AGENTS.md`；不加时写 `CLAUDE.md`。
 - `--replace` 升级已有约定块。块内本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`）
   原样保留；预览逐行列出 `will remove:`／`will add:`，不在现行模板里的删除行标 `[needs --accept-removals]`，
   不加这个参数时拒绝替换且不改文件。只差空白或折行的段不算删减，预览汇总成一行
@@ -32,11 +33,12 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:teardown-convention`
 
-参数：`[--dry-run] [--keep-state] [--accept-removals]`
+参数：`[--host=claude|--host=codex] [--dry-run] [--keep-state] [--accept-removals]`
 
 移除约定块，并把 `.agent/state.json` 改名为 `state.json.disabled`，阶段提示随之停止；`spec/`、`tasks/` 保留。
 
 - 每次先 `--dry-run` 预览。
+- `--host=codex`：移除 `AGENTS.md` 里的约定块；不加（或 `--host=claude`）时移除 `CLAUDE.md` 里的。另一侧的块还在时 `state.json` 保留原名，hook 继续激活。
 - 本地段的行留在块原来的位置；本地段以外、不在现行模板里的行要加 `--accept-removals` 才删，否则退出 1、不改任何文件。
 - `--keep-state` 保留 `state.json` 原名，hook 会继续激活（零足迹模式）。
 - 退出码 2：这个项目没启用过约定。
@@ -187,7 +189,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 只读的模块进度表：按开发顺序列出每个模块的作用、状态（✅ 已完成、🔨 进行中、⏸ 挂起（原因）、⛔ 阻塞：等被挂起的
 模块、🟢 可以开始、○ 未就绪：缺哪个依赖）与 Spec、Plan 的审查状态；表头给合计、关键卡点（挂起的模块按依赖链挡住了
-谁）、待批准、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
+谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
 结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`），供其他插件读取，可用

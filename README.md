@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.3` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.4` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
@@ -99,7 +99,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | | `/spec-guard:tracker-default` | 设置项目默认的事项后端，只用于预填预览 |
 | 文档治理与历史 | `/spec-guard:documentation-baseline`、`documentation-impact`、`documentation-verification` | 文档基线、模块的文档影响与交付核验 |
 | | `/spec-guard:history-integrity` | 核对旧版本留下的能力历史 |
-| 报告 | `/spec-guard:map` | 模块进度表：状态、审查、关键卡点 |
+| 报告 | `/spec-guard:map` | 模块进度表：状态、审查、关键卡点（只算挂起造成的阻塞） |
 | | `/spec-guard:cost-report` | 按 task 统计主代理与子代理的 token 与主会话轮次 |
 | 多模块并行 | `/spec-guard:checkout-role` | 并行开关打开时给每个 checkout 标角色 |
 
