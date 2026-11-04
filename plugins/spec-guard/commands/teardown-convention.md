@@ -1,6 +1,6 @@
 ---
 description: 从当前项目移除 spec-guard 的约定（保留你的 spec 和 plan 内容）
-argument-hint: "[--dry-run] [--keep-state] [--accept-removals]"
+argument-hint: "[--host=claude|--host=codex] [--dry-run] [--keep-state] [--accept-removals]"
 allowed-tools: Bash
 ---
 
@@ -62,7 +62,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "${CLAUDE_PLUGIN_ROOT}/hooks/teardown-convent
 
 当前的激活判据：`CLAUDE.md`／`AGENTS.md` 中独占一行的 `BEGIN` 标记，或含 `activeModule` 的
 `.agent/state.json`。正文里提到标记不会激活。该文件里的 `tracker` 字段已退役，不再是激活信号
-（`docs/retirements/state-tracker-field.md`）——删掉它**不会**让 hook 停下，停用请按上面改名
+（[`docs/retirements/state-tracker-field.md`](https://github.com/haigeerlab/spec-guard-plugin/blob/main/docs/retirements/state-tracker-field.md)）——删掉它**不会**让 hook 停下，停用请按上面改名
 `state.json`，或移除声明块。
 
 ## 之后

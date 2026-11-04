@@ -15,12 +15,13 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:setup-convention`
 
-参数：`[local] [--dry-run] [--replace [--accept-removals]]`
+参数：`[local] [--host=codex] [--dry-run] [--replace [--accept-removals]]`
 
 在当前项目安装多模块约定：建 `spec/`、`tasks/`、`.agent/state.json`，在 `CLAUDE.md`（Codex 是 `AGENTS.md`）写入
 [约定块](convention-block.md)。只支持本地文件式工作流，不访问远端。
 
 - 先 `--dry-run` 预览，确认后再正式运行。
+- `--host=codex`：在 Claude Code 里装 Codex 一侧，约定块写进 `AGENTS.md`；不加时写 `CLAUDE.md`。
 - `--replace` 升级已有约定块。块内本地段（`<!-- BEGIN:spec-guard-local -->` … `<!-- END:spec-guard-local -->`）
   原样保留；预览逐行列出 `will remove:`／`will add:`，不在现行模板里的删除行标 `[needs --accept-removals]`，
   不加这个参数时拒绝替换且不改文件。只差空白或折行的段不算删减，预览汇总成一行
@@ -32,11 +33,12 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 ### `/spec-guard:teardown-convention`
 
-参数：`[--dry-run] [--keep-state] [--accept-removals]`
+参数：`[--host=claude|--host=codex] [--dry-run] [--keep-state] [--accept-removals]`
 
 移除约定块，并把 `.agent/state.json` 改名为 `state.json.disabled`，阶段提示随之停止；`spec/`、`tasks/` 保留。
 
 - 每次先 `--dry-run` 预览。
+- `--host=codex`：移除 `AGENTS.md` 里的约定块；不加（或 `--host=claude`）时移除 `CLAUDE.md` 里的。另一侧的块还在时 `state.json` 保留原名，hook 继续激活。
 - 本地段的行留在块原来的位置；本地段以外、不在现行模板里的行要加 `--accept-removals` 才删，否则退出 1、不改任何文件。
 - `--keep-state` 保留 `state.json` 原名，hook 会继续激活（零足迹模式）。
 - 退出码 2：这个项目没启用过约定。

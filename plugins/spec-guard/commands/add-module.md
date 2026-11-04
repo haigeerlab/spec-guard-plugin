@@ -117,5 +117,5 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 先判断是不是该开新模块（细则见 `spec-guard-ops` 的共享检查点规则「返工与小模块」）：返工或修订已完成的模块，不开新模块，在它的 `todo.md` 追加任务；
 只盘点或接收既有实现、不新增行为的模块，先考虑并成相邻模块的一个任务，或与同类模块一次批量交审。
 
-如果这次新增需要留下经过审查的决定记录（而不只是快速插入），改用 Proposal 流程（见 `docs/workflow.md`）；
+如果这次新增需要留下经过审查的决定记录（而不只是快速插入），改用 Proposal 流程（见 [`docs/workflow.md`](https://github.com/haigeerlab/spec-guard-plugin/blob/main/docs/workflow.md)）；
 已接受的 Proposal 用上面的 `--proposal` 晋级。
