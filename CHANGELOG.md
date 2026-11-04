@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.86.6] - 2026-11-04
+
+本版 1 个模块：outcome-table-invalid。`interface.json` 不变（1.12）。
+
+### 修复
+
+- **`Documentation outcome` 表写坏时，`/spec-guard:documentation-verification` 报 `invalid`，不再抛堆栈。** 原来表只有表头、缺分隔行、
+  分隔行写错或某一行格数不对时，命令行打出 Python 堆栈（`ImpactError`），没有按约定输出 `{"state": "invalid", "error": …}` 并退出 1。
+  现在与其他结构错误一样处理，报错文字不变；表格格式要求不变（空表仍然无效）。
+
 ## [0.86.5] - 2026-11-04
 
 本版 1 个模块（S80）：doc-outcome-hint。`interface.json` 不变（1.12）。
