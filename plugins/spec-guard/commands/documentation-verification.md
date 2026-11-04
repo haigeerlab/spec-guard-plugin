@@ -47,7 +47,7 @@ python3 -B "$ROOT/hooks/documentation_verification.py" \
 
 有项目指向时 `follow` 会跟随到被指向的项目：stderr 出现「本次操作的是被指向的项目」时，回复用户时照原文转述这一句；它退出 2 时照原文报告诊断，不要改用会话目录重试。
 
-`absent` 表示项目未启用基线，应静默跳过；`invalid` 表示已有表格结构无效；`attention` 是提醒而非阻断，逐条列在 `attention` 里；`ready` 表示没有未收口的声明，且声明 delivered 的现状类 `update` 文档确被改过。
+`absent` 表示项目未启用基线，应静默跳过；`invalid` 表示已有表格结构无效；`attention` 是提醒而非阻断，逐条列在 `attention` 里（Plan 里一张 `Documentation outcome` 表都没有时，第一条点名缺表、给出 Plan 路径，后面仍逐项列出；补表的格式见 `references/documentation-impact.md` 的空模板）；`ready` 表示没有未收口的声明，且声明 delivered 的现状类 `update` 文档确被改过。
 
 每个 outcome 的 `check` 说明核到了什么（只核 `delivered` 的项：`update` 按基线状态看改没改过，`create` 只看文件在不在）：
 
