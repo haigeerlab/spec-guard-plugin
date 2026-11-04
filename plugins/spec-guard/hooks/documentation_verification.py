@@ -171,6 +171,10 @@ def verify_documentation(project, module):
     outcomes = _outcomes(plan, required)
     baseline = parse_baseline(project / "docs" / "DOCUMENTATION-BASELINE.md")
     attention = []
+    if required and not _has_outcome_table(plan):
+        # doc-outcome-hint: name the missing table itself, not only each concern it would have declared.
+        attention.append("tasks/%s/plan.md has no Documentation outcome table; add one before final acceptance "
+                         "(format: references/documentation-verification.md)" % module)
     for concern, decision in sorted(impact.decisions.items()):
         if decision.decision == "pending":
             attention.append("%s has a pending documentation decision" % concern)
