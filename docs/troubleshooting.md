@@ -155,7 +155,7 @@ grep -n -A3 'marketplaces.spec-guard-marketplace' ~/.codex/config.toml
 | `Linked project: … this session is linked to it by its own entry` | 这个会话在共用的会话目录里有自己的登记（`link-project set --session`），阶段与位置行是它登记的项目的；同目录的其他会话不受影响 |
 | 共用一个会话目录的几个会话，有的收到别的项目的阶段提示 | 目录里有一份目录级指向，对所有会话生效。让每个会话各自登记：`link-project set --project <路径> --session <会话标识>`；不再需要目录级指向时 `unset`（不带 `--session`）去掉它 |
 | `Suspended: <模块>` | 模块被挂起，不会自动恢复；用 `/spec-guard:module-suspend` 恢复 |
-| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块 |
+| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做；按提示把 `activeModule` 改成下一个模块（agent 会照提示直接改，你也可以自己改） |
 | 有 Plan 却没有 todo 的提醒 | 这类模块按已完成计；还有活就补 `tasks/<id>/todo.md`，确已交付可在 `plan.md` 加 `<!-- spec-guard: no-todo -->` |
 
 还没解决的，按[贡献指南](../CONTRIBUTING.md#报-bug)报 bug，附上 `/spec-guard:phase` 与 `/spec-guard:verify-artifacts` 的输出。

@@ -13,7 +13,7 @@
    ```text
    CLAUDE.md 或 AGENTS.md 里的约定块   # 告诉 agent 多模块的目录规则
    spec/CAPABILITY-MAP.md               # 能力图模板
-   .agent/state.json                    # 只记录当前模块：{"activeModule":""}
+   .agent/state.json                    # 只记录当前模块：{"activeModule":""}，agent 按阶段提示直接改，没有专门的命令
    ```
 
 2. **写能力图并审阅。** 动笔之前，agent 先在对话里总结需求（目标、给谁用、怎样算成功、限制、不做什么、还没定的），问你
@@ -148,7 +148,7 @@ Claude transcript 与 Codex rollout，按 task 列出主代理与子代理的 to
 | `NEEDS_SPEC` | 当前模块缺 Spec | 写 `spec/<模块>.md` |
 | `NEEDS_PLAN` | 当前模块有 Spec、缺 Plan | 用 `/plan` 生成 plan 和 todo |
 | `BUILDING` | todo 还有 N 项没勾 | 继续 `/build` |
-| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做完 | 把 `activeModule` 改成提示里点名的下一个模块；有被暂停的模块时点名它 |
+| `MODULE_DONE` | `activeModule` 指向的模块已完成，但还有别的模块没做完 | agent 把 `activeModule` 改成提示里点名的下一个模块（你也可以自己改）；有被暂停的模块时点名它 |
 | `DONE` | 全部模块都已完成 | 有新需求时，agent 先总结需求、问你说完没有，确认后用 `/spec-guard:add-module` 插入；`activeModule` 还指着已完成模块时可以清掉 |
 | `UNKNOWN` | 阶段算不出来 | 用 `/spec-guard:verify-artifacts` 查原因 |
 
