@@ -5,5 +5,5 @@
 - [x] Task 2：「可以开始」的说明（map.md、commands.md、concepts.md） — `commands/map.md` 状态图例、`docs/commands.md` map 段落、`docs/concepts.md` 术语表「进度表」一条各补：「可以开始」（`ready`）只表示依赖都已完成，不代表本轮要做，本轮做哪些由项目自己排（例如在能力图加一列，add-module 会把额外列留空）。JSON 的 `ready` 与表格文字未改。`validate.sh --quick` 通过。
 - [x] Task 3：版本号 0.86.7 与 CHANGELOG — 两份 `plugin.json` 改 0.86.7；README 中英 `--ref v0.86.7`；CHANGELOG 加 `## [0.86.7] - 2026-11-09`（修复、文档）。`check-readme-sync.py`、`check-manifests.py` 通过。
 - [x] Checkpoint 1（report）：发布前完整检查与变异验证 — 主机 macOS 27.2 arm64，系统 `/bin/bash` 3.2.57，HEAD `6f8878ae`：Task 1～3 提交时走完整档（`validate.sh`、phase-guard 512 例、verify-artifacts 88 例）并通过；`test_module_insert.py` 81 例；`evals/codex-plugin-smoke.sh --selftest` 通过；未改 `.sh`。变异（新建临时目录里的草稿副本）：去掉补齐 → 新用例 1 失败 2 报错；去掉说明行 → 3 失败。临时项目（四列能力图「本轮状态」）命令行实跑：预览新行 `| beta | B | alpha |  |` 并提示「额外列 `本轮状态` 留空，需要时自己填」，`--confirm` 写入成功，已有行 `本轮` 值不变。
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-09 用户「验收通过」；Spec 构建中未改；Proposal 收尾扫描 `pending` 为空；发版后按验收消息里的拟回告原文回复 ecosystem-lead（#19453）。
 - [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、回告 ecosystem-lead
