@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.7"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:34a0003cd9744aa269b8c89f73c8df86841c9354"
+      },
+      "observedAt": "2026-11-09T11:02:29Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.86.6 to 0.86.7; installed_plugins.json records version 0.86.7 and gitCommitSha 34a0003 (the tag); the installed plugin directory is identical to the release asset (Claude Code 2.1.311)",
+        "result:the installed 0.86.7 module-insert.py previewing an insertion into a temporary four-column map (extra column 本轮状态) prints the row `| beta | B | alpha |  |` and the note that the extra column is left empty"
+      ]
+    }
+  ]
+}

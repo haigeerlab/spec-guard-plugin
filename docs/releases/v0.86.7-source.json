@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.7"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:34a0003cd9744aa269b8c89f73c8df86841c9354"
+      },
+      "observedAt": "2026-11-09T11:02:29Z",
+      "evidence": [
+        "result:the v0.86.7 annotated tag resolves to merge commit 34a0003cd9744aa269b8c89f73c8df86841c9354 (pull request #442, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 42599869990)",
+        "result:one module (map-extra-columns): module-insert.py pads the new module row to the header width, leaving columns after Depends on empty, and the preview names them (`额外列 `X` 留空，需要时自己填`); a three-column map gives the same row and preview as 0.86.6; the /map docs say ready only means every dependency is done, not that the module is planned for this round; interface.json unchanged (1.12)",
+        "result:on the branch before merge (HEAD 6f8878ae, the plugin tree is identical to the merge commit) under macOS 27.2 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 512 cases passed, verify-artifacts 88 cases passed, test_module_insert 81 cases passed (the 3 new cases failed on 0.86.6); evals/codex-plugin-smoke.sh --selftest exited 0; removing the padding or the preview note on draft copies turned the new cases red"
+      ]
+    }
+  ]
+}
