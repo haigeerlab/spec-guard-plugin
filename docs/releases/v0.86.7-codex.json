@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.86.7"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.86.7-upgrade-20261109"
+      },
+      "observedAt": "2026-11-09T11:02:29Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "result:the marketplace ref moved from v0.86.6 to v0.86.7; codex plugin marketplace upgrade spec-guard-marketplace exited 0; the marketplace snapshot is at the tag commit and its plugins/spec-guard and .claude-plugin/marketplace.json are identical to the release asset",
+        "result:codex-cli 0.166.0: the first CLI started right after the upgrade showed 8 new or changed hooks, then a later start in the same tab exited with `config/read failed in TUI` (config.toml parsed fine afterwards); a fresh CLI in a new tab offered the 0.167.0 update, which the user skipped, and the user approved the hooks there; /hooks then showed SessionStart 5/5 and UserPromptSubmit 2/2 active (the 3 hooks still under review are PreToolUse and SessionEnd, which spec-guard does not install)",
+        "result:the smoke then exited 0 on its first run (spec-guard phase injection found in the session's machine record)"
+      ]
+    }
+  ]
+}
