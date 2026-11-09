@@ -112,6 +112,38 @@ class ModuleInsertTests(unittest.TestCase):
         # preview is read-only
         self.assertEqual(self.map_path.read_text(encoding="utf-8"), MAP)
 
+    def test_extra_column_is_left_empty_and_named_in_the_preview(self):
+        """map-extra-columns: a map with a column after Depends on still takes an insertion."""
+        self.write("spec/CAPABILITY-MAP.md", MAP.replace(
+            "| Module id | Responsibility | Depends on |\n| --- | --- | --- |",
+            "| Module id | Responsibility | Depends on | 本轮状态 |\n| --- | --- | --- | --- |").replace(
+            "| — |\n", "| — | 本轮 |\n").replace("| alpha |\n", "| alpha | 下轮 |\n").replace("| beta |\n", "| beta | 本轮 |\n"))
+        old_digest = module_insert.compute(str(self.map_path))
+        result = preview(self.root, "delta", "Fourth module", "beta", "after:beta")
+        self.assertEqual(result["row_text"], "| delta | Fourth module | beta |  |")
+        self.assertEqual(result["extra_columns"], ["本轮状态"])
+        self.assertIn("额外列 `本轮状态` 留空，需要时自己填", module_insert.format_report(result))
+        module_insert.write(self.root, "delta", "Fourth module", "beta", "after:beta")
+        module_insert.parse_map(self.map_path)
+        new_rows = dict((row["id"], row["rowDigest"]) for row in module_insert.compute(str(self.map_path))["rows"])
+        for row in old_digest["rows"]:
+            self.assertEqual(new_rows[row["id"]], row["rowDigest"])
+
+    def test_two_extra_columns_are_both_left_empty(self):
+        self.write("spec/CAPABILITY-MAP.md", MAP.replace(
+            "| Module id | Responsibility | Depends on |\n| --- | --- | --- |",
+            "| Module id | Responsibility | Depends on | Owner | Round |\n| --- | --- | --- | --- | --- |").replace(
+            " |\n| beta", " | a | 1 |\n| beta").replace(" |\n| gamma", " | b | 1 |\n| gamma").replace(
+            "| beta |\n\n", "| beta | c | 2 |\n\n"))
+        result = preview(self.root, "delta", "Fourth module", "—", "end")
+        self.assertEqual(result["row_text"], "| delta | Fourth module | — |  |  |")
+        self.assertIn("额外列 `Owner`、`Round` 留空，需要时自己填", module_insert.format_report(result))
+
+    def test_three_column_map_has_no_extra_column_note(self):
+        result = preview(self.root, "delta", "Fourth module", "—", "end")
+        self.assertEqual(result["extra_columns"], [])
+        self.assertNotIn("额外列", module_insert.format_report(result))
+
     def test_end_anchor_appends_row_and_build_order_step(self):
         result = preview(self.root, "delta", "Fourth module", "—", "end")
         lines = result["diff"]

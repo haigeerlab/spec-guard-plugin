@@ -187,7 +187,10 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
     build_order_index = _build_order_line_index(visible_lines)
 
     deps_text = ", ".join(depends_on) if depends_on else "—"
-    row_text = "| %s | %s | %s |" % (module_id, responsibility, deps_text)
+    # map-extra-columns: columns after Depends on are the project's own; the new row leaves them empty.
+    header_line = visible_lines[table_rows[0][0] - 2]
+    extra_columns = [cell.strip() for cell in header_line.strip().strip("|").split("|")][3:]
+    row_text = "| %s | %s | %s |" % (module_id, responsibility, deps_text) + "  |" * len(extra_columns)
 
     segments = _build_order_segments(old_lines[build_order_index])
     if anchor_id is None:
@@ -247,6 +250,7 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
 
     return {
         "row_text": row_text,
+        "extra_columns": extra_columns,
         "build_order_line": new_build_order_line,
         "diff": list(difflib.unified_diff(
             old_lines, new_lines,
@@ -386,7 +390,10 @@ def format_report(result):
         lines.extend(["Proposal: %s" % proposal["id"],
                       "revision: %s" % proposal["revision"],
                       "baseCommit: %s" % proposal["base_commit"], ""])
-    lines += ["新行:", "  " + result["row_text"], "", "新的 Build order:",
+    lines += ["新行:", "  " + result["row_text"]]
+    if result.get("extra_columns"):
+        lines.append("  额外列 %s 留空，需要时自己填" % "、".join("`%s`" % name for name in result["extra_columns"]))
+    lines += ["", "新的 Build order:",
              "  " + result["build_order_line"], "", "能力图 diff:"]
     lines.extend(result["diff"] or ["（无变化）"])
     lines.append("")
