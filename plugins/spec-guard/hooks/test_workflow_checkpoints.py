@@ -905,7 +905,7 @@ class SiblingRulesOutTests(unittest.TestCase):
 
 class NodeRulesTests(unittest.TestCase):
     """rules-at-nodes: the stop rules the phase hint attaches at each node, kept in step with the full contract."""
-    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收")
+    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收", "## 里程碑停点")
     LIMITS = {"## 最终验收": 3200}
     # What each section must say (Spec C2).
     ELEMENTS = {
@@ -924,6 +924,9 @@ class NodeRulesTests(unittest.TestCase):
                       "文档改动：无", "本模块的提交", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面", "Spec 的改动差异",
                       "同时批准修订后的 Spec", "先用 review-mark", "拟回告", "可以原样发送的完整文字", "对外渠道同样",
                       "重新给用户看", "agent-relay", "截图", "先勾这个 gate", "直接写它的 Spec", "/compact"),
+        "## 里程碑停点": ("先不开下一个模块", "用安装后的版本跑", "确认框之前", "命令与输出", "跑不了的写明原因", "“注意：”",
+                       "“批了会怎样：”", "可复制代码块", "明确判定通过", "milestone-mark", "`--confirm`", "追加任务",
+                       "不调用 milestone-mark"),
     }
     # Phrases each section shares word for word with workflow-checkpoints.md, so the summary cannot drift from the contract.
     SHARED = {
@@ -937,6 +940,7 @@ class NodeRulesTests(unittest.TestCase):
         "## 最终验收": ("单独一张表放在最前", "文档改动：无", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面",
                       "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec",
                       "README 从用法草案展开"),
+        "## 里程碑停点": ("先不开下一个模块", "用安装后的版本跑", "跑不了的写明原因", "不调用 milestone-mark"),
     }
 
     def setUp(self):
@@ -1074,6 +1078,11 @@ class UsageDraftRuleTests(unittest.TestCase):
     def test_contract_explains_when_and_what(self):
         for phrase in ("同一次需求确认拆出 2 个及以上模块", "`spec/usage/<需求>.md`", "默认出、不先问", "入口清单", "典型用法",
                        "里程碑", "有入口找不到模块", "有模块不对应任何入口", "单模块需求不出", "templates/USAGE.md"):
+            self.assertIn(phrase, self.contract)
+
+    def test_contract_explains_the_milestone_stop(self):
+        for phrase in ("### 里程碑停点", "milestone-mark", "`--confirm`", "返工与小模块", "确认后里程碑", "再停一次",
+                       "最终验收照旧逐模块"):
             self.assertIn(phrase, self.contract)
 
     def test_template_passes_the_checker_headings(self):

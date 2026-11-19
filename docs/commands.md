@@ -83,7 +83,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | 批准标记 | 写法无效 ❌；批准后已修订、待批准却已有勾选 ⚠️ |
 | 并行边界格式（只在 `moduleConcurrency` 为 `on` 时） | 格式错 ❌；未完成模块的 Spec 缺这一节 ⚠️ |
 | Plan 的「预先声明」格式（有这一节时，不看并行开关） | ❌ |
-| 用法草案 `spec/usage/*.md`（有这个目录时）：三节与表格、用法与里程碑对得上、模块在能力图上且只归一个里程碑、入口的模块在里程碑里、Build order 顺序 | ❌；里程碑里的模块没有入口 ⚠️ |
+| 用法草案 `spec/usage/*.md`（有这个目录时）：三节与表格、用法与里程碑对得上、模块在能力图上且只归一个里程碑、入口的模块在里程碑里、Build order 顺序、里程碑确认记录的写法 | ❌；里程碑里的模块没有入口、确认后里程碑的模块变了 ⚠️ |
 | 任务目录里 `plan.md`、`todo.md` 以外文件的未勾选项 | ⚠️（不计入阶段） |
 | `state.json` 里残留已退役的 `tracker` 字段 | ⚠️ |
 
@@ -133,6 +133,13 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 `--confirm` 才改文件里的一行标记。当前模块待批准时阶段提示报告等待批准、不建议写 Plan 或继续 build；Spec 的批准标记
 带内容指纹，批准后被改会报告“批准后已修订”。记为已批准时命令会提醒 agent 先确认你已在对话里看到内容。`approved` 只在你明确批准之后写（交审时推荐答复放在一个可复制代码块里，回复“批准”即可；所装协作插件对在哪里答复另有规定时以它为准；“继续”不会被记为批准）；批准来源以所装协作插件的规定为准；没装只认当前对话里的明确批准。没有标记的
 文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待批准或已修订时不行。拒绝时退出 2、不写文件。
+
+### `/spec-guard:milestone-mark`
+
+记录用法草案的一个里程碑已确认：`--draft spec/usage/<需求>.md --milestone M<n>`，先预览、`--confirm` 才在草案的 Milestones 表之后写一行
+`<!-- spec-guard: milestone M<n> confirmed <模块, …> -->`。阶段提示报「里程碑停点」时，agent 先按本里程碑的典型用法实际跑一遍、把证据给你看，
+你明确说通过后才用它记下，阶段提示随后转到下一个模块；你说不通过就在本里程碑补任务或改草案。确认后里程碑又加了模块，记录失效，
+新模块做完后会再停一次。拒绝（退出 2、不写文件）：里程碑不存在、有模块没完成、前面还有没确认的里程碑。
 
 ### `/spec-guard:checkout-role`
 
@@ -191,10 +198,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 只读的模块进度表：按开发顺序列出每个模块的作用、状态（✅ 已完成、🔨 进行中、⏸ 挂起（原因）、⛔ 阻塞：等被挂起的
 模块、🟢 可以开始（只表示依赖都已完成，不代表本轮要做）、○ 未就绪：缺哪个依赖）与 Spec、Plan 的审查状态；表头给合计、关键卡点（挂起的模块按依赖链挡住了
-谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
+谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、里程碑停点（有用法草案、某个里程碑做完还没确认时）、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`
@@ -219,6 +226,7 @@ Codex 不加载插件的斜杠命令，对它说下面这些话即可；说法�
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | 「用 spec-guard-ops 挂起模块 <id>，原因是……」／「用 spec-guard-ops 恢复模块 <id>」 |
 | 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | 「用 spec-guard-ops 把这个会话指向项目 <路径>」 |
 | 记录 Spec 或 Plan 的批准状态 | `/spec-guard:review-mark` | 不用你说：你回复批准后，agent 自己用 spec-guard-ops 的 review-mark 记下 |
+| 记录用法草案的里程碑已确认 | `/spec-guard:milestone-mark` | 不用你说：你判定里程碑通过后，agent 自己用 spec-guard-ops 的 milestone-mark 记下 |
 | 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | 「用 spec-guard-ops 把这个 checkout 标为模块 <id>」／「……标为协调」 |
 | 快速插入新模块 | `/spec-guard:add-module` | 「用 spec-guard-ops 插入一个新模块」，再说清需求 |
 | Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | 「用 spec-guard-ops 提交 Proposal <id>」／「审查 Proposal <id>」／「证明 Proposal <id> 已晋级」／「收尾 Proposal <id>」 |

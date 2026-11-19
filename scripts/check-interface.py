@@ -48,7 +48,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -77,6 +77,17 @@ def _deferral(view: dict) -> list:
         return ["mapView 缺少 deferral 说明"]
     if set(fields) != set(map_view.DEFERRAL_FIELDS):
         return ["mapView.deferral.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.DEFERRAL_FIELDS))]
+    return []
+
+
+def _milestone(view: dict) -> list:
+    """milestone-stop: interface 1.13 describes the milestoneStop field map_view writes."""
+    block = view.get("milestoneStop")
+    fields = block.get("fields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 milestoneStop 说明"]
+    if set(fields) != set(map_view.MILESTONE_FIELDS):
+        return ["mapView.milestoneStop.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.MILESTONE_FIELDS))]
     return []
 
 

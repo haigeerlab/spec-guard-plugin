@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.87.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.88.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
@@ -100,6 +100,7 @@ acceptance, with the stage hint the agent sees at every step, a table of what yo
 | | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers, usage drafts and other artifacts |
 | | `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
 | | `/spec-guard:review-mark` | Record whether a Spec or Plan is approved; the agent runs it after you approve |
+| | `/spec-guard:milestone-mark` | Record that a milestone of a usage draft is confirmed; the agent runs it after you pass it |
 | | `/spec-guard:module-suspend` | Suspend or resume a module that is waiting on something outside |
 | | `/spec-guard:link-project` | Point a session whose folder is not the project at the actual project |
 | Adding requirements | `/spec-guard:add-module` | Insert a new requirement into the capability map as a module at a checkpoint (preview, then confirm) |
@@ -191,6 +192,25 @@ and names the side to use instead of creating one. Keep your own rules inside th
 3. Then remove the plugin: `claude plugin uninstall spec-guard@spec-guard-marketplace` for Claude Code;
    `codex plugin remove spec-guard@spec-guard-marketplace` for Codex, and
    `codex plugin marketplace remove spec-guard-marketplace` once you no longer need the source.
+
+## Requirements that span several modules: usage drafts and milestone stops
+
+When one requirement splits into two or more modules, spec-guard lets you see how the result will be used before any work starts, and verifies it in
+stages instead of putting it together for the first time only at the very end.
+
+1. **Raise the requirement**: you describe it, the agent summarises it and you confirm it is complete. The next review shows both the new
+   capability-map rows and a usage draft `spec/usage/<requirement>.md`: the entry points and which module owns each, two or three typical
+   usages, and the milestones; a missing or surplus module is called out there. After approval, `/spec-guard:verify-artifacts` checks the
+   draft's structure and the Build order.
+2. **Add a module midway**: when you insert one with `/spec-guard:add-module`, the preview names the draft and milestone of the anchor and
+   reminds you to add the new module to the milestone table; a wrong order or a module in two milestones is reported by `verify-artifacts`.
+3. **A milestone is done**: after the last module of a milestone passes acceptance and is released, the stage hint reports a milestone stop.
+   The agent does not start the next module; it runs the milestone's typical usages for real with the installed version and puts the commands
+   and output in front of you. If you pass it, the agent previews `/spec-guard:milestone-mark`, records it in the draft once you confirm, and
+   only then does the hint move on; if not, tasks are added to this milestone or the draft and the modules not yet started are revised.
+
+The format is in `templates/USAGE.md`; the rules are in the "用法草案" section of the shared checkpoint rules. Single-module requirements get no
+draft; projects without `spec/usage/` see no change.
 
 ## Developing several modules at once (optional)
 

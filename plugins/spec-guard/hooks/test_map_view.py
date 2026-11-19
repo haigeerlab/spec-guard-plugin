@@ -19,7 +19,7 @@ APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
             "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence",
-            "deferredTotal"}
+            "deferredTotal", "milestoneStop"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred"}
@@ -107,6 +107,40 @@ FILES = {
 def fixture():
     project = Project(ROWS, ORDER, FILES, active="h")
     return project
+
+
+class MilestoneStopTest(unittest.TestCase):
+    """milestone-stop: the first finished, unconfirmed milestone of a usage draft, for callers that dispatch by /map."""
+    ROWS = [("a", "基础", "—"), ("b", "下游", "a")]
+    DRAFT = ("# Usage draft: demo\n\n## Entry points\n\n| Entry | Does | Module |\n|---|---|---|\n| `x` | y | a, b |\n\n"
+             "## Typical usage\n\n### U1: run\nx\n\n### U2: more\ny\n\n## Milestones\n\n"
+             "| Milestone | Usage | Modules |\n|---|---|---|\n| M1 | U1 | a |\n| M2 | U1, U2 | b |\n")
+
+    def project(self, draft):
+        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
+        if draft is not None:
+            files["spec/usage/demo.md"] = draft
+        return Project(self.ROWS, ["a", "b"], files)
+
+    def test_null_without_draft_or_stop(self):
+        with self.project(None) as project:
+            self.assertIsNone(project.json()["milestoneStop"])
+            self.assertNotIn("里程碑停点", project.run().stdout)
+        with self.project(self.DRAFT + "\n<!-- spec-guard: milestone M1 confirmed a -->\n") as project:
+            self.assertIsNone(project.json()["milestoneStop"])
+
+    def test_stop(self):
+        with self.project(self.DRAFT) as project:
+            self.assertEqual(project.json()["milestoneStop"],
+                             {"file": "spec/usage/demo.md", "milestone": "M1", "modules": ["a"], "usages": ["U1"]})
+            self.assertIn("里程碑停点：spec/usage/demo.md 的 M1（模块 a 已全部完成，未确认）", project.run().stdout)
+
+    def test_unreadable_draft_is_not_null(self):
+        with self.project("# nothing\n") as project:
+            stop = project.json()["milestoneStop"]
+            self.assertEqual(stop["error"], "unreadable")
+            self.assertIn("spec/usage/demo.md", stop["detail"])
+            self.assertIn("里程碑停点：未判定", project.run().stdout)
 
 
 class DeferralTest(unittest.TestCase):

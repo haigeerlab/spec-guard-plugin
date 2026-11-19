@@ -792,6 +792,11 @@ mkifc "$TMP/ifc-deferral" 'del data["mapView"]["deferral"]'
 want fail "interface: mapView 缺 1.12 的 deferral 说明 → 报错" python3 "$IFC" "$TMP/ifc-deferral/interface.json"
 mkifc "$TMP/ifc-deferral-field" 'del data["mapView"]["deferral"]["fields"]["deferredTotal"]'
 want fail "interface: deferral 少一个字段 → 报错" python3 "$IFC" "$TMP/ifc-deferral-field/interface.json"
+# milestone-stop：interface 1.13 的 mapView.milestoneStop 说明，字段与 map_view.MILESTONE_FIELDS 一致。
+mkifc "$TMP/ifc-milestone" 'del data["mapView"]["milestoneStop"]'
+want fail "interface: mapView 缺 1.13 的 milestoneStop 说明 → 报错" python3 "$IFC" "$TMP/ifc-milestone/interface.json"
+mkifc "$TMP/ifc-milestone-field" 'data["mapView"]["milestoneStop"]["fields"]["extra"] = "x"'
+want fail "interface: milestoneStop 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-milestone-field/interface.json"
 # pre-declared-scope：interface 1.11 的 declaredScope 入口，错误码与 module_scope.DECLARED_ERRORS 一致。
 mkifc "$TMP/ifc-declared" 'del data["declaredScope"]'
 want fail "interface: 缺 1.11 的 declaredScope 入口 → 报错" python3 "$IFC" "$TMP/ifc-declared/interface.json"

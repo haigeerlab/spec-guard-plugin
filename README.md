@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.87.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.88.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
@@ -89,6 +89,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记、用法草案等产物 |
 | | `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
 | | `/spec-guard:review-mark` | 记录 Spec、Plan 的批准状态；你回复批准后由 agent 来用 |
+| | `/spec-guard:milestone-mark` | 记录用法草案的一个里程碑已确认；你判定通过后由 agent 来用 |
 | | `/spec-guard:module-suspend` | 挂起或恢复在等外部条件的模块 |
 | | `/spec-guard:link-project` | 会话目录不是项目目录时，指向实际的项目 |
 | 加需求 | `/spec-guard:add-module` | 在检查点把新需求作为模块插进能力图（预览后确认） |
@@ -174,6 +175,20 @@ Codex 0.164 之前，只有新增的 `SessionStart` hook 要信任一次并重�
 3. 再卸载插件：Claude Code 用 `claude plugin uninstall spec-guard@spec-guard-marketplace`；Codex 用
    `codex plugin remove spec-guard@spec-guard-marketplace`，不再需要这个来源时再
    `codex plugin marketplace remove spec-guard-marketplace`。
+
+## 多模块需求：用法草案与里程碑停点
+
+一个需求拆成 2 个及以上模块时，spec-guard 让你在开工前看清做出来怎么用，并分段验证，不等全部做完才第一次拼起来用。
+
+1. **提需求**：你描述需求，agent 总结、你确认说完。下一轮交审里同时看到能力图新行和用法草案 `spec/usage/<需求>.md`：有哪些入口、各归哪个模块、
+   两三个典型用法、分几个里程碑；拆漏或拆多会在交审里写明。批准后 `/spec-guard:verify-artifacts` 检查草案结构和 Build order 顺序。
+2. **中途补模块**：用 `/spec-guard:add-module` 插入时，预览写明锚点在哪份草案的哪个里程碑，提醒你把新模块加进里程碑表；
+   排错顺序或归了两个里程碑，`verify-artifacts` 会报出来。
+3. **一个里程碑做完**：这个里程碑最后一个模块验收、发版之后，阶段提示报「里程碑停点」，agent 不直接开下一个模块，而是用安装后的版本
+   按这个里程碑的典型用法实际跑一遍，把命令与输出摆给你。你说通过，agent 用 `/spec-guard:milestone-mark` 预览、你确认后在草案里记下，
+   阶段提示才转到下一个模块；你说不通过，就在本里程碑补任务，或回头改草案和后面还没开工的模块。
+
+格式见 `templates/USAGE.md`，细则见共享检查点规则的「用法草案」一节。单模块需求不出草案；没有 `spec/usage/` 的项目一切照旧。
 
 ## 多模块并行（可选）
 
