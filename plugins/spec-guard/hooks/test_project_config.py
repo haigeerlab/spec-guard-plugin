@@ -148,7 +148,7 @@ class Summary(unittest.TestCase):
             (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "autonomyTier",
+        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "autonomyTier", "moduleAutonomy",
                                       "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
@@ -380,6 +380,99 @@ class AutonomyTier(unittest.TestCase):
         for tier in ("strict", "standard", "relaxed"):
             with Project({"version": 1, "autonomyTier": tier}) as project:
                 self.assertEqual(config_lines(project.root), baseline, tier)
+
+
+class ModuleAutonomy(unittest.TestCase):
+    """module-autonomy (C1): one entry per module, written one at a time; the effective tier is module_tier."""
+
+    def entries(self, project):
+        return json.loads(project.config.read_text(encoding="utf-8")).get("moduleAutonomy")
+
+    def test_set_each_tier_changes_only_that_entry(self):
+        for tier in ("strict", "standard", "relaxed"):
+            with Project({"version": 1, "moduleAutonomy": {"other": "strict"}}) as project:
+                code, out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", tier,
+                                        "--confirm")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.entries(project), {"other": "strict", "alpha": tier})
+
+    def test_preview_does_not_write(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")
+            self.assertEqual(code, 0, out)
+            self.assertIn("preview only", out)
+            self.assertFalse(project.config.exists())
+
+    def test_unset_module_then_last_entry_removes_key(self):
+        with Project({"version": 1, "reviewCadence": "combined",
+                      "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}) as project:
+            code, out = project.run("unset", "--key", "moduleAutonomy", "--module", "alpha", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(self.entries(project), {"beta": "strict"})
+            code, out = project.run("unset", "--key", "moduleAutonomy", "--module", "beta", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, []))
+
+    def test_unset_whole_key(self):
+        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
+            code, out = project.run("unset", "--key", "moduleAutonomy", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({}, []))
+
+    def test_rejects_bad_input_without_writing(self):
+        cases = [("set", "--key", "moduleAutonomy", "--module", "Bad_Id", "--value", "strict"),
+                 ("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "fast"),
+                 ("set", "--key", "moduleAutonomy", "--value", "strict"),
+                 ("set", "--key", "autonomyTier", "--module", "alpha", "--value", "strict"),
+                 ("unset", "--key", "reviewCadence", "--module", "alpha")]
+        for args in cases:
+            with Project() as project:
+                code, out = project.run(*args, "--confirm")
+                self.assertEqual(code, 2, (args, out))
+                self.assertFalse(project.config.exists(), args)
+
+    def test_invalid_value_in_file_drops_only_this_key(self):
+        for bad in ("relaxed", {"alpha": "fast"}, {"Bad_Id": "strict"}, ["alpha"]):
+            with Project({"version": 1, "reviewCadence": "combined", "moduleAutonomy": bad}) as project:
+                self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, ["moduleAutonomy-invalid"]), bad)
+                self.assertEqual(project.run("check")[0], 1, bad)
+
+    def test_wider_than_project_preview_note(self):
+        with Project({"version": 1, "autonomyTier": "standard"}) as project:
+            out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "relaxed")[1]
+            self.assertIn("note:", out)
+            self.assertIn("alpha", out)
+            out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")[1]
+            self.assertNotIn("note:", out)
+
+    def test_summary_lists_it(self):
+        with Project() as project:
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual((items["moduleAutonomy"]["value"], items["moduleAutonomy"]["source"]), ({}, "default"))
+        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual(items["moduleAutonomy"]["value"], {"alpha": "relaxed"})
+
+    def test_module_tier_sources(self):
+        from project_config import module_tier
+        with Project() as project:
+            self.assertEqual(module_tier(project.root, "alpha"), ("strict", "default"))
+        with Project({"version": 1, "autonomyTier": "standard"}) as project:
+            self.assertEqual(module_tier(project.root, "alpha"), ("standard", "autonomyTier"))
+        with Project({"version": 1, "autonomyTier": "fast"}) as project:
+            self.assertEqual(module_tier(project.root, "alpha"), ("strict", "default (config invalid)"))
+        with Project({"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed"}}) as project:
+            self.assertEqual(module_tier(project.root, "alpha"), ("relaxed", "moduleAutonomy"))
+            self.assertEqual(module_tier(project.root, "beta"), ("standard", "autonomyTier"))
+        with Project({"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "fast"}}) as project:
+            self.assertEqual(module_tier(project.root, "alpha"), ("standard", "default (config invalid)"))
+
+    def test_phase_hint_ignores_it(self):
+        from module_stage import config_lines
+        with Project() as plain:
+            baseline = config_lines(plain.root)
+        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
+            self.assertEqual(config_lines(project.root), baseline)
 
 
 class MachineState(unittest.TestCase):

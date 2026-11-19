@@ -22,7 +22,8 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
             "deferredTotal", "milestoneStop"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
-               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred"}
+               "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
+               "autonomy"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -141,6 +142,48 @@ class MilestoneStopTest(unittest.TestCase):
             self.assertEqual(stop["error"], "unreadable")
             self.assertIn("spec/usage/demo.md", stop["detail"])
             self.assertIn("里程碑停点：未判定", project.run().stdout)
+
+
+class AutonomyTest(unittest.TestCase):
+    """module-autonomy: each module's effective tier and its source; the text table is unchanged."""
+    ROWS = [("a", "基础", "—"), ("b", "下游", "a")]
+
+    def project(self, config=None):
+        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
+        if config is not None:
+            files[".agent/config.json"] = json.dumps(dict(version=1, **config))
+        return Project(self.ROWS, ["a", "b"], files)
+
+    def autonomy(self, project):
+        return {m["id"]: m["autonomy"] for m in project.json()["modules"]}
+
+    def test_without_config(self):
+        with self.project() as project:
+            self.assertEqual(self.autonomy(project), {
+                "a": {"tier": "strict", "source": "default", "widerThanProject": False},
+                "b": {"tier": "strict", "source": "default", "widerThanProject": False}})
+
+    def test_module_entry_and_project_tier(self):
+        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "relaxed", "b": "strict"}}) as project:
+            self.assertEqual(self.autonomy(project), {
+                "a": {"tier": "relaxed", "source": "moduleAutonomy", "widerThanProject": True},
+                "b": {"tier": "strict", "source": "moduleAutonomy", "widerThanProject": False}})
+        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "standard"}}) as project:
+            self.assertEqual(self.autonomy(project), {
+                "a": {"tier": "standard", "source": "moduleAutonomy", "widerThanProject": False},
+                "b": {"tier": "standard", "source": "autonomyTier", "widerThanProject": False}})
+
+    def test_invalid_entries_fall_back(self):
+        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "fast"}}) as project:
+            self.assertEqual(self.autonomy(project)["a"],
+                             {"tier": "standard", "source": "default (config invalid)", "widerThanProject": False})
+
+    def test_text_table_unchanged(self):
+        with self.project() as plain:
+            baseline = plain.run().stdout
+        with self.project({"moduleAutonomy": {"a": "relaxed"}}) as project:
+            self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
+                             baseline.replace(str(plain.root), "ROOT"))
 
 
 class DeferralTest(unittest.TestCase):
@@ -815,6 +858,8 @@ def snapshot(project):
     data = project.json()
     data.pop("generatedAt")
     data.pop("reviewCadence")  # map-progress-facts: its source reports an invalid config; checked in ProgressFactsTest
+    for module in data["modules"]:
+        module.pop("autonomy")  # module-autonomy: its source reports an invalid config too; checked in AutonomyTest
     done = project.run()
     assert done.returncode == 0, done.stderr
     return json.dumps(data, ensure_ascii=False, sort_keys=True), STAMP.sub("", done.stdout)

@@ -807,6 +807,15 @@ mkifc "$TMP/ifc-tier" 'del data["autonomyTier"]'
 want fail "interface: 缺 1.11 的 autonomyTier 入口 → 报错" python3 "$IFC" "$TMP/ifc-tier/interface.json"
 mkifc "$TMP/ifc-tier-less" 'del data["autonomyTier"]["values"]["relaxed"]'
 want fail "interface: autonomyTier 少一档 → 报错" python3 "$IFC" "$TMP/ifc-tier-less/interface.json"
+# module-autonomy：interface 1.14 的 moduleAutonomy 入口与 mapView.autonomy 说明，字段与取值和代码一致。
+mkifc "$TMP/ifc-modtier" 'del data["moduleAutonomy"]'
+want fail "interface: 缺 1.14 的 moduleAutonomy 入口 → 报错" python3 "$IFC" "$TMP/ifc-modtier/interface.json"
+mkifc "$TMP/ifc-modtier-less" 'del data["moduleAutonomy"]["values"]["relaxed"]'
+want fail "interface: moduleAutonomy 少一档 → 报错" python3 "$IFC" "$TMP/ifc-modtier-less/interface.json"
+mkifc "$TMP/ifc-autonomy" 'del data["mapView"]["autonomy"]'
+want fail "interface: mapView 缺 1.14 的 autonomy 说明 → 报错" python3 "$IFC" "$TMP/ifc-autonomy/interface.json"
+mkifc "$TMP/ifc-autonomy-field" 'data["mapView"]["autonomy"]["fields"]["cap"] = "x"'
+want fail "interface: autonomy 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-autonomy-field/interface.json"
 # review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
 mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
 want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"

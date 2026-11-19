@@ -18,8 +18,8 @@ import module_stage  # noqa: E402
 import project_config  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
-           "scopeOverlap", "declaredScope", "autonomyTier")  # crew-interface: 1.1; gate-tick: 1.7;
-# scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11
+           "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy")  # crew-interface: 1.1; gate-tick: 1.7;
+# scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11; module-autonomy: 1.14
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
 REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
@@ -48,7 +48,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _autonomy(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -91,6 +91,17 @@ def _milestone(view: dict) -> list:
     return []
 
 
+def _autonomy(view: dict) -> list:
+    """module-autonomy: interface 1.14 describes every per-module autonomy field map_view writes."""
+    block = view.get("autonomy")
+    fields = block.get("fields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 autonomy 说明"]
+    if set(fields) != set(map_view.AUTONOMY_FIELDS):
+        return ["mapView.autonomy.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.AUTONOMY_FIELDS))]
+    return []
+
+
 def _scripts(path: Path, label: str, command) -> list:
     scripts = [arg for arg in command if isinstance(arg, str) and arg.endswith(".py")] if isinstance(command, list) else []
     if not scripts:
@@ -119,6 +130,7 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
                lambda key: key.split()[0]),
               ("moduleConcurrency.values", data["moduleConcurrency"].get("values"), set(project_config.CONCURRENCY), None),
               ("autonomyTier.values", data["autonomyTier"].get("values"), set(project_config.TIERS), None),
+              ("moduleAutonomy.values", data["moduleAutonomy"].get("values"), set(project_config.TIERS), None),
               ("scopeOverlap.values.error", data["scopeOverlap"].get("values", {}).get("error"),
                set(module_scope.OVERLAP_ERRORS), None),
               ("declaredScope.values.error", data["declaredScope"].get("values", {}).get("error"),

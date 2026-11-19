@@ -22,6 +22,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from capability_map import MODULE_ID
 from state_paths import ENV as STATE_ENV, legacy_in_use, state_root
 from tracker_default import _write_atomic, read_default, read_text
 
@@ -35,13 +36,18 @@ TIERS = ("strict", "standard", "relaxed")
 # config-per-key: a file with one of these problems is unusable as a whole; every other problem
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
-DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "autonomyTier": "strict"}
+DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "autonomyTier": "strict", "moduleAutonomy": {}}
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
     "reviewCadence": lambda value: value in CADENCES,
     "moduleConcurrency": lambda value: value in CONCURRENCY,
     "autonomyTier": lambda value: value in TIERS,
+    # module-autonomy: module id -> tier; the whole key is invalid when any entry is.
+    "moduleAutonomy": lambda value: isinstance(value, dict) and all(
+        isinstance(key, str) and MODULE_ID.fullmatch(key) and value[key] in TIERS for key in value),
 }
+# Keys whose value is written one entry at a time with --module.
+PER_MODULE = ("moduleAutonomy",)
 OWNED_ELSEWHERE = {
     "trackerDefault": "/spec-guard:tracker-default",
 }
@@ -72,6 +78,40 @@ def load(root: Path) -> tuple[dict[str, Any], list[str]]:
             else:
                 problems.append(key + "-invalid")
     return values, problems
+
+
+def _project_tier(values: dict[str, Any], problems: list[str]) -> tuple[str, str]:
+    if "autonomyTier" in values:
+        return values["autonomyTier"], "autonomyTier"
+    if _structural(problems) or "autonomyTier-invalid" in problems:
+        return DEFAULTS["autonomyTier"], "default (config invalid)"
+    return DEFAULTS["autonomyTier"], "default"
+
+
+def module_tier(root: Path, module_id: str) -> tuple[str, str]:
+    """module-autonomy: the only reader of a module's effective tier, as (tier, source).
+
+    A module's own entry wins; otherwise the project's autonomyTier applies.  An invalid moduleAutonomy
+    sends every module back to the project tier with the source "default (config invalid)".  spec-guard
+    never caps the tier: a cap from elsewhere is the caller's to apply.
+    """
+    return module_tiers(root, [module_id])[1][module_id]
+
+
+def module_tiers(root: Path, module_ids) -> tuple[str, dict[str, tuple[str, str]]]:
+    """(project tier, {id: (tier, source)}) from one read of the file; module_tier is this for one id."""
+    values, problems = load(root)
+    entries = values.get("moduleAutonomy", {})
+    project, source = _project_tier(values, problems)
+    if "moduleAutonomy-invalid" in problems:
+        source = "default (config invalid)"
+    return project, {module: (entries[module], "moduleAutonomy") if module in entries else (project, source)
+                     for module in module_ids}
+
+
+def wider(tier: str, than: str) -> bool:
+    """TIERS runs from strict to relaxed."""
+    return TIERS.index(tier) > TIERS.index(than)
 
 
 def module_concurrency(root: Path) -> bool:
@@ -152,14 +192,26 @@ def _show(root: Path, as_json: bool) -> int:
     return 0
 
 
-def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
+def _change(root: Path, key: str, value: str | None, confirm: bool, module: str | None = None) -> int:
     if key in OWNED_ELSEWHERE:
         print("%s is not stored in %s; change it with %s" % (key, RELATIVE_PATH, OWNED_ELSEWHERE[key]))
         return 2
     if key not in VALIDATORS:
         print("unknown-key: configurable keys are %s" % ", ".join(VALIDATORS))
         return 2
-    if value is not None and not VALIDATORS[key](value):
+    if module is not None and key not in PER_MODULE:
+        print("--module only applies to %s" % ", ".join(PER_MODULE))
+        return 2
+    if key in PER_MODULE and value is not None and module is None:
+        print("%s is set one module at a time: add --module <module-id>" % key)
+        return 2
+    if module is not None and not MODULE_ID.fullmatch(module):
+        print("%s-invalid: --module takes a kebab-case module id" % key)
+        return 2
+    if module is not None and value is not None and value not in TIERS:
+        print("%s-invalid: see spec/module-autonomy.md for the accepted values" % key)
+        return 2
+    if module is None and value is not None and not VALIDATORS[key](value):
         print("%s-invalid: see spec/project-config.md for the accepted values" % key)
         return 2
     values, problems = load(root)
@@ -175,6 +227,13 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
     before = render(values, rest) if path.exists() else ""
     rest.pop(key, None)
     updated = dict(values)
+    if module is not None:
+        entries = dict(values.get(key, {}))
+        if value is None:
+            entries.pop(module, None)
+        else:
+            entries[module] = value
+        value = entries if entries else None
     if value is None:
         updated.pop(key, None)
     else:
@@ -184,6 +243,11 @@ def _change(root: Path, key: str, value: str | None, confirm: bool) -> int:
                                         fromfile=str(RELATIVE_PATH) + " (current)",
                                         tofile=str(RELATIVE_PATH) + " (proposed)"))
     print(diff if diff else "no change: %s already has this value" % RELATIVE_PATH)
+    if module is not None and module in (value or {}):
+        project, _ = _project_tier(values, problems)
+        if wider(value[module], project):
+            print("note: %s 的档位 %s 宽于项目档位 %s；spec-guard 不截断，按项目上限截断由调用方做"
+                  % (module, value[module], project))
     if not confirm:
         print("\npreview only; nothing was written. Re-run with --confirm to apply.")
         return 0
@@ -209,9 +273,11 @@ def main() -> int:
     setter = commands.add_parser("set", help="preview, and with --confirm write")
     setter.add_argument("--key", required=True)
     setter.add_argument("--value", required=True)
+    setter.add_argument("--module")
     setter.add_argument("--confirm", action="store_true")
     unsetter = commands.add_parser("unset", help="preview, and with --confirm remove one key")
     unsetter.add_argument("--key", required=True)
+    unsetter.add_argument("--module")
     unsetter.add_argument("--confirm", action="store_true")
     for sub in (show, commands.choices["check"], setter, unsetter):
         sub.add_argument("--project", default=".")
@@ -230,7 +296,7 @@ def main() -> int:
             return 1
         print("ok")
         return 0
-    return _change(root, args.key, getattr(args, "value", None), args.confirm)
+    return _change(root, args.key, getattr(args, "value", None), args.confirm, args.module)
 
 
 if __name__ == "__main__":

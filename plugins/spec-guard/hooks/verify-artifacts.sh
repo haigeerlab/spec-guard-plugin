@@ -115,6 +115,27 @@ if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
     else
       warn '未验证：项目配置检查没有正常运行'
     fi
+    # module-autonomy：按模块的档位写了能力图上没有的模块时逐个警告（模块可能稍后插入或刚改名），不判失败。
+    # 配置或能力图读不了时这里不报：前者已由上面的 check 判定，后者由能力图检查报告。
+    if [ "$CONFIG_RC" -eq 0 ] && [ -f spec/CAPABILITY-MAP.md ]; then
+      UNKNOWN_IDS="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from capability_map import parse_map
+from project_config import load
+try:
+    mapped = {row.module_id for row in parse_map(Path("spec/CAPABILITY-MAP.md")).rows}
+except Exception:
+    sys.exit(0)
+for module in load(Path("."))[0].get("moduleAutonomy", {}):
+    if module not in mapped:
+        print(module)
+' "$HOOKDIR" 2>/dev/null </dev/null)" || UNKNOWN_IDS=""
+      while IFS= read -r module; do
+        [ -n "$module" ] && warn "项目配置 moduleAutonomy 里的模块 ${module} 不在能力图上（用 /spec-guard:config 查看）"
+      done <<<"$UNKNOWN_IDS"
+    fi
   fi
 fi
 

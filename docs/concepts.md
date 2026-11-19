@@ -78,5 +78,5 @@ spec-guard 不跨仓库汇总进度。跨仓库的接口约定照上游 `spec-dr
 | 预先声明 | Plan 里可选的一节 `## 预先声明`：列出要改的公共路径、外部依赖、质量与工作区配置、补丁；批准 Plan 即授权这些改动，之后不再逐次问。删除文件、改对外契约、安全例外不能预先声明。`verify-artifacts` 校验格式 |
 | 并行边界 | `moduleConcurrency` 为 `on` 时，每个未完成模块的 Spec 里的一节 `## 并行边界`：写明独占哪些路径、预计碰哪类公共文件。`verify-artifacts` 校验格式，最终验收时标出改到边界外的文件 |
 | Build order 逗号组 | Build order 里用逗号分开的几个模块，例如 `a → b, c → d` 里的 `b, c`，表示可以同时进行。并行开关不是 `on` 时，按从左到右逐个推进 |
-| 自治档位 | `.agent/config.json` 的 `autonomyTier`（`strict` 默认、`standard`、`relaxed`），给 module-crew 用：各档放开什么由它定义，spec-guard 只存、读、报告来源，自己的停点不随它变。任何档位下能力图、Spec 与最终验收都要你批准 |
+| 自治档位 | `.agent/config.json` 的 `autonomyTier`（`strict` 默认、`standard`、`relaxed`），给 module-crew 用：各档放开什么由它定义，spec-guard 只存、读、报告来源，自己的停点不随它变。任何档位下能力图、Spec 与最终验收都要你批准。0.89.0 起可以用 `moduleAutonomy` 给单个模块另设档位（项目定上限、需求定实际），没设的模块随项目档位 |
 | Epiq | 本地事项账本用的开源事项工具（[epiq](https://github.com/ljtn/epiq)，MIT），以 MCP 方式接入 Claude Code／Codex；账本数据在项目的 `.epiq/` 与 `__epiq_state__` 状态 worktree 里 |

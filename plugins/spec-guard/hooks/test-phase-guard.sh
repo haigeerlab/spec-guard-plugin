@@ -2876,7 +2876,23 @@ grep -F 'Milestone stop' >/dev/null <<<"$(run "$ms" | context_of)" && fail "两�
 echo "  ✅ DONE 时最后一个里程碑未确认也停，确认后不停"; PASS=$((PASS + 1))
 }
 
-PARTS=24
+part_25() {
+# module-autonomy：按模块的自治档位只给 /map 与调用方读，阶段提示（正文与状态码）设与不设逐字相同。
+ma="$WORK/autonomy"; mkdir -p "$ma/spec" "$ma/tasks/alpha" "$ma/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ma/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$ma/spec/CAPABILITY-MAP.md"
+touch "$ma/spec/alpha.md"; printf '# Plan\n' > "$ma/tasks/alpha/plan.md"
+printf '%s\n' '- [x] one' '- [ ] two' > "$ma/tasks/alpha/todo.md"
+printf '{"version": 1, "autonomyTier": "standard"}\n' > "$ma/.agent/config.json"
+plain_ma="$(run "$ma" | raw_of)"
+printf '{"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}\n' > "$ma/.agent/config.json"
+[ "$(run "$ma" | raw_of)" = "$plain_ma" ] || fail "设了 moduleAutonomy 后阶段提示变了
+$(run "$ma" | raw_of)"
+echo "  ✅ 设了 moduleAutonomy 时阶段提示与状态码逐字不变"; PASS=$((PASS + 1))
+}
+
+PARTS=25
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
