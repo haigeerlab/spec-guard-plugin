@@ -597,6 +597,64 @@ def file_review_state(path: Path, kind: str) -> str:
         return "unreadable"
 
 
+BASELINE_COMMITS = 50  # pre-build-spec-batch: how far back the approved baseline is looked for
+
+
+def spec_baseline(root: Path, module: str) -> dict:
+    """pre-build-spec-batch: the Spec text the current approval marker was given for, read from git history.
+
+    {"status": "found", "commit", "text"} for the newest of the last BASELINE_COMMITS commits touching the Spec whose
+    text (marker line left out) has the marker's digest; {"status": "absent"} when there is no such commit or no
+    digest approval; {"status": "unverified", "reason"} when git cannot be read -- a failed probe is never "absent".
+    Read-only.
+    """
+    relative = "spec/%s.md" % module
+    try:
+        current = (root / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        return {"status": "unverified", "reason": "%s: %s" % (relative, type(error).__name__)}
+    markers = _review_split(current)[0]
+    match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0]) if len(markers) == 1 else None
+    if match is None:
+        return {"status": "absent"}
+
+    def run(*args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=5)
+
+    try:
+        if run("rev-parse", "--is-inside-work-tree").returncode != 0:
+            return {"status": "unverified", "reason": "not a git work tree"}
+        if run("rev-parse", "--verify", "-q", "HEAD").returncode != 0:
+            return {"status": "absent"}
+        log = run("log", "-n", str(BASELINE_COMMITS), "--format=%H", "--", relative)
+        if log.returncode != 0:
+            return {"status": "unverified", "reason": "git log failed"}
+        for sha in log.stdout.decode("ascii", "replace").split():
+            shown = run("show", "%s:./%s" % (sha, relative))
+            if shown.returncode != 0:
+                continue
+            try:
+                text = shown.stdout.decode("utf-8")
+            except UnicodeError:
+                continue
+            if review_digest(text) == match.group(1):
+                return {"status": "found", "commit": sha, "text": text}
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unverified", "reason": type(error).__name__}
+    return {"status": "absent"}
+
+
+def pre_build_batch(root: Path, module: str, stage: str, spec: str, plan: str) -> dict | None:
+    """pre-build-spec-batch: the baseline when a revised Spec is waiting for the Plan's review, else None.
+
+    "Before the build" is NEEDS_PLAN, or BUILDING with the Plan still pending; once the Plan is approved (or carries
+    no marker, as in older projects) the build rules apply unchanged.
+    """
+    if spec != "revised" or not (stage == "NEEDS_PLAN" or (stage == "BUILDING" and plan == "pending")):
+        return None
+    return spec_baseline(root, module)
+
+
 def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False) -> tuple:
     """(Review line, replacement next step, Spec state, Plan state) for the current module; empty strings when nothing to say.
 
