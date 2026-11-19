@@ -927,14 +927,16 @@ class NodeRulesTests(unittest.TestCase):
     }
     # Phrases each section shares word for word with workflow-checkpoints.md, so the summary cannot drift from the contract.
     SHARED = {
-        "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "新插入的标「新」", "不算合并交审"),
+        "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "新插入的标「新」", "不算合并交审",
+                       "多模块需求附用法草案", "拆分核对"),
         "## Spec 交审": ("要你确认的假设", "逐条全列", "不为了短而删减", "“继续”不会被记为批准", "一次交审只放一个模块",
-                       "按模块分组", "可复制代码块", "没装只认当前对话里的明确批准"),
+                       "按模块分组", "可复制代码块", "没装只认当前对话里的明确批准", "对外接口与用法草案一致吗"),
         "## Plan 交审": ("中途会停下来问你的地方", "没有中途 `gate` 写“无，做完直接交", "只在这几类情况停下问用户",
                        "删除工作区外的文件", "下载脚本直接执行", "测试改不红", "批准本 Plan 即授权以下公共改动"),
         "## 中途 gate": ("接下来要做的那一步", "开头的五件事落在这几项里", "不按默认推荐继续重试", "去哪个会话"),
         "## 最终验收": ("单独一张表放在最前", "文档改动：无", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面",
-                      "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec"),
+                      "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec",
+                      "README 从用法草案展开"),
     }
 
     def setUp(self):
@@ -1060,6 +1062,25 @@ class RequirementConfirmTests(unittest.TestCase):
             text = (self.plugin / rel).read_text(encoding="utf-8")
             with self.subTest(rel=rel):
                 self.assertLess(text.index("「" + self.POINTER + "」"), text.index(anchor))
+
+
+class UsageDraftRuleTests(unittest.TestCase):
+    """usage-draft: the rule, the template and the checker agree on the draft format."""
+
+    def setUp(self):
+        self.plugin = Path(__file__).resolve().parents[1]
+        self.contract = (self.plugin / CONTRACT).read_text(encoding="utf-8")
+
+    def test_contract_explains_when_and_what(self):
+        for phrase in ("同一次需求确认拆出 2 个及以上模块", "`spec/usage/<需求>.md`", "默认出、不先问", "入口清单", "典型用法",
+                       "里程碑", "有入口找不到模块", "有模块不对应任何入口", "单模块需求不出", "templates/USAGE.md"):
+            self.assertIn(phrase, self.contract)
+
+    def test_template_passes_the_checker_headings(self):
+        template = (self.plugin / "templates" / "USAGE.md").read_text(encoding="utf-8")
+        for heading in ("## Entry points", "## Typical usage", "## Milestones", "| Entry | Does | Module |",
+                        "| Milestone | Usage | Modules |", "### U1:"):
+            self.assertIn(heading, template)
 
 
 if __name__ == "__main__":
