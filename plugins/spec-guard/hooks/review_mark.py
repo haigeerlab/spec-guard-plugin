@@ -14,8 +14,8 @@ import difflib
 from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, file_review_state, review_approved_line, review_digest,
-                          review_marker_lines, review_state)
+from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, file_review_state, review_approved_line, review_body,
+                          review_digest, review_marker_lines, review_state, spec_baseline)
 from tracker_default import _write_atomic
 
 
@@ -109,7 +109,25 @@ def main() -> int:
             print("spec-not-approved: %s reads as %s. Approving a Spec needs the user's own explicit approval of "
                   "that Spec; the Plan's approval or an earlier \"continue\" does not cover it. Show the user the "
                   "Spec first, then use --target both if they approve both." % (relative["spec"], spec_state))
+            if spec_state == "revised":
+                print("Before the build the revision can be approved with the Plan: show the user the Spec's cumulative "
+                      "diff against its approved baseline (preview this command with --target both to print it), then "
+                      "record both with --target both.")
             return 2
+    if args.state == "approved" and "spec" in kinds and review_state(before["spec"], "spec") == "revised":
+        # pre-build-spec-batch: the user approves the revision itself, so they must see what changed since approval.
+        baseline = spec_baseline(root, module_id)
+        if baseline["status"] == "found":
+            print("Spec changes since it was approved (show this diff to the user verbatim):")
+            print("".join(difflib.unified_diff(review_body(baseline["text"]).splitlines(keepends=True),
+                                               review_body(before["spec"]).splitlines(keepends=True),
+                                               fromfile="%s (approved %s)" % (relative["spec"], baseline["commit"][:7]),
+                                               tofile=relative["spec"] + " (now)")))
+        else:
+            reason = ("no approved baseline in git" if baseline["status"] == "absent"
+                      else "the approved baseline could not be checked (%s)" % baseline["reason"])
+            print("%s: %s; show the user the whole revised Spec, not a summary of the changes."
+                  % (relative["spec"], reason))
     after = {kind: _marked(before[kind], kind, args.state) for kind in kinds}
     changed = [kind for kind in kinds if after[kind] != before[kind]]
     for kind in kinds:

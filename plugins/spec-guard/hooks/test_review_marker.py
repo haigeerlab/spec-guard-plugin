@@ -311,6 +311,59 @@ class Mark(unittest.TestCase):
             self.assertIn("```\n%s\n```\n" % REVIEW_PENDING, project.spec.read_text(encoding="utf-8"))
 
 
+class PreBuildBatch(unittest.TestCase):
+    """pre-build-spec-batch: approving both shows the revised Spec's cumulative diff against the approved baseline."""
+    GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
+           "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
+
+    def git(self, project, *args):
+        done = subprocess.run(self.GIT + list(args), cwd=project.root, check=True, capture_output=True, text=True,
+                              timeout=30)
+        return done.stdout.strip()
+
+    def revised(self, project, commit=True):
+        self.git(project, "init", "-q")
+        if not commit:
+            self.git(project, "add", "-A")
+            self.git(project, "commit", "-q", "-m", "draft")
+        project.run("--module", "alpha", "--target", "spec", "--state", "approved", "--confirm")
+        sha = None
+        if commit:
+            self.git(project, "add", "-A")
+            self.git(project, "commit", "-q", "-m", "approved")
+            sha = self.git(project, "rev-parse", "HEAD")
+        project.spec.write_text(project.spec.read_text(encoding="utf-8") + "补一条\n", encoding="utf-8")
+        return sha
+
+    def test_both_shows_the_cumulative_diff_and_approves_both(self):
+        with Project() as project:
+            sha = self.revised(project)
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "approved")
+            self.assertEqual(code, 0, out)
+            self.assertIn("spec/alpha.md (approved %s)" % sha[:7], out)
+            self.assertIn("+补一条", out)
+            self.assertEqual(project.states(), ("revised", "none"))
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.states(), ("approved", "approved"))
+
+    def test_without_a_baseline_the_whole_spec_must_be_shown(self):
+        with Project() as project:
+            self.revised(project, commit=False)
+            code, out = project.run("--module", "alpha", "--target", "both", "--state", "approved")
+            self.assertEqual(code, 0, out)
+            self.assertIn("no approved baseline in git", out)
+            self.assertNotIn("(approved ", out)
+
+    def test_plan_alone_still_refuses_and_names_both(self):
+        with Project() as project:
+            self.revised(project)
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 2, out)
+            self.assertIn("--target both", out)
+            self.assertIn("cumulative diff", out)
+
+
 class BlankLinesAroundTheMarker(unittest.TestCase):
     """review-marker-blank-line: whatever review_mark.py writes has a blank line on both sides of the marker line
     (none before it at the start of the file, none after it at the end), and the digest matches the file as written."""
