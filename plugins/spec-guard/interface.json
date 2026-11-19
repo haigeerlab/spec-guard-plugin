@@ -1,5 +1,5 @@
 {
-  "interface": "1.13",
+  "interface": "1.14",
   "mapView": {
     "command": [
       "python3",
@@ -63,6 +63,15 @@
         "milestoneStop": "top level; null when the project has no usage draft (spec/usage/*.md) or no milestone is waiting; {\"file\": \"spec/usage/<requirement>.md\", \"milestone\": \"M<n>\", \"modules\": [...], \"usages\": [\"U<n>\", ...]} for the first milestone (drafts by file name, milestones in table order) whose modules all have status done and which has no confirmation line naming exactly those modules; {\"error\": \"unreadable\", \"detail\": ...} when a draft cannot be read or names a module not in the map (never null in that case)"
       },
       "meaning": "the stage hint stops at this milestone until the user passes it and /spec-guard:milestone-mark records it; a caller that dispatches modules by this view should start no new module meanwhile, whichever milestone or draft it belongs to (modules not in any draft included), and lets modules already in progress finish; startable, stage and every other field are unchanged"
+    },
+    "autonomy": {
+      "appearsWhen": "always, on every module, whatever moduleConcurrency is (interface 1.14, spec/module-autonomy.md)",
+      "fields": {
+        "tier": "per module; the effective autonomy tier: the module's entry in .agent/config.json moduleAutonomy, else the project's autonomyTier (strict when unset)",
+        "source": "per module; moduleAutonomy (the module's own entry), autonomyTier (the project tier), default (nothing set) or default (config invalid) (the file, autonomyTier or moduleAutonomy is invalid; the tier is then the project's effective tier)",
+        "widerThanProject": "per module; true when tier is wider than the project's effective tier (strict < standard < relaxed); spec-guard only reports it and never caps the tier"
+      },
+      "meaning": "the same value project_config.module_tier(root, id) returns; what each tier allows is defined by module-crew; a cap from elsewhere (for example an onboarding verdict) is the caller's to apply"
     },
     "concurrency": {
       "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear",
@@ -390,5 +399,19 @@
     "readFrom": "python3 -B hooks/project_config.py show --project <project-root> --format json: the item whose key is autonomyTier, with value and source; an invalid value reads as strict with source \"default (config invalid)\"",
     "notes": "spec-guard only stores, reads and reports it; its own phase hints, stop rules and review cadence never change with it. It does not set reviewCadence: a tier that wants the Spec and Plan reviewed together needs reviewCadence=combined set separately. Writing it needs the user's own words. No tier goes below the floor in references/workflow-checkpoints.md (autonomy tier and floor). spec-guard 0.68.0-0.84.2 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
     "contract": "spec/autonomy-tier.md"
+  },
+  "moduleAutonomy": {
+    "config": ".agent/config.json",
+    "key": "moduleAutonomy",
+    "default": {},
+    "values": {
+      "strict": "per module; today's behaviour",
+      "standard": "per module; defined by module-crew",
+      "relaxed": "per module; defined by module-crew"
+    },
+    "readFrom": "python3 -B hooks/map_view.py --json --project <project-root>: each module's autonomy (tier, source, widerThanProject); or project_config.module_tier(root, id). The raw object is the item whose key is moduleAutonomy in project_config.py show --format json",
+    "writeWith": "python3 -B hooks/project_config.py set --key moduleAutonomy --module <module-id> --value <tier> [--confirm]; unset --key moduleAutonomy [--module <module-id>] [--confirm]; one entry at a time, preview unless --confirm",
+    "notes": "an object of module id -> tier; any bad entry (not kebab-case, tier not one of the three) makes the whole key invalid and every module falls back to the project tier with source default (config invalid). A module without an entry follows autonomyTier. Wider than the project tier is reported, never capped: the cap is the caller's. Ids not in the capability map are warned by verify-artifacts and ignored by /map. spec-guard's own phase hints, stop rules and floor never change with it. Writing it needs the user's own words. spec-guard 0.68.0-0.88.0 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
+    "contract": "spec/module-autonomy.md"
   }
 }
