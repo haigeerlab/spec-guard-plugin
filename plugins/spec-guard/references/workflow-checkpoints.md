@@ -305,7 +305,7 @@ Spec 和 Plan 一起审时，另设 `reviewCadence=combined`。设置或取消�
   `<!-- spec-guard: milestone M<n> confirmed <模块, …> -->`，阶段提示才转到下一个模块。
 - **不通过**：不调用 milestone-mark。在本里程碑的模块 todo 里追加任务（见「返工与小模块」），或回头改草案与后面还没开工的模块。
 - 确认后里程碑又加了模块，记录失效，新模块做完后会再停一次；verify-artifacts 对写坏的记录判失败、对失效的只提醒。
-- 并行推进时，模块协调按 `/map --json` 的 `milestoneStop` 停下，停点期间不开后一个里程碑的模块。
+- 并行推进时，模块协调按 `/map --json` 的 `milestoneStop` 停下，停点期间不开任何新模块（不论属于哪个里程碑或草案），已在做的照常做完。
 
 ## 文档建议
 
