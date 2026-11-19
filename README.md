@@ -86,7 +86,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | 约定与阶段 | `/spec-guard:setup-convention` | 在项目里安装多模块约定；`--replace` 升级约定块，`--dry-run` 只预览 |
 | | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 | | `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
-| | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记等产物 |
+| | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记、用法草案等产物 |
 | | `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
 | | `/spec-guard:review-mark` | 记录 Spec、Plan 的批准状态；你回复批准后由 agent 来用 |
 | | `/spec-guard:module-suspend` | 挂起或恢复在等外部条件的模块 |

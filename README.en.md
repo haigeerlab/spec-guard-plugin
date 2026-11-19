@@ -97,7 +97,7 @@ acceptance, with the stage hint the agent sees at every step, a table of what yo
 | Convention and stage | `/spec-guard:setup-convention` | Install the multi-module convention in a project; `--replace` upgrades the block, `--dry-run` only previews |
 | | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 | | `/spec-guard:phase` | Show the current stage and the suggested next step |
-| | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers and other artifacts |
+| | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers, usage drafts and other artifacts |
 | | `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
 | | `/spec-guard:review-mark` | Record whether a Spec or Plan is approved; the agent runs it after you approve |
 | | `/spec-guard:module-suspend` | Suspend or resume a module that is waiting on something outside |
