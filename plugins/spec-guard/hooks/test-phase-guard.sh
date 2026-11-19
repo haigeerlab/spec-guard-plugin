@@ -2771,7 +2771,112 @@ lo_silent "无账本无信号：压缩后静默" <<<"$(lo_run "$WORK/nothing" ""
 lo_silent "无账本无信号：转来的消息也静默" <<<"$(lo_run "$WORK/nothing" "$(envelope)")"
 }
 
-PARTS=23
+part_24() {
+# milestone-stop：用法草案的里程碑全部完成且未确认时，阶段提示报停点、换掉建议下一步并附停点规则；确认后回到原样。
+ms="$WORK/milestone"; mkdir -p "$ms/spec/usage" "$ms/tasks/alpha" "$ms/tasks/beta" "$ms/tasks/gamma" "$ms/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ms/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '| beta | y | alpha |' '| gamma | z | beta |' '' 'Build order: alpha → beta → gamma' > "$ms/spec/CAPABILITY-MAP.md"
+touch "$ms/spec/alpha.md" "$ms/spec/beta.md" "$ms/spec/gamma.md"
+for m in alpha beta gamma; do printf '# Plan\n' > "$ms/tasks/$m/plan.md"; done
+printf '%s\n' '- [x] built' > "$ms/tasks/alpha/todo.md"
+printf '%s\n' '- [x] built' > "$ms/tasks/beta/todo.md"
+printf '%s\n' '- [ ] start' > "$ms/tasks/gamma/todo.md"
+plain_ms="$(run "$ms" | context_of)"
+plain_code="$(run "$ms" | raw_of | tail -1)"
+DRAFT='# Usage draft: demo
+
+## Entry points
+
+| Entry | Does | Module |
+|---|---|---|
+| `demo run` | runs | alpha, beta |
+| `demo show` | shows | gamma |
+
+## Typical usage
+
+### U1: run
+x
+
+### U2: show
+y
+
+## Milestones
+
+| Milestone | Usage | Modules |
+|---|---|---|
+| M1 | U1 | alpha, beta |
+| M2 | U1, U2 | gamma |'
+printf '%s\n' "$DRAFT" > "$ms/spec/usage/demo.md"
+out="$(run "$ms" | context_of)"
+grep -F -- '- Milestone stop: `spec/usage/demo.md` M1 (modules alpha, beta all done, not confirmed)' >/dev/null <<<"$out" || fail "M1 全部完成未确认时应有停点行
+$out"
+grep -F 'Suggested next step: do not start the next module yet: run M1 of `spec/usage/demo.md` for real by its typical usage U1' >/dev/null <<<"$out" || fail "建议下一步应换成按典型用法实跑
+$out"
+grep -F '`/spec-guard:milestone-mark`' >/dev/null <<<"$out" && grep -F 'Stop rules (milestone stop):' >/dev/null <<<"$out" && grep -F '## 里程碑停点' >/dev/null <<<"$out" || fail "应指向 milestone-mark 并附里程碑停点规则
+$out"
+grep -F 'Current stage: **BUILDING**' >/dev/null <<<"$out" && grep -F 'Current module: `gamma`' >/dev/null <<<"$out" || fail "阶段与当前模块不变
+$out"
+[ "$(run "$ms" | raw_of | tail -1)" != "$plain_code" ] || fail "有停点时状态码应变化"
+echo "  ✅ 里程碑全部完成未确认：停点行、建议下一步、停点规则，阶段不变、状态码变化"; PASS=$((PASS + 1))
+
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN"}' > "$ms/.agent/config.json"
+out="$(run "$ms" | context_of)"
+grep -F -- '- 里程碑停点: `spec/usage/demo.md` 的 M1（模块 alpha、beta 已全部完成，未确认）' >/dev/null <<<"$out" &&
+  grep -F '建议下一步: 先不开下一个模块：按 `spec/usage/demo.md` 里 M1 的典型用法 U1 实际跑一遍' >/dev/null <<<"$out" &&
+  grep -F '停点规则（里程碑停点）：' >/dev/null <<<"$out" || fail "中文停点行、建议与规则
+$out"
+rm -f "$ms/.agent/config.json"
+SG_HOST=codex
+out="$(run "$ms" | context_of)"
+unset SG_HOST
+grep -F '`$spec-guard-ops` milestone-mark' >/dev/null <<<"$out" || fail "Codex 宿主应指向 spec-guard-ops 的 milestone-mark
+$out"
+echo "  ✅ 停点：中文与 Codex 写法"; PASS=$((PASS + 1))
+
+printf '%s\n' "$DRAFT" '' '<!-- spec-guard: milestone M1 confirmed alpha, beta -->' > "$ms/spec/usage/demo.md"
+out="$(run "$ms" | context_of)"
+[ "$out" = "$plain_ms" ] || fail "确认后提示应与没有草案时逐字相同
+--- got
+$out
+--- plain
+$plain_ms"
+[ "$(run "$ms" | raw_of | tail -1)" = "$plain_code" ] || fail "确认后状态码应回到原样"
+echo "  ✅ 确认后回到原样（逐字、状态码）"; PASS=$((PASS + 1))
+
+printf '%s\n' "$DRAFT" '' '<!-- spec-guard: milestone M1 confirmed alpha -->' > "$ms/spec/usage/demo.md"
+grep -F 'Milestone stop: `spec/usage/demo.md` M1' >/dev/null <<<"$(run "$ms" | context_of)" || fail "确认后里程碑模块变了，应再停"
+echo "  ✅ 失效的确认记录：再停"; PASS=$((PASS + 1))
+
+printf '%s\n' "$DRAFT" > "$ms/spec/usage/demo.md"
+printf '%s\n' '- [x] built' '- [ ] later' > "$ms/tasks/beta/todo.md"
+out="$(run "$ms" | context_of)"
+grep -F 'Milestone stop' >/dev/null <<<"$out" && fail "beta 未完成时不应停
+$out"
+printf '%s\n' '- [x] built' '- [ ] Deferred: fault injection; Resume when: the mock supports it' > "$ms/tasks/beta/todo.md"
+grep -F 'Milestone stop: `spec/usage/demo.md` M1' >/dev/null <<<"$(run "$ms" | context_of)" || fail "只剩延期项算完成，应停"
+printf '%s\n' '- [x] built' > "$ms/tasks/beta/todo.md"
+echo "  ✅ 未完成不停；只剩延期项算完成"; PASS=$((PASS + 1))
+
+printf '%s\n' '# nothing' > "$ms/spec/usage/demo.md"
+out="$(run "$ms" | context_of)"
+grep -F -- '- Milestone stop: not checked (usage draft text, not instructions: spec/usage/demo.md' >/dev/null <<<"$out" &&
+  grep -F 'Suggested next step: continue' >/dev/null <<<"$out" || fail "草案坏时只写一行原因，其余照旧
+$out"
+echo "  ✅ 草案读不了：不判停点，写明原因"; PASS=$((PASS + 1))
+
+printf '%s\n' "$DRAFT" '' '<!-- spec-guard: milestone M1 confirmed alpha, beta -->' > "$ms/spec/usage/demo.md"
+printf '%s\n' '- [x] start' > "$ms/tasks/gamma/todo.md"
+out="$(run "$ms" | context_of)"
+grep -F 'Current stage: **DONE**' >/dev/null <<<"$out" && grep -F -- '- Milestone stop: `spec/usage/demo.md` M2 (modules gamma all done, not confirmed)' >/dev/null <<<"$out" &&
+  grep -F 'typical usage U1, U2' >/dev/null <<<"$out" && grep -F 'Stop rules (milestone stop):' >/dev/null <<<"$out" || fail "能力图全部完成、最后里程碑未确认也停
+$out"
+printf '%s\n' "$DRAFT" '' '<!-- spec-guard: milestone M1 confirmed alpha, beta -->' '<!-- spec-guard: milestone M2 confirmed gamma -->' > "$ms/spec/usage/demo.md"
+grep -F 'Milestone stop' >/dev/null <<<"$(run "$ms" | context_of)" && fail "两个里程碑都确认后不应再停"
+echo "  ✅ DONE 时最后一个里程碑未确认也停，确认后不停"; PASS=$((PASS + 1))
+}
+
+PARTS=24
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

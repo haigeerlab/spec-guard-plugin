@@ -905,7 +905,7 @@ class SiblingRulesOutTests(unittest.TestCase):
 
 class NodeRulesTests(unittest.TestCase):
     """rules-at-nodes: the stop rules the phase hint attaches at each node, kept in step with the full contract."""
-    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收")
+    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收", "## 里程碑停点")
     LIMITS = {"## 最终验收": 3200}
     # What each section must say (Spec C2).
     ELEMENTS = {
@@ -924,6 +924,9 @@ class NodeRulesTests(unittest.TestCase):
                       "文档改动：无", "本模块的提交", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面", "Spec 的改动差异",
                       "同时批准修订后的 Spec", "先用 review-mark", "拟回告", "可以原样发送的完整文字", "对外渠道同样",
                       "重新给用户看", "agent-relay", "截图", "先勾这个 gate", "直接写它的 Spec", "/compact"),
+        "## 里程碑停点": ("先不开下一个模块", "用安装后的版本跑", "确认框之前", "命令与输出", "跑不了的写明原因", "“注意：”",
+                       "“批了会怎样：”", "可复制代码块", "明确判定通过", "milestone-mark", "`--confirm`", "追加任务",
+                       "不调用 milestone-mark"),
     }
     # Phrases each section shares word for word with workflow-checkpoints.md, so the summary cannot drift from the contract.
     SHARED = {

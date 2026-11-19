@@ -91,7 +91,8 @@ class StopNode(unittest.TestCase):
 class NodeRules(unittest.TestCase):
     def test_each_kind_reads_its_section(self):
         for kind, title in (("map-review", "## 能力图审阅"), ("spec-review", "## Spec 交审"), ("plan-review", "## Plan 交审"),
-                            ("mid-gate", "## 中途 gate"), ("final-gate", "## 最终验收")):
+                            ("mid-gate", "## 中途 gate"), ("final-gate", "## 最终验收"),
+                            ("milestone-stop", "## 里程碑停点")):
             with self.subTest(kind=kind):
                 text = node_rules(kind)
                 self.assertTrue(text.startswith(title + "\n"), text[:40])

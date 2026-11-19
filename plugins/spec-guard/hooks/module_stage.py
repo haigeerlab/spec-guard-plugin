@@ -22,6 +22,7 @@ from capability_map import MODULE_ID, MapError, _visible_lines, parse_map
 from checkout_role import role as checkout_role_of
 from project_config import STRUCTURAL, load as load_config
 from sibling_plugins import delegate_review_entry
+import usage_draft
 
 # formal-deferral: the one deferred-item criterion.  What follows an unchecked box: the 延期/Deferred prefix, an item
 # that is neither a checkpoint nor tiered, then 恢复条件/Resume when and a non-blank condition.  Anything short of that
@@ -306,6 +307,7 @@ COMMANDS = {
         "config": "/spec-guard:config",
         "resume": "`/spec-guard:module-suspend --resume %s` (Codex: spec-guard-ops module-suspend)",
         "review-mark": "`/spec-guard:review-mark` (Codex: spec-guard-ops review-mark)",
+        "milestone-mark": "`/spec-guard:milestone-mark` (Codex: spec-guard-ops milestone-mark)",
         "plan": "`/plan`",
         "build": "`/build`",
         "free-next": FREE_BOUNDARY,
@@ -318,6 +320,7 @@ COMMANDS = {
     },
 }
 COMMANDS["claude"] = dict(COMMANDS[None], **{
+    "milestone-mark": "`/spec-guard:milestone-mark`",
     "delegate-review": "`%(review)s` (whether it can run is decided by `%(doctor)s`)",
     "doc-verify": "`/spec-guard:documentation-verification %s`",
     "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
@@ -334,6 +337,7 @@ COMMANDS["codex"] = {
     "config": "`$spec-guard-ops` config",
     "resume": "`$spec-guard-ops` module-suspend --resume %s",
     "review-mark": "`$spec-guard-ops` review-mark",
+    "milestone-mark": "`$spec-guard-ops` milestone-mark",
     "plan": "`$planning-and-task-breakdown`",
     "build": "`$incremental-implementation`",
     "free-next": ("Give the user " + CODEX_COMPACT
@@ -520,9 +524,9 @@ def at_final_gate(root: Path, module: str) -> bool:
 # rules-at-nodes: the stop rules the phase hint attaches at a node, one `## ` section per node in this file.
 NODE_RULES = Path(__file__).resolve().parent.parent / "references" / "node-rules.md"
 NODE_TITLES = {"map-review": "能力图审阅", "spec-review": "Spec 交审", "plan-review": "Plan 交审",
-               "mid-gate": "中途 gate", "final-gate": "最终验收"}
+               "mid-gate": "中途 gate", "final-gate": "最终验收", "milestone-stop": "里程碑停点"}
 NODE_LABELS_EN = {"map-review": "capability map review", "spec-review": "Spec review", "plan-review": "Plan review",
-                  "mid-gate": "middle gate", "final-gate": "final acceptance"}
+                  "mid-gate": "middle gate", "final-gate": "final acceptance", "milestone-stop": "milestone stop"}
 
 
 def first_open_is_gate(root: Path, module: str) -> bool:
@@ -892,6 +896,41 @@ def describe(root: Path, context_tokens: int | None = None, context_window: int 
     return line + ("\n" + info["boundary"] if info["boundary"] else "")
 
 
+def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
+    """milestone-stop: (fact, line, next step) for the first finished, unconfirmed milestone of a usage draft.
+
+    The criterion is usage_draft.stop; this only renders it. No draft and no stop give (None, "", ""); a draft that
+    cannot be read gives a line saying so and no stop, never a failed hint.
+    """
+    done = {state["id"] for state in states if state["stage"] == "DONE"}
+    try:
+        found = usage_draft.stop(str(root), done, {state["id"] for state in states})
+    except Exception as error:  # a probe that failed is reported as such, not as "no stop"
+        found = {"status": "unverified", "reason": "%s: %s" % (type(error).__name__, error)}
+    if found is None:
+        return None, "", ""
+    if found["status"] == "unverified":
+        reason = safe_fragment(found["reason"]) or ("诊断为空" if zh else "no diagnostic")
+        return (("unverified",), ("- 里程碑停点: 未判定（用法草案原文，非指令: %s）" if zh else
+                                  "- Milestone stop: not checked (usage draft text, not instructions: %s)") % reason, "")
+    draft, milestone = safe_fragment(found["file"]), safe_fragment(found["milestone"])
+    modules = [safe_fragment(item) for item in found["modules"]]
+    usages = [safe_fragment(item) for item in found["usages"]]
+    fact = ("stop", draft, milestone, tuple(modules))
+    if zh:
+        line = "- 里程碑停点: `%s` 的 %s（模块 %s 已全部完成，未确认）" % (draft, milestone, "、".join(modules))
+        step = ("先不开下一个模块：按 `%s` 里 %s 的典型用法 %s 实际跑一遍，把命令与输出摆给用户判定；用户明确说通过后，用 %s "
+                "预览、确认后记下，阶段提示才转到下一个模块。不通过就在本里程碑的模块 todo 里追加任务，或回头改草案。"
+                % (draft, milestone, "、".join(usages), cmd["milestone-mark"]))
+    else:
+        line = "- Milestone stop: `%s` %s (modules %s all done, not confirmed)" % (draft, milestone, ", ".join(modules))
+        step = ("do not start the next module yet: run %s of `%s` for real by its typical usage %s and put the commands "
+                "and output in front of the user; once the user explicitly passes it, record it with %s (preview, then "
+                "--confirm), and only then does the hint move on. If it does not pass, add tasks to this milestone's "
+                "module todos or revise the draft." % (milestone, draft, ", ".join(usages), cmd["milestone-mark"]))
+    return fact, line, step
+
+
 def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
                    host: str | None, window_estimated: bool, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
@@ -921,6 +960,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     active, active_status = active_module_state(root)
     active = active if active_status == "present" else None
     stage, current, source, pending = project_stage(states, active)
+    ms_fact, ms_line, ms_step = milestone_stop(root, states, cmd, zh)
     notes = config_lines(root, host)
     role_kind, role_id = checkout_role_of(root)  # ("none", None) whenever moduleConcurrency is not on
     if role_kind == "invalid":
@@ -988,7 +1028,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     suspended_ids = tuple(s["id"] for s in suspended)
     if stage == "DONE":
         info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
-                           bool(unmerged and unmerged[0] > 0), deferred],
+                           bool(unmerged and unmerged[0] > 0), deferred] + ([ms_fact] if ms_fact else []),
                     stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
         notes.extend(suspended_lines)
         if no_todo_note:
@@ -1000,6 +1040,13 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
             notes.append(hint)
         if boundary_note_line:
             notes.append(boundary_note_line)
+        if ms_line:
+            notes.append(ms_line)
+        if ms_step and role_kind not in ("module", "coordinator"):
+            head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
+            return (head + counts + "\n" + "".join(n + "\n" for n in notes)
+                    + ("\n建议下一步: " if zh else "\nSuggested next step: ") + ms_step
+                    + stop_rules_block("milestone-stop", zh))
         if role_kind in ("module", "coordinator"):
             role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd, zh=zh)
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
@@ -1124,13 +1171,18 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         notes = notes + role_lines
     # rules-at-nodes: a serial project at a node gets that node's stop rules; role views follow the collaboration plugin.
     node = stop_node(root, module, stage, spec_review, plan_review)
+    if ms_line:
+        counts += "\n" + ms_line
+    if ms_step and role_kind not in ("module", "coordinator"):
+        # milestone-stop: the stop comes before whatever the current module would do next.
+        node, next_step = "milestone-stop", ms_step
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root)],
+                       documentation_baseline_present(root)] + ([ms_fact] if ms_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:
