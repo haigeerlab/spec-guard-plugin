@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.89.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:239b540d2f34ca6294ce4409128a806432101c46"
+      },
+      "observedAt": "2026-11-19T16:49:05Z",
+      "evidence": [
+        "result:the v0.89.0 annotated tag (object 4178d4b3) resolves to merge commit 239b540d2f34ca6294ce4409128a806432101c46 (pull request #452); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate run 44568597915)",
+        "result:one module (module-autonomy, autopr requirement 1a): .agent/config.json gains moduleAutonomy (module id -> strict/standard/relaxed), written one entry at a time with project_config.py set/unset --module, preview unless --confirm; any bad entry makes the whole key invalid; project_config.module_tier is the only reader of a module's effective tier; /map --json gains a per-module autonomy {tier, source, widerThanProject} and interface goes from 1.13 to 1.14 (addition only); wider than the project tier is reported, never capped; verify-artifacts warns about ids not in the capability map; the stage hint is unchanged",
+        "result:the release also carries pull request #451 (merged earlier, not released then): milestoneStop's meaning, the milestone-stop rule and docs/commands.md say a dispatcher starts no new module during a stop, whichever milestone or draft it belongs to",
+        "result:on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit went through verify-and-commit's full tier (validate.sh, phase-guard 520 cases, verify-artifacts 97 cases); checker regression 167 cases; test_project_config 51 and test_map_view 87 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; ShellCheck 0.11.0 -S warning passed; mutations (module_tiers ignoring moduleAutonomy, widerThanProject always false) each turned cases red"
+      ]
+    }
+  ]
+}
