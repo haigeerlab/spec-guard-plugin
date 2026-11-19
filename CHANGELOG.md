@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.90.0] - 2026-11-20
+
+本版 1 个模块：pre-build-spec-batch（autopr 需求 1b 第一步）。接口不变（interface 1.14）。
+
+### 变更
+
+- **开工前的 Spec 修订攒到 Plan 交审一次批。** Spec 已批准、Plan 还没批准（NEEDS_PLAN，或 BUILDING 且 Plan 待批准）时改了 Spec，阶段提示不再
+  让 agent 停下、先不写 Plan：批准一行写明基线提交，建议下一步换成「记进变更记录、照常写 Plan、交审时原样附上 Spec 相对基线的累计差异、
+  用 `review-mark --target both` 一起记下」，附「Plan 交审」的停点规则。修订削弱已批准的验收标准（E1）、做了 Spec 没覆盖的决定（E2）、
+  碰到 Spec 的 Boundaries 里「先问」的项（E3）、高风险或不可逆（E4）时当场停。第一次批准、构建中与最终验收的规则不变。
+- **基线从 git 取**：Spec 最近 50 个提交里指纹与批准标记一致的那一版。取不到（批准后没提交就改）时照旧当场复审，阶段提示写明原因；
+  git 读不了时写「基线未判定」，不当成没有基线。共享检查点规则因此加一条：Spec 获批后先提交再改。
+- **`review-mark`**：记 Spec 批准且 Spec 读作「批准后已修订」时，预览先打印相对基线的累计差异；取不到基线时写明原因并要求给用户看全文。
+  `--target plan` 在 Spec 已修订时照旧拒绝，提示改用 `--target both`。
+
 ## [0.89.0] - 2026-11-20
 
 本版 1 个模块：module-autonomy（autopr 需求 1a「项目定上限，需求定实际」）。`interface.json` 1.13 → 1.14（只新增 `moduleAutonomy` 入口与

@@ -75,6 +75,9 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
   “看起来可以”“继续”这类含糊的话不算，先问清楚。不得为了消除阶段提示而自行批准；标记只是让后续会话读得到的记录，不是授权来源，用户的批准原话以对话或契约消息里的「用户原话」为准。
 - 用户批准后，写入 `approved` 是第一个动作，先于任何代码改动、写 Plan 或勾选 todo。
 - Spec 被修订后先把修订内容交用户复审，批准后重新运行 `--state approved`，标记会带上新指纹。
+- 开工前（Spec 已批准、Plan 还没批准）的修订可以攒到 Plan 交审一次批：用户批准时用 `--target both`。Spec 读作“批准后已修订”时，
+  预览先打印 Spec 相对批准基线的累计差异（基线取自 git 里指纹与标记一致的那次提交），把这段差异原样给用户看；取不到基线时预览
+  写明原因，这时要把改过的 Spec 全文给用户看。所以 Spec 获批后先提交再改。只记 Plan（`--target plan`）在 Spec 已修订时照旧拒绝。
 - 合并审（`reviewCadence` 为 `combined`）下用户一次批准两份时用 `--target both`。
 - 既有项目里没有标记的 Spec 或 Plan 不必补标记。Spec 没有标记时可以单独记录 Plan 的批准，预览会说明本次只记录 Plan；
   要给旧的 Spec 补 `approved`，先向用户单独确认一次，不得依据此前含糊的答复补记。
