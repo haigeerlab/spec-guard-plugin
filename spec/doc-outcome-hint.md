@@ -1,6 +1,6 @@
 # Spec: doc-outcome-hint
 
-<!-- spec-guard: review approved 53ab2fe8a915 -->
+<!-- spec-guard: review approved b27153e85520 -->
 
 ## 目标
 
@@ -37,7 +37,7 @@
 ## 命令
 
 ```text
-python3 -B -m unittest plugins/spec-guard/hooks/test_documentation_verification.py
+python3 -B plugins/spec-guard/hooks/test_documentation_verification.py
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh

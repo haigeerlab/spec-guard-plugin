@@ -1,6 +1,6 @@
 # Spec: usage-draft
 
-<!-- spec-guard: review approved 9301eb951b01 -->
+<!-- spec-guard: review approved 116ae0206cd2 -->
 
 ## 目标
 
@@ -75,7 +75,7 @@
 
 ```text
 python3 -B -m unittest plugins/spec-guard/hooks/test_usage_draft.py
-python3 -B -m unittest plugins/spec-guard/hooks/test_module_insert.py
+python3 -B plugins/spec-guard/hooks/test_module_insert.py
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh

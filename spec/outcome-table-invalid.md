@@ -1,6 +1,6 @@
 # Spec: outcome-table-invalid
 
-<!-- spec-guard: review approved 13d47ca32e31 -->
+<!-- spec-guard: review approved e9c38a8f95da -->
 
 ## 目标
 
@@ -25,7 +25,7 @@
 ## 命令
 
 ```text
-python3 -B -m unittest plugins/spec-guard/hooks/test_documentation_verification.py
+python3 -B plugins/spec-guard/hooks/test_documentation_verification.py
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
