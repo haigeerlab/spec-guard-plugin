@@ -549,7 +549,10 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     """
     kind = None
     final = stage == "BUILDING" and at_final_gate(root, module)
-    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final):
+    # pre-build-spec-batch: a revised Spec with a baseline waits for the Plan's review instead of its own.
+    batched = (spec_review == "revised" and not final
+               and (pre_build_batch(root, module, stage, spec_review, plan_review) or {}).get("status") == "found")
+    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final and not batched):
         kind = "spec-review"
     spec_waits = kind == "spec-review" and load_config(root)[0].get("reviewCadence") != "combined"
     if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
@@ -597,6 +600,64 @@ def file_review_state(path: Path, kind: str) -> str:
         return "unreadable"
 
 
+BASELINE_COMMITS = 50  # pre-build-spec-batch: how far back the approved baseline is looked for
+
+
+def spec_baseline(root: Path, module: str) -> dict:
+    """pre-build-spec-batch: the Spec text the current approval marker was given for, read from git history.
+
+    {"status": "found", "commit", "text"} for the newest of the last BASELINE_COMMITS commits touching the Spec whose
+    text (marker line left out) has the marker's digest; {"status": "absent"} when there is no such commit or no
+    digest approval; {"status": "unverified", "reason"} when git cannot be read -- a failed probe is never "absent".
+    Read-only.
+    """
+    relative = "spec/%s.md" % module
+    try:
+        current = (root / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        return {"status": "unverified", "reason": "%s: %s" % (relative, type(error).__name__)}
+    markers = _review_split(current)[0]
+    match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0]) if len(markers) == 1 else None
+    if match is None:
+        return {"status": "absent"}
+
+    def run(*args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=5)
+
+    try:
+        if run("rev-parse", "--is-inside-work-tree").returncode != 0:
+            return {"status": "unverified", "reason": "not a git work tree"}
+        if run("rev-parse", "--verify", "-q", "HEAD").returncode != 0:
+            return {"status": "absent"}
+        log = run("log", "-n", str(BASELINE_COMMITS), "--format=%H", "--", relative)
+        if log.returncode != 0:
+            return {"status": "unverified", "reason": "git log failed"}
+        for sha in log.stdout.decode("ascii", "replace").split():
+            shown = run("show", "%s:./%s" % (sha, relative))
+            if shown.returncode != 0:
+                continue
+            try:
+                text = shown.stdout.decode("utf-8")
+            except UnicodeError:
+                continue
+            if review_digest(text) == match.group(1):
+                return {"status": "found", "commit": sha, "text": text}
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unverified", "reason": type(error).__name__}
+    return {"status": "absent"}
+
+
+def pre_build_batch(root: Path, module: str, stage: str, spec: str, plan: str) -> dict | None:
+    """pre-build-spec-batch: the baseline when a revised Spec is waiting for the Plan's review, else None.
+
+    "Before the build" is NEEDS_PLAN, or BUILDING with the Plan still pending; once the Plan is approved (or carries
+    no marker, as in older projects) the build rules apply unchanged.
+    """
+    if spec != "revised" or not (stage == "NEEDS_PLAN" or (stage == "BUILDING" and plan == "pending")):
+        return None
+    return spec_baseline(root, module)
+
+
 def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False) -> tuple:
     """(Review line, replacement next step, Spec state, Plan state) for the current module; empty strings when nothing to say.
 
@@ -632,6 +693,21 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
+    batch = pre_build_batch(root, module, stage, spec, plan)
+    if batch is not None and batch["status"] == "found":
+        return ("- Review: Spec `%s` was edited after it was approved (baseline %s)." % (spec_path, batch["commit"][:7]),
+                "the revision may wait for the Plan's review: record the revision in the Spec's change log and write the "
+                "Plan as usual; when presenting the Plan, show the Spec's cumulative diff against the baseline verbatim and "
+                "say that approving the Plan also approves the revised Spec, then record both with %s (`--target both`). "
+                "Stop and ask at once if the revision weakens an approved acceptance criterion, makes a decision the Spec "
+                "does not cover, touches an ask-first item in the Spec's Boundaries, or is high-risk or irreversible."
+                % cmd["review-mark"], spec, plan)
+    if batch is not None and stage == "NEEDS_PLAN":
+        why = ("the approved text is not in git (commit the Spec right after approval)" if batch["status"] == "absent"
+               else "the baseline could not be checked (%s)" % batch["reason"])
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "show the user the revised `%s` for another review; %s.%s It cannot wait for the Plan's review: %s."
+                % (spec_path, hold, record, why), spec, plan)
     if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
                 "at the final gate, show the diff of the revised `%s` verbatim in the acceptance message and say that "
@@ -664,6 +740,18 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan
+    batch = pre_build_batch(root, module, stage, spec, plan)
+    if batch is not None and batch["status"] == "found":
+        return ("- 批准: Spec `%s` 批准后又改过（基线 %s）。" % (spec_path, batch["commit"][:7]),
+                "开工前的修订可以攒到 Plan 交审一次批：记进 Spec 末尾的变更记录，照常写 Plan；交审 Plan 时原样附上 Spec 相对基线的"
+                "累计差异，说明批准 Plan 也就批准了修订后的 Spec，批准后用 %s（`--target both`）一起记下。修订削弱了已批准的验收标准、"
+                "做了 Spec 没覆盖的决定、碰到 Spec 的 Boundaries 里的「先问」项，或是高风险、不可逆的操作时，当场停下问用户。"
+                % cmd["review-mark"], spec, plan)
+    if batch is not None and stage == "NEEDS_PLAN":
+        why = ("取不到批准时的原文（Spec 获批后先提交再改）" if batch["status"] == "absent"
+               else "基线未判定（%s）" % batch["reason"])
+        return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
+                "把改过的 `%s` 再给用户审一次；%s。%s不能攒到 Plan 交审：%s。" % (spec_path, hold, record, why), spec, plan)
     if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
         return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "在最终 gate，把改过的 `%s` 的 diff 原样放进验收消息，并说明批准验收也就批准了改过的 Spec；批准后，"

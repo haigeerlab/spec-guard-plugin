@@ -2892,7 +2892,62 @@ $(run "$ma" | raw_of)"
 echo "  ✅ 设了 moduleAutonomy 时阶段提示与状态码逐字不变"; PASS=$((PASS + 1))
 }
 
-PARTS=25
+part_26() {
+# pre-build-spec-batch：Spec 批准后又改过、Plan 还没批准时，有基线就攒到 Plan 交审一次批，没有基线照旧当场复审。
+g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@"; }
+pb="$WORK/prebuild"; git init -q -b main "$pb"; mkdir -p "$pb/spec"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$pb/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$pb/spec/CAPABILITY-MAP.md"
+printf '%s\n' '# Spec: alpha' '' '## Objective' '' 'Do it.' > "$pb/spec/alpha.md"
+python3 -B "$HOOKDIR/review_mark.py" --project "$pb" --module alpha --target spec --state approved --confirm >/dev/null
+g -C "$pb" add -A; g -C "$pb" commit -q -m approved
+base="$(g -C "$pb" rev-parse --short HEAD)"
+printf '%s\n' '' 'More detail.' >> "$pb/spec/alpha.md"
+out="$(run "$pb" | context_of)"
+grep -F -- "- Review: Spec \`spec/alpha.md\` was edited after it was approved (baseline $base)." >/dev/null <<<"$out" &&
+  grep -F 'record the revision in the Spec'"'"'s change log and write the Plan' >/dev/null <<<"$out" &&
+  grep -F -- '--target both' >/dev/null <<<"$out" && grep -F 'Stop rules (Plan review):' >/dev/null <<<"$out" &&
+  ! grep -F 'do not write the Plan yet' >/dev/null <<<"$out" || fail "NEEDS_PLAN 有基线时应攒到 Plan 交审
+$out"
+echo "  ✅ NEEDS_PLAN、有基线：攒到 Plan 交审，附 Plan 交审规则与基线提交"; PASS=$((PASS + 1))
+
+mkdir -p "$pb/tasks/alpha"; printf '%s\n' '# Plan' '' '<!-- spec-guard: review pending -->' > "$pb/tasks/alpha/plan.md"
+printf '%s\n' '- [ ] one' > "$pb/tasks/alpha/todo.md"
+out="$(run "$pb" | context_of)"
+grep -F "(baseline $base)" >/dev/null <<<"$out" && ! grep -F 'an in-scope fix to the approved' >/dev/null <<<"$out" ||
+  fail "BUILDING 且 Plan 待批准时同样攒批
+$out"
+printf '%s\n' '# Plan' '' '<!-- spec-guard: review approved -->' > "$pb/tasks/alpha/plan.md"
+out="$(run "$pb" | context_of)"
+grep -F 'an in-scope fix to the approved' >/dev/null <<<"$out" && ! grep -F 'baseline' >/dev/null <<<"$out" ||
+  fail "Plan 已批准后按构建中规则，不变
+$out"
+echo "  ✅ BUILDING：Plan 待批准时攒批，Plan 已批准后照旧"; PASS=$((PASS + 1))
+
+rm -rf "$pb/tasks"
+nb="$WORK/prebuild-none"; git init -q -b main "$nb"; mkdir -p "$nb/spec"
+cp "$pb/CLAUDE.md" "$nb/CLAUDE.md"; cp "$pb/spec/CAPABILITY-MAP.md" "$nb/spec/"
+printf '%s\n' '# Spec: alpha' '' '## Objective' '' 'Do it.' > "$nb/spec/alpha.md"
+g -C "$nb" add -A; g -C "$nb" commit -q -m draft
+python3 -B "$HOOKDIR/review_mark.py" --project "$nb" --module alpha --target spec --state approved --confirm >/dev/null
+plain_nb="$(run "$nb" | context_of)"
+printf '%s\n' '' 'More detail.' >> "$nb/spec/alpha.md"
+out="$(run "$nb" | context_of)"
+grep -F 'show the user the revised `spec/alpha.md` for another review; do not write the Plan yet.' >/dev/null <<<"$out" &&
+  grep -F 'the approved text is not in git' >/dev/null <<<"$out" && grep -F 'Stop rules (Spec review):' >/dev/null <<<"$out" ||
+  fail "没有基线时照旧当场复审并写原因
+$out"
+echo "  ✅ 没有基线：照旧当场复审，写明原因"; PASS=$((PASS + 1))
+
+printf '%s\n' '# Spec: alpha' '' '## Objective' '' 'Do it.' > "$nb/spec/alpha.md"
+python3 -B "$HOOKDIR/review_mark.py" --project "$nb" --module alpha --target spec --state approved --confirm >/dev/null
+[ "$(run "$nb" | context_of)" = "$plain_nb" ] || fail "Spec 没有修订时输出应与改前一致
+$(run "$nb" | context_of)"
+echo "  ✅ Spec 没有修订：输出不变"; PASS=$((PASS + 1))
+}
+
+PARTS=26
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

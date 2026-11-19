@@ -171,6 +171,7 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_module_suspend.py' \
   'python3 -B plugins/spec-guard/hooks/test_map_view.py' \
   'python3 -B plugins/spec-guard/hooks/test_review_marker.py' \
+  'python3 -B plugins/spec-guard/hooks/test_spec_baseline.py' \
   'python3 -B plugins/spec-guard/hooks/test_gate_tick.py' \
   'python3 -B plugins/spec-guard/hooks/test_formal_deferral.py' \
   'python3 -B plugins/spec-guard/hooks/test_usage_draft.py' \

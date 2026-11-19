@@ -61,6 +61,15 @@ class StopNode(unittest.TestCase):
         files = building("- [ ] t\n- [ ] 最终验收（gate）\n", spec="# a\n\n<!-- spec-guard: review pending -->\n")
         self.assertEqual(self.node(files, "BUILDING"), "spec-review")
 
+    def test_a_revised_spec_before_the_build_is_the_plan_review_only_with_a_baseline(self):
+        # pre-build-spec-batch: the baseline decides; the probe itself is covered in test_spec_baseline.
+        revised = "# a\n\n<!-- spec-guard: review approved 000000000000 -->\n"
+        for status, kind in (("found", "plan-review"), ("absent", "spec-review"), ("unverified", "spec-review")):
+            with self.subTest(status=status), mock.patch.object(module_stage, "spec_baseline",
+                                                                return_value={"status": status, "commit": "0" * 40,
+                                                                              "text": "", "reason": "x"}):
+                self.assertEqual(self.node({"spec/alpha.md": revised}, "NEEDS_PLAN"), kind)
+
     def test_needs_plan_and_pending_plan_are_the_plan_review(self):
         self.assertEqual(self.node({"spec/alpha.md": "# a\n"}, "NEEDS_PLAN"), "plan-review")
         files = building("- [ ] t\n- [ ] 最终验收（gate）\n", plan="# Plan\n\n<!-- spec-guard: review pending -->\n")

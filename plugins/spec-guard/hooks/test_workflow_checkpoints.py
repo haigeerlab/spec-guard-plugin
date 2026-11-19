@@ -352,6 +352,18 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("Spec 的改动差异", "同时批准修订后的 Spec", "先用 `review-mark`", "不算 Spec 复审", "当场停下复审"):
             self.assertIn(phrase, section)
 
+    def test_pre_build_revisions_wait_for_the_plan(self):
+        # pre-build-spec-batch: before the build a revised Spec waits for the Plan's review; E1-E4 stop at once.
+        section = self.section("## 批准标记")
+        for phrase in ("开工前的修订攒到 Plan 交审一次批", "累计差异", "`review-mark --target both`", "Spec 获批后先提交再改",
+                       "取不到原文时退回当场复审", "E1 削弱已批准的意图", "E2 Spec 没覆盖的", "E3 碰到项目在 Spec 的 Boundaries",
+                       "E4 高风险或不可逆的操作"):
+            self.assertIn(phrase, section)
+        self.assertNotIn("还没开工时（例如写 Plan 阶段）Spec 被改，照旧交用户复审", section)
+        plan = self.node_rules("## Plan 交审")
+        for phrase in ("相对基线的累计差异", "批准本 Plan 也就批准了修订后的 Spec", "`--target both`"):
+            self.assertIn(phrase, plan)
+
     def test_the_next_spec_follows_an_accepted_module(self):
         section = self.section("## 阶段交接")
         for phrase in ("接着写", "已在能力图里", "/compact", "新插入能力图"):
