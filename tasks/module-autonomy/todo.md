@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交已批准的 Spec 与 Plan、todo — 2026-11-19 用户批准 Spec（「批准」）与 Plan（「Plan 批准」）；能力图插入经用户「确认插入」。
 - [x] Task 1：`project_config.py` 校验、`module_tier` 与 `--module` 写入，单元测试 — `VALIDATORS` 加 `moduleAutonomy`（对象，id 合 `MODULE_ID`、值在 `TIERS`，任一条目坏整个键失效），`DEFAULTS` 为 `{}`；新增 `module_tier()`（条目优先，否则随 `autonomyTier`；`moduleAutonomy` 不合法时来源为 `default (config invalid)`）与 `wider()`；`set`／`unset` 加 `--module`（只对 `moduleAutonomy`，写它必须带；最后一个条目去掉时整个键删除；宽于项目档位时预览多一行 note）。`test_project_config.py` 新增 10 例并把汇总项清单加上新键，实现前 8 失败 2 报错，实现后 51 例通过。
-- [ ] Task 2：`/map --json` 每个模块的 `autonomy`
+- [x] Task 2：`/map --json` 每个模块的 `autonomy` — `map_view` 每个模块加 `autonomy: {tier, source, widerThanProject}`（常量 `AUTONOMY_FIELDS`），由 `project_config.module_tiers()` 一次读取给出（`module_tier` 改为它的单 id 形式），文字版不变。`test_map_view.py` 新增 `AutonomyTest` 4 例、模块键清单加 `autonomy`，实现前 2 失败 3 报错；并行开关快照与 `reviewCadence` 同样剔除 `autonomy`（整份配置无效时来源报 config invalid 是正确行为，由 `AutonomyTest` 覆盖）；87 例通过。
 - [ ] Task 3：阶段提示逐字不变的回归与 verify-artifacts 未知 id 警告
 - [ ] Task 4：接口 1.14 与检查器
 - [ ] Task 5：说明文字（config、ops 技能、commands、concepts）

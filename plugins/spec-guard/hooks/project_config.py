@@ -95,14 +95,18 @@ def module_tier(root: Path, module_id: str) -> tuple[str, str]:
     sends every module back to the project tier with the source "default (config invalid)".  spec-guard
     never caps the tier: a cap from elsewhere is the caller's to apply.
     """
+    return module_tiers(root, [module_id])[1][module_id]
+
+
+def module_tiers(root: Path, module_ids) -> tuple[str, dict[str, tuple[str, str]]]:
+    """(project tier, {id: (tier, source)}) from one read of the file; module_tier is this for one id."""
     values, problems = load(root)
     entries = values.get("moduleAutonomy", {})
-    if module_id in entries:
-        return entries[module_id], "moduleAutonomy"
-    tier, source = _project_tier(values, problems)
+    project, source = _project_tier(values, problems)
     if "moduleAutonomy-invalid" in problems:
         source = "default (config invalid)"
-    return tier, source
+    return project, {module: (entries[module], "moduleAutonomy") if module in entries else (project, source)
+                     for module in module_ids}
 
 
 def wider(tier: str, than: str) -> bool:
