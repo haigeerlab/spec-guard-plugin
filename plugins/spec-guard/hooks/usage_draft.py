@@ -20,6 +20,8 @@ SECTIONS = (
 )
 USAGE_HEADING = re.compile(r"^###\s+(U\d+)\s*[:：]\s*\S")
 MILESTONE_ID = re.compile(r"^M\d+$")
+CONFIRM_PREFIX = re.compile(r"^<!--\s*spec-guard:\s*milestone\b")
+CONFIRM = re.compile(r"^<!--\s*spec-guard:\s*milestone\s+(M\d+)\s+confirmed\s+(.+?)\s*-->$")
 SEPARATOR = re.compile(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$")
 
 
@@ -107,7 +109,24 @@ def parse(path, label):
         if not _split(modules):
             raise UsageDraftError("%s: 里程碑 %s 没有列模块" % (label, milestone))
         milestones.append((milestone, _split(usage), _split(modules)))
-    return {"entries": entries, "usages": usages, "milestones": milestones}
+    confirmations = {}
+    for line in sections["Milestones"]:
+        stripped = line.strip()
+        if not CONFIRM_PREFIX.match(stripped):
+            continue
+        match = CONFIRM.match(stripped)
+        if not match:
+            raise UsageDraftError("%s: 里程碑确认记录要写成 `<!-- spec-guard: milestone M<n> confirmed 模块, … -->`: %s"
+                                  % (label, stripped))
+        if match.group(1) in confirmations:
+            raise UsageDraftError("%s: 里程碑 %s 有不止一条确认记录" % (label, match.group(1)))
+        confirmations[match.group(1)] = _split(match.group(2))
+    return {"entries": entries, "usages": usages, "milestones": milestones, "confirmations": confirmations}
+
+
+def confirmed(draft, milestone, modules):
+    """True when the draft records a confirmation of this milestone with exactly these modules."""
+    return draft["confirmations"].get(milestone) == list(modules)
 
 
 def draft_files(project):
@@ -145,7 +164,9 @@ def _check_one(label, draft, positions, owner, failures, warnings):
         failures.append("%s: 最后一个里程碑 %s 要跑通全部典型用法，缺 %s" % (label, last, "、".join(missing)))
 
     in_draft = set()
+    assigned = {}
     for milestone, _usage, modules in draft["milestones"]:
+        assigned[milestone] = []
         for module in modules:
             if module not in positions:
                 failures.append("%s: 里程碑 %s 的模块 %s 不在能力图上" % (label, milestone, module))
@@ -155,6 +176,7 @@ def _check_one(label, draft, positions, owner, failures, warnings):
                 continue
             owner[module] = (label, milestone)
             in_draft.add(module)
+            assigned[milestone].append(module)
 
     with_entry = set()
     for entry, modules in draft["entries"]:
@@ -168,13 +190,46 @@ def _check_one(label, draft, positions, owner, failures, warnings):
                 warnings.append("%s: 里程碑 %s 的模块 %s 没有对应任何入口（可能拆多了，基础设施模块可忽略）" % (label, milestone, module))
 
     previous = None
-    for milestone, _usage, modules in draft["milestones"]:
-        placed = [positions[module] for module in modules if module in positions]
+    rows = {milestone: modules for milestone, _usage, modules in draft["milestones"]}
+    for milestone, recorded in draft["confirmations"].items():
+        if milestone not in rows:
+            failures.append("%s: 确认记录指向不存在的里程碑 %s" % (label, milestone))
+        elif recorded != rows[milestone]:
+            warnings.append("%s: 里程碑 %s 确认后改过（记录的模块是 %s，现在是 %s），模块做完后会再停一次"
+                            % (label, milestone, "、".join(recorded), "、".join(rows[milestone])))
+
+    for milestone, _usage, _modules in draft["milestones"]:
+        # Only modules this milestone actually owns: a duplicate is reported once, as a duplicate.
+        placed = [positions[module] for module in assigned[milestone]]
         if not placed:
             continue
         if previous is not None and min(placed) <= previous[1]:
             failures.append("%s: Build order 把里程碑 %s 的模块排在了 %s 的模块之前或同一组" % (label, milestone, previous[0]))
         previous = (milestone, max(placed) if previous is None else max(max(placed), previous[1]))
+
+
+def stop(project, done, mapped):
+    """The first milestone whose modules are all done but which has no valid confirmation.
+
+    `done` and `mapped` are sets of module ids from the caller's stage facts. Returns None when there is
+    no draft or no stop, {"status": "stop", file, milestone, modules, usages} for a stop, and
+    {"status": "unverified", "reason"} when a draft cannot be read or names a module not in the map --
+    a failed probe is reported as such, never as "no stop".
+    """
+    for label in draft_files(project):
+        try:
+            draft = parse(os.path.join(project, label), label)
+        except UsageDraftError as error:
+            return {"status": "unverified", "reason": str(error)}
+        for milestone, usage, modules in draft["milestones"]:
+            missing = [module for module in modules if module not in mapped]
+            if missing:
+                return {"status": "unverified",
+                        "reason": "%s: 里程碑 %s 的模块 %s 不在能力图上" % (label, milestone, "、".join(missing))}
+            if all(module in done for module in modules) and not confirmed(draft, milestone, modules):
+                return {"status": "stop", "file": label, "milestone": milestone, "modules": list(modules),
+                        "usages": list(usage)}
+    return None
 
 
 def validate(project):

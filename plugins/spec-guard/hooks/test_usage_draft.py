@@ -180,6 +180,89 @@ class ValidateTest(Base):
         self.assertEqual(self.result()["status"], "unverified")
 
 
+    def test_duplicate_reports_once(self):
+        result = self.assertFails(GOOD.replace("| M2 | U1, U2 | gamma, delta |", "| M2 | U1, U2 | beta, gamma, delta |"), "beta")
+        self.assertFalse(any("Build order" in item for item in result["failures"]), result)
+
+    def test_confirmation_ok(self):
+        self.draft(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha, beta -->\n")
+        result = self.result()
+        self.assertEqual(result["status"], "pass", result)
+
+    def test_confirmation_bad_format(self):
+        self.assertFails(GOOD + "\n<!-- spec-guard: milestone M1 ok -->\n", "M1")
+
+    def test_confirmation_unknown_milestone(self):
+        self.assertFails(GOOD + "\n<!-- spec-guard: milestone M7 confirmed alpha -->\n", "M7")
+
+    def test_confirmation_twice(self):
+        self.assertFails(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha, beta -->\n"
+                         "<!-- spec-guard: milestone M1 confirmed alpha, beta -->\n", "M1")
+
+    def test_confirmation_stale_is_warning(self):
+        self.draft(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha -->\n")
+        result = self.result()
+        self.assertEqual(result["status"], "pass", result)
+        self.assertTrue(any("M1" in item and "确认后" in item for item in result["warnings"]), result)
+
+
+MAPPED = {"alpha", "beta", "gamma", "delta", "epsilon"}
+
+
+class StopTest(Base):
+    def stop(self, done, mapped=MAPPED):
+        return usage_draft.stop(str(self.root), set(done), set(mapped))
+
+    def test_no_drafts(self):
+        self.assertIsNone(self.stop(MAPPED))
+
+    def test_not_complete(self):
+        self.draft(GOOD)
+        self.assertIsNone(self.stop({"alpha"}))
+
+    def test_complete_unconfirmed_stops(self):
+        self.draft(GOOD)
+        found = self.stop({"alpha", "beta"})
+        self.assertEqual(found["status"], "stop")
+        self.assertEqual((found["file"], found["milestone"]), ("spec/usage/demo.md", "M1"))
+        self.assertEqual(found["modules"], ["alpha", "beta"])
+        self.assertEqual(found["usages"], ["U1"])
+
+    def test_confirmed_does_not_stop(self):
+        self.draft(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha, beta -->\n")
+        self.assertIsNone(self.stop({"alpha", "beta"}))
+
+    def test_last_milestone_stops(self):
+        self.draft(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha, beta -->\n")
+        found = self.stop(MAPPED)
+        self.assertEqual(found["milestone"], "M2")
+        self.assertEqual(found["usages"], ["U1", "U2"])
+
+    def test_stale_confirmation_stops_again(self):
+        self.draft(GOOD + "\n<!-- spec-guard: milestone M1 confirmed alpha -->\n")
+        self.assertEqual(self.stop({"alpha", "beta"})["milestone"], "M1")
+
+    def test_first_stop_across_drafts(self):
+        self.draft(GOOD)
+        other = ("# Usage draft: a\n\n## Entry points\n\n| Entry | Does | Module |\n|---|---|---|\n"
+                 "| `/a` | x | epsilon |\n\n## Typical usage\n\n### U1: x\nx\n\n## Milestones\n\n"
+                 "| Milestone | Usage | Modules |\n|---|---|---|\n| M1 | U1 | epsilon |\n")
+        self.draft(other, "a.md")
+        self.assertEqual(self.stop(MAPPED)["file"], "spec/usage/a.md")
+
+    def test_broken_draft_unverified(self):
+        self.draft("# nothing\n")
+        found = self.stop(MAPPED)
+        self.assertEqual(found["status"], "unverified")
+        self.assertIn("spec/usage/demo.md", found["reason"])
+
+    def test_unmapped_module_unverified(self):
+        self.draft(GOOD)
+        found = self.stop({"alpha", "beta"}, mapped={"alpha", "gamma", "delta"})
+        self.assertEqual(found["status"], "unverified")
+        self.assertIn("beta", found["reason"])
+
+
 class MilestonesTest(Base):
     def test_lookup(self):
         self.draft(GOOD)
