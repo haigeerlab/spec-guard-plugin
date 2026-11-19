@@ -6,7 +6,7 @@
 - [x] Task 3：接入 add-module 预览 — `preview` 结果多 `usage`（没有草案为 None）：草案文件、锚点、锚点所在里程碑或读草案的错误；`format_report` 在「新的 Build order」与「能力图 diff」之间加「用法草案」一段（文件列表、锚点所在里程碑、提醒一句；读不出写「未读取到用法草案」），没有草案时报告逐字不变（用例把 `usage` 去掉后比对同一报告）。`test_module_insert.py` 新增 5 例，实现前 4 例失败（`--confirm` 不改草案一例本来成立，作为守护），实现后 86 例通过，系统 Python 3.9.6 同样通过。`commands/add-module.md` 与 `skills/spec-guard-ops/SKILL.md`（Codex 入口，Plan 未列，超出预计影响面）补一句。
 - [x] Task 4：规则文本与模板 — `workflow-checkpoints.md` 新增「用法草案」一节（何时出、三部分格式、拆分核对、批准后 Spec 一致性与 README 展开、add-module 后补里程碑、verify-artifacts 只查结构、已开发项目不追溯），交审小项「拆成哪些模块」与 Spec「目标」、文档建议「能力图全部完成」各补一句，不新增小项；`node-rules.md` 三处同步（各节字节数仍在上限内）。新增 `templates/USAGE.md`（setup-convention 不复制它），把占位换成模块名后 `usage_draft.py` 判 `ok`。`test_workflow_checkpoints.py` 加 4 个共用短语与 `UsageDraftRuleTests` 2 例，改前 5 失败 1 报错，改后 87 例通过；`test_stop_rules.py` 通过。
 - [x] Task 5：文档 — `docs/concepts.md` 术语表加「用法草案」「里程碑」；`docs/commands.md` 的 verify-artifacts 检查表加一行、add-module 加一条；`docs/workflow.md` 检查点一段加两句；README 中英命令表 verify-artifacts 一行加「用法草案」。`validate.sh --quick` 通过。
-- [ ] Task 6：版本号 0.87.0 与 CHANGELOG
+- [x] Task 6：版本号 0.87.0 与 CHANGELOG — 两份 `plugin.json` 改 0.87.0；README 中英 `--ref v0.87.0`；CHANGELOG 加 `## [0.87.0] - 2026-11-19`（新增、文档）。`check-readme-sync.py`、`check-manifests.py` 通过。
 - [ ] Checkpoint 1（report）：发布前完整检查与变异验证
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 - [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、回告 ecosystem-lead
