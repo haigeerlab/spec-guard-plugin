@@ -220,6 +220,12 @@ printf '{"version": 2, "artifactLanguage": "en"}\n' > "$PROJECT/.agent/config.js
 check "结构问题的项目配置失败" 1 "项目配置无效: version-invalid"
 printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
 check "并行开关 on 的项目配置通过" 0 "项目配置有效"
+# module-autonomy：能力图上没有的模块 id 逐个警告、不判失败；档位写错整个键判无效。
+printf '{"version": 1, "moduleAutonomy": {"alpha": "relaxed", "ghost": "strict", "zeta": "strict"}}\n' > "$PROJECT/.agent/config.json"
+check "moduleAutonomy 里能力图上没有的模块警告" 0 "项目配置 moduleAutonomy 里的模块 ghost 不在能力图上"
+check "每个未知模块各一条警告" 0 "项目配置 moduleAutonomy 里的模块 zeta 不在能力图上"
+printf '{"version": 1, "moduleAutonomy": {"alpha": "fast"}}\n' > "$PROJECT/.agent/config.json"
+check "moduleAutonomy 档位写错判无效" 1 "项目配置无效: moduleAutonomy-invalid"
 printf '{"version": 1, "moduleConcurrency": "yes"}\n' > "$PROJECT/.agent/config.json"
 check "并行开关取值无效时失败" 1 "项目配置无效: moduleConcurrency-invalid"
 
