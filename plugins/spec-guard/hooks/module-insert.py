@@ -22,6 +22,7 @@ from pathlib import Path
 from capability_map import MapError, MODULE_ID, parse_map, _visible_lines
 from module_stage import CHECKED, active_module, module_state, paused_modules, project_stage
 from proposal_promotion_proof import _matches, preflight_as_json, promotion_base
+import usage_draft
 
 
 _digest_spec = importlib.util.spec_from_file_location(
@@ -264,7 +265,26 @@ def preview(project, module_id, responsibility, depends_on_raw, anchor, interrup
         "interrupted": interrupted,
         "responsibility": responsibility,
         "new_text": new_text,
+        "usage": _usage_note(project, anchor),
     }
+
+
+def _usage_note(project, anchor):
+    """usage-draft: which drafts exist and which milestone the anchor sits in; None when there is no draft."""
+    files = usage_draft.draft_files(str(project))
+    if not files:
+        return None
+    note = {"files": files, "anchor": None, "milestone": None, "error": None}
+    if anchor.startswith("after:"):
+        note["anchor"] = anchor[len("after:"):].strip()
+    try:
+        found = usage_draft.milestones(str(project))
+    except usage_draft.UsageDraftError as error:
+        note["error"] = str(error)
+        return note
+    if note["anchor"] in found:
+        note["milestone"] = found[note["anchor"]]
+    return note
 
 
 def write(project, module_id, responsibility, depends_on_raw, anchor, interrupt=False):
@@ -394,7 +414,16 @@ def format_report(result):
     if result.get("extra_columns"):
         lines.append("  额外列 %s 留空，需要时自己填" % "、".join("`%s`" % name for name in result["extra_columns"]))
     lines += ["", "新的 Build order:",
-             "  " + result["build_order_line"], "", "能力图 diff:"]
+             "  " + result["build_order_line"], ""]
+    usage = result.get("usage")
+    if usage:
+        lines.append("用法草案: %s" % "、".join(usage["files"]))
+        if usage["error"]:
+            lines.append("  未读取到用法草案：%s" % usage["error"])
+        elif usage["milestone"]:
+            lines.append("  锚点 `%s` 属于 `%s` 的 %s" % (usage["anchor"], usage["milestone"][0], usage["milestone"][1]))
+        lines += ["  新模块属于其中某个需求时，把它加进那份草案的里程碑表；本命令不改草案，verify-artifacts 会检查顺序", ""]
+    lines.append("能力图 diff:")
     lines.extend(result["diff"] or ["（无变化）"])
     lines.append("")
     none_label = "无（全部完成）"
