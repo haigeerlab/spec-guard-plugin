@@ -28,6 +28,7 @@ from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, extern
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
 from project_config import module_concurrency, summary as config_summary
+import usage_draft
 
 SCHEMA_VERSION = 1
 REASON_LINE = re.compile(r"^<!-- spec-guard: suspended-reason: (.*) -->$")
@@ -43,6 +44,7 @@ SPEC_PATH = re.compile(r"^spec/([^/\s]+)\.md$")
 COMMIT_SEP = "\x1e"
 PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence", "gates")  # interface.json progressFacts
 DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (formal-deferral, interface 1.12)
+MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone-stop, interface 1.13)
 
 
 class Unreadable(Exception):
@@ -346,6 +348,20 @@ def progress_facts(root: Path, modules: list) -> tuple:
     return {key: max(value, 0) for key, value in net.items()}, started
 
 
+def _milestone_stop(root: Path, modules: list):
+    """milestone-stop: usage_draft.stop over this view's statuses; None, the stop, or an error that is never None."""
+    try:
+        found = usage_draft.stop(str(root), {m["id"] for m in modules if m["status"] == "done"},
+                                 {m["id"] for m in modules})
+    except Exception as error:  # a failed probe is not "no stop"
+        return {"error": "unreadable", "detail": "%s: %s" % (type(error).__name__, error)}
+    if found is None:
+        return None
+    if found["status"] == "unverified":
+        return {"error": "unreadable", "detail": found["reason"]}
+    return {key: found[key] for key in ("file", "milestone", "modules", "usages")}
+
+
 def _review_cadence(root: Path) -> dict:
     # map-progress-facts: the same effective value and source that /spec-guard:config shows.
     item = next(i for i in config_summary(root) if i["key"] == "reviewCadence")
@@ -457,6 +473,7 @@ def build(root: Path) -> dict:
         "history": state,
         "reviewCadence": _review_cadence(root),
         "deferredTotal": sum(len(m["deferred"]) for m in modules),
+        "milestoneStop": _milestone_stop(root, modules),
     }
     if concurrent:
         data.update(_concurrency(root, parsed, modules))
@@ -578,6 +595,12 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
                                        for a in data["awaitingReview"]) or "无"))
     if data["nextGate"]:
         lines.append("下一个 gate：" + clean(data["nextGate"]))
+    stop = data.get("milestoneStop")
+    if stop and stop.get("error"):
+        lines.append("里程碑停点：未判定（%s）" % clean(stop["detail"]))
+    elif stop:
+        lines.append("里程碑停点：%s 的 %s（模块 %s 已全部完成，未确认）"
+                     % (clean(stop["file"]), clean(stop["milestone"]), clean("、".join(stop["modules"]))))
     head = data["head"]
     merged = ("%d 个提交（相对 %s）" % (head["unmerged"]["count"], head["unmerged"]["base"])
               if head["unmerged"] else "判断不了")
