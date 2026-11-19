@@ -940,6 +940,7 @@ class NodeRulesTests(unittest.TestCase):
         "## 最终验收": ("单独一张表放在最前", "文档改动：无", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面",
                       "可以原样发送的完整文字", "同意按这段文字发送", "重新给用户看", "同时批准修订后的 Spec",
                       "README 从用法草案展开"),
+        "## 里程碑停点": ("先不开下一个模块", "用安装后的版本跑", "跑不了的写明原因", "不调用 milestone-mark"),
     }
 
     def setUp(self):
@@ -1077,6 +1078,11 @@ class UsageDraftRuleTests(unittest.TestCase):
     def test_contract_explains_when_and_what(self):
         for phrase in ("同一次需求确认拆出 2 个及以上模块", "`spec/usage/<需求>.md`", "默认出、不先问", "入口清单", "典型用法",
                        "里程碑", "有入口找不到模块", "有模块不对应任何入口", "单模块需求不出", "templates/USAGE.md"):
+            self.assertIn(phrase, self.contract)
+
+    def test_contract_explains_the_milestone_stop(self):
+        for phrase in ("### 里程碑停点", "milestone-mark", "`--confirm`", "返工与小模块", "确认后里程碑", "再停一次",
+                       "最终验收照旧逐模块"):
             self.assertIn(phrase, self.contract)
 
     def test_template_passes_the_checker_headings(self):
