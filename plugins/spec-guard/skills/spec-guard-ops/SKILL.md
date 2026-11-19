@@ -313,7 +313,7 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
   --id <id> --responsibility "<responsibility>" --depends-on <a,b|—> --anchor <after:<id>|end>
 ```
 
-原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒）；被拒绝时原样说明是哪一
+原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒，有用法草案时还有「用法草案」一段）；被拒绝时原样说明是哪一
 条校验失败并停下。等用户明确确认后，才在同一条命令后加 `--confirm` 重新运行一次；用户改了 id、
 responsibility、depends-on 或 anchor 中任何一项，都要先重新预览，不能对着旧预览直接确认。
 

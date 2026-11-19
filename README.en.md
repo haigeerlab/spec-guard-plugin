@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.7` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.87.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
@@ -97,7 +97,7 @@ acceptance, with the stage hint the agent sees at every step, a table of what yo
 | Convention and stage | `/spec-guard:setup-convention` | Install the multi-module convention in a project; `--replace` upgrades the block, `--dry-run` only previews |
 | | `/spec-guard:teardown-convention` | Remove the convention and keep your Specs and plans |
 | | `/spec-guard:phase` | Show the current stage and the suggested next step |
-| | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers and other artifacts |
+| | `/spec-guard:verify-artifacts` | Check the capability map, module Specs, review markers, usage drafts and other artifacts |
 | | `/spec-guard:config` | View or set project config (artifact language, review cadence and more; every key is in the command reference) |
 | | `/spec-guard:review-mark` | Record whether a Spec or Plan is approved; the agent runs it after you approve |
 | | `/spec-guard:module-suspend` | Suspend or resume a module that is waiting on something outside |

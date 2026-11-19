@@ -40,6 +40,8 @@ spec-guard 不跨仓库汇总进度。跨仓库的接口约定照上游 `spec-dr
 | 能力图 | `spec/CAPABILITY-MAP.md`。列出项目的所有模块、各自职责、依赖关系和 Build order。每个项目同一时间只有一张 |
 | 模块 | 能力图里的一行，一块可以单独验收的能力。id 用 kebab-case，定下后不改名 |
 | Build order | 能力图里的一行 `Build order: a → b → c`，规定模块的推进顺序 |
+| 用法草案 | `spec/usage/<需求>.md`，一个需求拆成 2 个及以上模块时，在能力图审阅同一轮写的一页：对外有哪些入口（入口、做什么、归哪个模块）、两三个典型用法、分几个里程碑。让你在开工前看清做出来怎么用；`verify-artifacts` 只查它的结构，不评内容。格式见插件 `templates/USAGE.md` |
+| 里程碑 | 用法草案里的一段：几个模块合起来能跑通的一个或几个典型用法，写作 `M1`、`M2`。Build order 按里程碑排，最后一个里程碑跑通全部典型用法。只写在用法草案里，能力图格式不变；不叫「阶段」，以免与阶段提示混淆 |
 | 模块 Spec | `spec/<模块>.md`，这个模块的需求与验收标准 |
 | Plan / todo | `tasks/<模块>/plan.md` 与 `tasks/<模块>/todo.md`，每个模块各自一份，互不覆盖 |
 | activeModule | `.agent/state.json` 里记录的当前模块，`/build` 只从它的 todo 取任务。它是**书签**，不是进度账本：阶段每轮从 `spec/` 与 `tasks/` 的文件现状实时算出，丢了只会退化为按 Build order 取第一个未完成模块 |

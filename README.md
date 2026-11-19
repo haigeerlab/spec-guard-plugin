@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.86.7` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.87.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
@@ -86,7 +86,7 @@ setup 会建 `spec/`、`tasks/`，并在 `CLAUDE.md`（Codex 是 `AGENTS.md`）�
 | 约定与阶段 | `/spec-guard:setup-convention` | 在项目里安装多模块约定；`--replace` 升级约定块，`--dry-run` 只预览 |
 | | `/spec-guard:teardown-convention` | 移除约定，保留你的 Spec 和 plan |
 | | `/spec-guard:phase` | 查看当前阶段和建议的下一步 |
-| | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记等产物 |
+| | `/spec-guard:verify-artifacts` | 校验能力图、模块 Spec、批准标记、用法草案等产物 |
 | | `/spec-guard:config` | 查看或设置项目配置（产物语言、批准节奏等，全部键见命令参考） |
 | | `/spec-guard:review-mark` | 记录 Spec、Plan 的批准状态；你回复批准后由 agent 来用 |
 | | `/spec-guard:module-suspend` | 挂起或恢复在等外部条件的模块 |

@@ -144,6 +144,49 @@ class ModuleInsertTests(unittest.TestCase):
         self.assertEqual(result["extra_columns"], [])
         self.assertNotIn("额外列", module_insert.format_report(result))
 
+    # ---- usage-draft: preview names the milestone the anchor belongs to ----
+
+    USAGE = ("# Usage draft: demo\n\n## Entry points\n\n| Entry | Does | Module |\n|---|---|---|\n"
+             "| `/demo` | run | alpha |\n| `/demo more` | more | gamma |\n\n## Typical usage\n\n### U1: run\nx\n\n"
+             "## Milestones\n\n| Milestone | Usage | Modules |\n|---|---|---|\n| M1 | U1 | alpha, beta |\n| M2 | U1 | gamma |\n")
+
+    def test_usage_draft_names_anchor_milestone(self):
+        self.write("spec/usage/demo.md", self.USAGE)
+        result = preview(self.root, "delta", "Fourth module", "beta", "after:beta")
+        report = module_insert.format_report(result)
+        self.assertIn("用法草案: spec/usage/demo.md", report)
+        self.assertIn("锚点 `beta` 属于 `spec/usage/demo.md` 的 M1", report)
+        self.assertIn("新模块属于其中某个需求时，把它加进那份草案的里程碑表", report)
+        self.assertLess(report.index("新的 Build order:"), report.index("用法草案:"))
+        self.assertLess(report.index("用法草案:"), report.index("能力图 diff:"))
+
+    def test_usage_draft_end_anchor_has_no_milestone_line(self):
+        self.write("spec/usage/demo.md", self.USAGE)
+        report = module_insert.format_report(preview(self.root, "delta", "Fourth module", "—", "end"))
+        self.assertIn("用法草案: spec/usage/demo.md", report)
+        self.assertNotIn("锚点", report)
+        self.assertIn("把它加进那份草案的里程碑表", report)
+
+    def test_no_usage_draft_leaves_report_unchanged(self):
+        result = preview(self.root, "delta", "Fourth module", "beta", "after:beta")
+        self.assertIsNone(result["usage"])
+        report = module_insert.format_report(result)
+        self.assertNotIn("用法草案", report)
+        result.pop("usage")
+        self.assertEqual(report, module_insert.format_report(result))
+
+    def test_unreadable_usage_draft_does_not_fail_preview(self):
+        self.write("spec/usage/demo.md", "# nothing\n")
+        report = module_insert.format_report(preview(self.root, "delta", "Fourth module", "beta", "after:beta"))
+        self.assertIn("未读取到用法草案", report)
+        self.assertIn("新行:", report)
+
+    def test_confirm_does_not_touch_usage_draft(self):
+        self.write("spec/usage/demo.md", self.USAGE)
+        module_insert.write(self.root, "delta", "Fourth module", "beta", "after:beta")
+        self.assertEqual((self.root / "spec/usage/demo.md").read_text(encoding="utf-8"), self.USAGE)
+        self.assertIn("| delta |", self.map_path.read_text(encoding="utf-8"))
+
     def test_end_anchor_appends_row_and_build_order_step(self):
         result = preview(self.root, "delta", "Fourth module", "—", "end")
         lines = result["diff"]
