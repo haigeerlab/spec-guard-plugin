@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.87.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:c409ffcadc6316b8c529777d43849f24d53574df"
+      },
+      "observedAt": "2026-11-19T03:15:36Z",
+      "evidence": [
+        "result:the v0.87.0 annotated tag resolves to merge commit c409ffcadc6316b8c529777d43849f24d53574df (pull request #444, which carries the version bump); merged==true and main==merge sha were checked as a separate step before tagging; the push run on the merge commit succeeded (Validate run 44448784073)",
+        "result:one module (usage-draft, milestone M1 of a two-module requirement): new hooks/usage_draft.py checks spec/usage/<requirement>.md drafts (Entry points, Typical usage, Milestones) against the capability map and Build order; verify-artifacts gains a usage-draft item only when spec/usage/ exists; the add-module preview names the anchor's milestone when drafts exist and is byte-identical to 0.86.7 otherwise; shared checkpoint rules add a usage-draft section and templates/USAGE.md; capability map format and interface.json unchanged (1.12)",
+        "result:on the branch before merge (HEAD 70c3b750, tree identical to the merge commit) under macOS 27.2 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 512 cases passed, verify-artifacts 92 cases passed, test_usage_draft 26 cases, test_module_insert 86 cases, test_workflow_checkpoints 87 cases passed (also on system Python 3.9.6); evals/codex-plugin-smoke.sh --selftest exited 0; ShellCheck -S warning passed; removing the Build order order check, the last-milestone coverage check or the add-module note on draft copies turned 2, 2 and 3 cases red"
+      ]
+    }
+  ]
+}
