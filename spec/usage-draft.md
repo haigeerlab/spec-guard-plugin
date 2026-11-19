@@ -1,6 +1,6 @@
 # Spec: usage-draft
 
-<!-- spec-guard: review approved 80cb6f17746b -->
+<!-- spec-guard: review approved 9301eb951b01 -->
 
 ## 目标
 
