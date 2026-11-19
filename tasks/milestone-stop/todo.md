@@ -7,7 +7,7 @@
 - [x] Task 4：`/map --json` 的 `milestoneStop`，interface 1.13 — `map_view.py` 顶层加 `milestoneStop`（无草案或无停点 `null`；停点为 `{file, milestone, modules, usages}`；草案读不了为 `{error: unreadable, detail}`，不报成 `null`——Spec 只写了前两种，第三种按「探测失败不当事实」补上），文字版加「里程碑停点：」一行；`interface.json` 升 1.13，`mapView.milestoneStop` 说明字段、出现条件与含义（按 /map 派活的调用方停点期间不开后一个里程碑的模块；`startable` 等不变）；`check-interface.py` 校验字段与 `map_view.MILESTONE_FIELDS` 一致，`test-checkers.sh` 加 2 个反例。**偏离 Plan**：没改 `spec/map-view.md`（它带已批准标记，改了会变成批准后已修订），照 formal-deferral 的先例只写进 `interface.json`。`test_map_view.py` 新增 3 例并把顶层键加入清单，实现前 2 失败 3 报错，实现后 83 例通过；检查器回归 163 通过。
 - [x] Task 5：共享检查点规则补「里程碑停点」 — `workflow-checkpoints.md` 的「用法草案」一节加「### 里程碑停点」：何时停、与最终验收的关系（逐模块验收照旧，停点在发版后用安装后的版本跑）、交审写什么、通过用 milestone-mark、不通过追加任务或改草案、记录失效再停、并行时模块协调按 `milestoneStop` 停下。`test_workflow_checkpoints.py` 的共用短语加这一节 4 个、`UsageDraftRuleTests` 加 1 例，改前 5 失败，改后 88 例通过。
 - [x] Task 6：文档与 README 功能段 — `docs/commands.md`：verify-artifacts 表一行加确认记录（写坏 ❌、失效 ⚠️），`/map` 段写明里程碑停点行与 JSON 顶层 `milestoneStop`（interface 1.13）；milestone-mark 一段与对照表一行已在 Task 2 写入。`docs/concepts.md` 术语表加「里程碑停点」；`docs/workflow.md` 能力图审阅一段加停点一句。README 中英命令表加 milestone-mark 一行，新增一节「多模块需求：用法草案与里程碑停点」，从 `spec/usage/usage-milestones.md` 的 U1–U3 展开（能力图全部完成的收尾 README 建议，随本模块一起改）。`check-readme-sync.py`、`validate.sh --quick` 通过。
-- [ ] Task 7：版本号 0.88.0 与 CHANGELOG
+- [x] Task 7：版本号 0.88.0 与 CHANGELOG — 两份 `plugin.json` 改 0.88.0；README 中英 `--ref v0.88.0`；CHANGELOG 加 `## [0.88.0] - 2026-11-19`（新增、变更、文档；interface 1.13）。`check-manifests.py`、`check-readme-sync.py` 通过。
 - [ ] Checkpoint 1（report）：发布前完整检查、变异验证与临时项目实跑 U3
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 - [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、回告 ecosystem-lead
