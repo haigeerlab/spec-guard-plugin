@@ -191,6 +191,9 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `autonomyTier`：`strict`（默认）、`standard` 或 `relaxed`，自治档位，取什么值都不注入阶段提示；各档含义由 module-crew 定义，spec-guard
   只存、读、报告来源。不联动 `reviewCadence`（要 Spec 与 Plan 一起审另设 `combined`）。设置或取消要用户在对话里的原话，`--confirm` 前引用。
   任何档位都不低于共享检查点规则「自治档位与底线」。0.67.1 及更早版本会把含这个键的配置整份判为无效，0.68.0～0.84.2 只忽略它，团队都升级后再设置。
+- `moduleAutonomy`：按模块的自治档位，对象（模块 id → `strict`／`standard`／`relaxed`），没设的模块随 `autonomyTier`，取什么值都不注入阶段提示。
+  `set --key moduleAutonomy --module <id> --value <档位>` 一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。
+  比项目档位宽时预览多一行 `note:`，只提醒不截断，上限由读取它的插件做。写入要用户原话，0.68.0～0.88.0 只忽略这个键，团队都升级后再设置。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 

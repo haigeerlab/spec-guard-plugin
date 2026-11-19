@@ -77,7 +77,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | 能力图存在并通过严格解析（唯一模块表、Build order、依赖） | ❌（没有能力图只给 ⚠️） |
 | `spec/` 下每个模块 Spec 都在能力图里 | ❌ |
 | 项目根目录没有 `SPEC*.md` | ❌ |
-| `.agent/config.json` 有效 | 文件无效 ❌；只有不认识的键 ⚠️（已忽略） |
+| `.agent/config.json` 有效 | 文件无效 ❌；只有不认识的键 ⚠️（已忽略）；`moduleAutonomy` 里有能力图上没有的模块 ⚠️（每个一条） |
 | 有 Plan 没 todo 的模块 | ⚠️（按已完成计） |
 | 挂起标记 | 重复 ❌；已没有未勾选项 ⚠️ |
 | 批准标记 | 写法无效 ❌；批准后已修订、待批准却已有勾选 ⚠️ |
@@ -101,10 +101,15 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `reviewCadence` | `separate`／`combined` | `separate` |
 | `moduleConcurrency` | `off`／`on` | `off` |
 | `autonomyTier` | `strict`／`standard`／`relaxed` | `strict` |
+| `moduleAutonomy` | 模块 id → 档位（同上三档） | 未设置 |
 
 `autonomyTier`（自治档位）是给多模块协作插件 module-crew 用的：各档放开什么由它定义，spec-guard 只存、读、报告来源，自己的
 阶段提示和停点都不随它变，也不联动 `reviewCadence`。设置时要你在对话里说明设成哪一档；任何档位下，能力图、Spec 和最终验收
 都要你批准。团队都升级到 0.85.0 后再设。
+
+`moduleAutonomy`（按模块的自治档位，0.89.0 起）给单个模块另设档位：项目档位定上限，需求定实际。用
+`set --key moduleAutonomy --module <模块 id> --value <档位>` 一次改一个模块，没设的模块随 `autonomyTier`。比项目档位宽时只提醒、
+不截断，按上限截断由读取它的插件做；能力图上没有的模块 id 由 verify-artifacts 警告。设置同样要你在对话里的原话。
 
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件本身坏了时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`；个别键有问题时只有那个键失效、其余照常，阶段提示多一行
@@ -201,7 +206,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、里程碑停点（有用法草案、某个里程碑做完还没确认时）、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的生效自治档位与来源在 `autonomy`，interface 1.14 起），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`

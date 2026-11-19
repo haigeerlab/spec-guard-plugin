@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.89.0] - 2026-11-20
+
+本版 1 个模块：module-autonomy（autopr 需求 1a「项目定上限，需求定实际」）。`interface.json` 1.13 → 1.14（只新增 `moduleAutonomy` 入口与
+`mapView.autonomy`）。
+
+### 新增
+
+- **按模块的自治档位 `moduleAutonomy`。** `.agent/config.json` 新增对象键（模块 id → `strict`／`standard`／`relaxed`），没设的模块随
+  项目的 `autonomyTier`。`/spec-guard:config` 用 `set --key moduleAutonomy --module <id> --value <档位>` 一次改一个模块，`unset`
+  带 `--module` 去掉一个、不带去掉整个键；先预览、`--confirm` 才写，写入要用户原话。任一条写错（id 不是 kebab-case、档位不在三档里）
+  整个键失效，所有模块回到项目档位。模块档位宽于项目档位时预览多一行提醒，spec-guard 不截断，按上限截断由读取它的插件做。
+  spec-guard 自己的阶段提示、停点与底线不随它变，取什么值都不注入阶段提示。
+- **`/spec-guard:map --json` 每个模块加 `autonomy`**：`tier`、`source`（`moduleAutonomy`／`autonomyTier`／`default`／
+  `default (config invalid)`）、`widerThanProject`。文字版不变；判据只有 `project_config.module_tier`。
+- **verify-artifacts**：`moduleAutonomy` 里有能力图上没有的模块 id 时每个报一条 ⚠️，不判失败；写错时随项目配置判 ❌。
+
+### 变更
+
+- `interface.json` 的 `mapView.milestoneStop.meaning`、共享检查点规则「里程碑停点」与 `docs/commands.md` 写明：停点期间按 `/map`
+  派活的调用方不开任何新模块，不论属于哪个里程碑或草案（0.88.0 的说明写成「不开后一个里程碑的模块」，比阶段提示的实际行为窄；
+  字段与判据不变）。
+
+### 升级须知
+
+- 0.67.1 及更早的 spec-guard 会把含 `moduleAutonomy` 的配置整份判为无效，0.68.0～0.88.0 只忽略这个键并警告；团队都升级后再设置。
+- 读 `/map --json` 的插件（module-crew、autopr）：只新增字段，旧读取方忽略即可。
+
 ## [0.88.0] - 2026-11-19
 
 本版 1 个模块（S89 第二个里程碑）：milestone-stop。`interface.json` 1.12 → 1.13（只新增 `mapView.milestoneStop`）。
