@@ -549,7 +549,10 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     """
     kind = None
     final = stage == "BUILDING" and at_final_gate(root, module)
-    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final):
+    # pre-build-spec-batch: a revised Spec with a baseline waits for the Plan's review instead of its own.
+    batched = (spec_review == "revised" and not final
+               and (pre_build_batch(root, module, stage, spec_review, plan_review) or {}).get("status") == "found")
+    if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final and not batched):
         kind = "spec-review"
     spec_waits = kind == "spec-review" and load_config(root)[0].get("reviewCadence") != "combined"
     if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
@@ -690,6 +693,21 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
+    batch = pre_build_batch(root, module, stage, spec, plan)
+    if batch is not None and batch["status"] == "found":
+        return ("- Review: Spec `%s` was edited after it was approved (baseline %s)." % (spec_path, batch["commit"][:7]),
+                "the revision may wait for the Plan's review: record the revision in the Spec's change log and write the "
+                "Plan as usual; when presenting the Plan, show the Spec's cumulative diff against the baseline verbatim and "
+                "say that approving the Plan also approves the revised Spec, then record both with %s (`--target both`). "
+                "Stop and ask at once if the revision weakens an approved acceptance criterion, makes a decision the Spec "
+                "does not cover, touches an ask-first item in the Spec's Boundaries, or is high-risk or irreversible."
+                % cmd["review-mark"], spec, plan)
+    if batch is not None and stage == "NEEDS_PLAN":
+        why = ("the approved text is not in git (commit the Spec right after approval)" if batch["status"] == "absent"
+               else "the baseline could not be checked (%s)" % batch["reason"])
+        return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
+                "show the user the revised `%s` for another review; %s.%s It cannot wait for the Plan's review: %s."
+                % (spec_path, hold, record, why), spec, plan)
     if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
                 "at the final gate, show the diff of the revised `%s` verbatim in the acceptance message and say that "
@@ -722,6 +740,18 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan
+    batch = pre_build_batch(root, module, stage, spec, plan)
+    if batch is not None and batch["status"] == "found":
+        return ("- 批准: Spec `%s` 批准后又改过（基线 %s）。" % (spec_path, batch["commit"][:7]),
+                "开工前的修订可以攒到 Plan 交审一次批：记进 Spec 末尾的变更记录，照常写 Plan；交审 Plan 时原样附上 Spec 相对基线的"
+                "累计差异，说明批准 Plan 也就批准了修订后的 Spec，批准后用 %s（`--target both`）一起记下。修订削弱了已批准的验收标准、"
+                "做了 Spec 没覆盖的决定、碰到 Spec 的 Boundaries 里的「先问」项，或是高风险、不可逆的操作时，当场停下问用户。"
+                % cmd["review-mark"], spec, plan)
+    if batch is not None and stage == "NEEDS_PLAN":
+        why = ("取不到批准时的原文（Spec 获批后先提交再改）" if batch["status"] == "absent"
+               else "基线未判定（%s）" % batch["reason"])
+        return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
+                "把改过的 `%s` 再给用户审一次；%s。%s不能攒到 Plan 交审：%s。" % (spec_path, hold, record, why), spec, plan)
     if spec == "revised" and stage == "BUILDING" and at_final_gate(root, module):
         return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
                 "在最终 gate，把改过的 `%s` 的 diff 原样放进验收消息，并说明批准验收也就批准了改过的 Spec；批准后，"

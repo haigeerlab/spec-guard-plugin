@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交 Plan 与 todo — 2026-11-20 用户批准 Spec（「批准」，能力图与 Spec 在批准后先行提交）与 Plan（「Plan 批准」）；能力图插入经用户「确认插入」。
 - [x] Task 1：`spec_baseline` 与 `pre_build_batch`，单元测试 — `module_stage.spec_baseline()` 沿 Spec 最近 50 个提交从新到旧找指纹与批准标记一致的版本（原样字节解码，不经 `_git` 的 strip），返回 found／absent／unverified（不在 git 工作区或 git 出错为 unverified 带原因；还没有提交为 absent）；`pre_build_batch()` 只在 Spec 为 revised 且 NEEDS_PLAN 或 BUILDING＋Plan pending 时返回基线。新增 `test_spec_baseline.py` 6 例，实现前导入即失败，实现后通过；`validate.sh` 登记。
-- [ ] Task 2：阶段提示接开工前攒批（中英两套、节点规则种类）
+- [x] Task 2：阶段提示接开工前攒批（中英两套、节点规则种类） — `review_hint` 中英两套接 `pre_build_batch`：有基线时批准行写基线短 sha，建议下一步换成「记变更记录、照常写 Plan、交审附累计差异、`--target both` 一起记」并列出 E1–E4 当场停；NEEDS_PLAN 无基线或未判定时保留原提示并加一句原因；BUILDING＋Plan 待批准且无基线时保持原来的构建中提示（Spec 假设 3「无基线时与现在逐字相同」）。`stop_node` 有基线时不再给 spec-review，NEEDS_PLAN 附 Plan 交审规则。`test-phase-guard.sh` 新增第 26 段 4 例（PARTS=26），524 例通过；临时 zh-CN 项目手看中文措辞正确。
 - [ ] Task 3：`review-mark` 的累计差异预览与拒绝文字
 - [ ] Task 4：规则（workflow-checkpoints、node-rules）与规则回归
 - [ ] Task 5：说明文字（review-mark 命令、ops 技能、workflow）
