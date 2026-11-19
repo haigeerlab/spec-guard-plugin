@@ -7,7 +7,7 @@
 - [x] Task 4：规则文本与模板 — `workflow-checkpoints.md` 新增「用法草案」一节（何时出、三部分格式、拆分核对、批准后 Spec 一致性与 README 展开、add-module 后补里程碑、verify-artifacts 只查结构、已开发项目不追溯），交审小项「拆成哪些模块」与 Spec「目标」、文档建议「能力图全部完成」各补一句，不新增小项；`node-rules.md` 三处同步（各节字节数仍在上限内）。新增 `templates/USAGE.md`（setup-convention 不复制它），把占位换成模块名后 `usage_draft.py` 判 `ok`。`test_workflow_checkpoints.py` 加 4 个共用短语与 `UsageDraftRuleTests` 2 例，改前 5 失败 1 报错，改后 87 例通过；`test_stop_rules.py` 通过。
 - [x] Task 5：文档 — `docs/concepts.md` 术语表加「用法草案」「里程碑」；`docs/commands.md` 的 verify-artifacts 检查表加一行、add-module 加一条；`docs/workflow.md` 检查点一段加两句；README 中英命令表 verify-artifacts 一行加「用法草案」。`validate.sh --quick` 通过。
 - [x] Task 6：版本号 0.87.0 与 CHANGELOG — 两份 `plugin.json` 改 0.87.0；README 中英 `--ref v0.87.0`；CHANGELOG 加 `## [0.87.0] - 2026-11-19`（新增、文档）。`check-readme-sync.py`、`check-manifests.py` 通过。
-- [ ] Checkpoint 1（report）：发布前完整检查与变异验证
+- [x] Checkpoint 1（report）：发布前完整检查与变异验证 — 主机 macOS 27.2 arm64，系统 `/bin/bash` 3.2.57，HEAD `acaa9d6f`：`validate.sh` 通过、phase-guard 512 例、verify-artifacts 92 例；`evals/codex-plugin-smoke.sh --selftest` 通过；ShellCheck 0.11.0（`-S warning`）通过；本仓库 `verify-artifacts` 报「用法草案结构正确（1 份）」、0 失败。变异（草稿副本）：去掉 Build order 顺序检查 → 2 失败；去掉「最后里程碑覆盖全部用法」→ 2 失败；去掉 add-module 提醒 → 3 失败。临时项目（notes-cli，4 个模块、2 个里程碑）命令行实跑：U1 `verify-artifacts` 报用法草案通过并提醒 `store` 没有入口；U2 add-module 锚点 `list-cmd` 时预览写明属于 M1，锚点 end 时只列文件与提醒，`--confirm` 后草案 sha 不变；把排在最后的新模块错归 M1，`verify-artifacts` 退出 1 并报「Build order 把里程碑 M2 的模块排在了 M1 的模块之前或同一组」，改归 M2 后退出 0。第一次实跑时临时能力图缺 `## 模块` 标题、预览被目标摘要校验拒绝，属夹具写错，补标题后重跑。
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 - [ ] 发版（合并后按 Checkpoint 2 授权）：核对合并、打 tag、发 Release、刷新并核对两个宿主、证据收尾 PR、回告 ecosystem-lead
 - [ ] M1 停点（gate）：用安装副本在临时项目跑 U1、U2，证据摆给用户判定
