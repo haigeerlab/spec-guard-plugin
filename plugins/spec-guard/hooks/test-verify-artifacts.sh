@@ -399,4 +399,23 @@ check "旁路文件里的合格延期仍按未勾选项报告" 0 "tasks/alpha/de
 side_project deferral-none
 check_absent "没有延期写法时不输出延期一节" "延期"
 
+# usage-draft：spec/usage/ 下的用法草案由 usage_draft.py 判定；没有草案时不出现这一项。
+usage_draft() {
+  mkdir -p "$PROJECT/spec/usage"
+  printf '%s\n' '# Usage draft: demo' '' '## Entry points' '' '| Entry | Does | Module |' '|---|---|---|' "| \`/demo\` | run | $1 |" '' \
+    '## Typical usage' '' '### U1: run' 'Type it.' '' '## Milestones' '' '| Milestone | Usage | Modules |' '|---|---|---|' "| M1 | $2 | alpha |" \
+    > "$PROJECT/spec/usage/demo.md"
+}
+project usage-none
+check_absent "没有用法草案时不输出用法草案一项" "用法草案"
+project usage-good
+usage_draft alpha U1
+check "合格用法草案通过" 0 "用法草案结构正确（1 份）"
+project usage-bad
+usage_draft alpha U2
+check "用法草案引用不存在的用法判失败并点名" 1 "spec/usage/demo.md: 里程碑 M1 引用了不存在的典型用法 U2"
+project usage-entry
+usage_draft beta U1
+check "入口归属模块不在里程碑里判失败" 1 "入口 \`/demo\` 归属的模块 beta 不在本草案的里程碑里"
+
 echo "verify-artifacts regression passed ($PASS cases)"
