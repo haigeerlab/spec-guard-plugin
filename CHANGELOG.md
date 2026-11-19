@@ -20,6 +20,8 @@
 
 - **`/spec-guard:verify-artifacts` 检查确认记录**：写坏或指向不存在的里程碑判失败，确认后模块变了只提醒。
   同一模块归了两个里程碑时只报「重复归属」一条，不再连带报 Build order 顺序。
+- **用法草案检查出错时说明原因**：`verify-artifacts` 不再丢掉 `usage_draft.py` 的报错，「未验证」提醒带上报错的最后一行；
+  `spec/usage-draft.md` 补写能力图读不了时的 `unverified` 状态（0.87.0 起代码已如此）。
 
 ### 文档
 

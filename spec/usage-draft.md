@@ -1,6 +1,6 @@
 # Spec: usage-draft
 
-<!-- spec-guard: review approved 80cb6f17746b -->
+<!-- spec-guard: review approved 9301eb951b01 -->
 
 ## 目标
 
@@ -83,8 +83,9 @@ python3 -B -m unittest plugins/spec-guard/hooks/test_module_insert.py
 
 ## 项目结构
 
-- 新增 `hooks/usage_draft.py`（解析与 `validate --project <dir>`，输出 JSON：`status` 为 `pass`／`fail`／`absent`，`failures`、`warnings`
-  逐条带文件名）与 `hooks/test_usage_draft.py`；`verify-artifacts.sh` 调它，判据只在这一个文件里。
+- 新增 `hooks/usage_draft.py`（解析与 `validate --project <dir>`，输出 JSON：`status` 为 `pass`／`fail`／`absent`／`unverified`，`failures`、`warnings`
+  逐条带文件名；`unverified` 在能力图读不了时出现，带 `reason`，`verify-artifacts` 报「未验证」提醒而不判失败——探测失败不当结论）
+  与 `hooks/test_usage_draft.py`；`verify-artifacts.sh` 调它，判据只在这一个文件里；脚本异常时「未验证」提醒带上报错原因。
 - `module-insert.py` 的预览报告调 `usage_draft.py` 取里程碑归属；读草案失败时提醒写「未读取到用法草案」，不让预览失败。
 - 规则：`references/workflow-checkpoints.md`、`references/node-rules.md`；模板 `templates/USAGE.md`。
 - 文档：`docs/concepts.md` 术语表（用法草案、里程碑）、`docs/commands.md`（verify-artifacts、add-module）、`docs/workflow.md`。
@@ -125,3 +126,7 @@ python3 -B -m unittest plugins/spec-guard/hooks/test_module_insert.py
 ## 待定问题
 
 - 无。
+
+## 变更记录
+
+- 2026-11-19（随 0.88.0）：「项目结构」补写 `unverified` 状态与脚本异常时带原因，与 0.87.0 已有代码对齐；由 ecosystem-lead 转来的检查发现（agent-relay #21443），用户决定并进 milestone-stop 一起发。

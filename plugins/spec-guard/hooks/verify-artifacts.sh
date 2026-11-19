@@ -218,19 +218,24 @@ fi
 
 # 用法草案（usage-draft）：判据只在 usage_draft.py；没有 spec/usage/*.md 时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d spec/usage ]; then
-  USAGE_OUT="$(python3 -B "$HOOKDIR/usage_draft.py" validate --project . 2>/dev/null </dev/null)"
+  # stderr is kept (#21443): when the script fails, the last line it printed is the reason, and the warning carries it.
+  USAGE_OUT="$(python3 -B "$HOOKDIR/usage_draft.py" validate --project . 2>&1 </dev/null)"
   USAGE_RC=$?
-  if [ "$USAGE_RC" -le 1 ] && [ -n "$USAGE_OUT" ]; then
+  USAGE_SEEN=0
+  if [ "$USAGE_RC" -le 1 ]; then
     while IFS=' ' read -r kind rest; do
       case "$kind" in
-        ok) ok "用法草案结构正确（${rest} 份）" ;;
-        bad) bad "用法草案: ${rest}" ;;
-        warn) warn "用法草案提醒: ${rest}" ;;
-        unverified) warn "未验证：能力图读不了，没有检查用法草案（${rest}）" ;;
+        ok) USAGE_SEEN=1; ok "用法草案结构正确（${rest} 份）" ;;
+        bad) USAGE_SEEN=1; bad "用法草案: ${rest}" ;;
+        warn) USAGE_SEEN=1; warn "用法草案提醒: ${rest}" ;;
+        unverified) USAGE_SEEN=1; warn "未验证：能力图读不了，没有检查用法草案（${rest}）" ;;
+        absent) USAGE_SEEN=1 ;;
       esac
     done <<<"$USAGE_OUT"
-  else
-    warn '未验证：用法草案检查没有正常运行'
+  fi
+  if [ "$USAGE_SEEN" -eq 0 ]; then
+    USAGE_WHY="$(printf '%s\n' "$USAGE_OUT" | awk 'NF { line = $0 } END { print substr(line, 1, 200) }')"
+    warn "未验证：用法草案检查没有正常运行（${USAGE_WHY:-没有输出，退出码 ${USAGE_RC}}）"
   fi
 fi
 
