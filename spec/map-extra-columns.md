@@ -1,6 +1,6 @@
 # Spec: map-extra-columns
 
-<!-- spec-guard: review approved ef28f3c3898d -->
+<!-- spec-guard: review approved 4f9ddc77a80c -->
 
 ## 目标
 
@@ -32,7 +32,7 @@
 ## 命令
 
 ```text
-python3 -B -m unittest plugins/spec-guard/hooks/test_module_insert.py
+python3 -B plugins/spec-guard/hooks/test_module_insert.py
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
