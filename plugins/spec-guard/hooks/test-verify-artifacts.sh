@@ -417,5 +417,18 @@ check "用法草案引用不存在的用法判失败并点名" 1 "spec/usage/dem
 project usage-entry
 usage_draft beta U1
 check "入口归属模块不在里程碑里判失败" 1 "入口 \`/demo\` 归属的模块 beta 不在本草案的里程碑里"
+# 「未验证」分支（#21443）：能力图读不了只提醒、带原因；脚本异常时提醒也带上报错的最后一行，不再被吞掉。
+project usage-map-broken
+usage_draft alpha U1
+printf '%s\n' '# broken' > "$PROJECT/spec/CAPABILITY-MAP.md"
+check "能力图读不了：用法草案报未验证并带原因" 1 "未验证：能力图读不了，没有检查用法草案（"
+project usage-crash
+usage_draft alpha U1
+REAL_PY="$(command -v python3)"
+mkdir -p "$WORK/crash-bin"
+printf '%s\n' '#!/bin/bash' 'for a in "$@"; do case "$a" in */usage_draft.py) echo "Traceback (most recent call last):" >&2; echo "RuntimeError: boom in usage draft" >&2; exit 1;; esac; done' \
+  "exec \"$REAL_PY\" \"\$@\"" > "$WORK/crash-bin/python3"
+chmod +x "$WORK/crash-bin/python3"
+RUN_PATH="$WORK/crash-bin:$PATH" check "用法草案脚本异常：未验证提醒带报错原因" 0 "未验证：用法草案检查没有正常运行（RuntimeError: boom in usage draft）"
 
 echo "verify-artifacts regression passed ($PASS cases)"
