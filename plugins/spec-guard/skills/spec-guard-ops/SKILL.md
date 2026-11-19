@@ -272,6 +272,19 @@ Plan：架构决定、分几步（任务与验证方式）、会改哪些文件�
 （Spec 的批准需要用户单独明确确认；Spec 没有标记时不拒绝，只记录 Plan 的批准）。交审时就告诉用户回复“批准”即可、“继续”不会被
 记为批准；既有项目不必补标记，要补先向用户单独确认，不得依据此前含糊的答复补记。
 
+## milestone-mark
+
+用户判定用法草案的一个里程碑通过后记下确认（Claude 侧为 `/spec-guard:milestone-mark`）：在 `spec/usage/<需求>.md` 的 Milestones 表之后写一行
+`<!-- spec-guard: milestone M<n> confirmed <模块, …> -->`。阶段提示报「里程碑停点」时先按共享检查点规则「用法草案」一节把本里程碑的典型用法实际跑一遍、
+摆证据给用户判定；只在用户明确说通过后才 `--confirm`，不通过就在本里程碑的模块 todo 里追加任务或改草案。默认只预览：
+
+```bash
+python3 -B "$ROOT/hooks/milestone_mark.py" --project "$PROJECT" --draft spec/usage/<需求>.md --milestone M<n>
+python3 -B "$ROOT/hooks/milestone_mark.py" --project "$PROJECT" --draft spec/usage/<需求>.md --milestone M<n> --confirm
+```
+
+拒绝时退出码 2 且不写文件：草案或能力图读不了、里程碑不存在、模块不在能力图上或未完成、前面还有没确认的里程碑；已确认时正常退出不改动。
+
 ## checkout-role
 
 多模块并行开关（`moduleConcurrency`）为 `on` 时，给当前 checkout 标角色（Claude 侧为 `/spec-guard:checkout-role`）：`module <id>` 或

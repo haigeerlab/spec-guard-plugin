@@ -134,6 +134,13 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 带内容指纹，批准后被改会报告“批准后已修订”。记为已批准时命令会提醒 agent 先确认你已在对话里看到内容。`approved` 只在你明确批准之后写（交审时推荐答复放在一个可复制代码块里，回复“批准”即可；所装协作插件对在哪里答复另有规定时以它为准；“继续”不会被记为批准）；批准来源以所装协作插件的规定为准；没装只认当前对话里的明确批准。没有标记的
 文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待批准或已修订时不行。拒绝时退出 2、不写文件。
 
+### `/spec-guard:milestone-mark`
+
+记录用法草案的一个里程碑已确认：`--draft spec/usage/<需求>.md --milestone M<n>`，先预览、`--confirm` 才在草案的 Milestones 表之后写一行
+`<!-- spec-guard: milestone M<n> confirmed <模块, …> -->`。阶段提示报「里程碑停点」时，agent 先按本里程碑的典型用法实际跑一遍、把证据给你看，
+你明确说通过后才用它记下，阶段提示随后转到下一个模块；你说不通过就在本里程碑补任务或改草案。确认后里程碑又加了模块，记录失效，
+新模块做完后会再停一次。拒绝（退出 2、不写文件）：里程碑不存在、有模块没完成、前面还有没确认的里程碑。
+
 ### `/spec-guard:checkout-role`
 
 多模块并行开关为 on 时，给当前 checkout 标角色：`set --module <id>` 或 `set --coordinator`，`clear` 清除，`show` 查看；先预览、`--confirm` 才写。
@@ -219,6 +226,7 @@ Codex 不加载插件的斜杠命令，对它说下面这些话即可；说法�
 | 挂起或恢复在等外部条件的模块 | `/spec-guard:module-suspend` | 「用 spec-guard-ops 挂起模块 <id>，原因是……」／「用 spec-guard-ops 恢复模块 <id>」 |
 | 会话目录不是项目目录时指向项目 | `/spec-guard:link-project` | 「用 spec-guard-ops 把这个会话指向项目 <路径>」 |
 | 记录 Spec 或 Plan 的批准状态 | `/spec-guard:review-mark` | 不用你说：你回复批准后，agent 自己用 spec-guard-ops 的 review-mark 记下 |
+| 记录用法草案的里程碑已确认 | `/spec-guard:milestone-mark` | 不用你说：你判定里程碑通过后，agent 自己用 spec-guard-ops 的 milestone-mark 记下 |
 | 多模块并行时给 checkout 标角色 | `/spec-guard:checkout-role` | 「用 spec-guard-ops 把这个 checkout 标为模块 <id>」／「……标为协调」 |
 | 快速插入新模块 | `/spec-guard:add-module` | 「用 spec-guard-ops 插入一个新模块」，再说清需求 |
 | Proposal 提交、审查、预检、证明、收尾（晋级用 `add-module --proposal`） | `/spec-guard:proposal-submit`、`proposal-review`、`proposal-promotion-preflight`、`proposal-promotion-proof`、`proposal-closeout` | 「用 spec-guard-ops 提交 Proposal <id>」／「审查 Proposal <id>」／「证明 Proposal <id> 已晋级」／「收尾 Proposal <id>」 |
