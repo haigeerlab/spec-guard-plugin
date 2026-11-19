@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.88.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:37480b7e770ccb1779529bb5ea278e94131738f0"
+      },
+      "observedAt": "2026-11-19T05:09:26Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:updated from 0.87.0 to 0.88.0; installed_plugins.json records version 0.88.0 and gitCommitSha 37480b7e (the tag); the installed plugin directory is identical to the release asset apart from Claude Code's own .in_use marker (Claude Code 2.1.311)",
+        "result:the installed 0.88.0 stage hint in this repository reports the milestone stop of spec/usage/usage-milestones.md M1 (usage-draft done, no confirmation line yet), as the plan expected"
+      ]
+    }
+  ]
+}

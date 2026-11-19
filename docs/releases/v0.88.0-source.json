@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.88.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:37480b7e770ccb1779529bb5ea278e94131738f0"
+      },
+      "observedAt": "2026-11-19T05:09:26Z",
+      "evidence": [
+        "result:the v0.88.0 annotated tag resolves to merge commit 37480b7e770ccb1779529bb5ea278e94131738f0 (pull request #447); the version bump came in pull request #446 (merge 6e7994ff); merged==true and main==merge sha were checked for both before tagging; the push run on the tagged merge commit succeeded (Validate run 44459269814)",
+        "result:one module (milestone-stop, milestone M2): usage_draft.stop decides the first finished, unconfirmed milestone of a usage draft; the stage hint adds a milestone-stop line, replaces the suggested next step and attaches the node-rules section, keeping the stage line; new command milestone-mark records a confirmation line after the Milestones table (preview by default, --confirm to write); /map --json gains top-level milestoneStop and interface goes from 1.12 to 1.13 (addition only); verify-artifacts checks confirmation lines; a module in two milestones is reported once",
+        "result:pull request #447 closes two usage-draft gaps forwarded by ecosystem-lead (agent-relay #21443): spec/usage-draft.md now names the unverified status, and verify-artifacts keeps usage_draft.py's stderr so an unverified warning carries the reason",
+        "result:on the branches before merge under macOS 27.2 arm64 /bin/bash 3.2.57: validate.sh passed, phase-guard 519 cases, verify-artifacts 94 cases, checker regression 163 cases, test_usage_draft 41, test_milestone_mark 9, test_map_view 83, test_workflow_checkpoints 88 cases passed (also on system Python 3.9.6); evals/codex-plugin-smoke.sh --selftest exited 0; ShellCheck -S warning passed; mutations (confirmation not compared by modules, stage hint without the stop, milestone-mark accepting unfinished modules, stderr dropped again) each turned cases red"
+      ]
+    }
+  ]
+}
