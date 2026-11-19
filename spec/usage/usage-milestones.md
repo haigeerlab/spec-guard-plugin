@@ -37,3 +37,6 @@
 |---|---|---|
 | M1 | U1, U2 | usage-draft |
 | M2 | U1, U2, U3 | milestone-stop |
+
+<!-- spec-guard: milestone M1 confirmed usage-draft -->
+<!-- spec-guard: milestone M2 confirmed milestone-stop -->
