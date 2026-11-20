@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.90.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:00a348b8f53306c1ec95d1234b4f499179b2a1ee"
+      },
+      "observedAt": "2026-11-20T07:02:08Z",
+      "evidence": [
+        "result:the v0.90.1 annotated tag resolves to merge commit 00a348b8f53306c1ec95d1234b4f499179b2a1ee (pull request #457); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate run 44689483788)",
+        "result:one module (compact-hint-gate, S99): the 'write the next Spec after acceptance' rule in workflow-checkpoints and the last line of node-rules 'final acceptance' no longer ask the acceptance message to suggest /compact regardless of context use; compaction is suggested only by the stage hint's boundary line at 70% of the window; the rules say the next Spec is written in the same turn without ending it, and that without a reading the agent does not call the context long; 'the user decides whether to compact or clear' became 'the user can send /compact or /clear at any time; the agent does not stop for it'; hook code, stage-hint output and interface unchanged (1.14)",
+        "result:on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit went through verify-and-commit (validate.sh, phase-guard 524 cases, verify-artifacts 97 cases); test_workflow_checkpoints 89 cases passed, the new assertions failed before the rule edits; evals/codex-plugin-smoke.sh --selftest exited 0; no .sh changed, so ShellCheck was not involved; mutation (the /compact clause put back into node-rules final acceptance) turned the regression red"
+      ]
+    }
+  ]
+}
