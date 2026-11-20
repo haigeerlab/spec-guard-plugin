@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.90.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:e04f2e5a72fd3338a1d18e51c22619577124255e"
+      },
+      "observedAt": "2026-11-19T17:51:20Z",
+      "evidence": [
+        "result:the v0.90.0 annotated tag resolves to merge commit e04f2e5a72fd3338a1d18e51c22619577124255e (pull request #454); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate run 44581006294)",
+        "result:one module (pre-build-spec-batch, autopr requirement 1b step 1): a Spec edited after approval while the Plan is not yet approved (NEEDS_PLAN, or BUILDING with the Plan pending) no longer stops for its own review when an approved baseline is found in git (the newest of the last 50 commits whose text has the marker's digest); the stage hint names the baseline, asks for the cumulative diff at the Plan review and attaches the Plan-review rules; E1-E4 still stop at once; without a baseline the old hint stays with a reason; review-mark prints the cumulative diff when approving a revised Spec; the shared rules add 'commit the Spec right after approval'; interface unchanged (1.14)",
+        "result:on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit went through verify-and-commit's full tier (validate.sh, phase-guard 524 cases, verify-artifacts 97 cases); test_spec_baseline 6, test_review_marker, test_stop_rules 21 and test_workflow_checkpoints 89 cases passed; evals/codex-plugin-smoke.sh --selftest exited 0; ShellCheck 0.11.0 -S warning passed; mutations (baseline not compared by digest, pre-build ignoring the Plan state) each turned cases red"
+      ]
+    }
+  ]
+}
