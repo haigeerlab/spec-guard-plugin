@@ -376,6 +376,9 @@ class CheckpointContractTests(unittest.TestCase):
         final = self.node_rules("## 最终验收")
         self.assertIn("不结束本轮", final)
         self.assertNotIn("/compact", final)
+        workflow = (self.plugin.parents[1] / "docs" / "workflow.md").read_text(encoding="utf-8")
+        self.assertNotIn("想先释放上下文，就先发 `/compact`", workflow)
+        self.assertIn("不为压缩停下", workflow)
 
     def test_review_content_comes_before_a_turn_ending_box(self):
         section = self.section("## 批准标记")
