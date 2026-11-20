@@ -6,4 +6,4 @@
 - [x] Task 3：版本号 0.90.1 与 CHANGELOG — 两份 `plugin.json` 改 0.90.1；README 中英 `--ref v0.90.1`；CHANGELOG 加 `## [0.90.1] - 2026-11-20`（修复两条，接口与阶段提示输出不变）。`check-manifests.py`、`check-readme-sync.py` 通过。
 - [x] Checkpoint 1（report）：发布前完整检查与变异验证 — 主机 macOS 27.2 arm64，系统 `/bin/bash` 3.2.57：`validate.sh` 通过，phase-guard 524 例、verify-artifacts 97 例通过，`evals/codex-plugin-smoke.sh --selftest` 通过；本模块没改 `.sh`，ShellCheck 不涉及。变异（临时目录副本）：把「并提示可先 `/compact`」加回 `node-rules.md`「最终验收」→ `test_the_next_spec_follows_an_accepted_module` 失败。
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-20 用户「验收通过」（针对 AC1–AC5 证据、变异验证、文件表与提交表、拟回告全文、注意三条）；Spec 与 Plan 批准后未改。
-- [ ] 发版（合并后按 Checkpoint 2 授权）：打 tag、发 Release 并立即通知 ecosystem-lead、刷新两个宿主、证据收尾 PR
+- [x] 发版（合并后按 Checkpoint 2 授权）：打 tag、发 Release 并立即通知 ecosystem-lead、刷新两个宿主、证据收尾 PR — 2026-11-20 PR #457 合并于 `00a348b8`（先核对 merged 与 main 指向）；tag `v0.90.1` 打在这里，Release 资产 sha256 `b35033b8…85aa8b`（714722 字节），下载比对一致；Release 后立即按验收时的原文通知 ecosystem-lead（#21759）；Claude 更新到 0.90.1、缓存与发布包一致；Codex 改 ref 升级、快照与发布包一致，用户在新标签 CLI（0.170.0）里审过 hook 后 smoke 首次即退出 0；ChatGPT 桌面版未重开；证据 `docs/releases/v0.90.1-*.json`。
