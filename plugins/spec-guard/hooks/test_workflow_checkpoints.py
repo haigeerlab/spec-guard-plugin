@@ -169,6 +169,9 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertIn("不建议用户开新会话", batch)
         self.assertNotIn("换会话", batch)
         self.assertNotIn("spec-guard:handoff", batch)
+        # compact-hint-gate: the user may compact at any time, but that is never a reason to stop.
+        self.assertIn("agent 不为此停下", batch)
+        self.assertNotIn("由用户决定压缩还是清空", batch)
 
     def test_session_handoff_is_retired_everywhere_it_could_be_offered(self):
         # context-after-compact: no command, skill, reference or hint offers the retired handoff command.
@@ -366,8 +369,13 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_the_next_spec_follows_an_accepted_module(self):
         section = self.section("## 阶段交接")
-        for phrase in ("接着写", "已在能力图里", "/compact", "新插入能力图"):
+        for phrase in ("接着写", "已在能力图里", "新插入能力图", "不结束本轮", "没给出上下文读数时，不说上下文已经很长"):
             self.assertIn(phrase, section)
+        # compact-hint-gate: no ungated /compact hint here; the hook's 70% boundary line is the only trigger.
+        self.assertNotIn("/compact", section)
+        final = self.node_rules("## 最终验收")
+        self.assertIn("不结束本轮", final)
+        self.assertNotIn("/compact", final)
 
     def test_review_content_comes_before_a_turn_ending_box(self):
         section = self.section("## 批准标记")
@@ -935,7 +943,7 @@ class NodeRulesTests(unittest.TestCase):
         "## 最终验收": ("做了什么", "验收结果", "改了哪些文件", "Spec 中途改过吗", "按 AC 编号逐条给证据", "单独一张表放在最前",
                       "文档改动：无", "本模块的提交", "新增依赖、锁文件改动：无", "超出 Plan 预计影响面", "Spec 的改动差异",
                       "同时批准修订后的 Spec", "先用 review-mark", "拟回告", "可以原样发送的完整文字", "对外渠道同样",
-                      "重新给用户看", "agent-relay", "截图", "先勾这个 gate", "直接写它的 Spec", "/compact"),
+                      "重新给用户看", "agent-relay", "截图", "先勾这个 gate", "直接写它的 Spec", "不结束本轮"),
         "## 里程碑停点": ("先不开下一个模块", "用安装后的版本跑", "确认框之前", "命令与输出", "跑不了的写明原因", "“注意：”",
                        "“批了会怎样：”", "可复制代码块", "明确判定通过", "milestone-mark", "`--confirm`", "追加任务",
                        "不调用 milestone-mark"),
