@@ -310,5 +310,87 @@ class CliTest(Base):
         self.assertEqual(out.returncode, 2)
 
 
+GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
+       "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
+
+
+def _map(*ids):
+    rows = "".join("| %s | x | — |\n" % module for module in ids)
+    return ("# Capability Map\n\n| Module id | Responsibility | Depends on |\n|---|---|---|\n%s\nBuild order: %s\n"
+            % (rows, " → ".join(ids)))
+
+
+class Missing(unittest.TestCase):
+    """usage-draft-gate (C1): a batch of 2+ modules inserted in one commit, not done, with no draft covering them."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        (self.root / "spec").mkdir()
+
+    def git(self, *args):
+        subprocess.run(GIT + list(args), cwd=self.root, check=True, capture_output=True, timeout=30)
+
+    def write_map(self, *ids):
+        (self.root / "spec" / "CAPABILITY-MAP.md").write_text(_map(*ids), encoding="utf-8")
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.root, capture_output=True, text=True,
+                              check=True).stdout.strip()
+
+    def base(self):
+        self.git("init", "-q")
+        self.write_map("alpha")
+        self.commit("first")
+
+    def test_batch_without_a_draft(self):
+        self.base()
+        self.write_map("alpha", "beta", "gamma")
+        sha = self.commit("two at once")
+        found = usage_draft.missing(str(self.root), {"alpha"})
+        self.assertEqual(found["status"], "missing", found)
+        self.assertEqual(found["batches"], [{"commit": sha, "modules": ["beta", "gamma"], "uncovered": ["beta", "gamma"]}])
+
+    def test_draft_covers_the_batch(self):
+        self.base()
+        self.write_map("alpha", "beta", "gamma")
+        self.commit("two at once")
+        usage = self.root / "spec" / "usage"
+        usage.mkdir()
+        (usage / "demo.md").write_text(GOOD, encoding="utf-8")  # its milestones list beta (M1) and gamma (M2)
+        found = usage_draft.missing(str(self.root), {"alpha"})
+        self.assertEqual(found["status"], "ok", found)
+
+    def test_one_module_per_commit_is_fine(self):
+        self.base()
+        self.write_map("alpha", "beta")
+        self.commit("one")
+        self.write_map("alpha", "beta", "gamma")
+        self.commit("another")
+        self.assertEqual(usage_draft.missing(str(self.root), set())["status"], "ok")
+
+    def test_finished_batches_are_left_alone(self):
+        self.base()
+        self.write_map("alpha", "beta", "gamma")
+        self.commit("two at once")
+        self.assertEqual(usage_draft.missing(str(self.root), {"alpha", "beta", "gamma"})["status"], "ok")
+
+    def test_uncommitted_rows_are_a_batch(self):
+        self.base()
+        self.write_map("alpha", "beta", "gamma")
+        found = usage_draft.missing(str(self.root), set())
+        self.assertEqual(found["status"], "missing", found)
+        self.assertEqual(found["batches"][0]["commit"], "uncommitted")
+
+    def test_outside_git_is_unverified(self):
+        self.write_map("alpha", "beta", "gamma")
+        found = usage_draft.missing(str(self.root), set())
+        self.assertEqual(found["status"], "unverified")
+        self.assertTrue(found["reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
