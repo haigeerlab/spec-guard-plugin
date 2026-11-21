@@ -1022,6 +1022,40 @@ def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
     return fact, line, step
 
 
+def draft_gate(root: Path, states: list, module: str, stage: str, zh: bool) -> tuple:
+    """usage-draft-gate: (fact, line, next step) when the current module waits for its Spec in a batch with no draft.
+
+    The criterion is usage_draft.missing; git is read only at NEEDS_SPEC.  Unverified (no git, git failing) leaves the
+    hint as it was: verify-artifacts reports it.
+    """
+    if stage != "NEEDS_SPEC" or not module:
+        return None, "", ""
+    done = {state["id"] for state in states if state["stage"] == "DONE"}
+    try:
+        found = usage_draft.missing(str(root), done)
+    except Exception:  # a failed probe changes nothing here; verify-artifacts says it could not tell
+        return None, "", ""
+    batch = next((item for item in found.get("batches", []) if module in item["modules"]), None)
+    if batch is None:
+        return None, "", ""
+    modules = [safe_fragment(item) for item in batch["modules"]]
+    fact = ("draft-gate", tuple(modules))
+    if zh:
+        line = "- 用法草案: 模块 %s 是同一批插入的，还没有用法草案把它们写进里程碑。" % "、".join(modules)
+        step = ("先写用法草案 `spec/usage/<需求>.md`（入口清单、典型用法、里程碑，覆盖这批全部模块：%s），交用户审，再写 `spec/%s.md`。"
+                "已完成的模块也列进里程碑；其中已完成的里程碑在交审时请用户逐个三选一（照常跑一遍／凭已有证据判定通过／不记确认），"
+                "不自动记确认。" % ("、".join(modules), module))
+    else:
+        line = "- Usage draft: modules %s were inserted together and no usage draft puts them in milestones yet." % (
+            ", ".join(modules))
+        step = ("write the usage draft `spec/usage/<requirement>.md` first (entry points, typical usage, milestones, covering "
+                "every module of this batch: %s), have the user review it, then write `spec/%s.md`. List finished modules "
+                "in the milestones too; for each finished milestone the user picks one: run it as usual, pass it on the "
+                "evidence already there, or leave it unconfirmed. Never record a confirmation on your own."
+                % (", ".join(modules), module))
+    return fact, line, step
+
+
 def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
                    host: str | None, window_estimated: bool, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
@@ -1267,13 +1301,20 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     if ms_step and role_kind not in ("module", "coordinator"):
         # milestone-stop: the stop comes before whatever the current module would do next.
         node, next_step = "milestone-stop", ms_step
+    dg_fact, dg_line, dg_step = draft_gate(root, states, module, stage, zh)
+    if dg_line:
+        counts += "\n" + dg_line
+    if dg_step and not ms_step and role_kind not in ("module", "coordinator"):
+        # usage-draft-gate: a multi-module batch reviews its usage draft before its first Spec.
+        node, next_step = "map-review", dg_step
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root)] + ([ms_fact] if ms_fact else []),
+                       documentation_baseline_present(root)] + ([ms_fact] if ms_fact else [])
+                      + ([dg_fact] if dg_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:

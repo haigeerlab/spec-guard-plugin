@@ -2166,8 +2166,14 @@ ENGLISH_ONLY+=(-"Modules " -"Suspended" -"Paused" -"Plan without todo" -"This br
   -"awaiting the user" -"a good point to free context" -"do not paste handoff text" -"slash command for the chat")
 zm="$WORK/zh-map"; lang_project "$zm" zh-CN
 mkdir -p "$zm/spec" "$zm/tasks/alpha" "$zm/tasks/beta"
+# usage-draft-gate：两个模块分两次提交插入，不构成缺草案的多模块批次。
+zg() { git -C "$zm" -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@" >/dev/null; }
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
+  '| alpha | x | — |' '' 'Build order: alpha' > "$zm/spec/CAPABILITY-MAP.md"
+zg add spec/CAPABILITY-MAP.md; zg commit -q -m alpha
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$zm/spec/CAPABILITY-MAP.md"
+zg add spec/CAPABILITY-MAP.md; zg commit -q -m beta
 printf '# Spec: alpha\n' > "$zm/spec/alpha.md"; printf '# Plan\n' > "$zm/tasks/alpha/plan.md"
 printf '%s\n' '- [x] done' > "$zm/tasks/alpha/todo.md"
 zh_check "zh-CN：NEEDS_SPEC" "$zm" +"当前阶段: **NEEDS_SPEC**" +"- 能力图: 已有" +"- 当前模块: \`beta\`（Build order 中下一个）" \
@@ -2953,7 +2959,55 @@ $(run "$nb" | context_of)"
 echo "  ✅ Spec 没有修订：输出不变"; PASS=$((PASS + 1))
 }
 
-PARTS=26
+part_27() {
+# usage-draft-gate：缺草案批里的模块在 NEEDS_SPEC 时先出用法草案并附能力图审阅规则；补上草案或没有批量插入时照旧。
+g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false -c core.hooksPath=/dev/null "$@"; }
+mkbatch() {  # $1=目录 $2=together|apart
+  git init -q -b main "$1"; mkdir -p "$1/spec" "$1/tasks/alpha"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$1/CLAUDE.md"
+  printf '%s\n' '# Spec' > "$1/spec/alpha.md"; printf '# Plan\n' > "$1/tasks/alpha/plan.md"; printf -- '- [x] one\n' > "$1/tasks/alpha/todo.md"
+  printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
+    'Build order: alpha' > "$1/spec/CAPABILITY-MAP.md"
+  g -C "$1" add -A; g -C "$1" commit -q -m alpha
+  if [ "$2" = apart ]; then
+    printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' \
+      '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$1/spec/CAPABILITY-MAP.md"
+    g -C "$1" add -A; g -C "$1" commit -q -m beta
+  fi
+  printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' \
+    '| beta | y | alpha |' '| gamma | z | beta |' '' 'Build order: alpha → beta → gamma' > "$1/spec/CAPABILITY-MAP.md"
+  g -C "$1" add -A; g -C "$1" commit -q -m rest
+}
+ub="$WORK/draftgate"; mkbatch "$ub" together
+out="$(run "$ub" | context_of)"
+grep -F 'write the usage draft' >/dev/null <<<"$out" && grep -F 'Stop rules (capability map review):' >/dev/null <<<"$out" &&
+  grep -F 'beta, gamma' >/dev/null <<<"$out" || fail "缺草案批的 NEEDS_SPEC 应先出草案并附能力图审阅规则
+$out"
+mkdir -p "$ub/.agent"; printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$ub/.agent/config.json"
+out="$(run "$ub" | context_of)"
+grep -F '先写用法草案' >/dev/null <<<"$out" && grep -F '停点规则（能力图审阅）：' >/dev/null <<<"$out" ||
+  fail "中文提示同样先出草案
+$out"
+rm "$ub/.agent/config.json"
+echo "  ✅ 缺草案批的 NEEDS_SPEC：先出用法草案，附能力图审阅规则（中英）"; PASS=$((PASS + 1))
+ua="$WORK/draftgate-apart"; mkbatch "$ua" apart
+plain_ua="$(run "$ua" | context_of)"
+grep -F 'usage draft' >/dev/null <<<"$plain_ua" && fail "逐个插入的模块不应提示用法草案
+$plain_ua"
+mkdir -p "$ub/spec/usage"
+printf '%s\n' '# Usage draft: demo' '' '## Entry points' '' '| Entry | Does | Module |' '|---|---|---|' '| `/demo` | run | beta |' '' \
+  '## Typical usage' '' '### U1: run' 'Type it.' '' '## Milestones' '' '| Milestone | Usage | Modules |' '|---|---|---|' \
+  '| M1 | U1 | beta, gamma |' > "$ub/spec/usage/demo.md"
+covered="$(run "$ub" | context_of)"
+[ "$(sed "s#$ub#ROOT#g" <<<"$covered")" = "$(sed "s#$ua#ROOT#g" <<<"$plain_ua")" ] || fail "补上草案后应与没有批量插入时逐字相同
+--- covered
+$covered
+--- apart
+$plain_ua"
+echo "  ✅ 补上草案、或模块逐个插入：输出与改前逐字相同"; PASS=$((PASS + 1))
+}
+
+PARTS=27
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
