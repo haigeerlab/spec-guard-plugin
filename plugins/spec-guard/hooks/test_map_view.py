@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover"}
+               "autonomy", "takeover", "reviewApprovedBy"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -243,6 +243,33 @@ class TakeoverTest(unittest.TestCase):
             self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
                              baseline.replace(str(plain.root), "ROOT"))
             self.assertEqual([m["autonomy"] for m in project.json()["modules"]], autonomy)
+
+
+class CodexReviewTest(unittest.TestCase):
+    """codex-approval (C2, assumption 11): review shows the raw marker, reviewApprovedBy who approved it in effect."""
+    ROWS = [("a", "基础", "—")]
+
+    def project(self, config):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from module_stage import review_codex_line, review_digest
+        spec = "# Spec: a\n\n<!-- spec-guard: review pending -->\n\n正文\n"
+        spec = spec.replace("<!-- spec-guard: review pending -->", review_codex_line(review_digest(spec)))
+        files = {"spec/a.md": spec, "tasks/a/plan.md": "# Plan\n\n<!-- spec-guard: review approved -->\n",
+                 "tasks/a/todo.md": "- [ ] one\n", ".agent/config.json": json.dumps(dict(version=1, **config))}
+        return Project(self.ROWS, ["a"], files)
+
+    def test_codex_counts_only_under_the_takeover(self):
+        with self.project({"takeover": {"spec": "codex"}}) as project:
+            data = project.json()
+            module = data["modules"][0]
+            self.assertEqual(module["review"], {"spec": "codex-approved", "plan": "approved"})
+            self.assertEqual(module["reviewApprovedBy"], {"spec": "codex", "plan": "user"})
+            self.assertEqual(data["awaitingReview"], [])
+        with self.project({}) as project:
+            data = project.json()
+            self.assertEqual(data["modules"][0]["reviewApprovedBy"], {"spec": None, "plan": "user"})
+            self.assertEqual(data["awaitingReview"], [{"id": "a", "kind": "spec", "review": "codex-approved"}])
 
 class DeferralTest(unittest.TestCase):
     """formal-deferral: a module whose only unchecked items are formal deferrals is done; its dependents can start.

@@ -30,6 +30,11 @@
         "none": "no external review recorded and not declined",
         "recorded": "an external review (for example from delegate) is recorded; advisory only, not an approval",
         "declined": "the user declined an external review for this module"
+      },
+      "reviewApprovedBy": {
+        "user": "per module, per file (spec, plan): the user's approval marker (interface 1.15, spec/codex-approval.md)",
+        "codex": "per module, per file: Codex's approval marker, and the module's takeover gives this step to codex (for a Plan, its pre-declared section lists nothing)",
+        "null": "per module, per file: no approval in effect -- no marker, pending, revised, invalid, or Codex's approval where the takeover does not let it count (such a file is listed in awaitingReview)"
       }
     },
     "progressFacts": {

@@ -23,7 +23,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, external_review_state, file_review_state, module_state,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, effective_review, external_review_state,
+                          file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
@@ -36,7 +37,10 @@ REASON_LINE = re.compile(r"^<!-- spec-guard: suspended-reason: (.*) -->$")
 STATUSES = ("done", "in_progress", "suspended", "blocked", "ready", "not_ready")
 ICONS = {"done": "✅", "in_progress": "🔨", "suspended": "⏸", "blocked": "⛔", "ready": "🟢", "not_ready": "○"}
 AWAITING = ("pending", "revised", "invalid")
-REVIEW_WORDS = {"approved": "✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效", "none": "无标记"}
+# interface.json mapView.values.reviewApprovedBy (codex-approval, interface 1.15); null is written as JSON null.
+APPROVED_BY = ("user", "codex", "null")
+REVIEW_WORDS = {"approved": "✔", "codex-approved": "Codex ✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效",
+                "none": "无标记"}
 RESPONSIBILITY_LIMIT = 40
 CHECKED_LINE = re.compile(r"^\s*[-*+]\s+\[[xX]\]")
 DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
@@ -92,6 +96,12 @@ def _review(root: Path, module: str) -> dict:
         if state == "unreadable":
             raise Unreadable(path)
     return {"spec": spec, "plan": plan}
+
+
+def _approved_by(root: Path, module: str) -> dict:
+    """codex-approval: who approved each file in effect -- user, codex (only where the takeover allows it) or None."""
+    review = _review(root, module)
+    return {kind: effective_review(root, module, kind, review[kind])[1] for kind in ("spec", "plan")}
 
 
 def _external_review(root: Path, module: str) -> str:
@@ -447,6 +457,7 @@ def build(root: Path) -> dict:
             "missingDeps": [d for d in deps[module] if status[d] != "done"] if value == "not_ready" else [],
             "blocks": {"count": len(blocks), "ids": blocks},
             "review": _review(root, module),
+            "reviewApprovedBy": _approved_by(root, module),
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
@@ -474,7 +485,9 @@ def build(root: Path) -> dict:
     suspended = [m for m in modules if m["status"] == "suspended"]
     suspended.sort(key=lambda m: (-m["blocks"]["count"], m["position"]))
     awaiting = [{"id": m["id"], "kind": kind, "review": m["review"][kind]}
-                for m in modules for kind in ("spec", "plan") if m["review"][kind] in AWAITING]
+                for m in modules for kind in ("spec", "plan")
+                if m["review"][kind] in AWAITING or (m["review"][kind] == "codex-approved"
+                                                     and m["reviewApprovedBy"][kind] is None)]
     active = current["id"] if current is not None and stage != "DONE" else None
     data = {
         "schemaVersion": SCHEMA_VERSION,
