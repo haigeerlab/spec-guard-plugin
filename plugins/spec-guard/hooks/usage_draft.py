@@ -226,14 +226,24 @@ def missing(project, done):
         covered = milestones(project)
     except UsageDraftError as error:
         return {"status": "unverified", "reason": str(error)}
-    flagged = []
+    flagged, checked = [], 0
     for commit, modules in found:
-        if len(modules) < 2:
+        if len(modules) < 2 or all(module in done for module in modules):
             continue
+        checked += 1
         uncovered = [module for module in modules if module not in done and module not in covered]
         if uncovered:
             flagged.append({"commit": commit, "modules": modules, "uncovered": uncovered})
-    return {"status": "missing" if flagged else "ok", "batches": flagged}
+    return {"status": "missing" if flagged else "ok", "batches": flagged, "checked": checked}
+
+
+def _done_modules(project):
+    """Finished module ids by the phase hint's own rule; imported late (module_stage imports this module)."""
+    from pathlib import Path
+    import module_stage
+    root = Path(project)
+    ids = [row.module_id for row in parse_map(os.path.join(project, MAP_PATH)).rows]
+    return {module for module in ids if module_stage.module_state(root, module)["stage"] == "DONE"}
 
 
 def _check_one(label, draft, positions, owner, failures, warnings):
@@ -350,7 +360,24 @@ def main(argv=None):
     check = sub.add_parser("validate")
     check.add_argument("--project", required=True)
     check.add_argument("--format", choices=("lines", "json"), default="lines")
+    batch = sub.add_parser("missing", help="usage-draft-gate: batches of 2+ unfinished modules with no draft")
+    batch.add_argument("--project", required=True)
     args = parser.parse_args(argv)
+    if args.command == "missing":
+        try:
+            done = _done_modules(args.project)
+        except (MapError, OSError) as error:
+            print("unverified capability map unreadable: %s" % str(error).replace("\n", " "))
+            return 0
+        found = missing(args.project, done)
+        if found["status"] == "unverified":
+            print("unverified %s" % found["reason"].replace("\n", " "))
+        elif found["status"] == "missing":
+            for item in found["batches"]:
+                print("missing %s %s" % (item["commit"], ",".join(item["uncovered"])))
+        elif found["checked"]:
+            print("ok %d" % found["checked"])
+        return 0
     if args.command != "validate":
         parser.print_usage(sys.stderr)
         return 2

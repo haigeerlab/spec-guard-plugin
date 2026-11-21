@@ -39,6 +39,8 @@ project() {
     '| Module id | Responsibility | Depends on |' '| --- | --- | --- |' '| alpha | x | — |' '' \
     'Build order: alpha' "$@" > "$PROJECT/spec/CAPABILITY-MAP.md"
   touch "$PROJECT/spec/alpha.md"
+  # usage-draft-gate：夹具是 git 仓库，否则每个夹具都多一条「多模块批次未判定」的警告。
+  git init -q "$PROJECT"
 }
 
 project valid
@@ -142,12 +144,16 @@ RUN_PATH="$WORK/summary-fails:$PATH" \
 many_modules() {
   local i id ids="" rows=()
   PROJECT="$WORK/$1"; mkdir -p "$PROJECT/spec"
+  # usage-draft-gate：每个模块各自一次提交插入，不构成「多模块批次」，警告数只反映 todo 一项。
+  git init -q "$PROJECT"
   for i in $(seq 1 "$2"); do
     id="$(printf m%02d "$i")"; ids="${ids}${ids:+, }${id}"
     rows+=("| ${id} | x | — |"); touch "$PROJECT/spec/${id}.md"
+    printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Responsibility | Depends on |' \
+      '| --- | --- | --- |' "${rows[@]}" '' "Build order: ${ids}" > "$PROJECT/spec/CAPABILITY-MAP.md"
+    git -C "$PROJECT" add spec
+    git -C "$PROJECT" -c user.name=t -c user.email=t@example.invalid -c core.hooksPath=/dev/null commit -q -m "$id" >/dev/null
   done
-  printf '%s\n' '# Capability Map: fixture' '' '## 模块' '' '| Module id | Responsibility | Depends on |' \
-    '| --- | --- | --- |' "${rows[@]}" '' "Build order: ${ids}" > "$PROJECT/spec/CAPABILITY-MAP.md"
 }
 # $1=模块 id：只放 plan.md
 plan_only() { mkdir -p "$PROJECT/tasks/$1"; touch "$PROJECT/tasks/$1/plan.md"; }
@@ -430,6 +436,37 @@ project usage-entry
 usage_draft beta U1
 check "入口归属模块不在里程碑里判失败" 1 "入口 \`/demo\` 归属的模块 beta 不在本草案的里程碑里"
 # 「未验证」分支（#21443）：能力图读不了只提醒、带原因；脚本异常时提醒也带上报错的最后一行，不再被吞掉。
+# usage-draft-gate：同一提交插入 2 个及以上未完成模块、又没有草案覆盖时警告；不判失败；读不到 git 报未判定。
+batch_map() {
+  local table="" order="alpha" id
+  for id in "$@"; do table="${table}| ${id} | x | alpha |"$'\n'; order="${order} → ${id}"; done
+  printf '%s\n' '# Capability Map: fixture' '' '## 目标' '' 'Verify artifacts.' '' '## 模块' '' \
+    '| Module id | Responsibility | Depends on |' '| --- | --- | --- |' '| alpha | x | — |' > "$PROJECT/spec/CAPABILITY-MAP.md"
+  printf '%s' "$table" >> "$PROJECT/spec/CAPABILITY-MAP.md"
+  printf '%s\n' '' "Build order: ${order}" >> "$PROJECT/spec/CAPABILITY-MAP.md"
+}
+batch_git() { git -C "$PROJECT" -c user.name=t -c user.email=t@example.invalid -c core.hooksPath=/dev/null "$@" >/dev/null; }
+project batch-missing
+batch_git init -q; batch_git add -A; batch_git commit -q -m first
+batch_map beta gamma; batch_git add -A; batch_git commit -q -m two
+check "一个提交插入两个模块且无草案：警告不判失败" 0 "多模块批次缺用法草案：beta、gamma"
+batch_map beta gamma delta epsilon
+check "工作区未提交的新行也算一批" 0 "多模块批次缺用法草案：delta、epsilon（未提交）"
+project batch-covered
+batch_git init -q; batch_git add -A; batch_git commit -q -m first
+batch_map beta gamma; batch_git add -A; batch_git commit -q -m two
+mkdir -p "$PROJECT/spec/usage"
+printf '%s\n' '# Usage draft: demo' '' '## Entry points' '' '| Entry | Does | Module |' '|---|---|---|' '| `/demo` | run | beta |' '' \
+  '## Typical usage' '' '### U1: run' 'Type it.' '' '## Milestones' '' '| Milestone | Usage | Modules |' '|---|---|---|' '| M1 | U1 | beta, gamma |' \
+  > "$PROJECT/spec/usage/demo.md"
+check "草案覆盖了这一批：通过" 0 "多模块批次都有用法草案（1 批）"
+project batch-single
+batch_git init -q; batch_git add -A; batch_git commit -q -m first
+batch_map beta; batch_git add -A; batch_git commit -q -m one
+check_absent "没有批量插入时不输出这一项" "多模块批次"
+PROJECT="$WORK/batch-nogit"; mkdir -p "$PROJECT/spec"; touch "$PROJECT/spec/alpha.md"
+batch_map beta gamma
+check "不是 git 仓库：未判定带原因" 0 "未判定：多模块批次的草案覆盖（not a git work tree）"
 project usage-map-broken
 usage_draft alpha U1
 printf '%s\n' '# broken' > "$PROJECT/spec/CAPABILITY-MAP.md"

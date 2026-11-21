@@ -242,6 +242,21 @@ if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ] && [ -d t
   fi
 fi
 
+# usage-draft-gate：同一提交插入能力图、尚未完成的模块有 2 个及以上而没有草案覆盖时警告；只警告不判失败（已开工的项目先补写）。
+# 判据在 usage_draft.missing；没有这样的批次时不输出这一项。
+if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ]; then
+  BATCH_OUT="$(python3 -B "$HOOKDIR/usage_draft.py" missing --project . 2>&1 </dev/null)" || true
+  while IFS=' ' read -r kind first rest; do
+    case "$kind" in
+      ok) ok "多模块批次都有用法草案（${first} 批）" ;;
+      missing)
+        [ "$first" = uncommitted ] && where='未提交' || where="提交 ${first:0:8}"
+        warn "多模块批次缺用法草案：${rest//,/、}（${where}）——写 Spec 前先出 spec/usage/<需求>.md，覆盖这批全部模块" ;;
+      unverified) warn "未判定：多模块批次的草案覆盖（${first}${rest:+ ${rest}}）" ;;
+    esac
+  done <<<"$BATCH_OUT"
+fi
+
 # 用法草案（usage-draft）：判据只在 usage_draft.py；没有 spec/usage/*.md 时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d spec/usage ]; then
   # stderr is kept (#21443): when the script fails, the last line it printed is the reason, and the warning carries it.
