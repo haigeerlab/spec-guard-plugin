@@ -106,8 +106,13 @@ if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
     CONFIG_OUT="$(python3 -B "$HOOKDIR/project_config.py" check --project . 2>/dev/null </dev/null)"
     CONFIG_RC=$?
     if [ "$CONFIG_RC" -eq 0 ] && [ "${CONFIG_OUT#*ignored}" != "$CONFIG_OUT" ]; then
-      # config-per-key：只有不认识的键时 check 退出 0 并写 ignored；其余设置照常生效。
-      warn '项目配置里有不认识的键，已忽略（可能来自更新版本的 spec-guard）'
+      # config-per-key：只有不认识的键或已退役的键时 check 退出 0 并写 ignored；其余设置照常生效。
+      case "$CONFIG_OUT" in
+        *unknown-key*) warn '项目配置里有不认识的键，已忽略（可能来自更新版本的 spec-guard）' ;;
+      esac
+      case "$CONFIG_OUT" in
+        *retired-key*) warn '项目配置里有已退役的 autonomyTier 或 moduleAutonomy，已不生效；改设 takeover／moduleTakeover，可用 unset 删除（用 /spec-guard:config 查看）' ;;
+      esac
     elif [ "$CONFIG_RC" -eq 0 ]; then
       ok '项目配置有效'
     elif [ "$CONFIG_RC" -eq 1 ]; then
@@ -115,7 +120,7 @@ if [ -e .agent/config.json ] || [ -L .agent/config.json ]; then
     else
       warn '未验证：项目配置检查没有正常运行'
     fi
-    # module-autonomy：按模块的档位写了能力图上没有的模块时逐个警告（模块可能稍后插入或刚改名），不判失败。
+    # takeover-config（沿用 module-autonomy 的做法）：按模块的接管档位写了能力图上没有的模块时逐个警告（模块可能稍后插入或刚改名），不判失败。
     # 配置或能力图读不了时这里不报：前者已由上面的 check 判定，后者由能力图检查报告。
     if [ "$CONFIG_RC" -eq 0 ] && [ -f spec/CAPABILITY-MAP.md ]; then
       UNKNOWN_IDS="$(python3 -B -c '
@@ -128,12 +133,12 @@ try:
     mapped = {row.module_id for row in parse_map(Path("spec/CAPABILITY-MAP.md")).rows}
 except Exception:
     sys.exit(0)
-for module in load(Path("."))[0].get("moduleAutonomy", {}):
+for module in load(Path("."))[0].get("moduleTakeover", {}):
     if module not in mapped:
         print(module)
 ' "$HOOKDIR" 2>/dev/null </dev/null)" || UNKNOWN_IDS=""
       while IFS= read -r module; do
-        [ -n "$module" ] && warn "项目配置 moduleAutonomy 里的模块 ${module} 不在能力图上（用 /spec-guard:config 查看）"
+        [ -n "$module" ] && warn "项目配置 moduleTakeover 里的模块 ${module} 不在能力图上（用 /spec-guard:config 查看）"
       done <<<"$UNKNOWN_IDS"
     fi
   fi
