@@ -8,5 +8,5 @@
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-22 用户「验收通过」（针对 AC1–AC4 证据、变异与实跑、文件表与提交表、Spec 构建中措辞修正的原样差异——一并批准、第 25 段调整与 verify-artifacts 一项未做的说明）；已用 review-mark 记下修订后 Spec 的批准。
 - [x] Task 4（M2 返工）：接管模块的越界检查把 `spec/CAPABILITY-MAP.md` 与 `spec/usage/*.md` 记为流程文件（`flow`），不算越界；只对接管模块生效，开关 on 的非接管模块照旧 — 2026-11-22 用户判定 M2「不通过，追加修复」（实跑发现 add-module 改能力图与 Spec 同一提交时被误判越界）。`module_scope.classify` 对接管模块把 `FLOW_FILES`／`FLOW_DIRS` 记为 `flow`，`SCOPES` 加 `flow`，`scope_applies` 复用 `_takeover_module`。`test_module_scope.py` 新增 1 例（改前失败；含开关 on 的非接管模块照旧算 outside），56 例通过。
 - [x] Task 5（M2 返工）：规则与 review-mark 说明写明审查报告存到仓库外（例如 `$TMPDIR`）；接口 `scopeCheck` 的 scope 取值加 `flow` — 阶段提示中英两套的 Codex 审查建议、`workflow-checkpoints.md`「批准标记」与「并行边界」、`commands/review-mark.md` 写明报告存到仓库外，「并行边界」补能力图与用法草案是 `flow`；`interface.json` 加 `flow` 说明；`test_workflow_checkpoints.py` 断言加「仓库外」「`flow`」（改前失败），通过。
-- [ ] Checkpoint 3（report）：完整检查、变异验证，并按 M2 的 U1、U2、U3、U5 重跑
+- [x] Checkpoint 3（report）：完整检查、变异验证，并按 M2 的 U1、U2、U3、U5 重跑 — 完整检查随返工提交通过（verify-and-commit 完整档）。变异：接管模块不放行流程文件 → `TakeoverCheck` 1 失败。M2 重跑（报告存到仓库外）：U1 设档位；U2 Spec 由用户批、Plan 交 Codex，一轮阻断后无阻断记 codex-approved，转为继续构建，能力图不再被判越界，只改边界内继续、改 README.md 停下；U3 收窄一格、跨两格被拒、一格恢复；U5 同批插入 auth、audit 出用法草案提醒，auth 判为重要（multi-module、risk-path）要求先拷问。
 
