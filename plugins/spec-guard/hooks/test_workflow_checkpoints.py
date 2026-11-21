@@ -312,6 +312,15 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertIn(phrase, marks)
         for title in ("## Spec 交审", "## Plan 交审"):
             self.assertIn("交 Codex 审", self.node_rules(title))
+        # important-requirement (C4): the three rules in the floor, the merged round for a single module, interview first.
+        for phrase in ("同批插入", "公共文件类别", "`.github/autopr/risk-paths.json`", "T3", "T4", "interview-me"):
+            self.assertIn(phrase, floor)
+        confirm = self.section("## 需求确认")
+        for phrase in ("单模块需求", "同一轮", "能力图新行预览", "多模块需求", "仍分两轮", "拷问结束前拆法还会变"):
+            self.assertIn(phrase, confirm)
+        self.assertNotIn("**确认后停一轮，再一起交审。**", confirm)
+        self.assertIn("单模块需求", self.node_rules("## 能力图审阅"))
+        self.assertIn("interview-me", self.node_rules("## Spec 交审"))
         self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
         self.assertLess(rules.index("## 批准节奏"), rules.index("## 自治档位与底线"))
@@ -1068,18 +1077,19 @@ class RequirementConfirmTests(unittest.TestCase):
     def test_section_states_when_what_and_how(self):
         self.assertTrue(self.order, "the section goes before 阶段交接")
         for phrase in (self.QUESTION, "插入模块", "第一份 Spec", "目标", "给谁", "怎样算成功", "限制", "不做什么", "还没定",
-                       "只认明确确认", "这一轮停下", "`interview-me`", "不用拷问", "已在别处批过"):
+                       "只认明确确认", "同一轮", "`interview-me`", "不用拷问", "已在别处批过"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
 
     def test_summary_comes_first_and_map_row_goes_with_spec(self):
         # Rework 1: "already settled" before the summary still gets the summary; map row and Spec are reviewed together.
-        for phrase in ("还没看过总结", "先给总结再确认", "能力图新行和 Spec 一起交审", "不为能力图新行单独停一次"):
+        # important-requirement: a single module's map row now comes in the same round as the summary (「A 合成一轮」).
+        for phrase in ("还没看过总结", "先给总结再确认", "能力图新行预览", "一次答完"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
         for rel in ("commands/add-module.md", "skills/spec-guard-ops/SKILL.md"):
             with self.subTest(rel=rel):
-                self.assertIn("和 Spec 一起交审", (self.plugin / rel).read_text(encoding="utf-8"))
+                self.assertIn("能力图新行预览", (self.plugin / rel).read_text(encoding="utf-8"))
 
     def test_section_names_what_does_not_trigger(self):
         for phrase in ("改 bug", "已批准范围内", "验收后接着写下一份 Spec"):
