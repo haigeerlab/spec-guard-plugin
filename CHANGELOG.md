@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.91.0] - 2026-11-22
+
+本版 7 个模块：自动接管（S101）的 takeover-config、takeover-narrow、codex-approval、important-requirement、takeover-scope-check、
+codex-final-acceptance，以及中途插入的 usage-draft-gate（S102）。`interface.json` 1.14 → 1.15。不设接管档位的项目，除缺用法草案的多模块批次外，阶段提示输出不变。
+
+### 新增
+
+- **接管档位 `takeover`／`moduleTakeover`**（takeover-config）。`.agent/config.json` 按项目或模块定 Spec、Plan、合并、发布四项各由人做还是交给
+  AI：预设 `none`、`plan`、`merge`，或逐项自定义。`/spec-guard:config` 先预览、用户原话确认才写，放宽一次一档。`/map --json` 每个模块加
+  `takeover`（四项与来源）。
+- **只许收窄的写入口 `narrow`**（takeover-narrow）。autopilot、module-crew 出事时把档位往严里改一格并记下来源与原因，不要用户原话；
+  收窄过的档位恢复时一次只升一格。`/map --json` 报收窄记录，接口加 `takeoverNarrow`。
+- **Codex 批准 Spec 与 Plan**（codex-approval）。档位里这一项是 codex 时，`review-mark --state codex-approved|codex-reviewed --review <delegate 报告>`
+  只认完成且有结论的 Codex 报告，按 `scope.files` 的 sha256 核对被审文件，缺严重程度按阻断；每轮在「外部审查意见」记一行，两轮仍有阻断交用户。
+  阶段提示只在档位允许时把 `codex-approved` 当已批准；「预先声明」有内容的 Plan 不论档位都由用户批。`/map --json` 加 `reviewApprovedBy`。
+- **重要需求按规则判定**（important-requirement）。同批插入的多个模块、跨模块（并行边界写了公共类别或与别的模块独占路径重叠）、碰
+  `.github/autopr/risk-paths.json` 里 T3／T4 路径，任一条成立就是重要需求：Spec 先用 `interview-me` 拷问、由用户批，Codex 的批准不算数。
+  单模块需求的需求确认与能力图预览合成一轮。`/map --json` 加 `important`。
+- **接管模块也做越界检查**（takeover-scope-check）。档位里任一项不是 human 的模块，构建中改到 Spec 并行边界与已批准的 Plan 预先声明之外的文件，
+  阶段提示停下交用户；没写并行边界也停。`module_scope.py check` 对接管模块不再因开关没开退出，`--base` 可省（默认本模块 Spec 第一次提交的父提交），
+  结果加 `declared` 与 `base`。能力图与用法草案不算越界。
+- **合并自动的模块由 Codex 做最终验收**（codex-final-acceptance）。到最终 gate 时，`review-mark --target acceptance --state codex-approved --review <最终补丁的 Codex 报告>`
+  核对三样：Codex 审到 HEAD、无阻断、Spec 与工作区一致；autopilot 在 HEAD 上的检查证据（`~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json`，
+  `autopilot.check-evidence/v1`，非作者跑、全部退出 0）；工作区干净、没有越界。齐了把记录写在 git 目录的 `spec-guard/acceptance/<id>.json`，
+  不进提交；记录的提交是 HEAD 或其祖先时阶段提示当最终 gate 已过，合并后再补勾。`/map --json` 加 `acceptance`。拟回告不自动发出。
+- **多模块批次先出用法草案**（usage-draft-gate，S102）。一次插入 2 个及以上模块却没有用法草案时，`verify-artifacts` 报出来，阶段提示在写第一份
+  Spec 前要求先出草案；`add-module` 插入同一批第 2 个模块后提醒。
+
+### 变更
+
+- **`autonomyTier`、`moduleAutonomy` 退役**，不映射到接管档位：文件里还有时不生效，`/spec-guard:config` 标为已退役，可用 unset 删除。
+- **「自治档位与底线」按勾选项**：能力图永远由用户批；Spec、Plan 按档位；重要需求的 Spec 与「预先声明」有内容的 Plan 由用户批；最终验收由用户做，
+  合并自动的模块按 Codex 最终验收规则；测试改不红、Spec 没覆盖的决定、高风险不可逆改动、接管模块越界必停。
+- README 中英加「自动接管」一段。
+- 家目录检查放行只读的 `~/.autopilot`（autopilot 自己的检查证据）。
+
 ## [0.90.1] - 2026-11-20
 
 本版 1 个模块：compact-hint-gate（S99）。接口不变（interface 1.14），阶段提示输出不变。
