@@ -869,6 +869,49 @@ GROUPED_MAP = fixtures.BASE_MAP.replace(
         "Build order: alpha", "Build order: alpha, beta")
 
 
+class UsageDraftReminderTests(unittest.TestCase):
+    """usage-draft-gate (C4): after writing a second uncommitted module of one batch with no draft, say so."""
+
+    MAP = ("# Capability Map\n\n| Module id | Responsibility | Depends on |\n|---|---|---|\n| alpha | A | — |\n\n"
+           "Build order: alpha\n")
+    GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
+           "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory(prefix="sg-module-insert-draft-")
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        (self.root / "spec").mkdir()
+        (self.root / "spec" / "CAPABILITY-MAP.md").write_text(self.MAP, encoding="utf-8")
+        subprocess.run(self.GIT + ["init", "-q"], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(self.GIT + ["add", "-A"], cwd=self.root, check=True, capture_output=True)
+        subprocess.run(self.GIT + ["commit", "-q", "-m", "alpha"], cwd=self.root, check=True, capture_output=True)
+
+    def insert(self, module, anchor):
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            code = main(["--project", str(self.root), "--id", module, "--responsibility", "x", "--depends-on", "alpha",
+                         "--anchor", anchor, "--confirm"])
+        self.assertEqual(code, 0, out.getvalue())
+        return out.getvalue()
+
+    def test_second_module_of_a_batch_is_reminded(self):
+        self.assertNotIn("用法草案", self.insert("beta", "after:alpha"))
+        out = self.insert("gamma", "after:beta")
+        self.assertIn("用法草案", out)
+        self.assertIn("beta、gamma", out)
+
+    def test_a_covering_draft_or_a_single_insert_stays_quiet(self):
+        usage = self.root / "spec" / "usage"
+        usage.mkdir()
+        (usage / "demo.md").write_text(
+            "# Usage draft: demo\n\n## Entry points\n\n| Entry | Does | Module |\n|---|---|---|\n| `/d` | run | beta |\n\n"
+            "## Typical usage\n\n### U1: run\nType it.\n\n## Milestones\n\n| Milestone | Usage | Modules |\n|---|---|---|\n"
+            "| M1 | U1 | beta, gamma |\n", encoding="utf-8")
+        self.insert("beta", "after:alpha")
+        self.assertNotIn("写 Spec 前先出用法草案", self.insert("gamma", "after:beta"))
+
+
 class ProposalPromotionFixture(fixtures.PromotionFixture):
     """A real temp remote and consumer clone with a published Proposal for `gamma`."""
     skip_promotion = True

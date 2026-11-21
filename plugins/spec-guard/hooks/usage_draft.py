@@ -9,9 +9,10 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
-from capability_map import MapError, _table_cells, _visible_lines, parse_map
+from capability_map import MODULE_ID, MapError, _parse_rows, _table_cells, _visible_lines, parse_map
 
 SECTIONS = (
     ("Entry points", ("Entry", "Does", "Module")),
@@ -147,6 +148,104 @@ def milestones(project):
     return found
 
 
+MAP_PATH = "spec/CAPABILITY-MAP.md"
+BATCH_HISTORY = 100  # usage-draft-gate: commits of the capability map looked at, newest first
+
+
+def _git(project, *args):
+    """stdout of a read-only git command, or None when it fails; raw text, never stripped."""
+    try:
+        done = subprocess.run(["git", "-C", project, *args], capture_output=True, text=True, timeout=20, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def _row_id(line):
+    """The module id of one capability-map table row, or None."""
+    rows = _parse_rows([line], strict=True)
+    return rows[0].module_id if rows and MODULE_ID.match(rows[0].module_id) else None
+
+
+def _added(diff_lines):
+    """Ids on + rows that are not also on - rows: rows edited in place are not insertions."""
+    plus = [_row_id(line[1:]) for line in diff_lines if line.startswith("+") and not line.startswith("+++")]
+    minus = {_row_id(line[1:]) for line in diff_lines if line.startswith("-") and not line.startswith("---")}
+    return [module for module in plus if module and module not in minus]
+
+
+def batches(project):
+    """usage-draft-gate: [(commit, [module ids first added in it])], newest first; "uncommitted" for the work tree.
+
+    One `git diff` and one `git log -p` over the capability map, so the hint stays cheap.  Raises UsageDraftError
+    when git cannot tell (not a work tree, git failing).
+    """
+    if _git(project, "rev-parse", "--is-inside-work-tree") is None:
+        raise UsageDraftError("not a git work tree")
+    found, seen = [], set()
+    has_head = _git(project, "rev-parse", "--verify", "--quiet", "HEAD") is not None
+    work = _git(project, "diff", "--unified=0", "--no-color", "HEAD" if has_head else "--cached", "--", MAP_PATH)
+    if work is None:
+        raise UsageDraftError("git diff failed")
+    if not has_head:
+        try:
+            with open(os.path.join(project, MAP_PATH), encoding="utf-8") as handle:
+                work = "".join("+" + line for line in handle.read().splitlines(True))
+        except OSError:
+            work = ""
+    uncommitted = _added(work.splitlines())
+    if uncommitted:
+        found.append(("uncommitted", uncommitted))
+        seen.update(uncommitted)
+    if not has_head:
+        return found
+    log = _git(project, "log", "-n", str(BATCH_HISTORY), "--format=commit %H", "--unified=0", "--no-color", "-p",
+               "--", MAP_PATH)
+    if log is None:
+        raise UsageDraftError("git log failed")
+    for chunk in log.split("\ncommit ")[0:]:
+        lines = chunk.splitlines()
+        if not lines:
+            continue
+        sha = lines[0].replace("commit ", "", 1).strip()
+        added = [module for module in _added(lines[1:]) if module not in seen]
+        if added:
+            found.append((sha, added))
+            seen.update(added)
+    return found
+
+
+def missing(project, done):
+    """usage-draft-gate: the batches of 2+ modules whose unfinished modules are not all in some draft's milestones.
+
+    `done` is the set of finished module ids (the caller's module states).  Returns
+    {"status": "ok"|"missing", "batches": [...]} or {"status": "unverified", "reason": ...}.
+    """
+    try:
+        found = batches(project)
+        covered = milestones(project)
+    except UsageDraftError as error:
+        return {"status": "unverified", "reason": str(error)}
+    flagged, checked = [], 0
+    for commit, modules in found:
+        if len(modules) < 2 or all(module in done for module in modules):
+            continue
+        checked += 1
+        uncovered = [module for module in modules if module not in done and module not in covered]
+        if uncovered:
+            flagged.append({"commit": commit, "modules": modules, "uncovered": uncovered})
+    return {"status": "missing" if flagged else "ok", "batches": flagged, "checked": checked}
+
+
+def _done_modules(project):
+    """Finished module ids by the phase hint's own rule; imported late (module_stage imports this module)."""
+    from pathlib import Path
+    import module_stage
+    root = Path(project)
+    ids = [row.module_id for row in parse_map(os.path.join(project, MAP_PATH)).rows]
+    return {module for module in ids if module_stage.module_state(root, module)["stage"] == "DONE"}
+
+
 def _check_one(label, draft, positions, owner, failures, warnings):
     usages = draft["usages"]
     referenced = set()
@@ -261,7 +360,24 @@ def main(argv=None):
     check = sub.add_parser("validate")
     check.add_argument("--project", required=True)
     check.add_argument("--format", choices=("lines", "json"), default="lines")
+    batch = sub.add_parser("missing", help="usage-draft-gate: batches of 2+ unfinished modules with no draft")
+    batch.add_argument("--project", required=True)
     args = parser.parse_args(argv)
+    if args.command == "missing":
+        try:
+            done = _done_modules(args.project)
+        except (MapError, OSError) as error:
+            print("unverified capability map unreadable: %s" % str(error).replace("\n", " "))
+            return 0
+        found = missing(args.project, done)
+        if found["status"] == "unverified":
+            print("unverified %s" % found["reason"].replace("\n", " "))
+        elif found["status"] == "missing":
+            for item in found["batches"]:
+                print("missing %s %s" % (item["commit"], ",".join(item["uncovered"])))
+        elif found["checked"]:
+            print("ok %d" % found["checked"])
+        return 0
     if args.command != "validate":
         parser.print_usage(sys.stderr)
         return 2

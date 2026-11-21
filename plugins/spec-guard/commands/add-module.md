@@ -70,7 +70,8 @@ python3 -B "$ROOT/hooks/module-insert.py" --project "$PROJECT" \
 
 原样转述预览输出（新行、新 Build order、diff、当前模块会不会变、Proposal 同 id 提醒，有用法草案时还有「用法草案」一段）。
 项目有 `spec/usage/` 用法草案、新模块又属于其中某个需求时，写入后把它加进那份草案的里程碑表（本命令不改草案），
-排在哪个里程碑要和 Build order 一致；`verify-artifacts` 会检查。**被拒绝时**，原样说明
+排在哪个里程碑要和 Build order 一致；`verify-artifacts` 会检查。同一个需求写入第 2 个模块后，如果还没有草案覆盖这批模块，结果末尾会提醒
+写 Spec 前先出用法草案 `spec/usage/<需求>.md`（覆盖这批全部模块、交用户审），照做后再写 Spec。**被拒绝时**，原样说明
 是哪一条校验失败，然后停下——不要自行改字段重试，除非那正是用户接下来要做的事。
 
 `spec/<id>.md` 已存在不算拒绝：预览会提示插入后该模块阶段为 `NEEDS_PLAN`（视为已批准）；若这份 Spec 尚未批准，先批准再 `--confirm`。

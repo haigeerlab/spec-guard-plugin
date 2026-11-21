@@ -494,6 +494,9 @@ def _main_fields(args):
         print(format_stage_hint(outcome))
         if outcome["existing_spec"]:
             print(format_existing_spec_hint(outcome))
+        reminder = _batch_reminder(args.project)
+        if reminder:
+            print(reminder)
         return 0
 
     try:
@@ -534,6 +537,19 @@ def _main_proposal(args, tracker_reader):
     if outcome["existing_spec"]:
         print(format_existing_spec_hint(outcome))
     return 0
+
+
+def _batch_reminder(project):
+    """usage-draft-gate: the uncommitted rows are one batch; 2+ of them with no draft covering them get a reminder."""
+    try:
+        found = dict(usage_draft.batches(str(project))).get("uncommitted", [])
+        covered = usage_draft.milestones(str(project))
+    except usage_draft.UsageDraftError:
+        return ""
+    if len(found) < 2 or all(module in covered for module in found):
+        return ""
+    return ("用法草案: 这次需求已插入 %s（未提交），写 Spec 前先出用法草案 spec/usage/<需求>.md，覆盖这批全部模块，交用户审。"
+            % "、".join(found))
 
 
 if __name__ == "__main__":

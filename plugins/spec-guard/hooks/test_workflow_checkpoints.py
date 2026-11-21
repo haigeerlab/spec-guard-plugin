@@ -1110,6 +1110,12 @@ class UsageDraftRuleTests(unittest.TestCase):
                        "最终验收照旧逐模块"):
             self.assertIn(phrase, self.contract)
 
+    def test_contract_explains_the_machine_check_and_catch_up(self):
+        # usage-draft-gate (C5): where the machine reminds, and how a project already under way catches up.
+        for phrase in ("同一次提交插入", "verify-artifacts 警告", "先写用法草案", "add-module", "补写", "已完成的模块也列进里程碑",
+                       "照常停下跑一遍", "凭已有证据直接判定通过", "不记确认", "不自动记"):
+            self.assertIn(phrase, self.contract)
+
     def test_template_passes_the_checker_headings(self):
         template = (self.plugin / "templates" / "USAGE.md").read_text(encoding="utf-8")
         for heading in ("## Entry points", "## Typical usage", "## Milestones", "| Entry | Does | Module |",
