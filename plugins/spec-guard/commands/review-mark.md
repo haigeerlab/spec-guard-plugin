@@ -124,4 +124,5 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 三样（审查无阻断且审到 HEAD、Spec 与工作区一致；检查由非作者在 HEAD 上跑、全部退出 0；两者都是 HEAD）缺一，或有越界文件，就拒绝并写明原因。
 加 `--confirm` 才写：记录写在 git 目录的 `spec-guard/acceptance/<id>.json`（不被跟踪、不进提交），报告路径存为绝对路径。
 todo 里的最终 gate 现在不勾：记录的提交是 HEAD 或其祖先时阶段提示当它已过，合并后补勾并写一句来源。拟回告写进 todo，不发出。
-合并不是 auto 的模块被拒绝，最终验收照旧由用户做。
+合并不是 auto 的模块被拒绝，最终验收照旧由用户做；本模块开工前的提交里合并还不是 auto（开工后才放宽）的也拒绝（`acceptance-not-auto-at-base`），
+免得补丁靠改 `.agent/config.json` 给自己开自动合并。

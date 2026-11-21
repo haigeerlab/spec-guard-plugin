@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.91.1] - 2026-11-22
+
+M3 停点返工（codex-final-acceptance，S101）：用安装后的 0.91.0 实跑「自动接管」发现的问题。接口不变（interface 1.15，只在已有说明里补了取值含义）。
+
+### 修复
+
+- **档位调整不再让模块做不了 Codex 最终验收。** 接管模块开工后，autopilot 收窄档位、或你再调回来，都会改 `.agent/config.json`；越界检查原来把它算作
+  这个模块越界，阶段提示停下、`review-mark --target acceptance` 也拒绝。现在它和能力图、用法草案一样记为 `flow`，不算越界。
+- **补丁不能给自己开自动合并。** 配置不算越界之后，Codex 最终验收另核对本模块开工前的提交里合并也已是 auto；开工后才放宽的模块拒绝
+  （`acceptance-not-auto-at-base`），由你验收。
+- **设档位时提醒已退役的键。** 文件里还有 `autonomyTier`／`moduleAutonomy` 时，`/spec-guard:config` 设 `takeover` 的预览多一行：它们已退役、不生效，
+  可用 unset 删除（原来只有 `config show` 标出）。
+- **Plan 不交 Codex 时写明原因。** 档位让 Codex 批 Plan、但 Plan 的「预先声明」有内容或格式不对时，批准行写明按规则由用户批、不交 Codex，
+  不再只说「等用户审阅」。
+
 ## [0.91.0] - 2026-11-22
 
 本版 7 个模块：自动接管（S101）的 takeover-config、takeover-narrow、codex-approval、important-requirement、takeover-scope-check、

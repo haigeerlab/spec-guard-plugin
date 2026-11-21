@@ -326,11 +326,14 @@ class CheckpointContractTests(unittest.TestCase):
         # codex-final-acceptance (assumptions 5-7): merge=auto modules are accepted by Codex on evidence, recorded uncommitted.
         self.assertIn("「合并：自动」的模块按最终验收的 Codex 规则", floor)
         for phrase in ("--target acceptance", "检查证据", "git 目录", "不进提交", "HEAD 或其祖先", "合并后补勾", "不要自己验收",
-                       "拟回告写进 todo，不发出", "其余模块的最终验收照旧由用户做"):
+                       "拟回告写进 todo，不发出", "其余模块的最终验收照旧由用户做",
+                       # M3 rework (Q14 A): merge must have been auto before the module started.
+                       "开工前就是合并：自动"):
             self.assertIn(phrase, marks)
         self.assertIn("最终验收交 Codex", self.node_rules("## 最终验收"))
         boundary = self.section("## 并行边界\n")
-        for phrase in ("接管模块", "开关没开", "预先声明", "停下", "Spec 第一次提交", "`--base`", "`flow`"):
+        for phrase in ("接管模块", "开关没开", "预先声明", "停下", "Spec 第一次提交", "`--base`", "`flow`",
+                       "`.agent/config.json` 是流程文件"):  # M3 rework
             self.assertIn(phrase, boundary)
         self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
