@@ -149,6 +149,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 带内容指纹，批准后被改会报告“批准后已修订”。记为已批准时命令会提醒 agent 先确认你已在对话里看到内容。`approved` 只在你明确批准之后写（交审时推荐答复放在一个可复制代码块里，回复“批准”即可；所装协作插件对在哪里答复另有规定时以它为准；“继续”不会被记为批准）；批准来源以所装协作插件的规定为准；没装只认当前对话里的明确批准。没有标记的
 文件判定照旧；Spec 没有标记时可以单独记录 Plan 的批准，Spec 标着待批准或已修订时不行。拒绝时退出 2、不写文件。
 
+接管档位里 Spec 或 Plan 交给 Codex 时，agent 用 /delegate:review 请 Codex 审，再用 `--state codex-approved --review <报告文件>` 记下
+（有阻断时用 `codex-reviewed` 记一轮、改完再审，两轮仍有阻断就交给你）。spec-guard 核对报告确实是 Codex 对这份文件的完成审查；
+`/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的。
+
 ### `/spec-guard:milestone-mark`
 
 记录用法草案的一个里程碑已确认：`--draft spec/usage/<需求>.md --milestone M<n>`，先预览、`--confirm` 才在草案的 Milestones 表之后写一行

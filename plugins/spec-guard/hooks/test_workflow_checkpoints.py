@@ -301,8 +301,17 @@ class CheckpointContractTests(unittest.TestCase):
         # takeover-config: the takeover keys replace the retired autonomy tier; the floor text itself is unchanged here.
         for phrase in ("`takeover`", "`moduleTakeover`", "`none`", "`plan`", "`merge`", "发布", "原话",
                        "`autonomyTier`", "已退役", "不映射", "能力图", "可以和 Plan 一起批", "最终验收", "测试改不红",
-                       "Spec 没覆盖的决策", "高风险不可逆改动", "必停", "以项目为准"):
+                       "Spec 没覆盖的决策", "高风险不可逆改动", "必停", "以项目为准",
+                       # codex-approval (assumption 10): the floor follows the takeover's ticks.
+                       "按勾选项", "能力图永远由用户批", "重要需求", "预先声明"):
             self.assertIn(phrase, floor)
+        self.assertNotIn("Spec（可以和 Plan 一起批）、最终验收要用户批", floor)
+        marks = self.section("## 批准标记")
+        for phrase in ("`codex-approved`", "--state codex-reviewed", "--review", "`scope.files`", "两轮", "不要自己审自己",
+                       "建议", "不是用户的批准"):
+            self.assertIn(phrase, marks)
+        for title in ("## Spec 交审", "## Plan 交审"):
+            self.assertIn("交 Codex 审", self.node_rules(title))
         self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
         self.assertLess(rules.index("## 批准节奏"), rules.index("## 自治档位与底线"))

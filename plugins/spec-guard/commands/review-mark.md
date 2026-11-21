@@ -96,3 +96,18 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 不存在或读不了、标记无效（多于一行或写法不符，需手工改正）、Spec 标着待批准、已修订或标记无效时单独把 Plan 标为已批准
 （Spec 的批准需要用户针对这份 Spec 单独明确确认；Spec 没有标记时不拒绝）。
 不执行任何 Git 或远端操作，不改 `.agent/state.json`、todo.md 或能力图。
+
+## Codex 审查（接管档位）
+
+模块档位里 Spec 或 Plan 是 codex 时（`/spec-guard:config` 的 takeover），用 /delegate:review（后端 codex）审这个文件，把它标准输出的 JSON
+存成文件，再记下这一轮（一次一个文件，不用 `--target both`）：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|plan> --state codex-approved --review <报告文件>
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|plan> --state codex-reviewed --review <报告文件>
+```
+
+只认完成且有结论的 Codex 报告；被审文件按报告 `scope.files` 的内容 sha256 与工作区核对，对不上就拒绝；缺严重程度的意见按阻断。
+每次都在「外部审查意见」一节追加一行轮次；`codex-approved` 要求本轮没有阻断，并写 `<!-- spec-guard: review codex-approved <digest> -->`；
+有阻断用 `codex-reviewed` 只记这一轮，改完再审。两轮仍有阻断后两种都拒绝，交用户批（`--state approved`）。Codex 的批准不是用户的批准：
+档位不允许、或 Plan 的「预先声明」有内容时，阶段提示把它当作待用户批准。
