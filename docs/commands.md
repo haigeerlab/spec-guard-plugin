@@ -154,6 +154,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 `/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的；`important` 写明哪些模块按规则是重要需求、理由是什么
 （同批多模块、跨模块、碰高风险路径），这些模块的 Spec 不论档位都由你批。
 
+接管档位里有任一项不是「人」的模块，构建中还会做越界检查：改到 Spec 并行边界与（已批准的）Plan 预先声明之外的文件，阶段提示就停下来，
+让 agent 逐个说明为什么要改、由你决定；没写并行边界也会停。只读结果用
+`module_scope.py check --module <id> --format json`（`--base` 可省，默认是这个模块 Spec 第一次提交之前的状态），合并前看 `outside` 是不是 0。
+
 ### `/spec-guard:milestone-mark`
 
 记录用法草案的一个里程碑已确认：`--draft spec/usage/<需求>.md --milestone M<n>`，先预览、`--confirm` 才在草案的 Milestones 表之后写一行

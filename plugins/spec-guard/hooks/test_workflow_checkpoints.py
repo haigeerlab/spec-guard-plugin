@@ -321,6 +321,11 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertNotIn("**确认后停一轮，再一起交审。**", confirm)
         self.assertIn("单模块需求", self.node_rules("## 能力图审阅"))
         self.assertIn("interview-me", self.node_rules("## Spec 交审"))
+        # takeover-scope-check (C3): takeover modules are checked too, and going outside the scope stops.
+        self.assertIn("接管模块越界", floor)
+        boundary = self.section("## 并行边界\n")
+        for phrase in ("接管模块", "开关没开", "预先声明", "停下", "Spec 第一次提交", "`--base`"):
+            self.assertIn(phrase, boundary)
         self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
         self.assertLess(rules.index("## 批准节奏"), rules.index("## 自治档位与底线"))
