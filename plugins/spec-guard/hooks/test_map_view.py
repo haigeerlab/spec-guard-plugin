@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "important"}
+               "autonomy", "takeover", "reviewApprovedBy", "important", "acceptance"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -1235,6 +1235,32 @@ class WorktreeField(unittest.TestCase):
             self.assertEqual(spy.call_count, 0)
             self.assertNotIn("worktree", data["modules"][0])
             self.assertNotIn("worktree", fixture.table())
+
+class AcceptanceTest(unittest.TestCase):
+    """codex-final-acceptance (C3, AC2): /map reports a merge=auto module's acceptance record from the git directory."""
+
+    def test_acceptance_record(self):
+        files = {"spec/a.md": "# Spec: a\n", "tasks/a/plan.md": "# Plan\n",
+                 "tasks/a/todo.md": "- [x] one\n- [ ] Checkpoint 1（gate）：最终验收\n",
+                 ".agent/config.json": json.dumps({"version": 1, "takeover": "merge"})}
+        with Project([("a", "基础", "—")], ["a"], files) as project:
+            subprocess.run(GIT + ["init", "-q", str(project.root)], check=True)
+            subprocess.run(GIT + ["-C", str(project.root), "add", "-A"], check=True)
+            subprocess.run(GIT + ["-C", str(project.root), "commit", "-qm", "c"], check=True)
+            head = subprocess.run(["git", "-C", str(project.root), "rev-parse", "HEAD"], capture_output=True,
+                                  text=True).stdout.strip()
+            self.assertIsNone(project.json()["modules"][0]["acceptance"])
+            record = project.root / ".git" / "spec-guard" / "acceptance" / "a.json"
+            record.parent.mkdir(parents=True)
+            record.write_text(json.dumps({"marker": "codex-approved", "sha": head, "module": "a"}), encoding="utf-8")
+            data = project.json()
+            self.assertEqual(data["modules"][0]["acceptance"], {"marker": "codex-approved", "sha": head})
+            self.assertEqual(data["modules"][0]["status"], "done")
+            (project.root / ".agent" / "config.json").write_text(json.dumps({"version": 1, "takeover": "plan"}))
+            data = project.json()
+            self.assertIsNone(data["modules"][0]["acceptance"])
+            self.assertNotEqual(data["modules"][0]["status"], "done")
+
 
 if __name__ == "__main__":
     unittest.main()

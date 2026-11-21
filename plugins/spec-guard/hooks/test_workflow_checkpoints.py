@@ -323,6 +323,12 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertIn("interview-me", self.node_rules("## Spec 交审"))
         # takeover-scope-check (C3): takeover modules are checked too, and going outside the scope stops.
         self.assertIn("接管模块越界", floor)
+        # codex-final-acceptance (assumptions 5-7): merge=auto modules are accepted by Codex on evidence, recorded uncommitted.
+        self.assertIn("「合并：自动」的模块按最终验收的 Codex 规则", floor)
+        for phrase in ("--target acceptance", "检查证据", "git 目录", "不进提交", "HEAD 或其祖先", "合并后补勾", "不要自己验收",
+                       "拟回告写进 todo，不发出", "其余模块的最终验收照旧由用户做"):
+            self.assertIn(phrase, marks)
+        self.assertIn("最终验收交 Codex", self.node_rules("## 最终验收"))
         boundary = self.section("## 并行边界\n")
         for phrase in ("接管模块", "开关没开", "预先声明", "停下", "Spec 第一次提交", "`--base`", "`flow`"):
             self.assertIn(phrase, boundary)

@@ -176,6 +176,11 @@ Spec 交给 Codex 的模块，没写并行边界或清单读不到也按重要�
   有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审；两轮仍有阻断就停下交用户，之后只能由用户批。建议类意见由 agent 决定是否采纳，
   在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。审查报告不是用户的批准：档位不允许、或 Plan 的「预先声明」
   有内容时，`codex-approved` 读作待用户批准。
+- **合并自动的模块由 Codex 做最终验收**：模块档位里合并是 auto 时，到最终 gate 用 /delegate:review（后端 codex）审本模块开工前的提交到
+  HEAD 的补丁（`--spec spec/<id>.md`，报告存仓库外），再等 autopilot 在 HEAD 上的检查证据（非作者跑、全部退出 0）；两样齐了、工作区干净、
+  没有越界，用 `review-mark --target acceptance --state codex-approved --review <报告>` 记下。记录写在 git 目录、不进提交（提交会让 HEAD
+  变掉），记录的提交是 HEAD 或其祖先时阶段提示当最终 gate 已过；合并后补勾并写一句来源。缺任一样或被拒绝就停下等用户，不要自己验收；
+  拟回告写进 todo，不发出，等用户确认（回告是对外发送）。其余模块的最终验收照旧由用户做。
 - **写出 Spec 或 Plan 交用户批准时标 `pending`**（写文件时直接带上这一行，或用 `review-mark`）。当前模块待批准时，
   阶段提示报告“等待用户批准”，不建议写 Plan 或继续构建；`combined` 节奏下 Spec 待批准时照常写出 Plan，两份一起交审。
 - **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，用 `/spec-guard:review-mark`（Codex：`spec-guard-ops`

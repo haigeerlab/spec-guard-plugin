@@ -551,5 +551,158 @@ class BlankLinesAroundTheMarker(unittest.TestCase):
             self.assertEqual(project.plan.read_text(encoding="utf-8"), "%s\n\n# Plan: alpha\n\n步骤\n" % REVIEW_APPROVED)
 
 
+class Acceptance(unittest.TestCase):
+    """codex-final-acceptance (C2): three pieces of evidence on HEAD, recorded in the git directory, never committed."""
+
+    BOUNDARY = "\n## 并行边界\n\n- 独占：`spec/alpha.md`、`tasks/alpha/`、`src/alpha.py`\n- 公共：无\n"
+
+    def setUp(self):
+        import json
+        import os
+        self.json = json
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__)
+        self.root = self.project.root
+        self.home = self.root.parent / (self.root.name + "-home")
+        self.home.mkdir()
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.home, ignore_errors=True))
+        self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        self.env.update(HOME=str(self.home), GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
+                        GIT_COMMITTER_EMAIL="t@t")
+        self.project.spec.unlink()
+        self.project.plan.unlink()
+        self.config({"merge": "auto"})
+        self.git("init", "-q")
+        self.git("remote", "add", "origin", "https://github.com/acme/widget.git")
+        self.git("add", ".")
+        self.git("commit", "-qm", "base")
+        self.project.spec.write_text(SPEC + self.BOUNDARY, encoding="utf-8")
+        self.project.plan.write_text("# Plan: alpha\n\n步骤\n", encoding="utf-8")
+        (self.root / "src").mkdir()
+        (self.root / "src" / "alpha.py").write_text("x = 1\n", encoding="utf-8")
+        self.commit("alpha")
+
+    def config(self, takeover):
+        (self.root / ".agent").mkdir(exist_ok=True)
+        (self.root / ".agent" / "config.json").write_text(self.json.dumps({"version": 1, "takeover": takeover}),
+                                                          encoding="utf-8")
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True, text=True,
+                              env=self.env).stdout.strip()
+
+    def commit(self, message):
+        self.git("add", ".")
+        self.git("commit", "-qm", message)
+        self.head = self.git("rev-parse", "HEAD")
+
+    def report(self, **changes):
+        import hashlib
+        document = {"schema_version": 1, "execution_status": "completed", "review_outcome": "no_findings_in_scope",
+                    "backend": "codex", "findings": [], "limitations": [], "reviewed": ["spec/alpha.md"],
+                    "scope": {"files": {"spec/alpha.md": hashlib.sha256(self.project.spec.read_bytes()).hexdigest()},
+                              "baseline": {"mode": "commits", "from": "HEAD~1", "to": self.head}}}
+        document.update(changes)
+        path = self.home / "final.json"
+        path.write_text(self.json.dumps(document), encoding="utf-8")
+        return path
+
+    def evidence(self, **changes):
+        document = {"schema": "autopilot.check-evidence/v1", "repo": "acme/widget", "head_sha": self.head,
+                    "runner": "autopilot-orchestrator", "non_author": True, "clone": "/tmp/c", "ran_at": "2026-11-22T00:00:00Z",
+                    "checks": [{"cmd": "make test", "exit": 0, "output_sha256": "0" * 64, "tail": "ok"}]}
+        document.update(changes)
+        folder = self.home / ".autopilot" / "evidence" / "acme__widget"
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / (self.head + ".json")).write_text(self.json.dumps(document), encoding="utf-8")
+
+    def accept(self, report, *extra, state="codex-approved"):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(self.root), "--module", "alpha",
+                               "--target", "acceptance", "--state", state, "--review", str(report), *extra],
+                              capture_output=True, text=True, timeout=30, env=self.env)
+        return done.returncode, done.stdout
+
+    def record_path(self):
+        return self.root / ".git" / "spec-guard" / "acceptance" / "alpha.json"
+
+    def test_three_pieces_record_in_the_git_directory(self):
+        import hashlib
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report)
+        self.assertEqual(code, 0, out)
+        self.assertIn("preview only", out)
+        self.assertFalse(self.record_path().exists())
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 0, out)
+        record = self.json.loads(self.record_path().read_text(encoding="utf-8"))
+        self.assertEqual((record["marker"], record["sha"], record["module"]), ("codex-approved", self.head, "alpha"))
+        self.assertEqual(record["report_sha256"], hashlib.sha256(report.read_bytes()).hexdigest())
+        self.assertEqual(record["report"], str(report.resolve()))
+        self.assertTrue(Path(record["report"]).is_absolute())
+        self.assertRegex(record["at"], r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ")
+        self.assertEqual(self.git("status", "--porcelain"), "")
+        self.assertEqual(self.git("rev-parse", "HEAD"), self.head)
+
+    def test_a_relative_report_path_is_recorded_absolute(self):
+        report = self.report()
+        self.evidence()
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(self.root), "--module", "alpha",
+                               "--target", "acceptance", "--state", "codex-approved", "--review", "final.json",
+                               "--confirm"], capture_output=True, text=True, timeout=30, env=self.env, cwd=str(self.home))
+        self.assertEqual(done.returncode, 0, done.stdout)
+        record = self.json.loads(self.record_path().read_text(encoding="utf-8"))
+        self.assertEqual(record["report"], str(report.resolve()))
+
+    def assertRefused(self, code_out, word):
+        code, out = code_out
+        self.assertEqual(code, 2, out)
+        self.assertIn(word, out)
+        self.assertFalse(self.record_path().exists())
+
+    def test_only_a_merge_auto_module(self):
+        for takeover in ("none", "plan", {"spec": "codex", "plan": "codex"}):
+            with self.subTest(takeover=takeover):
+                self.config(takeover)
+                self.commit("takeover %s" % takeover)
+                report = self.report()
+                self.evidence()
+                self.assertRefused(self.accept(report, "--confirm"), "acceptance-not-auto")
+
+    def test_only_codex_approved_with_a_report(self):
+        self.evidence()
+        self.assertRefused(self.accept(self.report(), "--confirm", state="approved"), "acceptance-state")
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--project", str(self.root), "--module", "alpha",
+                               "--target", "acceptance", "--state", "codex-approved", "--confirm"],
+                              capture_output=True, text=True, timeout=30, env=self.env)
+        self.assertRefused((done.returncode, done.stdout), "review-missing")
+
+    def test_each_missing_piece_refuses(self):
+        report = self.report()
+        self.assertRefused(self.accept(report, "--confirm"), "no check evidence")
+        self.evidence(non_author=False)
+        self.assertRefused(self.accept(report, "--confirm"), "non-author")
+        self.evidence()
+        self.assertRefused(self.accept(self.report(review_outcome="findings", findings=[{"title": "t"}]), "--confirm"),
+                           "blocking")
+        self.assertRefused(self.accept(self.report(scope={"files": {}, "baseline": {}}), "--confirm"), "scope.files")
+
+    def test_uncommitted_changes_refuse(self):
+        report = self.report()
+        self.evidence()
+        (self.root / "src" / "alpha.py").write_text("x = 2\n", encoding="utf-8")
+        self.assertRefused(self.accept(report, "--confirm"), "uncommitted")
+        (self.root / "src" / "alpha.py").write_text("x = 1\n", encoding="utf-8")
+        (self.root / "loose.txt").write_text("x\n", encoding="utf-8")
+        self.assertRefused(self.accept(report, "--confirm"), "uncommitted")
+
+    def test_out_of_scope_changes_refuse(self):
+        (self.root / "README.md").write_text("x\n", encoding="utf-8")
+        self.commit("outside")
+        report = self.report()
+        self.evidence()
+        self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.90.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.91.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
@@ -189,6 +189,24 @@ Codex 0.164 之前，只有新增的 `SessionStart` hook 要信任一次并重�
    阶段提示才转到下一个模块；你说不通过，就在本里程碑补任务，或回头改草案和后面还没开工的模块。
 
 格式见 `templates/USAGE.md`，细则见共享检查点规则的「用法草案」一节。单模块需求不出草案；没有 `spec/usage/` 的项目一切照旧。
+
+## 自动接管（可选）
+
+默认每个 Spec、Plan、最终验收都由你批，合并、发布也由你做。想少介入时，可以给项目或单个模块设「接管档位」，把其中几步交给 Codex 和
+autopilot。不设档位的项目一切照旧。
+
+1. **设档位**：对 agent 说「这个项目只接管 Plan」之类的话，agent 用 `/spec-guard:config` 预览四项（Spec、Plan、合并、发布）各由谁做，
+   你确认后写进 `.agent/config.json`（`takeover`，单个模块用 `moduleTakeover`）。预设有 `none`（不接管）、`plan`（只接管 Plan）、
+   `merge`（接管到合并），也可以逐项自定义。放宽一次只升一档；试点先用「只接管 Plan」。
+2. **Codex 审什么**：交给 Codex 的 Spec 或 Plan，agent 用 /delegate:review 请 Codex 审，没有阻断意见才记 `codex-approved`，阶段提示当作已批准、
+   接着往下做；两轮还有阻断或 Codex 不可用就停下交你，不会自己审自己。合并交给自动化的模块，最终验收由 Codex 凭三样证据做：
+   Codex 审最终补丁无阻断、autopilot 由非作者在同一提交上跑过检查、两者都是当前提交。记录写在 git 目录、不进提交，autopilot 据此合并。
+3. **哪些永远由你批**：能力图；判为重要需求的 Spec（同批拆出多个模块、跨模块、碰高风险路径，由规则判定，不由 agent 自己判）；
+   「预先声明」有内容的 Plan。测试改不红、Spec 没覆盖的决定、高风险不可逆操作、接管模块改到声明范围之外，都照旧停下问你。
+4. **出事自动降档**：autopilot 或 module-crew 发现问题时，用只许收窄的入口把档位往严里改一格并记下原因；你想恢复，用 config 说一句，一次升一档。
+
+`/spec-guard:map --json` 每个模块报出档位（`takeover`）、实际由谁批（`reviewApprovedBy`）、是否重要需求（`important`）和 Codex 验收记录
+（`acceptance`），供 autopilot、module-crew 读。规则原文见共享检查点规则的「自治档位与底线」「批准标记」两节。
 
 ## 多模块并行（可选）
 

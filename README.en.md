@@ -63,7 +63,7 @@ Terms and design reasons: [concepts](docs/concepts.md) (Chinese).
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.90.1` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.91.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | Open a new session and review and trust spec-guard's `UserPromptSubmit` hook and its two `SessionStart` hooks under `/hooks` | From Codex 0.164: approve spec-guard's 3 hooks under `/hooks` in the command-line `codex`, then open a new session (see [Update and uninstall](#update-and-uninstall)); on earlier versions, just open a new session |
 
@@ -211,6 +211,32 @@ stages instead of putting it together for the first time only at the very end.
 
 The format is in `templates/USAGE.md`; the rules are in the "用法草案" section of the shared checkpoint rules. Single-module requirements get no
 draft; projects without `spec/usage/` see no change.
+
+## Automatic takeover (optional)
+
+By default you approve every Spec, Plan and final acceptance, and you merge and release yourself. To step in less, give the project or a
+single module a takeover setting that hands some of these steps to Codex and autopilot. Projects without one see no change.
+
+1. **Set it**: tell the agent something like "take over the Plans in this project". It previews with `/spec-guard:config` who does each of
+   the four steps (Spec, Plan, merge, release) and writes `.agent/config.json` once you confirm (`takeover`; `moduleTakeover` for one
+   module). Presets are `none`, `plan` (Plans only) and `merge` (up to the merge), or set each step yourself. Widening goes one step at a
+   time; start a pilot with Plans only.
+2. **What Codex reviews**: for a Spec or Plan given to Codex, the agent has Codex review it with /delegate:review and records
+   `codex-approved` only when nothing blocks; the stage hint then treats it as approved and moves on. Blocking findings after two rounds, or
+   Codex being unavailable, stop the work and come to you; the agent never reviews its own work. For a module whose merge is automated,
+   Codex does the final acceptance on three pieces of evidence: its review of the final patch has nothing blocking, autopilot ran the checks
+   on the same commit as a non-author, and both are about the current commit. The record stays in the git directory, uncommitted, and
+   autopilot merges on it.
+3. **What always stays with you**: the capability map; a Spec judged an important requirement (several modules from one request,
+   cross-module, or touching high-risk paths, decided by rule and not by the agent); a Plan whose "预先声明" (pre-declared) section is not
+   empty. Tests that cannot be made to fail, decisions the Spec does not cover, high-risk irreversible steps and changes outside a takeover
+   module's declared scope still stop and ask you.
+4. **Automatic step-down**: when autopilot or module-crew sees trouble it narrows the setting one step through a narrow-only entry and
+   records why; to restore it, say so through config, one step at a time.
+
+`/spec-guard:map --json` reports per module the takeover (`takeover`), who approved each file in effect (`reviewApprovedBy`), whether it is
+an important requirement (`important`) and Codex's acceptance record (`acceptance`), for autopilot and module-crew to read. The rules are in
+the "自治档位与底线" and "批准标记" sections of the shared checkpoint rules.
 
 ## Developing several modules at once (optional)
 
