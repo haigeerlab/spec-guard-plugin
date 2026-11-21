@@ -7,7 +7,8 @@ M3 停点返工（codex-final-acceptance，S101）：用安装后的 0.91.0 实�
 ### 修复
 
 - **档位调整不再让模块做不了 Codex 最终验收。** 接管模块开工后，autopilot 收窄档位、或你再调回来，都会改 `.agent/config.json`；越界检查原来把它算作
-  这个模块越界，阶段提示停下、`review-mark --target acceptance` 也拒绝。现在它和能力图、用法草案一样记为 `flow`，不算越界。
+  这个模块越界，阶段提示停下、`review-mark --target acceptance` 也拒绝。现在它和能力图、用法草案一样记为 `flow`，不算越界；记 `activeModule` 的 `.agent/state.json` 同样（autopr-design 沙盒演练发现）。
+  `CLAUDE.md`／`AGENTS.md` 与 `.github/autopr/risk-paths.json` 照旧算越界：先提交约定、配置与清单，再提交 Spec。
 - **补丁不能给自己开自动合并。** 配置不算越界之后，Codex 最终验收另核对本模块开工前的提交里合并也已是 auto；开工后才放宽的模块拒绝
   （`acceptance-not-auto-at-base`），由你验收。
 - **设档位时提醒已退役的键。** 文件里还有 `autonomyTier`／`moduleAutonomy` 时，`/spec-guard:config` 设 `takeover` 的预览多一行：它们已退役、不生效，

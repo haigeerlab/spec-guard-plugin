@@ -285,6 +285,13 @@ class TakeoverCheck(unittest.TestCase):
             code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
             files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
             self.assertEqual(files[".agent/config.json"], "flow", out)
+        with Repo(switch="off") as repo:  # Q15 A: activeModule changes at every module boundary
+            self.takeover(repo)
+            repo.write(".agent/state.json", json.dumps({"activeModule": "m"}))
+            repo.write("CLAUDE.md", "user text\n")
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual((files[".agent/state.json"], files["CLAUDE.md"]), ("flow", "outside"), out)
         with Repo(switch="on") as repo:  # a concurrency module that is not a takeover module keeps the old reading
             repo.write(".agent/config.json", json.dumps({"version": 1, "moduleConcurrency": "on", "reviewCadence": "combined"}))
             code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")

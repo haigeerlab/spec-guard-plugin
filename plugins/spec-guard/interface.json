@@ -160,7 +160,7 @@
         "own": "the module's own spec/<id>.md or tasks/<id>/",
         "outside": "outside the boundary (shared categories included); reported, and for a takeover module the stage hint stops and hands it to the user (interface 1.15)",
         "declared": "outside the boundary but a public path the approved, unchanged Plan pre-declares (interface 1.15, spec/takeover-scope-check.md)",
-        "flow": "a takeover module's change to spec/CAPABILITY-MAP.md or spec/usage/*.md (interface 1.15): add-module edits them next to the Spec and the user reviews them, so they are not overreach; since 0.91.1 also .agent/config.json, the project setting that narrowing or adjusting the takeover rewrites"
+        "flow": "a takeover module's change to spec/CAPABILITY-MAP.md or spec/usage/*.md (interface 1.15): add-module edits them next to the Spec and the user reviews them, so they are not overreach; since 0.91.1 also .agent/config.json, the project setting that narrowing or adjusting the takeover rewrites, and .agent/state.json, whose activeModule changes at module boundaries"
       }
     },
     "contract": "spec/module-scope-boundary.md"

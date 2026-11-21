@@ -83,3 +83,4 @@
 
 - 2026-11-22（构建中）：假设 2 原写「公共类别……与现在一样记为 shared，不算越界」，与现有越界检查不符——现有检查把改到公共文件记为越界（公共文件不归任何模块，要改先提出）。按「与现在一样」的本意改正措辞，行为不变。
 - 2026-11-22（M3 返工，用户「批准；Q14 A」）：假设 2 的允许范围对接管模块再加 `.agent/config.json`（记为 `flow`，与能力图、用法草案相同）：它是项目设置，autopilot 收窄或用户调整档位都会改它，不属于模块的补丁。防止 PR 借此开自动合并的核对放在 codex-final-acceptance。
+- 2026-11-22（M3 返工，用户「Q15 A」，autopr-design 沙盒演练 2 发现）：基线仍按 Q10 A；接管模块的 `flow` 再加 `.agent/state.json`（`activeModule` 在模块交接时就会改）。约定块所在的 `CLAUDE.md`／`AGENTS.md` 与 `.github/autopr/risk-paths.json` 照旧算越界，应在 Spec 之前单独提交。

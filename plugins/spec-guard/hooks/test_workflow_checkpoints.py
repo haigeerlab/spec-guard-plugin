@@ -333,7 +333,7 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertIn("最终验收交 Codex", self.node_rules("## 最终验收"))
         boundary = self.section("## 并行边界\n")
         for phrase in ("接管模块", "开关没开", "预先声明", "停下", "Spec 第一次提交", "`--base`", "`flow`",
-                       "`.agent/config.json` 是流程文件"):  # M3 rework
+                       "`.agent/config.json`、`.agent/state.json` 是流程文件"):  # M3 rework
             self.assertIn(phrase, boundary)
         self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
