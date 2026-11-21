@@ -9,7 +9,8 @@ did (`~/.local/state/spec-guard`).
 Rule, deliberately literal: in a non-test Python file under `plugins/spec-guard/hooks/`, other
 than state_paths.py, every line that uses `Path.home()`, `expanduser(` or a `"~/` literal must
 also name an allowed home location -- the hosts' own configuration (`.claude`, `.codex`) or
-epiq's own directory (`.epiq-global`).  Those are read, never spec-guard state.  Comment lines
+epiq's own directory (`.epiq-global`), or autopilot's check evidence (`.autopilot`, codex-final-acceptance).
+Those are read, never spec-guard state.  Comment lines
 are skipped.  Zero Python files is "not found", not "clean" (docs/lenses.md A5).
 
 Usage: check-state-paths.py [repo-root]
@@ -19,7 +20,7 @@ import re
 import sys
 
 HOME_USE = re.compile(r"Path\.home\(\)|expanduser\(|[\"']~/")
-ALLOWED = ('".claude"', '".codex"', '".epiq-global"')
+ALLOWED = ('".claude"', '".codex"', '".epiq-global"', '".autopilot"')
 OWNER = "state_paths.py"
 
 
