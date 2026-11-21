@@ -266,7 +266,9 @@ python3 -B "$ROOT/hooks/project_link.py" unset --from "$FROM" --confirm
 `<!-- spec-guard: review pending -->`、`<!-- spec-guard: review approved <digest> -->`（Spec，带批准时的内容指纹）或
 `<!-- spec-guard: review approved -->`（Plan），接管档位下由 Codex 批的写 `<!-- spec-guard: review codex-approved <digest> -->`
 （`--state codex-approved|codex-reviewed --review <delegate 报告 JSON>`，只认完成且有结论的 Codex 报告、按 `scope.files` 的 sha256 核对文件，
-每轮记一行，两轮阻断后交用户；档位不允许或 Plan 有预先声明时算待用户批准）。当前模块待批准时阶段提示报告等待用户批准、不建议写 Plan 或继续构建；
+每轮记一行，两轮阻断后交用户；档位不允许或 Plan 有预先声明时算待用户批准）。合并是 auto 的模块到最终 gate 时，
+`--target acceptance --state codex-approved --review <最终补丁的 Codex 报告>` 核对报告、autopilot 在 HEAD 上的检查证据与越界后，
+把 Codex 验收记在 git 目录（不进提交，最终 gate 合并后补勾）；缺一样就拒绝，停下等用户。当前模块待批准时阶段提示报告等待用户批准、不建议写 Plan 或继续构建；
 Spec 批准后内容有变即判为批准后已修订，需复审后重新记录；没有标记的文件判定照旧。默认只预览，把预览给用户看过并
 确认后才加 `--confirm`，只改这一行并读回：
 

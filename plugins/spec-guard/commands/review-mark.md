@@ -111,3 +111,17 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 每次都在「外部审查意见」一节追加一行轮次；`codex-approved` 要求本轮没有阻断，并写 `<!-- spec-guard: review codex-approved <digest> -->`；
 有阻断用 `codex-reviewed` 只记这一轮，改完再审。两轮仍有阻断后两种都拒绝，交用户批（`--state approved`）。Codex 的批准不是用户的批准：
 档位不允许、或 Plan 的「预先声明」有内容时，阶段提示把它当作待用户批准。
+
+## Codex 最终验收（合并：自动）
+
+模块档位里合并是 auto 时，到最终 gate 用 /delegate:review（后端 codex）审本模块开工前的提交到 HEAD 的补丁（`--spec spec/<id>.md`），
+报告存成仓库外的文件；等 autopilot 在 HEAD 上写好检查证据（`~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json`），工作区干净时：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target acceptance --state codex-approved --review <报告文件>
+```
+
+三样（审查无阻断且审到 HEAD、Spec 与工作区一致；检查由非作者在 HEAD 上跑、全部退出 0；两者都是 HEAD）缺一，或有越界文件，就拒绝并写明原因。
+加 `--confirm` 才写：记录写在 git 目录的 `spec-guard/acceptance/<id>.json`（不被跟踪、不进提交），报告路径存为绝对路径。
+todo 里的最终 gate 现在不勾：记录的提交是 HEAD 或其祖先时阶段提示当它已过，合并后补勾并写一句来源。拟回告写进 todo，不发出。
+合并不是 auto 的模块被拒绝，最终验收照旧由用户做。

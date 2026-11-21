@@ -154,6 +154,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 `/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的；`important` 写明哪些模块按规则是重要需求、理由是什么
 （同批多模块、跨模块、碰高风险路径），这些模块的 Spec 不论档位都由你批。
 
+合并交给自动化的模块，最终验收也可以由 Codex 做：agent 请 Codex 审最终补丁，等 autopilot 在同一个提交上跑完检查（由非作者跑、全部通过），
+再用 `--target acceptance --state codex-approved --review <报告文件>` 记下。记录写在 git 目录里、不进提交，autopilot 据此合并；
+`/map --json` 每个模块的 `acceptance` 报出它（`null` 或 `{marker, sha}`）。缺一样证据或有越界改动就拒绝，停下等你；拟回告不会自动发出。
+
 接管档位里有任一项不是「人」的模块，构建中还会做越界检查：改到 Spec 并行边界与（已批准的）Plan 预先声明之外的文件，阶段提示就停下来，
 让 agent 逐个说明为什么要改、由你决定；没写并行边界也会停。只读结果用
 `module_scope.py check --module <id> --format json`（`--base` 可省，默认是这个模块 Spec 第一次提交之前的状态），合并前看 `outside` 是不是 0。
