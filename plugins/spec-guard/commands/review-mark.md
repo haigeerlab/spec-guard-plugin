@@ -100,7 +100,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 ## Codex 审查（接管档位）
 
 模块档位里 Spec 或 Plan 是 codex 时（`/spec-guard:config` 的 takeover），用 /delegate:review（后端 codex）审这个文件，把它标准输出的 JSON
-存成文件，再记下这一轮（一次一个文件，不用 `--target both`）：
+存成仓库外的文件（例如 `$TMPDIR` 下），再记下这一轮（一次一个文件，不用 `--target both`）：
 
 ```bash
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|plan> --state codex-approved --review <报告文件>

@@ -263,6 +263,21 @@ class TakeoverCheck(unittest.TestCase):
                 self.assertEqual(files["package-lock.json"], expected, approved)
                 self.assertEqual(report["declared"], 1 if approved else 0)
 
+    def test_map_and_usage_drafts_are_flow_files_for_takeover_modules(self):
+        # M2 rework: add-module edits the capability map (and the batch's usage draft) next to the Spec; not overreach.
+        with Repo(switch="off") as repo:
+            self.takeover(repo)
+            repo.write("spec/CAPABILITY-MAP.md", "changed\n")
+            repo.write("spec/usage/io.md", "draft\n")
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual((files["spec/CAPABILITY-MAP.md"], files["spec/usage/io.md"]), ("flow", "flow"), out)
+        with Repo(switch="on") as repo:  # a concurrency module that is not a takeover module keeps the old reading
+            repo.write("spec/CAPABILITY-MAP.md", "changed\n")
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual(files["spec/CAPABILITY-MAP.md"], "outside")
+
     def test_default_base_is_the_parent_of_the_spec_commit(self):
         with Repo(switch="off") as repo:
             self.takeover(repo)

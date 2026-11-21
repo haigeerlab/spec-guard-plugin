@@ -171,7 +171,7 @@ Spec 交给 Codex 的模块，没写并行边界或清单读不到也按重要�
 ```
 
 - **接管档位下由 Codex 批（`codex-approved`）**：模块档位里这一项是 codex 时，Spec 或 Plan 标 `pending` 后交 Codex 审：
-  用 /delegate:review（后端 codex）审这个文件，把标准输出的 JSON 存成文件，再用 `review-mark --state codex-approved --review <文件>` 记下；
+  用 /delegate:review（后端 codex）审这个文件，把标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下，否则越界检查会把它当成改动），再用 `review-mark --state codex-approved --review <文件>` 记下；
   spec-guard 只认完成且有结论的 Codex 报告，按 `scope.files` 的内容 sha256 核对被审文件就是工作区这一份，缺严重程度的意见按阻断。
   有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审；两轮仍有阻断就停下交用户，之后只能由用户批。建议类意见由 agent 决定是否采纳，
   在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。审查报告不是用户的批准：档位不允许、或 Plan 的「预先声明」
@@ -450,7 +450,7 @@ B 维持现有顺序串行做。硬门槛不满足时只写「不建议并行」
   不互相替代。越界只报告，不卡验收；是否接受由用户决定。开关 on 时 `--base` 给集成基线。
 
 **接管模块也查，越界即停。** 接管档位里任一项不是 `human` 的模块，开关没开也查：基线默认是本模块 Spec 第一次提交的父提交（`--base`
-可省），Plan 已批准且之后没改时，它「预先声明」的公共路径放行（记为 `declared`）。构建中阶段提示一出现越界文件，就停下逐个说明为什么要改，
+可省），Plan 已批准且之后没改时，它「预先声明」的公共路径放行（记为 `declared`）；能力图与用法草案是流程文件（记为 `flow`），不算越界。构建中阶段提示一出现越界文件，就停下逐个说明为什么要改，
 交用户决定：同意就补进并行边界或预先声明并复审，不同意就撤回；没写并行边界同样停下。autopilot 合并前读 `--format json` 的 `outside`。
 
 ## 协调会话的批准与合并（moduleConcurrency 为 on 时）

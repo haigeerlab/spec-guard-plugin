@@ -831,12 +831,12 @@ def codex_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool, raw: di
                     "the user approves it (%s `--state approved`)." % cmd["review-mark"])
         if zh:
             return ("- 批准: %s `%s` 按接管档位由 Codex 审。" % (names[kind], path),
-                    "用 /delegate:review（后端 codex）审 `%s`，把它标准输出的 JSON 存成文件；没有阻断意见就用 %s `--state codex-approved "
+                    "用 /delegate:review（后端 codex）审 `%s`，把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下），免得报告本身被当成改动；没有阻断意见就用 %s `--state codex-approved "
                     "--review <文件>` 记下并接着往下做；有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审，两轮仍有阻断就交用户。"
                     "建议类意见由你决定是否采纳，在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。"
                     % (path, cmd["review-mark"]))
         return ("- Review: %s `%s` is reviewed by Codex under the takeover." % (names[kind], path),
-                "review `%s` with /delegate:review (backend codex) and save its standard-output JSON to a file; with no "
+                "review `%s` with /delegate:review (backend codex) and save its standard-output JSON to a file outside the repository (for example under `$TMPDIR`), so the report is not taken for a change; with no "
                 "blocking finding record it with %s `--state codex-approved --review <file>` and go on; with blocking "
                 "findings record the round with `--state codex-reviewed`, fix them and review again, and hand it to the user "
                 "after two blocking rounds. Decide on each suggestion yourself and give one line of reason under the external "

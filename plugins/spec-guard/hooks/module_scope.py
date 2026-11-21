@@ -33,7 +33,7 @@ FIELD = re.compile(r"^-\s+([^:：]+?)\s*[:：]\s*(.*)$")
 TICKED = re.compile(r"^`([^`]*)`$")
 SEPARATORS = re.compile(r"\s*[、,]\s*")
 BAD_PATH_CHARS = set("*?[]\\")
-SCOPES = ("exclusive", "own", "outside", "declared")  # interface.json scopeCheck.values.scope
+SCOPES = ("exclusive", "own", "outside", "declared", "flow")  # interface.json scopeCheck.values.scope
 # interface.json scopeOverlap.values.error: ScopeError codes, then the overlap command's own.
 OVERLAP_ERRORS = ("no-boundary", "missing-exclusive", "bad-path", "bad-category", "duplicate-section", "unknown-line",
                   "unreadable", "no-capability-map", "map-unreadable")
@@ -313,10 +313,7 @@ def changed_files(root: Path, base: str) -> list | None:
 
 def scope_applies(root: Path, module_id: str) -> bool:
     """takeover-scope-check: the switch is on, or the module's takeover hands any step to codex or automation."""
-    if module_concurrency(root):
-        return True
-    from project_config import module_takeover
-    return any(value != "human" for value in module_takeover(root, module_id)[0].values())
+    return module_concurrency(root) or _takeover_module(root, module_id)
 
 
 def default_base(root: Path, module_id: str) -> str | None:
@@ -340,17 +337,34 @@ def _declared_paths(root: Path, module_id: str) -> tuple:
     return declared.public_paths if declared is not None else ()
 
 
+FLOW_FILES = ("spec/CAPABILITY-MAP.md",)
+FLOW_DIRS = ("spec/usage/",)
+
+
+def _takeover_module(root: Path, module_id: str) -> bool:
+    from project_config import module_takeover
+    return any(value != "human" for value in module_takeover(root, module_id)[0].values())
+
+
 def classify(root: Path, module_id: str, scope: Scope, base: str) -> list | None:
-    """[{path, status, scope}] since `base`; None when the base is not a commit."""
+    """[{path, status, scope}] since `base`; None when the base is not a commit.
+
+    For a takeover module the capability map and the usage drafts are `flow` files (M2 rework): add-module edits them
+    next to the Spec and the user reviews them anyway.  A concurrency module that is not a takeover module keeps the
+    old reading, where the map belongs to the coordinating session.
+    """
     files = changed_files(root, base)
     if files is None:
         return None
     declared = _declared_paths(root, module_id)
+    flow = _takeover_module(root, module_id)
     rows = []
     for status, path in files:
         where = covers(scope, module_id, path)
         if where == "outside" and any(path.startswith(item) if item.endswith("/") else path == item for item in declared):
             where = "declared"
+        if where == "outside" and flow and (path in FLOW_FILES or path.startswith(FLOW_DIRS)):
+            where = "flow"
         rows.append({"path": path, "status": status, "scope": where})
     return rows
 
