@@ -1,6 +1,6 @@
 # Spec: codex-approval
 
-<!-- spec-guard: review approved aea9dde81716 -->
+<!-- spec-guard: review approved a37ff55fb207 -->
 
 ## Objective
 
@@ -18,15 +18,16 @@
 ## Assumptions
 
 1. **谁调 Codex**：Claude 主会话按阶段提示用 `/delegate:review`（后端 codex）审 Spec 或 Plan 文件；spec-guard 不调外部进程，只读审查报告。
-2. **审查报告怎么给**：`review-mark --target spec|plan --state codex-approved --review <报告 JSON>`。报告由 delegate 产出（格式以 delegate 接口为准，
-   delegate-owner 确认中）。spec-guard 读：后端必须是 codex；`findings` 里每条的 `severity`，缺这个字段按 `blocking`；审查范围的指纹
-   （`blob-pairs-v1`）与基线提交 `from`／`to`。
-3. **报告和文件绑在一起**：spec-guard 用 git 按 `from`／`to` 重算指纹、与报告一致；被批的文件在指纹的路径里；`to` 提交里这个文件的内容与
-   工作区当前内容相同。所以交 Codex 审之前要先提交（与「Spec 获批后先提交再改」同一做法）。任何一条对不上就拒绝记录（退出 2）并写明哪一条。
+2. **审查报告怎么给**：agent 把 `/delegate:review` 标准输出的那份 JSON 存成文件，传给 `review-mark --target spec|plan --state codex-approved --review <文件>`
+   （delegate 接口 1.5，delegate-owner #21973 确认；标准错误里的 artifacts 路径是私有副本，不用）。spec-guard 读：`execution_status` 必须是 `completed`，
+   `review_outcome` 必须是 `findings` 或 `no_findings_in_scope`，否则算没有结论；后端 `backend` 必须是 codex；`findings` 里每条的 `severity`，缺这个字段
+   按 `blocking`。报告的 `limitations` 写明审查结论不是合并或交付许可——「Codex 审过即批准」是 spec-guard 按用户设的接管档位采用的策略，不是 delegate 的结论。
+3. **报告和文件绑在一起**：被批的文件必须在报告的 `scope.files` 里，且那里记的内容 sha256 等于工作区当前文件的 sha256（delegate 建议的核对方式，
+   `--spec`／`--plan` 带进来的上下文文件也在其中）。不需要先提交，也不重算 `blob-pairs-v1`。任何一条对不上就拒绝记录（退出 2）并写明哪一条。
 4. **标记**：`<!-- spec-guard: review codex-approved <指纹> -->`，指纹仍由 `spec-digest.py` 算（去掉标记行后的正文）；文件之后再改，读作
    「批准后已修订」，和用户批准一样处理。同一文件里用户批准与 Codex 批准只留一行，后写的替换先写的。
 5. **轮次与证据记在哪**：`review-mark --review` 每次（不论有没有阻断）都在文件的「外部审查意见」一节追加一行
-   `<!-- spec-guard: codex-review round=<n> blocking=<k> fingerprint=<sha256 前 12 位> -->`；`--state codex-approved` 只在最新一轮 `blocking=0`
+   `<!-- spec-guard: codex-review round=<n> blocking=<k> sha256=<被审文件内容 sha256 前 12 位> -->`；轮次由 spec-guard 自己计数（delegate 报告没有轮次字段）；`--state codex-approved` 只在最新一轮 `blocking=0`
    时可写。另用 `--state codex-reviewed`（只记一轮、不记批准）记录有阻断的一轮。建议类意见由 Claude 决定是否采纳，在同一节每条写一句理由（规则文字，
    机器不判）。
 6. **两轮上限**：同一文件已有 2 轮 `blocking>0` 的记录、最新一轮仍有阻断时，阶段提示把下一步换成「停下，把两轮的阻断意见交用户决定」；
@@ -61,8 +62,8 @@
 
 ## Acceptance criteria
 
-- **AC1** 报告校验（`test_review_marker.py`，临时 git 仓库与手写报告）：codex 报告无阻断、指纹与 from/to 一致、文件内容一致 → 可记；后端不是 codex、
-  有阻断、`severity` 缺失、指纹对不上、文件不在路径里、工作区内容与 `to` 不同 → 各自退出 2 并写原因、不写文件。
+- **AC1** 报告校验（`test_codex_review.py`／`test_review_marker.py`，手写报告）：codex 报告、`execution_status=completed`、无阻断、文件在 `scope.files`
+  且 sha256 一致 → 可记；未完成或没有结论、后端不是 codex、有阻断、`severity` 缺失、文件不在 `scope.files`、sha256 与工作区不同 → 各自退出 2 并写原因、不写文件。
 - **AC2** 轮次：每次 `--review` 追加一行轮次；两轮阻断后 `codex-reviewed` 被拒、`approved` 仍可记；最新一轮有阻断时 `codex-approved` 被拒。
 - **AC3** 生效：档位 spec=codex 时 Spec 的 `codex-approved` 读作已批准；档位为 human 时读作待批准并写明原因；用户批准任何档位都有效；改文件后读作批准后已修订。
 - **AC4** 阶段提示（`test-phase-guard.sh` 新段）：勾了 codex 的模块在 Spec 交审节点建议交 Codex 审；两轮阻断后建议交用户；没勾的模块输出与改前逐字相同；中英各一例。

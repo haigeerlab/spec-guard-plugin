@@ -6,20 +6,20 @@ Spec：[spec/codex-approval.md](../../spec/codex-approval.md)（2026-11-22 批�
 
 ## 架构决定
 
-- **报告校验单独一个文件**：新增 `hooks/codex_review.py`，只做三件事：读报告 JSON、按 delegate 公布的 `blob-pairs-v1` 定义用 `git ls-tree`
-  重算指纹、核对被批文件与工作区内容。`review_mark.py` 调它；阶段提示不调它（阶段提示只读文件里已写下的标记与轮次行，不读报告、不跑 git）。
+- **报告校验单独一个文件**：新增 `hooks/codex_review.py`，只做三件事：读报告 JSON（`execution_status`、`review_outcome`、`backend`、`findings[].severity`）、
+  在 `scope.files` 里找被批文件、比对内容 sha256 与工作区（delegate-owner #21973 建议；不跑 git、不重算 `blob-pairs-v1`）。`review_mark.py` 调它；阶段提示不调它（阶段提示只读文件里已写下的标记与轮次行，不读报告、不跑 git）。
 - **生效判定只有一处**：`module_stage.effective_review(root, module, target)` 把标记（approved／codex-approved／pending／revised）、接管档位
   （`project_config.module_takeover`）、两轮上限、Q6（Plan 的「预先声明」是否有非「无」行，复用 `module_scope` 的解析）合起来，给出
   `state` 与 `approvedBy`；批准行、`stop_node`、评审节奏、`/map` 都用它。
-- **轮次行的写法固定**：`<!-- spec-guard: codex-review round=<n> blocking=<k> fingerprint=<12 位> -->`，写在「外部审查意见」一节（没有就新建该节），
+- **轮次行的写法固定**：`<!-- spec-guard: codex-review round=<n> blocking=<k> sha256=<12 位> -->`，写在「外部审查意见」一节（没有就新建该节），
   只由 `review-mark` 写；阶段提示与 verify-artifacts 读它。
 - **没勾 codex 的模块逐字不变**：所有新分支都以「档位里这一项是 codex 或文件里有 codex 标记」为前提；用 phase-guard 回归守住。
 
 ## 任务
 
 - **Task 0**：提交本 Plan 与 todo。验证：`validate.sh --quick`、verify-artifacts 0 失败。
-- **Task 1**：`codex_review.py` 与单测 `test_codex_review.py`（在 `validate.sh` 登记）：临时 git 仓库造提交与手写报告，覆盖 AC1 的七种情形；先写测试确认失败再实现。
-  如果 delegate-owner 的答复与 Spec 假设 2、3 不一致（字段名、报告落盘方式），在这里停下把差异交用户（Spec 没覆盖的决定）。
+- **Task 1**：`codex_review.py` 与单测 `test_codex_review.py`（在 `validate.sh` 登记）：手写报告覆盖 AC1 的各种情形；先写测试确认失败再实现。
+  （delegate-owner 的答复与原假设 2、3 不一致，已在开工前停下修订 Spec 与本 Plan 交用户复审。）
 - **Task 2**：`review_mark.py` 加 `--state codex-approved|codex-reviewed`、`--review`，轮次行、两轮上限（AC1、AC2）；`test_review_marker.py` 先写例子。
 - **Task 3**：`module_stage.effective_review` 与阶段提示（AC3、AC4、AC5，含 Q6）：批准行文字、建议下一步（交 Codex 审／两轮后交用户／Codex 不可用就停）、
   `stop_node`、combined 按批准人拆开；`test-phase-guard.sh` 新增第 28 段（中英各一例、没勾 codex 时逐字不变）；`test_stop_rules.py` 补节点种类。
@@ -38,9 +38,9 @@ Spec：[spec/codex-approval.md](../../spec/codex-approval.md)（2026-11-22 批�
 
 ## 风险
 
-- **报告格式未确认**：依赖 delegate 的报告字段与落盘方式（已问 delegate-owner #21972）；不一致时 Task 1 停下交用户。
-- **指纹算法有两份实现**：`blob-pairs-v1` 是 delegate 定义的；spec-guard 按它公布的定义另写一份只用于核对。用一份真实的 delegate 报告做夹具（能拿到时）证明两边算出同一个值；
-  算不出就拒绝记录，不会误放行。
+- **报告格式**：按 delegate 接口 1.5（delegate-owner #21973）；字段名在接口主版本 1 内只增不改。本机装的 delegate 是 0.9.0，还没有 `severity`——
+  缺字段一律按阻断，所以旧版本的报告永远批不了，不会误放行。
+- **核对方式**：用 `scope.files` 的内容 sha256 比工作区文件，不另写一份 `blob-pairs-v1`，避免两份算法不一致。
 - **阶段提示回归面**：批准判定是阶段提示的核心；以「没勾 codex 的项目逐字不变」守住，phase-guard 全量回归。
 - **叠加分支**：基于 #462 的分支；前面 PR 合并后 rebase 到 main 再开 PR。
 - **shell 改动**：提交前跑 ShellCheck。
@@ -54,4 +54,4 @@ Spec：[spec/codex-approval.md](../../spec/codex-approval.md)（2026-11-22 批�
 
 ## 未决问题
 
-- 无（报告格式待 delegate-owner 确认，见风险第一条）。
+- 无。
