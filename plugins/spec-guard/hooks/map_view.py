@@ -27,7 +27,8 @@ from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, extern
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
-from project_config import module_concurrency, module_tiers, summary as config_summary, wider
+from project_config import (ITEMS as TAKEOVER_ITEMS, module_concurrency, module_takeovers, module_tiers,
+                            summary as config_summary, takeover_wider, wider)
 import usage_draft
 
 SCHEMA_VERSION = 1
@@ -45,7 +46,9 @@ COMMIT_SEP = "\x1e"
 PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence", "gates")  # interface.json progressFacts
 DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (formal-deferral, interface 1.12)
 MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone-stop, interface 1.13)
-AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14)
+AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
+# interface.json mapView.takeover (takeover-config, interface 1.15)
+TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject")
 
 
 class Unreadable(Exception):
@@ -414,6 +417,7 @@ def build(root: Path) -> dict:
             status[module] = "not_ready"
 
     project_tier, tiers = module_tiers(root, order)
+    project_takeover, takeovers = module_takeovers(root, order)
     modules = []
     for module in order:
         state, value = by_id[module], status[module]
@@ -439,6 +443,8 @@ def build(root: Path) -> dict:
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
             "autonomy": {"tier": tiers[module][0], "source": tiers[module][1],
                          "widerThanProject": wider(tiers[module][0], project_tier)},
+            "takeover": {**takeovers[module][0], "source": takeovers[module][1],
+                         "widerThanProject": takeover_wider(takeovers[module][0], project_takeover)},
         })
 
     state, ticks, suspended_write = history(root)

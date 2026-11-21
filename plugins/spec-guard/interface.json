@@ -1,5 +1,5 @@
 {
-  "interface": "1.14",
+  "interface": "1.15",
   "mapView": {
     "command": [
       "python3",
@@ -71,7 +71,20 @@
         "source": "per module; moduleAutonomy (the module's own entry), autonomyTier (the project tier), default (nothing set) or default (config invalid) (the file, autonomyTier or moduleAutonomy is invalid; the tier is then the project's effective tier)",
         "widerThanProject": "per module; true when tier is wider than the project's effective tier (strict < standard < relaxed); spec-guard only reports it and never caps the tier"
       },
-      "meaning": "the same value project_config.module_tier(root, id) returns; what each tier allows is defined by module-crew; a cap from elsewhere (for example an onboarding verdict) is the caller's to apply"
+      "meaning": "the same value project_config.module_tier(root, id) returns; what each tier allows is defined by module-crew; a cap from elsewhere (for example an onboarding verdict) is the caller's to apply",
+      "deprecated": "since interface 1.15 (spec/takeover-config.md): autonomyTier and moduleAutonomy are retired; the field is still computed from them for one release so callers can switch to takeover, and is removed in the next"
+    },
+    "takeover": {
+      "appearsWhen": "always, on every module, whatever moduleConcurrency is (interface 1.15, spec/takeover-config.md)",
+      "fields": {
+        "spec": "per module; human or codex: who approves the module's Spec",
+        "plan": "per module; human or codex: who approves the module's Plan",
+        "merge": "per module; human or auto: whether a merge may be automatic",
+        "release": "per module; human, prepare, auto-confirm or auto: how far a release may go without the user",
+        "source": "per module; moduleTakeover (the module's own entry), takeover (the project value), default (nothing set) or default (config invalid) (the file, takeover or moduleTakeover is invalid; the items are then the next layer's)",
+        "widerThanProject": "per module; true when any item is wider than the project's effective item (orders as in takeover.items); spec-guard only reports it and never caps"
+      },
+      "meaning": "the same value project_config.module_takeover(root, id) returns; autopilot reads merge and release, module-crew reads spec and plan; spec-guard only stores and reports it, the callers act on it and enforce the release limits"
     },
     "concurrency": {
       "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear",
@@ -398,7 +411,8 @@
     },
     "readFrom": "python3 -B hooks/project_config.py show --project <project-root> --format json: the item whose key is autonomyTier, with value and source; an invalid value reads as strict with source \"default (config invalid)\"",
     "notes": "spec-guard only stores, reads and reports it; its own phase hints, stop rules and review cadence never change with it. It does not set reviewCadence: a tier that wants the Spec and Plan reviewed together needs reviewCadence=combined set separately. Writing it needs the user's own words. No tier goes below the floor in references/workflow-checkpoints.md (autonomy tier and floor). spec-guard 0.68.0-0.84.2 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
-    "contract": "spec/autonomy-tier.md"
+    "contract": "spec/autonomy-tier.md",
+    "retired": "interface 1.15 (spec/takeover-config.md): not mapped to takeover; set is refused, unset still works, a file that has it stays valid (retired-key) and shows it as not in effect"
   },
   "moduleAutonomy": {
     "config": ".agent/config.json",
@@ -412,6 +426,50 @@
     "readFrom": "python3 -B hooks/map_view.py --json --project <project-root>: each module's autonomy (tier, source, widerThanProject); or project_config.module_tier(root, id). The raw object is the item whose key is moduleAutonomy in project_config.py show --format json",
     "writeWith": "python3 -B hooks/project_config.py set --key moduleAutonomy --module <module-id> --value <tier> [--confirm]; unset --key moduleAutonomy [--module <module-id>] [--confirm]; one entry at a time, preview unless --confirm",
     "notes": "an object of module id -> tier; any bad entry (not kebab-case, tier not one of the three) makes the whole key invalid and every module falls back to the project tier with source default (config invalid). A module without an entry follows autonomyTier. Wider than the project tier is reported, never capped: the cap is the caller's. Ids not in the capability map are warned by verify-artifacts and ignored by /map. spec-guard's own phase hints, stop rules and floor never change with it. Writing it needs the user's own words. spec-guard 0.68.0-0.88.0 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
-    "contract": "spec/module-autonomy.md"
+    "contract": "spec/module-autonomy.md",
+    "retired": "interface 1.15 (spec/takeover-config.md): as autonomyTier; only /map's deprecated autonomy field still reads it"
+  },
+  "takeover": {
+    "config": ".agent/config.json",
+    "key": "takeover",
+    "default": "none",
+    "presets": {
+      "none": "default; spec, plan, merge and release all human (today's behaviour)",
+      "plan": "plan=codex; the rest human",
+      "merge": "spec=codex, plan=codex, merge=auto; release human"
+    },
+    "items": {
+      "spec": [
+        "human",
+        "codex"
+      ],
+      "plan": [
+        "human",
+        "codex"
+      ],
+      "merge": [
+        "human",
+        "auto"
+      ],
+      "release": [
+        "human",
+        "prepare",
+        "auto-confirm",
+        "auto"
+      ]
+    },
+    "readFrom": "python3 -B hooks/map_view.py --json --project <project-root>: each module's takeover; or project_config.module_takeover(root, id). The raw value is the item whose key is takeover in project_config.py show --format json",
+    "writeWith": "python3 -B hooks/project_config.py set --key takeover --value <preset|JSON object> [--confirm]; unset --key takeover [--confirm]; preview unless --confirm",
+    "notes": "a preset name or a custom object of items (missing items read as human); any unknown item or value makes the whole key invalid. Items run from strictest to widest in the order listed. Release auto-confirm and auto are stored as given; the limits (the four pipeline plugins at most prepare, auto only where a release rolls back quickly) are hinted at in the preview and enforced by autopilot. spec-guard's own phase hints and stop rules do not read it in 1.15. Writing it needs the user's own words. spec-guard 0.68.0-0.90.1 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
+    "contract": "spec/takeover-config.md"
+  },
+  "moduleTakeover": {
+    "config": ".agent/config.json",
+    "key": "moduleTakeover",
+    "default": {},
+    "readFrom": "as takeover: each module's takeover in map_view.py --json, or project_config.module_takeover(root, id)",
+    "writeWith": "python3 -B hooks/project_config.py set --key moduleTakeover --module <module-id> --value <preset|JSON object> [--confirm]; unset --key moduleTakeover [--module <module-id>] [--confirm]; one entry at a time, preview unless --confirm",
+    "notes": "an object of module id -> takeover value; any bad entry makes the whole key invalid and every module falls back to the project value with source default (config invalid). A module without an entry follows takeover. Wider than the project is reported, never capped. Ids not in the capability map are warned by verify-artifacts and ignored by /map. Writing it needs the user's own words",
+    "contract": "spec/takeover-config.md"
   }
 }
