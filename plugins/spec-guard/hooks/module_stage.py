@@ -575,7 +575,7 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
                and (pre_build_batch(root, module, stage, spec_review, plan_review) or {}).get("status") == "found")
     if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final and not batched):
         kind = "spec-review"
-    spec_waits = kind == "spec-review" and load_config(root)[0].get("reviewCadence") != "combined"
+    spec_waits = kind == "spec-review" and not cadence_combined(root, module)
     if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
         kind = "plan-review"
     if final:
@@ -619,6 +619,99 @@ def file_review_state(path: Path, kind: str) -> str:
         return review_state(path.read_text(encoding="utf-8"), kind)
     except (OSError, UnicodeError):
         return "unreadable"
+
+
+def _takeover_item(root: Path, module: str, kind: str) -> str:
+    from project_config import module_takeover  # late: project_config is light, but keep the hook's import list as it was
+    return module_takeover(root, module)[0][kind]
+
+
+def _declared_nonempty(root: Path, module: str) -> bool:
+    """codex-approval Q6: the Plan's pre-declared section lists something (a malformed section counts as listing)."""
+    from module_scope import ScopeError, parse_declared  # late: module_scope imports this module
+    try:
+        declared = parse_declared((root / "tasks" / module / "plan.md").read_text(encoding="utf-8"))
+    except ScopeError:
+        return True
+    except (OSError, UnicodeError):
+        return False
+    return declared is not None and any(declared)
+
+
+def codex_route(root: Path, module: str, kind: str) -> str:
+    """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
+    if _takeover_item(root, module, kind) != "codex":
+        return "takeover"
+    if kind == "plan" and _declared_nonempty(root, module):
+        return "pre-declared"
+    return ""
+
+
+def codex_rounds_exhausted(root: Path, path: str) -> bool:
+    try:
+        rounds = codex_rounds((root / path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError):
+        return False
+    return sum(1 for _, blocking in rounds if blocking) >= 2 and bool(rounds) and rounds[-1][1] > 0
+
+
+def effective_review(root: Path, module: str, kind: str, raw: str) -> tuple:
+    """codex-approval: (state, approved by) where Codex's approval counts only when the takeover gives it this step."""
+    if raw == "codex-approved":
+        return ("approved", "codex") if not codex_route(root, module, kind) else ("pending", None)
+    return raw, ("user" if raw == "approved" else None)
+
+
+def cadence_combined(root: Path, module: str) -> bool:
+    """reviewCadence=combined, except where the Spec and the Plan have different approvers (codex-approval Q5)."""
+    if load_config(root)[0].get("reviewCadence") != "combined":
+        return False
+    return (codex_route(root, module, "spec") == "") == (codex_route(root, module, "plan") == "")
+
+
+def codex_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool, raw: dict) -> tuple | None:
+    """(Review line, next step) where Codex approves a step under the takeover, or where its approval does not count."""
+    paths = {"spec": "spec/%s.md" % module, "plan": "tasks/%s/plan.md" % module}
+    names = {"spec": "Spec", "plan": "Plan"}
+    for kind in ("spec", "plan"):
+        state, path = raw[kind], paths[kind]
+        if kind == "plan" and stage != "BUILDING":
+            continue
+        route = codex_route(root, module, kind)
+        if state == "codex-approved" and route:
+            why = (("本模块的接管档位要求人批" if route == "takeover" else "Plan 的「预先声明」有内容，按规则由用户批") if zh else
+                   ("this module's takeover gives this step to the user" if route == "takeover"
+                    else "the Plan pre-declares shared changes, which the user approves"))
+            if zh:
+                return ("- 批准: %s `%s` 经 Codex 审过，但%s。" % (names[kind], path, why),
+                        "把 `%s` 交给用户审；Codex 的批准在这里不算数。用户批准后，用 %s 记下来。" % (path, cmd["review-mark"]))
+            return ("- Review: %s `%s` was reviewed by Codex, but %s." % (names[kind], path, why),
+                    "have the user review `%s`; Codex's approval does not count here. When the user approves it, record "
+                    "that with %s." % (path, cmd["review-mark"]))
+        if state != "pending" or route:
+            continue
+        if codex_rounds_exhausted(root, path):
+            if zh:
+                return ("- 批准: %s `%s` 经 Codex 审了两轮仍有阻断意见。" % (names[kind], path),
+                        "停下，把两轮的阻断意见和你的改法交给用户决定；之后只能由用户批准（%s `--state approved`）。"
+                        % cmd["review-mark"])
+            return ("- Review: %s `%s` still has blocking findings after two Codex rounds." % (names[kind], path),
+                    "stop and hand both rounds' blocking findings, with how you would fix them, to the user; from here only "
+                    "the user approves it (%s `--state approved`)." % cmd["review-mark"])
+        if zh:
+            return ("- 批准: %s `%s` 按接管档位由 Codex 审。" % (names[kind], path),
+                    "用 /delegate:review（后端 codex）审 `%s`，把它标准输出的 JSON 存成文件；没有阻断意见就用 %s `--state codex-approved "
+                    "--review <文件>` 记下并接着往下做；有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审，两轮仍有阻断就交用户。"
+                    "建议类意见由你决定是否采纳，在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。"
+                    % (path, cmd["review-mark"]))
+        return ("- Review: %s `%s` is reviewed by Codex under the takeover." % (names[kind], path),
+                "review `%s` with /delegate:review (backend codex) and save its standard-output JSON to a file; with no "
+                "blocking finding record it with %s `--state codex-approved --review <file>` and go on; with blocking "
+                "findings record the round with `--state codex-reviewed`, fix them and review again, and hand it to the user "
+                "after two blocking rounds. Decide on each suggestion yourself and give one line of reason under the external "
+                "review section. If Codex is unavailable, stop and wait; never review it yourself."
+                % (path, cmd["review-mark"]))
+    return None
 
 
 BASELINE_COMMITS = 50  # pre-build-spec-batch: how far back the approved baseline is looked for
@@ -703,14 +796,18 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
         if state == "unreadable":
             return ("- Review: `%s` could not be read, so its review state is unknown (a read failure, "
                     "not a review state)." % path, "", spec, plan)
+    raw = {"spec": spec, "plan": plan}
+    spec, plan = effective_review(root, module, "spec", spec)[0], effective_review(root, module, "plan", plan)[0]
+    codex = codex_hint(root, module, stage, cmd, zh, raw)
+    if codex is not None:
+        return codex[0], codex[1], spec, plan
     if zh:
         return review_hint_zh(root, module, stage, cmd, spec, plan, spec_path, plan_path)
     hold = "do not write the Plan yet" if stage == "NEEDS_PLAN" else "do not continue the build"
     record = " When the user approves it, record that with %s." % cmd["review-mark"]
     if spec == "pending":
         line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
-        values = load_config(root)[0]
-        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
+        if stage == "NEEDS_PLAN" and cadence_combined(root, module):
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
         return line, "wait for the user to review `%s`; %s.%s" % (spec_path, hold, record), spec, plan
@@ -756,8 +853,7 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
     record = "用户批准后，用 %s 记下来。" % cmd["review-mark"]
     if spec == "pending":
         line = "- 批准: Spec `%s` 正在等用户批准。" % spec_path
-        values = load_config(root)[0]
-        if stage == "NEEDS_PLAN" and values.get("reviewCadence") == "combined":
+        if stage == "NEEDS_PLAN" and cadence_combined(root, module):
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
         return line, "等用户审阅 `%s`；%s。%s" % (spec_path, hold, record), spec, plan

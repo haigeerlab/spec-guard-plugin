@@ -436,11 +436,55 @@ class CodexMarks(unittest.TestCase):
                                          "--review", self.report(project), "--confirm")[0], 2)
             self.assertEqual(project.spec.read_text(encoding="utf-8"), before)
 
+    def test_a_codex_approved_spec_lets_the_plan_be_approved(self):
+        import json
+        with Project() as project:
+            (project.root / ".agent").mkdir()
+            (project.root / ".agent" / "config.json").write_text(json.dumps({"version": 1, "takeover": {"spec": "codex"}}),
+                                                                 encoding="utf-8")
+            self.assertEqual(self.mark(project, "codex-approved", self.report(project))[0], 0)
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+
     def test_plan_too(self):
         with Project() as project:
             code, out = self.mark(project, "codex-approved", self.report(project, kind="plan"), kind="plan")
             self.assertEqual(code, 0, out)
             self.assertEqual(review_state(project.plan.read_text(encoding="utf-8"), "plan"), "codex-approved")
+
+
+class Effective(unittest.TestCase):
+    """codex-approval (C2, assumptions 7, 9, Q6): Codex's approval counts only where the takeover gives it the step."""
+
+    def project(self, config, plan="# Plan: alpha\n\n步骤\n"):
+        import json
+        project = Project().__enter__()
+        self.addCleanup(project.__exit__)
+        (project.root / ".agent").mkdir()
+        (project.root / ".agent" / "config.json").write_text(json.dumps(dict(version=1, **config)), encoding="utf-8")
+        project.plan.write_text(plan, encoding="utf-8")
+        return project.root
+
+    def test_codex_approval_needs_the_takeover(self):
+        from module_stage import effective_review
+        root = self.project({"takeover": {"spec": "codex"}})
+        self.assertEqual(effective_review(root, "alpha", "spec", "codex-approved"), ("approved", "codex"))
+        self.assertEqual(effective_review(root, "alpha", "plan", "codex-approved"), ("pending", None))
+        self.assertEqual(effective_review(root, "alpha", "plan", "approved"), ("approved", "user"))
+        self.assertEqual(effective_review(root, "alpha", "spec", "revised"), ("revised", None))
+
+    def test_a_plan_that_pre_declares_goes_to_the_user(self):
+        from module_stage import codex_route
+        listed = "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：`package.json`\n"
+        self.assertEqual(codex_route(self.project({"takeover": "plan"}, listed), "alpha", "plan"), "pre-declared")
+        empty = "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：无\n"
+        self.assertEqual(codex_route(self.project({"takeover": "plan"}, empty), "alpha", "plan"), "")
+
+    def test_combined_only_with_one_approver(self):
+        from module_stage import cadence_combined
+        self.assertTrue(cadence_combined(self.project({"reviewCadence": "combined"}), "alpha"))
+        self.assertFalse(cadence_combined(self.project({"reviewCadence": "combined", "takeover": "plan"}), "alpha"))
+        self.assertTrue(cadence_combined(self.project({"reviewCadence": "combined", "takeover": "merge"}), "alpha"))
 
 
 class BlankLinesAroundTheMarker(unittest.TestCase):

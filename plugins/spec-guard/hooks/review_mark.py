@@ -15,7 +15,8 @@ from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
 from codex_review import inspect as inspect_report
-from module_stage import (EXTERNAL_REVIEW_HEADING, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, file_review_state,
+from module_stage import (EXTERNAL_REVIEW_HEADING, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, effective_review,
+                          file_review_state,
                           review_approved_line, review_body, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
 from tracker_default import _write_atomic
@@ -176,7 +177,8 @@ def main() -> int:
     if args.state == "approved" and kinds == ["plan"]:
         # No marker means the Spec is not tracked, which must not block anything; a Spec that is
         # tracked and not approved does.
-        spec_state = file_review_state(root / relative["spec"], "spec")
+        # codex-approval: a Spec Codex approved under the takeover counts as approved here too.
+        spec_state = effective_review(root, module_id, "spec", file_review_state(root / relative["spec"], "spec"))[0]
         unmarked_spec = spec_state == "none"
         if spec_state not in ("approved", "none"):
             print("spec-not-approved: %s reads as %s. Approving a Spec needs the user's own explicit approval of "
