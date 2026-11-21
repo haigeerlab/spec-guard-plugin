@@ -82,10 +82,12 @@ class ValueSets(unittest.TestCase):
     """plugin-interface: interface.json publishes these sets, so every state the code returns must be in them."""
 
     def test_review_states(self):
-        self.assertEqual(REVIEW_STATES, ("none", "pending", "approved", "revised", "invalid"))
+        self.assertEqual(REVIEW_STATES, ("none", "pending", "approved", "codex-approved", "revised", "invalid"))
+        from module_stage import review_codex_line
+        codex = with_marker(review_codex_line(review_digest(with_marker(REVIEW_PENDING))))
         seen = {review_state(SPEC, "spec"), review_state(with_marker(REVIEW_PENDING), "spec"),
                 review_state(approved(), "spec"), review_state(approved() + "改\n", "spec"),
-                review_state(with_marker(REVIEW_APPROVED), "spec")}
+                review_state(with_marker(REVIEW_APPROVED), "spec"), review_state(codex, "spec")}
         self.assertEqual(seen, set(REVIEW_STATES))
 
     def test_external_review_states(self):
@@ -362,6 +364,127 @@ class PreBuildBatch(unittest.TestCase):
             self.assertEqual(code, 2, out)
             self.assertIn("--target both", out)
             self.assertIn("cumulative diff", out)
+
+
+class CodexMarks(unittest.TestCase):
+    """codex-approval (C1, assumptions 2-6): rounds are recorded from a report; approval needs a clean last round."""
+
+    def report(self, project, kind="spec", severities=(), outcome=None):
+        import hashlib
+        import json
+        path = project.spec if kind == "spec" else project.plan
+        relative = "spec/alpha.md" if kind == "spec" else "tasks/alpha/plan.md"
+        findings = [{"title": "t", "file": relative, "line": None, "trigger": "x", "impact": "y", "evidence": "z",
+                     "suggestion": "w", "unverified": [], "severity": severity} for severity in severities]
+        document = {"schema_version": 1, "execution_status": "completed",
+                    "review_outcome": outcome or ("findings" if findings else "no_findings_in_scope"),
+                    "backend": "codex", "scope": {"files": {relative: hashlib.sha256(path.read_bytes()).hexdigest()}},
+                    "reviewed": [relative], "findings": findings, "limitations": []}
+        out = project.root / ("report-%d.json" % len(list(project.root.glob("report-*.json"))))
+        out.write_text(json.dumps(document), encoding="utf-8")
+        return str(out)
+
+    def mark(self, project, state, report, kind="spec"):
+        return project.run("--module", "alpha", "--target", kind, "--state", state, "--review", report, "--confirm")
+
+    def test_clean_review_records_round_and_codex_approval(self):
+        with Project() as project:
+            code, out = self.mark(project, "codex-approved", self.report(project))
+            self.assertEqual(code, 0, out)
+            text = project.spec.read_text(encoding="utf-8")
+            self.assertEqual(review_state(text, "spec"), "codex-approved")
+            self.assertIn("## 外部审查意见", text)
+            self.assertRegex(text, r"<!-- spec-guard: codex-review round=1 blocking=0 sha256=[0-9a-f]{12} -->")
+            project.spec.write_text(text + "\n改动\n", encoding="utf-8")
+            self.assertEqual(review_state(project.spec.read_text(encoding="utf-8"), "spec"), "revised")
+
+    def test_blocking_round_is_recorded_not_approved(self):
+        with Project() as project:
+            report = self.report(project, severities=("blocking", "suggestion"))
+            code, out = self.mark(project, "codex-approved", report)
+            self.assertEqual(code, 2, out)
+            self.assertIn("blocking", out)
+            code, out = self.mark(project, "codex-reviewed", report)
+            self.assertEqual(code, 0, out)
+            text = project.spec.read_text(encoding="utf-8")
+            self.assertIn("round=1 blocking=1", text)
+            self.assertEqual(review_state(text, "spec"), "none")
+            code, out = self.mark(project, "codex-approved", self.report(project))
+            self.assertEqual(code, 0, out)
+            self.assertIn("round=2 blocking=0", project.spec.read_text(encoding="utf-8"))
+
+    def test_two_blocking_rounds_hand_it_to_the_user(self):
+        with Project() as project:
+            for _ in range(2):
+                self.assertEqual(self.mark(project, "codex-reviewed", self.report(project, severities=("blocking",)))[0], 0)
+            for state, severities in (("codex-reviewed", ("blocking",)), ("codex-approved", ())):
+                code, out = self.mark(project, state, self.report(project, severities=severities))
+                self.assertEqual(code, 2, (state, out))
+                self.assertIn("two rounds", out)
+            code, out = project.run("--module", "alpha", "--target", "spec", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+
+    def test_bad_reports_write_nothing(self):
+        with Project() as project:
+            before = project.spec.read_text(encoding="utf-8")
+            for report in (self.report(project, outcome="inconclusive"), str(project.root / "missing.json")):
+                code, out = self.mark(project, "codex-approved", report)
+                self.assertEqual(code, 2, out)
+            self.assertEqual(project.run("--module", "alpha", "--target", "spec", "--state", "codex-approved",
+                                         "--confirm")[0], 2)  # no --review
+            self.assertEqual(project.run("--module", "alpha", "--target", "both", "--state", "codex-approved",
+                                         "--review", self.report(project), "--confirm")[0], 2)
+            self.assertEqual(project.spec.read_text(encoding="utf-8"), before)
+
+    def test_a_codex_approved_spec_lets_the_plan_be_approved(self):
+        import json
+        with Project() as project:
+            (project.root / ".agent").mkdir()
+            (project.root / ".agent" / "config.json").write_text(json.dumps({"version": 1, "takeover": {"spec": "codex"}}),
+                                                                 encoding="utf-8")
+            self.assertEqual(self.mark(project, "codex-approved", self.report(project))[0], 0)
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
+            self.assertEqual(code, 0, out)
+
+    def test_plan_too(self):
+        with Project() as project:
+            code, out = self.mark(project, "codex-approved", self.report(project, kind="plan"), kind="plan")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(review_state(project.plan.read_text(encoding="utf-8"), "plan"), "codex-approved")
+
+
+class Effective(unittest.TestCase):
+    """codex-approval (C2, assumptions 7, 9, Q6): Codex's approval counts only where the takeover gives it the step."""
+
+    def project(self, config, plan="# Plan: alpha\n\n步骤\n"):
+        import json
+        project = Project().__enter__()
+        self.addCleanup(project.__exit__)
+        (project.root / ".agent").mkdir()
+        (project.root / ".agent" / "config.json").write_text(json.dumps(dict(version=1, **config)), encoding="utf-8")
+        project.plan.write_text(plan, encoding="utf-8")
+        return project.root
+
+    def test_codex_approval_needs_the_takeover(self):
+        from module_stage import effective_review
+        root = self.project({"takeover": {"spec": "codex"}})
+        self.assertEqual(effective_review(root, "alpha", "spec", "codex-approved"), ("approved", "codex"))
+        self.assertEqual(effective_review(root, "alpha", "plan", "codex-approved"), ("pending", None))
+        self.assertEqual(effective_review(root, "alpha", "plan", "approved"), ("approved", "user"))
+        self.assertEqual(effective_review(root, "alpha", "spec", "revised"), ("revised", None))
+
+    def test_a_plan_that_pre_declares_goes_to_the_user(self):
+        from module_stage import codex_route
+        listed = "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：`package.json`\n"
+        self.assertEqual(codex_route(self.project({"takeover": "plan"}, listed), "alpha", "plan"), "pre-declared")
+        empty = "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：无\n"
+        self.assertEqual(codex_route(self.project({"takeover": "plan"}, empty), "alpha", "plan"), "")
+
+    def test_combined_only_with_one_approver(self):
+        from module_stage import cadence_combined
+        self.assertTrue(cadence_combined(self.project({"reviewCadence": "combined"}), "alpha"))
+        self.assertFalse(cadence_combined(self.project({"reviewCadence": "combined", "takeover": "plan"}), "alpha"))
+        self.assertTrue(cadence_combined(self.project({"reviewCadence": "combined", "takeover": "merge"}), "alpha"))
 
 
 class BlankLinesAroundTheMarker(unittest.TestCase):

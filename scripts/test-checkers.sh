@@ -823,6 +823,9 @@ mkifc "$TMP/ifc-takeover-preset" 'del data["takeover"]["presets"]["merge"]'
 want fail "interface: takeover 少一个预设 → 报错" python3 "$IFC" "$TMP/ifc-takeover-preset/interface.json"
 mkifc "$TMP/ifc-map-takeover" 'del data["mapView"]["takeover"]'
 want fail "interface: mapView 缺 1.15 的 takeover 说明 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover/interface.json"
+# codex-approval：interface 1.15 的 mapView.values.reviewApprovedBy，取值与 map_view.APPROVED_BY 一致。
+mkifc "$TMP/ifc-approved-by" 'del data["mapView"]["values"]["reviewApprovedBy"]'
+want fail "interface: mapView 缺 1.15 的 reviewApprovedBy 取值 → 报错" python3 "$IFC" "$TMP/ifc-approved-by/interface.json"
 # takeover-narrow：interface 1.15 的 takeoverNarrow 入口，来源词表与 project_config.SOURCES 一致。
 mkifc "$TMP/ifc-narrow" 'del data["takeoverNarrow"]'
 want fail "interface: 缺 1.15 的 takeoverNarrow 入口 → 报错" python3 "$IFC" "$TMP/ifc-narrow/interface.json"

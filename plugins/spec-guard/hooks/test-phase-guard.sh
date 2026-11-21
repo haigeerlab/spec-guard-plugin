@@ -3007,7 +3007,52 @@ $plain_ua"
 echo "  ✅ 补上草案、或模块逐个插入：输出与改前逐字相同"; PASS=$((PASS + 1))
 }
 
-PARTS=27
+part_28() {
+# codex-approval：勾了 codex 的模块交 Codex 审，两轮阻断交用户，档位不允许时 Codex 批准不算；没勾的模块逐字不变。
+cx="$WORK/codex"; git init -q -b main "$cx"; mkdir -p "$cx/spec" "$cx/.agent"
+printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$cx/CLAUDE.md"
+printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
+  'Build order: alpha' > "$cx/spec/CAPABILITY-MAP.md"
+printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' > "$cx/spec/alpha.md"
+printf '{"version": 1}\n' > "$cx/.agent/config.json"
+plain_cx="$(run "$cx" | context_of)"
+printf '{"version": 1, "takeover": {"plan": "codex"}}\n' > "$cx/.agent/config.json"
+[ "$(run "$cx" | context_of)" = "$plain_cx" ] || fail "Spec 没勾 codex 时输出应与没有档位时逐字相同
+$(run "$cx" | context_of)"
+printf '{"version": 1, "takeover": {"spec": "codex"}}\n' > "$cx/.agent/config.json"
+out="$(run "$cx" | context_of)"
+grep -F 'is reviewed by Codex under the takeover' >/dev/null <<<"$out" && grep -F -- '--state codex-approved' >/dev/null <<<"$out" &&
+  grep -F 'never review it yourself' >/dev/null <<<"$out" || fail "勾了 spec=codex 时应交 Codex 审
+$out"
+printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": {"spec": "codex"}}\n' > "$cx/.agent/config.json"
+out="$(run "$cx" | context_of)"
+grep -F '按接管档位由 Codex 审' >/dev/null <<<"$out" && grep -F '不要自己审自己' >/dev/null <<<"$out" || fail "中文同样交 Codex 审
+$out"
+echo "  ✅ 勾了 codex 的 Spec 交 Codex 审（中英），没勾时逐字不变"; PASS=$((PASS + 1))
+
+printf '{"version": 1, "takeover": {"spec": "codex"}}\n' > "$cx/.agent/config.json"
+printf '%s\n' '' '## 外部审查意见' '' '<!-- spec-guard: codex-review round=1 blocking=2 sha256=aaaaaaaaaaaa -->' \
+  '<!-- spec-guard: codex-review round=2 blocking=1 sha256=bbbbbbbbbbbb -->' >> "$cx/spec/alpha.md"
+out="$(run "$cx" | context_of)"
+grep -F 'still has blocking findings after two Codex rounds' >/dev/null <<<"$out" || fail "两轮阻断后应交用户
+$out"
+echo "  ✅ 两轮阻断后交用户"; PASS=$((PASS + 1))
+
+printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' > "$cx/spec/alpha.md"
+digest="$(python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); from module_stage import review_digest; print(review_digest(open(sys.argv[2]).read()))' "$HOOKDIR" "$cx/spec/alpha.md")"
+sed -i.bak "s/<!-- spec-guard: review pending -->/<!-- spec-guard: review codex-approved $digest -->/" "$cx/spec/alpha.md"
+out="$(run "$cx" | context_of)"
+grep -F 'create `tasks/alpha/plan.md`' >/dev/null <<<"$out" && ! grep -F 'Review:' >/dev/null <<<"$out" ||
+  fail "档位允许时 Codex 批准算已批准，接着写 Plan
+$out"
+printf '{"version": 1}\n' > "$cx/.agent/config.json"
+out="$(run "$cx" | context_of)"
+grep -F 'was reviewed by Codex, but this module' >/dev/null <<<"$out" || fail "档位不允许时 Codex 批准不算
+$out"
+echo "  ✅ Codex 批准只在档位允许时算数"; PASS=$((PASS + 1))
+}
+
+PARTS=28
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

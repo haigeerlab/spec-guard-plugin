@@ -144,12 +144,13 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题的�
 
 项目可以在 `.agent/config.json` 设接管档位：`takeover`（项目）与 `moduleTakeover`（单个模块），定 Spec 批准、Plan 批准、合并、发布
 四项各由人做还是交给 AI。预设 `none`（默认，等于今天的做法）、`plan`（只接管 Plan）、`merge`（接管到合并），也可以自定义每一项。
-spec-guard 只存、读、报告来源；读它放行的是 autopilot 与 module-crew，按档位放行的规则落地前，下面的底线照旧适用。设置或取消要用户
+spec-guard 只存、读、报告来源；Spec、Plan 由 Codex 批见「批准标记」一节，合并与发布由 autopilot、module-crew 读它放行。设置或取消要用户
 在对话里的原话（说明设成什么），`--confirm` 前在回复里引用。原来的 `autonomyTier`、`moduleAutonomy` 已退役、不映射：文件里还有时
 不生效，config 标为已退役，可用 unset 删除。
 
-任何档位都不能低于这条底线：能力图、Spec（可以和 Plan 一起批）、最终验收要用户批；测试改不红、Spec 没覆盖的决策、高风险不可逆改动这三种
-情况必停。项目自己的规则更严时，以项目为准。
+底线按勾选项：能力图永远由用户批；Spec、Plan（可以和 Plan 一起批，批准人不同时分开批）按档位，没勾 codex 的由用户批；判为重要需求的
+Spec、「预先声明」有内容的 Plan 不论档位都由用户批；最终验收照旧由用户做（勾了「合并：自动」的模块按最终验收的 Codex 规则）；
+测试改不红、Spec 没覆盖的决策、高风险不可逆改动这三种情况必停。项目自己的规则更严时，以项目为准。
 
 ## 批准标记
 
@@ -159,8 +160,15 @@ spec-guard 只存、读、报告来源；读它放行的是 autopilot 与 module
 <!-- spec-guard: review pending -->
 <!-- spec-guard: review approved <digest> -->     ← Spec，digest 是批准时的内容指纹
 <!-- spec-guard: review approved -->              ← Plan
+<!-- spec-guard: review codex-approved <digest> --> ← Codex 按接管档位批的 Spec 或 Plan
 ```
 
+- **接管档位下由 Codex 批（`codex-approved`）**：模块档位里这一项是 codex 时，Spec 或 Plan 标 `pending` 后交 Codex 审：
+  用 /delegate:review（后端 codex）审这个文件，把标准输出的 JSON 存成文件，再用 `review-mark --state codex-approved --review <文件>` 记下；
+  spec-guard 只认完成且有结论的 Codex 报告，按 `scope.files` 的内容 sha256 核对被审文件就是工作区这一份，缺严重程度的意见按阻断。
+  有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审；两轮仍有阻断就停下交用户，之后只能由用户批。建议类意见由 agent 决定是否采纳，
+  在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。审查报告不是用户的批准：档位不允许、或 Plan 的「预先声明」
+  有内容时，`codex-approved` 读作待用户批准。
 - **写出 Spec 或 Plan 交用户批准时标 `pending`**（写文件时直接带上这一行，或用 `review-mark`）。当前模块待批准时，
   阶段提示报告“等待用户批准”，不建议写 Plan 或继续构建；`combined` 节奏下 Spec 待批准时照常写出 Plan，两份一起交审。
 - **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，用 `/spec-guard:review-mark`（Codex：`spec-guard-ops`

@@ -262,7 +262,9 @@ python3 -B "$ROOT/hooks/project_link.py" unset --from "$FROM" --confirm
 
 记录模块 Spec 或 Plan 的批准状态（Claude 侧为 `/spec-guard:review-mark`）：在 `spec/<id>.md` 或 `tasks/<id>/plan.md` 写一行
 `<!-- spec-guard: review pending -->`、`<!-- spec-guard: review approved <digest> -->`（Spec，带批准时的内容指纹）或
-`<!-- spec-guard: review approved -->`（Plan）。当前模块待批准时阶段提示报告等待用户批准、不建议写 Plan 或继续构建；
+`<!-- spec-guard: review approved -->`（Plan），接管档位下由 Codex 批的写 `<!-- spec-guard: review codex-approved <digest> -->`
+（`--state codex-approved|codex-reviewed --review <delegate 报告 JSON>`，只认完成且有结论的 Codex 报告、按 `scope.files` 的 sha256 核对文件，
+每轮记一行，两轮阻断后交用户；档位不允许或 Plan 有预先声明时算待用户批准）。当前模块待批准时阶段提示报告等待用户批准、不建议写 Plan 或继续构建；
 Spec 批准后内容有变即判为批准后已修订，需复审后重新记录；没有标记的文件判定照旧。默认只预览，把预览给用户看过并
 确认后才加 `--confirm`，只改这一行并读回：
 
