@@ -135,6 +135,25 @@ def _outside(root: Path, module_id: str) -> str | None:
     return "%d file(s) outside: %s" % (len(outside), ", ".join(outside[:5])) if outside else None
 
 
+def _merge_at_base(root: Path, module_id: str) -> str:
+    """M3 rework (Q14 A): the module's merge item as of the commit before it started, read by the one config reader."""
+    import tempfile
+    from module_scope import default_base
+    from project_config import module_takeover
+    base = default_base(root, module_id)
+    if not base:
+        return "unknown (no commit before the module)"
+    if _git(root, "cat-file", "-e", "%s:.agent/config.json" % base) is None:
+        return "human"  # no config then: the default takeover
+    text = _git(root, "show", "%s:.agent/config.json" % base)
+    if text is None:
+        return "unknown (config unreadable)"
+    with tempfile.TemporaryDirectory(prefix="spec-guard-base-") as folder:
+        (Path(folder) / ".agent").mkdir()
+        (Path(folder) / ".agent" / "config.json").write_text(text + "\n", encoding="utf-8")
+        return module_takeover(Path(folder), module_id)[0].get("merge")
+
+
 def _acceptance(root: Path, module_id: str, state: str, report: str | None, confirm: bool) -> int:
     """codex-final-acceptance: record Codex's final acceptance of HEAD in the git directory, or say why not."""
     from project_config import module_takeover
@@ -149,6 +168,12 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
     if takeover.get("merge") != "auto":
         print("acceptance-not-auto: %s's takeover has merge=%s; only a merge=auto module is accepted by Codex, "
               "others wait for the user" % (module_id, takeover.get("merge")))
+        return 2
+    base_merge = _merge_at_base(root, module_id)
+    if base_merge != "auto":
+        print("acceptance-not-auto-at-base: before %s started, its takeover had merge=%s; Codex accepts only a module "
+              "whose merge was automatic from the start, so a patch cannot grant it to itself (Q14 A)"
+              % (module_id, base_merge))
         return 2
     status = _git(root, "status", "--porcelain")
     if status is None:

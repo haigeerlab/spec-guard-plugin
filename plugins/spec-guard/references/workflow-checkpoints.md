@@ -178,7 +178,7 @@ Spec 交给 Codex 的模块，没写并行边界或清单读不到也按重要�
   有内容时，`codex-approved` 读作待用户批准。
 - **合并自动的模块由 Codex 做最终验收**：模块档位里合并是 auto 时，到最终 gate 用 /delegate:review（后端 codex）审本模块开工前的提交到
   HEAD 的补丁（`--spec spec/<id>.md`，报告存仓库外），再等 autopilot 在 HEAD 上的检查证据（非作者跑、全部退出 0）；两样齐了、工作区干净、
-  没有越界，用 `review-mark --target acceptance --state codex-approved --review <报告>` 记下。记录写在 git 目录、不进提交（提交会让 HEAD
+  没有越界、且本模块开工前就是合并：自动（开工后才放宽的由用户验收，免得补丁靠改配置放宽自己的档位），用 `review-mark --target acceptance --state codex-approved --review <报告>` 记下。记录写在 git 目录、不进提交（提交会让 HEAD
   变掉），记录的提交是 HEAD 或其祖先时阶段提示当最终 gate 已过；合并后补勾并写一句来源。缺任一样或被拒绝就停下等用户，不要自己验收；
   拟回告写进 todo，不发出，等用户确认（回告是对外发送）。其余模块的最终验收照旧由用户做。
 - **写出 Spec 或 Plan 交用户批准时标 `pending`**（写文件时直接带上这一行，或用 `review-mark`）。当前模块待批准时，
@@ -455,7 +455,7 @@ B 维持现有顺序串行做。硬门槛不满足时只写「不建议并行」
   不互相替代。越界只报告，不卡验收；是否接受由用户决定。开关 on 时 `--base` 给集成基线。
 
 **接管模块也查，越界即停。** 接管档位里任一项不是 `human` 的模块，开关没开也查：基线默认是本模块 Spec 第一次提交的父提交（`--base`
-可省），Plan 已批准且之后没改时，它「预先声明」的公共路径放行（记为 `declared`）；能力图与用法草案是流程文件（记为 `flow`），不算越界。构建中阶段提示一出现越界文件，就停下逐个说明为什么要改，
+可省），Plan 已批准且之后没改时，它「预先声明」的公共路径放行（记为 `declared`）；能力图、用法草案与 `.agent/config.json`、`.agent/state.json` 是流程文件（记为 `flow`），不算越界。构建中阶段提示一出现越界文件，就停下逐个说明为什么要改，
 交用户决定：同意就补进并行边界或预先声明并复审，不同意就撤回；没写并行边界同样停下。autopilot 合并前读 `--format json` 的 `outside`。
 
 ## 协调会话的批准与合并（moduleConcurrency 为 on 时）

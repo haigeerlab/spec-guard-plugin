@@ -861,6 +861,17 @@ def codex_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool, raw: di
             return ("- Review: %s `%s` was reviewed by Codex, but %s." % (names[kind], path, why),
                     "have the user review `%s`; Codex's approval does not count here. When the user approves it, record "
                     "that with %s." % (path, cmd["review-mark"]))
+        if state == "pending" and route == "pre-declared":
+            # M3 rework: say why this Plan skips Codex instead of only "waiting for the user".
+            if zh:
+                return ("- 批准: Plan `%s` 的「预先声明」有内容或格式不对，按规则由用户批，不交 Codex。" % path,
+                        "把 `%s` 交给用户审，交审时逐条列出预先声明的四行；格式不对就先按 verify-artifacts 的提示改好。"
+                        "用户批准后，用 %s 记下来。" % (path, cmd["review-mark"]))
+            return ("- Review: Plan `%s`'s pre-declared section lists shared changes or is malformed, so the user "
+                    "approves it, not Codex." % path,
+                    "have the user review `%s`, listing the four pre-declared lines; if the section is malformed, fix it "
+                    "as verify-artifacts says first. When the user approves it, record that with %s."
+                    % (path, cmd["review-mark"]))
         if state != "pending" or route:
             continue
         if codex_rounds_exhausted(root, path):

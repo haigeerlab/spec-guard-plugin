@@ -371,6 +371,15 @@ class RetiredAutonomy(unittest.TestCase):
             self.assertNotIn("autonomyTier", items)
             self.assertNotIn("moduleAutonomy", items)
 
+    def test_setting_the_takeover_reminds_of_retired_keys(self):
+        # M3 rework: U1 says the preview tells the user the old tier is retired; only show did.
+        with Project(self.OLD) as project:
+            out = project.run("set", "--key", "takeover", "--value", "plan")[1]
+            self.assertIn("note: autonomyTier, moduleAutonomy are retired and not in effect", out)
+            self.assertIn("unset --key autonomyTier", out)
+        with Project({"version": 1}) as project:
+            self.assertNotIn("retired", project.run("set", "--key", "takeover", "--value", "plan")[1])
+
     def test_set_is_refused_unset_works(self):
         for args in (("set", "--key", "autonomyTier", "--value", "strict"),
                      ("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")):

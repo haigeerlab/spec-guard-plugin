@@ -412,6 +412,11 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
                       % (module, _items_line(project)))
         if items["release"] in ("auto-confirm", "auto"):
             print("\n".join(RELEASE_LIMITS))
+        retired = [name for name in RETIRED if name in rest]
+        if retired:  # M3 rework: the takeover replaces them; say so where the user sets it
+            print("note: %s %s retired and not in effect; the takeover above replaces them. Remove with %s"
+                  % (", ".join(retired), "is" if len(retired) == 1 else "are",
+                     " and ".join("unset --key %s" % name for name in retired)))
     return _commit(root, updated, rest, after, confirm)
 
 

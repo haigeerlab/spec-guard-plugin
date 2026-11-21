@@ -239,7 +239,7 @@ class TakeoverCheck(unittest.TestCase):
             code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
             self.assertEqual(code, 0, out)
             outside = {item["path"] for item in json.loads(out)["files"] if item["scope"] == "outside"}
-            self.assertEqual(outside, {"apps/mm/x.py", ".agent/config.json"})  # writing the takeover changed the config too
+            self.assertEqual(outside, {"apps/mm/x.py"})  # writing the takeover changed the config, which is flow (M3 rework)
         with Repo(switch="off") as repo:
             self.takeover(repo, "none")
             self.assertEqual(repo.run("check", "--module", "m", "--base", "base")[0], 3)
@@ -278,6 +278,26 @@ class TakeoverCheck(unittest.TestCase):
             files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
             self.assertEqual(files["spec/CAPABILITY-MAP.md"], "outside")
 
+    def test_project_config_is_a_flow_file_for_takeover_modules(self):
+        # M3 rework: narrowing or adjusting the takeover rewrites .agent/config.json; it is a project setting, not overreach.
+        with Repo(switch="off") as repo:
+            self.takeover(repo)
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual(files[".agent/config.json"], "flow", out)
+        with Repo(switch="off") as repo:  # Q15 A: activeModule changes at every module boundary
+            self.takeover(repo)
+            repo.write(".agent/state.json", json.dumps({"activeModule": "m"}))
+            repo.write("CLAUDE.md", "user text\n")
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual((files[".agent/state.json"], files["CLAUDE.md"]), ("flow", "outside"), out)
+        with Repo(switch="on") as repo:  # a concurrency module that is not a takeover module keeps the old reading
+            repo.write(".agent/config.json", json.dumps({"version": 1, "moduleConcurrency": "on", "reviewCadence": "combined"}))
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            files = {item["path"]: item["scope"] for item in json.loads(out)["files"]}
+            self.assertEqual(files[".agent/config.json"], "outside", out)
+
     def test_default_base_is_the_parent_of_the_spec_commit(self):
         with Repo(switch="off") as repo:
             self.takeover(repo)
@@ -301,7 +321,7 @@ class TakeoverCheck(unittest.TestCase):
             self.assertEqual(code, 0, out)
             report = json.loads(out)
             self.assertEqual(report["base"], first)
-            self.assertEqual(report["outside"], 2)  # the config written after the Spec, and apps/elsewhere.py
+            self.assertEqual(report["outside"], 1)  # apps/elsewhere.py; the config written after the Spec is flow (M3 rework)
 
 class Validate(unittest.TestCase):
     """`validate` feeds verify-artifacts: nothing when the switch is off, one line per finding when on."""
