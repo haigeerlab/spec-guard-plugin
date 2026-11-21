@@ -149,7 +149,7 @@ class Summary(unittest.TestCase):
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
         self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency",
-                                      "takeover", "moduleTakeover",
+                                      "takeover", "moduleTakeover", "takeoverNarrowed",
                                       "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
@@ -522,6 +522,105 @@ class Takeover(unittest.TestCase):
             items = {item["key"]: item for item in summary(project.root)}
             self.assertEqual((items["takeover"]["value"], items["takeover"]["source"]), ("none", "default"))
             self.assertEqual((items["moduleTakeover"]["value"], items["moduleTakeover"]["source"]), ({}, "default"))
+
+
+class Narrow(unittest.TestCase):
+    """takeover-narrow (C1): one step stricter, no user words, with a record of where it started."""
+
+    FULL = {"spec": "codex", "plan": "codex", "merge": "auto", "release": "auto"}
+
+    def doc(self, project):
+        return json.loads(project.config.read_text(encoding="utf-8"))
+
+    def narrow(self, project, *extra, reason="rollback of #12"):
+        return project.run("narrow", "--source", "autopilot", "--reason", reason, *extra, "--confirm")
+
+    def test_preset_order(self):
+        with Project({"version": 1, "takeover": "merge"}) as project:
+            for expected in ("plan", "none"):
+                code, out = self.narrow(project)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.doc(project)["takeover"], expected)
+            before = project.config.read_text(encoding="utf-8")
+            code, out = self.narrow(project)
+            self.assertEqual(code, 0, out)
+            self.assertIn("already", out)
+            self.assertEqual(project.config.read_text(encoding="utf-8"), before)
+
+    def test_custom_order_release_merge_plan_spec(self):
+        with Project({"version": 1, "takeover": self.FULL}) as project:
+            for expected in ({"spec": "codex", "plan": "codex", "merge": "auto"}, {"spec": "codex", "plan": "codex"},
+                             {"spec": "codex"}, "none"):
+                code, out = self.narrow(project)
+                self.assertEqual(code, 0, out)
+                self.assertEqual(self.doc(project)["takeover"], expected)
+        with Project({"version": 1, "takeover": {"plan": "codex", "release": "prepare"}}) as project:
+            self.narrow(project)
+            self.assertEqual(self.doc(project)["takeover"], {"plan": "codex"})
+
+    def test_preview_does_not_write(self):
+        with Project({"version": 1, "takeover": "merge"}) as project:
+            before = project.config.read_text(encoding="utf-8")
+            code, out = project.run("narrow", "--source", "autopilot", "--reason", "x")
+            self.assertEqual(code, 0, out)
+            self.assertIn("preview only", out)
+            self.assertIn("spec=human plan=codex merge=human release=human", out)
+            self.assertEqual(project.config.read_text(encoding="utf-8"), before)
+
+    def test_bad_arguments_write_nothing(self):
+        cases = [("--source", "someone", "--reason", "x"), ("--source", "autopilot", "--reason", ""),
+                 ("--source", "autopilot", "--reason", "two\nlines"), ("--source", "autopilot", "--reason", "x" * 201),
+                 ("--source", "autopilot", "--reason", "x", "--module", "Bad_Id")]
+        for args in cases:
+            with Project({"version": 1, "takeover": "merge"}) as project:
+                before = project.config.read_text(encoding="utf-8")
+                code, out = project.run("narrow", *args, "--confirm")
+                self.assertEqual(code, 2, (args, out))
+                self.assertEqual(project.config.read_text(encoding="utf-8"), before, args)
+
+    def test_module_starts_from_the_project_value(self):
+        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"beta": "merge"}}) as project:
+            code, out = self.narrow(project, "--module", "alpha")
+            self.assertEqual(code, 0, out)
+            document = self.doc(project)
+            self.assertEqual(document["takeover"], "plan")
+            self.assertEqual(document["moduleTakeover"], {"beta": "merge", "alpha": "none"})
+            self.assertEqual(document["takeoverNarrowed"]["alpha"]["from"], "plan")
+
+    def test_project_narrow_leaves_module_entries(self):
+        with Project({"version": 1, "takeover": "merge", "moduleTakeover": {"beta": "merge"}}) as project:
+            self.narrow(project)
+            document = self.doc(project)
+            self.assertEqual((document["takeover"], document["moduleTakeover"]), ("plan", {"beta": "merge"}))
+
+    def test_record_keeps_the_first_from(self):
+        with Project({"version": 1, "takeover": "merge"}) as project:
+            self.narrow(project, reason="first")
+            record = self.doc(project)["takeoverNarrowed"]["project"]
+            self.assertEqual((record["from"], record["to"], record["source"], record["reason"]),
+                             ("merge", "plan", "autopilot", "first"))
+            self.assertTrue(record["at"].endswith("Z"))
+            project.run("narrow", "--source", "module-crew", "--reason", "second", "--confirm")
+            record = self.doc(project)["takeoverNarrowed"]["project"]
+            self.assertEqual((record["from"], record["to"], record["source"], record["reason"]),
+                             ("merge", "none", "module-crew", "second"))
+
+    def test_invalid_record_drops_only_itself(self):
+        for bad in ({"project": {"from": "merge"}}, {"Bad_Id": {"from": "merge", "to": "plan", "source": "autopilot",
+                                                                 "reason": "x", "at": "2026-11-21T00:00:00Z"}},
+                    {"project": {"from": "merge", "to": "plan", "source": "robot", "reason": "x",
+                                 "at": "2026-11-21T00:00:00Z"}}):
+            with Project({"version": 1, "takeover": "plan", "takeoverNarrowed": bad}) as project:
+                self.assertEqual(load(project.root), ({"takeover": "plan"}, ["takeoverNarrowed-invalid"]), bad)
+                self.assertEqual(project.run("check")[0], 1, bad)
+
+    def test_config_cannot_edit_the_record(self):
+        with Project({"version": 1, "takeover": "merge"}) as project:
+            self.narrow(project)
+            for args in (("set", "--key", "takeoverNarrowed", "--value", "{}"), ("unset", "--key", "takeoverNarrowed")):
+                code, out = project.run(*args, "--confirm")
+                self.assertEqual(code, 2, (args, out))
+            self.assertIn("takeoverNarrowed", self.doc(project))
 
 
 class MachineState(unittest.TestCase):

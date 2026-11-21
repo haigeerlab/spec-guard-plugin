@@ -1,7 +1,7 @@
 # Todo: takeover-narrow
 
 - [x] Task 0：提交 Plan 与 todo — 2026-11-21 用户批准 Spec（「批准；Q3 A」）与 Plan（「Plan 批准」）。
-- [ ] Task 1：narrow_step 与 narrow 子命令、takeoverNarrowed 校验
+- [x] Task 1：narrow_step 与 narrow 子命令、takeoverNarrowed 校验 — `project_config.py` 新增 `PRESET_LADDER`、`NARROW_ORDER`（发布、合并、Plan、Spec）、`narrow_step`、`narrower_or_equal`、`widen_steps`、`valid_reason`、`valid_narrowed`，`VALIDATORS` 加 `takeoverNarrowed`（`config set／unset` 不能直接改它，退出 2）；子命令 `narrow --source --reason [--module] [--confirm]`：预览列收窄前后四项，已是最严时不写、退出 0，记录保留第一次的 from；写入部分抽成 `_prepare`／`_print_diff`／`_commit` 供 set 与 narrow 共用。`test_project_config.py` 新增 `Narrow` 9 例（实现前 7 失败 1 错误），62 例全过。
 - [ ] Task 2：恢复一次一格
 - [ ] Task 3：/map --json 的 narrowed 与接口
 - [ ] Task 4：说明文字
