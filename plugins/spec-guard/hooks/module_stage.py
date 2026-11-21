@@ -149,6 +149,8 @@ def module_state(root: Path, module_id: str) -> dict:
     todo = root / "tasks" / module_id / "todo.md"
     text = todo.read_text(encoding="utf-8") if todo.is_file() else ""
     open_items = len(UNCHECKED.findall(text))
+    if open_items and has_plan_files(root, module_id) and final_gate_accepted(root, module_id, text):
+        open_items -= 1  # codex-final-acceptance: ticked after the merge; until then the record stands for it
     half = bool(open_items) and bool(CHECKED.search(text))
     # A marker on a module with nothing left open is stale: the module simply counts as done.
     suspended = bool(open_items) and any(line.strip() == SUSPEND_MARKER for line in text.splitlines())
@@ -534,12 +536,52 @@ def at_final_gate(root: Path, module: str) -> bool:
         text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return False
+    return final_gate_text(text) and not final_gate_accepted(root, module, text)
+
+
+def final_gate_text(text: str) -> bool:
+    """`at_final_gate` on the todo's text alone, before any acceptance record is considered."""
     lines = text.splitlines()
     open_gates = {index for index, _, checked in gate_checkpoints(text) if not checked}
     open_items = [index for index, line in enumerate(lines) if OPEN_ITEM.match(line)]
     if not open_items or open_items[0] not in open_gates:
         return False
     return not any(index in open_gates for index in open_items[1:])
+
+
+def has_plan_files(root: Path, module: str) -> bool:
+    return (root / "spec" / ("%s.md" % module)).is_file() and (root / "tasks" / module / "plan.md").is_file()
+
+
+ACCEPTANCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
+
+
+def acceptance_record(root: Path, module: str) -> dict | None:
+    """codex-final-acceptance: {marker, sha} of a merge=auto module's Codex acceptance record, else None.
+
+    The record lives in the git directory (`acceptance_path`), written only by review-mark --target acceptance;
+    a module whose takeover does not give merge to automation has none that counts.
+    """
+    from project_config import module_takeover  # late: project_config is imported by callers of this module
+    if module_takeover(root, module)[0].get("merge") != "auto":
+        return None
+    path = acceptance_path(root, module)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8")) if path is not None and path.is_file() else None
+    except (OSError, UnicodeError, ValueError):
+        return None
+    if (not isinstance(document, dict) or document.get("marker") != "codex-approved" or document.get("module") != module
+            or not isinstance(document.get("sha"), str) or not ACCEPTANCE_SHA.match(document["sha"])):
+        return None
+    return {"marker": document["marker"], "sha": document["sha"]}
+
+
+def final_gate_accepted(root: Path, module: str, text: str) -> bool:
+    """The module waits at its final gate and Codex accepted HEAD or an ancestor of it (assumption 5)."""
+    if not final_gate_text(text):
+        return False
+    record = acceptance_record(root, module)
+    return record is not None and _git(root, "merge-base", "--is-ancestor", record["sha"], "HEAD") is not None
 
 
 # rules-at-nodes: the stop rules the phase hint attaches at a node, one `## ` section per node in this file.
@@ -558,7 +600,7 @@ def first_open_is_gate(root: Path, module: str) -> bool:
         return False
     open_gates = {index for index, _, checked in gate_checkpoints(text) if not checked}
     open_items = [index for index, line in enumerate(text.splitlines()) if OPEN_ITEM.match(line)]
-    return bool(open_items) and open_items[0] in open_gates
+    return bool(open_items) and open_items[0] in open_gates and not final_gate_accepted(root, module, text)
 
 
 def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review: str) -> str | None:
@@ -1316,6 +1358,29 @@ def acceptance_path(root: Path, module: str) -> Path | None:
     return path if path.is_absolute() else Path(root) / path
 
 
+def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
+    """codex-final-acceptance (assumption 6): (fact, next step) at the final gate of a merge=auto module, else (None, "")."""
+    if stage != "BUILDING" or not module or not at_final_gate(root, module):
+        return None, ""
+    from project_config import module_takeover
+    if module_takeover(root, module)[0].get("merge") != "auto":
+        return None, ""
+    entry = "--target acceptance --state codex-approved --review <report>"
+    if zh:
+        return ("acceptance", "auto"), (
+            "本模块合并是自动的，最终验收交 Codex：用 `/delegate:review`（后端 codex）审本模块开工前的提交到 HEAD 的补丁，"
+            "`--spec spec/%s.md`，报告存到仓库外；等 autopilot 在 HEAD 上的检查证据；两样齐了、工作区干净，用 %s（%s）"
+            "记下验收，记录在 git 目录里、不进提交，最终 gate 合并后再补勾。缺任一样、或被拒绝，就停下等用户，不要自己验收。"
+            "拟回告写进 todo，不发出，等用户确认。" % (module, cmd["review-mark"], entry))
+    return ("acceptance", "auto"), (
+        "this module merges automatically, so Codex does the final acceptance: review the patch from the commit before "
+        "this module to HEAD with `/delegate:review` (backend codex) and `--spec spec/%s.md`, saving the report outside "
+        "the repository; wait for autopilot's check evidence on HEAD; with both and a clean working tree, record the "
+        "acceptance with %s (%s) -- the record stays in the git directory, uncommitted, and the final gate is ticked "
+        "after the merge. If either is missing or it is refused, stop and wait for the user; never accept it yourself. "
+        "Write the drafted reply into the todo and do not send it until the user confirms." % (module, cmd["review-mark"], entry))
+
+
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """takeover-scope-check: (fact, line, next step) when a takeover module's build goes outside its declared scope.
 
@@ -1603,6 +1668,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     if ms_step and role_kind not in ("module", "coordinator"):
         # milestone-stop: the stop comes before whatever the current module would do next.
         node, next_step = "milestone-stop", ms_step
+    ac_fact, ac_step = acceptance_step(root, module, stage, cmd, zh)
+    if ac_step and node == "final-gate" and role_kind not in ("module", "coordinator"):
+        next_step = ac_step
     sc_fact, sc_line, sc_step = scope_overreach(root, module, stage, zh)
     if sc_line:
         counts += "\n" + sc_line
@@ -1622,7 +1690,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
                        documentation_baseline_present(root)] + ([ms_fact] if ms_fact else [])
-                      + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else []),
+                      + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
+                      + ([ac_fact] if ac_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:

@@ -3144,7 +3144,61 @@ $out"
 echo "  ✅ 接管模块没写并行边界时停下"; PASS=$((PASS + 1))
 }
 
-PARTS=30
+part_31() {
+# codex-final-acceptance：合并自动的模块到最终 gate 时交 Codex 验收（中英）；记录在 HEAD 或其祖先上就当最终 gate 已过；
+# 合并不是自动时，有记录也与没有时逐字相同。
+fa() {  # $1=目录 $2=config JSON
+  git init -q -b main "$1"; mkdir -p "$1/spec" "$1/.agent" "$1/tasks/alpha"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$1/CLAUDE.md"
+  printf '%s\n' "$2" > "$1/.agent/config.json"
+  printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' \
+    '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$1/spec/CAPABILITY-MAP.md"
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "开始"
+  printf '%s\n' '# Spec: alpha' '' '## 并行边界' '' '- 独占：`src/alpha/`' > "$1/spec/alpha.md"
+  printf '%s\n' '# Plan: alpha' > "$1/tasks/alpha/plan.md"
+  printf '%s\n' '- [x] one' '- [ ] Checkpoint 2（gate）：最终验收' > "$1/tasks/alpha/todo.md"
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "模块"
+}
+record() {  # $1=目录 $2=sha
+  mkdir -p "$1/.git/spec-guard/acceptance"
+  printf '{"marker": "codex-approved", "sha": "%s", "module": "alpha"}\n' "$2" > "$1/.git/spec-guard/acceptance/alpha.json"
+}
+fp="$WORK/final-plain"; fa "$fp" '{"version": 1, "takeover": "plan"}'
+plain_fp="$(run "$fp" | context_of | sed "s#$fp#ROOT#g")"
+record "$fp" "$(git -C "$fp" rev-parse HEAD)"
+[ "$(run "$fp" | context_of | sed "s#$fp#ROOT#g")" = "$plain_fp" ] || fail "合并不是自动时，有验收记录也应逐字不变
+$(run "$fp" | context_of)"
+echo "  ✅ 合并不是自动的模块，验收记录不起作用、输出逐字不变"; PASS=$((PASS + 1))
+fx="$WORK/final-auto"; fa "$fx" '{"version": 1, "takeover": {"merge": "auto"}}'
+out="$(run "$fx" | context_of)"
+grep -F 'Codex does the final acceptance' >/dev/null <<<"$out" && grep -F -- '--target acceptance' >/dev/null <<<"$out" &&
+  grep -F 'never accept it yourself' >/dev/null <<<"$out" || fail "合并自动的模块到最终 gate 应交 Codex 验收
+$out"
+# 配置改动不提交会被越界检查算作越界；这里只换提示语言，让 git 不把它当改动。
+printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": {"merge": "auto"}}\n' > "$fx/.agent/config.json"
+git -C "$fx" update-index --assume-unchanged .agent/config.json
+out="$(run "$fx" | context_of)"
+grep -F '最终验收交 Codex' >/dev/null <<<"$out" && grep -F '不要自己验收' >/dev/null <<<"$out" || fail "中文同样交 Codex 验收
+$out"
+echo "  ✅ 合并自动的模块到最终 gate 时交 Codex 验收（中英）"; PASS=$((PASS + 1))
+record "$fx" 0000000000000000000000000000000000000000
+out="$(run "$fx" | context_of)"
+grep -F '最终验收交 Codex' >/dev/null <<<"$out" || fail "记录的提交不是 HEAD 的祖先时，最终 gate 不算通过
+$out"
+first="$(git -C "$fx" rev-parse HEAD)"
+printf 'x\n' > "$fx/src.txt"; git -C "$fx" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+git -C "$fx" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "合并后"
+record "$fx" "$first"
+out="$(run "$fx" | context_of)"
+grep -F '`beta`' >/dev/null <<<"$out" && ! grep -F '最终验收交 Codex' >/dev/null <<<"$out" ||
+  fail "记录在 HEAD 的祖先上时，最终 gate 当作已过、转到下一个模块
+$out"
+echo "  ✅ 验收记录在 HEAD 或其祖先上时最终 gate 当作已过，转到下一个模块"; PASS=$((PASS + 1))
+}
+
+PARTS=31
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

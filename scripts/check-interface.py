@@ -51,7 +51,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -91,6 +91,17 @@ def _milestone(view: dict) -> list:
         return ["mapView 缺少 milestoneStop 说明"]
     if set(fields) != set(map_view.MILESTONE_FIELDS):
         return ["mapView.milestoneStop.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.MILESTONE_FIELDS))]
+    return []
+
+
+def _acceptance(view: dict) -> list:
+    """codex-final-acceptance: interface 1.15 describes the per-module acceptance record map_view writes."""
+    block = view.get("acceptance")
+    fields = block.get("fields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 acceptance 说明"]
+    if set(fields) != set(map_view.ACCEPTANCE_FIELDS):
+        return ["mapView.acceptance.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.ACCEPTANCE_FIELDS))]
     return []
 
 

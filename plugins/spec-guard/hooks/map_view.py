@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, effective_review, external_review_state, important,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, effective_review, external_review_state, important,
                           file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -50,6 +50,7 @@ COMMIT_SEP = "\x1e"
 PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewCadence", "gates")  # interface.json progressFacts
 DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (formal-deferral, interface 1.12)
 MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone-stop, interface 1.13)
+ACCEPTANCE_FIELDS = ("marker", "sha")  # interface.json mapView.acceptance (codex-final-acceptance, interface 1.15)
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
 TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject", "narrowed")
@@ -459,6 +460,8 @@ def build(root: Path) -> dict:
             "review": _review(root, module),
             "reviewApprovedBy": _approved_by(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
+            # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
+            "acceptance": acceptance_record(root, module),
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
