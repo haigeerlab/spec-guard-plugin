@@ -758,6 +758,8 @@ def codex_route(root: Path, module: str, kind: str) -> str:
     """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
     if _takeover_item(root, module, kind) != "codex":
         return "takeover"
+    if kind == "spec" and important(root, module):
+        return "important"
     if kind == "plan" and _declared_nonempty(root, module):
         return "pre-declared"
     return ""
@@ -794,6 +796,17 @@ def codex_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool, raw: di
         if kind == "plan" and stage != "BUILDING":
             continue
         route = codex_route(root, module, kind)
+        if route == "important" and state in ("pending", "codex-approved"):
+            reasons = ", ".join(important(root, module))
+            if zh:
+                return ("- 批准: Spec `%s` 是重要需求（%s），不论接管档位都由用户批。" % (path, reasons),
+                        "先用 agent-skills 的 interview-me 一次一个问题向用户拷问需求，按答复改好 `%s`，再交用户审；Codex 的批准在这里不算数。"
+                        "用户批准后，用 %s 记下来。" % (path, cmd["review-mark"]))
+            return ("- Review: Spec `%s` is an important requirement (%s), so the user approves it whatever the takeover."
+                    % (path, reasons),
+                    "first interview the user with agent-skills' interview-me, one question at a time, revise `%s` from the "
+                    "answers, then have the user review it; Codex's approval does not count here. When the user approves "
+                    "it, record that with %s." % (path, cmd["review-mark"]))
         if state == "codex-approved" and route:
             why = (("本模块的接管档位要求人批" if route == "takeover" else "Plan 的「预先声明」有内容，按规则由用户批") if zh else
                    ("this module's takeover gives this step to the user" if route == "takeover"

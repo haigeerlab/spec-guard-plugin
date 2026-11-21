@@ -253,10 +253,12 @@ class CodexReviewTest(unittest.TestCase):
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from module_stage import review_codex_line, review_digest
-        spec = "# Spec: a\n\n<!-- spec-guard: review pending -->\n\n正文\n"
+        spec = "# Spec: a\n\n<!-- spec-guard: review pending -->\n\n正文\n\n## 并行边界\n\n- 独占：`src/a/`\n"
         spec = spec.replace("<!-- spec-guard: review pending -->", review_codex_line(review_digest(spec)))
         files = {"spec/a.md": spec, "tasks/a/plan.md": "# Plan\n\n<!-- spec-guard: review approved -->\n",
-                 "tasks/a/todo.md": "- [ ] one\n", ".agent/config.json": json.dumps(dict(version=1, **config))}
+                 "tasks/a/todo.md": "- [ ] one\n", ".agent/config.json": json.dumps(dict(version=1, **config)),
+                 # important-requirement: a boundary and a readable, non-matching risk list keep this Spec ordinary.
+                 ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []})}
         return Project(self.ROWS, ["a"], files)
 
     def test_codex_counts_only_under_the_takeover(self):
