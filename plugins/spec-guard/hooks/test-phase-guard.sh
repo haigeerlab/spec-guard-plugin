@@ -2877,19 +2877,24 @@ echo "  ✅ DONE 时最后一个里程碑未确认也停，确认后不停"; PAS
 }
 
 part_25() {
-# module-autonomy：按模块的自治档位只给 /map 与调用方读，阶段提示（正文与状态码）设与不设逐字相同。
+# module-autonomy／takeover-config：档位只给 /map 与调用方读，阶段提示（正文与状态码）设与不设逐字相同。
 ma="$WORK/autonomy"; mkdir -p "$ma/spec" "$ma/tasks/alpha" "$ma/.agent"
 printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$ma/CLAUDE.md"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
   '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$ma/spec/CAPABILITY-MAP.md"
 touch "$ma/spec/alpha.md"; printf '# Plan\n' > "$ma/tasks/alpha/plan.md"
 printf '%s\n' '- [x] one' '- [ ] two' > "$ma/tasks/alpha/todo.md"
-printf '{"version": 1, "autonomyTier": "standard"}\n' > "$ma/.agent/config.json"
+printf '{"version": 1}\n' > "$ma/.agent/config.json"
 plain_ma="$(run "$ma" | raw_of)"
-printf '{"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}\n' > "$ma/.agent/config.json"
-[ "$(run "$ma" | raw_of)" = "$plain_ma" ] || fail "设了 moduleAutonomy 后阶段提示变了
+# takeover-config：已退役的 autonomyTier、moduleAutonomy 不加「已忽略」行；takeover、moduleTakeover 本版阶段提示也不读。
+for body in '{"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}' \
+            '{"version": 1, "takeover": "merge"}' \
+            '{"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"release": "auto"}, "beta": "none"}}'; do
+  printf '%s\n' "$body" > "$ma/.agent/config.json"
+  [ "$(run "$ma" | raw_of)" = "$plain_ma" ] || fail "配置为 ${body} 时阶段提示变了
 $(run "$ma" | raw_of)"
-echo "  ✅ 设了 moduleAutonomy 时阶段提示与状态码逐字不变"; PASS=$((PASS + 1))
+done
+echo "  ✅ 已退役的档位键与接管档位都不改阶段提示与状态码"; PASS=$((PASS + 1))
 }
 
 part_26() {
