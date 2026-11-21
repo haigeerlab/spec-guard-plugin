@@ -1,5 +1,5 @@
 ---
-description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关、自治档位、按模块的自治档位），并汇总默认事项后端的当前值和来源
+description: 查看或按明确确认设置项目配置（产物语言、批准节奏、多模块并行开关、接管档位、按模块的接管档位），并汇总默认事项后端的当前值和来源
 allowed-tools: Bash
 ---
 
@@ -60,10 +60,11 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译。恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「批准节奏」 |
 | `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键 |
-| `autonomyTier` | `strict`／`standard`／`relaxed` | `strict` | 自治档位：各档放开什么由 module-crew 定义；spec-guard 只存、读、报告来源，自己的行为不随它变。不联动 `reviewCadence`：要 Spec 与 Plan 一起审，另设 `reviewCadence=combined`。设置或取消要用户在对话里的原话（说明设成哪一档），`--confirm` 前引用。任何档位都不低于共享检查点规则「自治档位与底线」。0.67.1 及更早的 spec-guard 会把含这个键的配置整份判为无效，0.68.0～0.84.2 只忽略这个键；团队都升级后再设置 |
-| `moduleAutonomy` | 对象：模块 id → `strict`／`standard`／`relaxed` | 未设置（`{}`） | 按模块的自治档位：「项目定上限，需求定实际」。没设的模块随 `autonomyTier`。用 `--module` 一次改一个模块；任何一条写错（id 不是 kebab-case、档位不在三档里）整个键失效，所有模块回到项目档位。比项目档位宽时只提醒、不截断，按项目上限截断由读取它的插件做。能力图上没有的模块 id 由 verify-artifacts 警告。`/map --json` 每个模块的 `autonomy` 报生效档位与来源。设置或取消同样要用户原话，规则与底线同 `autonomyTier`。0.67.1 及更早会把整份配置判为无效，0.68.0～0.88.0 只忽略这个键；团队都升级后再设置 |
+| `takeover` | 预设 `none`／`plan`／`merge`，或自定义对象 `{"spec","plan","merge","release"}` | `none` | 接管档位：Spec 批准、Plan 批准（`human`／`codex`）、合并（`human`／`auto`）、发布（`human`／`prepare`／`auto-confirm`／`auto`）各由谁做。`plan` 只把 Plan 交给 Codex；`merge` 把 Spec、Plan 交给 Codex 且合并自动；发布只能用自定义打开。自定义里没写的项按 `human`，任何一项写错整个键失效。spec-guard 只存、读、报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制（流水线自用的四个插件最高 `prepare`；`auto` 只给能快速回滚的项目），由 autopilot 拦截。设置或取消要用户在对话里的原话，`--confirm` 前引用；按档位放行的规则落地前，共享检查点规则「自治档位与底线」照旧适用。0.67.1 及更早的 spec-guard 会把含这个键的配置整份判为无效，0.68.0～0.90.1 只忽略它；团队都升级后再设置 |
+| `moduleTakeover` | 对象：模块 id → 同 `takeover` 的值 | 未设置（`{}`） | 按模块的接管档位，没设的模块随 `takeover`。用 `--module` 一次改一个模块；任何一条写错整个键失效。比项目宽时只提醒、不截断。能力图上没有的模块 id 由 verify-artifacts 警告。`/map --json` 每个模块的 `takeover` 报四项与来源。写入同样要用户原话 |
+| `autonomyTier`、`moduleAutonomy` | — | — | 已退役（S101），不映射到接管档位：文件里还有时不生效，`show` 标为已退役，verify-artifacts 只警告；不能再 `set`，可以 `unset` 删除。`/map --json` 的 `autonomy` 字段本版仍按它们计算、标为 deprecated，下一版删除 |
 
-设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency`、`autonomyTier`、`moduleAutonomy` 例外：取什么值都不注入，它们的效果只在相应规则的停点或读取它的插件里出现。
+设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency`、`takeover`、`moduleTakeover` 例外：取什么值都不注入，它们的效果只在相应规则的停点或读取它的插件里出现。
 
 只读汇总、不在这里修改的一项：
 
@@ -83,13 +84,19 @@ python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key artifa
 python3 -B "$ROOT/hooks/project_config.py" unset --project "$PROJECT" --key reviewCadence
 ```
 
-`moduleAutonomy` 一次只改一个模块，`set` 必须带 `--module`；`unset` 带 `--module` 去掉一个模块，不带则去掉整个键：
+`takeover` 的值是预设名，或以 `{` 开头的 JSON 对象（自定义）；预览先列出四项各由谁做：
 
 ```bash
-python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key moduleAutonomy --module <module-id> --value relaxed
+python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key takeover --value plan
 ```
 
-模块档位宽于项目档位时，预览多一行 `note:`，照实转述；spec-guard 不截断。
+`moduleTakeover` 一次只改一个模块，`set` 必须带 `--module`；`unset` 带 `--module` 去掉一个模块，不带则去掉整个键：
+
+```bash
+python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key moduleTakeover --module <module-id> --value '{"plan": "codex", "release": "prepare"}'
+```
+
+模块档位宽于项目时、发布为 `auto-confirm`／`auto` 时，预览多出 `note:` 行，照实转述；spec-guard 不截断。
 
 不带 `--confirm` 只打印改前／改后的差异，**什么都不写**；`--confirm` 只原子写回 `.agent/config.json`
 这一个文件并读回核对。取值不合法、键不认识或属于上表"只读汇总"的两项时，退出码 2 且不写文件。

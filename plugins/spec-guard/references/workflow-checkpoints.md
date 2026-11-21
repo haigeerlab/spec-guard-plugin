@@ -142,9 +142,11 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题的�
 
 ## 自治档位与底线
 
-项目可以在 `.agent/config.json` 设 `autonomyTier`：`strict`（默认，等于今天的做法）、`standard`、`relaxed`。各档放开什么由多模块协作插件
-（module-crew）定义；spec-guard 只存、读、报告来源，自己的阶段提示、停点规则和交审节奏都不随它变。它不联动 `reviewCadence`：某一档要
-Spec 和 Plan 一起审时，另设 `reviewCadence=combined`。设置或取消这一项要用户在对话里的原话（说明要设成哪一档），`--confirm` 前在回复里引用。
+项目可以在 `.agent/config.json` 设接管档位：`takeover`（项目）与 `moduleTakeover`（单个模块），定 Spec 批准、Plan 批准、合并、发布
+四项各由人做还是交给 AI。预设 `none`（默认，等于今天的做法）、`plan`（只接管 Plan）、`merge`（接管到合并），也可以自定义每一项。
+spec-guard 只存、读、报告来源；读它放行的是 autopilot 与 module-crew，按档位放行的规则落地前，下面的底线照旧适用。设置或取消要用户
+在对话里的原话（说明设成什么），`--confirm` 前在回复里引用。原来的 `autonomyTier`、`moduleAutonomy` 已退役、不映射：文件里还有时
+不生效，config 标为已退役，可用 unset 删除。
 
 任何档位都不能低于这条底线：能力图、Spec（可以和 Plan 一起批）、最终验收要用户批；测试改不红、Spec 没覆盖的决策、高风险不可逆改动这三种
 情况必停。项目自己的规则更严时，以项目为准。
