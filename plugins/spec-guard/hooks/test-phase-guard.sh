@@ -3013,7 +3013,10 @@ cx="$WORK/codex"; git init -q -b main "$cx"; mkdir -p "$cx/spec" "$cx/.agent"
 printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$cx/CLAUDE.md"
 printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
   'Build order: alpha' > "$cx/spec/CAPABILITY-MAP.md"
-printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' > "$cx/spec/alpha.md"
+# important-requirement：写上并行边界、放一份不命中的高风险清单，这个模块按规则不是重要需求。
+mkdir -p "$cx/.github/autopr"
+printf '%s\n' '{"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}' > "$cx/.github/autopr/risk-paths.json"
+printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' '' '## 并行边界' '' '- 独占：`src/alpha/`' > "$cx/spec/alpha.md"
 printf '{"version": 1}\n' > "$cx/.agent/config.json"
 plain_cx="$(run "$cx" | context_of)"
 printf '{"version": 1, "takeover": {"plan": "codex"}}\n' > "$cx/.agent/config.json"
@@ -3038,7 +3041,7 @@ grep -F 'still has blocking findings after two Codex rounds' >/dev/null <<<"$out
 $out"
 echo "  ✅ 两轮阻断后交用户"; PASS=$((PASS + 1))
 
-printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' > "$cx/spec/alpha.md"
+printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' '' '## 并行边界' '' '- 独占：`src/alpha/`' > "$cx/spec/alpha.md"
 digest="$(python3 -B -c 'import sys; sys.path.insert(0, sys.argv[1]); from module_stage import review_digest; print(review_digest(open(sys.argv[2]).read()))' "$HOOKDIR" "$cx/spec/alpha.md")"
 sed -i.bak "s/<!-- spec-guard: review pending -->/<!-- spec-guard: review codex-approved $digest -->/" "$cx/spec/alpha.md"
 out="$(run "$cx" | context_of)"
@@ -3052,7 +3055,52 @@ $out"
 echo "  ✅ Codex 批准只在档位允许时算数"; PASS=$((PASS + 1))
 }
 
-PARTS=28
+part_29() {
+# important-requirement：勾了 spec=codex 时，重要需求的 Spec 先拷问再交用户、写明理由；不重要的照常交 Codex；没勾 codex 时逐字不变。
+ir() {  # $1=目录 $2=together|alone
+  git init -q -b main "$1"; mkdir -p "$1/spec" "$1/.agent" "$1/.github/autopr"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$1/CLAUDE.md"
+  printf '%s\n' '{"schema": "autopilot.risk-paths/v1", "category": "plugin", "default": "T2", "T4": [".github/**"], "T3": []}' \
+    > "$1/.github/autopr/risk-paths.json"
+  printf '%s\n' '# Spec: alpha' '' '<!-- spec-guard: review pending -->' '' '## Objective' '' 'Do it.' '' '## 并行边界' '' \
+    '- 独占：`src/alpha/`' > "$1/spec/alpha.md"
+  if [ "$2" = together ]; then
+    printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' \
+      '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$1/spec/CAPABILITY-MAP.md"
+  else
+    printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
+      'Build order: alpha' > "$1/spec/CAPABILITY-MAP.md"
+  fi
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "初始"
+}
+it="$WORK/important"; ir "$it" together
+printf '{"version": 1, "takeover": {"plan": "codex"}}\n' > "$it/.agent/config.json"
+plain_it="$(run "$it" | context_of)"
+printf '{"version": 1}\n' > "$it/.agent/config.json"
+[ "$(run "$it" | context_of)" = "$plain_it" ] || fail "没勾 spec=codex 时重要与否都不该改输出
+$(run "$it" | context_of)"
+printf '{"version": 1, "takeover": {"spec": "codex"}}\n' > "$it/.agent/config.json"
+out="$(run "$it" | context_of)"
+grep -F 'important requirement' >/dev/null <<<"$out" && grep -F 'multi-module' >/dev/null <<<"$out" &&
+  grep -F 'interview-me' >/dev/null <<<"$out" && ! grep -F 'reviewed by Codex under the takeover' >/dev/null <<<"$out" ||
+  fail "重要需求的 Spec 应先拷问再交用户
+$out"
+printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": {"spec": "codex"}}\n' > "$it/.agent/config.json"
+out="$(run "$it" | context_of)"
+grep -F '重要需求' >/dev/null <<<"$out" && grep -F 'interview-me' >/dev/null <<<"$out" || fail "中文同样先拷问
+$out"
+echo "  ✅ 重要需求的 Spec 先拷问再交用户（中英），没勾 spec=codex 时逐字不变"; PASS=$((PASS + 1))
+ia="$WORK/important-alone"; ir "$ia" alone
+printf '{"version": 1, "takeover": {"spec": "codex"}}\n' > "$ia/.agent/config.json"
+out="$(run "$ia" | context_of)"
+grep -F 'reviewed by Codex under the takeover' >/dev/null <<<"$out" && ! grep -F 'important requirement' >/dev/null <<<"$out" ||
+  fail "不重要的 Spec 照常交 Codex
+$out"
+echo "  ✅ 不重要的 Spec 照常交 Codex 审"; PASS=$((PASS + 1))
+}
+
+PARTS=29
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

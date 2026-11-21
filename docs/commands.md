@@ -151,7 +151,8 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 接管档位里 Spec 或 Plan 交给 Codex 时，agent 用 /delegate:review 请 Codex 审，再用 `--state codex-approved --review <报告文件>` 记下
 （有阻断时用 `codex-reviewed` 记一轮、改完再审，两轮仍有阻断就交给你）。spec-guard 核对报告确实是 Codex 对这份文件的完成审查；
-`/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的。
+`/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的；`important` 写明哪些模块按规则是重要需求、理由是什么
+（同批多模块、跨模块、碰高风险路径），这些模块的 Spec 不论档位都由你批。
 
 ### `/spec-guard:milestone-mark`
 

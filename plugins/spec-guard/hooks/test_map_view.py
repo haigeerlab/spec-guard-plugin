@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy"}
+               "autonomy", "takeover", "reviewApprovedBy", "important"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -253,11 +253,21 @@ class CodexReviewTest(unittest.TestCase):
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         from module_stage import review_codex_line, review_digest
-        spec = "# Spec: a\n\n<!-- spec-guard: review pending -->\n\n正文\n"
+        spec = "# Spec: a\n\n<!-- spec-guard: review pending -->\n\n正文\n\n## 并行边界\n\n- 独占：`src/a/`\n"
         spec = spec.replace("<!-- spec-guard: review pending -->", review_codex_line(review_digest(spec)))
         files = {"spec/a.md": spec, "tasks/a/plan.md": "# Plan\n\n<!-- spec-guard: review approved -->\n",
-                 "tasks/a/todo.md": "- [ ] one\n", ".agent/config.json": json.dumps(dict(version=1, **config))}
+                 "tasks/a/todo.md": "- [ ] one\n", ".agent/config.json": json.dumps(dict(version=1, **config)),
+                 # important-requirement: a boundary and a readable, non-matching risk list keep this Spec ordinary.
+                 ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []})}
         return Project(self.ROWS, ["a"], files)
+
+    def test_important_reasons(self):
+        # important-requirement (AC4): with no risk list a Codex-reviewed Spec is important for risk-unknown.
+        with self.project({"takeover": {"spec": "codex"}}) as project:
+            (project.root / ".github" / "autopr" / "risk-paths.json").unlink()
+            module = project.json()["modules"][0]
+            self.assertEqual(module["important"], {"reasons": ["risk-unknown"]})
+            self.assertEqual(module["reviewApprovedBy"]["spec"], None)
 
     def test_codex_counts_only_under_the_takeover(self):
         with self.project({"takeover": {"spec": "codex"}}) as project:
@@ -266,9 +276,11 @@ class CodexReviewTest(unittest.TestCase):
             self.assertEqual(module["review"], {"spec": "codex-approved", "plan": "approved"})
             self.assertEqual(module["reviewApprovedBy"], {"spec": "codex", "plan": "user"})
             self.assertEqual(data["awaitingReview"], [])
+            self.assertIsNone(module["important"])
         with self.project({}) as project:
             data = project.json()
             self.assertEqual(data["modules"][0]["reviewApprovedBy"], {"spec": None, "plan": "user"})
+            self.assertIsNone(data["modules"][0]["important"])
             self.assertEqual(data["awaitingReview"], [{"id": "a", "kind": "spec", "review": "codex-approved"}])
 
 class DeferralTest(unittest.TestCase):

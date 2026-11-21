@@ -826,6 +826,9 @@ want fail "interface: mapView 缺 1.15 的 takeover 说明 → 报错" python3 "
 # codex-approval：interface 1.15 的 mapView.values.reviewApprovedBy，取值与 map_view.APPROVED_BY 一致。
 mkifc "$TMP/ifc-approved-by" 'del data["mapView"]["values"]["reviewApprovedBy"]'
 want fail "interface: mapView 缺 1.15 的 reviewApprovedBy 取值 → 报错" python3 "$IFC" "$TMP/ifc-approved-by/interface.json"
+# important-requirement：interface 1.15 的 mapView.values.importantReasons，取值与 module_stage.IMPORTANT_REASONS 一致。
+mkifc "$TMP/ifc-important" 'del data["mapView"]["values"]["importantReasons"]'
+want fail "interface: mapView 缺 1.15 的 importantReasons 取值 → 报错" python3 "$IFC" "$TMP/ifc-important/interface.json"
 # takeover-narrow：interface 1.15 的 takeoverNarrow 入口，来源词表与 project_config.SOURCES 一致。
 mkifc "$TMP/ifc-narrow" 'del data["takeoverNarrow"]'
 want fail "interface: 缺 1.15 的 takeoverNarrow 入口 → 报错" python3 "$IFC" "$TMP/ifc-narrow/interface.json"

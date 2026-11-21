@@ -34,7 +34,14 @@
       "reviewApprovedBy": {
         "user": "per module, per file (spec, plan): the user's approval marker (interface 1.15, spec/codex-approval.md)",
         "codex": "per module, per file: Codex's approval marker, and the module's takeover gives this step to codex (for a Plan, its pre-declared section lists nothing)",
-        "null": "per module, per file: no approval in effect -- no marker, pending, revised, invalid, or Codex's approval where the takeover does not let it count (such a file is listed in awaitingReview)"
+        "null": "per module, per file: no approval in effect -- no marker, pending, revised, invalid, or Codex's approval where the takeover does not let it count (such a file is listed in awaitingReview); an important requirement's Spec approved by Codex is null too"
+      },
+      "importantReasons": {
+        "multi-module": "per module, in important.reasons (interface 1.15, spec/important-requirement.md): inserted into the capability map in one batch with another module",
+        "cross-module": "the Spec's concurrency boundary lists shared file categories, or its exclusive paths overlap another unfinished module's",
+        "cross-unknown": "the Spec has no concurrency boundary to judge by; only listed where the module's takeover gives the Spec to codex (Q7 A)",
+        "risk-path": "a boundary path or a pre-declared public path matches a T3 or T4 pattern in .github/autopr/risk-paths.json (autopilot.risk-paths/v1)",
+        "risk-unknown": "that list is missing or unreadable; only listed where the module's takeover gives the Spec to codex"
       }
     },
     "progressFacts": {

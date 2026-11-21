@@ -366,6 +366,16 @@ class PreBuildBatch(unittest.TestCase):
             self.assertIn("cumulative diff", out)
 
 
+def not_important(project):
+    """important-requirement: a Spec with a boundary and a readable, non-matching risk list is not important by rule."""
+    import json
+    project.spec.write_text(project.spec.read_text(encoding="utf-8") + "\n## 并行边界\n\n- 独占：`src/alpha/`\n", encoding="utf-8")
+    folder = project.root / ".github" / "autopr"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "risk-paths.json").write_text(json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}),
+                                            encoding="utf-8")
+
+
 class CodexMarks(unittest.TestCase):
     """codex-approval (C1, assumptions 2-6): rounds are recorded from a report; approval needs a clean last round."""
 
@@ -442,6 +452,7 @@ class CodexMarks(unittest.TestCase):
             (project.root / ".agent").mkdir()
             (project.root / ".agent" / "config.json").write_text(json.dumps({"version": 1, "takeover": {"spec": "codex"}}),
                                                                  encoding="utf-8")
+            not_important(project)
             self.assertEqual(self.mark(project, "codex-approved", self.report(project))[0], 0)
             code, out = project.run("--module", "alpha", "--target", "plan", "--state", "approved", "--confirm")
             self.assertEqual(code, 0, out)
@@ -463,6 +474,7 @@ class Effective(unittest.TestCase):
         (project.root / ".agent").mkdir()
         (project.root / ".agent" / "config.json").write_text(json.dumps(dict(version=1, **config)), encoding="utf-8")
         project.plan.write_text(plan, encoding="utf-8")
+        not_important(project)
         return project.root
 
     def test_codex_approval_needs_the_takeover(self):
@@ -472,6 +484,15 @@ class Effective(unittest.TestCase):
         self.assertEqual(effective_review(root, "alpha", "plan", "codex-approved"), ("pending", None))
         self.assertEqual(effective_review(root, "alpha", "plan", "approved"), ("approved", "user"))
         self.assertEqual(effective_review(root, "alpha", "spec", "revised"), ("revised", None))
+
+    def test_an_important_spec_goes_to_the_user(self):
+        # important-requirement (AC2): without a boundary the Spec is important (Q7 A); the Plan still follows the takeover.
+        from module_stage import effective_review
+        root = self.project({"takeover": {"spec": "codex", "plan": "codex"}})
+        spec = root / "spec" / "alpha.md"
+        spec.write_text(spec.read_text(encoding="utf-8").split("\n## 并行边界")[0] + "\n", encoding="utf-8")
+        self.assertEqual(effective_review(root, "alpha", "spec", "codex-approved"), ("pending", None))
+        self.assertEqual(effective_review(root, "alpha", "plan", "codex-approved"), ("approved", "codex"))
 
     def test_a_plan_that_pre_declares_goes_to_the_user(self):
         from module_stage import codex_route
