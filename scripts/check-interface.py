@@ -19,7 +19,7 @@ import project_config  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
            "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy",
-           "takeover", "moduleTakeover")  # crew-interface: 1.1; gate-tick: 1.7;
+           "takeover", "moduleTakeover", "takeoverNarrow")  # crew-interface: 1.1; gate-tick: 1.7;
 # scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11; module-autonomy: 1.14; takeover-config: 1.15
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
@@ -149,6 +149,11 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
     found += _scripts(path, "scopeOverlap.command", data["scopeOverlap"].get("command"))
     found += _scripts(path, "declaredScope.command", data["declaredScope"].get("command"))
     found += _takeover(data)
+    found += _scripts(path, "takeoverNarrow.command", data["takeoverNarrow"].get("command"))
+    sources = data["takeoverNarrow"].get("values", {}).get("source")
+    if not isinstance(sources, dict) or set(sources) != set(project_config.SOURCES):
+        found.append("takeoverNarrow.values.source 为 %s，代码为 %s"
+                     % (sorted(sources or {}), sorted(project_config.SOURCES)))
     commands = data["checkoutRole"].get("commands")
     for name, command in (commands.items() if isinstance(commands, dict) and commands else [("commands", None)]):
         found += _scripts(path, "checkoutRole.commands.%s" % name, command)

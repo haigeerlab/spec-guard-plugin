@@ -19,6 +19,7 @@ import json
 import os
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -46,7 +47,8 @@ RELEASE_LIMITS = ("note: the four pipeline plugins (spec-guard, module-crew, del
 # config-per-key: a file with one of these problems is unusable as a whole; every other problem
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
-DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "takeover": "none", "moduleTakeover": {}}
+DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "takeover": "none", "moduleTakeover": {},
+            "takeoverNarrowed": {}}
 
 
 def valid_takeover(value: Any) -> bool:
@@ -63,6 +65,57 @@ def expand(value: Any) -> dict[str, str]:
 
 def takeover_wider(items: dict[str, str], than: dict[str, str]) -> bool:
     return any(ITEMS[item].index(items[item]) > ITEMS[item].index(than[item]) for item in ITEMS)
+
+
+# takeover-narrow: the order a step is taken back in (Q7, r3 Q13).  A preset steps down the preset ladder; a custom
+# value hands back its outermost non-human item, release first; release goes straight back to human.
+PRESET_LADDER = ("none", "plan", "merge")
+NARROW_ORDER = ("release", "merge", "plan", "spec")
+SOURCES = ("autopilot", "module-crew", "user")
+REASON_MAX = 200
+SCOPE_PROJECT = "project"
+STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
+
+
+def narrow_step(value: Any) -> Any:
+    """The value one step stricter, or None when it is already the strictest."""
+    if isinstance(value, str):
+        index = PRESET_LADDER.index(value)
+        return PRESET_LADDER[index - 1] if index else None
+    items = expand(value)
+    for item in NARROW_ORDER:
+        if items[item] != "human":
+            items[item] = "human"
+            custom = {key: items[key] for key in ITEMS if items[key] != "human"}
+            return custom or "none"
+    return None
+
+
+def narrower_or_equal(value: Any, than: Any) -> bool:
+    return not takeover_wider(expand(value), expand(than))
+
+
+def widen_steps(before: Any, after: Any) -> int:
+    """How many narrow steps take `after` back to no wider than `before`; 0 when it is not wider."""
+    steps, value = 0, after
+    while not narrower_or_equal(value, before):
+        value, steps = narrow_step(value), steps + 1
+    return steps
+
+
+def valid_reason(reason: Any) -> bool:
+    return (isinstance(reason, str) and 0 < len(reason) <= REASON_MAX and reason.isprintable()
+            and "\n" not in reason)
+
+
+def valid_narrowed(value: Any) -> bool:
+    """takeoverNarrowed: scope (project or a module id) -> {from, to, source, reason, at}."""
+    return isinstance(value, dict) and all(
+        isinstance(scope, str) and (scope == SCOPE_PROJECT or MODULE_ID.fullmatch(scope))
+        and isinstance(record, dict) and set(record) == {"from", "to", "source", "reason", "at"}
+        and valid_takeover(record["from"]) and valid_takeover(record["to"]) and record["source"] in SOURCES
+        and valid_reason(record["reason"]) and isinstance(record["at"], str) and bool(STAMP.fullmatch(record["at"]))
+        for scope, record in value.items())
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
     "reviewCadence": lambda value: value in CADENCES,
@@ -71,7 +124,10 @@ VALIDATORS = {
     # takeover-config: module id -> takeover value; the whole key is invalid when any entry is.
     "moduleTakeover": lambda value: isinstance(value, dict) and all(
         isinstance(key, str) and MODULE_ID.fullmatch(key) and valid_takeover(value[key]) for key in value),
+    # takeover-narrow: written only by narrow (and kept in step by set); config cannot set or unset it.
+    "takeoverNarrowed": valid_narrowed,
 }
+MANAGED = ("takeoverNarrowed",)
 # takeover-config: retired keys (S101, "autonomyTier 退役吧"), not mapped to takeover.  A file that still has them is
 # valid (problem "retired-key"), keeps them on writes and can unset them; they cannot be set.  Only module_tier reads
 # them, for /map's deprecated autonomy field.
@@ -292,6 +348,9 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
     if key in RETIRED and (value is not None or module is not None):
         print("%s is retired (takeover-config); set takeover or moduleTakeover instead" % key)
         return 2
+    if key in MANAGED:
+        print("%s is kept by narrow and by set; it cannot be set or unset directly" % key)
+        return 2
     if key not in VALIDATORS and key not in RETIRED:
         print("unknown-key: configurable keys are %s" % ", ".join(VALIDATORS))
         return 2
@@ -317,17 +376,10 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
     if module is None and value is not None and not VALIDATORS[key](value):
         print("%s-invalid: see spec/project-config.md for the accepted values" % key)
         return 2
-    values, problems = load(root)
-    if _structural(problems):
-        print("%s is invalid (%s); fix or remove it before changing settings" % (RELATIVE_PATH, ", ".join(problems)))
-        return 2
-    directory = root / RELATIVE_PATH.parent
-    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
-        print("agent-directory-unsafe: %s is not a directory in this project" % RELATIVE_PATH.parent)
-        return 2
-    path = root / RELATIVE_PATH
-    rest = _rest(root, values) if path.exists() else {}
-    before = render(values, rest) if path.exists() else ""
+    prepared = _prepare(root)
+    if isinstance(prepared, int):
+        return prepared
+    values, rest, before = prepared
     rest.pop(key, None)
     updated = dict(values)
     if module is not None:
@@ -341,11 +393,14 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
         updated.pop(key, None)
     else:
         updated[key] = value
+    if key in ("takeover", "moduleTakeover"):
+        refused = _keep_narrowed(values, updated)
+        if refused:
+            print(refused)
+            return 2
+        rest.pop("takeoverNarrowed", None)
     after = render(updated, rest)
-    diff = "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
-                                        fromfile=str(RELATIVE_PATH) + " (current)",
-                                        tofile=str(RELATIVE_PATH) + " (proposed)"))
-    print(diff if diff else "no change: %s already has this value" % RELATIVE_PATH)
+    _print_diff(before, after)
     shown = (value or {}).get(module) if module is not None else value
     if key in ("takeover", "moduleTakeover") and shown is not None:
         items = expand(shown)
@@ -357,11 +412,53 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
                       % (module, _items_line(project)))
         if items["release"] in ("auto-confirm", "auto"):
             print("\n".join(RELEASE_LIMITS))
+    return _commit(root, updated, rest, after, confirm)
+
+
+def _scope_value(values: dict[str, Any], scope: str) -> Any:
+    project = values.get("takeover", DEFAULTS["takeover"])
+    return project if scope == SCOPE_PROJECT else values.get("moduleTakeover", {}).get(scope, project)
+
+
+def _keep_narrowed(values: dict[str, Any], updated: dict[str, Any]) -> str | None:
+    """takeover-narrow: a narrowed scope widens one step at a time; the record goes once it is back at `from`.
+
+    Edits `updated` in place and returns the refusal text, or None.
+    """
+    records = dict(values.get("takeoverNarrowed", {}))
+    for scope, record in list(records.items()):
+        before, after = _scope_value(values, scope), _scope_value(updated, scope)
+        if expand(before) == expand(after):
+            continue
+        if widen_steps(before, after) > 1:
+            return ("takeover-narrowed: %s was narrowed (from %s); widen it one step at a time"
+                    % (scope, _items_line(expand(record["from"]))))
+        if narrower_or_equal(record["from"], after):
+            del records[scope]
+        else:
+            records[scope] = dict(record, to=after)
+    if records:
+        updated["takeoverNarrowed"] = records
+    else:
+        updated.pop("takeoverNarrowed", None)
+    return None
+
+
+def _print_diff(before: str, after: str) -> None:
+    diff = "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
+                                        fromfile=str(RELATIVE_PATH) + " (current)",
+                                        tofile=str(RELATIVE_PATH) + " (proposed)"))
+    print(diff if diff else "no change: %s already has this value" % RELATIVE_PATH)
+
+
+def _commit(root: Path, updated: dict[str, Any], rest: dict[str, Any], after: str, confirm: bool) -> int:
+    """Preview stops here; --confirm writes atomically and reads back."""
     if not confirm:
         print("\npreview only; nothing was written. Re-run with --confirm to apply.")
         return 0
+    path = root / RELATIVE_PATH
     try:
-        directory.mkdir(exist_ok=True)
+        path.parent.mkdir(exist_ok=True)
         _write_atomic(path, after)
     except OSError:
         print("config-unwritable: %s could not be written" % RELATIVE_PATH)
@@ -371,6 +468,64 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
         return 2
     print("\nwrote %s" % RELATIVE_PATH)
     return 0
+
+
+def _prepare(root: Path):
+    """(values, rest, before text) for a write, or an exit code when the file or directory is unusable."""
+    values, problems = load(root)
+    if _structural(problems):
+        print("%s is invalid (%s); fix or remove it before changing settings" % (RELATIVE_PATH, ", ".join(problems)))
+        return 2
+    directory = root / RELATIVE_PATH.parent
+    if directory.is_symlink() or (directory.exists() and not directory.is_dir()):
+        print("agent-directory-unsafe: %s is not a directory in this project" % RELATIVE_PATH.parent)
+        return 2
+    path = root / RELATIVE_PATH
+    rest = _rest(root, values) if path.exists() else {}
+    return values, rest, render(values, rest) if path.exists() else ""
+
+
+def _narrow(root: Path, module: str | None, source: str, reason: str, confirm: bool) -> int:
+    """takeover-narrow: one step stricter for the project or one module; no user words needed."""
+    if source not in SOURCES:
+        print("narrow-invalid: --source is one of %s" % ", ".join(SOURCES))
+        return 2
+    if not valid_reason(reason):
+        print("narrow-invalid: --reason is one printable line of at most %d characters" % REASON_MAX)
+        return 2
+    if module is not None and not MODULE_ID.fullmatch(module):
+        print("narrow-invalid: --module takes a kebab-case module id")
+        return 2
+    prepared = _prepare(root)
+    if isinstance(prepared, int):
+        return prepared
+    values, rest, before = prepared
+    project = values.get("takeover", DEFAULTS["takeover"])
+    entries = dict(values.get("moduleTakeover", {}))
+    scope = SCOPE_PROJECT if module is None else module
+    current = project if module is None else entries.get(module, project)
+    new = narrow_step(current)
+    if new is None:
+        print("already the strictest: %s is %s; nothing to narrow" % (scope, _items_line(expand(current))))
+        return 0
+    updated = dict(values)
+    if module is None:
+        updated["takeover"] = new
+    else:
+        entries[module] = new
+        updated["moduleTakeover"] = entries
+    records = dict(values.get("takeoverNarrowed", {}))
+    first = records.get(scope, {}).get("from", current)
+    records[scope] = {"from": first, "to": new, "source": source, "reason": reason,
+                      "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    updated["takeoverNarrowed"] = records
+    for key in ("takeover", "moduleTakeover", "takeoverNarrowed"):
+        rest.pop(key, None)
+    after = render(updated, rest)
+    _print_diff(before, after)
+    print("narrow %s: %s -> %s" % (scope, _items_line(expand(current)), _items_line(expand(new))))
+    print("takeover: %s" % _items_line(expand(new)))
+    return _commit(root, updated, rest, after, confirm)
 
 
 def main() -> int:
@@ -388,7 +543,12 @@ def main() -> int:
     unsetter.add_argument("--key", required=True)
     unsetter.add_argument("--module")
     unsetter.add_argument("--confirm", action="store_true")
-    for sub in (show, commands.choices["check"], setter, unsetter):
+    narrower = commands.add_parser("narrow", help="one step stricter (takeover-narrow); preview unless --confirm")
+    narrower.add_argument("--module")
+    narrower.add_argument("--source", required=True)
+    narrower.add_argument("--reason", required=True)
+    narrower.add_argument("--confirm", action="store_true")
+    for sub in (show, commands.choices["check"], setter, unsetter, narrower):
         sub.add_argument("--project", default=".")
     args = parser.parse_args()
     root = Path(args.project)
@@ -406,6 +566,8 @@ def main() -> int:
             return 1
         print("ok")
         return 0
+    if args.command == "narrow":
+        return _narrow(root, args.module, args.source, args.reason, args.confirm)
     return _change(root, args.key, getattr(args, "value", None), args.confirm, args.module)
 
 

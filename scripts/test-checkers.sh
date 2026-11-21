@@ -736,7 +736,7 @@ want pass "tests-registered: 读不到运行器时说的是没找到，不是把
 IFC="$ROOT/scripts/check-interface.py"
 mkifc() {  # $1=目录 $2=python 表达式，对 data（正确的 interface.json）做的改动，空=不改
   rm -rf "$1"; mkdir -p "$1/hooks"
-  for script in map_view module_scope checkout_role review_mark gate_tick; do : > "$1/hooks/$script.py"; done
+  for script in map_view module_scope checkout_role review_mark gate_tick project_config; do : > "$1/hooks/$script.py"; done
   mkdir -p "$1/references"; cp "$ROOT/plugins/spec-guard/references/workflow-checkpoints.md" "$1/references/"
   python3 - "$ROOT/plugins/spec-guard/interface.json" "$1/interface.json" "${2:-}" <<'PY'
 import json, sys
@@ -823,6 +823,11 @@ mkifc "$TMP/ifc-takeover-preset" 'del data["takeover"]["presets"]["merge"]'
 want fail "interface: takeover 少一个预设 → 报错" python3 "$IFC" "$TMP/ifc-takeover-preset/interface.json"
 mkifc "$TMP/ifc-map-takeover" 'del data["mapView"]["takeover"]'
 want fail "interface: mapView 缺 1.15 的 takeover 说明 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover/interface.json"
+# takeover-narrow：interface 1.15 的 takeoverNarrow 入口，来源词表与 project_config.SOURCES 一致。
+mkifc "$TMP/ifc-narrow" 'del data["takeoverNarrow"]'
+want fail "interface: 缺 1.15 的 takeoverNarrow 入口 → 报错" python3 "$IFC" "$TMP/ifc-narrow/interface.json"
+mkifc "$TMP/ifc-narrow-source" 'data["takeoverNarrow"]["values"]["source"].pop("user")'
+want fail "interface: takeoverNarrow 的来源少一个 → 报错" python3 "$IFC" "$TMP/ifc-narrow-source/interface.json"
 mkifc "$TMP/ifc-map-takeover-field" 'data["mapView"]["takeover"]["fields"]["extra"] = "x"'
 want fail "interface: mapView.takeover 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover-field/interface.json"
 mkifc "$TMP/ifc-autonomy" 'del data["mapView"]["autonomy"]'
