@@ -50,3 +50,4 @@ Codex 验收标记，autopilot 据此合并。缺任一样就停在最终验收�
 | M3 | U1, U2, U3, U4, U5 | codex-final-acceptance |
 
 <!-- spec-guard: milestone M1 confirmed takeover-config, takeover-narrow -->
+<!-- spec-guard: milestone M2 confirmed codex-approval, important-requirement, takeover-scope-check -->

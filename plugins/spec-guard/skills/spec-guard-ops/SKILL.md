@@ -198,6 +198,8 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - 出事收窄：`project_config.py narrow --source <autopilot|module-crew|user> --reason <一行> [--module <id>] [--confirm]`，往严里改一格、不需要用户原话
   （预设 `merge`→`plan`→`none`；自定义按发布、合并、Plan、Spec 交还一项），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
   回到收窄前的值后记录删除。`takeoverNarrowed` 不能直接 `set`／`unset`。
+- 接管模块（档位任一项不是 human）构建中做越界检查：`module_scope.py check --module <id> --format json`（`--base` 可省，默认取 Spec 第一次提交的父提交），
+  已批准 Plan 的预先声明公共路径记为 `declared`；阶段提示报越界或没有并行边界时停下，逐个说明交用户。
 - `autonomyTier`、`moduleAutonomy`：已退役、不映射。文件里还有时不生效，`show` 标为已退役，不能再 `set`，可以 `unset` 删除；`/map --json` 的 `autonomy`
   字段本版仍按它们计算、标为 deprecated。
 

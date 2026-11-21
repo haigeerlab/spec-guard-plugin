@@ -831,12 +831,12 @@ def codex_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool, raw: di
                     "the user approves it (%s `--state approved`)." % cmd["review-mark"])
         if zh:
             return ("- 批准: %s `%s` 按接管档位由 Codex 审。" % (names[kind], path),
-                    "用 /delegate:review（后端 codex）审 `%s`，把它标准输出的 JSON 存成文件；没有阻断意见就用 %s `--state codex-approved "
+                    "用 /delegate:review（后端 codex）审 `%s`，把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下），免得报告本身被当成改动；没有阻断意见就用 %s `--state codex-approved "
                     "--review <文件>` 记下并接着往下做；有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审，两轮仍有阻断就交用户。"
                     "建议类意见由你决定是否采纳，在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。"
                     % (path, cmd["review-mark"]))
         return ("- Review: %s `%s` is reviewed by Codex under the takeover." % (names[kind], path),
-                "review `%s` with /delegate:review (backend codex) and save its standard-output JSON to a file; with no "
+                "review `%s` with /delegate:review (backend codex) and save its standard-output JSON to a file outside the repository (for example under `$TMPDIR`), so the report is not taken for a change; with no "
                 "blocking finding record it with %s `--state codex-approved --review <file>` and go on; with blocking "
                 "findings record the round with `--state codex-reviewed`, fix them and review again, and hand it to the user "
                 "after two blocking rounds. Decide on each suggestion yourself and give one line of reason under the external "
@@ -1301,6 +1301,51 @@ def draft_gate(root: Path, states: list, module: str, stage: str, zh: bool) -> t
     return fact, line, step
 
 
+SCOPE_SHOWN = 5  # takeover-scope-check: how many out-of-scope files the line names
+
+
+def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
+    """takeover-scope-check: (fact, line, next step) when a takeover module's build goes outside its declared scope.
+
+    Only a module whose takeover hands a step to codex or automation, while building.  No boundary stops too (Q11 A);
+    a base that cannot be found or read is reported, not taken as clean.
+    """
+    if stage != "BUILDING" or not module:
+        return None, "", ""
+    from project_config import module_takeover
+    if all(value == "human" for value in module_takeover(root, module)[0].values()):
+        return None, "", ""
+    from module_scope import ScopeError, classify, default_base, parse  # late: module_scope imports this module
+    try:
+        scope = parse((root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ScopeError):
+        scope = None
+    if scope is None:
+        if zh:
+            return (("scope", "no-boundary"), "- 越界：`spec/%s.md` 没有可用的「并行边界」一节，无法检查改动是否越界。" % module,
+                    "停下，把这个模块要改的文件交用户；用户同意后在 Spec 补上并行边界并复审，再继续构建。")
+        return (("scope", "no-boundary"), "- Out of scope: `spec/%s.md` has no usable concurrency boundary, so the changes "
+                "cannot be checked." % module, "stop and show the user which files this module changes; once they agree, "
+                "add the concurrency boundary to the Spec, have it reviewed again, then continue the build.")
+    base = default_base(root, module)
+    rows = classify(root, module, scope, base) if base else None
+    if rows is None:
+        line = ("- 越界：基线未判定（`spec/%s.md` 没有更早的提交可比），越界检查没有运行。" % module if zh else
+                "- Out of scope: not checked (no commit before `spec/%s.md` to compare with)." % module)
+        return ("scope", "unknown"), line, ""
+    outside = [safe_fragment(row["path"]) for row in rows if row["scope"] == "outside"]
+    if not outside:
+        return None, "", ""
+    shown = ", ".join("`%s`" % path for path in outside[:SCOPE_SHOWN]) + ("…" if len(outside) > SCOPE_SHOWN else "")
+    if zh:
+        return (("scope", tuple(outside)), "- 越界：%d 个文件超出 Spec 的并行边界与 Plan 的预先声明（%s）。" % (len(outside), shown),
+                "停下，逐个说明这些文件为什么要改，交用户决定：同意就补进 Spec 并行边界或 Plan 预先声明并复审，不同意就撤回这些改动。")
+    return (("scope", tuple(outside)), "- Out of scope: %d file(s) outside the Spec's boundary and the Plan's pre-declared "
+            "paths (%s)." % (len(outside), shown), "stop and show the user why each of these files has to change: if they "
+            "agree, add them to the Spec's concurrency boundary or the Plan's pre-declared section and have it reviewed "
+            "again; if not, undo those changes.")
+
+
 def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
                    host: str | None, window_estimated: bool, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
@@ -1546,6 +1591,12 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     if ms_step and role_kind not in ("module", "coordinator"):
         # milestone-stop: the stop comes before whatever the current module would do next.
         node, next_step = "milestone-stop", ms_step
+    sc_fact, sc_line, sc_step = scope_overreach(root, module, stage, zh)
+    if sc_line:
+        counts += "\n" + sc_line
+    if sc_step and not ms_step and role_kind not in ("module", "coordinator"):
+        # takeover-scope-check: a change outside the declared scope is a decision the Spec does not cover.
+        node, next_step = "mid-gate", sc_step
     dg_fact, dg_line, dg_step = draft_gate(root, states, module, stage, zh)
     if dg_line:
         counts += "\n" + dg_line
@@ -1559,7 +1610,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
                        documentation_baseline_present(root)] + ([ms_fact] if ms_fact else [])
-                      + ([dg_fact] if dg_fact else []),
+                      + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:
