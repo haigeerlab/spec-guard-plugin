@@ -79,3 +79,4 @@ README 中英加「自动接管」一段（从用法草案展开：怎么设档�
 ## 变更记录
 
 - 2026-11-22（开工前）：按 autopr-design #21981 写定检查证据（本机 `~/.autopilot/evidence/…`、`autopilot.check-evidence/v1`）；验收记录改为写在 git 目录、不进提交，最终 gate 合并后补勾，`/map --json` 报 `acceptance`。
+- 2026-11-22（M3 返工，用户「批准；Q14 A」）：假设 5 加一条——除 HEAD 外，本模块开工前的提交（takeover-scope-check 的默认基线）里的配置也必须是「合并：自动」，否则拒绝；原因是 `.agent/config.json` 改为不算越界后，PR 不能借改配置给自己开自动合并。
