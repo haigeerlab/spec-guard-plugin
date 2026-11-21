@@ -642,6 +642,8 @@ def _declared_nonempty(root: Path, module: str) -> bool:
 RISK_PATHS = Path(".github") / "autopr" / "risk-paths.json"
 RISK_SCHEMA = "autopilot.risk-paths/v1"
 RISK_TIERS = ("T4", "T3")  # Q9 A: both count
+# interface.json mapView.values.importantReasons (important-requirement, interface 1.15)
+IMPORTANT_REASONS = ("multi-module", "cross-module", "cross-unknown", "risk-path", "risk-unknown")
 
 
 def _segment(pattern: str, name: str) -> bool:

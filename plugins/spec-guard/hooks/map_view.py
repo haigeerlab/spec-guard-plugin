@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, effective_review, external_review_state,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, effective_review, external_review_state, important,
                           file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -458,6 +458,7 @@ def build(root: Path) -> dict:
             "blocks": {"count": len(blocks), "ids": blocks},
             "review": _review(root, module),
             "reviewApprovedBy": _approved_by(root, module),
+            "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],

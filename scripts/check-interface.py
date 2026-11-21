@@ -44,7 +44,8 @@ def problems(path: Path) -> list:
     values = view.get("values") if isinstance(view.get("values"), dict) else {}
     for key, expected in (("review", module_stage.REVIEW_STATES),
                           ("externalReview", module_stage.EXTERNAL_REVIEW_STATES),
-                          ("reviewApprovedBy", map_view.APPROVED_BY)):  # codex-approval: 1.15
+                          ("reviewApprovedBy", map_view.APPROVED_BY),  # codex-approval: 1.15
+                          ("importantReasons", module_stage.IMPORTANT_REASONS)):  # important-requirement: 1.15
         got = values.get(key)
         if not isinstance(got, dict) or set(got) != set(expected):
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
