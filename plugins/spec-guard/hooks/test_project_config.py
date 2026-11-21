@@ -623,6 +623,62 @@ class Narrow(unittest.TestCase):
             self.assertIn("takeoverNarrowed", self.doc(project))
 
 
+class Restore(unittest.TestCase):
+    """takeover-narrow (C1, assumption 5): after a narrowing, widening goes back one step at a time."""
+
+    def doc(self, project):
+        return json.loads(project.config.read_text(encoding="utf-8"))
+
+    def narrowed(self, payload, times=1, module=None):
+        project = Project(payload).__enter__()
+        self.addCleanup(project.__exit__)
+        for _ in range(times):
+            extra = ("--module", module) if module else ()
+            code, out = project.run("narrow", "--source", "autopilot", "--reason", "revert", *extra, "--confirm")
+            self.assertEqual(code, 0, out)
+        return project
+
+    def test_two_steps_refused_one_step_allowed(self):
+        project = self.narrowed({"version": 1, "takeover": "merge"}, times=2)
+        code, out = project.run("set", "--key", "takeover", "--value", "merge", "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertIn("one step", out)
+        self.assertEqual(self.doc(project)["takeover"], "none")
+        code, out = project.run("set", "--key", "takeover", "--value", "plan", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["to"], "plan")
+        code, out = project.run("set", "--key", "takeover", "--value", "merge", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("takeoverNarrowed", self.doc(project))
+
+    def test_narrowing_by_set_is_never_limited(self):
+        project = self.narrowed({"version": 1, "takeover": "merge"})
+        code, out = project.run("set", "--key", "takeover", "--value", "none", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["to"], "none")
+        code, out = project.run("unset", "--key", "takeover", "--confirm")
+        self.assertEqual(code, 0, out)
+
+    def test_custom_value_counts_items(self):
+        full = {"spec": "codex", "plan": "codex", "merge": "auto", "release": "auto"}
+        project = self.narrowed({"version": 1, "takeover": full}, times=2)
+        self.assertEqual(project.run("set", "--key", "takeover", "--value", json.dumps(full), "--confirm")[0], 2)
+        code, out = project.run("set", "--key", "takeover", "--value",
+                                json.dumps({"spec": "codex", "plan": "codex", "merge": "auto"}), "--confirm")
+        self.assertEqual(code, 0, out)
+
+    def test_module_scope(self):
+        project = self.narrowed({"version": 1, "moduleTakeover": {"alpha": "merge"}}, module="alpha")
+        code, out = project.run("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "merge", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("takeoverNarrowed", self.doc(project))
+
+    def test_without_a_record_widening_is_free(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "takeover", "--value", "merge", "--confirm")
+            self.assertEqual(code, 0, out)
+
+
 class MachineState(unittest.TestCase):
     """runtime-state-layout: `show` states the machine-state root and any legacy directory still read."""
 

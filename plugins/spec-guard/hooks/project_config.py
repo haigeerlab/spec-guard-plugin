@@ -393,6 +393,12 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
         updated.pop(key, None)
     else:
         updated[key] = value
+    if key in ("takeover", "moduleTakeover"):
+        refused = _keep_narrowed(values, updated)
+        if refused:
+            print(refused)
+            return 2
+        rest.pop("takeoverNarrowed", None)
     after = render(updated, rest)
     _print_diff(before, after)
     shown = (value or {}).get(module) if module is not None else value
@@ -407,6 +413,35 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
         if items["release"] in ("auto-confirm", "auto"):
             print("\n".join(RELEASE_LIMITS))
     return _commit(root, updated, rest, after, confirm)
+
+
+def _scope_value(values: dict[str, Any], scope: str) -> Any:
+    project = values.get("takeover", DEFAULTS["takeover"])
+    return project if scope == SCOPE_PROJECT else values.get("moduleTakeover", {}).get(scope, project)
+
+
+def _keep_narrowed(values: dict[str, Any], updated: dict[str, Any]) -> str | None:
+    """takeover-narrow: a narrowed scope widens one step at a time; the record goes once it is back at `from`.
+
+    Edits `updated` in place and returns the refusal text, or None.
+    """
+    records = dict(values.get("takeoverNarrowed", {}))
+    for scope, record in list(records.items()):
+        before, after = _scope_value(values, scope), _scope_value(updated, scope)
+        if expand(before) == expand(after):
+            continue
+        if widen_steps(before, after) > 1:
+            return ("takeover-narrowed: %s was narrowed (from %s); widen it one step at a time"
+                    % (scope, _items_line(expand(record["from"]))))
+        if narrower_or_equal(record["from"], after):
+            del records[scope]
+        else:
+            records[scope] = dict(record, to=after)
+    if records:
+        updated["takeoverNarrowed"] = records
+    else:
+        updated.pop("takeoverNarrowed", None)
+    return None
 
 
 def _print_diff(before: str, after: str) -> None:
