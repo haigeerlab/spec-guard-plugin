@@ -14,8 +14,10 @@ import difflib
 from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import (REVIEW_APPROVED, REVIEW_PENDING, file_review_state, review_approved_line, review_body,
-                          review_digest, review_marker_lines, review_state, spec_baseline)
+from codex_review import inspect as inspect_report
+from module_stage import (EXTERNAL_REVIEW_HEADING, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, file_review_state,
+                          review_approved_line, review_body, review_codex_line, review_digest, review_marker_lines,
+                          review_state, spec_baseline)
 from tracker_default import _write_atomic
 
 
@@ -62,12 +64,59 @@ def _marked(text: str, kind: str, state: str) -> str:
     return _with_marker(text, review_approved_line(review_digest(_with_marker(text, REVIEW_PENDING))))
 
 
+ROUND_CAP = 2  # codex-approval: blocking rounds before the file goes to the user
+
+
+def _with_round(text: str, line: str) -> str:
+    """The text with `line` appended to its external review section, made at the end when there is none."""
+    lines = text.splitlines(keepends=True)
+    heading = next((index for index, item in enumerate(lines) if EXTERNAL_REVIEW_HEADING.match(item.rstrip("\r\n"))), None)
+    if heading is None:
+        body = text if text.endswith("\n") or not text else text + "\n"
+        return body + "\n## 外部审查意见\n\n" + line + "\n"
+    end = next((index for index in range(heading + 1, len(lines)) if lines[index].startswith("## ")), len(lines))
+    while end > heading + 1 and not lines[end - 1].strip():
+        end -= 1
+    insert = [line + "\n"]
+    if end == heading + 1:
+        insert = ["\n"] + insert
+    elif not lines[end - 1].endswith("\n"):
+        lines[end - 1] += "\n"
+    lines[end:end] = insert
+    return "".join(lines)
+
+
+def _codex(root: Path, relative: str, kind: str, state: str, report: str | None, text: str):
+    """codex-approval: (new text, message) or (None, refusal) for a Codex round from a delegate report."""
+    if report is None:
+        return None, "review-missing: --state %s needs --review <the /delegate:review JSON saved to a file>" % state
+    found = inspect_report(report, root, relative)
+    if found["status"] != "ok":
+        return None, "report-invalid: %s" % found["reason"]
+    rounds = codex_rounds(text)
+    if sum(1 for _, blocking in rounds if blocking) >= ROUND_CAP and rounds[-1][1]:
+        return None, ("codex-rounds-exhausted: %s already had two rounds with blocking findings; hand them to the user, "
+                      "who approves it with --state approved or sends it back" % relative)
+    if state == "codex-approved" and found["blocking"]:
+        return None, ("codex-blocking: the report has %d blocking finding(s); fix them and review again, or record this "
+                      "round with --state codex-reviewed" % found["blocking"])
+    line = "<!-- spec-guard: codex-review round=%d blocking=%d sha256=%s -->" % (
+        len(rounds) + 1, found["blocking"], found["sha256"][:12])
+    updated = _with_round(text, line)
+    if state == "codex-approved":
+        updated = _with_marker(updated, review_codex_line(review_digest(_with_marker(updated, REVIEW_PENDING))))
+    note = ("round %d: %d blocking, %d suggestion(s). Codex's review is not the user's approval: it counts only where "
+            "the module's takeover gives this step to codex." % (len(rounds) + 1, found["blocking"], found["suggestions"]))
+    return updated, note
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mark a module's Spec or Plan review state (preview unless --confirm).")
     parser.add_argument("--project", default=".")
     parser.add_argument("--module", required=True)
     parser.add_argument("--target", required=True, choices=["spec", "plan", "both"])
-    parser.add_argument("--state", required=True, choices=["pending", "approved"])
+    parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed"])
+    parser.add_argument("--review", help="codex states: the /delegate:review JSON report saved to a file")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args()
     root, module_id = Path(args.project), args.module
@@ -99,6 +148,30 @@ def main() -> int:
             print("marker-invalid: %s has more than one review marker or a malformed one; fix it by hand "
                   "(run /spec-guard:verify-artifacts to see it)" % relative[kind])
             return 2
+    if args.state.startswith("codex-"):
+        if args.target == "both":
+            print("codex-one-target: a Codex round is recorded for one file at a time (--target spec or plan)")
+            return 2
+        kind = kinds[0]
+        updated, message = _codex(root, relative[kind], kind, args.state, args.review, before[kind])
+        print(message)
+        if updated is None:
+            return 2
+        print("".join(difflib.unified_diff(before[kind].splitlines(keepends=True), updated.splitlines(keepends=True),
+                                           fromfile=relative[kind] + " (current)", tofile=relative[kind] + " (proposed)")))
+        if not args.confirm:
+            print("\npreview only; nothing was written. Re-run with --confirm to apply.")
+            return 0
+        try:
+            _write_atomic(root / relative[kind], updated)
+        except OSError:
+            print("file-unwritable: %s could not be written" % relative[kind])
+            return 2
+        if args.state == "codex-approved" and review_state((root / relative[kind]).read_text(encoding="utf-8"), kind) != args.state:
+            print("readback-mismatch: %s does not read back as codex-approved" % relative[kind])
+            return 2
+        print("\nrecorded %s: %s" % (args.state, relative[kind]))
+        return 0
     unmarked_spec = False
     if args.state == "approved" and kinds == ["plan"]:
         # No marker means the Spec is not tracked, which must not block anything; a Spec that is

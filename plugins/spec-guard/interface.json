@@ -22,7 +22,8 @@
         "none": "no review marker in the file (the project may not use markers); says nothing about approval",
         "pending": "written and waiting for the user's review",
         "approved": "approved by the user; the file has not changed since",
-        "revised": "Spec only: approved earlier, edited after approval, needs another review",
+        "codex-approved": "Codex reviewed it with no blocking finding and spec-guard recorded it from a delegate report (interface 1.15, spec/codex-approval.md); it counts as approved only where the module's takeover gives this step to codex. The file has not changed since",
+        "revised": "approved earlier (by the user, or by Codex for a Spec or Plan), edited after approval, needs another review",
         "invalid": "the marker line is malformed; review state unknown"
       },
       "externalReview": {
@@ -210,14 +211,15 @@
       "--target",
       "<spec|plan|both>",
       "--state",
-      "<pending|approved>"
+      "<pending|approved|codex-approved|codex-reviewed>",
+      "[--review <report file>]"
     ],
     "confirm": "only previews unless --confirm is added",
     "exitCodes": {
       "0": "ok (preview, written, or no change)",
-      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid"
+      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid; for codex-approved and codex-reviewed also: no --review, a report that is not a completed Codex review with a conclusion or does not match the file on disk, blocking findings (codex-approved), two rounds with blocking findings already, or --target both"
     },
-    "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges)",
+    "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges). codex-approved and codex-reviewed (interface 1.15, spec/codex-approval.md) take the /delegate:review JSON saved to a file; each records one round line under the external review section, and codex-approved also writes the Codex marker. Codex's approval is spec-guard's policy under the takeover setting, not the user's approval",
     "contract": "spec/review-approval-marker.md"
   },
   "reviewKinds": {

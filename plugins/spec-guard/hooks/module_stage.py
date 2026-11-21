@@ -43,13 +43,28 @@ REVIEW_PREFIX = "<!-- spec-guard: review"
 REVIEW_PENDING = "<!-- spec-guard: review pending -->"
 REVIEW_APPROVED = "<!-- spec-guard: review approved -->"
 # plugin-interface: published in interface.json; scripts/check-interface.py keeps the two in step.
-REVIEW_STATES = ("none", "pending", "approved", "revised", "invalid")
+REVIEW_STATES = ("none", "pending", "approved", "codex-approved", "revised", "invalid")
 REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]{12}) -->")
+# codex-approval: Codex's approval under the module's takeover, kept apart from the user's; Spec and Plan both carry the
+# digest, so an edit afterwards reads as `revised`.  Each review round is one line under the external review section.
+REVIEW_CODEX_DIGEST = re.compile(r"<!-- spec-guard: review codex-approved ([0-9a-f]{12}) -->")
+CODEX_ROUND = re.compile(r"<!-- spec-guard: codex-review round=(\d+) blocking=(\d+) sha256=([0-9a-f]{12}) -->")
 _DIGEST_MODULE = None
 
 
 def review_approved_line(digest: str) -> str:
     return "<!-- spec-guard: review approved %s -->" % digest
+
+
+def review_codex_line(digest: str) -> str:
+    return "<!-- spec-guard: review codex-approved %s -->" % digest
+
+
+def codex_rounds(text: str) -> list:
+    """codex-approval: [(round, blocking)] from the round lines outside code fences, in file order."""
+    return [(int(match.group(1)), int(match.group(2)))
+            for match in (CODEX_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
+            if match]
 
 
 def review_marker_lines(text: str) -> list:
@@ -89,6 +104,9 @@ def review_state(text: str, kind: str) -> str:
         return "invalid"
     if markers[0] == REVIEW_PENDING:
         return "pending"
+    codex = REVIEW_CODEX_DIGEST.fullmatch(markers[0])
+    if codex:
+        return "codex-approved" if codex.group(1) == review_digest(text) else "revised"
     if kind == "plan":
         return "approved" if markers[0] == REVIEW_APPROVED else "invalid"
     match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0])
