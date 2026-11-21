@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:56100e9e672a052b436f991ff2f5ae274f047c67"
+      },
+      "observedAt": "2026-11-21T20:11:27Z",
+      "evidence": [
+        "result:the v0.91.0 annotated tag resolves to merge commit 56100e9e672a052b436f991ff2f5ae274f047c67 (pull request #466); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate run 44944032707)",
+        "result:seven modules: S101 auto-takeover (takeover-config, takeover-narrow, codex-approval, important-requirement, takeover-scope-check, codex-final-acceptance) and S102 usage-draft-gate; interface.json 1.14 -> 1.15 (takeover, moduleTakeover, takeoverNarrow, reviewMark codex-approved/codex-reviewed and --target acceptance, mapView takeover/reviewApprovedBy/important/acceptance); autonomyTier and moduleAutonomy retired; projects without a takeover see an unchanged stage hint except a multi-module batch without a usage draft",
+        "result:codex-final-acceptance on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit went through verify-and-commit (validate.sh, phase-guard 536 cases with new part 31, verify-artifacts 105 cases; ShellCheck when .sh was staged); mutations (check evidence ignoring non_author; the acceptance record ignoring ancestry) each turned the regression red; a temporary project ran the whole acceptance flow (refused without evidence, preview, record in the git directory with a clean tree and unchanged HEAD, stage hint moved to the next module, /map reported acceptance); the earlier modules were merged as #460-#465 with their own checks"
+      ]
+    }
+  ]
+}

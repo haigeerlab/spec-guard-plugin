@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-release-artifact",
+      "status": "package-verified",
+      "target": {
+        "kind": "package",
+        "id": "release:v0.91.0;asset:spec-guard-v0.91.0.tar.gz;sha256:19c137453ec33bd869335326855764c3e6e7a4b8f9990ac6d63455b336d62b24"
+      },
+      "observedAt": "2026-11-21T20:11:27Z",
+      "evidence": [
+        "release:https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.91.0",
+        "asset:spec-guard-v0.91.0.tar.gz;size:758677",
+        "source-tag:v0.91.0@56100e9e672a052b436f991ff2f5ae274f047c67",
+        "command:git archive --prefix=spec-guard-v0.91.0/ v0.91.0 .claude-plugin plugins/spec-guard",
+        "command:python3 scripts/release-package.py validate <dir> 0.91.0",
+        "result:built from the merge commit the tag points to; no `._*` entries; validated before packing and again after extracting; the asset downloaded from the Release has the same SHA-256; the Release notes carry the 0.91.0 CHANGELOG section; the Release is marked latest (releases/latest returns v0.91.0); the release notice went to ecosystem-lead right after the Release (#21987)"
+      ]
+    }
+  ]
+}
