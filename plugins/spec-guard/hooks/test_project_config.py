@@ -148,7 +148,8 @@ class Summary(unittest.TestCase):
             (project.root / "CLAUDE.md").write_text(CLAUDE_BLOCK % DISPATCH, encoding="utf-8")
             (project.root / "AGENTS.md").write_text(CODEX_BLOCK % "", encoding="utf-8")
             items = {item["key"]: item for item in summary(project.root)}
-        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency", "autonomyTier", "moduleAutonomy",
+        self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency",
+                                      "takeover", "moduleTakeover",
                                       "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
@@ -342,118 +343,58 @@ class Cli(unittest.TestCase):
             self.assertNotIn(hostile, out)
 
 
-class AutonomyTier(unittest.TestCase):
-    """autonomy-tier (C1): stored, read and reported; spec-guard itself never changes with it."""
+class RetiredAutonomy(unittest.TestCase):
+    """takeover-config (C1, Spec assumption 8): autonomyTier and moduleAutonomy are retired, not mapped.
 
-    def test_three_tiers_round_trip(self):
-        for tier in ("strict", "standard", "relaxed"):
-            with Project() as project:
-                code, out = project.run("set", "--key", "autonomyTier", "--value", tier, "--confirm")
-                self.assertEqual(code, 0, out)
-                self.assertEqual(load(project.root), ({"autonomyTier": tier}, []))
-                items = {item["key"]: item for item in summary(project.root)}
-                self.assertEqual((items["autonomyTier"]["value"], items["autonomyTier"]["source"]),
-                                 (tier, ".agent/config.json"))
-                code, out = project.run("unset", "--key", "autonomyTier", "--confirm")
-                self.assertEqual(code, 0, out)
-                self.assertEqual(load(project.root), ({}, []))
+    A file that still has them stays valid, shows them as retired and keeps them on writes; they can be removed
+    but not set.  module_tier still reads them, only for /map's deprecated autonomy field.
+    """
 
-    def test_unset_reads_as_strict_from_default(self):
-        with Project() as project:
-            items = {item["key"]: item for item in summary(project.root)}
-            self.assertEqual((items["autonomyTier"]["value"], items["autonomyTier"]["source"]), ("strict", "default"))
+    OLD = {"version": 1, "reviewCadence": "combined", "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed"}}
 
-    def test_invalid_values(self):
-        with Project() as project:
-            code, out = project.run("set", "--key", "autonomyTier", "--value", "fast", "--confirm")
-            self.assertEqual(code, 2)
-            self.assertIn("autonomyTier-invalid", out)
-            self.assertFalse(project.config.exists())
-        with Project({"version": 1, "reviewCadence": "combined", "autonomyTier": "fast"}) as project:
-            self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, ["autonomyTier-invalid"]))
-            self.assertEqual(project.run("check")[0], 1)
-
-    def test_phase_hint_ignores_the_tier(self):
-        from module_stage import config_lines
-        with Project() as plain:
-            baseline = config_lines(plain.root)
-        for tier in ("strict", "standard", "relaxed"):
-            with Project({"version": 1, "autonomyTier": tier}) as project:
-                self.assertEqual(config_lines(project.root), baseline, tier)
-
-
-class ModuleAutonomy(unittest.TestCase):
-    """module-autonomy (C1): one entry per module, written one at a time; the effective tier is module_tier."""
-
-    def entries(self, project):
-        return json.loads(project.config.read_text(encoding="utf-8")).get("moduleAutonomy")
-
-    def test_set_each_tier_changes_only_that_entry(self):
-        for tier in ("strict", "standard", "relaxed"):
-            with Project({"version": 1, "moduleAutonomy": {"other": "strict"}}) as project:
-                code, out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", tier,
-                                        "--confirm")
-                self.assertEqual(code, 0, out)
-                self.assertEqual(self.entries(project), {"other": "strict", "alpha": tier})
-
-    def test_preview_does_not_write(self):
-        with Project() as project:
-            code, out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")
+    def test_old_keys_are_retired_not_invalid(self):
+        with Project(self.OLD) as project:
+            self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, ["retired-key"]))
+            code, out = project.run("check")
             self.assertEqual(code, 0, out)
-            self.assertIn("preview only", out)
-            self.assertFalse(project.config.exists())
+            self.assertIn("retired-key", out)
+        with Project({"version": 1, "autonomyTier": "fast"}) as project:
+            self.assertEqual(project.run("check")[0], 0)
 
-    def test_unset_module_then_last_entry_removes_key(self):
-        with Project({"version": 1, "reviewCadence": "combined",
-                      "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}) as project:
-            code, out = project.run("unset", "--key", "moduleAutonomy", "--module", "alpha", "--confirm")
-            self.assertEqual(code, 0, out)
-            self.assertEqual(self.entries(project), {"beta": "strict"})
-            code, out = project.run("unset", "--key", "moduleAutonomy", "--module", "beta", "--confirm")
-            self.assertEqual(code, 0, out)
-            self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, []))
+    def test_show_marks_them_retired(self):
+        with Project(self.OLD) as project:
+            out = project.run("show")[1]
+            self.assertIn("autonomyTier", out)
+            self.assertIn("retired", out)
+            self.assertIn("takeover", out)
+            items = {item["key"] for item in summary(project.root)}
+            self.assertNotIn("autonomyTier", items)
+            self.assertNotIn("moduleAutonomy", items)
 
-    def test_unset_whole_key(self):
-        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
-            code, out = project.run("unset", "--key", "moduleAutonomy", "--confirm")
-            self.assertEqual(code, 0, out)
-            self.assertEqual(load(project.root), ({}, []))
-
-    def test_rejects_bad_input_without_writing(self):
-        cases = [("set", "--key", "moduleAutonomy", "--module", "Bad_Id", "--value", "strict"),
-                 ("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "fast"),
-                 ("set", "--key", "moduleAutonomy", "--value", "strict"),
-                 ("set", "--key", "autonomyTier", "--module", "alpha", "--value", "strict"),
-                 ("unset", "--key", "reviewCadence", "--module", "alpha")]
-        for args in cases:
+    def test_set_is_refused_unset_works(self):
+        for args in (("set", "--key", "autonomyTier", "--value", "strict"),
+                     ("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")):
             with Project() as project:
                 code, out = project.run(*args, "--confirm")
                 self.assertEqual(code, 2, (args, out))
-                self.assertFalse(project.config.exists(), args)
+                self.assertIn("retired", out)
+                self.assertFalse(project.config.exists())
+        with Project(self.OLD) as project:
+            code, out = project.run("unset", "--key", "autonomyTier", "--confirm")
+            self.assertEqual(code, 0, out)
+            code, out = project.run("unset", "--key", "moduleAutonomy", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(json.loads(project.config.read_text(encoding="utf-8")),
+                             {"version": 1, "reviewCadence": "combined"})
 
-    def test_invalid_value_in_file_drops_only_this_key(self):
-        for bad in ("relaxed", {"alpha": "fast"}, {"Bad_Id": "strict"}, ["alpha"]):
-            with Project({"version": 1, "reviewCadence": "combined", "moduleAutonomy": bad}) as project:
-                self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, ["moduleAutonomy-invalid"]), bad)
-                self.assertEqual(project.run("check")[0], 1, bad)
+    def test_writes_keep_the_retired_keys(self):
+        with Project(self.OLD) as project:
+            code, out = project.run("set", "--key", "takeover", "--value", "plan", "--confirm")
+            self.assertEqual(code, 0, out)
+            document = json.loads(project.config.read_text(encoding="utf-8"))
+            self.assertEqual((document["autonomyTier"], document["moduleAutonomy"]), ("standard", {"alpha": "relaxed"}))
 
-    def test_wider_than_project_preview_note(self):
-        with Project({"version": 1, "autonomyTier": "standard"}) as project:
-            out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "relaxed")[1]
-            self.assertIn("note:", out)
-            self.assertIn("alpha", out)
-            out = project.run("set", "--key", "moduleAutonomy", "--module", "alpha", "--value", "strict")[1]
-            self.assertNotIn("note:", out)
-
-    def test_summary_lists_it(self):
-        with Project() as project:
-            items = {item["key"]: item for item in summary(project.root)}
-            self.assertEqual((items["moduleAutonomy"]["value"], items["moduleAutonomy"]["source"]), ({}, "default"))
-        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
-            items = {item["key"]: item for item in summary(project.root)}
-            self.assertEqual(items["moduleAutonomy"]["value"], {"alpha": "relaxed"})
-
-    def test_module_tier_sources(self):
+    def test_module_tier_still_reads_them(self):
         from project_config import module_tier
         with Project() as project:
             self.assertEqual(module_tier(project.root, "alpha"), ("strict", "default"))
@@ -467,12 +408,120 @@ class ModuleAutonomy(unittest.TestCase):
         with Project({"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "fast"}}) as project:
             self.assertEqual(module_tier(project.root, "alpha"), ("standard", "default (config invalid)"))
 
-    def test_phase_hint_ignores_it(self):
+    def test_phase_hint_ignores_them(self):
         from module_stage import config_lines
-        with Project() as plain:
+        with Project({"version": 1, "reviewCadence": "combined"}) as plain:
             baseline = config_lines(plain.root)
-        with Project({"version": 1, "moduleAutonomy": {"alpha": "relaxed"}}) as project:
+        with Project(self.OLD) as project:
             self.assertEqual(config_lines(project.root), baseline)
+
+
+class Takeover(unittest.TestCase):
+    """takeover-config (C1): who approves the Spec and Plan, merges and releases, per project and per module."""
+
+    HUMAN = {"spec": "human", "plan": "human", "merge": "human", "release": "human"}
+
+    def doc(self, project):
+        return json.loads(project.config.read_text(encoding="utf-8"))
+
+    def test_presets_and_custom_round_trip(self):
+        for value in ("none", "plan", "merge"):
+            with Project() as project:
+                code, out = project.run("set", "--key", "takeover", "--value", value, "--confirm")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(load(project.root), ({"takeover": value}, []))
+        custom = {"plan": "codex", "release": "prepare"}
+        with Project() as project:
+            code, out = project.run("set", "--key", "takeover", "--value", json.dumps(custom), "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(self.doc(project)["takeover"], custom)
+
+    def test_presets_expand(self):
+        from project_config import module_takeover
+        expected = {"none": self.HUMAN,
+                    "plan": dict(self.HUMAN, plan="codex"),
+                    "merge": dict(self.HUMAN, spec="codex", plan="codex", merge="auto")}
+        for value, items in expected.items():
+            with Project({"version": 1, "takeover": value}) as project:
+                self.assertEqual(module_takeover(project.root, "alpha"), (items, "takeover"), value)
+        with Project({"version": 1, "takeover": {"merge": "auto"}}) as project:
+            self.assertEqual(module_takeover(project.root, "alpha"), (dict(self.HUMAN, merge="auto"), "takeover"))
+
+    def test_sources(self):
+        from project_config import module_takeover
+        with Project() as project:
+            self.assertEqual(module_takeover(project.root, "alpha"), (self.HUMAN, "default"))
+        with Project({"version": 1, "takeover": "fast"}) as project:
+            self.assertEqual(module_takeover(project.root, "alpha"), (self.HUMAN, "default (config invalid)"))
+        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": "merge"}}) as project:
+            self.assertEqual(module_takeover(project.root, "alpha")[1], "moduleTakeover")
+            self.assertEqual(module_takeover(project.root, "alpha")[0]["merge"], "auto")
+            self.assertEqual(module_takeover(project.root, "beta"), (dict(self.HUMAN, plan="codex"), "takeover"))
+        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": "fast"}}) as project:
+            self.assertEqual(module_takeover(project.root, "alpha"),
+                             (dict(self.HUMAN, plan="codex"), "default (config invalid)"))
+
+    def test_invalid_values_rejected_without_writing(self):
+        bad = ["fast", "{", json.dumps({"spec": "auto"}), json.dumps({"deploy": "human"}),
+               json.dumps({"release": "yes"}), json.dumps(["plan"])]
+        for value in bad:
+            with Project() as project:
+                code, out = project.run("set", "--key", "takeover", "--value", value, "--confirm")
+                self.assertEqual(code, 2, (value, out))
+                self.assertIn("takeover-invalid", out)
+                self.assertFalse(project.config.exists(), value)
+        cases = [("set", "--key", "takeover", "--module", "alpha", "--value", "plan"),
+                 ("set", "--key", "moduleTakeover", "--value", "plan"),
+                 ("set", "--key", "moduleTakeover", "--module", "Bad_Id", "--value", "plan"),
+                 ("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "fast")]
+        for args in cases:
+            with Project() as project:
+                code, out = project.run(*args, "--confirm")
+                self.assertEqual(code, 2, (args, out))
+                self.assertFalse(project.config.exists(), args)
+
+    def test_invalid_value_in_file_drops_only_this_key(self):
+        for key, bad in (("takeover", "fast"), ("takeover", {"spec": "auto"}), ("moduleTakeover", {"alpha": "fast"}),
+                         ("moduleTakeover", {"Bad_Id": "plan"}), ("moduleTakeover", "plan")):
+            with Project({"version": 1, "reviewCadence": "combined", key: bad}) as project:
+                self.assertEqual(load(project.root), ({"reviewCadence": "combined"}, [key + "-invalid"]), bad)
+                self.assertEqual(project.run("check")[0], 1, bad)
+
+    def test_module_entries_one_at_a_time(self):
+        with Project({"version": 1, "moduleTakeover": {"other": "none"}}) as project:
+            code, out = project.run("set", "--key", "moduleTakeover", "--module", "alpha",
+                                    "--value", json.dumps({"plan": "codex"}), "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(self.doc(project)["moduleTakeover"], {"other": "none", "alpha": {"plan": "codex"}})
+            code, out = project.run("unset", "--key", "moduleTakeover", "--module", "other", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(self.doc(project)["moduleTakeover"], {"alpha": {"plan": "codex"}})
+
+    def test_preview_lists_the_four_items(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "takeover", "--value", "plan")
+            self.assertEqual(code, 0, out)
+            self.assertIn("spec=human plan=codex merge=human release=human", out)
+            self.assertFalse(project.config.exists())
+
+    def test_wider_than_project_note(self):
+        with Project({"version": 1, "takeover": "plan"}) as project:
+            out = project.run("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "merge")[1]
+            self.assertIn("note:", out)
+            out = project.run("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "none")[1]
+            self.assertNotIn("note:", out)
+
+    def test_release_limits_are_hinted(self):
+        for release, hinted in (("prepare", False), ("auto-confirm", True), ("auto", True)):
+            with Project() as project:
+                out = project.run("set", "--key", "takeover", "--value", json.dumps({"release": release}))[1]
+                self.assertEqual("prepare" in out and "autopilot" in out, hinted, (release, out))
+
+    def test_summary_defaults(self):
+        with Project() as project:
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual((items["takeover"]["value"], items["takeover"]["source"]), ("none", "default"))
+            self.assertEqual((items["moduleTakeover"]["value"], items["moduleTakeover"]["source"]), ({}, "default"))
 
 
 class MachineState(unittest.TestCase):

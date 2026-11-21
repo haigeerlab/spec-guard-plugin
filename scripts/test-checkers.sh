@@ -812,6 +812,19 @@ mkifc "$TMP/ifc-modtier" 'del data["moduleAutonomy"]'
 want fail "interface: 缺 1.14 的 moduleAutonomy 入口 → 报错" python3 "$IFC" "$TMP/ifc-modtier/interface.json"
 mkifc "$TMP/ifc-modtier-less" 'del data["moduleAutonomy"]["values"]["relaxed"]'
 want fail "interface: moduleAutonomy 少一档 → 报错" python3 "$IFC" "$TMP/ifc-modtier-less/interface.json"
+# takeover-config：interface 1.15 的 takeover、moduleTakeover 入口与 mapView.takeover 说明，字段与取值和代码一致。
+mkifc "$TMP/ifc-takeover" 'del data["takeover"]'
+want fail "interface: 缺 1.15 的 takeover 入口 → 报错" python3 "$IFC" "$TMP/ifc-takeover/interface.json"
+mkifc "$TMP/ifc-modtakeover" 'del data["moduleTakeover"]'
+want fail "interface: 缺 1.15 的 moduleTakeover 入口 → 报错" python3 "$IFC" "$TMP/ifc-modtakeover/interface.json"
+mkifc "$TMP/ifc-takeover-item" 'del data["takeover"]["items"]["release"]'
+want fail "interface: takeover 少一项 → 报错" python3 "$IFC" "$TMP/ifc-takeover-item/interface.json"
+mkifc "$TMP/ifc-takeover-preset" 'del data["takeover"]["presets"]["merge"]'
+want fail "interface: takeover 少一个预设 → 报错" python3 "$IFC" "$TMP/ifc-takeover-preset/interface.json"
+mkifc "$TMP/ifc-map-takeover" 'del data["mapView"]["takeover"]'
+want fail "interface: mapView 缺 1.15 的 takeover 说明 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover/interface.json"
+mkifc "$TMP/ifc-map-takeover-field" 'data["mapView"]["takeover"]["fields"]["extra"] = "x"'
+want fail "interface: mapView.takeover 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover-field/interface.json"
 mkifc "$TMP/ifc-autonomy" 'del data["mapView"]["autonomy"]'
 want fail "interface: mapView 缺 1.14 的 autonomy 说明 → 报错" python3 "$IFC" "$TMP/ifc-autonomy/interface.json"
 mkifc "$TMP/ifc-autonomy-field" 'data["mapView"]["autonomy"]["fields"]["cap"] = "x"'

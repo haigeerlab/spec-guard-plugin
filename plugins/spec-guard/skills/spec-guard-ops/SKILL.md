@@ -175,7 +175,7 @@ GitLab 用正整数 project id，与 Proposal 命令的 `--target` 形态一致�
 ## config
 
 项目配置（Claude 侧为 `/spec-guard:config`），存在入库的 `.agent/config.json`。没有这个文件就是什么都没配，
-行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency`、`autonomyTier` 的生效值与来源，以及只在别处修改的
+行为不变。只读汇总，列出 `artifactLanguage`、`reviewCadence`、`moduleConcurrency`、`takeover`、`moduleTakeover` 的生效值与来源，以及只在别处修改的
 `trackerDefault`（上一节）：
 
 ```bash
@@ -188,12 +188,15 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键。
-- `autonomyTier`：`strict`（默认）、`standard` 或 `relaxed`，自治档位，取什么值都不注入阶段提示；各档含义由 module-crew 定义，spec-guard
-  只存、读、报告来源。不联动 `reviewCadence`（要 Spec 与 Plan 一起审另设 `combined`）。设置或取消要用户在对话里的原话，`--confirm` 前引用。
-  任何档位都不低于共享检查点规则「自治档位与底线」。0.67.1 及更早版本会把含这个键的配置整份判为无效，0.68.0～0.84.2 只忽略它，团队都升级后再设置。
-- `moduleAutonomy`：按模块的自治档位，对象（模块 id → `strict`／`standard`／`relaxed`），没设的模块随 `autonomyTier`，取什么值都不注入阶段提示。
-  `set --key moduleAutonomy --module <id> --value <档位>` 一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。
-  比项目档位宽时预览多一行 `note:`，只提醒不截断，上限由读取它的插件做。写入要用户原话，0.68.0～0.88.0 只忽略这个键，团队都升级后再设置。
+- `takeover`：接管档位，预设 `none`（默认）、`plan`、`merge`，或自定义对象 `{"spec","plan","merge","release"}`（Spec、Plan 为 `human`／`codex`，
+  合并为 `human`／`auto`，发布为 `human`／`prepare`／`auto-confirm`／`auto`，没写的项按 `human`），取什么值都不注入阶段提示；spec-guard 只存、读、
+  报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制，由 autopilot 拦截。设置或取消要用户在对话里的原话，
+  `--confirm` 前引用；按档位放行的规则落地前不低于共享检查点规则「自治档位与底线」。0.67.1 及更早版本会把含这个键的配置整份判为无效，
+  0.68.0～0.90.1 只忽略它，团队都升级后再设置。
+- `moduleTakeover`：按模块的接管档位，对象（模块 id → 同 `takeover` 的值），没设的模块随 `takeover`。`set --key moduleTakeover --module <id> --value <值>`
+  一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。比项目宽时预览多一行 `note:`，只提醒不截断。写入要用户原话。
+- `autonomyTier`、`moduleAutonomy`：已退役、不映射。文件里还有时不生效，`show` 标为已退役，不能再 `set`，可以 `unset` 删除；`/map --json` 的 `autonomy`
+  字段本版仍按它们计算、标为 deprecated。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 

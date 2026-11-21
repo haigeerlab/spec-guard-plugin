@@ -18,8 +18,9 @@ import module_stage  # noqa: E402
 import project_config  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
-           "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy")  # crew-interface: 1.1; gate-tick: 1.7;
-# scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11; module-autonomy: 1.14
+           "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy",
+           "takeover", "moduleTakeover")  # crew-interface: 1.1; gate-tick: 1.7;
+# scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11; module-autonomy: 1.14; takeover-config: 1.15
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
 # review-card-sections: interface 1.5; the session-protocol 【等待用户】「类型」 codes of the kinds spec-guard produces.
 REVIEW_KINDS = ("capability-map", "spec", "plan", "spec-plan", "checkpoint", "final", "stuck")
@@ -48,7 +49,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _autonomy(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -102,6 +103,31 @@ def _autonomy(view: dict) -> list:
     return []
 
 
+def _takeover_view(view: dict) -> list:
+    """takeover-config: interface 1.15 describes every per-module takeover field map_view writes."""
+    block = view.get("takeover")
+    fields = block.get("fields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 takeover 说明"]
+    if set(fields) != set(map_view.TAKEOVER_FIELDS):
+        return ["mapView.takeover.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.TAKEOVER_FIELDS))]
+    return []
+
+
+def _takeover(data: dict) -> list:
+    """takeover-config: the takeover entry lists exactly the items, values and presets project_config defines."""
+    entry = data["takeover"]
+    found = []
+    items = entry.get("items")
+    if not isinstance(items, dict) or {key: tuple(value) for key, value in items.items()
+                                       if isinstance(value, list)} != project_config.ITEMS:
+        found.append("takeover.items 与 project_config.ITEMS 不一致")
+    presets = entry.get("presets")
+    if not isinstance(presets, dict) or set(presets) != set(project_config.PRESETS):
+        found.append("takeover.presets 为 %s，代码为 %s" % (sorted(presets or {}), sorted(project_config.PRESETS)))
+    return found
+
+
 def _scripts(path: Path, label: str, command) -> list:
     scripts = [arg for arg in command if isinstance(arg, str) and arg.endswith(".py")] if isinstance(command, list) else []
     if not scripts:
@@ -122,6 +148,7 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
     found += _scripts(path, "gateTick.command", data["gateTick"].get("command"))
     found += _scripts(path, "scopeOverlap.command", data["scopeOverlap"].get("command"))
     found += _scripts(path, "declaredScope.command", data["declaredScope"].get("command"))
+    found += _takeover(data)
     commands = data["checkoutRole"].get("commands")
     for name, command in (commands.items() if isinstance(commands, dict) and commands else [("commands", None)]):
         found += _scripts(path, "checkoutRole.commands.%s" % name, command)

@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy"}
+               "autonomy", "takeover"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -185,6 +185,50 @@ class AutonomyTest(unittest.TestCase):
             self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
                              baseline.replace(str(plain.root), "ROOT"))
 
+
+
+class TakeoverTest(unittest.TestCase):
+    """takeover-config (C2): each module's takeover items and source; the text table and autonomy are unchanged."""
+    ROWS = [("a", "基础", "—"), ("b", "下游", "a")]
+    HUMAN = {"spec": "human", "plan": "human", "merge": "human", "release": "human"}
+
+    def project(self, config=None):
+        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
+        if config is not None:
+            files[".agent/config.json"] = json.dumps(dict(version=1, **config))
+        return Project(self.ROWS, ["a", "b"], files)
+
+    def takeover(self, project):
+        return {m["id"]: m["takeover"] for m in project.json()["modules"]}
+
+    def test_without_config(self):
+        with self.project() as project:
+            self.assertEqual(self.takeover(project), {
+                m: dict(self.HUMAN, source="default", widerThanProject=False) for m in ("a", "b")})
+
+    def test_module_entry_and_project_value(self):
+        with self.project({"takeover": "plan", "moduleTakeover": {"a": "merge"}}) as project:
+            self.assertEqual(self.takeover(project), {
+                "a": {"spec": "codex", "plan": "codex", "merge": "auto", "release": "human",
+                      "source": "moduleTakeover", "widerThanProject": True},
+                "b": dict(self.HUMAN, plan="codex", source="takeover", widerThanProject=False)})
+        with self.project({"takeover": "merge", "moduleTakeover": {"a": {"release": "prepare"}}}) as project:
+            self.assertEqual(self.takeover(project)["a"],
+                             dict(self.HUMAN, release="prepare", source="moduleTakeover", widerThanProject=True))
+
+    def test_invalid_entries_fall_back(self):
+        with self.project({"takeover": "plan", "moduleTakeover": {"a": "fast"}}) as project:
+            self.assertEqual(self.takeover(project)["a"],
+                             dict(self.HUMAN, plan="codex", source="default (config invalid)", widerThanProject=False))
+
+    def test_autonomy_and_text_unchanged(self):
+        with self.project() as plain:
+            baseline = plain.run().stdout
+            autonomy = [m["autonomy"] for m in plain.json()["modules"]]
+        with self.project({"takeover": "merge", "moduleTakeover": {"a": "none"}}) as project:
+            self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
+                             baseline.replace(str(plain.root), "ROOT"))
+            self.assertEqual([m["autonomy"] for m in project.json()["modules"]], autonomy)
 
 class DeferralTest(unittest.TestCase):
     """formal-deferral: a module whose only unchecked items are formal deferrals is done; its dependents can start.
@@ -860,6 +904,7 @@ def snapshot(project):
     data.pop("reviewCadence")  # map-progress-facts: its source reports an invalid config; checked in ProgressFactsTest
     for module in data["modules"]:
         module.pop("autonomy")  # module-autonomy: its source reports an invalid config too; checked in AutonomyTest
+        module.pop("takeover")  # takeover-config: same, checked in TakeoverTest
     done = project.run()
     assert done.returncode == 0, done.stderr
     return json.dumps(data, ensure_ascii=False, sort_keys=True), STAMP.sub("", done.stdout)

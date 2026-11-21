@@ -220,12 +220,18 @@ printf '{"version": 2, "artifactLanguage": "en"}\n' > "$PROJECT/.agent/config.js
 check "结构问题的项目配置失败" 1 "项目配置无效: version-invalid"
 printf '{"version": 1, "moduleConcurrency": "on"}\n' > "$PROJECT/.agent/config.json"
 check "并行开关 on 的项目配置通过" 0 "项目配置有效"
-# module-autonomy：能力图上没有的模块 id 逐个警告、不判失败；档位写错整个键判无效。
-printf '{"version": 1, "moduleAutonomy": {"alpha": "relaxed", "ghost": "strict", "zeta": "strict"}}\n' > "$PROJECT/.agent/config.json"
-check "moduleAutonomy 里能力图上没有的模块警告" 0 "项目配置 moduleAutonomy 里的模块 ghost 不在能力图上"
-check "每个未知模块各一条警告" 0 "项目配置 moduleAutonomy 里的模块 zeta 不在能力图上"
-printf '{"version": 1, "moduleAutonomy": {"alpha": "fast"}}\n' > "$PROJECT/.agent/config.json"
-check "moduleAutonomy 档位写错判无效" 1 "项目配置无效: moduleAutonomy-invalid"
+# takeover-config：能力图上没有的模块 id 逐个警告、不判失败；档位写错整个键判无效。
+printf '{"version": 1, "moduleTakeover": {"alpha": "plan", "ghost": "none", "zeta": {"merge": "auto"}}}\n' > "$PROJECT/.agent/config.json"
+check "moduleTakeover 里能力图上没有的模块警告" 0 "项目配置 moduleTakeover 里的模块 ghost 不在能力图上"
+check "每个未知模块各一条警告" 0 "项目配置 moduleTakeover 里的模块 zeta 不在能力图上"
+printf '{"version": 1, "moduleTakeover": {"alpha": "fast"}}\n' > "$PROJECT/.agent/config.json"
+check "moduleTakeover 取值写错判无效" 1 "项目配置无效: moduleTakeover-invalid"
+printf '{"version": 1, "takeover": {"spec": "auto"}}\n' > "$PROJECT/.agent/config.json"
+check "takeover 取值写错判无效" 1 "项目配置无效: takeover-invalid"
+# takeover-config：已退役的 autonomyTier、moduleAutonomy（哪怕写错）只警告、不判失败。
+printf '{"version": 1, "autonomyTier": "fast", "moduleAutonomy": {"ghost": "strict"}}\n' > "$PROJECT/.agent/config.json"
+check "已退役的档位键只警告" 0 "项目配置里有已退役的 autonomyTier 或 moduleAutonomy"
+check_absent "已退役的 moduleAutonomy 不再按能力图逐个警告" "moduleAutonomy 里的模块"
 printf '{"version": 1, "moduleConcurrency": "yes"}\n' > "$PROJECT/.agent/config.json"
 check "并行开关取值无效时失败" 1 "项目配置无效: moduleConcurrency-invalid"
 

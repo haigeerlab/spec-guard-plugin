@@ -298,10 +298,12 @@ class CheckpointContractTests(unittest.TestCase):
     def test_autonomy_tier_and_floor(self):
         # autonomy-tier (C2, C4): the floor no tier goes below, and where the tier is described.
         floor = self.section("## 自治档位与底线")
-        for phrase in ("`autonomyTier`", "`strict`", "`standard`", "`relaxed`", "module-crew", "不联动 `reviewCadence`",
-                       "`reviewCadence=combined`", "原话", "能力图", "可以和 Plan 一起批", "最终验收", "测试改不红",
+        # takeover-config: the takeover keys replace the retired autonomy tier; the floor text itself is unchanged here.
+        for phrase in ("`takeover`", "`moduleTakeover`", "`none`", "`plan`", "`merge`", "发布", "原话",
+                       "`autonomyTier`", "已退役", "不映射", "能力图", "可以和 Plan 一起批", "最终验收", "测试改不红",
                        "Spec 没覆盖的决策", "高风险不可逆改动", "必停", "以项目为准"):
             self.assertIn(phrase, floor)
+        self.assertNotIn("`standard`", floor)
         rules = self.target.read_text(encoding="utf-8")
         self.assertLess(rules.index("## 批准节奏"), rules.index("## 自治档位与底线"))
         self.assertLess(rules.index("## 自治档位与底线"), rules.index("## 批准标记"))
@@ -309,7 +311,7 @@ class CheckpointContractTests(unittest.TestCase):
         skill = (self.plugin / "skills" / "spec-guard-ops" / "SKILL.md").read_text(encoding="utf-8")
         for name, text in (("config.md", command), ("SKILL.md", skill)):
             with self.subTest(surface=name):
-                for phrase in ("`autonomyTier`", "`strict`", "module-crew", "不联动", "原话", "0.67.1 及更早"):
+                for phrase in ("`takeover`", "`moduleTakeover`", "`autonomyTier`", "已退役", "原话", "0.67.1 及更早"):
                     self.assertIn(phrase, text)
 
     def test_pre_declared_section(self):

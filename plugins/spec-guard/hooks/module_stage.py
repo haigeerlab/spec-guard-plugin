@@ -428,6 +428,9 @@ def config_lines(root: Path, host: str | None = None) -> list:
     values, problems = load_config(root)
     if set(problems) & set(STRUCTURAL):
         return ["- Project config: invalid (%s) — run %s." % (", ".join(problems), COMMANDS[host]["config"])]
+    # takeover-config: a retired key (autonomyTier, moduleAutonomy) never changed the hint, so it adds no line;
+    # /spec-guard:config and verify-artifacts report it.
+    problems = [problem for problem in problems if problem != "retired-key"]
     zh = values.get("artifactLanguage") == "zh-CN"
     lines = []
     if "artifactLanguage" in values:
