@@ -1,6 +1,6 @@
 # Spec: codex-final-acceptance
 
-<!-- spec-guard: review approved b26d1fd47c5a -->
+<!-- spec-guard: review approved b21874eb8d18 -->
 
 ## Objective
 

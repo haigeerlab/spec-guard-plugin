@@ -1,6 +1,6 @@
 # Spec: takeover-scope-check
 
-<!-- spec-guard: review approved 0309d893d411 -->
+<!-- spec-guard: review approved 557739d8b122 -->
 
 ## Objective
 

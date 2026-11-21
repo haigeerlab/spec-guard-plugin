@@ -13,7 +13,7 @@
 - [x] Task 6b（M3 返工，Q15 A）：接管模块的越界检查把 `.agent/state.json` 也记为 `flow`；`CLAUDE.md`／`AGENTS.md`、`risk-paths.json` 照旧算越界 — autopr-design #21997 沙盒演练 2 发现；`test_module_scope` 新增断言（改前失败）
 - [x] Task 8（M3 返工）：规则与说明补「配置文件不算越界」「Codex 最终验收要求开工前就是合并：自动」；CHANGELOG 与版本号 0.91.1
 - [x] Checkpoint 3（report）：完整检查、变异与临时项目重跑 U3 接 U4
-- [ ] Checkpoint 4（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.1，用安装版重跑 M3
+- [x] Checkpoint 4（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.1，用安装版重跑 M3
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -42,3 +42,5 @@
   2. 开工前是 plan、开工后才放宽到 merge：`acceptance-not-auto-at-base`，拒绝。
   3. 像沙盒那样约定、配置、state、risk-paths 与 Spec 同一次提交：`acceptance-not-auto-at-base`，拒绝。
   4. 先提交约定、配置与清单，再提交 Spec（`.agent/state.json` 随 Spec 提交）：记下。
+
+2026-11-22 用户「验收通过」（M3 返工，含两份 Spec 的变更记录）。
