@@ -7,7 +7,7 @@
 - [x] Task 4：规则与说明
 - [x] Task 5：0.91.0 版本号、README、CHANGELOG
 - [x] Checkpoint 1（report）：完整检查、变异验证与实跑
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -22,3 +22,7 @@
   4. `--confirm`：记录写到 `.git/spec-guard/acceptance/alpha.json`，`git status --porcelain` 为空，HEAD 不变。
   5. 阶段提示：当前模块转到 `beta`（最终 gate 当作已过）。
   6. `/map --json`：alpha `done`，`acceptance` 为 `{marker: codex-approved, sha: <HEAD>}`；beta 为 `null`。
+
+<!-- spec-guard: external-review declined -->
+
+2026-11-22 用户「验收通过」。
