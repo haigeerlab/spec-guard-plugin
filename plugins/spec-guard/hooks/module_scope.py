@@ -337,7 +337,7 @@ def _declared_paths(root: Path, module_id: str) -> tuple:
     return declared.public_paths if declared is not None else ()
 
 
-FLOW_FILES = ("spec/CAPABILITY-MAP.md",)
+FLOW_FILES = ("spec/CAPABILITY-MAP.md", ".agent/config.json")  # M3 rework: the project setting
 FLOW_DIRS = ("spec/usage/",)
 
 

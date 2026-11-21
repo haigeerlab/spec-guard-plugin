@@ -551,9 +551,10 @@ class BlankLinesAroundTheMarker(unittest.TestCase):
             self.assertEqual(project.plan.read_text(encoding="utf-8"), "%s\n\n# Plan: alpha\n\n步骤\n" % REVIEW_APPROVED)
 
 
-class Acceptance(unittest.TestCase):
+class AcceptanceFixture(unittest.TestCase):
     """codex-final-acceptance (C2): three pieces of evidence on HEAD, recorded in the git directory, never committed."""
 
+    BASE_TAKEOVER = {"merge": "auto"}  # the takeover in the commit before the module started
     BOUNDARY = "\n## 并行边界\n\n- 独占：`spec/alpha.md`、`tasks/alpha/`、`src/alpha.py`\n- 公共：无\n"
 
     def setUp(self):
@@ -571,7 +572,7 @@ class Acceptance(unittest.TestCase):
                         GIT_COMMITTER_EMAIL="t@t")
         self.project.spec.unlink()
         self.project.plan.unlink()
-        self.config({"merge": "auto"})
+        self.config(self.BASE_TAKEOVER)
         self.git("init", "-q")
         self.git("remote", "add", "origin", "https://github.com/acme/widget.git")
         self.git("add", ".")
@@ -625,6 +626,9 @@ class Acceptance(unittest.TestCase):
     def record_path(self):
         return self.root / ".git" / "spec-guard" / "acceptance" / "alpha.json"
 
+
+
+class Acceptance(AcceptanceFixture):
     def test_three_pieces_record_in_the_git_directory(self):
         import hashlib
         report = self.report()
@@ -696,12 +700,37 @@ class Acceptance(unittest.TestCase):
         (self.root / "loose.txt").write_text("x\n", encoding="utf-8")
         self.assertRefused(self.accept(report, "--confirm"), "uncommitted")
 
+    def test_a_config_change_after_the_start_is_not_out_of_scope(self):
+        # M3 rework: narrowing and restoring the takeover rewrites the config; merge was auto before the start too.
+        self.config({"merge": "auto", "plan": "codex"})
+        self.commit("restored after a narrow")
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 0, out)
+
     def test_out_of_scope_changes_refuse(self):
         (self.root / "README.md").write_text("x\n", encoding="utf-8")
         self.commit("outside")
         report = self.report()
         self.evidence()
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
+
+
+class AcceptanceWidenedLater(AcceptanceFixture):
+    """M3 rework (Q14 A): merge must have been auto before the module started, so a patch cannot grant it to itself."""
+
+    BASE_TAKEOVER = {"plan": "codex"}
+
+    def test_merge_auto_only_after_the_start_refuses(self):
+        self.config({"merge": "auto"})
+        self.commit("widened during the module")
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertIn("acceptance-not-auto-at-base", out)
+        self.assertFalse(self.record_path().exists())
 
 
 if __name__ == "__main__":
