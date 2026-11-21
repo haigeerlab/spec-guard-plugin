@@ -1,6 +1,6 @@
 # Spec: important-requirement
 
-<!-- spec-guard: review approved eeeca5b6d661 -->
+<!-- spec-guard: review approved da96214d4473 -->
 
 ## Objective
 
@@ -78,9 +78,10 @@
 - **Q7 没有「并行边界」一节的 Spec 怎么算跨模块**（2026-11-22 用户选 A）：
   - **A（推荐）**：档位勾了 spec=codex 的模块，没写并行边界就判为重要（`cross-module` 未判定），Spec 由用户批；没勾的不受影响。
   - **B**：没写就当作不跨模块。
-- **Q8 高风险路径清单从哪读**（2026-11-22 用户选 A：读 `.agent/risk-paths.json`）：合并方案定的是「调用方向只能是 autopilot → 插件，插件不认识 autopilot」，而清单接口是 autopilot 的命令。
-  - **A（推荐）**：autopilot 体检时把清单写成项目里的一个文件（例如 `.agent/risk-paths.json`，格式 `autopilot.risk-paths/v1`），spec-guard 只读这个文件；
-    文件随仓库提交，改它属于高风险改动由用户审。需要 autopilot 那边配合写文件（我去和 autopr-design 对齐）。
+- **Q8 高风险路径清单从哪读**（2026-11-22 用户选 A：读 `.github/autopr/risk-paths.json`）：合并方案定的是「调用方向只能是 autopilot → 插件，插件不认识 autopilot」，而清单接口是 autopilot 的命令。
+  - **A（推荐）**：autopilot 体检时把清单写成项目里的一个文件（例如 `.github/autopr/risk-paths.json`，格式 `autopilot.risk-paths/v1`），spec-guard 只读这个文件；
+    文件随仓库提交，改它属于高风险改动由用户审（`.github/**` 本身是 T4）。autopr-design #21976 确认由 autopilot 体检生成、交用户审后提交，
+    并由体检提示「过期」；spec-guard 不判断过期。
   - **B**：spec-guard 直接调 autopilot-hub 的 `risk/cli.py`，钉住 hub 的提交。违背上面的调用方向，还要知道 hub 检出在哪。
 - **Q9 T3 算不算**（2026-11-22 用户选 A：T3、T4 都算）：
   - **A（推荐）**：T3、T4 都算（autopr-design 的建议）。
@@ -95,3 +96,7 @@
 
 改 `commands/add-module.md`、`skills/spec-guard-ops/SKILL.md`、`docs/workflow.md`、`docs/commands.md`（`/map` 的 `important`）。CHANGELOG 与 README 在
 最后一个模块统一写。项目没有文档基线。
+
+## 变更记录
+
+- 2026-11-22：高风险清单文件位置由 `.agent/risk-paths.json` 改为 `.github/autopr/risk-paths.json`（autopr-design #21976：谁生成放谁的目录，`.github/**` 本身是 T4）；仍是 Q8 A 的做法。
