@@ -33,7 +33,7 @@ FIELD = re.compile(r"^-\s+([^:：]+?)\s*[:：]\s*(.*)$")
 TICKED = re.compile(r"^`([^`]*)`$")
 SEPARATORS = re.compile(r"\s*[、,]\s*")
 BAD_PATH_CHARS = set("*?[]\\")
-SCOPES = ("exclusive", "own", "outside")  # interface.json scopeCheck.values.scope
+SCOPES = ("exclusive", "own", "outside", "declared")  # interface.json scopeCheck.values.scope
 # interface.json scopeOverlap.values.error: ScopeError codes, then the overlap command's own.
 OVERLAP_ERRORS = ("no-boundary", "missing-exclusive", "bad-path", "bad-category", "duplicate-section", "unknown-line",
                   "unreadable", "no-capability-map", "map-unreadable")
@@ -187,7 +187,7 @@ def parse_declared(text: str) -> DeclaredScope | None:
 
 def covers(scope: Scope, module_id: str, path: str) -> str:
     """`own` for the module's flow files, `exclusive` inside its paths, otherwise `outside`."""
-    exclusive, own, outside = SCOPES
+    exclusive, own, outside = SCOPES[:3]
     if path == "spec/%s.md" % module_id or path.startswith("tasks/%s/" % module_id):
         return own
     for owned in scope.exclusive:
@@ -311,15 +311,60 @@ def changed_files(root: Path, base: str) -> list | None:
     return sorted(files, key=lambda item: item[1])
 
 
-def _check(root: Path, module_id: str, base: str, as_json: bool) -> int:
+def scope_applies(root: Path, module_id: str) -> bool:
+    """takeover-scope-check: the switch is on, or the module's takeover hands any step to codex or automation."""
+    if module_concurrency(root):
+        return True
+    from project_config import module_takeover
+    return any(value != "human" for value in module_takeover(root, module_id)[0].values())
+
+
+def default_base(root: Path, module_id: str) -> str | None:
+    """takeover-scope-check (Q10 A): the parent of the commit that first added the module's Spec; None without one."""
+    added = _git(root, "log", "--diff-filter=A", "--format=%H", "--", "spec/%s.md" % module_id)
+    commits = added.split() if added else []
+    if not commits:
+        return None
+    parent = _git(root, "rev-parse", "--verify", "--quiet", commits[-1] + "^")
+    return parent.strip() if parent else None
+
+
+def _declared_paths(root: Path, module_id: str) -> tuple:
+    """Public paths an approved, unchanged Plan pre-declares (pre-declared-scope's approval); () otherwise."""
+    if not plan_approval(root, module_id)[0]:
+        return ()
+    try:
+        declared = parse_declared((root / "tasks" / module_id / "plan.md").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ScopeError):
+        return ()
+    return declared.public_paths if declared is not None else ()
+
+
+def classify(root: Path, module_id: str, scope: Scope, base: str) -> list | None:
+    """[{path, status, scope}] since `base`; None when the base is not a commit."""
+    files = changed_files(root, base)
+    if files is None:
+        return None
+    declared = _declared_paths(root, module_id)
+    rows = []
+    for status, path in files:
+        where = covers(scope, module_id, path)
+        if where == "outside" and any(path.startswith(item) if item.endswith("/") else path == item for item in declared):
+            where = "declared"
+        rows.append({"path": path, "status": status, "scope": where})
+    return rows
+
+
+def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
     if not MODULE_ID.fullmatch(module_id):
         print("module-id-invalid: not a capability-map module id")
         return 2
     if _git(root, "rev-parse", "--is-inside-work-tree") is None:
         print("not-a-git-repository: the overreach check compares against a git base")
         return 2
-    if not module_concurrency(root):
-        print("moduleConcurrency is not on in .agent/config.json; the overreach check does not run")
+    if not scope_applies(root, module_id):
+        print("moduleConcurrency is not on in .agent/config.json and the module's takeover is none; the overreach check "
+              "does not run")
         return 3
     spec_path = root / "spec" / ("%s.md" % module_id)
     try:
@@ -332,14 +377,19 @@ def _check(root: Path, module_id: str, base: str, as_json: bool) -> int:
     if scope is None:
         print("no-boundary: spec/%s.md has no concurrency boundary section" % module_id)
         return 4
-    files = changed_files(root, base)
-    if files is None:
+    if base is None:
+        base = default_base(root, module_id)
+        if base is None:
+            print("base-unknown: spec/%s.md was not committed after an earlier commit; give --base" % module_id)
+            return 2
+    rows = classify(root, module_id, scope, base)
+    if rows is None:
         print("base-invalid: the base is not a commit in this repository")
         return 2
-    rows = [{"path": path, "status": status, "scope": covers(scope, module_id, path)} for status, path in files]
     outside = sum(1 for row in rows if row["scope"] == "outside")
+    declared = sum(1 for row in rows if row["scope"] == "declared")
     if as_json:
-        print(json.dumps({"module": module_id, "base": base, "files": rows, "outside": outside},
+        print(json.dumps({"module": module_id, "base": base, "files": rows, "outside": outside, "declared": declared},
                          ensure_ascii=False, sort_keys=True))
         return 0
     print("concurrency boundary check: %s against %s" % (module_id, base))
@@ -502,7 +552,7 @@ def main() -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     check = commands.add_parser("check", help="classify a module's changes since a base against its boundary")
     check.add_argument("--module", required=True)
-    check.add_argument("--base", required=True)
+    check.add_argument("--base", help="the base commit; defaults to the parent of the commit that added the Spec")
     check.add_argument("--format", choices=("text", "json"), default="text")
     check.add_argument("--project", default=".")
     checker = commands.add_parser("validate", help="lines for verify-artifacts; silent when the switch is off")

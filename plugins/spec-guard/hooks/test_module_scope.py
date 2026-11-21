@@ -225,6 +225,69 @@ class Check(unittest.TestCase):
         self.assertEqual(done.returncode, 2)
 
 
+
+class TakeoverCheck(unittest.TestCase):
+    """takeover-scope-check (C1): takeover modules are checked with the switch off; pre-declared paths pass once approved."""
+
+    def takeover(self, repo, value="plan"):
+        repo.write(".agent/config.json", json.dumps({"version": 1, "takeover": value}))
+
+    def test_takeover_module_runs_with_the_switch_off(self):
+        with Repo(switch="off") as repo:
+            self.takeover(repo)
+            repo.write("apps/mm/x.py")
+            code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+            self.assertEqual(code, 0, out)
+            outside = {item["path"] for item in json.loads(out)["files"] if item["scope"] == "outside"}
+            self.assertEqual(outside, {"apps/mm/x.py", ".agent/config.json"})  # writing the takeover changed the config too
+        with Repo(switch="off") as repo:
+            self.takeover(repo, "none")
+            self.assertEqual(repo.run("check", "--module", "m", "--base", "base")[0], 3)
+
+    def plan(self, repo, approved):
+        marker = "<!-- spec-guard: review approved -->" if approved else "<!-- spec-guard: review pending -->"
+        repo.write("tasks/m/plan.md", "# Plan: m\n\n%s\n\n## 预先声明\n\n- 公共路径：`package-lock.json`\n" % marker)
+        repo.git("add", "-A")
+        repo.git("commit", "-qm", "plan")
+
+    def test_pre_declared_paths_pass_only_when_the_plan_is_approved(self):
+        for approved, expected in ((True, "declared"), (False, "outside")):
+            with Repo(switch="off") as repo:
+                self.takeover(repo)
+                self.plan(repo, approved)
+                repo.write("package-lock.json", "changed\n")
+                code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+                self.assertEqual(code, 0, out)
+                report = json.loads(out)
+                files = {item["path"]: item["scope"] for item in report["files"]}
+                self.assertEqual(files["package-lock.json"], expected, approved)
+                self.assertEqual(report["declared"], 1 if approved else 0)
+
+    def test_default_base_is_the_parent_of_the_spec_commit(self):
+        with Repo(switch="off") as repo:
+            self.takeover(repo)
+            code, out = repo.run("check", "--module", "m", "--format", "json")
+            self.assertEqual(code, 2, out)  # the Spec came in the root commit: no parent to compare with
+            self.assertIn("base-unknown", out)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Repo(switch="off")
+            repo.root = Path(tmp)
+            repo.git("init", "-q")
+            repo.write("README.md")
+            repo.git("add", "-A")
+            repo.git("commit", "-qm", "start")
+            first = subprocess.run(["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+            repo.write("spec/m.md", "# Spec: m\n\n## 并行边界\n\n- 独占：`apps/m/`\n")
+            self.takeover(repo)
+            repo.git("add", "-A")
+            repo.git("commit", "-qm", "spec")
+            repo.write("apps/elsewhere.py")
+            code, out = repo.run("check", "--module", "m", "--format", "json")
+            self.assertEqual(code, 0, out)
+            report = json.loads(out)
+            self.assertEqual(report["base"], first)
+            self.assertEqual(report["outside"], 2)  # the config written after the Spec, and apps/elsewhere.py
+
 class Validate(unittest.TestCase):
     """`validate` feeds verify-artifacts: nothing when the switch is off, one line per finding when on."""
 
