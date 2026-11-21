@@ -2893,9 +2893,9 @@ printf '%s\n' '- [x] one' '- [ ] two' > "$ma/tasks/alpha/todo.md"
 printf '{"version": 1}\n' > "$ma/.agent/config.json"
 plain_ma="$(run "$ma" | raw_of)"
 # takeover-config：已退役的 autonomyTier、moduleAutonomy 不加「已忽略」行；takeover、moduleTakeover 本版阶段提示也不读。
+# takeover-scope-check：接管档位非 none 的模块构建中会做越界检查（第 30 段），这里只比不改行为的配置。
 for body in '{"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}' \
-            '{"version": 1, "takeover": "merge"}' \
-            '{"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"release": "auto"}, "beta": "none"}}' \
+            '{"version": 1, "takeover": "none", "moduleTakeover": {"beta": {"release": "auto"}}}' \
             '{"version": 1, "takeover": "none", "takeoverNarrowed": {"project": {"from": "merge", "to": "none", "source": "autopilot", "reason": "revert", "at": "2026-11-21T00:00:00Z"}}}'; do
   printf '%s\n' "$body" > "$ma/.agent/config.json"
   [ "$(run "$ma" | raw_of)" = "$plain_ma" ] || fail "配置为 ${body} 时阶段提示变了
@@ -3100,7 +3100,51 @@ $out"
 echo "  ✅ 不重要的 Spec 照常交 Codex 审"; PASS=$((PASS + 1))
 }
 
-PARTS=29
+part_30() {
+# takeover-scope-check：接管模块构建中改到边界外的文件就停下交用户；不越界、非接管时逐字不变；没写边界同样停（Q11 A）。
+sc() {  # $1=目录 $2=config JSON $3=spec 是否带边界（yes|no）
+  git init -q -b main "$1"; mkdir -p "$1/spec" "$1/.agent" "$1/tasks/alpha"
+  printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$1/CLAUDE.md"
+  printf '%s\n' "$2" > "$1/.agent/config.json"
+  printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' '| alpha | x | — |' '' \
+    'Build order: alpha' > "$1/spec/CAPABILITY-MAP.md"
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "开始"
+  if [ "$3" = yes ]; then
+    printf '%s\n' '# Spec: alpha' '' '## 并行边界' '' '- 独占：`src/alpha/`' > "$1/spec/alpha.md"
+  else
+    printf '%s\n' '# Spec: alpha' '' '## Objective' '' 'x' > "$1/spec/alpha.md"
+  fi
+  printf '%s\n' '# Plan: alpha' > "$1/tasks/alpha/plan.md"; printf '%s\n' '- [x] one' '- [ ] two' > "$1/tasks/alpha/todo.md"
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null add -A
+  git -C "$1" -c user.name=t -c user.email=t@example.com -c core.hooksPath=/dev/null commit -q -m "模块"
+}
+sp="$WORK/scope-plain"; sc "$sp" '{"version": 1}' yes
+st="$WORK/scope-take"; sc "$st" '{"version": 1, "takeover": "plan"}' yes
+[ "$(run "$sp" | context_of | sed "s#$sp#ROOT#g")" = "$(run "$st" | context_of | sed "s#$st#ROOT#g")" ] ||
+  fail "接管模块不越界时输出应与非接管时逐字相同
+$(run "$st" | context_of)"
+mkdir -p "$sp/src/other" "$st/src/other"; printf 'x\n' > "$sp/src/other/a.py"; printf 'x\n' > "$st/src/other/a.py"
+plain_sp="$(run "$sp" | context_of)"
+grep -F 'outside' >/dev/null <<<"$plain_sp" && fail "非接管模块不查越界
+$plain_sp"
+out="$(run "$st" | context_of)"
+grep -F 'Out of scope: 1 file(s)' >/dev/null <<<"$out" && grep -F 'src/other/a.py' >/dev/null <<<"$out" &&
+  grep -F 'stop and show the user' >/dev/null <<<"$out" || fail "接管模块越界应停下交用户
+$out"
+printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": "plan"}\n' > "$st/.agent/config.json"
+out="$(run "$st" | context_of)"
+grep -F '越界：' >/dev/null <<<"$out" && grep -F '停下' >/dev/null <<<"$out" || fail "中文同样停下
+$out"
+echo "  ✅ 接管模块越界时停下交用户（中英），不越界或非接管时逐字不变"; PASS=$((PASS + 1))
+sn="$WORK/scope-noboundary"; sc "$sn" '{"version": 1, "takeover": "plan"}' no
+out="$(run "$sn" | context_of)"
+grep -F 'no usable concurrency boundary' >/dev/null <<<"$out" || fail "接管模块没写边界应停下（Q11 A）
+$out"
+echo "  ✅ 接管模块没写并行边界时停下"; PASS=$((PASS + 1))
+}
+
+PARTS=30
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (
