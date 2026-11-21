@@ -501,6 +501,22 @@ class Effective(unittest.TestCase):
         empty = "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：无\n"
         self.assertEqual(codex_route(self.project({"takeover": "plan"}, empty), "alpha", "plan"), "")
 
+    def test_a_pending_plan_says_why_it_goes_to_the_user(self):
+        # M3 rework: with the Plan given to codex, a pending Plan that pre-declares (or has a malformed section) goes to
+        # the user, and the hint now says why instead of only "waiting for the user".
+        from module_stage import COMMANDS, COMMANDS_ZH, codex_hint
+        raw = {"spec": "approved", "plan": "pending"}
+        for plan in ("# Plan: alpha\n\n## 预先声明\n\n- 公共路径：`package.json`\n",
+                     "# Plan: alpha\n\n## 预先声明\n\n- 配置：无\n"):
+            root = self.project({"takeover": "plan"}, plan)
+            line, step = codex_hint(root, "alpha", "BUILDING", COMMANDS["claude"], False, raw)
+            self.assertIn("pre-declared section lists shared changes or is malformed", line)
+            self.assertIn("have the user review", step)
+            line, step = codex_hint(root, "alpha", "BUILDING", COMMANDS_ZH["claude"], True, raw)
+            self.assertIn("「预先声明」有内容或格式不对", line)
+        root = self.project({}, "# Plan: alpha\n\n## 预先声明\n\n- 公共路径：`package.json`\n")
+        self.assertIsNone(codex_hint(root, "alpha", "BUILDING", COMMANDS["claude"], False, raw))
+
     def test_combined_only_with_one_approver(self):
         from module_stage import cadence_combined
         self.assertTrue(cadence_combined(self.project({"reviewCadence": "combined"}), "alpha"))
