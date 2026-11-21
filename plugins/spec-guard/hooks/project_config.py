@@ -33,10 +33,37 @@ CADENCES = ("separate", "combined")
 CONCURRENCY = ("off", "on")
 # autonomy-tier: what each tier allows is defined by module-crew; spec-guard only stores, reads and reports it.
 TIERS = ("strict", "standard", "relaxed")
+# takeover-config: who does each step, from strictest to widest.  A preset expands to all four items; a custom
+# object may omit items, which read as human.  Callers (autopilot, module-crew) act on it; spec-guard only stores it.
+ITEMS = {"spec": ("human", "codex"), "plan": ("human", "codex"), "merge": ("human", "auto"),
+         "release": ("human", "prepare", "auto-confirm", "auto")}
+HUMAN = {item: values[0] for item, values in ITEMS.items()}
+PRESETS = {"none": dict(HUMAN), "plan": dict(HUMAN, plan="codex"),
+           "merge": dict(HUMAN, spec="codex", plan="codex", merge="auto")}
+# Q14 and 8.4 of the S101 plan: spec-guard stores these release values and only hints at the limits; autopilot enforces them.
+RELEASE_LIMITS = ("note: the four pipeline plugins (spec-guard, module-crew, delegate, agent-relay) release at most at prepare",
+                  "note: release=auto is only for projects that can roll back quickly; autopilot enforces both limits")
 # config-per-key: a file with one of these problems is unusable as a whole; every other problem
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
-DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "autonomyTier": "strict", "moduleAutonomy": {}}
+DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "autonomyTier": "strict", "moduleAutonomy": {},
+            "takeover": "none", "moduleTakeover": {}}
+
+
+def valid_takeover(value: Any) -> bool:
+    if isinstance(value, str):
+        return value in PRESETS
+    return isinstance(value, dict) and all(
+        isinstance(item, str) and item in ITEMS and value[item] in ITEMS[item] for item in value)
+
+
+def expand(value: Any) -> dict[str, str]:
+    """A valid takeover value as all four items."""
+    return dict(PRESETS[value]) if isinstance(value, str) else dict(HUMAN, **value)
+
+
+def takeover_wider(items: dict[str, str], than: dict[str, str]) -> bool:
+    return any(ITEMS[item].index(items[item]) > ITEMS[item].index(than[item]) for item in ITEMS)
 VALIDATORS = {
     "artifactLanguage": lambda value: isinstance(value, str) and bool(LANGUAGE_TAG.fullmatch(value)),
     "reviewCadence": lambda value: value in CADENCES,
@@ -45,9 +72,15 @@ VALIDATORS = {
     # module-autonomy: module id -> tier; the whole key is invalid when any entry is.
     "moduleAutonomy": lambda value: isinstance(value, dict) and all(
         isinstance(key, str) and MODULE_ID.fullmatch(key) and value[key] in TIERS for key in value),
+    "takeover": valid_takeover,
+    # takeover-config: module id -> takeover value; the whole key is invalid when any entry is.
+    "moduleTakeover": lambda value: isinstance(value, dict) and all(
+        isinstance(key, str) and MODULE_ID.fullmatch(key) and valid_takeover(value[key]) for key in value),
 }
+# Per-module keys and what each entry must satisfy.
+ENTRY_VALID = {"moduleAutonomy": lambda value: value in TIERS, "moduleTakeover": valid_takeover}
 # Keys whose value is written one entry at a time with --module.
-PER_MODULE = ("moduleAutonomy",)
+PER_MODULE = ("moduleAutonomy", "moduleTakeover")
 OWNED_ELSEWHERE = {
     "trackerDefault": "/spec-guard:tracker-default",
 }
@@ -112,6 +145,35 @@ def module_tiers(root: Path, module_ids) -> tuple[str, dict[str, tuple[str, str]
 def wider(tier: str, than: str) -> bool:
     """TIERS runs from strict to relaxed."""
     return TIERS.index(tier) > TIERS.index(than)
+
+
+def module_takeover(root: Path, module_id: str) -> tuple[dict[str, str], str]:
+    """takeover-config: the only reader of a module's effective takeover, as (four items, source)."""
+    return module_takeovers(root, [module_id])[1][module_id]
+
+
+def module_takeovers(root: Path, module_ids) -> tuple[dict[str, str], dict[str, tuple[dict[str, str], str]]]:
+    """(project items, {id: (items, source)}) from one read of the file.
+
+    A module's own entry wins; otherwise the project's takeover applies, else none.  An invalid key falls back to the
+    next layer with the source "default (config invalid)".  spec-guard never caps a module at the project's value.
+    """
+    values, problems = load(root)
+    if "takeover" in values:
+        project, source = expand(values["takeover"]), "takeover"
+    elif _structural(problems) or "takeover-invalid" in problems:
+        project, source = dict(HUMAN), "default (config invalid)"
+    else:
+        project, source = dict(HUMAN), "default"
+    entries = values.get("moduleTakeover", {})
+    if "moduleTakeover-invalid" in problems:
+        source = "default (config invalid)"
+    return project, {module: (expand(entries[module]), "moduleTakeover") if module in entries
+                     else (dict(project), source) for module in module_ids}
+
+
+def _items_line(items: dict[str, str]) -> str:
+    return " ".join("%s=%s" % (item, items[item]) for item in ITEMS)
 
 
 def module_concurrency(root: Path) -> bool:
@@ -208,8 +270,15 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
     if module is not None and not MODULE_ID.fullmatch(module):
         print("%s-invalid: --module takes a kebab-case module id" % key)
         return 2
-    if module is not None and value is not None and value not in TIERS:
-        print("%s-invalid: see spec/module-autonomy.md for the accepted values" % key)
+    if isinstance(value, str) and value.startswith("{") and key in ("takeover", "moduleTakeover"):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            print("%s-invalid: --value takes a preset name or a JSON object" % key)
+            return 2
+    if module is not None and value is not None and not ENTRY_VALID[key](value):
+        print("%s-invalid: see spec/%s.md for the accepted values"
+              % (key, "module-autonomy" if key == "moduleAutonomy" else "takeover-config"))
         return 2
     if module is None and value is not None and not VALIDATORS[key](value):
         print("%s-invalid: see spec/project-config.md for the accepted values" % key)
@@ -243,7 +312,18 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
                                         fromfile=str(RELATIVE_PATH) + " (current)",
                                         tofile=str(RELATIVE_PATH) + " (proposed)"))
     print(diff if diff else "no change: %s already has this value" % RELATIVE_PATH)
-    if module is not None and module in (value or {}):
+    shown = (value or {}).get(module) if module is not None else value
+    if key in ("takeover", "moduleTakeover") and shown is not None:
+        items = expand(shown)
+        print("takeover: %s" % _items_line(items))
+        if module is not None:
+            project = expand(values["takeover"]) if "takeover" in values else dict(HUMAN)
+            if takeover_wider(items, project):
+                print("note: %s 的接管档位宽于项目（%s）；spec-guard 不截断，按项目截断由调用方做"
+                      % (module, _items_line(project)))
+        if items["release"] in ("auto-confirm", "auto"):
+            print("\n".join(RELEASE_LIMITS))
+    if key == "moduleAutonomy" and module is not None and module in (value or {}):
         project, _ = _project_tier(values, problems)
         if wider(value[module], project):
             print("note: %s 的档位 %s 宽于项目档位 %s；spec-guard 不截断，按项目上限截断由调用方做"
