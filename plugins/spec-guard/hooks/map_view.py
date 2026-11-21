@@ -27,8 +27,8 @@ from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, active_module, extern
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
-from project_config import (ITEMS as TAKEOVER_ITEMS, module_concurrency, module_takeovers, module_tiers,
-                            summary as config_summary, takeover_wider, wider)
+from project_config import (ITEMS as TAKEOVER_ITEMS, SCOPE_PROJECT, load as load_config, module_concurrency,
+                            module_takeovers, module_tiers, summary as config_summary, takeover_wider, wider)
 import usage_draft
 
 SCHEMA_VERSION = 1
@@ -48,7 +48,9 @@ DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (form
 MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone-stop, interface 1.13)
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
-TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject")
+TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject", "narrowed")
+# takeover-narrow: the record fields /map shows; the caller-written reason stays out of it.
+NARROWED_FIELDS = ("from", "source", "at")
 
 
 class Unreadable(Exception):
@@ -372,6 +374,11 @@ def _review_cadence(root: Path) -> dict:
     return {"value": item["value"], "source": item["source"]}
 
 
+def _narrowed(record):
+    """takeover-narrow: where the module's effective takeover was narrowed from, without the reason."""
+    return {field: record[field] for field in NARROWED_FIELDS} if record else None
+
+
 def build(root: Path) -> dict:
     map_path = root / "spec" / "CAPABILITY-MAP.md"
     parsed = parse_map(map_path)
@@ -418,6 +425,8 @@ def build(root: Path) -> dict:
 
     project_tier, tiers = module_tiers(root, order)
     project_takeover, takeovers = module_takeovers(root, order)
+    config_values = load_config(root)[0]
+    narrowings, own = config_values.get("takeoverNarrowed", {}), config_values.get("moduleTakeover", {})
     modules = []
     for module in order:
         state, value = by_id[module], status[module]
@@ -444,7 +453,8 @@ def build(root: Path) -> dict:
             "autonomy": {"tier": tiers[module][0], "source": tiers[module][1],
                          "widerThanProject": wider(tiers[module][0], project_tier)},
             "takeover": {**takeovers[module][0], "source": takeovers[module][1],
-                         "widerThanProject": takeover_wider(takeovers[module][0], project_takeover)},
+                         "widerThanProject": takeover_wider(takeovers[module][0], project_takeover),
+                         "narrowed": _narrowed(narrowings.get(module if module in own else SCOPE_PROJECT))},
         })
 
     state, ticks, suspended_write = history(root)

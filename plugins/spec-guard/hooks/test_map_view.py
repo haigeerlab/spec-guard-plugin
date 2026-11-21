@@ -204,22 +204,36 @@ class TakeoverTest(unittest.TestCase):
     def test_without_config(self):
         with self.project() as project:
             self.assertEqual(self.takeover(project), {
-                m: dict(self.HUMAN, source="default", widerThanProject=False) for m in ("a", "b")})
+                m: dict(self.HUMAN, source="default", widerThanProject=False, narrowed=None) for m in ("a", "b")})
 
     def test_module_entry_and_project_value(self):
         with self.project({"takeover": "plan", "moduleTakeover": {"a": "merge"}}) as project:
             self.assertEqual(self.takeover(project), {
                 "a": {"spec": "codex", "plan": "codex", "merge": "auto", "release": "human",
-                      "source": "moduleTakeover", "widerThanProject": True},
-                "b": dict(self.HUMAN, plan="codex", source="takeover", widerThanProject=False)})
+                      "source": "moduleTakeover", "widerThanProject": True, "narrowed": None},
+                "b": dict(self.HUMAN, plan="codex", source="takeover", widerThanProject=False, narrowed=None)})
         with self.project({"takeover": "merge", "moduleTakeover": {"a": {"release": "prepare"}}}) as project:
             self.assertEqual(self.takeover(project)["a"],
-                             dict(self.HUMAN, release="prepare", source="moduleTakeover", widerThanProject=True))
+                             dict(self.HUMAN, release="prepare", source="moduleTakeover", widerThanProject=True,
+                                  narrowed=None))
 
     def test_invalid_entries_fall_back(self):
         with self.project({"takeover": "plan", "moduleTakeover": {"a": "fast"}}) as project:
             self.assertEqual(self.takeover(project)["a"],
-                             dict(self.HUMAN, plan="codex", source="default (config invalid)", widerThanProject=False))
+                             dict(self.HUMAN, plan="codex", source="default (config invalid)", widerThanProject=False,
+                                  narrowed=None))
+
+    def test_narrowed(self):
+        record = {"from": "merge", "to": "plan", "source": "autopilot", "reason": "secret words",
+                  "at": "2026-11-21T00:00:00Z"}
+        with self.project({"takeover": "plan", "moduleTakeover": {"a": "none"},
+                           "takeoverNarrowed": {"project": record, "a": dict(record, to="none")}}) as project:
+            takeover = self.takeover(project)
+            self.assertEqual(takeover["a"]["narrowed"], {"from": "merge", "source": "autopilot", "at": "2026-11-21T00:00:00Z"})
+            self.assertEqual(takeover["b"]["narrowed"], {"from": "merge", "source": "autopilot", "at": "2026-11-21T00:00:00Z"})
+            self.assertNotIn("secret words", json.dumps(project.json()))
+        with self.project() as project:
+            self.assertIsNone(self.takeover(project)["a"]["narrowed"])
 
     def test_autonomy_and_text_unchanged(self):
         with self.project() as plain:

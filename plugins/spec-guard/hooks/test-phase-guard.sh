@@ -2889,12 +2889,13 @@ plain_ma="$(run "$ma" | raw_of)"
 # takeover-config：已退役的 autonomyTier、moduleAutonomy 不加「已忽略」行；takeover、moduleTakeover 本版阶段提示也不读。
 for body in '{"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed", "beta": "strict"}}' \
             '{"version": 1, "takeover": "merge"}' \
-            '{"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"release": "auto"}, "beta": "none"}}'; do
+            '{"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"release": "auto"}, "beta": "none"}}' \
+            '{"version": 1, "takeover": "none", "takeoverNarrowed": {"project": {"from": "merge", "to": "none", "source": "autopilot", "reason": "revert", "at": "2026-11-21T00:00:00Z"}}}'; do
   printf '%s\n' "$body" > "$ma/.agent/config.json"
   [ "$(run "$ma" | raw_of)" = "$plain_ma" ] || fail "配置为 ${body} 时阶段提示变了
 $(run "$ma" | raw_of)"
 done
-echo "  ✅ 已退役的档位键与接管档位都不改阶段提示与状态码"; PASS=$((PASS + 1))
+echo "  ✅ 已退役的档位键、接管档位与收窄记录都不改阶段提示与状态码"; PASS=$((PASS + 1))
 }
 
 part_26() {

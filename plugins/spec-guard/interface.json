@@ -82,7 +82,8 @@
         "merge": "per module; human or auto: whether a merge may be automatic",
         "release": "per module; human, prepare, auto-confirm or auto: how far a release may go without the user",
         "source": "per module; moduleTakeover (the module's own entry), takeover (the project value), default (nothing set) or default (config invalid) (the file, takeover or moduleTakeover is invalid; the items are then the next layer's)",
-        "widerThanProject": "per module; true when any item is wider than the project's effective item (orders as in takeover.items); spec-guard only reports it and never caps"
+        "widerThanProject": "per module; true when any item is wider than the project's effective item (orders as in takeover.items); spec-guard only reports it and never caps",
+        "narrowed": "per module; null when the scope the module reads (its own moduleTakeover entry, else the project) has no narrowing record; else {\"from\", \"source\", \"at\"}: the value before the first narrowing, who narrowed last and when (takeover-narrow). The caller-written reason is never included"
       },
       "meaning": "the same value project_config.module_takeover(root, id) returns; autopilot reads merge and release, module-crew reads spec and plan; spec-guard only stores and reports it, the callers act on it and enforce the release limits"
     },
@@ -460,7 +461,7 @@
     },
     "readFrom": "python3 -B hooks/map_view.py --json --project <project-root>: each module's takeover; or project_config.module_takeover(root, id). The raw value is the item whose key is takeover in project_config.py show --format json",
     "writeWith": "python3 -B hooks/project_config.py set --key takeover --value <preset|JSON object> [--confirm]; unset --key takeover [--confirm]; preview unless --confirm",
-    "notes": "a preset name or a custom object of items (missing items read as human); any unknown item or value makes the whole key invalid. Items run from strictest to widest in the order listed. Release auto-confirm and auto are stored as given; the limits (the four pipeline plugins at most prepare, auto only where a release rolls back quickly) are hinted at in the preview and enforced by autopilot. spec-guard's own phase hints and stop rules do not read it in 1.15. Writing it needs the user's own words. spec-guard 0.68.0-0.90.1 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
+    "notes": "a preset name or a custom object of items (missing items read as human); any unknown item or value makes the whole key invalid. Items run from strictest to widest in the order listed. Release auto-confirm and auto are stored as given; the limits (the four pipeline plugins at most prepare, auto only where a release rolls back quickly) are hinted at in the preview and enforced by autopilot. spec-guard's own phase hints and stop rules do not read it in 1.15. Writing it needs the user's own words. spec-guard 0.68.0-0.90.1 ignore the key; 0.67.1 and earlier treat the whole file as invalid. The file may also hold takeoverNarrowed (scope -> {from, to, source, reason, at}), written only by narrow and kept by set; config cannot set or unset it",
     "contract": "spec/takeover-config.md"
   },
   "moduleTakeover": {
@@ -471,5 +472,36 @@
     "writeWith": "python3 -B hooks/project_config.py set --key moduleTakeover --module <module-id> --value <preset|JSON object> [--confirm]; unset --key moduleTakeover [--module <module-id>] [--confirm]; one entry at a time, preview unless --confirm",
     "notes": "an object of module id -> takeover value; any bad entry makes the whole key invalid and every module falls back to the project value with source default (config invalid). A module without an entry follows takeover. Wider than the project is reported, never capped. Ids not in the capability map are warned by verify-artifacts and ignored by /map. Writing it needs the user's own words",
     "contract": "spec/takeover-config.md"
+  },
+  "takeoverNarrow": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/project_config.py",
+      "narrow",
+      "--project",
+      "<project-root>",
+      "[--module <module-id>]",
+      "--source",
+      "<source>",
+      "--reason",
+      "<one line, at most 200 characters>",
+      "[--confirm]"
+    ],
+    "values": {
+      "source": {
+        "autopilot": "autopilot found a reverted auto-merge, a red main or a rollback after release",
+        "module-crew": "module-crew found one of its incidents",
+        "user": "the user narrowed by hand"
+      }
+    },
+    "order": "a preset steps merge -> plan -> none; a custom value hands back its first non-human item in the order release, merge, plan, spec (release goes straight back to human); all human is written as none; already the strictest writes nothing and exits 0",
+    "scope": "--module narrows that module (starting from the project value when it has no entry of its own) and writes its moduleTakeover entry; without it the project takeover is narrowed and module entries are left alone",
+    "exitCodes": {
+      "0": "narrowed, previewed, or already the strictest",
+      "2": "bad --source, --reason or --module, or the configuration file cannot be written"
+    },
+    "notes": "no user words needed: narrowing is the safe direction (S101 Q6). Writes .agent/config.json, which the caller or the user then commits. Records takeoverNarrowed: the first from stays until the scope is restored to it; while the record exists, config set widens that scope at most one step at a time (exit 2 otherwise). Preview unless --confirm",
+    "contract": "spec/takeover-narrow.md"
   }
 }
