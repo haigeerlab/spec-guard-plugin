@@ -6,16 +6,23 @@ gave -- where approvals may come from follows the installed collaboration plugin
 reads back as `revised`.  The states are decided by `module_stage` alone; this script only adds or
 replaces the marker line, previews the change, and writes only with `--confirm`.  It cannot check
 that the user approved anything: the marker is a record for later sessions, not a source of authority.
+
+`--target acceptance` (codex-final-acceptance) is separate: for a merge=auto module it records Codex's final
+acceptance of HEAD -- final review, a non-author's check evidence and HEAD agreeing -- as a JSON file in the git
+directory, so recording it does not move HEAD.
 """
 from __future__ import annotations
 
 import argparse
+import datetime
 import difflib
+import hashlib
+import json
 from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
-from codex_review import inspect as inspect_report
-from module_stage import (EXTERNAL_REVIEW_HEADING, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, effective_review,
+from codex_review import inspect as inspect_report, inspect_check, inspect_final
+from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, effective_review,
                           file_review_state,
                           review_approved_line, review_body, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
@@ -111,11 +118,95 @@ def _codex(root: Path, relative: str, kind: str, state: str, report: str | None,
     return updated, note
 
 
+def _outside(root: Path, module_id: str) -> str | None:
+    """takeover-scope-check reused: why the module's changes cannot be accepted as in scope, or None when they are."""
+    from module_scope import ScopeError, classify, default_base, parse
+    try:
+        scope = parse((root / "spec" / ("%s.md" % module_id)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ScopeError):
+        scope = None
+    if scope is None:
+        return "spec/%s.md has no usable concurrency boundary" % module_id
+    base = default_base(root, module_id)
+    rows = classify(root, module_id, scope, base) if base else None
+    if rows is None:
+        return "no base commit to compare with"
+    outside = [row["path"] for row in rows if row["scope"] == "outside"]
+    return "%d file(s) outside: %s" % (len(outside), ", ".join(outside[:5])) if outside else None
+
+
+def _acceptance(root: Path, module_id: str, state: str, report: str | None, confirm: bool) -> int:
+    """codex-final-acceptance: record Codex's final acceptance of HEAD in the git directory, or say why not."""
+    from project_config import module_takeover
+    if state != "codex-approved":
+        print("acceptance-state: --target acceptance records only codex-approved; the user's own final acceptance "
+              "is the final gate in tasks/%s/todo.md" % module_id)
+        return 2
+    if report is None:
+        print("review-missing: --target acceptance needs --review <the /delegate:review JSON of the final patch>")
+        return 2
+    takeover = module_takeover(root, module_id)[0]
+    if takeover.get("merge") != "auto":
+        print("acceptance-not-auto: %s's takeover has merge=%s; only a merge=auto module is accepted by Codex, "
+              "others wait for the user" % (module_id, takeover.get("merge")))
+        return 2
+    status = _git(root, "status", "--porcelain")
+    if status is None:
+        print("git-unreadable: could not read the working tree status")
+        return 2
+    if status:
+        print("acceptance-uncommitted: the working tree has uncommitted changes; the evidence must be about HEAD alone")
+        return 2
+    final = inspect_final(report, root, module_id)
+    if final["status"] != "ok":
+        print("report-invalid: %s" % final["reason"])
+        return 2
+    check = inspect_check(root)
+    if check["status"] != "ok":
+        print("check-invalid: %s" % check["reason"])
+        return 2
+    if final["head"] != check["head"]:
+        print("acceptance-head-moved: the review and the check evidence are about different commits")
+        return 2
+    outside = _outside(root, module_id)
+    if outside:
+        print("acceptance-out-of-scope: %s" % outside)
+        return 2
+    path = acceptance_path(root, module_id)
+    if path is None:
+        print("git-unreadable: could not find the git directory")
+        return 2
+    report_path = Path(report).resolve()
+    record = {"marker": "codex-approved", "sha": final["head"], "module": module_id,
+              "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(), "report": str(report_path),
+              "at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    text = json.dumps(record, ensure_ascii=False, indent=2) + "\n"
+    print("Codex final acceptance of %s at %s: final review %s, check evidence %s, nothing out of scope."
+          % (module_id, final["head"][:12], report_path, check["path"]))
+    print("record (git directory, not tracked, not committed): %s" % path)
+    print(text, end="")
+    print("The final gate in tasks/%s/todo.md is not ticked now: the phase hint reads it as passed while this record's "
+          "commit is HEAD or an ancestor of it; tick it after the merge. A drafted reply is not sent." % module_id)
+    if not confirm:
+        print("\npreview only; nothing was written. Re-run with --confirm to apply.")
+        return 0
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_atomic(path, text)
+        if json.loads(path.read_text(encoding="utf-8")) != record:
+            raise ValueError
+    except (OSError, ValueError):
+        print("file-unwritable: %s could not be written or read back" % path)
+        return 2
+    print("\nrecorded codex-approved acceptance: %s" % path)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mark a module's Spec or Plan review state (preview unless --confirm).")
     parser.add_argument("--project", default=".")
     parser.add_argument("--module", required=True)
-    parser.add_argument("--target", required=True, choices=["spec", "plan", "both"])
+    parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance"])
     parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed"])
     parser.add_argument("--review", help="codex states: the /delegate:review JSON report saved to a file")
     parser.add_argument("--confirm", action="store_true")
@@ -132,6 +223,8 @@ def main() -> int:
     if module_id not in [row.module_id for row in parsed.rows]:
         print("not-in-map: %s is not in spec/CAPABILITY-MAP.md" % module_id)
         return 2
+    if args.target == "acceptance":
+        return _acceptance(root, module_id, args.state, args.review, args.confirm)
     relative = {"spec": "spec/%s.md" % module_id, "plan": "tasks/%s/plan.md" % module_id}
     kinds = ["spec", "plan"] if args.target == "both" else [args.target]
     before = {}

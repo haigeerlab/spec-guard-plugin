@@ -1304,6 +1304,18 @@ def draft_gate(root: Path, states: list, module: str, stage: str, zh: bool) -> t
 SCOPE_SHOWN = 5  # takeover-scope-check: how many out-of-scope files the line names
 
 
+ACCEPTANCE_DIR = "spec-guard/acceptance"
+
+
+def acceptance_path(root: Path, module: str) -> Path | None:
+    """codex-final-acceptance: where the module's Codex acceptance record lives -- in the git directory, never tracked."""
+    found = _git(root, "rev-parse", "--git-path", "%s/%s.json" % (ACCEPTANCE_DIR, module))
+    if not found:
+        return None
+    path = Path(found)
+    return path if path.is_absolute() else Path(root) / path
+
+
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """takeover-scope-check: (fact, line, next step) when a takeover module's build goes outside its declared scope.
 

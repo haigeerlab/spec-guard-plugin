@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交 Plan 与 todo
 - [x] Task 1：inspect_final、inspect_check 与单测
-- [ ] Task 2：review-mark --target acceptance 与 git 目录记录
+- [x] Task 2：review-mark --target acceptance 与 git 目录记录
 - [ ] Task 3：阶段提示与 /map 的 acceptance、接口
 - [ ] Task 4：规则与说明
 - [ ] Task 5：0.91.0 版本号、README、CHANGELOG
