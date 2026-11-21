@@ -409,7 +409,7 @@
       "standard": "defined by module-crew",
       "relaxed": "defined by module-crew"
     },
-    "readFrom": "python3 -B hooks/project_config.py show --project <project-root> --format json: the item whose key is autonomyTier, with value and source; an invalid value reads as strict with source \"default (config invalid)\"",
+    "readFrom": "retired in 1.15: project_config.py show --format json no longer lists an autonomyTier item (a file that still has the key adds the problem retired-key); before 1.15 it was the item whose key is autonomyTier, with value and source",
     "notes": "spec-guard only stores, reads and reports it; its own phase hints, stop rules and review cadence never change with it. It does not set reviewCadence: a tier that wants the Spec and Plan reviewed together needs reviewCadence=combined set separately. Writing it needs the user's own words. No tier goes below the floor in references/workflow-checkpoints.md (autonomy tier and floor). spec-guard 0.68.0-0.84.2 ignore the key; 0.67.1 and earlier treat the whole file as invalid",
     "contract": "spec/autonomy-tier.md",
     "retired": "interface 1.15 (spec/takeover-config.md): not mapped to takeover; set is refused, unset still works, a file that has it stays valid (retired-key) and shows it as not in effect"
