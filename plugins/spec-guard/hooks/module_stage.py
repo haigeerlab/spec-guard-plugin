@@ -638,6 +638,122 @@ def _declared_nonempty(root: Path, module: str) -> bool:
     return declared is not None and any(declared)
 
 
+# important-requirement: the high-risk path list autopilot writes into the project (S101 Q8 A; autopr-design #21976).
+RISK_PATHS = Path(".github") / "autopr" / "risk-paths.json"
+RISK_SCHEMA = "autopilot.risk-paths/v1"
+RISK_TIERS = ("T4", "T3")  # Q9 A: both count
+
+
+def _segment(pattern: str, name: str) -> bool:
+    return re.fullmatch("".join("[^/]*" if char == "*" else "[^/]" if char == "?" else re.escape(char)
+                                for char in pattern), name) is not None
+
+
+def risk_hit(pattern: str, path: str) -> bool:
+    """`**` spans directories, `*` one segment.  A path ending in `/` is a directory: it hits when it may hold a match,
+    which only a pattern starting with a literal segment can say (`**/*.lock` names files, not where they live)."""
+    pattern_parts, path_parts = pattern.split("/"), path.rstrip("/").split("/")
+    if path.endswith("/"):
+        if "*" in pattern_parts[0] or "?" in pattern_parts[0]:
+            return False
+        for index, part in enumerate(path_parts):
+            if index >= len(pattern_parts):
+                return False
+            if pattern_parts[index] == "**":
+                return True
+            if not _segment(pattern_parts[index], part):
+                return False
+        return True
+
+    def walk(p: int, q: int) -> bool:
+        if p == len(pattern_parts):
+            return q == len(path_parts)
+        if pattern_parts[p] == "**":
+            return any(walk(p + 1, k) for k in range(q, len(path_parts) + 1))
+        return q < len(path_parts) and _segment(pattern_parts[p], path_parts[q]) and walk(p + 1, q + 1)
+    return walk(0, 0)
+
+
+def _risk_patterns(root: Path) -> list | None:
+    try:
+        document = json.loads((root / RISK_PATHS).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return None
+    if not isinstance(document, dict) or document.get("schema") != RISK_SCHEMA:
+        return None
+    patterns = []
+    for tier in RISK_TIERS:
+        items = document.get(tier, [])
+        if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
+            return None
+        patterns += items
+    return patterns
+
+
+def important(root: Path, module: str) -> list:
+    """important-requirement: the reasons this module's requirement is important by rule, [] when none.
+
+    multi-module: inserted in one batch with another module; cross-module: its Spec's boundary lists shared files or
+    overlaps another unfinished module's; risk-path: a boundary path or a pre-declared public path is on the T3/T4
+    list.  cross-unknown (no boundary) and risk-unknown (no readable list) count only where the Spec is Codex's.
+    """
+    from module_scope import ScopeError, overlap, parse, parse_declared  # late: module_scope imports this module
+    codex = _takeover_item(root, module, "spec") == "codex"
+    reasons = []
+    try:
+        if any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
+            reasons.append("multi-module")
+    except usage_draft.UsageDraftError:
+        pass  # without git there are no batches to tell; the other rules still apply
+
+    def read(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            return ""
+    try:
+        scope = parse(read(root / "spec" / ("%s.md" % module)))
+    except ScopeError:
+        scope = None
+    if scope is None:
+        if codex:
+            reasons.append("cross-unknown")
+    else:
+        others = []
+        try:
+            others = [row.module_id for row in parse_map(root / "spec" / "CAPABILITY-MAP.md").rows
+                      if row.module_id != module]
+        except (OSError, MapError, UnicodeError):
+            pass
+        clash = False
+        for other in others:
+            if module_state(root, other)["stage"] == "DONE":
+                continue
+            try:
+                theirs = parse(read(root / "spec" / ("%s.md" % other)))
+            except ScopeError:
+                continue
+            if theirs is not None and overlap(scope, theirs):
+                clash = True
+                break
+        if scope.shared or clash:
+            reasons.append("cross-module")
+    paths = list(scope.exclusive) if scope is not None else []
+    try:
+        declared = parse_declared(read(root / "tasks" / module / "plan.md"))
+    except ScopeError:
+        declared = None
+    if declared is not None:
+        paths += list(declared.public_paths)
+    patterns = _risk_patterns(root)
+    if patterns is None:
+        if codex:
+            reasons.append("risk-unknown")
+    elif any(risk_hit(pattern, path) for pattern in patterns for path in paths):
+        reasons.append("risk-path")
+    return reasons
+
+
 def codex_route(root: Path, module: str, kind: str) -> str:
     """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
     if _takeover_item(root, module, kind) != "codex":
