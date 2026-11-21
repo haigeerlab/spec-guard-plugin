@@ -116,6 +116,10 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 比项目宽时只提醒、不截断。能力图上没有的模块 id 由 verify-artifacts 警告。设置时要你在对话里的原话。原来的 `autonomyTier`、
 `moduleAutonomy` 已退役，不映射到接管档位；文件里还有时不生效，可以 `unset` 删掉。团队都升级到 0.91.0 后再设。
 
+出事时 autopilot 或 module-crew 会用 `narrow` 自动把档位往严里收一格（先收发布，再收合并、Plan、Spec），不用问你，并在
+`.agent/config.json` 里记下原因；这个文件改了之后要提交。想恢复时照常说一句，比如「恢复成接管到合并」；收窄过的档位一次只能升一格，
+差两格就分两次说。`/map --json` 里每个模块的 `takeover.narrowed` 写着从哪一档收下来、谁收的、什么时候。
+
 不带参数时 `show`；`set`／`unset` 先预览差异，`--confirm` 才写。取值不合法时退出 2、不写文件。文件本身坏了时所有项按
 默认处理，阶段提示只多一行 `Project config: invalid`；个别键有问题时只有那个键失效、其余照常，阶段提示多一行
 `Project config: ignored`。同时只读汇总默认事项后端的当前值和来源。

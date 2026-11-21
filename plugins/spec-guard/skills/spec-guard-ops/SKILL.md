@@ -195,6 +195,9 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
   0.68.0～0.90.1 只忽略它，团队都升级后再设置。
 - `moduleTakeover`：按模块的接管档位，对象（模块 id → 同 `takeover` 的值），没设的模块随 `takeover`。`set --key moduleTakeover --module <id> --value <值>`
   一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。比项目宽时预览多一行 `note:`，只提醒不截断。写入要用户原话。
+- 出事收窄：`project_config.py narrow --source <autopilot|module-crew|user> --reason <一行> [--module <id>] [--confirm]`，往严里改一格、不需要用户原话
+  （预设 `merge`→`plan`→`none`；自定义按发布、合并、Plan、Spec 交还一项），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
+  回到收窄前的值后记录删除。`takeoverNarrowed` 不能直接 `set`／`unset`。
 - `autonomyTier`、`moduleAutonomy`：已退役、不映射。文件里还有时不生效，`show` 标为已退役，不能再 `set`，可以 `unset` 删除；`/map --json` 的 `autonomy`
   字段本版仍按它们计算、标为 deprecated。
 

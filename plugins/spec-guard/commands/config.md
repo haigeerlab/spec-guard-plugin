@@ -98,6 +98,17 @@ python3 -B "$ROOT/hooks/project_config.py" set --project "$PROJECT" --key module
 
 模块档位宽于项目时、发布为 `auto-confirm`／`auto` 时，预览多出 `note:` 行，照实转述；spec-guard 不截断。
 
+**出事收窄（给 autopilot 与 module-crew 调用）**：`narrow` 往严里改一格，不需要用户原话；预设按 `merge` → `plan` → `none`，
+自定义按发布、合并、Plan、Spec 的顺序把一项交还给人（发布一步回到 `human`）；已是最严时不写。带 `--module` 只收这个模块：
+
+```bash
+python3 -B "$ROOT/hooks/project_config.py" narrow --project "$PROJECT" --source autopilot --reason "自动合并 #12 被撤回" --confirm
+```
+
+它会在 `.agent/config.json` 里记下 `takeoverNarrowed`（第一次收窄前的值、谁、为什么、何时），这个文件随后要有人提交。
+收窄过的范围恢复时一次只能升一格：用户说要恢复，照常 `set` 预览、引用原话后 `--confirm`；放宽超过一格会退出 2。恢复到收窄前的值后记录自动删除。
+`takeoverNarrowed` 不能用 `set`／`unset` 直接改。
+
 不带 `--confirm` 只打印改前／改后的差异，**什么都不写**；`--confirm` 只原子写回 `.agent/config.json`
 这一个文件并读回核对。取值不合法、键不认识或属于上表"只读汇总"的两项时，退出码 2 且不写文件。
 
