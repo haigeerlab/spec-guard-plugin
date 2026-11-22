@@ -10,7 +10,7 @@
 - [x] Task 5（返工）：`evidence` 写进证据的命令不带本机绝对路径——仓库内的脚本写相对路径，家目录下的路径写成 `~/…`；回归断言四份证据里没有仓库根与家目录的绝对路径 — 2026-11-22 v0.92.0 发版时发现（codex 证据的 smoke 命令带了本机用户名的路径，#476 手工改掉）；用户「两个都修」
 - [x] Task 6（返工，发版时发现）：共用模板仓库的测试在建模板时关掉 git 后台维护（`maintenance.auto=false`、`gc.auto=0`），避免复制模板时撞上 `maintenance.lock` 消失 — #476 的 CI 因 `test_proposal_promotion_proof` 偶发失败；ecosystem-lead #22105 提供 kb-plugin 的同类做法；用户「两个都修」
 - [x] Checkpoint 3（report）：完整检查与变异
-- [ ] Checkpoint 4（gate）：最终验收；通过后推送并开 PR，合并由用户进行；不发版
+- [x] Checkpoint 4（gate）：最终验收；通过后推送并开 PR，合并由用户进行；不发版
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -34,3 +34,5 @@
 - Task 5：`test_release.py` 44 例通过；变异（证据命令改回仓库绝对路径）2 例失败。
 - Task 6：四个共用模板的测试用 `run_tests_parallel.py` 重跑全部通过（62／52／16／28 例）；变异（不启用 GIT_CONFIG 设置）6 例失败。
 - 两个提交都走 verify-and-commit 完整档，全绿。插件本身没有改动，不发版。
+
+2026-11-22 用户对 Task 5、6「验收通过」。
