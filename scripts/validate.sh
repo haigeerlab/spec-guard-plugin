@@ -38,6 +38,10 @@ echo "═══ interface.json ↔ 代码 一致性 ═══"
 python3 scripts/check-interface.py || F=1
 
 echo ""
+echo "═══ 本机用户名路径 ═══"
+python3 scripts/check-local-paths.py || F=1
+
+echo ""
 echo "═══ 公开安装元数据 ═══"
 /bin/bash evals/test-public-metadata.sh || F=1
 
@@ -130,6 +134,7 @@ fi
 python3 -B scripts/run_steps_parallel.py \
   --section '═══ 校验器自身的回归 ═══' \
   'bash scripts/test-checkers.sh' \
+  'python3 -B scripts/test_check_local_paths.py' \
   'python3 -B scripts/test_pre_push_environment.py' \
   'python3 -B scripts/test_verify_and_commit.py' \
   'python3 -B scripts/test_validate_quick.py' \

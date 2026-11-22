@@ -1,6 +1,6 @@
 # Spec: module-cost-report
 
-<!-- spec-guard: review approved 506f0f24bc6e -->
+<!-- spec-guard: review approved ab153ba11b7f -->
 
 ## Objective
 
@@ -36,7 +36,7 @@ tier-guard 会话用 textkit 验收运行手工算过一次总账：父子同为
 
 - 主会话：`~/.claude/projects/<项目路径编码>/<sessionId>.jsonl`。路径编码：先取 realpath（macOS 上
   `/var/folders/…` 记作 `/private/var/folders/…`），再把 `/`、`.`、`_` 换成 `-`（本仓库为
-  `-Users-vilin-Documents-haigeerlab-spec-guard-plugin`）；另以每条记录的 `cwd` 复核属于本项目。
+  `-Users-<name>-Documents-haigeerlab-spec-guard-plugin`）；另以每条记录的 `cwd` 复核属于本项目。
   `--continue` 追加到同一主会话文件，`-p` 每次新建文件；同目录下可能有别的会话，一律按时间窗筛选。
 - 子代理：`<sessionId>/subagents/agent-<agentId>.jsonl`，记录带 `isSidechain: true` 与 `agentId`；同名
   `.meta.json` 带 `agentType`、`model`、`toolUseId`（对应主会话里那次 Agent 调用的 `tool_use.id`）。
