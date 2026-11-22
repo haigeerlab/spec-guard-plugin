@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.91.3] - 2026-11-22
+
+codex-final-acceptance 的 M3 后修订（autopr-design 沙盒演练 2 发现）。接口不变（interface 1.15）。
+
+### 变更
+
+- **最终验收交 Codex 时附上它看不到的信息。** 合并自动的模块到最终 gate 时，建议下一步要求在交给 `/delegate:review` 的任务说明里列出流程文件
+  （能力图、用法草案、`.agent/config.json`、`.agent/state.json`，取自越界检查的同一份清单），写明它们不算实现范围，并附上 autopilot 检查证据里
+  每条检查的命令、退出码、`output_sha256` 与 `tail`。原来 Codex 看不到这两点，第 1 轮常判阻断或留下「测试结果待核实」，白花一轮额度。
+  spec-guard 仍不调 delegate、不读证据内容。
+
 ## [0.91.2] - 2026-11-22
 
 M3 停点第二次返工（codex-final-acceptance，S101）：用安装后的 0.91.1 重跑「自动接管」发现的问题。接口不变（interface 1.15）。
