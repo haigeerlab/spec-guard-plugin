@@ -1,7 +1,7 @@
 # Todo: release-command
 
 - [x] Task 0：提交 Plan 与 todo
-- [ ] Task 1：骨架、check、prepare 与测试（Codex）
+- [x] Task 1：骨架、check、prepare 与测试（Codex）
 - [ ] Task 2：publish、install 与测试（Codex）
 - [ ] Task 3：smoke、evidence 与测试（Codex）
 - [ ] Task 4：docs/release-process.md
