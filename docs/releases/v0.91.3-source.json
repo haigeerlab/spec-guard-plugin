@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.3"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:663438ed49cf46864d76e32fe07cf2bda4357667"
+      },
+      "observedAt": "2026-11-22T04:47:30Z",
+      "evidence": [
+        "result:the v0.91.3 annotated tag resolves to merge commit 663438ed49cf46864d76e32fe07cf2bda4357667 (pull request #472); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded",
+        "result:codex-final-acceptance revision after M3 (autopr-design #22019): at the final gate of a merge=auto module the suggested next step asks the task description given to Codex to list the flow files (from module_scope FLOW_FILES/FLOW_DIRS) as outside the implementation scope and to attach each check's command, exit code, output_sha256 and tail from the autopilot evidence; interface 1.15 unchanged",
+        "result:coding by Codex (delegate run --write, run 20261122121432.78972, touched only module_stage.py and test-phase-guard.sh); Claude read the diff, reran phase-guard (536 cases) and the related unit tests under macOS 27.2 arm64 /bin/bash 3.2.57; mutation (old module_stage.py back) turned part 31 red; every commit went through verify-and-commit full tier"
+      ]
+    }
+  ]
+}
