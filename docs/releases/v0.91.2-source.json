@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:bae626f11e2d544f49080ec2ad68fa07895a5c35"
+      },
+      "observedAt": "2026-11-22T03:43:49Z",
+      "evidence": [
+        "result:the v0.91.2 annotated tag resolves to merge commit bae626f11e2d544f49080ec2ad68fa07895a5c35 (pull request #469); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate on the merge commit, success)",
+        "result:M3 stop second rework: the codex-approved digest leaves out the external review section, so writing a reason per Codex suggestion no longer reads as revised (digests from 0.91.0/0.91.1 still count); the final gate of a merge=auto module names the commit before the module (--base); singular wording for one retired key; interface 1.15 unchanged",
+        "result:on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit through verify-and-commit full tier (phase-guard 536 cases); mutations (digest over the whole text; old digests not accepted) turned the regressions red; a temporary project recorded a suggestion-only Codex report, kept codex-approved after a reason was written, and read revised after a body edit"
+      ]
+    }
+  ]
+}

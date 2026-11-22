@@ -51,3 +51,4 @@ Codex 验收标记，autopilot 据此合并。缺任一样就停在最终验收�
 
 <!-- spec-guard: milestone M1 confirmed takeover-config, takeover-narrow -->
 <!-- spec-guard: milestone M2 confirmed codex-approval, important-requirement, takeover-scope-check -->
+<!-- spec-guard: milestone M3 confirmed codex-final-acceptance -->
