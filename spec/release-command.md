@@ -1,6 +1,6 @@
 # Spec: release-command
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 27da24eead6b -->
 
 ## Objective
 
