@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check, prepare, publish and install a Spec Guard release from its merged commit."""
+"""Release Spec Guard from its merged commit and record host verification evidence."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -43,10 +43,10 @@ def refuse(reason, message):
     raise ReleaseError(message, "refused", reason)
 
 
-def run(args, check=False, timeout=120):
+def run(args, check=False, timeout=120, stdin=None):
     """Run one command without a shell; preserve binary stdout for git archive."""
     try:
-        result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
+        result = subprocess.run(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ReleaseError("无法执行命令 %s：%s" % (args[0], error)) from error
     if check and result.returncode:
@@ -417,19 +417,175 @@ def install_release(args):
         remove_temporary(directory)
 
 
+def chatgpt_restart(upgraded_at):
+    """Compare the desktop main process's local start time with the recorded upgrade."""
+    unknown = {"state": "unknown", "startedAt": None}
+    try:
+        code, output, _ = run(["ps", "-axo", "lstart=,command="])
+        if code:
+            return unknown
+        for line in output.decode("utf-8", errors="replace").splitlines():
+            match = re.fullmatch(r"\s*(\w+\s+\w+\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+"
+                                 r"(.*/ChatGPT\.app/Contents/MacOS/ChatGPT)", line)
+            if match:
+                started = datetime.strptime(match[1], "%a %b %d %H:%M:%S %Y").astimezone(timezone.utc)
+                upgraded = datetime.fromisoformat(upgraded_at.replace("Z", "+00:00"))
+                if upgraded.tzinfo is None:
+                    return unknown
+                return {"state": "restarted" if started > upgraded else "not-restarted",
+                        "startedAt": started.strftime("%Y-%m-%dT%H:%M:%SZ")}
+    except (ReleaseError, ValueError, TypeError, AttributeError, OverflowError):
+        return unknown
+    return unknown
+
+
+def smoke_release(args):
+    record = read_record(args.version)
+    installed = require_step(record, "install")
+    source = args.expected_source if args.expected_source is not None else installed["codex"]["source"]
+    command = ["/bin/bash", str(args.repo / "evals/codex-plugin-smoke.sh"), "--plugin-id",
+               "spec-guard@spec-guard-marketplace", "--expected-source", str(source)]
+    print("正在运行 Codex 插件 smoke，最长等待 600 秒。")
+    try:
+        code, stdout, stderr = run(command, timeout=600, stdin=subprocess.DEVNULL)
+        output = "\n".join(part.decode("utf-8", errors="replace").rstrip("\n")
+                           for part in (stdout, stderr) if part)
+    except ReleaseError as error:
+        code, output = None, str(error)
+    if code == 0:
+        status = "ok"
+        print("Codex 插件 smoke 通过。")
+    elif code == 2 and "未观察到宿主 hook 事件" in output:
+        status = "waiting-on-user"
+        print("Codex 升级后 hook 的批准失效了：请在新开的终端里启动命令行 `codex`，"
+              "在 `/hooks` 里批准 spec-guard 的 hook，然后重跑本命令")
+    else:
+        status = "failed"
+        print("Codex 插件 smoke 失败（退出码 %s），最后 5 行输出：\n%s" %
+              (code, "\n".join(output.splitlines()[-5:])))
+    cli = None
+    try:
+        cli_code, cli_output, _ = run(["codex", "--version"])
+        lines = cli_output.decode("utf-8", errors="replace").splitlines()
+        if cli_code == 0 and lines:
+            cli = lines[0]
+    except ReleaseError:
+        pass
+    chatgpt = chatgpt_restart(installed["codex"]["upgradedAt"])
+    if chatgpt["state"] == "not-restarted":
+        print("ChatGPT 尚未在安装后重开：请用 ⌘Q 退出 ChatGPT 再打开。")
+    elif chatgpt["state"] == "restarted":
+        print("ChatGPT 已在安装后重开，主进程启动时间为 %s。" % chatgpt["startedAt"])
+    else:
+        print("未能核实 ChatGPT 主进程的启动时间。")
+    write_record(record, "smoke", {"status": status, "exitCode": code, "codexCli": cli,
+                                   "chatgpt": chatgpt, "at": utc_now()})
+    return {"status": status, "exitCode": code, "chatgpt": chatgpt}
+
+
+def evidence_release(args):
+    record = read_record(args.version)
+    for step in ("check", "prepare", "publish", "install"):
+        require_step(record, step)
+    prepared = record["steps"]["prepare"]
+    published = record["steps"]["publish"]
+    installed = record["steps"]["install"]
+    claude, codex = installed["claude"], installed["codex"]
+    smoke = record["steps"].get("smoke")
+    now = datetime.now(timezone.utc)
+    observed_at = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    tag, sha = "v" + args.version, record["mergeCommit"]
+    asset = Path(prepared["asset"]).name
+
+    def verified(subject, status, kind, target, evidence):
+        return {"subject": subject, "status": status, "target": {"kind": kind, "id": target},
+                "observedAt": observed_at, "evidence": evidence}
+
+    documents = {
+        "source": verified("spec-guard-source", "source-verified", "source-checkout", "commit:" + sha, [
+            "result:the %s annotated tag resolves to merge commit %s (pull request #%s); "
+            "merged==true and main==merge sha were checked before tagging; "
+            "the CI run on the tagged merge commit succeeded" % (tag, sha, record["pr"]),
+            *["result:" + note for note in args.note]]),
+        "package": verified("spec-guard-release-artifact", "package-verified", "package",
+            "release:%s;asset:%s;sha256:%s" % (tag, asset, prepared["sha256"]), [
+                "release:" + published["url"], "asset:%s;size:%s" % (asset, prepared["size"]),
+                "source-tag:%s@%s" % (tag, sha),
+                "command:git archive --prefix=spec-guard-%s/ %s .claude-plugin plugins/spec-guard" % (tag, tag),
+                "command:python3 scripts/release-package.py validate <dir> " + args.version,
+                "result:built from the merge commit the tag points to; no `._*` entries; validated before "
+                "packing and again after extracting; the asset downloaded from the Release has the same "
+                "SHA-256 (%s); the Release notes carry the %s CHANGELOG section; "
+                "the Release is marked latest (releases/latest returns %s)" %
+                (published["downloadSha256"], args.version, published["tag"])]),
+        "claude": verified("spec-guard-claude", "host-verified", "host-session",
+            "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:" + sha, [
+                "command:claude plugin marketplace update spec-guard-marketplace && "
+                "claude plugin update spec-guard@spec-guard-marketplace",
+                "result:installed_plugins.json records version %s, updated at %s and gitCommitSha %s "
+                "(the tag); the installed plugin directory is identical to the release asset apart from "
+                "Claude Code's own .in_use marker" % (claude["version"], claude["updatedAt"], claude["commit"])])}
+    codex_target = {"kind": "host-session", "id": "codex-cli;test:%s-upgrade-%s" % (tag, now.strftime("%Y%m%d"))}
+    install_result = ("the marketplace ref moved from %s to %s; codex plugin marketplace upgrade exited 0 "
+                      "at %s; the snapshot is identical to the release asset; "
+                      "codex plugin list --json shows spec-guard %s enabled" %
+                      (codex["refFrom"], codex["refTo"], codex["upgradedAt"], codex["version"]))
+    if isinstance(smoke, dict) and smoke.get("status") == "ok":
+        command = ["/bin/bash", str(args.repo / "evals/codex-plugin-smoke.sh"), "--plugin-id",
+                   "spec-guard@spec-guard-marketplace", "--expected-source", codex["source"]]
+        chatgpt = smoke["chatgpt"]
+        if chatgpt["state"] == "unknown":
+            desktop_result = "the ChatGPT desktop app restart and main process start time were not verified"
+        else:
+            desktop_result = ("the ChatGPT desktop app was %s after the install; its main process started %s "
+                              "(checked with ps)" %
+                              ("restarted" if chatgpt["state"] == "restarted" else "not restarted", chatgpt["startedAt"]))
+        documents["codex"] = verified("spec-guard-codex", "host-verified", "host-session", codex_target["id"], [
+            "command:" + shlex.join(command) + " </dev/null", "result:" + install_result,
+            "result:%s; the smoke exited 0 on its first run" %
+            (smoke["codexCli"] if smoke["codexCli"] is not None else "Codex CLI version was not verified"),
+            "result:" + desktop_result])
+    else:
+        if not isinstance(smoke, dict):
+            reason = "the smoke was not run"
+        elif smoke.get("status") == "waiting-on-user":
+            reason = "the hooks were not re-approved after the upgrade; the smoke is waiting on the user"
+        else:
+            reason = "the smoke did not succeed (status %s, exit code %s)" % (smoke.get("status"), smoke.get("exitCode"))
+        documents["codex"] = {"subject": "spec-guard-codex", "status": "not-verified", "target": codex_target,
+                              "reason": "installed: %s, but %s" % (install_result, reason)}
+    directory = args.output_dir if args.output_dir is not None else args.repo / "docs/releases"
+    directory.mkdir(parents=True, exist_ok=True)
+    files = []
+    for name, evidence in documents.items():
+        path = directory / ("%s-%s.json" % (tag, name))
+        data = {"schemaVersion": 1, "release": {"version": args.version}, "records": [evidence]}
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        files.append(str(path))
+    for filename in files:
+        code, stdout, stderr = run(["python3", "-B", str(args.repo / "scripts/release-evidence.py"), "validate", filename])
+        if code:
+            output = (stdout + stderr).decode("utf-8", errors="replace").strip()
+            raise ReleaseError("证据校验失败：%s（退出码 %s）：%s" % (filename, code, output))
+    write_record(record, "evidence", {"status": "ok", "files": files, "at": utc_now()})
+    print("四份发版证据已写入 %s，逐份校验通过。" % directory)
+    return {"status": "ok", "files": files}
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         refuse("invalid-arguments", "命令参数错误：%s" % message)
 
 
 def parser():
-    result = Parser(description="检查、准备、发布与安装 Spec Guard 发版。")
+    result = Parser(description="检查、准备、发布、安装与验证 Spec Guard 发版。")
     commands = result.add_subparsers(dest="step", required=True)
     result.add_argument("--repo", default=str(ROOT))
     result.add_argument("--remote", default="origin")
     result.add_argument("--github")
     for step, handler in (("check", check_release), ("prepare", prepare_release),
-                          ("publish", publish_release), ("install", install_release)):
+                          ("publish", publish_release), ("install", install_release),
+                          ("smoke", smoke_release), ("evidence", evidence_release)):
         command = commands.add_parser(step)
         for option in ("--repo", "--remote", "--github"):
             command.add_argument(option, default=argparse.SUPPRESS)
@@ -443,6 +599,11 @@ def parser():
         if step == "install":
             command.add_argument("--claude-home", type=Path, default=Path.home() / ".claude")
             command.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
+        if step == "smoke":
+            command.add_argument("--expected-source", type=Path)
+        if step == "evidence":
+            command.add_argument("--note", action="append", default=[])
+            command.add_argument("--output-dir", type=Path)
     return result
 
 

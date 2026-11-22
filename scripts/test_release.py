@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,14 @@ class ReleaseTests(unittest.TestCase):
             "GH_LOG": str(self.log),
             "RELEASE_COMMAND_LOG": str(self.command_log),
             "PATH": str(self.bin) + os.pathsep + os.environ["PATH"],
+            "TZ": "UTC",
+            "SMOKE_EXIT_CODE": "0",
+            "SMOKE_OUTPUT": "fixture smoke passed\n",
+            "SMOKE_STDERR": "",
+            "PS_OUTPUT": "Sun Nov 22 04:46:46 2026 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT\n",
+            "PS_EXIT_CODE": "0",
+            "CODEX_VERSION": "codex-cli 0.171.0\nsecond line\n",
+            "CODEX_VERSION_EXIT_CODE": "0",
         })
         fake = self.bin / "gh"
         fake.write_text("#!" + sys.executable + "\n" + '''import json
@@ -113,6 +122,27 @@ sys.stdout.write((root / name).read_text(encoding="utf-8"))
             self.write(relative, content)
         (self.repo / "scripts").mkdir()
         shutil.copyfile(ROOT / "scripts/release-package.py", self.repo / "scripts/release-package.py")
+        shutil.copyfile(ROOT / "scripts/release-evidence.py", self.repo / "scripts/release-evidence.py")
+        smoke_code = '''import json, os, sys
+with open(os.environ["RELEASE_COMMAND_LOG"], "a", encoding="utf-8") as log:
+    log.write(json.dumps(["smoke", *sys.argv[1:]]) + "\\n")
+if sys.stdin.read() != "":
+    print("smoke stdin was not empty", file=sys.stderr)
+    sys.exit(91)
+sys.stdout.write(os.environ["SMOKE_OUTPUT"])
+sys.stderr.write(os.environ["SMOKE_STDERR"])
+sys.exit(int(os.environ["SMOKE_EXIT_CODE"]))
+'''
+        self.write("evals/codex-plugin-smoke.sh",
+                   "#!/bin/bash\nexec " + shlex.join([sys.executable, "-c", smoke_code]) + ' "$@"\n')
+        fake_ps = self.bin / "ps"
+        fake_ps.write_text("#!" + sys.executable + "\n" + '''import json, os, sys
+with open(os.environ["RELEASE_COMMAND_LOG"], "a", encoding="utf-8") as log:
+    log.write(json.dumps(["ps", *sys.argv[1:]]) + "\\n")
+sys.stdout.write(os.environ["PS_OUTPUT"])
+sys.exit(int(os.environ["PS_EXIT_CODE"]))
+''', encoding="utf-8")
+        fake_ps.chmod(0o755)
         self.commit()
         self.fixture("runs.json", [{"conclusion": "success", "databaseId": 44986116526,
                                     "event": "push", "status": "completed", "workflowName": "Validate"}])
@@ -137,6 +167,9 @@ args = sys.argv[1:]
 with open(os.environ["RELEASE_COMMAND_LOG"], "a", encoding="utf-8") as log:
     log.write(json.dumps([name, *args]) + "\\n")
 root = Path(os.environ["GH_FIXTURES"])
+if name == "codex" and args == ["--version"]:
+    sys.stdout.write(os.environ["CODEX_VERSION"])
+    sys.exit(int(os.environ["CODEX_VERSION_EXIT_CODE"]))
 settings = json.loads((root / "hosts.json").read_text())
 if settings.get("fail") == [name, *args]:
     print("fixture host failure", file=sys.stderr)
@@ -189,7 +222,8 @@ else:
             "--repo", str(self.repo), "--github", GITHUB]
         command += [step, *options]
         result = subprocess.run(command, cwd=self.root, env=self.env, capture_output=True,
-                                text=True, timeout=60)
+                                text=True, timeout=60,
+                                input="inherited smoke input must be ignored\n" if step == "smoke" else None)
         self.last_stdout = result.stdout
         lines = result.stdout.splitlines()
         self.assertGreaterEqual(len(lines), 2, result.stdout + result.stderr)
@@ -441,6 +475,276 @@ else:
     def assert_utc(self, value):
         self.assertEqual(datetime.fromisoformat(value.replace("Z", "+00:00")).utcoffset(),
                          timezone.utc.utcoffset(None))
+
+    def installed_record(self):
+        at = "2026-11-22T04:45:41.123456+00:00"
+        record = {"schema": "spec-guard.release-record/v1", "version": VERSION,
+                  "pr": 42, "mergeCommit": self.sha, "github": GITHUB,
+                  "steps": {
+                      "check": {"status": "ok", "at": at},
+                      "prepare": {"status": "ok", "at": at,
+                          "asset": str(self.root / ("spec-guard-v" + VERSION + ".tar.gz")),
+                          "sha256": "a" * 64, "size": 12345,
+                          "dir": str(self.root / "package"), "notes": str(self.root / "notes.md")},
+                      "publish": {"status": "ok", "tag": "v" + VERSION,
+                          "url": "https://github.com/" + GITHUB + "/releases/tag/v" + VERSION,
+                          "downloadSha256": "a" * 64, "at": at},
+                      "install": {"status": "ok", "at": at,
+                          "claude": {"version": VERSION, "commit": self.sha, "updatedAt": at,
+                              "installPath": str(self.root / "claude plugin")},
+                          "codex": {"version": VERSION, "source": str(self.root / "codex plugin"),
+                              "refFrom": "v1.2.2", "refTo": "v" + VERSION,
+                              "upgradedAt": at, "backup": None}}}}
+        self.save_record(record)
+        return record
+
+    def save_record(self, record):
+        self.record_path().parent.mkdir(parents=True, exist_ok=True)
+        self.record_path().write_text(json.dumps(record), encoding="utf-8")
+
+    def smoke(self, *options):
+        return self.release("smoke", "--version", VERSION, *options)
+
+    def evidence(self, *options):
+        return self.release("evidence", "--version", VERSION, *options)
+
+    def evidence_records(self, files):
+        records = {}
+        self.assertEqual(len(files), 4)
+        for name, filename in zip(("source", "package", "claude", "codex"), files):
+            path = Path(filename)
+            self.assertEqual(path.name, "v" + VERSION + "-" + name + ".json")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(set(data), {"schemaVersion", "release", "records"})
+            self.assertEqual(data["schemaVersion"], 1)
+            self.assertEqual(data["release"], {"version": VERSION})
+            self.assertEqual(len(data["records"]), 1)
+            observed = data["records"][0]
+            if observed["status"] != "not-verified":
+                self.assertEqual(set(observed), {"subject", "status", "target", "observedAt", "evidence"})
+                self.assertRegex(observed["observedAt"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+            validation = subprocess.run([sys.executable, "-B", str(self.repo / "scripts/release-evidence.py"),
+                                         "validate", str(path)], env=self.env, capture_output=True, text=True,
+                                        timeout=30)
+            self.assertEqual(validation.returncode, 0, validation.stdout + validation.stderr)
+            records[name] = observed
+        return records
+
+    def test_smoke_success_records_host_facts_and_preserves_other_steps(self):
+        before = self.installed_record()
+        result = self.smoke()
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["exitCode"], 0)
+        self.assertEqual(result["chatgpt"], {"state": "restarted", "startedAt": "2026-11-22T04:46:46Z"})
+        smoke = self.record()["steps"]["smoke"]
+        self.assertEqual(set(smoke), {"status", "exitCode", "codexCli", "chatgpt", "at"})
+        self.assertEqual(smoke["status"], "ok")
+        self.assertEqual(smoke["exitCode"], 0)
+        self.assertEqual(smoke["codexCli"], "codex-cli 0.171.0")
+        self.assertEqual(smoke["chatgpt"], result["chatgpt"])
+        self.assert_utc(smoke["at"])
+        self.assertEqual(self.calls(), [
+            ["smoke", "--plugin-id", "spec-guard@spec-guard-marketplace", "--expected-source",
+             before["steps"]["install"]["codex"]["source"]],
+            ["codex", "--version"], ["ps", "-axo", "lstart=,command="]])
+        after = self.record()
+        del after["steps"]["smoke"]
+        self.assertEqual(after, before)
+
+    def test_smoke_hook_approval_failure_and_other_exit_codes(self):
+        self.installed_record()
+        for code, output, expected in ((2, "未观察到宿主 hook 事件", "waiting-on-user"),
+                                       (2, "unrelated smoke failure", "failed"),
+                                       (7, "未观察到宿主 hook 事件", "failed")):
+            with self.subTest(code=code, output=output):
+                self.env.update(SMOKE_EXIT_CODE=str(code), SMOKE_OUTPUT="", SMOKE_STDERR=output)
+                result = self.smoke()
+                self.assertEqual(result["status"], expected)
+                self.assertEqual(result["exitCode"], code)
+                recorded = self.record()["steps"]["smoke"]
+                self.assertEqual(recorded["status"], expected)
+                self.assertEqual(recorded["exitCode"], code)
+                if expected == "waiting-on-user":
+                    self.assertIn("Codex 升级后 hook 的批准失效了：请在新开的终端里启动命令行 `codex`，"
+                                  "在 `/hooks` 里批准 spec-guard 的 hook，然后重跑本命令", self.last_stdout)
+
+    def test_smoke_failure_shows_last_five_output_lines(self):
+        self.installed_record()
+        self.env.update(SMOKE_EXIT_CODE="1", SMOKE_OUTPUT="omitted-one\nomitted-two\ntail-1\ntail-2\n",
+                        SMOKE_STDERR="tail-3\ntail-4\ntail-5\n")
+        self.assertEqual(self.smoke()["status"], "failed")
+        self.assertNotIn("omitted-", self.last_stdout)
+        self.assertIn("tail-1\ntail-2\ntail-3\ntail-4\ntail-5", self.last_stdout)
+
+    def test_smoke_expected_source_override(self):
+        self.installed_record()
+        source = self.root / "expected source"
+        self.assertEqual(self.smoke("--expected-source", str(source))["status"], "ok")
+        self.assertEqual(self.calls()[0][-2:], ["--expected-source", str(source)])
+
+    def test_smoke_chatgpt_restart_detection_and_local_timezone(self):
+        self.installed_record()
+        self.env["TZ"] = "Asia/Kuala_Lumpur"
+        for started, state, utc in (("12:44:46", "not-restarted", "2026-11-22T04:44:46Z"),
+                                    ("12:46:46", "restarted", "2026-11-22T04:46:46Z")):
+            with self.subTest(state=state):
+                self.env["PS_OUTPUT"] = ("Sun Nov 22 12:47:00 2026 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT Helper\n"
+                    "Sun Nov 22 " + started + " 2026 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT\n")
+                result = self.smoke()
+                self.assertEqual(result["status"], "ok")
+                self.assertEqual(result["chatgpt"], {"state": state, "startedAt": utc})
+                if state == "not-restarted":
+                    self.assertIn("⌘Q", self.last_stdout)
+                    self.assertIn("ChatGPT", self.last_stdout)
+
+    def test_smoke_chatgpt_unknown_and_codex_version_unavailable(self):
+        self.installed_record()
+        for output, exit_code in (("", "0"), ("unparseable /Applications/ChatGPT.app/Contents/MacOS/ChatGPT", "0"),
+                                  (self.env["PS_OUTPUT"], "1"),
+                                  ("Sun Nov 22 04:46:46 2026 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT Helper", "0")):
+            with self.subTest(output=output, exit_code=exit_code):
+                self.env.update(PS_OUTPUT=output, PS_EXIT_CODE=exit_code, CODEX_VERSION_EXIT_CODE="1")
+                result = self.smoke()
+                self.assertEqual(result["status"], "ok")
+                self.assertEqual(result["chatgpt"], {"state": "unknown", "startedAt": None})
+                self.assertIsNone(self.record()["steps"]["smoke"]["codexCli"])
+
+    def test_smoke_refuses_without_install(self):
+        for record in ({}, {"steps": None}, {"steps": {"install": None}},
+                       {"steps": {"install": {"status": "failed"}}}):
+            with self.subTest(record=record):
+                self.save_record(record)
+                before = self.record_path().read_bytes()
+                self.assertEqual(self.smoke()["reason"], "install-not-ok")
+                self.assertEqual(self.record_path().read_bytes(), before)
+        self.assertFalse(self.command_log.exists())
+
+    def test_evidence_verified_files_match_release_facts_and_notes(self):
+        self.installed_record()
+        self.assertEqual(self.smoke()["status"], "ok")
+        before = self.record()
+        result = self.evidence("--note", "Task 3 verified.", "--note", "Second note.")
+        self.assertEqual(result["status"], "ok")
+        self.assertTrue(all(Path(path).parent == self.repo.resolve() / "docs/releases" for path in result["files"]))
+        records = self.evidence_records(result["files"])
+        expected = {"source": ("spec-guard-source", "source-verified", "source-checkout", "commit:" + self.sha),
+                    "package": ("spec-guard-release-artifact", "package-verified", "package",
+                        "release:v" + VERSION + ";asset:spec-guard-v" + VERSION + ".tar.gz;sha256:" + "a" * 64),
+                    "claude": ("spec-guard-claude", "host-verified", "host-session",
+                        "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:" + self.sha)}
+        for name, (subject, status, kind, target) in expected.items():
+            self.assertEqual(records[name]["subject"], subject)
+            self.assertEqual(records[name]["status"], status)
+            self.assertEqual(records[name]["target"], {"kind": kind, "id": target})
+        source = records["source"]["evidence"]
+        for text in ("v" + VERSION, self.sha, "#42", "merged", "main", "succeeded"):
+            self.assertIn(text, source[0])
+        self.assertEqual(source[1:], ["result:Task 3 verified.", "result:Second note."])
+        package = records["package"]["evidence"]
+        self.assertEqual(package[:3], ["release:" + before["steps"]["publish"]["url"],
+            "asset:spec-guard-v" + VERSION + ".tar.gz;size:12345", "source-tag:v" + VERSION + "@" + self.sha])
+        for line in package:
+            self.assertNotIn(str(self.repo), line)
+            for path in (str(self.root), tempfile.gettempdir(), self.env["TMPDIR"],
+                         before["steps"]["prepare"]["dir"]):
+                self.assertNotIn(path, line)
+            self.assertNotRegex(line, r"/(?:private/)?(?:tmp|var/(?:tmp|folders))/")
+        self.assertEqual([line for line in package if line.startswith("command:")], [
+            "command:git archive --prefix=spec-guard-v" + VERSION + "/ v" + VERSION +
+            " .claude-plugin plugins/spec-guard",
+            "command:python3 scripts/release-package.py validate <dir> " + VERSION])
+        for text in ("git archive", "release-package.py", " validate ", "._*", "SHA-256", "CHANGELOG", "latest"):
+            self.assertIn(text, "\n".join(package))
+        claude = records["claude"]["evidence"]
+        self.assertEqual(claude[0], "command:claude plugin marketplace update spec-guard-marketplace && "
+                         "claude plugin update spec-guard@spec-guard-marketplace")
+        for text in (VERSION, self.sha, before["steps"]["install"]["claude"]["updatedAt"], ".in_use"):
+            self.assertIn(text, claude[1])
+        codex = records["codex"]
+        self.assertEqual(codex["subject"], "spec-guard-codex")
+        self.assertEqual(codex["status"], "host-verified")
+        self.assertEqual(codex["target"]["kind"], "host-session")
+        self.assertRegex(codex["target"]["id"], r"^codex-cli;test:v1\.2\.3-upgrade-\d{8}$")
+        self.assertEqual(len(codex["evidence"]), 4)
+        for text in ("codex-plugin-smoke.sh", "--expected-source", "v1.2.2", "v" + VERSION,
+                     "codex-cli 0.171.0", "exited 0", "2026-11-22T04:46:46Z", "restarted",
+                     "enabled", before["steps"]["install"]["codex"]["upgradedAt"]):
+            self.assertIn(text, "\n".join(codex["evidence"]))
+        written = self.record()["steps"]["evidence"]
+        self.assertEqual(written["status"], "ok")
+        self.assertEqual(written["files"], result["files"])
+        self.assert_utc(written["at"])
+        after = self.record()
+        del after["steps"]["evidence"]
+        self.assertEqual(after, before)
+
+    def test_evidence_unverified_codex_for_missing_waiting_or_failed_smoke(self):
+        for state in (None, "waiting-on-user", "failed"):
+            with self.subTest(state=state):
+                self.installed_record()
+                if state:
+                    self.env.update(SMOKE_EXIT_CODE="2" if state == "waiting-on-user" else "1",
+                                    SMOKE_OUTPUT="未观察到宿主 hook 事件" if state == "waiting-on-user" else "failed smoke")
+                    self.assertEqual(self.smoke()["status"], state)
+                output = self.root / "release evidence"
+                result = self.evidence("--output-dir", str(output))
+                self.assertEqual(result["status"], "ok")
+                self.assertTrue(all(Path(path).parent == output for path in result["files"]))
+                codex = self.evidence_records(result["files"])["codex"]
+                self.assertEqual(set(codex), {"subject", "status", "target", "reason"})
+                self.assertEqual(codex["status"], "not-verified")
+                for text in ("installed", "v1.2.2", "v" + VERSION, "release asset",
+                             self.record()["steps"]["install"]["codex"]["upgradedAt"]):
+                    self.assertIn(text, codex["reason"])
+                self.assertIn({None: "not run", "waiting-on-user": "hooks", "failed": "exit"}[state], codex["reason"])
+
+    def test_evidence_reports_unknown_or_not_restarted_chatgpt_honestly(self):
+        self.installed_record()
+        for output, expected in (("", "not verified"),
+                ("Sun Nov 22 04:44:46 2026 /Applications/ChatGPT.app/Contents/MacOS/ChatGPT", "not restarted")):
+            with self.subTest(output=output):
+                self.env["PS_OUTPUT"] = output
+                self.assertEqual(self.smoke()["status"], "ok")
+                result = self.evidence()
+                codex = self.evidence_records(result["files"])["codex"]
+                self.assertEqual(codex["status"], "host-verified")
+                self.assertIn(expected, codex["evidence"][-1])
+
+    def test_evidence_refuses_without_each_prerequisite(self):
+        for step in ("check", "prepare", "publish", "install"):
+            for facts in (None, {"status": "failed"}):
+                with self.subTest(step=step, facts=facts):
+                    record = self.installed_record()
+                    if facts is None:
+                        del record["steps"][step]
+                    else:
+                        record["steps"][step] = facts
+                    self.save_record(record)
+                    before = self.record_path().read_bytes()
+                    result = self.evidence()
+                    self.assertEqual(result["status"], "refused")
+                    self.assertEqual(result["reason"], step + "-not-ok")
+                    self.assertEqual(self.record_path().read_bytes(), before)
+                    self.assertFalse((self.repo / "docs/releases").exists())
+
+    def test_evidence_validation_failure_reports_file_and_output(self):
+        self.installed_record()
+        validator = self.repo / "scripts/release-evidence.py"
+        original = validator.read_text(encoding="utf-8")
+        names = ("source", "package", "claude", "codex")
+        for name in names:
+            with self.subTest(name=name):
+                filename = "v" + VERSION + "-" + name + ".json"
+                validator.write_text("import sys\n" +
+                    "if sys.argv[0] and sys.argv[-1].endswith(" + repr(filename) + "):\n" +
+                    "    print('fixture evidence rejected', file=sys.stderr)\n" +
+                    "    raise SystemExit(1)\n" + original, encoding="utf-8")
+                before = self.record_path().read_bytes()
+                result = self.evidence()
+                self.assertEqual(result["status"], "failed")
+                self.assertIn(filename, self.last_stdout)
+                self.assertIn("fixture evidence rejected", self.last_stdout)
+                self.assertEqual(self.record_path().read_bytes(), before)
 
     def test_publish_preview_has_no_commands_or_record_writes(self):
         self.prepare_publish()
