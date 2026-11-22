@@ -3175,6 +3175,9 @@ fx="$WORK/final-auto"; fa "$fx" '{"version": 1, "takeover": {"merge": "auto"}}'
 out="$(run "$fx" | context_of)"
 start="$(git -C "$fx" rev-parse HEAD~1)"
 grep -F 'Codex does the final acceptance' >/dev/null <<<"$out" && grep -F -- '--target acceptance' >/dev/null <<<"$out" &&
+  grep -F 'list the flow files (`spec/CAPABILITY-MAP.md`' >/dev/null <<<"$out" &&
+  grep -F 'as outside the implementation scope' >/dev/null <<<"$out" &&
+  grep -F "attach each check's command, exit code, \`output_sha256\` and \`tail\`" >/dev/null <<<"$out" &&
   grep -F "from \`${start:0:12}\` (the commit before this module; \`--base ${start:0:12}\`)" >/dev/null <<<"$out" &&
   grep -F 'never accept it yourself' >/dev/null <<<"$out" || fail "合并自动的模块到最终 gate 应交 Codex 验收
 $out"
@@ -3183,6 +3186,9 @@ printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": {"merge": "auto"
 git -C "$fx" update-index --assume-unchanged .agent/config.json
 out="$(run "$fx" | context_of)"
 grep -F '最终验收交 Codex' >/dev/null <<<"$out" && grep -F '不要自己验收' >/dev/null <<<"$out" &&
+  grep -F '任务说明里列出流程文件（`spec/CAPABILITY-MAP.md`' >/dev/null <<<"$out" &&
+  grep -F '不算实现范围' >/dev/null <<<"$out" &&
+  grep -F '每条检查的命令、退出码、`output_sha256` 与 `tail`' >/dev/null <<<"$out" &&
   grep -F "（\`${start:0:12}\`，即 \`--base ${start:0:12}\`）" >/dev/null <<<"$out" || fail "中文同样交 Codex 验收
 $out"
 echo "  ✅ 合并自动的模块到最终 gate 时交 Codex 验收（中英）"; PASS=$((PASS + 1))

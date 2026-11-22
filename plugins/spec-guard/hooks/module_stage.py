@@ -1396,24 +1396,29 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
     if module_takeover(root, module)[0].get("merge") != "auto":
         return None, ""
     entry = "--target acceptance --state codex-approved --review <report>"
-    from module_scope import default_base  # late: module_scope imports this module
+    from module_scope import FLOW_DIRS, FLOW_FILES, default_base  # late: module_scope imports this module
     base = default_base(root, module)
+    flow_files = ("、" if zh else ", ").join("`%s`" % path for path in FLOW_FILES + FLOW_DIRS)
     # M3 second rework: name the start of the review range instead of leaving the agent to work it out.
     start_zh = "（`%s`，即 `--base %s`）" % (base[:12], base[:12]) if base else ""
     start_en = "`%s` (the commit before this module; `--base %s`)" % (base[:12], base[:12]) if base else "the commit before this module"
     if zh:
         return ("acceptance", "auto", base), (
             "本模块合并是自动的，最终验收交 Codex：用 `/delegate:review`（后端 codex）审本模块开工前的提交%s到 HEAD 的补丁，"
-            "`--spec spec/%s.md`，报告存到仓库外；等 autopilot 在 HEAD 上的检查证据；两样齐了、工作区干净，用 %s（%s）"
+            "`--spec spec/%s.md`；任务说明里列出流程文件（%s），写明它们不算实现范围，并附上 "
+            "`~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json` 里每条检查的命令、退出码、`output_sha256` 与 `tail`；"
+            "报告存到仓库外；等 autopilot 在 HEAD 上的检查证据；两样齐了、工作区干净，用 %s（%s）"
             "记下验收，记录在 git 目录里、不进提交，最终 gate 合并后再补勾。缺任一样、或被拒绝，就停下等用户，不要自己验收。"
-            "拟回告写进 todo，不发出，等用户确认。" % (start_zh, module, cmd["review-mark"], entry))
+            "拟回告写进 todo，不发出，等用户确认。" % (start_zh, module, flow_files, cmd["review-mark"], entry))
     return ("acceptance", "auto", base), (
         "this module merges automatically, so Codex does the final acceptance: review the patch from %s to HEAD with "
-        "`/delegate:review` (backend codex) and `--spec spec/%s.md`, saving the report outside "
+        "`/delegate:review` (backend codex) and `--spec spec/%s.md`; in the task description, list the flow files (%s) "
+        "as outside the implementation scope and attach each check's command, exit code, `output_sha256` and `tail` from "
+        "`~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json`; save the report outside "
         "the repository; wait for autopilot's check evidence on HEAD; with both and a clean working tree, record the "
         "acceptance with %s (%s) -- the record stays in the git directory, uncommitted, and the final gate is ticked "
         "after the merge. If either is missing or it is refused, stop and wait for the user; never accept it yourself. "
-        "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, cmd["review-mark"], entry))
+        "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, flow_files, cmd["review-mark"], entry))
 
 
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
