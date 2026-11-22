@@ -8,7 +8,7 @@ replaces the marker line, previews the change, and writes only with `--confirm`.
 that the user approved anything: the marker is a record for later sessions, not a source of authority.
 
 `--target acceptance` (codex-final-acceptance) is separate: for a merge=auto module it records Codex's final
-acceptance of HEAD -- final review, a non-author's check evidence and HEAD agreeing -- as a JSON file in the git
+acceptance of HEAD -- final review, a non-author's check evidence and HEAD agreeing -- as a JSON file in the common git
 directory, so recording it does not move HEAD.
 """
 from __future__ import annotations
@@ -155,7 +155,7 @@ def _merge_at_base(root: Path, module_id: str) -> str:
 
 
 def _acceptance(root: Path, module_id: str, state: str, report: str | None, confirm: bool) -> int:
-    """codex-final-acceptance: record Codex's final acceptance of HEAD in the git directory, or say why not."""
+    """codex-final-acceptance: record Codex's final acceptance of HEAD in the common git directory, or say why not."""
     from project_config import module_takeover
     if state != "codex-approved":
         print("acceptance-state: --target acceptance records only codex-approved; the user's own final acceptance "
@@ -199,7 +199,7 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
         return 2
     path = acceptance_path(root, module_id)
     if path is None:
-        print("git-unreadable: could not find the git directory")
+        print("git-unreadable: could not find the common git directory")
         return 2
     report_path = Path(report).resolve()
     record = {"marker": "codex-approved", "sha": final["head"], "module": module_id,
@@ -208,7 +208,7 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
     text = json.dumps(record, ensure_ascii=False, indent=2) + "\n"
     print("Codex final acceptance of %s at %s: final review %s, check evidence %s, nothing out of scope."
           % (module_id, final["head"][:12], report_path, check["path"]))
-    print("record (git directory, not tracked, not committed): %s" % path)
+    print("record (common git directory, not tracked, not committed): %s" % path)
     print(text, end="")
     print("The final gate in tasks/%s/todo.md is not ticked now: the phase hint reads it as passed while this record's "
           "commit is HEAD or an ancestor of it; tick it after the merge. A drafted reply is not sent." % module_id)

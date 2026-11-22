@@ -813,6 +813,87 @@ class Acceptance(AcceptanceFixture):
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
 
 
+class AcceptanceWorktrees(AcceptanceFixture):
+    """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""
+
+    def setUp(self):
+        super().setUp()
+        self.main = self.root.resolve()
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        linked = Path(folder.name) / "linked"
+        self.git("worktree", "add", "--detach", str(linked))
+        self.root = linked
+        self.common_record = self.main / ".git" / "spec-guard" / "acceptance" / "alpha.json"
+        self.legacy_record = Path(self.git("rev-parse", "--git-path", "spec-guard/acceptance/alpha.json"))
+        self.assertNotEqual(self.common_record, self.legacy_record)
+
+    def write_record(self, path, sha):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.json.dumps({"marker": "codex-approved", "sha": sha, "module": "alpha"}),
+                        encoding="utf-8")
+
+    def test_linked_acceptance_is_shared_and_gate_still_requires_ancestry(self):
+        from module_stage import acceptance_path, acceptance_record, final_gate_accepted
+        self.git("commit", "--allow-empty", "-qm", "linked acceptance")
+        self.head = self.git("rev-parse", "HEAD")
+        self.evidence()
+        code, out = self.accept(self.report(), "--confirm")
+        self.assertEqual(code, 0, out)
+        expected = {"marker": "codex-approved", "sha": self.head}
+        self.assertEqual(acceptance_record(self.main, "alpha"), expected)
+        self.assertEqual(acceptance_path(self.main, "alpha"), self.common_record)
+        self.assertEqual(acceptance_path(self.root, "alpha"), self.common_record)
+        self.assertIn("recorded codex-approved acceptance: %s" % self.common_record, out)
+        self.assertFalse(self.legacy_record.exists())
+        self.assertEqual(self.json.loads(self.common_record.read_text(encoding="utf-8"))["sha"], self.head)
+        done = subprocess.run([sys.executable, "-B", str(Path(SCRIPT).with_name("map_view.py")),
+                               "--project", str(self.main), "--json"], capture_output=True, text=True,
+                              timeout=30, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        module = next(item for item in self.json.loads(done.stdout)["modules"] if item["id"] == "alpha")
+        self.assertEqual(module["acceptance"], expected)
+        todo = "- [x] implementation\n- [ ] Checkpoint 1（gate）：最终验收\n"
+        self.assertFalse(final_gate_accepted(self.main, "alpha", todo))
+        self.git("-C", str(self.main), "merge", "--ff-only", self.head)
+        self.assertTrue(final_gate_accepted(self.main, "alpha", todo))
+        self.git("-C", str(self.main), "commit", "--allow-empty", "-qm", "after acceptance")
+        self.assertNotEqual(self.git("-C", str(self.main), "rev-parse", "HEAD"), self.head)
+        self.assertTrue(final_gate_accepted(self.main, "alpha", todo))
+
+    def test_legacy_record_is_read_without_migration(self):
+        from module_stage import acceptance_record
+        self.write_record(self.legacy_record, self.head)
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
+        self.assertFalse(self.common_record.exists())
+
+    def test_common_record_takes_priority_and_writing_preserves_legacy(self):
+        from module_stage import acceptance_record
+        legacy_sha = self.git("rev-parse", "HEAD~1")
+        self.write_record(self.legacy_record, legacy_sha)
+        legacy = self.legacy_record.read_bytes()
+        self.write_record(self.common_record, self.head)
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
+        self.evidence()
+        code, out = self.accept(self.report(), "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.legacy_record.read_bytes(), legacy)
+
+    def test_invalid_common_records_fall_back_to_legacy(self):
+        from module_stage import acceptance_record
+        self.write_record(self.legacy_record, self.head)
+        self.common_record.parent.mkdir(parents=True)
+        for text in ("{", "[]", "\ufffd", self.json.dumps({"marker": "approved", "sha": self.head, "module": "alpha"}),
+                     self.json.dumps({"marker": "codex-approved", "sha": "invalid", "module": "alpha"}),
+                     self.json.dumps({"marker": "codex-approved", "sha": self.head, "module": "beta"})):
+            with self.subTest(text=text):
+                self.common_record.write_text(text, encoding="utf-8")
+                self.assertEqual(acceptance_record(self.root, "alpha"),
+                                 {"marker": "codex-approved", "sha": self.head})
+        self.common_record.write_bytes(b"\xff")
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
+
+
 class AcceptanceWidenedLater(AcceptanceFixture):
     """M3 rework (Q14 A): merge must have been auto before the module started, so a patch cannot grant it to itself."""
 

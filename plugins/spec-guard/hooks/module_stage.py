@@ -578,21 +578,22 @@ ACCEPTANCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
 def acceptance_record(root: Path, module: str) -> dict | None:
     """codex-final-acceptance: {marker, sha} of a merge=auto module's Codex acceptance record, else None.
 
-    The record lives in the git directory (`acceptance_path`), written only by review-mark --target acceptance;
-    a module whose takeover does not give merge to automation has none that counts.
+    The record lives in the common git directory (`acceptance_path`), with fallback to the legacy checkout path;
+    only review-mark --target acceptance writes it. A module without merge=auto has none that counts.
     """
     from project_config import module_takeover  # late: project_config is imported by callers of this module
     if module_takeover(root, module)[0].get("merge") != "auto":
         return None
-    path = acceptance_path(root, module)
-    try:
-        document = json.loads(path.read_text(encoding="utf-8")) if path is not None and path.is_file() else None
-    except (OSError, UnicodeError, ValueError):
-        return None
-    if (not isinstance(document, dict) or document.get("marker") != "codex-approved" or document.get("module") != module
-            or not isinstance(document.get("sha"), str) or not ACCEPTANCE_SHA.match(document["sha"])):
-        return None
-    return {"marker": document["marker"], "sha": document["sha"]}
+    for path in (acceptance_path(root, module), legacy_acceptance_path(root, module)):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8")) if path is not None and path.is_file() else None
+        except (OSError, UnicodeError, ValueError):
+            continue
+        if (not isinstance(document, dict) or document.get("marker") != "codex-approved" or document.get("module") != module
+                or not isinstance(document.get("sha"), str) or not ACCEPTANCE_SHA.match(document["sha"])):
+            continue
+        return {"marker": document["marker"], "sha": document["sha"]}
+    return None
 
 
 def final_gate_accepted(root: Path, module: str, text: str) -> bool:
@@ -1380,7 +1381,17 @@ ACCEPTANCE_DIR = "spec-guard/acceptance"
 
 
 def acceptance_path(root: Path, module: str) -> Path | None:
-    """codex-final-acceptance: where the module's Codex acceptance record lives -- in the git directory, never tracked."""
+    """The shared Codex acceptance record: in the common git directory, never tracked."""
+    found = _git(root, "rev-parse", "--git-common-dir")
+    if not found:
+        return None
+    path = Path(found)
+    common = path if path.is_absolute() else Path(root) / path
+    return common / ACCEPTANCE_DIR / ("%s.json" % module)
+
+
+def legacy_acceptance_path(root: Path, module: str) -> Path | None:
+    """The pre-1.16 checkout-local location, read only as a compatibility fallback."""
     found = _git(root, "rev-parse", "--git-path", "%s/%s.json" % (ACCEPTANCE_DIR, module))
     if not found:
         return None
