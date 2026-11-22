@@ -6,7 +6,7 @@
 - [x] Task 3：验收记录放公共 git 目录、先新后旧读取与回归（Codex）
 - [x] Task 4：命令说明、0.92.0 版本号、CHANGELOG、README
 - [x] Checkpoint 1（report）：完整检查、变异与临时项目实跑
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -18,3 +18,7 @@
   没有读报告，工作区不变；`/map --json` 里 codex-route-guard、codex-approval 的 `codexRoute` 都是 `{"spec": "takeover", "plan": "takeover"}`。
 - 跨 worktree：回归 `AcceptanceWorktrees` 用真实 git 建 linked worktree，在其中经 `review_mark --target acceptance --confirm` 记录，主 checkout 的 `acceptance_record`
   与 `/map --json` 读得到；合入前 gate 不算过、快进后算过、再多一个提交仍算过；旧位置兼容、新位置优先、新位置无效时回退。
+
+2026-11-22 用户「验收通过」（验收前问过是否要 Codex 只读复核，用户没有要求）。
+
+<!-- spec-guard: external-review declined -->
