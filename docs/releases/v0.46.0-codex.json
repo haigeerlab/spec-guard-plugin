@@ -27,7 +27,7 @@
       },
       "observedAt": "2026-10-06T06:32:45Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
         "result:the injected text in that session's rollout begins with the new location line -- `Location: branch `main` · worktree `<the smoke's temporary Git project>`. State this location to the user whenever you ask them to review or confirm.` -- followed by `当前阶段: **IDLE**`",
         "host:codex-cli 0.160.0 (thread 01a10fe7-a349-7160-a104-66f1bc555eba)"

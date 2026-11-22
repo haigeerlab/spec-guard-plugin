@@ -27,7 +27,7 @@
       "observedAt": "2026-09-28T06:45:53Z",
       "evidence": [
         "scope:hooks.json is unchanged since 0.21.1, so the hook trust the user granted then still applied",
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:a real Codex CLI session in a temporary consumer project received the injected stage and the smoke exited 0",
         "result:the run left no temporary project trust entry in the Codex config",
         "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"

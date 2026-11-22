@@ -24,7 +24,7 @@
       },
       "observedAt": "2026-09-28T07:55:30Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:the smoke exited 0 and left no temporary project trust entry in the Codex config",
         "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"
       ]

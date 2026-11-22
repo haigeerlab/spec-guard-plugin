@@ -26,7 +26,7 @@
       },
       "observedAt": "2026-09-30T01:45:17Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:the smoke exited 0 and the user Codex config was byte-identical before and after the run",
         "result:test_module_insert.py, test_proposal_promotion_proof.py and test_proposal_publication.py from the installed marketplace copy passed under the macOS system python3 3.9.6 (PATH=/usr/bin:/bin)",
         "limit:this verifies the Codex CLI hook path; it does not claim a native Codex Desktop hook acceptance"

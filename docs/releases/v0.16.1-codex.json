@@ -15,7 +15,7 @@
       "evidence": [
         "command:codex plugin marketplace add https://github.com/haigeer-labs/spec-guard-plugin.git --ref v0.16.1 --json",
         "command:codex plugin add spec-guard@spec-guard-marketplace --json",
-        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.1",
+        "installed-cache:~/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.1",
         "result:codex plugin list reports spec-guard@spec-guard-marketplace 0.16.1 installed and enabled; marketplace snapshot at 54b47222d06b0feab113766fc92717da839df313"
       ]
     },

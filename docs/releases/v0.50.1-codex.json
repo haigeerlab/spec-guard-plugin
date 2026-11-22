@@ -15,7 +15,7 @@
       "evidence": [
         "command:edit the `ref` line of [marketplaces.spec-guard-marketplace] in ~/.codex/config.toml from v0.50.0 to v0.50.1 (backup kept)",
         "command:codex plugin marketplace upgrade",
-        "result:the upgrade exited 0 reporting 2 marketplaces upgraded, and `codex plugin list --json` reports spec-guard 0.50.1, installed and enabled, source.path /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard"
+        "result:the upgrade exited 0 reporting 2 marketplaces upgraded, and `codex plugin list --json` reports spec-guard 0.50.1, installed and enabled, source.path ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard"
       ]
     },
     {
@@ -27,7 +27,7 @@
       },
       "observedAt": "2026-10-07T04:25:00Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
         "host:codex-cli 0.160.0"
       ]
