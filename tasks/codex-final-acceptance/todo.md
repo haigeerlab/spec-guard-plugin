@@ -17,7 +17,7 @@
 - [x] Task 9（M3 第二次返工）：Codex 批准的指纹不算「外部审查意见」一节（规则要求在那里给建议写理由，写完原来会让批准读作已修订）；0.91.0／0.91.1 记下的旧指纹照样认 — 2026-11-22 用户判定 M3「不通过，追加修复」（安装版 0.91.1 重跑 U2 发现）
 - [x] Task 10（M3 第二次返工）：合并自动的模块到最终 gate 时，建议下一步写出本模块开工前的提交号（审查范围的起点）；退役键提醒只有一个键时英文用单数
 - [x] Checkpoint 5（report）：完整检查、变异与临时项目重跑 U2（只有建议的一轮）
-- [ ] Checkpoint 6（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.2，用安装版重跑 M3
+- [x] Checkpoint 6（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.2，用安装版重跑 M3
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -56,3 +56,5 @@
   `test_a_codex_approval_from_0_91_0_still_counts` 变红。均已还原。
 - 临时项目（工作区源码，档位 plan，手写一份只有建议的 Codex 报告）：记 `codex-approved` → 在「外部审查意见」写理由后 `/map` 仍为
   `codex-approved`、`reviewApprovedBy.plan: codex` → 改 Plan 正文后读作 `revised`、`null`。
+
+2026-11-22 用户「验收通过」（M3 第二次返工，含 codex-approval Spec 的变更记录）。
