@@ -72,6 +72,16 @@ class SourceInventoryTests(unittest.TestCase):
     def setUpClass(cls):
         # Build the repository and its state worktree once; every test copies it and repairs the worktree links.
         # This replaces eight git calls per test with one.
+        # Inherit these settings in every git subprocess, including the code under test.
+        count = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+        settings = {"GIT_CONFIG_COUNT": str(count + 2)}
+        for index, (key, value) in enumerate(
+                (("maintenance.auto", "false"), ("gc.auto", "0")), start=count):
+            settings["GIT_CONFIG_KEY_%d" % index] = key
+            settings["GIT_CONFIG_VALUE_%d" % index] = value
+        environment = patch.dict(os.environ, settings)
+        environment.start()
+        cls.addClassCleanup(environment.stop)
         cls._template = tempfile.TemporaryDirectory(prefix="sg-portability-template-")
         base = Path(cls._template.name)
         root = base / "repo"

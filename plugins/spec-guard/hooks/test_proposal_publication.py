@@ -1,6 +1,7 @@
 """Publication reads a local bare remote, never the consumer worktree."""
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -40,6 +41,16 @@ class ProposalPublicationTests(unittest.TestCase):
     def setUpClass(cls):
         """Build the git fixture once; each test copies it (see setUp)."""
         super().setUpClass()
+        # Inherit these settings in every git subprocess, including the code under test.
+        count = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+        settings = {"GIT_CONFIG_COUNT": str(count + 2)}
+        for index, (key, value) in enumerate(
+                (("maintenance.auto", "false"), ("gc.auto", "0")), start=count):
+            settings["GIT_CONFIG_KEY_%d" % index] = key
+            settings["GIT_CONFIG_VALUE_%d" % index] = value
+        environment = patch.dict(os.environ, settings)
+        environment.start()
+        cls.addClassCleanup(environment.stop)
         cls._template = Path(tempfile.mkdtemp(prefix="sg-proposal-publication-template-"))
         try:
             builder = cls("setUp")
