@@ -1,5 +1,5 @@
 {
-  "interface": "1.15",
+  "interface": "1.16",
   "mapView": {
     "command": [
       "python3",
@@ -36,6 +36,12 @@
         "codex": "per module, per file: Codex's approval marker, and the module's takeover gives this step to codex (for a Plan, its pre-declared section lists nothing)",
         "null": "per module, per file: no approval in effect -- no marker, pending, revised, invalid, or Codex's approval where the takeover does not let it count (such a file is listed in awaitingReview); an important requirement's Spec approved by Codex is null too"
       },
+      "codexRoute": {
+        "null": "the module's takeover gives this step to Codex and no user approval is required",
+        "takeover": "the module's takeover does not give this step to Codex",
+        "important": "the Spec is judged to be an important requirement",
+        "pre-declared": "the Plan's pre-declared section has content or is malformed"
+      },
       "importantReasons": {
         "multi-module": "per module, in important.reasons (interface 1.15, spec/important-requirement.md): inserted into the capability map in one batch with another module",
         "cross-module": "the Spec's concurrency boundary lists shared file categories, or its exclusive paths overlap another unfinished module's",
@@ -69,6 +75,14 @@
         "deferredTotal": "top level; the sum of every module's deferred items"
       },
       "statusChange": "since 1.12 a formal deferral is not an unchecked item: a module whose only unchecked items are deferrals has status done (before 1.12 in_progress) and its dependents can be ready; progress.total and the stage hint's counts leave deferrals out; status values are unchanged; projects without deferrals see no change"
+    },
+    "codexRoute": {
+      "appearsWhen": "per module, always (interface 1.16, spec/codex-route-guard.md)",
+      "fields": {
+        "spec": "the Spec's approval route: null, takeover, important or pre-declared (see values.codexRoute)",
+        "plan": "the Plan's approval route: null, takeover, important or pre-declared (see values.codexRoute)"
+      },
+      "meaning": "the same module_stage.codex_route(root, module, kind) decision used by reviewMark to refuse codex-approved when nonempty; an empty result is JSON null. Computed even when the Spec or Plan file is missing, independently of its approval marker"
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the git directory holds its Codex acceptance record",

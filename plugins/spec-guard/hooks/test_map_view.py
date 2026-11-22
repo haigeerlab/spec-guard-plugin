@@ -9,7 +9,7 @@ import unittest
 from unittest import mock
 from pathlib import Path
 
-from module_stage import SUSPEND_MARKER
+from module_stage import SUSPEND_MARKER, codex_route
 
 SCRIPT = str(Path(__file__).with_name("map_view.py"))
 PLUGIN_JSON = Path(__file__).resolve().parent.parent / ".claude-plugin" / "plugin.json"
@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "important", "acceptance"}
+               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "important", "acceptance"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -282,6 +282,51 @@ class CodexReviewTest(unittest.TestCase):
             self.assertEqual(data["modules"][0]["reviewApprovedBy"], {"spec": None, "plan": "user"})
             self.assertIsNone(data["modules"][0]["important"])
             self.assertEqual(data["awaitingReview"], [{"id": "a", "kind": "spec", "review": "codex-approved"}])
+
+class CodexRouteTest(unittest.TestCase):
+    """codex-route-guard (AC3): every module exposes the shared Spec/Plan approval decision."""
+
+    def project(self, kind=None, spec="# a\n", plan="# Plan\n"):
+        files = {"spec/a.md": spec, "tasks/a/plan.md": plan,
+                 ".github/autopr/risk-paths.json": json.dumps(
+                     {"schema": "autopilot.risk-paths/v1", "T3": [], "T4": []})}
+        if kind is not None:
+            files[".agent/config.json"] = json.dumps(
+                {"version": 1, "moduleTakeover": {"a": {kind: "codex"}}})
+        return Project([("a", "基础", "—"), ("b", "下游", "a")], ["a", "b"], files)
+
+    def routes(self, project):
+        modules = project.json()["modules"]
+        for module in modules:
+            self.assertEqual(set(module["codexRoute"]), {"spec", "plan"})
+            for kind in ("spec", "plan"):
+                with self.subTest(module=module["id"], kind=kind):
+                    self.assertEqual(module["codexRoute"][kind],
+                                     codex_route(project.root, module["id"], kind) or None)
+        return {module["id"]: module["codexRoute"] for module in modules}
+
+    def test_without_takeover_including_missing_files(self):
+        with self.project() as project:
+            self.assertEqual(self.routes(project), {
+                "a": {"spec": "takeover", "plan": "takeover"},
+                "b": {"spec": "takeover", "plan": "takeover"}})
+
+    def test_spec_with_boundary_is_not_important(self):
+        with self.project("spec", spec="# a\n\n## 并行边界\n\n- 独占：`src/a/`\n") as project:
+            self.assertEqual(self.routes(project)["a"], {"spec": None, "plan": "takeover"})
+
+    def test_spec_without_boundary_is_important(self):
+        with self.project("spec") as project:
+            self.assertEqual(self.routes(project)["a"], {"spec": "important", "plan": "takeover"})
+
+    def test_plan_pre_declaration(self):
+        for declaration, expected in (("- 公共路径：`package.json`\n", "pre-declared"),
+                                      ("- 配置：无\n", "pre-declared"),
+                                      ("- 公共路径：无\n", None)):
+            with self.subTest(declaration=declaration), self.project(
+                    "plan", plan="# Plan\n\n## 预先声明\n\n" + declaration) as project:
+                self.assertEqual(self.routes(project)["a"], {"spec": "takeover", "plan": expected})
+
 
 class DeferralTest(unittest.TestCase):
     """formal-deferral: a module whose only unchecked items are formal deferrals is done; its dependents can start.

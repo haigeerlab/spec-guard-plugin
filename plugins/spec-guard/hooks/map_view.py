@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, effective_review, external_review_state, important,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_route, effective_review, external_review_state, important,
                           file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -39,6 +39,8 @@ ICONS = {"done": "✅", "in_progress": "🔨", "suspended": "⏸", "blocked": "�
 AWAITING = ("pending", "revised", "invalid")
 # interface.json mapView.values.reviewApprovedBy (codex-approval, interface 1.15); null is written as JSON null.
 APPROVED_BY = ("user", "codex", "null")
+# interface.json mapView.values.codexRoute (codex-route-guard, interface 1.16); null is written as JSON null.
+CODEX_ROUTE = ("null", "takeover", "important", "pre-declared")
 REVIEW_WORDS = {"approved": "✔", "codex-approved": "Codex ✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效",
                 "none": "无标记"}
 RESPONSIBILITY_LIMIT = 40
@@ -459,6 +461,7 @@ def build(root: Path) -> dict:
             "blocks": {"count": len(blocks), "ids": blocks},
             "review": _review(root, module),
             "reviewApprovedBy": _approved_by(root, module),
+            "codexRoute": {kind: codex_route(root, module, kind) or None for kind in ("spec", "plan")},
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),

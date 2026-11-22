@@ -45,6 +45,7 @@ def problems(path: Path) -> list:
     for key, expected in (("review", module_stage.REVIEW_STATES),
                           ("externalReview", module_stage.EXTERNAL_REVIEW_STATES),
                           ("reviewApprovedBy", map_view.APPROVED_BY),  # codex-approval: 1.15
+                          ("codexRoute", map_view.CODEX_ROUTE),  # codex-route-guard: 1.16
                           ("importantReasons", module_stage.IMPORTANT_REASONS)):  # important-requirement: 1.15
         got = values.get(key)
         if not isinstance(got, dict) or set(got) != set(expected):
