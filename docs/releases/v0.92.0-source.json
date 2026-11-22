@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.92.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:ed850b3148fd52a114b26b202571f1bcae2f1ab9"
+      },
+      "observedAt": "2026-11-22T08:07:35Z",
+      "evidence": [
+        "result:the v0.92.0 annotated tag resolves to merge commit ed850b3148fd52a114b26b202571f1bcae2f1ab9 (pull request #475); merged==true and main==merge sha were checked before tagging; the CI run on the tagged merge commit succeeded",
+        "result:codex-route-guard (S106 follow-up): review-mark refuses codex-approved before reading the report when codex_route is nonempty (codex-route-takeover/important/pre-declared); /map --json adds codexRoute {spec, plan} (null when Codex may approve); Codex final acceptance records move to the common git directory with legacy fallback; interface 1.15 -> 1.16; Codex wrote Tasks 1-3, Claude verified (mutations red), full verify-and-commit on every commit"
+      ]
+    }
+  ]
+}
