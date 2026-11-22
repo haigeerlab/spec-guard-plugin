@@ -531,8 +531,11 @@ def evidence_release(args):
                       "codex plugin list --json shows spec-guard %s enabled" %
                       (codex["refFrom"], codex["refTo"], codex["upgradedAt"], codex["version"]))
     if isinstance(smoke, dict) and smoke.get("status") == "ok":
-        command = ["/bin/bash", str(args.repo / "evals/codex-plugin-smoke.sh"), "--plugin-id",
-                   "spec-guard@spec-guard-marketplace", "--expected-source", codex["source"]]
+        source = Path(codex["source"])
+        if source.is_relative_to(Path.home()):
+            source = Path("~") / source.relative_to(Path.home())
+        command = ["/bin/bash", "evals/codex-plugin-smoke.sh", "--plugin-id",
+                   "spec-guard@spec-guard-marketplace", "--expected-source", str(source)]
         chatgpt = smoke["chatgpt"]
         if chatgpt["state"] == "unknown":
             desktop_result = "the ChatGPT desktop app restart and main process start time were not verified"

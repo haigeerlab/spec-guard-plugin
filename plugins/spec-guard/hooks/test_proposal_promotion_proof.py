@@ -3,6 +3,7 @@ import copy
 import importlib.util
 import io
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -71,6 +72,16 @@ class PromotionFixture(unittest.TestCase):
     def setUpClass(cls):
         """Build the git fixture once; each test copies it (see setUp)."""
         super().setUpClass()
+        # Inherit these settings in every git subprocess, including the code under test.
+        count = int(os.environ.get("GIT_CONFIG_COUNT") or 0)
+        settings = {"GIT_CONFIG_COUNT": str(count + 2)}
+        for index, (key, value) in enumerate(
+                (("maintenance.auto", "false"), ("gc.auto", "0")), start=count):
+            settings["GIT_CONFIG_KEY_%d" % index] = key
+            settings["GIT_CONFIG_VALUE_%d" % index] = value
+        environment = patch.dict(os.environ, settings)
+        environment.start()
+        cls.addClassCleanup(environment.stop)
         cls._template = Path(tempfile.mkdtemp(prefix="sg-proposal-promotion-template-"))
         try:
             builder = cls("setUp")
@@ -256,6 +267,14 @@ Gamma is separate.
 
 
 class PromotionProofStateTests(PromotionFixture):
+    def test_template_git_background_maintenance_is_disabled(self):
+        for repository in ("seed", "remote.git", "consumer"):
+            for key, expected in (("maintenance.auto", "false"), ("gc.auto", "0")):
+                with self.subTest(repository=repository, key=key):
+                    self.assertEqual(
+                        self.git(self._template / repository, "config", "--get", key).strip(),
+                        expected)
+
     def test_unusable_tracker_or_stage_stops_before_remote_access(self):
         cases = (
             (TrackerRead("absent"), "absent"),

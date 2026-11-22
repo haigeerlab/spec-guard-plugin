@@ -678,6 +678,31 @@ else:
         del after["steps"]["evidence"]
         self.assertEqual(after, before)
 
+    def test_evidence_omits_absolute_repo_and_home_paths(self):
+        record = self.installed_record()
+        home = Path(self.env["HOME"])
+        record["steps"]["prepare"]["asset"] = str(self.repo / "dist/spec-guard-v1.2.3.tar.gz")
+        record["steps"]["prepare"]["notes"] = str(home / "notes.md")
+        record["steps"]["install"]["claude"]["installPath"] = str(home / ".claude/plugins/cache/spec-guard")
+        source = home / ".codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard"
+        record["steps"]["install"]["codex"]["source"] = str(source)
+        self.save_record(record)
+        self.assertEqual(self.smoke()["status"], "ok")
+        self.assertEqual(self.calls()[0], [
+            "smoke", "--plugin-id", "spec-guard@spec-guard-marketplace", "--expected-source", str(source)])
+        result = self.evidence()
+        self.assertEqual(result["status"], "ok")
+        records = self.evidence_records(result["files"])
+        for filename in result["files"]:
+            with self.subTest(filename=Path(filename).name):
+                text = Path(filename).read_text(encoding="utf-8")
+                for path in (self.repo, self.repo.resolve(), home, home.resolve()):
+                    self.assertNotIn(str(path), text)
+        command = shlex.split(records["codex"]["evidence"][0].removeprefix("command:"))
+        self.assertEqual(command[1], "evals/codex-plugin-smoke.sh")
+        self.assertEqual(command[command.index("--expected-source") + 1],
+                         "~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard")
+
     def test_evidence_unverified_codex_for_missing_waiting_or_failed_smoke(self):
         for state in (None, "waiting-on-user", "failed"):
             with self.subTest(state=state):
