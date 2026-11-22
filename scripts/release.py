@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check and prepare a Spec Guard release from its merged commit."""
+"""Check, prepare, publish and install a Spec Guard release from its merged commit."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -239,18 +240,196 @@ def prepare_release(args):
             remove_temporary(directory)
 
 
+def require_step(record, step):
+    steps = record.get("steps")
+    facts = steps.get(step) if isinstance(steps, dict) else None
+    if not isinstance(facts, dict) or facts.get("status") != "ok":
+        refuse(step + "-not-ok", "本机记录中没有成功的 %s，请先完成该步骤。" % step)
+    return facts
+
+
+def publish_release(args):
+    record = read_record(args.version)
+    prepared = require_step(record, "prepare")
+    if not isinstance(prepared.get("asset"), str) or not prepared["asset"]:
+        refuse("asset-changed", "本机记录中没有发布包路径，请重新 prepare。")
+    asset = Path(prepared["asset"])
+    if not asset.is_file() or hashlib.sha256(asset.read_bytes()).hexdigest() != prepared.get("sha256"):
+        refuse("asset-changed", "发布包不存在或 sha256 已改变，请重新 prepare。")
+    tag = "v" + args.version
+    github = record["github"]
+    directory = Path(tempfile.mkdtemp(prefix=TEMP_PREFIX))
+    try:
+        commands = [
+            ["git", "-C", str(args.repo), "tag", "-a", tag, record["mergeCommit"], "-m", tag],
+            ["git", "-C", str(args.repo), "push", args.remote, tag],
+            ["gh", "release", "create", tag, "--repo", github, "--verify-tag", "--title", tag,
+             "--notes-file", prepared["notes"], str(asset)],
+            ["gh", "release", "download", tag, "--repo", github, "-p", asset.name, "-D", str(directory)],
+            ["gh", "api", "repos/%s/releases/latest" % github],
+        ]
+        print("将按顺序执行以下发布命令，并核对回下载 sha256 与 latest 标签：")
+        for command in commands:
+            print(shlex.join(command))
+        if not args.confirm:
+            return {"status": "preview"}
+        for command in commands[:4]:
+            run(command, check=True)
+        digest = hashlib.sha256((directory / asset.name).read_bytes()).hexdigest()
+        if digest != prepared["sha256"]:
+            raise ReleaseError("回下载 sha256 不一致：记录为 %s，下载为 %s。" % (prepared["sha256"], digest))
+        latest = json.loads(run(commands[4], check=True)[1])
+        if not isinstance(latest, dict):
+            raise ReleaseError("GitHub latest Release 数据不是 JSON 对象。")
+        if latest.get("tag_name") != tag:
+            raise ReleaseError("latest Release 标签不符：期望 %s，实际 %s。" % (tag, latest.get("tag_name")))
+        url = latest["html_url"]
+        write_record(record, "publish", {"status": "ok", "tag": tag, "url": url,
+                                         "downloadSha256": digest, "at": utc_now()})
+        print("发布完成，回下载 sha256 与 latest 标签均已核对。")
+        return {"status": "ok", "tag": tag, "url": url}
+    finally:
+        remove_temporary(directory)
+
+
+def codex_ref_change(path, version):
+    """Locate one exact ref line without decoding or normalizing any other bytes."""
+    if not path.is_file():
+        refuse("codex-config-ref", "Codex config.toml 不存在，无法定位 marketplace ref。")
+    lines = path.read_bytes().splitlines(keepends=True)
+    headers = [index for index, line in enumerate(lines)
+               if line.rstrip(b"\r\n") == b"[marketplaces.spec-guard-marketplace]"]
+    if len(headers) != 1:
+        refuse("codex-config-ref", "Codex 配置必须恰好有一个 [marketplaces.spec-guard-marketplace] 节。")
+    start = headers[0] + 1
+    end = next((index for index in range(start, len(lines)) if lines[index].startswith(b"[")), len(lines))
+    matches = [(index, re.fullmatch(rb'ref = "([^"\r\n]*)"', lines[index].rstrip(b"\r\n")))
+               for index in range(start, end)]
+    matches = [(index, match) for index, match in matches if match is not None]
+    if len(matches) != 1:
+        refuse("codex-config-ref", 'Codex marketplace 节内必须恰好有一行 ref = "..."。')
+    index, match = matches[0]
+    previous = match.group(1).decode("utf-8")
+    target = "v" + version
+    ending = lines[index][len(lines[index].rstrip(b"\r\n")):]
+    lines[index] = ('ref = "%s"' % target).encode("utf-8") + ending
+    backup = None
+    if previous != target:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+        backup = state_dir("release") / "backups" / ("config.toml.%s.%s" % (version, timestamp))
+    return b"".join(lines), previous, target, backup
+
+
+def update_codex_config(path, replacement, backup):
+    if backup is None:
+        return
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(path, backup)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".release-", suffix=".tmp", delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(replacement)
+        shutil.copymode(path, temporary)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
+
+
+def compare_plugin(reference, installed, host, ignore_marker=False):
+    """Compare relative file paths and bytes against the extracted release plugin."""
+    if not installed.is_dir():
+        raise ReleaseError("%s 安装目录不存在：%s。" % (host, installed))
+    expected = {path.relative_to(reference): path for path in reference.rglob("*") if path.is_file()}
+    actual = {path.relative_to(installed): path for path in installed.rglob("*")
+              if path.is_file() and not (ignore_marker and path.relative_to(installed) == Path(".in_use"))}
+    missing = expected.keys() - actual.keys()
+    extra = actual.keys() - expected.keys()
+    if missing or extra:
+        raise ReleaseError("%s 安装文件集合不符：缺少 %s；多出 %s。" %
+                           (host, ", ".join(str(path) for path in sorted(missing)) or "无",
+                            ", ".join(str(path) for path in sorted(extra)) or "无"))
+    for relative in sorted(expected):
+        if expected[relative].read_bytes() != actual[relative].read_bytes():
+            raise ReleaseError("%s 安装文件内容不符：%s。" % (host, relative))
+
+
+def install_release(args):
+    record = read_record(args.version)
+    require_step(record, "publish")
+    directory = Path(tempfile.mkdtemp(prefix=TEMP_PREFIX))
+    try:
+        with tarfile.open(record["steps"]["prepare"]["asset"], "r:gz") as archive:
+            extract(archive, directory)
+        reference = directory / ("spec-guard-v" + args.version) / "plugins/spec-guard"
+        if not reference.is_dir():
+            raise ReleaseError("发布包中没有参照插件目录：%s。" % reference)
+        config = args.codex_home / "config.toml"
+        replacement, ref_from, ref_to, backup = codex_ref_change(config, args.version)
+        claude_commands = [["claude", "plugin", "marketplace", "update", "spec-guard-marketplace"],
+                           ["claude", "plugin", "update", "spec-guard@spec-guard-marketplace"]]
+        upgrade = ["codex", "plugin", "marketplace", "upgrade", "spec-guard-marketplace"]
+        print("将更新并核对 Claude 与 Codex 插件：")
+        for command in claude_commands:
+            print(shlex.join(command))
+        print("Codex 配置 %s：ref 从 %s 到 %s；备份：%s。" %
+              (config, ref_from, ref_to, backup if backup is not None else "无需修改或备份"))
+        print(shlex.join(upgrade))
+        if not args.confirm:
+            return {"status": "preview"}
+        for command in claude_commands:
+            run(command, check=True)
+        data = json.loads((args.claude_home / "plugins/installed_plugins.json").read_bytes())
+        plugins = data.get("plugins") if isinstance(data, dict) else None
+        entries = plugins.get("spec-guard@spec-guard-marketplace") if isinstance(plugins, dict) else None
+        claude = entries[0] if isinstance(entries, list) and entries else None
+        if not isinstance(claude, dict):
+            raise ReleaseError("Claude installed_plugins.json 没有 spec-guard 的安装记录。")
+        for field, expected in (("version", args.version), ("gitCommitSha", record["mergeCommit"])):
+            if claude.get(field) != expected:
+                raise ReleaseError("Claude %s 不符：期望 %s，实际 %s。" % (field, expected, claude.get(field)))
+        compare_plugin(reference, Path(claude["installPath"]), "Claude", ignore_marker=True)
+        claude_facts = {"version": claude["version"], "commit": claude["gitCommitSha"],
+                        "updatedAt": claude["lastUpdated"], "installPath": claude["installPath"]}
+        update_codex_config(config, replacement, backup)
+        run(upgrade, check=True)
+        upgraded_at = utc_now()
+        data = json.loads(run(["codex", "plugin", "list", "--json"], check=True)[1])
+        entries = data.get("installed") if isinstance(data, dict) else None
+        codex = next((entry for entry in entries if isinstance(entry, dict) and entry.get("name") == "spec-guard"),
+                     None) if isinstance(entries, list) else None
+        if codex is None:
+            raise ReleaseError("Codex plugin list 中没有 spec-guard 的安装记录。")
+        if codex.get("version") != args.version:
+            raise ReleaseError("Codex version 不符：期望 %s，实际 %s。" % (args.version, codex.get("version")))
+        if codex.get("enabled") is not True:
+            raise ReleaseError("Codex enabled 不是 true。")
+        source = codex["source"]["path"]
+        compare_plugin(reference, Path(source), "Codex")
+        codex_facts = {"version": codex["version"], "source": source, "upgradedAt": upgraded_at,
+                       "backup": str(backup) if backup is not None else None, "refFrom": ref_from, "refTo": ref_to}
+        write_record(record, "install", {"status": "ok", "claude": claude_facts, "codex": codex_facts, "at": utc_now()})
+        print("两侧安装的版本与文件已核对，Claude 更新时间 %s；Codex 升级完成时间 %s。" %
+              (claude_facts["updatedAt"], upgraded_at))
+        return {"status": "ok", "claude": claude_facts, "codex": codex_facts}
+    finally:
+        remove_temporary(directory)
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         refuse("invalid-arguments", "命令参数错误：%s" % message)
 
 
 def parser():
-    result = Parser(description="检查与准备 Spec Guard 发版。")
+    result = Parser(description="检查、准备、发布与安装 Spec Guard 发版。")
     commands = result.add_subparsers(dest="step", required=True)
     result.add_argument("--repo", default=str(ROOT))
     result.add_argument("--remote", default="origin")
     result.add_argument("--github")
-    for step, handler in (("check", check_release), ("prepare", prepare_release)):
+    for step, handler in (("check", check_release), ("prepare", prepare_release),
+                          ("publish", publish_release), ("install", install_release)):
         command = commands.add_parser(step)
         for option in ("--repo", "--remote", "--github"):
             command.add_argument(option, default=argparse.SUPPRESS)
@@ -259,6 +438,11 @@ def parser():
             command.add_argument("--pr", type=int, required=True)
         else:
             command.add_argument("--version", required=True)
+        if step in ("publish", "install"):
+            command.add_argument("--confirm", action="store_true")
+        if step == "install":
+            command.add_argument("--claude-home", type=Path, default=Path.home() / ".claude")
+            command.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
     return result
 
 
