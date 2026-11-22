@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""检查 Git 跟踪的文本文件，阻止写入带本机用户名的路径。"""
+"""检查 Git 跟踪的文本文件，阻止写入本机登录名及用户名路径。"""
+import getpass
 import os
 from pathlib import Path
 import re
@@ -9,6 +10,9 @@ import sys
 ALLOWED_NAMES = frozenset({
     "someone", "user", "username", "name", "me", "you", "example", "...", "$user", "${user}",
 })
+GENERIC_LOGIN_NAMES = frozenset({
+    "runner", "root", "ubuntu", "admin", "user", "vagrant", "ci", "nobody", "buildbot", "jenkins",
+})
 # 分开书写前缀，避免检查器源码本身构成待检查的路径；不豁免任何文件。
 PATH_PATTERNS = (
     re.compile(r"/Users" r"/([^/\r\n]+)/"),
@@ -16,7 +20,20 @@ PATH_PATTERNS = (
 )
 
 
+def login_name_pattern() -> re.Pattern | None:
+    name = os.environ.get("SPEC_GUARD_LOGIN_NAME")
+    if name is None:
+        try:
+            name = getpass.getuser()
+        except Exception:
+            return None
+    if not name or len(name) < 3 or name.lower() in ALLOWED_NAMES | GENERIC_LOGIN_NAMES:
+        return None
+    return re.compile(r"(?<!\w)" + re.escape(name) + r"(?!\w)", re.IGNORECASE)
+
+
 def scan(root: Path) -> list[str]:
+    login_pattern = login_name_pattern()
     tracked = subprocess.check_output(["git", "-C", str(root), "ls-files", "-z"])
     found = []
     for entry in tracked.split(b"\0"):
@@ -37,6 +54,9 @@ def scan(root: Path) -> list[str]:
                     if name.lower() in ALLOWED_NAMES or re.fullmatch(r"<[^<>]+>", name):
                         continue
                     found.append(f"{relative}:{lineno}: {match.group(0)}")
+            if login_pattern is not None:
+                for match in login_pattern.finditer(line):
+                    found.append(f"{relative}:{lineno}: {match.group(0)}")
     return found
 
 
@@ -52,7 +72,7 @@ def main() -> int:
         print("  ❌ " + item)
     if found:
         return 1
-    print("  ✅ Git 跟踪的文本文件中没有带本机用户名的路径")
+    print("  ✅ Git 跟踪的文本文件中没有本机登录名或带本机用户名的路径")
     return 0
 
 
