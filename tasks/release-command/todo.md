@@ -6,7 +6,7 @@
 - [x] Task 3：smoke、evidence 与测试（Codex）
 - [x] Task 4：docs/release-process.md
 - [x] Checkpoint 1（report）：完整检查、变异与本仓库实跑
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -19,3 +19,7 @@
   2. 临时记录里手写 check 通过后 `prepare --version 0.91.3` → `ok`；与已发布的 `spec-guard-v0.91.3.tar.gz` 解压后逐文件一致（186 个文件）。
   3. `publish --version 0.91.3`（不带 `--confirm`）→ `preview`，只打印五条命令。
   4. `install --version 0.91.3`（不带 `--confirm`）→ `preview`；Codex 配置已是 v0.91.3，显示无需修改或备份。
+
+2026-11-22 用户「验收通过」（验收前问过是否要外部审查，用户没有要求）。
+
+<!-- spec-guard: external-review declined -->
