@@ -7,5 +7,3 @@
 - [ ] Task 4：docs/release-process.md
 - [ ] Checkpoint 1（report）：完整检查、变异与本仓库实跑
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
-
-<!-- spec-guard: external-review declined -->
