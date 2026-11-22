@@ -1,6 +1,6 @@
 # Spec: codex-final-acceptance
 
-<!-- spec-guard: review approved b21874eb8d18 -->
+<!-- spec-guard: review approved 58a34e9df4f9 -->
 
 ## Objective
 
@@ -81,3 +81,4 @@ README 中英加「自动接管」一段（从用法草案展开：怎么设档�
 - 2026-11-22（开工前）：按 autopr-design #21981 写定检查证据（本机 `~/.autopilot/evidence/…`、`autopilot.check-evidence/v1`）；验收记录改为写在 git 目录、不进提交，最终 gate 合并后补勾，`/map --json` 报 `acceptance`。
 - 2026-11-22（M3 返工，用户「批准；Q14 A」）：假设 5 加一条——除 HEAD 外，本模块开工前的提交（takeover-scope-check 的默认基线）里的配置也必须是「合并：自动」，否则拒绝；原因是 `.agent/config.json` 改为不算越界后，PR 不能借改配置给自己开自动合并。
 - 2026-11-22（M3 返工，用户「Q15 A」，autopr-design 沙盒演练 2 发现）：基线仍按 Q10 A；接管模块的 `flow` 再加 `.agent/state.json`（`activeModule` 在模块交接时就会改）。约定块所在的 `CLAUDE.md`／`AGENTS.md` 与 `.github/autopr/risk-paths.json` 照旧算越界，应在 Spec 之前单独提交。
+- 2026-11-22（M3 后修订，用户「说完了，开工」，autopr-design #22019）：假设 6 的建议下一步补两句——交 Codex 的任务说明要列出流程文件清单（不算实现范围），并附上 HEAD 检查证据里的命令、退出码、`output_sha256` 与 `tail`；否则 Codex 第 1 轮常因看不到这两点判阻断。spec-guard 仍不调 delegate、不读证据内容。

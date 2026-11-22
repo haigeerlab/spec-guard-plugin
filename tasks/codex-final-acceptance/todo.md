@@ -18,6 +18,10 @@
 - [x] Task 10（M3 第二次返工）：合并自动的模块到最终 gate 时，建议下一步写出本模块开工前的提交号（审查范围的起点）；退役键提醒只有一个键时英文用单数
 - [x] Checkpoint 5（report）：完整检查、变异与临时项目重跑 U2（只有建议的一轮）
 - [x] Checkpoint 6（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.2，用安装版重跑 M3
+- [x] Task 11（M3 后修订）：合并自动的模块到最终 gate 时，建议下一步要求在交 Codex 的任务说明里 (a) 列出流程文件清单（取自 `module_scope.FLOW_FILES`／`FLOW_DIRS`），写明不算实现范围；(b) 附上 HEAD 那份检查证据里每条检查的命令、退出码、`output_sha256` 与 `tail`（中英） — 2026-11-22 用户「0.91.2 后再补」「说完了，开工」，来源 autopr-design #22019；编码交 Codex
+- [x] Task 12（M3 后修订）：规则「批准标记」与说明同步；CHANGELOG 与版本号 0.91.3
+- [x] Checkpoint 7（report）：完整检查、变异
+- [x] Checkpoint 8（gate）：最终验收；通过后推送并开 PR，合并由用户进行；合并后发 0.91.3
 
 ## Checkpoint 1 记录（2026-11-22）
 
@@ -58,3 +62,11 @@
   `codex-approved`、`reviewApprovedBy.plan: codex` → 改 Plan 正文后读作 `revised`、`null`。
 
 2026-11-22 用户「验收通过」（M3 第二次返工，含 codex-approval Spec 的变更记录）。
+
+## Checkpoint 7 记录（2026-11-22，M3 后修订）
+
+- Task 11 由 Codex 实现（`/delegate:run --write`，run 20261122121432.78972，只改 `module_stage.py`、`test-phase-guard.sh` 两个文件，未越界）。
+  Claude 验收：读了实际差异；自己重跑 phase-guard（536 例）与 `test_review_marker` 通过；变异（换回旧版 `module_stage.py`）→ 第 31 段变红，已还原。
+- 每个提交走 verify-and-commit 完整档，全绿。
+
+2026-11-22 用户「验收通过」（M3 后修订，含 Spec 变更记录）。

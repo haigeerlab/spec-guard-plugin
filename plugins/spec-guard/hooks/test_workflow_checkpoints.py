@@ -329,7 +329,8 @@ class CheckpointContractTests(unittest.TestCase):
         for phrase in ("--target acceptance", "检查证据", "git 目录", "不进提交", "HEAD 或其祖先", "合并后补勾", "不要自己验收",
                        "拟回告写进 todo，不发出", "其余模块的最终验收照旧由用户做",
                        # M3 rework (Q14 A): merge must have been auto before the module started.
-                       "开工前就是合并：自动"):
+                       "开工前就是合并：自动",
+                       "任务说明列出流程文件"):  # final-acceptance context (autopr-design #22019)
             self.assertIn(phrase, marks)
         self.assertIn("最终验收交 Codex", self.node_rules("## 最终验收"))
         boundary = self.section("## 并行边界\n")
