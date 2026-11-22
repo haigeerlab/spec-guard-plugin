@@ -22,7 +22,7 @@ from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
 from codex_review import inspect as inspect_report, inspect_check, inspect_final
-from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, effective_review,
+from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
                           file_review_state,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
@@ -272,6 +272,13 @@ def main() -> int:
             print("codex-one-target: a Codex round is recorded for one file at a time (--target spec or plan)")
             return 2
         kind = kinds[0]
+        if args.state == "codex-approved":
+            route = codex_route(root, module_id, kind)
+            if route:
+                print("codex-route-%s: %s requires the user's approval under the module's takeover settings; "
+                      "record this round with --state codex-reviewed, then have the user approve it with --state approved."
+                      % (route, relative[kind]))
+                return 2
         updated, message = _codex(root, relative[kind], kind, args.state, args.review, before[kind])
         print(message)
         if updated is None:
