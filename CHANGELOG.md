@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.92.0] - 2026-11-22
+
+codex-route-guard（S106 后续）：Codex 批准与验收的兜底与共享。接口 1.15 → 1.16。
+
+### 变更
+
+- **写 Codex 批准之前先按接管设置判定。** `review-mark --state codex-approved` 在读审查报告之前先跑 `codex_route`：模块接管没把这一步给 Codex、
+  Spec 判为重要需求、或 Plan 的「预先声明」有内容（或格式不对）时拒绝，原因码 `codex-route-takeover`／`codex-route-important`／`codex-route-pre-declared`，
+  文件不动；改用 `--state codex-reviewed` 记下这一轮，交用户批。原来只靠调用方自己照抄规则，抄错就会写出一个本该人批的 codex-approved。
+- **`/map --json` 每个模块加 `codexRoute`。** `{"spec", "plan"}` 两项，`null` 表示 Codex 可以批，否则为上面三种原因之一；与兜底检查是同一个判定，
+  其他插件直接读它，不必再抄规则。
+- **Codex 最终验收记录改放公共 git 目录。** 在 linked worktree 里记的验收，主 checkout 和其他 worktree 的 `/map --json` 与阶段提示也读得到；
+  最终 gate 仍只在记录的提交是本 checkout 的 HEAD 或其祖先时算已过。旧位置的记录照样读，新位置优先，不迁移、不删除。
+
 ## [0.91.3] - 2026-11-22
 
 codex-final-acceptance 的 M3 后修订（autopr-design 沙盒演练 2 发现）。接口不变（interface 1.15）。

@@ -111,6 +111,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 每次都在「外部审查意见」一节追加一行轮次；`codex-approved` 要求本轮没有阻断，并写 `<!-- spec-guard: review codex-approved <digest> -->`；
 有阻断用 `codex-reviewed` 只记这一轮，改完再审。两轮仍有阻断后两种都拒绝，交用户批（`--state approved`）。Codex 的批准不是用户的批准：
 档位不允许、或 Plan 的「预先声明」有内容时，阶段提示把它当作待用户批准。
+档位不允许、Spec 判为重要需求、或 Plan 的「预先声明」有内容（或格式不对）时，`codex-approved` 在读报告之前就拒绝（`codex-route-takeover`／`codex-route-important`／`codex-route-pre-declared`），什么都不写；改用 `codex-reviewed` 记下这一轮，交用户批。同一判定见 `/map --json` 每个模块的 `codexRoute`。
 
 ## Codex 最终验收（合并：自动）
 
@@ -122,7 +123,7 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 ```
 
 三样（审查无阻断且审到 HEAD、Spec 与工作区一致；检查由非作者在 HEAD 上跑、全部退出 0；两者都是 HEAD）缺一，或有越界文件，就拒绝并写明原因。
-加 `--confirm` 才写：记录写在 git 目录的 `spec-guard/acceptance/<id>.json`（不被跟踪、不进提交），报告路径存为绝对路径。
+加 `--confirm` 才写：记录写在公共 git 目录（`git rev-parse --git-common-dir`）的 `spec-guard/acceptance/<id>.json`（不被跟踪、不进提交），在 linked worktree 里记的，主 checkout 和其他 worktree 也读得到；0.92.0 之前写在本 worktree git 目录里的旧记录照样认，报告路径存为绝对路径。
 todo 里的最终 gate 现在不勾：记录的提交是 HEAD 或其祖先时阶段提示当它已过，合并后补勾并写一句来源。拟回告写进 todo，不发出。
 合并不是 auto 的模块被拒绝，最终验收照旧由用户做；本模块开工前的提交里合并还不是 auto（开工后才放宽）的也拒绝（`acceptance-not-auto-at-base`），
 免得补丁靠改 `.agent/config.json` 给自己开自动合并。
