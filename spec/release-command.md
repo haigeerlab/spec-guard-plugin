@@ -47,7 +47,7 @@
 
 - **C1** `scripts/release.py`：六个子命令（假设 1～5），共用本机记录（假设 3）与输出格式（假设 2）。
 - **C2** `scripts/test_release.py`：用临时 git 仓库与 `PATH` 里的假 `gh`／`claude`／`codex` 跑各子命令，不碰网络与真实宿主；在 `scripts/validate.sh` 登记。
-- **C3** 文档：`docs/release-process.md`、`docs/maintainer-workflow.md`（如有发版段落）改为调用命令。
+- **C3** 文档：`docs/release-process.md` 改为调用命令。
 
 ## Acceptance criteria
 
@@ -67,7 +67,7 @@
 
 ## 并行边界
 
-- 独占：`spec/release-command.md`、`tasks/release-command/`、`scripts/release.py`、`scripts/test_release.py`、`scripts/validate.sh`、`docs/release-process.md`、`docs/maintainer-workflow.md`
+- 独占：`spec/release-command.md`、`tasks/release-command/`、`scripts/release.py`、`scripts/test_release.py`、`scripts/validate.sh`、`docs/release-process.md`
 - 公共：无
 
 ## 文档建议
