@@ -219,7 +219,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
                  "status": "success", "value": {"projectId": "project", "stateBranch": "__epiq_state__"},
              }) as mcp_call:
             payload = local_ledger_runtime.initialize_project(
-                self.runtime_dir, self.project_dir, "Vilin", "code --wait", False, **kwargs)
+                self.runtime_dir, self.project_dir, "Tester", "code --wait", False, **kwargs)
         return payload, check, mcp_call
 
     LOCAL_ONLY_PREFLIGHT = (0, {"state": "ready", "projectDir": "/repo", "origin": "https://example.invalid/r.git",
@@ -496,10 +496,10 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
 
     def test_project_init_arguments_pass_only_the_given_user_setup_values(self):
         arguments = local_ledger_runtime.project_init_arguments(
-            self.project_dir, " Vilin ", "code --wait", False)
+            self.project_dir, " Tester ", "code --wait", False)
         self.assertEqual(arguments, {
             "repoRoot": str(self.project_dir),
-            "userName": "Vilin",
+            "userName": "Tester",
             "preferredEditor": "code --wait",
             "autoSync": False,
         })
@@ -539,7 +539,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
                            "warnings": ["[init:15] do not print this", "[init:15] nor this", "no code here"]},
              }) as mcp_call:
             payload = local_ledger_runtime.initialize_project(
-                self.runtime_dir, self.project_dir, "Vilin", "code --wait", False,
+                self.runtime_dir, self.project_dir, "Tester", "code --wait", False,
             )
         self.assertEqual(payload, {
             "state": "initialized", "projectId": "project", "stateBranch": "__epiq_state__",
@@ -548,7 +548,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         })
         self.assertNotIn("print this", json.dumps(payload))
         self.assertEqual(mcp_call.call_args.args[1], "epiq_project_init")
-        self.assertEqual(mcp_call.call_args.args[2]["userName"], "Vilin")
+        self.assertEqual(mcp_call.call_args.args[2]["userName"], "Tester")
 
     def test_initialize_refuses_before_starting_mcp_when_origin_has_not_been_confirmed(self):
         with patch("local_ledger_runtime.initialization_preflight", return_value=(1, {
@@ -556,7 +556,7 @@ class LocalLedgerRuntimeTests(unittest.TestCase):
         })), patch("local_ledger_runtime.mcp_tool_call") as mcp_call:
             with self.assertRaisesRegex(local_ledger_runtime.RuntimeContractError, "push-confirmation-required"):
                 local_ledger_runtime.initialize_project(
-                    self.runtime_dir, self.project_dir, "Vilin", "code --wait", False,
+                    self.runtime_dir, self.project_dir, "Tester", "code --wait", False,
                 )
         mcp_call.assert_not_called()
 
