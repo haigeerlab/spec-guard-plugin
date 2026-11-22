@@ -397,8 +397,65 @@ class CodexMarks(unittest.TestCase):
     def mark(self, project, state, report, kind="spec"):
         return project.run("--module", "alpha", "--target", kind, "--state", state, "--review", report, "--confirm")
 
+    def allow_codex(self, project, kind="spec"):
+        import json
+        (project.root / ".agent").mkdir()
+        (project.root / ".agent" / "config.json").write_text(
+            json.dumps({"version": 1, "takeover": {kind: "codex"}}), encoding="utf-8")
+        if kind == "spec":
+            not_important(project)
+
+    def test_codex_approval_without_takeover_refuses_before_reading_report(self):
+        for kind in ("spec", "plan"):
+            with self.subTest(kind=kind), Project() as project:
+                before = (project.spec.read_bytes(), project.plan.read_bytes())
+                for report in (self.report(project, kind=kind), str(project.root / "missing.json")):
+                    for confirm in ((), ("--confirm",)):
+                        code, out = project.run("--module", "alpha", "--target", kind, "--state", "codex-approved",
+                                                "--review", report, *confirm)
+                        self.assertEqual(code, 2, out)
+                        self.assertTrue(out.startswith("codex-route-takeover: "), out)
+                        self.assertEqual(len(out.splitlines()), 1, out)
+                        self.assertIn("--state codex-reviewed", out)
+                        self.assertIn("--state approved", out)
+                        self.assertEqual((project.spec.read_bytes(), project.plan.read_bytes()), before)
+
+    def test_codex_approval_of_important_spec_refuses(self):
+        with Project() as project:
+            self.allow_codex(project)
+            project.spec.write_text(SPEC, encoding="utf-8")  # no boundary: important-requirement
+            before = project.spec.read_bytes()
+            for confirm in ((), ("--confirm",)):
+                code, out = project.run("--module", "alpha", "--target", "spec", "--state", "codex-approved",
+                                        "--review", self.report(project), *confirm)
+                self.assertEqual(code, 2, out)
+                self.assertTrue(out.startswith("codex-route-important: "), out)
+                self.assertEqual(project.spec.read_bytes(), before)
+
+    def test_codex_approval_of_pre_declared_plan_refuses(self):
+        with Project() as project:
+            self.allow_codex(project, "plan")
+            project.plan.write_text("# Plan: alpha\n\n## 预先声明\n\n- 公共路径：`package.json`\n", encoding="utf-8")
+            before = project.plan.read_bytes()
+            for confirm in ((), ("--confirm",)):
+                code, out = project.run("--module", "alpha", "--target", "plan", "--state", "codex-approved",
+                                        "--review", self.report(project, kind="plan"), *confirm)
+                self.assertEqual(code, 2, out)
+                self.assertTrue(out.startswith("codex-route-pre-declared: "), out)
+                self.assertEqual(project.plan.read_bytes(), before)
+
+    def test_codex_review_without_takeover_still_records_a_round(self):
+        for kind in ("spec", "plan"):
+            with self.subTest(kind=kind), Project() as project:
+                code, out = self.mark(project, "codex-reviewed", self.report(project, kind=kind), kind=kind)
+                self.assertEqual(code, 0, out)
+                text = (project.spec if kind == "spec" else project.plan).read_text(encoding="utf-8")
+                self.assertIn("round=1 blocking=0", text)
+                self.assertEqual(review_state(text, kind), "none")
+
     def test_clean_review_records_round_and_codex_approval(self):
         with Project() as project:
+            self.allow_codex(project)
             code, out = self.mark(project, "codex-approved", self.report(project))
             self.assertEqual(code, 0, out)
             text = project.spec.read_text(encoding="utf-8")
@@ -411,6 +468,7 @@ class CodexMarks(unittest.TestCase):
     def test_reasons_under_external_review_keep_the_codex_approval(self):
         # M3 second rework: the rule asks for a reason per suggestion in that section; writing it must not void the approval.
         with Project() as project:
+            self.allow_codex(project)
             self.assertEqual(self.mark(project, "codex-approved", self.report(project, severities=("suggestion",)))[0], 0)
             text = project.spec.read_text(encoding="utf-8")
             project.spec.write_text(text + "- 建议一：采纳，已在 Task 1 写明。\n", encoding="utf-8")
@@ -428,6 +486,7 @@ class CodexMarks(unittest.TestCase):
 
     def test_blocking_round_is_recorded_not_approved(self):
         with Project() as project:
+            self.allow_codex(project)
             report = self.report(project, severities=("blocking", "suggestion"))
             code, out = self.mark(project, "codex-approved", report)
             self.assertEqual(code, 2, out)
@@ -443,6 +502,7 @@ class CodexMarks(unittest.TestCase):
 
     def test_two_blocking_rounds_hand_it_to_the_user(self):
         with Project() as project:
+            self.allow_codex(project)
             for _ in range(2):
                 self.assertEqual(self.mark(project, "codex-reviewed", self.report(project, severities=("blocking",)))[0], 0)
             for state, severities in (("codex-reviewed", ("blocking",)), ("codex-approved", ())):
@@ -454,6 +514,7 @@ class CodexMarks(unittest.TestCase):
 
     def test_bad_reports_write_nothing(self):
         with Project() as project:
+            self.allow_codex(project)
             before = project.spec.read_text(encoding="utf-8")
             for report in (self.report(project, outcome="inconclusive"), str(project.root / "missing.json")):
                 code, out = self.mark(project, "codex-approved", report)
@@ -477,6 +538,7 @@ class CodexMarks(unittest.TestCase):
 
     def test_plan_too(self):
         with Project() as project:
+            self.allow_codex(project, "plan")
             code, out = self.mark(project, "codex-approved", self.report(project, kind="plan"), kind="plan")
             self.assertEqual(code, 0, out)
             self.assertEqual(review_state(project.plan.read_text(encoding="utf-8"), "plan"), "codex-approved")
@@ -749,6 +811,87 @@ class Acceptance(AcceptanceFixture):
         report = self.report()
         self.evidence()
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
+
+
+class AcceptanceWorktrees(AcceptanceFixture):
+    """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""
+
+    def setUp(self):
+        super().setUp()
+        self.main = self.root.resolve()
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        linked = Path(folder.name) / "linked"
+        self.git("worktree", "add", "--detach", str(linked))
+        self.root = linked
+        self.common_record = self.main / ".git" / "spec-guard" / "acceptance" / "alpha.json"
+        self.legacy_record = Path(self.git("rev-parse", "--git-path", "spec-guard/acceptance/alpha.json"))
+        self.assertNotEqual(self.common_record, self.legacy_record)
+
+    def write_record(self, path, sha):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.json.dumps({"marker": "codex-approved", "sha": sha, "module": "alpha"}),
+                        encoding="utf-8")
+
+    def test_linked_acceptance_is_shared_and_gate_still_requires_ancestry(self):
+        from module_stage import acceptance_path, acceptance_record, final_gate_accepted
+        self.git("commit", "--allow-empty", "-qm", "linked acceptance")
+        self.head = self.git("rev-parse", "HEAD")
+        self.evidence()
+        code, out = self.accept(self.report(), "--confirm")
+        self.assertEqual(code, 0, out)
+        expected = {"marker": "codex-approved", "sha": self.head}
+        self.assertEqual(acceptance_record(self.main, "alpha"), expected)
+        self.assertEqual(acceptance_path(self.main, "alpha"), self.common_record)
+        self.assertEqual(acceptance_path(self.root, "alpha"), self.common_record)
+        self.assertIn("recorded codex-approved acceptance: %s" % self.common_record, out)
+        self.assertFalse(self.legacy_record.exists())
+        self.assertEqual(self.json.loads(self.common_record.read_text(encoding="utf-8"))["sha"], self.head)
+        done = subprocess.run([sys.executable, "-B", str(Path(SCRIPT).with_name("map_view.py")),
+                               "--project", str(self.main), "--json"], capture_output=True, text=True,
+                              timeout=30, env=self.env)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        module = next(item for item in self.json.loads(done.stdout)["modules"] if item["id"] == "alpha")
+        self.assertEqual(module["acceptance"], expected)
+        todo = "- [x] implementation\n- [ ] Checkpoint 1（gate）：最终验收\n"
+        self.assertFalse(final_gate_accepted(self.main, "alpha", todo))
+        self.git("-C", str(self.main), "merge", "--ff-only", self.head)
+        self.assertTrue(final_gate_accepted(self.main, "alpha", todo))
+        self.git("-C", str(self.main), "commit", "--allow-empty", "-qm", "after acceptance")
+        self.assertNotEqual(self.git("-C", str(self.main), "rev-parse", "HEAD"), self.head)
+        self.assertTrue(final_gate_accepted(self.main, "alpha", todo))
+
+    def test_legacy_record_is_read_without_migration(self):
+        from module_stage import acceptance_record
+        self.write_record(self.legacy_record, self.head)
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
+        self.assertFalse(self.common_record.exists())
+
+    def test_common_record_takes_priority_and_writing_preserves_legacy(self):
+        from module_stage import acceptance_record
+        legacy_sha = self.git("rev-parse", "HEAD~1")
+        self.write_record(self.legacy_record, legacy_sha)
+        legacy = self.legacy_record.read_bytes()
+        self.write_record(self.common_record, self.head)
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
+        self.evidence()
+        code, out = self.accept(self.report(), "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.legacy_record.read_bytes(), legacy)
+
+    def test_invalid_common_records_fall_back_to_legacy(self):
+        from module_stage import acceptance_record
+        self.write_record(self.legacy_record, self.head)
+        self.common_record.parent.mkdir(parents=True)
+        for text in ("{", "[]", "\ufffd", self.json.dumps({"marker": "approved", "sha": self.head, "module": "alpha"}),
+                     self.json.dumps({"marker": "codex-approved", "sha": "invalid", "module": "alpha"}),
+                     self.json.dumps({"marker": "codex-approved", "sha": self.head, "module": "beta"})):
+            with self.subTest(text=text):
+                self.common_record.write_text(text, encoding="utf-8")
+                self.assertEqual(acceptance_record(self.root, "alpha"),
+                                 {"marker": "codex-approved", "sha": self.head})
+        self.common_record.write_bytes(b"\xff")
+        self.assertEqual(acceptance_record(self.root, "alpha"), {"marker": "codex-approved", "sha": self.head})
 
 
 class AcceptanceWidenedLater(AcceptanceFixture):
