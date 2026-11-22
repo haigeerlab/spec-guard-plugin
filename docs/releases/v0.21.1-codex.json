@@ -29,7 +29,7 @@
       "observedAt": "2026-09-28T05:45:57Z",
       "evidence": [
         "change:the user re-trusted the spec-guard UserPromptSubmit hook in Codex /hooks; trusted_hash changed from sha256:71f34386… to sha256:20361c94…",
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:a real Codex CLI session in a temporary consumer project restated the injected stage (当前阶段：IDLE) and the smoke exited 0",
         "note:the first run after re-trust exited 2 only because the grader required an ASCII colon; the reply used a full-width colon. The grader was fixed to accept both before this run",
         "result:the run left no temporary project trust entry in the Codex config",

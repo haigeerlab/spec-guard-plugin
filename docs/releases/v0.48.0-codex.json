@@ -27,7 +27,7 @@
       },
       "observedAt": "2026-10-06T11:15:00Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard",
         "result:the first run exited 2 because the Codex login had expired (refresh_token_invalidated); after the user signed in again the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
         "host:codex-cli 0.160.0"
       ]

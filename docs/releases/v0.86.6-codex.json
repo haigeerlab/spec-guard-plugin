@@ -13,7 +13,7 @@
       },
       "observedAt": "2026-11-04T11:45:39Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
         "result:the marketplace ref moved from v0.86.5 to v0.86.6; codex plugin marketplace upgrade spec-guard-marketplace exited 0; the marketplace snapshot is at the tag commit and its plugins/spec-guard and .claude-plugin/marketplace.json are identical to the release asset",
         "result:codex-cli 0.166.0: a freshly started CLI reported 6 new or changed hooks; the user approved them there and /hooks then showed SessionStart 5/5 and UserPromptSubmit 2/2 active (the 3 hooks still under review are PreToolUse and SessionEnd, which spec-guard does not install)",
         "result:the smoke then exited 0 on its first run (spec-guard phase injection found in the session's machine record)"

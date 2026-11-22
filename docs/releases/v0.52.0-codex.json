@@ -27,7 +27,7 @@
       },
       "observedAt": "2026-10-08T01:50:00Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
         "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection (a first run started without </dev/null hung in codex exec on an inherited non-TTY stdin and was stopped; that is the invocation, not the plugin)",
         "host:codex-cli 0.160.0"
       ]

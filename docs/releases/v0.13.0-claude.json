@@ -15,7 +15,7 @@
       "evidence": [
         "command:claude plugin marketplace update spec-guard-marketplace",
         "command:claude plugin update spec-guard@spec-guard-marketplace -y",
-        "installed-cache:/Users/vilin/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.13.0",
+        "installed-cache:~/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.13.0",
         "result:installed_plugins.json reports spec-guard@spec-guard-marketplace version 0.13.0, gitCommitSha 257b6fd, scope user, enabled"
       ]
     },

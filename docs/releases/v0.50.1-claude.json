@@ -29,7 +29,7 @@
       "evidence": [
         "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p \"/spec-guard:phase\" --model sonnet in this repository's worktree; codex is not on that PATH",
         "command:PATH=$HOME/.local/bin:/usr/bin:/bin claude -p \"/spec-guard:collaboration\" --model sonnet, same worktree",
-        "result:in both session transcripts the command text carries ROOT=\"/Users/vilin/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.50.1\" substituted by the host; phase ran the installed hook and reported BUILDING, collaboration ran the installed agent_relay_probe.py (not-installed) and relayed it; neither exited 2, where 0.50.0 exited 2 in the same setting",
+        "result:in both session transcripts the command text carries ROOT=\"~/.claude/plugins/cache/spec-guard-marketplace/spec-guard/0.50.1\" substituted by the host; phase ran the installed hook and reported BUILDING, collaboration ran the installed agent_relay_probe.py (not-installed) and relayed it; neither exited 2, where 0.50.0 exited 2 in the same setting",
         "result:the same substitution was seen before release in an interactive session (tmux, typed slash command) with a probe plugin: only the exact token is substituted, the `:-` form stays literal, and the Bash environment has neither variable",
         "host:Claude Code 2.1.291"
       ]

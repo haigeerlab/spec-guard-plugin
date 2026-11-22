@@ -28,7 +28,7 @@
       "observedAt": "2026-09-09T15:57:18Z",
       "evidence": [
         "command:codex plugin list --available --json",
-        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.10.0"
+        "installed-cache:~/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.10.0"
       ]
     },
     {

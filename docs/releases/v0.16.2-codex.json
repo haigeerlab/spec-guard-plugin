@@ -13,7 +13,7 @@
       "evidence": [
         "command:codex plugin marketplace add https://github.com/yizhongkaimail-collab/spec-guard-plugin.git --ref v0.16.2 --json",
         "command:codex plugin add spec-guard@spec-guard-marketplace --json",
-        "installed-cache:/Users/vilin/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.2",
+        "installed-cache:~/.codex/plugins/cache/spec-guard-marketplace/spec-guard/0.16.2",
         "result:codex plugin list reports spec-guard@spec-guard-marketplace 0.16.2 installed and enabled; direct cached phase-guard read-only check exited 0"
       ]
     },

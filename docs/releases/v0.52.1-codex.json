@@ -27,7 +27,7 @@
       },
       "observedAt": "2026-10-08T05:30:00Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
         "result:the smoke exited 0 and its machine session record contained a valid Spec Guard phase injection",
         "host:codex-cli 0.160.0"
       ]

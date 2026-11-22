@@ -13,7 +13,7 @@
       },
       "observedAt": "2026-11-19T17:51:20Z",
       "evidence": [
-        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source /Users/vilin/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source ~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard </dev/null",
         "result:the marketplace ref moved from v0.89.0 to v0.90.0; codex plugin marketplace upgrade spec-guard-marketplace exited 0; the marketplace snapshot is at the tag commit and its plugins/spec-guard and .claude-plugin/marketplace.json are identical to the release asset; codex plugin list --json shows spec-guard 0.90.0 enabled with the expected source.path",
         "result:codex-cli 0.170.0: in a fresh CLI tab the user reviewed the hooks (9 new or changed across installed plugins) and approved spec-guard's",
         "result:the smoke then exited 0 on its first run (spec-guard phase injection found in the session's machine record); the ChatGPT desktop app was restarted after both installs (its main process started 2026-11-20 01:56:14 +08, after the 17:49Z installs; process start time checked with ps), so it loads 0.90.0; a spec-guard injection inside the desktop app was not observed here"
