@@ -1,6 +1,6 @@
 # Spec: codex-approval
 
-<!-- spec-guard: review approved a37ff55fb207 -->
+<!-- spec-guard: review approved 0d562acef1cb -->
 
 ## Objective
 
@@ -92,3 +92,7 @@
 
 改 `commands/review-mark.md`、`skills/spec-guard-ops/SKILL.md`（review-mark 一节）、`docs/commands.md`、`docs/workflow.md`（批准一段加接管档位下谁批）。
 CHANGELOG 与 README 在最后一个模块统一写。项目没有文档基线。
+
+## 变更记录
+
+- 2026-11-22（codex-final-acceptance 的 M3 第二次返工，用户「M3 不通过，追加修复」）：假设 4 的指纹对 `codex-approved` 不算「外部审查意见」一节——假设 5 要求在那一节给建议写理由，原来写完就读作「批准后已修订」。0.91.0／0.91.1 按整份正文记下的旧指纹照样认。

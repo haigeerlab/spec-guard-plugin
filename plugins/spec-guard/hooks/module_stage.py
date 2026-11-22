@@ -95,6 +95,24 @@ def review_digest(text: str) -> str:
     return _DIGEST_MODULE.text_digest(review_body(text))
 
 
+def review_codex_digest(text: str) -> str:
+    """codex-approval (M3 second rework): `review_digest` without the external review section.
+
+    The rule asks for a reason per Codex suggestion in that section, after the approval; it records the review, it is
+    not what Codex approved.  The section runs from its heading to the next `## ` heading.
+    """
+    kept, inside = [], False
+    for line in text.splitlines(keepends=True):
+        if EXTERNAL_REVIEW_HEADING.match(line.rstrip("\r\n")):
+            inside = True
+            continue
+        if inside and line.startswith("## "):
+            inside = False
+        if not inside:
+            kept.append(line)
+    return review_digest("".join(kept))
+
+
 def review_state(text: str, kind: str) -> str:
     """`none`, `pending`, `approved`, `revised` (Spec only) or `invalid`; `kind` is `spec` or `plan`."""
     markers = _review_split(text)[0]
@@ -106,7 +124,8 @@ def review_state(text: str, kind: str) -> str:
         return "pending"
     codex = REVIEW_CODEX_DIGEST.fullmatch(markers[0])
     if codex:
-        return "codex-approved" if codex.group(1) == review_digest(text) else "revised"
+        # 0.91.0/0.91.1 wrote the digest of the whole text; it still counts.
+        return "codex-approved" if codex.group(1) in (review_codex_digest(text), review_digest(text)) else "revised"
     if kind == "plan":
         return "approved" if markers[0] == REVIEW_APPROVED else "invalid"
     match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0])
@@ -1377,19 +1396,24 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
     if module_takeover(root, module)[0].get("merge") != "auto":
         return None, ""
     entry = "--target acceptance --state codex-approved --review <report>"
+    from module_scope import default_base  # late: module_scope imports this module
+    base = default_base(root, module)
+    # M3 second rework: name the start of the review range instead of leaving the agent to work it out.
+    start_zh = "（`%s`，即 `--base %s`）" % (base[:12], base[:12]) if base else ""
+    start_en = "`%s` (the commit before this module; `--base %s`)" % (base[:12], base[:12]) if base else "the commit before this module"
     if zh:
-        return ("acceptance", "auto"), (
-            "本模块合并是自动的，最终验收交 Codex：用 `/delegate:review`（后端 codex）审本模块开工前的提交到 HEAD 的补丁，"
+        return ("acceptance", "auto", base), (
+            "本模块合并是自动的，最终验收交 Codex：用 `/delegate:review`（后端 codex）审本模块开工前的提交%s到 HEAD 的补丁，"
             "`--spec spec/%s.md`，报告存到仓库外；等 autopilot 在 HEAD 上的检查证据；两样齐了、工作区干净，用 %s（%s）"
             "记下验收，记录在 git 目录里、不进提交，最终 gate 合并后再补勾。缺任一样、或被拒绝，就停下等用户，不要自己验收。"
-            "拟回告写进 todo，不发出，等用户确认。" % (module, cmd["review-mark"], entry))
-    return ("acceptance", "auto"), (
-        "this module merges automatically, so Codex does the final acceptance: review the patch from the commit before "
-        "this module to HEAD with `/delegate:review` (backend codex) and `--spec spec/%s.md`, saving the report outside "
+            "拟回告写进 todo，不发出，等用户确认。" % (start_zh, module, cmd["review-mark"], entry))
+    return ("acceptance", "auto", base), (
+        "this module merges automatically, so Codex does the final acceptance: review the patch from %s to HEAD with "
+        "`/delegate:review` (backend codex) and `--spec spec/%s.md`, saving the report outside "
         "the repository; wait for autopilot's check evidence on HEAD; with both and a clean working tree, record the "
         "acceptance with %s (%s) -- the record stays in the git directory, uncommitted, and the final gate is ticked "
         "after the merge. If either is missing or it is refused, stop and wait for the user; never accept it yourself. "
-        "Write the drafted reply into the todo and do not send it until the user confirms." % (module, cmd["review-mark"], entry))
+        "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, cmd["review-mark"], entry))
 
 
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:

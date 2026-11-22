@@ -24,7 +24,7 @@ from capability_map import MODULE_ID, MapError, parse_map
 from codex_review import inspect as inspect_report, inspect_check, inspect_final
 from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, effective_review,
                           file_review_state,
-                          review_approved_line, review_body, review_codex_line, review_digest, review_marker_lines,
+                          review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
 from tracker_default import _write_atomic
 
@@ -112,7 +112,7 @@ def _codex(root: Path, relative: str, kind: str, state: str, report: str | None,
         len(rounds) + 1, found["blocking"], found["sha256"][:12])
     updated = _with_round(text, line)
     if state == "codex-approved":
-        updated = _with_marker(updated, review_codex_line(review_digest(_with_marker(updated, REVIEW_PENDING))))
+        updated = _with_marker(updated, review_codex_line(review_codex_digest(_with_marker(updated, REVIEW_PENDING))))
     note = ("round %d: %d blocking, %d suggestion(s). Codex's review is not the user's approval: it counts only where "
             "the module's takeover gives this step to codex." % (len(rounds) + 1, found["blocking"], found["suggestions"]))
     return updated, note

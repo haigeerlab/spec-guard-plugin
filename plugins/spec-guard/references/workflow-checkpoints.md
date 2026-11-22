@@ -174,7 +174,7 @@ Spec 交给 Codex 的模块，没写并行边界或清单读不到也按重要�
   用 /delegate:review（后端 codex）审这个文件，把标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下，否则越界检查会把它当成改动），再用 `review-mark --state codex-approved --review <文件>` 记下；
   spec-guard 只认完成且有结论的 Codex 报告，按 `scope.files` 的内容 sha256 核对被审文件就是工作区这一份，缺严重程度的意见按阻断。
   有阻断就用 `--state codex-reviewed` 记下这一轮、改完再审；两轮仍有阻断就停下交用户，之后只能由用户批。建议类意见由 agent 决定是否采纳，
-  在「外部审查意见」一节逐条写一句理由。Codex 不可用时停下等，不要自己审自己。审查报告不是用户的批准：档位不允许、或 Plan 的「预先声明」
+  在「外部审查意见」一节逐条写一句理由（这一节不算进 Codex 批准的指纹，写理由不会让批准失效）。Codex 不可用时停下等，不要自己审自己。审查报告不是用户的批准：档位不允许、或 Plan 的「预先声明」
   有内容时，`codex-approved` 读作待用户批准。
 - **合并自动的模块由 Codex 做最终验收**：模块档位里合并是 auto 时，到最终 gate 用 /delegate:review（后端 codex）审本模块开工前的提交到
   HEAD 的补丁（`--spec spec/<id>.md`，报告存仓库外），再等 autopilot 在 HEAD 上的检查证据（非作者跑、全部退出 0）；两样齐了、工作区干净、

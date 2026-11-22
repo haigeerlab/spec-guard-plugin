@@ -3173,14 +3173,17 @@ $(run "$fp" | context_of)"
 echo "  ✅ 合并不是自动的模块，验收记录不起作用、输出逐字不变"; PASS=$((PASS + 1))
 fx="$WORK/final-auto"; fa "$fx" '{"version": 1, "takeover": {"merge": "auto"}}'
 out="$(run "$fx" | context_of)"
+start="$(git -C "$fx" rev-parse HEAD~1)"
 grep -F 'Codex does the final acceptance' >/dev/null <<<"$out" && grep -F -- '--target acceptance' >/dev/null <<<"$out" &&
+  grep -F "from \`${start:0:12}\` (the commit before this module; \`--base ${start:0:12}\`)" >/dev/null <<<"$out" &&
   grep -F 'never accept it yourself' >/dev/null <<<"$out" || fail "合并自动的模块到最终 gate 应交 Codex 验收
 $out"
 # 配置改动不提交会被越界检查算作越界；这里只换提示语言，让 git 不把它当改动。
 printf '{"version": 1, "artifactLanguage": "zh-CN", "takeover": {"merge": "auto"}}\n' > "$fx/.agent/config.json"
 git -C "$fx" update-index --assume-unchanged .agent/config.json
 out="$(run "$fx" | context_of)"
-grep -F '最终验收交 Codex' >/dev/null <<<"$out" && grep -F '不要自己验收' >/dev/null <<<"$out" || fail "中文同样交 Codex 验收
+grep -F '最终验收交 Codex' >/dev/null <<<"$out" && grep -F '不要自己验收' >/dev/null <<<"$out" &&
+  grep -F "（\`${start:0:12}\`，即 \`--base ${start:0:12}\`）" >/dev/null <<<"$out" || fail "中文同样交 Codex 验收
 $out"
 echo "  ✅ 合并自动的模块到最终 gate 时交 Codex 验收（中英）"; PASS=$((PASS + 1))
 record "$fx" 0000000000000000000000000000000000000000
