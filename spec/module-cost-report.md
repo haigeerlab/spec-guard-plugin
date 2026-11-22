@@ -1,6 +1,6 @@
 # Spec: module-cost-report
 
-<!-- spec-guard: review approved 506f0f24bc6e -->
+<!-- spec-guard: review approved ab153ba11b7f -->
 
 ## Objective
 
