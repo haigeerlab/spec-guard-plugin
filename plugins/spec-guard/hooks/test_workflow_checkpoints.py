@@ -308,7 +308,8 @@ class CheckpointContractTests(unittest.TestCase):
         self.assertNotIn("Spec（可以和 Plan 一起批）、最终验收要用户批", floor)
         marks = self.section("## 批准标记")
         for phrase in ("`codex-approved`", "--state codex-reviewed", "--review", "`scope.files`", "两轮", "不要自己审自己", "仓库外",
-                       "建议", "不是用户的批准"):
+                       "建议", "不是用户的批准",
+                       "写理由不会让批准失效"):  # M3 second rework
             self.assertIn(phrase, marks)
         for title in ("## Spec 交审", "## Plan 交审"):
             self.assertIn("交 Codex 审", self.node_rules(title))
