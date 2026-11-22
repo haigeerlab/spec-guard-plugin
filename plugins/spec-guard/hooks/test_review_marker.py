@@ -405,8 +405,26 @@ class CodexMarks(unittest.TestCase):
             self.assertEqual(review_state(text, "spec"), "codex-approved")
             self.assertIn("## 外部审查意见", text)
             self.assertRegex(text, r"<!-- spec-guard: codex-review round=1 blocking=0 sha256=[0-9a-f]{12} -->")
-            project.spec.write_text(text + "\n改动\n", encoding="utf-8")
+            project.spec.write_text(text.replace("正文", "正文改动"), encoding="utf-8")
             self.assertEqual(review_state(project.spec.read_text(encoding="utf-8"), "spec"), "revised")
+
+    def test_reasons_under_external_review_keep_the_codex_approval(self):
+        # M3 second rework: the rule asks for a reason per suggestion in that section; writing it must not void the approval.
+        with Project() as project:
+            self.assertEqual(self.mark(project, "codex-approved", self.report(project, severities=("suggestion",)))[0], 0)
+            text = project.spec.read_text(encoding="utf-8")
+            project.spec.write_text(text + "- 建议一：采纳，已在 Task 1 写明。\n", encoding="utf-8")
+            self.assertEqual(review_state(project.spec.read_text(encoding="utf-8"), "spec"), "codex-approved")
+            project.spec.write_text(text.replace("正文", "正文改动") + "- 建议一：采纳。\n", encoding="utf-8")
+            self.assertEqual(review_state(project.spec.read_text(encoding="utf-8"), "spec"), "revised")
+
+    def test_a_codex_approval_from_0_91_0_still_counts(self):
+        # A marker written over the whole text (0.91.0/0.91.1) reads the same as before the upgrade.
+        from module_stage import review_codex_line
+        text = with_marker(REVIEW_PENDING) + "\n## 外部审查意见\n\n<!-- spec-guard: codex-review round=1 blocking=0 sha256=aaaaaaaaaaaa -->\n"
+        old = text.replace(REVIEW_PENDING, review_codex_line(review_digest(text)))
+        self.assertEqual(review_state(old, "spec"), "codex-approved")
+        self.assertEqual(review_state(old.replace("正文", "正文改动"), "spec"), "revised")
 
     def test_blocking_round_is_recorded_not_approved(self):
         with Project() as project:
