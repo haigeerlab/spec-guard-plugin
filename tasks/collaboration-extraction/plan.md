@@ -89,7 +89,7 @@ Show the file tree, counts, history samples, and suite result; wait for approval
 
 ### Task 4: Create agent-relay
 
-**Description:** Run the script into `/Users/vilin/Documents/haigeerlab/agent-relay` with the same base.
+**Description:** Run the script into `~/Documents/haigeerlab/agent-relay` with the same base.
 Confirm the result matches the rehearsal (same file list and blob ids). Delete the scratch rehearsal. Confirm
 Spec Guard's tree has no changes outside this module and the guide plugin is still 0.49.0.
 

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Create the local agent-relay repository at `/Users/vilin/Documents/haigeerlab/agent-relay` from Spec Guard's
+Create the local agent-relay repository at `~/Documents/haigeerlab/agent-relay` from Spec Guard's
 history with `git filter-repo`, so that the collaboration code, its tests, and its records arrive with their
 per-file history. This is a move, not a rewrite: file contents are byte-identical to Spec Guard at the
 extraction base, and Spec Guard's own tree is not changed (deleting the moved code is
@@ -85,7 +85,7 @@ All three taken as recommended by the user on 2026-10-06.
 
 ```bash
 brew install git-filter-repo                      # once, after approval
-/bin/bash scripts/extract-collaboration.sh <base-commit> /Users/vilin/Documents/haigeerlab/agent-relay
+/bin/bash scripts/extract-collaboration.sh <base-commit> ~/Documents/haigeerlab/agent-relay
 /bin/bash scripts/validate.sh
 /bin/bash plugins/spec-guard/hooks/test-phase-guard.sh
 /bin/bash plugins/spec-guard/hooks/test-verify-artifacts.sh
@@ -96,7 +96,7 @@ brew install git-filter-repo                      # once, after approval
 - `spec/collaboration-extraction.md`, `tasks/collaboration-extraction/` — this module.
 - `scripts/collaboration-extraction-paths.txt`, `scripts/extract-collaboration.sh` — kept in Spec Guard as the
   reproducible record of how agent-relay was created; removed or archived by `collaboration-dependency`.
-- New repository `/Users/vilin/Documents/haigeerlab/agent-relay` — created, not modified further here
+- New repository `~/Documents/haigeerlab/agent-relay` — created, not modified further here
   (skeleton, convention, and capability map are global step 4).
 
 ## Testing strategy
@@ -115,7 +115,7 @@ are added to the owned list (they define what moves).
 
 ## Success criteria
 
-1. `/Users/vilin/Documents/haigeerlab/agent-relay` exists as a local repository with only `main`, no tags, no
+1. `~/Documents/haigeerlab/agent-relay` exists as a local repository with only `main`, no tags, no
    remote, and exactly the re-rooted path set.
 2. All path-set files are byte-identical to the base; sampled files keep pre-boundary history.
 3. The re-rooted collaboration suite: 198 pass, 4 known errors (D7).
