@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "not-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.91.1-upgrade-20261122"
+      },
+      "reason": "installed but no real Codex smoke on 0.91.1: the marketplace ref moved from v0.91.0 to v0.91.1 and codex plugin marketplace upgrade exited 0 at 2026-11-21T21:01:24Z with the snapshot identical to the release asset, but the hooks were not re-approved before 0.91.2 shipped; the user chose to approve once after 0.91.2 and record the smoke there (v0.91.2-codex.json)"
+    }
+  ]
+}

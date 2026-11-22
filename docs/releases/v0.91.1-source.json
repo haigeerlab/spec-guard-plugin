@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.91.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:efc4d8c1960b58927c6b3027a49cdaf61e320208"
+      },
+      "observedAt": "2026-11-22T03:43:49Z",
+      "evidence": [
+        "result:the v0.91.1 annotated tag resolves to merge commit efc4d8c1960b58927c6b3027a49cdaf61e320208 (pull request #468); merged==true and main==merge sha were checked before tagging; the push run on the tagged merge commit succeeded (Validate on the merge commit, success)",
+        "result:M3 stop rework (codex-final-acceptance, S101): a takeover module's .agent/config.json and .agent/state.json are flow, not overreach (Q15 A); Codex final acceptance also requires merge=auto in the commit before the module started (acceptance-not-auto-at-base, Q14 A); the takeover preview reminds of retired keys; a pending Plan that pre-declares says why it goes to the user; interface 1.15 unchanged",
+        "result:on the branch before merge under macOS 27.2 arm64 /bin/bash 3.2.57: every commit through verify-and-commit full tier; mutations (no base-config check; config and state not flow) turned the regressions red; a temporary project ran four cases (narrow then restore: recorded; widened after the start: refused; convention, config and Spec in one commit: refused; convention and config first: recorded)"
+      ]
+    }
+  ]
+}
