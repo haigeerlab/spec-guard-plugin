@@ -4,7 +4,7 @@
 - [x] Task 1：doc-skeletons.md、DOC_SECTIONS、flow_info 与回归
 - [x] Task 2：新阶段、BEFORE_PLAN 替换、下一步文本与回归
 - [x] Task 3：/map 的 tier、step，接口 1.18 与回归
-- [ ] Task 4：verify-artifacts 的 v2 检查与回归
+- [x] Task 4：verify-artifacts 的 v2 检查与回归
 - [ ] Task 5：规则文本与 docs/commands.md
 - [ ] Checkpoint 1（report）：完整检查、变异与实跑
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行

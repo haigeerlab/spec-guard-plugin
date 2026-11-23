@@ -248,6 +248,51 @@ def flow_tier_line(root: Path, module: str, zh: bool) -> str:
     return "- Tier: the flow marker in `spec/%s.md` %s; treated as `%s`." % (module, why, flow["tier"])
 
 
+FLOW_DOCS = (("requirement", "spec/%s.md"), ("design", "tasks/%s/design.md"), ("regression", "tasks/%s/regression.md"),
+             ("plan", "tasks/%s/plan.md"))
+SECTION_HEADING = re.compile(r"^##\s+(.+?)\s*$")
+
+
+def _sections(text: str) -> set:
+    return {match.group(1) for match in (SECTION_HEADING.match(line) for line in _visible_lines(text.splitlines()))
+            if match}
+
+
+def flow_doc_problems(root: Path, module: str) -> list:
+    """flow-doc-skeletons: [(level, message)] for a flow v2 module's documents; [] for an old-flow module.
+
+    A document is required once a later one exists (a module still writing its design lacks nothing); every document
+    that exists must carry its skeleton sections, in Chinese or English, possibly saying "不涉及".
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"]:
+        return []
+    found = [("warn", "`spec/%s.md` 的流程标记%s" % (module, {"tier-invalid": "档位无效，按 normal 处理",
+                                                          "tier-below-rule": "档位低于规则判定，按 important 处理"}[p]))
+             for p in flow["problems"]]
+    short = flow["tier"] in SHORT_TIERS
+    docs = [(kind, pattern % module) for kind, pattern in FLOW_DOCS if not (short and kind in ("design", "regression"))]
+    present = [(root / path).is_file() for _, path in docs]
+    last = max((index for index, here in enumerate(present) if here), default=-1)
+    for index, (kind, path) in enumerate(docs):
+        if not present[index]:
+            if index < last:
+                found.append(("fail", "`%s` 缺失（档位 %s，后面的文档已经写了）" % (path, flow["tier"])))
+            continue
+        wanted = {"requirement": ("bug",) if flow["tier"] == "bug" else
+                  (("requirement", "small") if flow["tier"] == "small" else ("requirement",))}.get(kind, (kind,))
+        try:
+            have = _sections((root / path).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            found.append(("fail", "`%s` 读不了" % path))
+            continue
+        missing = [zh for group in wanted for zh, en in zip(DOC_SECTIONS[group]["zh"], DOC_SECTIONS[group]["en"])
+                   if zh not in have and en not in have]
+        if missing:
+            found.append(("fail", "`%s` 缺章节：%s" % (path, "、".join(missing))))
+    return found
+
+
 def _v2(root: Path, module: str) -> bool:
     return flow_marker(root, module)["v2"]
 

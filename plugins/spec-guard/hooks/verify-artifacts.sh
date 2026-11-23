@@ -88,6 +88,26 @@ if ids:
         NOTODO=""
       fi
       [ -z "$NOTODO" ] || warn "$NOTODO"
+      # flow-doc-skeletons：新流程模块（spec 里有 flow v2 标记）按档位查文档与章节；判据在 module_stage.flow_doc_problems。
+      if ! FLOWDOCS="$(python3 -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from capability_map import parse_map
+from module_stage import flow_doc_problems
+root = Path(".")
+parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
+for module in list(parsed.order) or [row.module_id for row in parsed.rows]:
+    for level, message in flow_doc_problems(root, module):
+        print("%s\t%s" % (level, message))
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+        warn '未验证：新流程文档检查脚本没有正常运行'
+        FLOWDOCS=""
+      fi
+      while IFS=$'\t' read -r level message; do
+        [ -n "$level" ] || continue
+        if [ "$level" = fail ]; then bad "新流程文档：${message}"; else warn "新流程文档：${message}"; fi
+      done <<<"$FLOWDOCS"
     fi
   fi
 fi

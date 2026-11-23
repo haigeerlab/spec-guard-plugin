@@ -106,6 +106,11 @@ autopilot 调校验器，通过后调 spec-guard 的记录命令写结论，记�
 
 沿用现有轮次行与 `reviewRounds`（0.93.0）：技术方案的每轮审查记一行，最多两轮且第二轮只核对上一轮；审查者同厂商时报告里注明，spec-guard 照记、不判定。审查标准归 delegate。
 
+delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）：调用 `/delegate:review --profile design --backend auto --author-host <claude-code|codex> --paths tasks/<id>/design.md --spec spec/<id>.md [--spec <影响面里列的已有文件>…]`，
+第二轮加 `--previous-report <上一轮报告>`；判据 `design-v1`；`--author-host` 由阶段提示按当前宿主填。报告顶层 `reviewer: {vendor, backend, same_vendor, selection}`，
+`reviewerVendor`／`sameVendor` 取 `reviewer.vendor`／`reviewer.same_vendor`；`selection="none"`（`execution_status=conditions_missing`、诊断 `no_reviewer_available`）记为「未审」、不当失败。
+阻断 = `recheck.items` 中 `unresolved` 的条目 + `findings` 中非 `suggestion` 的条目；拿不出代码证据的阻断 delegate 已降为 `suggestion`。`backend` 不再限 codex。delegate 计划 0.12.0、接口 1.7。
+
 ## 待定问题
 
 用户 2026-11-24「确认插入，Q1–Q6 按推荐」：Q1～Q6 均按推荐定；Q4 autopr-design 已同意（#22347），并补了报告字段与证据评论双重核对，已并入 C。接口按 #22347 的意见修订为 v1（`design` 取值改为 `reviewer`、生效档位、报告与用例字段、作者会话记录、`regression_view`、合规监测字段）。
