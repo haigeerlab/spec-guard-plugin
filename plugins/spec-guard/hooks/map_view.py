@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_route, effective_review, external_review_state, important,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, external_review_state, important,
                           file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -105,6 +105,21 @@ def _approved_by(root: Path, module: str) -> dict:
     """codex-approval: who approved each file in effect -- user, codex (only where the takeover allows it) or None."""
     review = _review(root, module)
     return {kind: effective_review(root, module, kind, review[kind])[1] for kind in ("spec", "plan")}
+
+
+def _review_rounds(root: Path, module: str) -> dict:
+    """review-rounds-in-map: the Codex round lines of the Spec and the Plan, as facts; a missing file has none."""
+    rounds = {}
+    for kind, relative in (("spec", "spec/%s.md" % module), ("plan", "tasks/%s/plan.md" % module)):
+        path = root / relative
+        if not path.is_file():
+            rounds[kind] = []
+            continue
+        try:
+            rounds[kind] = codex_round_records(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            raise Unreadable(relative)
+    return rounds
 
 
 def _external_review(root: Path, module: str) -> str:
@@ -462,6 +477,7 @@ def build(root: Path) -> dict:
             "review": _review(root, module),
             "reviewApprovedBy": _approved_by(root, module),
             "codexRoute": {kind: codex_route(root, module, kind) or None for kind in ("spec", "plan")},
+            "reviewRounds": _review_rounds(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),
