@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.93.0] - 2026-11-23
+
+review-rounds-in-map（autopilot 合规监测的数据补充）：`/map --json` 给出每轮 Codex 审查的事实。接口 1.16 → 1.17。
+
+### 变更
+
+- **`/map --json` 每个模块加 `reviewRounds`。** `{"spec": [...], "plan": [...]}`，每轮 `{"round", "blocking", "sha256"}`，按文件顺序，取自 review-mark 写在
+  「外部审查意见」一节的轮次行；`sha256` 是报告 sha256 的前 12 位（轮次行一直只记这么多）。文件不存在或没有轮次行为 `[]`，修订前的轮次照样列出。
+  只给事实、不给结论：调用方拿它配合 `reviewApprovedBy`、`codexRoute` 自己核对 Codex 批准确有审查报告、审了两轮仍有阻断的已转人批。表格视图不变。
+
 ## [0.92.0] - 2026-11-22
 
 codex-route-guard（S106 后续）：Codex 批准与验收的兜底与共享。接口 1.15 → 1.16。

@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交能力图新行、Spec、Plan 与 todo
 - [x] Task 1：codex_round_records 与 /map --json 的 reviewRounds，先写回归
-- [ ] Task 2：接口 1.17、check-interface、docs/commands.md、0.93.0 版本号、CHANGELOG、README
+- [x] Task 2：接口 1.17、check-interface、docs/commands.md、0.93.0 版本号、CHANGELOG、README
 - [ ] Checkpoint 1（report）：完整检查、变异与实跑
 - [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
 - [ ] 合并后：核实合并、发 0.93.0、通知 ecosystem-lead、字段格式发 autopr-design 抄送 ecosystem-lead（记下 Release 地址、证据 PR、消息号）

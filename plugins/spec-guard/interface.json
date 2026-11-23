@@ -1,5 +1,5 @@
 {
-  "interface": "1.16",
+  "interface": "1.17",
   "mapView": {
     "command": [
       "python3",
@@ -83,6 +83,19 @@
         "plan": "the Plan's approval route: null, takeover, important or pre-declared (see values.codexRoute)"
       },
       "meaning": "the same module_stage.codex_route(root, module, kind) decision used by reviewMark to refuse codex-approved when nonempty; an empty result is JSON null. Computed even when the Spec or Plan file is missing, independently of its approval marker"
+    },
+    "reviewRounds": {
+      "appearsWhen": "per module, always (interface 1.17, spec/review-rounds-in-map.md)",
+      "fields": {
+        "spec": "the Codex review rounds recorded in spec/<id>.md, in file order; [] when the file is missing or has no round line",
+        "plan": "the Codex review rounds recorded in tasks/<id>/plan.md, in file order; [] when the file is missing or has no round line"
+      },
+      "entryFields": {
+        "round": "the round number written by reviewMark (codex-approved or codex-reviewed)",
+        "blocking": "the number of blocking findings in that round's report",
+        "sha256": "the first 12 hex digits of the report's sha256 (the round line keeps only this prefix), not the full digest"
+      },
+      "meaning": "facts read from the round lines <!-- spec-guard: codex-review round=N blocking=N sha256=<12 hex> --> outside code fences, the same reading reviewMark uses for its two-round cap; every round is listed, also from before a revision, whatever the approval marker says now. No verdict is derived here: a caller checks a Codex approval or the two-round hand-off against reviewApprovedBy and codexRoute itself. An unreadable Spec or Plan fails the whole view (exit 4) like review"
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",

@@ -53,6 +53,8 @@ PROGRESS_FIELDS = ("uncommittedTicks", "startedAt", "head.committedAt", "reviewC
 DEFERRAL_FIELDS = ("deferred", "deferredTotal")  # interface.json deferral (formal-deferral, interface 1.12)
 MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone-stop, interface 1.13)
 ACCEPTANCE_FIELDS = ("marker", "sha")  # interface.json mapView.acceptance (codex-final-acceptance, interface 1.15)
+# interface.json mapView.reviewRounds (review-rounds-in-map, interface 1.17): the keys of one round entry.
+REVIEW_ROUND_FIELDS = ("round", "blocking", "sha256")
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
 TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject", "narrowed")
