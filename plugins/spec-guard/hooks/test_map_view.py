@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "important", "acceptance"}
+               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -100,7 +100,8 @@ FILES = {
     "spec/b.md": "# b\n", "tasks/b/plan.md": "# Plan\n",
     "tasks/b/todo.md": "- [x] one\n- [ ] two\n" + SUSPEND_MARKER + "\n" + REASON_PREFIX + "上游漏洞 -->\n",
     "spec/g.md": "# g\n\n" + PENDING + "\n",
-    "spec/h.md": "# h\n", "tasks/h/plan.md": "# Plan\n\n" + PENDING + "\n",
+    "spec/h.md": "# h\n", "tasks/h/plan.md": "# Plan\n\n" + PENDING + "\n\n## 外部审查意见\n\n"
+    "<!-- spec-guard: codex-review round=1 blocking=2 sha256=0123456789ab -->\n",
     "tasks/h/todo.md": "- [x] t1\n- [ ] t2\n- [ ] Checkpoint 1（gate）：模块评审\n",
 }
 
@@ -367,6 +368,90 @@ class DeferralTest(unittest.TestCase):
             out = project.run().stdout
             self.assertNotIn("\x1b", out)
             self.assertIn("- a · a", out)
+
+
+def round_line(number, blocking, sha):
+    return "<!-- spec-guard: codex-review round=%d blocking=%d sha256=%s -->" % (number, blocking, sha)
+
+
+class ReviewRoundsTest(unittest.TestCase):
+    """review-rounds-in-map: every module lists the Codex round lines of its Spec and Plan, as facts."""
+
+    def rounds(self, files, module="a"):
+        with Project([("a", "基础", "—"), ("b", "下游", "a")], ["a", "b"], files) as project:
+            modules = {m["id"]: m for m in project.json()["modules"]}
+        self.assertEqual(set(modules[module]["reviewRounds"]), {"spec", "plan"})
+        for kind in ("spec", "plan"):
+            for entry in modules[module]["reviewRounds"][kind]:
+                self.assertEqual(set(entry), {"round", "blocking", "sha256"})
+        return modules[module]["reviewRounds"]
+
+    @staticmethod
+    def doc(marker, *lines):
+        return "# Doc\n\n%s\n\n正文\n\n## 外部审查意见\n\n%s" % (marker, "".join(line + "\n" for line in lines))
+
+    def test_codex_approved_after_a_clean_round(self):
+        plan = self.doc("<!-- spec-guard: review codex-approved 0123456789ab -->",
+                        round_line(1, 3, "aaaaaaaaaaaa"), round_line(2, 0, "bbbbbbbbbbbb"))
+        self.assertEqual(self.rounds({"spec/a.md": "# a\n", "tasks/a/plan.md": plan})["plan"],
+                         [{"round": 1, "blocking": 3, "sha256": "aaaaaaaaaaaa"},
+                          {"round": 2, "blocking": 0, "sha256": "bbbbbbbbbbbb"}])
+
+    def test_two_blocking_rounds_then_the_user(self):
+        spec = self.doc("<!-- spec-guard: review approved 0123456789ab -->",
+                        round_line(1, 4, "111111111111"), round_line(2, 3, "222222222222"))
+        got = self.rounds({"spec/a.md": spec})
+        self.assertEqual(got["spec"], [{"round": 1, "blocking": 4, "sha256": "111111111111"},
+                                       {"round": 2, "blocking": 3, "sha256": "222222222222"}])
+        self.assertEqual(got["plan"], [])  # no Plan file
+
+    def test_reviewed_but_not_approved(self):
+        plan = self.doc(PENDING, round_line(1, 1, "cccccccccccc"))
+        self.assertEqual(self.rounds({"tasks/a/plan.md": plan}),  # no Spec file
+                         {"spec": [], "plan": [{"round": 1, "blocking": 1, "sha256": "cccccccccccc"}]})
+
+    def test_revision_keeps_every_round_in_file_order(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from module_stage import review_codex_line, review_digest
+        plan = self.doc(PENDING, round_line(1, 0, "dddddddddddd"))
+        plan = plan.replace(PENDING, review_codex_line(review_digest(plan)))
+        revised = plan.replace("正文", "改过的正文") + round_line(2, 1, "eeeeeeeeeeee") + "\n"
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": "# a\n", "tasks/a/plan.md": revised}) as project:
+            module = project.json()["modules"][0]
+        self.assertEqual(module["review"]["plan"], "revised")
+        self.assertEqual(module["reviewRounds"]["plan"],
+                         [{"round": 1, "blocking": 0, "sha256": "dddddddddddd"},
+                          {"round": 2, "blocking": 1, "sha256": "eeeeeeeeeeee"}])
+
+    def test_no_lines_missing_files_and_fenced_examples(self):
+        fenced = "# a\n\n```\n%s\n```\n" % round_line(1, 2, "ffffffffffff")
+        got = self.rounds({"spec/a.md": fenced, "tasks/a/plan.md": "# Plan\n"})
+        self.assertEqual(got, {"spec": [], "plan": []})
+        self.assertEqual(self.rounds({}, module="b"), {"spec": [], "plan": []})
+
+    def test_unreadable_plan_fails_like_review(self):
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("root reads mode-0 files")
+        plan = self.doc(PENDING, round_line(1, 1, "cccccccccccc"))
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": "# a\n", "tasks/a/plan.md": plan}) as project:
+            path = project.root / "tasks" / "a" / "plan.md"
+            path.chmod(0)
+            try:
+                done = project.run("--json")
+            finally:
+                path.chmod(0o644)
+        self.assertEqual(done.returncode, 4, done.stdout)
+        self.assertEqual(json.loads(done.stdout)["error"], "unreadable")
+
+    def test_table_is_unchanged_by_round_lines(self):
+        plain = {"spec/a.md": "# a\n", "tasks/a/plan.md": self.doc(PENDING)}
+        with_rounds = {"spec/a.md": "# a\n", "tasks/a/plan.md": self.doc(PENDING, round_line(1, 2, "abcdefabcdef"))}
+        outputs = []
+        for files in (plain, with_rounds):
+            with Project([("a", "基础", "—")], ["a"], files) as project:
+                outputs.append(project.run().stdout.replace(str(project.root), "ROOT"))
+        self.assertEqual(outputs[0], outputs[1])
 
 
 class StatusTest(unittest.TestCase):

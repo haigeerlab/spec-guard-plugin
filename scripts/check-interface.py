@@ -52,7 +52,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -103,6 +103,17 @@ def _acceptance(view: dict) -> list:
         return ["mapView 缺少 acceptance 说明"]
     if set(fields) != set(map_view.ACCEPTANCE_FIELDS):
         return ["mapView.acceptance.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.ACCEPTANCE_FIELDS))]
+    return []
+
+
+def _review_rounds(view: dict) -> list:
+    """review-rounds-in-map: interface 1.17 describes the keys of one Codex round entry map_view writes."""
+    block = view.get("reviewRounds")
+    fields = block.get("entryFields") if isinstance(block, dict) else None
+    if not isinstance(fields, dict):
+        return ["mapView 缺少 reviewRounds 说明"]
+    if set(fields) != set(map_view.REVIEW_ROUND_FIELDS):
+        return ["mapView.reviewRounds.entryFields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.REVIEW_ROUND_FIELDS))]
     return []
 
 

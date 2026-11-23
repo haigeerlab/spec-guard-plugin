@@ -230,7 +230,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、里程碑停点（有用法草案、某个里程碑做完还没确认时）、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位四项与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位四项与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`

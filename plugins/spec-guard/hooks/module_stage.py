@@ -60,11 +60,17 @@ def review_codex_line(digest: str) -> str:
     return "<!-- spec-guard: review codex-approved %s -->" % digest
 
 
-def codex_rounds(text: str) -> list:
-    """codex-approval: [(round, blocking)] from the round lines outside code fences, in file order."""
-    return [(int(match.group(1)), int(match.group(2)))
+def codex_round_records(text: str) -> list:
+    """review-rounds-in-map: [{"round", "blocking", "sha256"}] from the round lines outside code fences, in file order.
+    sha256 is the 12-hex prefix the round line keeps of the reviewed file's sha256 (its value in the report's scope.files)."""
+    return [{"round": int(match.group(1)), "blocking": int(match.group(2)), "sha256": match.group(3)}
             for match in (CODEX_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
             if match]
+
+
+def codex_rounds(text: str) -> list:
+    """codex-approval: [(round, blocking)] from the round lines outside code fences, in file order."""
+    return [(record["round"], record["blocking"]) for record in codex_round_records(text)]
 
 
 def review_marker_lines(text: str) -> list:
