@@ -5,7 +5,7 @@
 - [x] Task 2：接口 1.17、check-interface、docs/commands.md、0.93.0 版本号、CHANGELOG、README
 - [x] Checkpoint 1（report）：完整检查、变异与实跑
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
-- [ ] 延期：合并后核实合并、发 0.93.0、通知 ecosystem-lead、字段格式发 autopr-design 抄送 ecosystem-lead（记下 Release 地址、证据 PR、消息号）；恢复条件：PR #483 合并进 main
+- [x] 合并后：#483 合并（9718b24）后发布 v0.93.0（https://github.com/haigeerlab/spec-guard-plugin/releases/tag/v0.93.0，只建 tag 与 Release，按用户 11-24「0.93.0 只发布」不安装；安装、smoke 与证据随 0.94.0），字段格式已回 autopr-design（#22398，抄送 ecosystem-lead），发版通知 ecosystem-lead（#22399）
 
 2026-11-24 用户「验收通过」（同时批准修订后的 Spec：sha256 改为被审文件指纹）。
 
