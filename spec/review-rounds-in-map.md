@@ -21,7 +21,7 @@
 ## Assumptions
 
 1. **字段**：`/map --json` 每个模块在 `codexRoute` 旁边加 `reviewRounds: {"spec": [...], "plan": [...]}`，每项是一轮 `{"round": N, "blocking": N, "sha256": "<12 位十六进制>"}`，按文件里出现的顺序；没有轮次行或文件不存在时为 `[]`。表格视图不变。
-2. **sha256 只有前 12 位**：文件里一直只记报告 sha256 的前 12 位，字段照实给出这 12 位，接口说明写清楚是前缀；不改成记完整值（旧记录补不回来，改了也只有新记录有）。
+2. **sha256 是被审文件的指纹、只有前 12 位**：轮次行记的是这一轮被审的 Spec 或 Plan 内容的 sha256（即审查报告 `scope.files` 里该文件的值），不是报告文件本身的哈希，且只记前 12 位；字段照实给出这 12 位，接口说明写清楚是前缀；不改成记完整值（旧记录补不回来，改了也只有新记录有）。
 3. **只报事实，不加判定字段**：不另给「两轮已用完」「批准有依据」这类结论；autopilot 用 `reviewRounds` 配合 `reviewApprovedBy`、`codexRoute` 自己核对。判定规则仍只在 `review_mark` 一处（`ROUND_CAP = 2`）。
 4. **读法与现有一致**：与 `module_stage.codex_rounds` 同一个正则、同样跳过代码块里的示例行；Spec 或 Plan 读不了时按 `/map` 现有的读失败处理（与 `review` 字段一致），不悄悄给 `[]`。
    实现上把 `codex_rounds` 拆出一个带 sha256 的读取函数，`codex_rounds` 与 `review_mark` 的行为不变。

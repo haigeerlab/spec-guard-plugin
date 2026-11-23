@@ -62,7 +62,7 @@ def review_codex_line(digest: str) -> str:
 
 def codex_round_records(text: str) -> list:
     """review-rounds-in-map: [{"round", "blocking", "sha256"}] from the round lines outside code fences, in file order.
-    sha256 is the 12-hex prefix the round line keeps of the report's sha256."""
+    sha256 is the 12-hex prefix the round line keeps of the reviewed file's sha256 (its value in the report's scope.files)."""
     return [{"round": int(match.group(1)), "blocking": int(match.group(2)), "sha256": match.group(3)}
             for match in (CODEX_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
             if match]

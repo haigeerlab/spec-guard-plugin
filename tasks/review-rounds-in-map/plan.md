@@ -10,7 +10,7 @@ Spec：[spec/review-rounds-in-map.md](../../spec/review-rounds-in-map.md)（2026
   `codex_rounds` 改为 `[(r["round"], r["blocking"]) for r in codex_round_records(text)]`，返回值不变，`review_mark` 与 `codex_rounds_exhausted` 不改。
 - **`reviewRounds` 放在 `codexRoute` 旁边**：`map_view` 新增 `_review_rounds(root, module)`，对 `spec/<id>.md`、`tasks/<id>/plan.md` 各读一次；文件不存在给 `[]`，
   读失败抛现有的 `Unreadable(path)`（与 `_review` 同样的读失败处理）。表格视图不变。
-- **接口**：`interface.json` 1.17，`mapView` 加 `reviewRounds` 字段说明（每项三个键、`sha256` 是报告 sha256 的前 12 位、`[]` 的含义、按文件顺序、不随修订清空）；
+- **接口**：`interface.json` 1.17，`mapView` 加 `reviewRounds` 字段说明（每项三个键、`sha256` 是被审文件（审查报告 `scope.files` 里该文件）sha256 的前 12 位、`[]` 的含义、按文件顺序、不随修订清空）；
   `check-interface.py` 的字段清单与 `test_map_view.py` 的字段集合同步。
 - **测试**：在 `test_map_view.py` 加 `ReviewRoundsTest`，用现有 `Project` 夹具直接写轮次行，覆盖 AC1～AC3；读失败用不可读文件覆盖。
 
