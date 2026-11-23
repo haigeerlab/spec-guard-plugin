@@ -1,7 +1,7 @@
 # Todo: project-sections
 
 - [x] Task 0：提交 Plan 与 todo
-- [ ] Task 1：projectSections 配置键、校验与 set，回归
+- [x] Task 1：projectSections 配置键、校验与 set，回归
 - [ ] Task 2：追加章节的检查与提示，回归
 - [ ] Task 3：骨架与配置说明、0.94.0、CHANGELOG、README
 - [ ] Checkpoint 1（report）：完整检查、变异与实跑
