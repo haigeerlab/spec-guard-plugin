@@ -103,6 +103,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `moduleConcurrency` | `off`／`on` | `off` |
 | `takeover` | 预设 `none`／`plan`／`merge`，或自定义四项 | `none` |
 | `moduleTakeover` | 模块 id → 同 `takeover` 的值 | 未设置 |
+| `projectSections` | 文档 → 追加章节名列表，如 `{"design": ["浏览器兼容"]}` | 未设置 |
 
 `takeover`（接管档位）定 Spec 批准、Plan 批准、合并、发布四项各由你做还是交给 AI：`none` 全由你做（等于以前的流程），`plan`
 只把 Plan 交给 Codex 审，`merge` 把 Spec、Plan 交给 Codex 审并且审查通过后自动合并；发布只能用自定义打开（`human`／`prepare`／

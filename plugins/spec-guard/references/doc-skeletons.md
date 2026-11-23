@@ -78,3 +78,14 @@
 | 检查点 | Checkpoints |
 
 新流程模块的 Plan 只留任务列表（每个任务写验证方式）与检查点；架构决定和风险写在技术方案里。todo 照旧。
+
+## 项目追加章节
+
+项目特有的内容（前端的浏览器兼容、后端的数据迁移、游戏的试玩清单……）用 `.agent/config.json` 的 `projectSections` 声明，例如：
+
+```json
+{"version": 1, "projectSections": {"design": ["浏览器兼容"], "regression": ["视觉回归"]}}
+```
+
+文档种类只能是 `requirement`（需求文档）、`design`（技术方案）、`regression`（回归测试文档）。声明后，新流程模块的这几份文档在上面的骨架章节之外必须带上这些章节
+（同样是二级标题，内容可以写「不涉及」）；`bug`、`small` 只写一份需求文档，只要求 `requirement` 的追加章节。用 `/spec-guard:config` 设置。
