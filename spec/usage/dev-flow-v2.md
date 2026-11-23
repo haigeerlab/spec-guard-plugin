@@ -110,6 +110,9 @@ delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）�
 第二轮加 `--previous-report <上一轮报告>`；判据 `design-v1`；`--author-host` 由阶段提示按当前宿主填。报告顶层 `reviewer: {vendor, backend, same_vendor, selection}`，
 `reviewerVendor`／`sameVendor` 取 `reviewer.vendor`／`reviewer.same_vendor`；`selection="none"`（`execution_status=conditions_missing`、诊断 `no_reviewer_available`）记为「未审」、不当失败。
 阻断 = `recheck.items` 中 `unresolved` 的条目 + `findings` 中非 `suggestion` 的条目；拿不出代码证据的阻断 delegate 已降为 `suggestion`。`backend` 不再限 codex。delegate 计划 0.12.0、接口 1.7。
+细化（delegate-owner #22372，delegate 两份 Spec 用户已批）：`--backend auto --author-host …` 时 `reviewer.same_vendor` 一定是 true／false（显式 backend 不带 author-host 时为 null）；
+报告顶层 `criteria` 为 `severity-v1` 或 `design-v1`，复审前后必须相同；`--backend auto` 不能与 `--model`、`--effort`、`--max-turns`、`--max-budget-usd` 同用（退出 64），阶段提示给的命令不带这些参数；
+开工前检测可用审查者用 `/delegate:doctor --reviewers --json`（`delegate.reviewers/v1`，只检查、不阻止、退出 0）。
 
 ## 待定问题
 
