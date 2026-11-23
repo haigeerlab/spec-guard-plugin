@@ -1,6 +1,6 @@
 # Spec: project-sections
 
-<!-- spec-guard: review approved 10fe4a237c42 -->
+<!-- spec-guard: review approved 306c7d9016f4 -->
 
 ## Objective
 
@@ -46,7 +46,7 @@ S110 要求 spec-guard 是通用插件、不与前端耦合，各类项目特有
 - **AC1** `set --key projectSections` 对合法值预览后 `--confirm` 写入、读回一致；对每类不合法值（不是对象、键不是三种文档、章节名为空或超长或含 `|`／`#`／换行、重复、与骨架同名、超过 10 个）退出 2 且不写文件。
 - **AC2** 文件里 `projectSections` 不合法时，只有这个键失效：`show` 与 verify-artifacts 报它无效，其余配置（如 `artifactLanguage`）照常生效。
 - **AC3** 声明了 `design: ["浏览器兼容"]` 的项目，normal 档模块的技术方案缺「浏览器兼容」时 verify-artifacts 失败，写了标题（内容「不涉及」）时通过；bug、small 档不要求 `design`／`regression` 的追加章节，但要求 `requirement` 的。
-- **AC4** 老模块（没有流程标记）不受 `projectSections` 影响：verify-artifacts 与阶段提示输出与不设这个键时一致。
+- **AC4** 老模块（已有需求文档但没有流程标记）不受 `projectSections` 影响：verify-artifacts 与阶段提示输出与不设这个键时一致。还没写需求文档的模块（`NEEDS_SPEC`）分不出新旧流程，声明了 `requirement` 追加章节时提示多一句「按新流程写需求文档时……」（假设 4）。
 - **AC5** 阶段提示在 `NEEDS_DESIGN` 时列出追加章节（中英）；没有声明时提示与 flow-doc-skeletons 的输出逐字相同。
 - **AC6** 变异：不读追加章节、校验不拦重复章节名，各让对应回归变红。
 - **AC7** `validate.sh`、phase-guard、verify-artifacts 全绿；两份 `plugin.json` 为 0.94.0，`scripts/validate.sh` 的版本一致性检查通过。
