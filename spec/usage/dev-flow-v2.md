@@ -128,6 +128,12 @@ delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）�
 - **Q6 四个仓库切换时的档位**：切换时把 `takeover=plan` 映射为 `design`（推荐：Plan 原本交给 Codex，改版后对应的是技术方案交给第二审查者，打扰最少；
   放宽档位需要你在对话里的原话，切换时逐个仓库请你说一句）；或保持读作 `none`，每份技术方案都由你批。
 
+## 后续模块已收到的输入（写对应 Spec 时处理，交用户批）
+
+- regression-doc-check：module-crew 的多模块布局提案（mc-coord #22381；需求一级各节写进用法草案，整体联调回归 `spec/usage/<需求>.regression.md`，结论复用 `spec-guard.verification/v1`），
+  需要让 `usage_draft.draft_files` 排除 `*.regression.md`；bug／small 的回归用例按同一格式解析、阶段提示提醒补上（ecosystem-lead #22380）；`regression_view --ref` 与用例内容 sha256（#22354）。
+- design-review：delegate 的调用方式与报告字段（见 D 节，#22369、#22372）。
+
 ## Milestones
 
 | Milestone | Usage | Modules |
