@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance"}
+               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -452,6 +452,45 @@ class ReviewRoundsTest(unittest.TestCase):
             with Project([("a", "基础", "—")], ["a"], files) as project:
                 outputs.append(project.run().stdout.replace(str(project.root), "ROOT"))
         self.assertEqual(outputs[0], outputs[1])
+
+
+class FlowTest(unittest.TestCase):
+    """flow-doc-skeletons: tier per module (null for the old flow) and the design/regression steps."""
+
+    @staticmethod
+    def spec(tier, extra=""):
+        return "# a\n\n<!-- spec-guard: flow v2 tier=%s -->\n%s" % (tier, extra)
+
+    def module(self, files, rows=(("a", "基础", "—"),), order=("a",)):
+        with Project(list(rows), list(order), files) as project:
+            data = project.json()
+            table = project.run().stdout
+        return data["modules"][0], table
+
+    def test_old_module_has_null_tier(self):
+        module, _ = self.module({"spec/a.md": "# a\n"})
+        self.assertIsNone(module["tier"])
+        self.assertEqual(module["step"], "plan")
+
+    def test_steps_follow_the_documents(self):
+        module, table = self.module({"spec/a.md": self.spec("normal")})
+        self.assertEqual((module["tier"], module["step"]), ("normal", "design"))
+        self.assertIn("🔨 写技术方案", table)
+        module, table = self.module({"spec/a.md": self.spec("normal"), "tasks/a/design.md": "# d\n"})
+        self.assertEqual(module["step"], "regression")
+        self.assertIn("🔨 写回归文档", table)
+        module, _ = self.module({"spec/a.md": self.spec("normal"), "tasks/a/design.md": "# d\n",
+                                 "tasks/a/regression.md": "# r\n"})
+        self.assertEqual(module["step"], "plan")
+
+    def test_short_tiers_and_correction(self):
+        module, _ = self.module({"spec/a.md": self.spec("bug")})
+        self.assertEqual((module["tier"], module["step"]), ("bug", "plan"))
+        module, _ = self.module({"spec/a.md": self.spec("huge")})
+        self.assertEqual(module["tier"], "normal")
+        lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/a/`\n- 公共：全局配置\n")
+        module, _ = self.module({"spec/a.md": lifted})
+        self.assertEqual((module["tier"], module["step"]), ("important", "design"))
 
 
 class StatusTest(unittest.TestCase):

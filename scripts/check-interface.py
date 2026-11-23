@@ -52,7 +52,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -115,6 +115,21 @@ def _review_rounds(view: dict) -> list:
     if set(fields) != set(map_view.REVIEW_ROUND_FIELDS):
         return ["mapView.reviewRounds.entryFields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.REVIEW_ROUND_FIELDS))]
     return []
+
+
+def _flow(view: dict) -> list:
+    """flow-doc-skeletons: interface 1.18 lists the tiers and the new steps map_view writes."""
+    block = view.get("flow")
+    if not isinstance(block, dict) or not isinstance(block.get("fields"), dict) or "tier" not in block["fields"]:
+        return ["mapView 缺少 flow 说明"]
+    found = []
+    if block.get("tierValues") != list(module_stage.TIERS):
+        found.append("mapView.flow.tierValues 为 %s，代码为 %s" % (block.get("tierValues"), list(module_stage.TIERS)))
+    steps = block.get("stepValues")
+    if not isinstance(steps, dict) or set(steps) != set(map_view.FLOW_STEPS.values()):
+        found.append("mapView.flow.stepValues 为 %s，代码为 %s"
+                     % (sorted(steps) if isinstance(steps, dict) else steps, sorted(map_view.FLOW_STEPS.values())))
+    return found
 
 
 def _autonomy(view: dict) -> list:
