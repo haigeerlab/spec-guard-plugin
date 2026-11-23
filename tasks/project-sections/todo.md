@@ -5,8 +5,10 @@
 - [x] Task 2：追加章节的检查与提示，回归
 - [x] Task 3：骨架与配置说明、0.94.0、CHANGELOG、README
 - [x] Checkpoint 1（report）：完整检查、变异与实跑
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
 - [ ] 延期：合并后发 0.94.0 并通知 ecosystem-lead 与 S110 各方；恢复条件：本模块的 PR 合并进 main
+
+2026-11-24 用户「验收通过」。推送与开 PR 等 PR #483 合并后再做。
 
 ## 外部审查意见
 
