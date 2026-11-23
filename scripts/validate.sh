@@ -179,6 +179,7 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_spec_baseline.py' \
   'python3 -B plugins/spec-guard/hooks/test_codex_review.py' \
   'python3 -B plugins/spec-guard/hooks/test_important_requirement.py' \
+  'python3 -B plugins/spec-guard/hooks/test_flow_v2.py' \
   'python3 -B plugins/spec-guard/hooks/test_gate_tick.py' \
   'python3 -B plugins/spec-guard/hooks/test_formal_deferral.py' \
   'python3 -B plugins/spec-guard/hooks/test_usage_draft.py' \

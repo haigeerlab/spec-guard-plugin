@@ -48,7 +48,31 @@ RELEASE_LIMITS = ("note: the four pipeline plugins (spec-guard, module-crew, del
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
 DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "takeover": "none", "moduleTakeover": {},
-            "takeoverNarrowed": {}}
+            "takeoverNarrowed": {}, "projectSections": {}}
+# project-sections: which flow v2 documents a project may extend, and the limits on one section name.
+SECTION_DOCS = {"requirement": ("requirement", "small", "bug"), "design": ("design",), "regression": ("regression",)}
+SECTION_LIMIT, SECTION_COUNT = 40, 10
+SECTION_FORBIDDEN = re.compile(r"[|#\r\n]")
+
+
+def valid_sections(value: Any) -> bool:
+    """project-sections: {document: [section name, ...]} for requirement, design and regression."""
+    from module_stage import DOC_SECTIONS  # late: module_stage imports this module
+    if not isinstance(value, dict):
+        return False
+    for doc, names in value.items():
+        if doc not in SECTION_DOCS or not isinstance(names, list) or not names or len(names) > SECTION_COUNT:
+            return False
+        builtin = {name for group in SECTION_DOCS[doc] for lang in ("zh", "en") for name in DOC_SECTIONS[group][lang]}
+        seen = set()
+        for name in names:
+            if not isinstance(name, str):
+                return False
+            clean = name.strip()
+            if not clean or len(clean) > SECTION_LIMIT or SECTION_FORBIDDEN.search(name) or clean in seen or clean in builtin:
+                return False
+            seen.add(clean)
+    return True
 
 
 def valid_takeover(value: Any) -> bool:
@@ -126,6 +150,7 @@ VALIDATORS = {
         isinstance(key, str) and MODULE_ID.fullmatch(key) and valid_takeover(value[key]) for key in value),
     # takeover-narrow: written only by narrow (and kept in step by set); config cannot set or unset it.
     "takeoverNarrowed": valid_narrowed,
+    "projectSections": valid_sections,
 }
 MANAGED = ("takeoverNarrowed",)
 # takeover-config: retired keys (S101, "autonomyTier 退役吧"), not mapped to takeover.  A file that still has them is
@@ -363,6 +388,12 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
     if module is not None and not MODULE_ID.fullmatch(module):
         print("%s-invalid: --module takes a kebab-case module id" % key)
         return 2
+    if isinstance(value, str) and key == "projectSections":
+        try:
+            value = json.loads(value)
+        except ValueError:
+            print("projectSections-invalid: --value takes a JSON object, e.g. '{\"design\": [\"浏览器兼容\"]}'")
+            return 2
     if isinstance(value, str) and value.startswith("{") and key in ("takeover", "moduleTakeover"):
         try:
             value = json.loads(value)

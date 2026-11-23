@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.94.0] - 2026-11-24
+
+S110 开发流程改版的 M1：新流程的文档骨架与项目追加章节（flow-doc-skeletons、project-sections）。接口 1.17 → 1.18。老模块（需求文档没有 `flow v2` 标记）的行为与输出不变。
+
+### 新增
+
+- **新流程模块的文档骨架。** 需求文档 `spec/<id>.md` 写一行 `<!-- spec-guard: flow v2 tier=bug|small|normal|important -->`，之后按档位写技术方案 `tasks/<id>/design.md`、
+  回归测试文档 `tasks/<id>/regression.md` 与只留任务的 Plan；`bug`、`small` 合成一份需求文档（含回归用例一节）。各文档的章节见插件的 `references/doc-skeletons.md`（中英各一套）。
+  规则判为重要需求时，档位写得再低也按 `important` 处理。
+- **两个新阶段。** 新流程模块在需求文档之后依次是 `NEEDS_DESIGN`、`NEEDS_REGRESSION`，阶段提示指出要写的文件与骨架；档位写错或低于规则判定时多一行说明。
+- **`/map --json`。** 每个模块加 `tier`（老模块为 null），`step` 新增 `design`、`regression`，表格显示「写技术方案」「写回归文档」；接口说明在 `mapView.flow`。
+- **verify-artifacts。** 新流程模块后面的文档已写而前面的缺失、已有文档缺骨架章节时判失败（中英章节名都认，内容可以是「不涉及」）。
+- **项目追加章节。** `.agent/config.json` 的 `projectSections` 声明项目特有的章节，例如 `{"design": ["浏览器兼容"]}`；新流程模块的对应文档必须带上，阶段提示写到那份文档时列出。
+
 ## [0.93.0] - 2026-11-23
 
 review-rounds-in-map（autopilot 合规监测的数据补充）：`/map --json` 给出每轮 Codex 审查的事实。接口 1.16 → 1.17。

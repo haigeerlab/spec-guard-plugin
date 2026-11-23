@@ -142,6 +142,44 @@ class ModuleConcurrency(unittest.TestCase):
             self.assertIs(module_concurrency(project.root), False)
 
 
+class ProjectSections(unittest.TestCase):
+    """project-sections: a project declares extra sections for the flow v2 documents."""
+    GOOD = {"design": ["浏览器兼容"], "regression": ["视觉回归", "Visual regression"]}
+
+    def test_set_previews_then_writes_and_reads_back(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "projectSections", "--value", json.dumps(self.GOOD))
+            self.assertEqual(code, 0, out)
+            self.assertFalse(project.config.exists())
+            code, out = project.run("set", "--key", "projectSections", "--value", "  " + json.dumps(self.GOOD) + "\n",
+                                    "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({"projectSections": self.GOOD}, []))
+            code, out = project.run("unset", "--key", "projectSections", "--confirm")
+            self.assertEqual((code, load(project.root)[0]), (0, {}), out)
+
+    def test_every_kind_of_invalid_value_is_refused(self):
+        bad = ["not json", json.dumps(["浏览器兼容"]), json.dumps({"plan": ["x"]}), json.dumps({"design": "x"}),
+               json.dumps({"design": [""]}), json.dumps({"design": ["  "]}), json.dumps({"design": ["x" * 41]}),
+               json.dumps({"design": ["a|b"]}), json.dumps({"design": ["# a"]}), json.dumps({"design": ["a\nb"]}),
+               json.dumps({"design": ["a", "a"]}), json.dumps({"design": ["影响面"]}),
+               json.dumps({"requirement": ["Objective"]}), json.dumps({"requirement": ["回归用例"]}),
+               json.dumps({"design": ["s%d" % n for n in range(11)]}), json.dumps({"design": [1]})]
+        for value in bad:
+            with self.subTest(value=value), Project() as project:
+                code, out = project.run("set", "--key", "projectSections", "--value", value, "--confirm")
+                self.assertEqual(code, 2, out)
+                self.assertIn("projectSections-invalid", out)
+                self.assertFalse(project.config.exists())
+
+    def test_invalid_value_in_file_drops_only_this_key(self):
+        with Project({"version": 1, "artifactLanguage": "zh-CN", "projectSections": {"design": ["a", "a"]}}) as project:
+            self.assertEqual(load(project.root), ({"artifactLanguage": "zh-CN"}, ["projectSections-invalid"]))
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual(items["projectSections"]["source"], "default (config invalid)")
+            self.assertEqual(items["artifactLanguage"]["value"], "zh-CN")
+
+
 class Summary(unittest.TestCase):
     def test_sources_for_every_item(self):
         with Project({"version": 1, "artifactLanguage": "zh-CN"}) as project:
@@ -150,7 +188,7 @@ class Summary(unittest.TestCase):
             items = {item["key"]: item for item in summary(project.root)}
         self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency",
                                       "takeover", "moduleTakeover", "takeoverNarrowed",
-                                      "trackerDefault"})
+                                      "projectSections", "trackerDefault"})
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
         self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),

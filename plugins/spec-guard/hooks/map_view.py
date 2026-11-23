@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, external_review_state, important,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, important,
                           file_review_state, module_state,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -55,6 +55,8 @@ MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone
 ACCEPTANCE_FIELDS = ("marker", "sha")  # interface.json mapView.acceptance (codex-final-acceptance, interface 1.15)
 # interface.json mapView.reviewRounds (review-rounds-in-map, interface 1.17): the keys of one round entry.
 REVIEW_ROUND_FIELDS = ("round", "blocking", "sha256")
+# interface.json mapView.flow (flow-doc-skeletons, interface 1.18): the steps of a flow v2 module before its Plan.
+FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
 TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject", "narrowed")
@@ -469,7 +471,8 @@ def build(root: Path) -> dict:
             "id": module, "position": position[module], "responsibility": rows[module].responsibility or "",
             "dependsOn": deps[module], "status": value,
             "step": (None if value != "in_progress" else
-                     "spec" if not state["spec"] else "plan" if not state["plan"] else "build"),
+                     "spec" if not state["spec"] else FLOW_STEPS.get(state["stage"])
+                     or ("plan" if not state["plan"] else "build")),
             "progress": {"done": done_items, "total": done_items + state["open"]},
             "suspendedReason": suspended_reason(todo) if value == "suspended" else None,
             "blockedOn": (sorted((m for m in upstream if status[m] == "suspended"), key=position.get)
@@ -480,6 +483,7 @@ def build(root: Path) -> dict:
             "reviewApprovedBy": _approved_by(root, module),
             "codexRoute": {kind: codex_route(root, module, kind) or None for kind in ("spec", "plan")},
             "reviewRounds": _review_rounds(root, module),
+            "tier": effective_tier(root, module)["tier"],
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),
@@ -578,6 +582,10 @@ def _status_cell(m: dict, now: datetime, concurrent: bool = False, head_at: str 
             return "🔨 写 Spec"
         if m["step"] == "plan":
             return "🔨 写 Plan"
+        if m["step"] == "design":
+            return "🔨 写技术方案"
+        if m["step"] == "regression":
+            return "🔨 写回归文档"
         since = _elapsed(m.get("lastTickAt"), now)
         pending = ""
         if m.get("uncommittedTicks"):

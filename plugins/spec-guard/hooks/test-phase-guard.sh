@@ -273,6 +273,14 @@ injects "Codex 声明块激活并提示首个 spec" "$local_project" 'spec/'
 touch "$local_project/spec/alpha.md"
 injects "有 spec 没 plan 时报告 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
 injects "指出当前模块" "$local_project" 'Current module: `alpha` (next in Build order)'
+# flow-doc-skeletons：带流程标记的模块先要技术方案、再要回归文档；标记去掉后回到原来的 NEEDS_PLAN。
+printf '# alpha\n\n<!-- spec-guard: flow v2 tier=normal -->\n' >"$local_project/spec/alpha.md"
+injects "新流程模块缺技术方案时报告 NEEDS_DESIGN" "$local_project" "Current stage: **NEEDS_DESIGN**"
+injects "NEEDS_DESIGN 指向技术方案与骨架" "$local_project" 'write the design `tasks/alpha/design.md`'
+mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"
+injects "有技术方案缺回归时报告 NEEDS_REGRESSION" "$local_project" "Current stage: **NEEDS_REGRESSION**"
+rm -rf "$local_project/tasks/alpha" && : >"$local_project/spec/alpha.md"
+injects "去掉流程标记后回到 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
 if grep -Eqi 'sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$local_project")"; then
   fail "legacy tracker advice leaked into local phase output"
 fi

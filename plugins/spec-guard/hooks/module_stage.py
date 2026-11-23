@@ -52,6 +52,50 @@ CODEX_ROUND = re.compile(r"<!-- spec-guard: codex-review round=(\d+) blocking=(\
 _DIGEST_MODULE = None
 
 
+# flow-doc-skeletons: a new-flow (S110) module carries this line in spec/<id>.md; without it the old Spec -> Plan
+# flow applies unchanged.  references/doc-skeletons.md is the human-readable copy of DOC_SECTIONS.
+FLOW_MARKER = re.compile(r"<!-- spec-guard: flow v2 tier=(\S+) -->")
+TIERS = ("bug", "small", "normal", "important")
+SHORT_TIERS = ("bug", "small")  # one document: no design, no separate regression document
+DOC_SECTIONS = {
+    "requirement": {"zh": ("目标", "给谁用", "使用场景", "业务规则和异常情形", "不做什么", "成功标准", "待定问题"),
+                    "en": ("Objective", "Users", "Scenarios", "Rules and exceptions", "Out of scope", "Success criteria",
+                           "Open questions")},
+    "small": {"zh": ("做法", "回归用例"), "en": ("Approach", "Regression cases")},
+    "bug": {"zh": ("复现步骤", "预期结果", "回归用例"), "en": ("Steps to reproduce", "Expected result", "Regression cases")},
+    "design": {"zh": ("现状调研", "影响面", "实现方案", "接口和数据改动", "风险与回滚", "方案取舍"),
+               "en": ("Current state", "Impact", "Implementation", "Interface and data changes", "Risks and rollback",
+                      "Alternatives")},
+    "regression": {"zh": ("用例清单", "成功标准对照", "受影响的老功能"),
+                   "en": ("Cases", "Success criteria coverage", "Affected existing features")},
+    "plan": {"zh": ("任务", "检查点"), "en": ("Tasks", "Checkpoints")},
+}
+
+
+def flow_marker(root: Path, module: str) -> dict:
+    """flow-doc-skeletons: the raw flow marker of spec/<id>.md -- never consults important(), so module_state may use it."""
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return {"v2": False, "tier": None, "problems": []}
+    for line in _visible_lines(text.splitlines()):
+        match = FLOW_MARKER.fullmatch(line.strip())
+        if match:
+            tier = match.group(1)
+            if tier in TIERS:
+                return {"v2": True, "tier": tier, "problems": []}
+            return {"v2": True, "tier": "normal", "problems": ["tier-invalid"]}
+    return {"v2": False, "tier": None, "problems": []}
+
+
+def effective_tier(root: Path, module: str) -> dict:
+    """flow-doc-skeletons: the marker's tier, lifted to important when the rules say the requirement is important."""
+    flow = flow_marker(root, module)
+    if flow["v2"] and flow["tier"] != "important" and important(root, module):
+        return {"v2": True, "tier": "important", "problems": flow["problems"] + ["tier-below-rule"]}
+    return flow
+
+
 def review_approved_line(digest: str) -> str:
     return "<!-- spec-guard: review approved %s -->" % digest
 
@@ -167,7 +211,142 @@ def deferral_lint(text: str) -> list:
     return found
 
 
+# flow-doc-skeletons: the stages between an approved requirement and the Plan.  NEEDS_DESIGN and NEEDS_REGRESSION
+# occur only on flow v2 modules; every "Spec written, Plan not yet" test reads BEFORE_PLAN.
+BEFORE_PLAN = ("NEEDS_DESIGN", "NEEDS_REGRESSION", "NEEDS_PLAN")
+SKELETONS_REF = "references/doc-skeletons.md"
+
+
+def doc_step(module: str, stage: str, zh: bool) -> str:
+    """flow-doc-skeletons: what a flow v2 module writes at a before-the-Plan stage, with its skeleton; no final period."""
+    if zh:
+        return {"NEEDS_DESIGN": "写技术方案 `tasks/%s/design.md`（章节见 spec-guard 插件的 `%s`「技术方案」一节）" % (module, SKELETONS_REF),
+                "NEEDS_REGRESSION": "写回归测试文档 `tasks/%s/regression.md`（章节见 spec-guard 插件的 `%s`「回归测试文档」一节）"
+                                    % (module, SKELETONS_REF),
+                "NEEDS_PLAN": "写 `tasks/%s/plan.md`（只留任务列表与检查点，章节见 spec-guard 插件的 `%s`「Plan」一节）和 `tasks/%s/todo.md`"
+                              % (module, SKELETONS_REF, module)}[stage]
+    return {"NEEDS_DESIGN": "write the design `tasks/%s/design.md` (sections: the design part of the spec-guard plugin's `%s`)"
+                            % (module, SKELETONS_REF),
+            "NEEDS_REGRESSION": "write the regression document `tasks/%s/regression.md` (sections: the regression part of the "
+                                "spec-guard plugin's `%s`)" % (module, SKELETONS_REF),
+            "NEEDS_PLAN": "write `tasks/%s/plan.md` (tasks and checkpoints only; sections: the Plan part of the spec-guard "
+                          "plugin's `%s`) and `tasks/%s/todo.md`" % (module, SKELETONS_REF, module)}[stage]
+
+
+def flow_tier_line(root: Path, module: str, zh: bool) -> str:
+    """flow-doc-skeletons: one line when the flow marker's tier is invalid or below what the rules say; else empty."""
+    flow = effective_tier(root, module)
+    if not flow["problems"]:
+        return ""
+    if zh:
+        why = "、".join({"tier-invalid": "档位不是 bug／small／normal／important 之一", "tier-below-rule": "规则判为重要需求"}[p]
+                       for p in flow["problems"])
+        return "- 档位: `spec/%s.md` 的流程标记%s，按 `%s` 处理。" % (module, why, flow["tier"])
+    why = " and ".join({"tier-invalid": "names no known tier (bug, small, normal, important)",
+                        "tier-below-rule": "is below what the rules decide (an important requirement)"}[p]
+                       for p in flow["problems"])
+    return "- Tier: the flow marker in `spec/%s.md` %s; treated as `%s`." % (module, why, flow["tier"])
+
+
+FLOW_DOCS = (("requirement", "spec/%s.md"), ("design", "tasks/%s/design.md"), ("regression", "tasks/%s/regression.md"),
+             ("plan", "tasks/%s/plan.md"))
+SECTION_HEADING = re.compile(r"^##\s+(.+?)\s*$")
+
+
+def _sections(text: str) -> set:
+    return {match.group(1) for match in (SECTION_HEADING.match(line) for line in _visible_lines(text.splitlines()))
+            if match}
+
+
+def project_sections(root: Path) -> dict:
+    """project-sections: {requirement, design, regression: (section name, ...)} from the project config; empty when unset or invalid."""
+    try:
+        declared = load_config(root)[0].get("projectSections", {})
+    except Exception:  # a failed read changes nothing: verify-artifacts reports the config
+        declared = {}
+    return {doc: tuple(name.strip() for name in declared.get(doc, ())) for doc in ("requirement", "design", "regression")}
+
+
+def sections_sentence(root: Path, stage: str, zh: bool) -> str:
+    """project-sections: the sentence after the next step naming this project's extra sections; empty when none apply."""
+    doc = {"NEEDS_SPEC": "requirement", "NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}.get(stage)
+    names = project_sections(root).get(doc, ()) if doc else ()
+    if not names:
+        return ""
+    if stage == "NEEDS_SPEC":
+        return ("按新流程写需求文档时，另加本项目要求的章节：%s。" % "、".join(names) if zh else
+                " When writing the requirement in the new flow, also add this project's sections: %s." % ", ".join(names))
+    return ("另加本项目要求的章节：%s。" % "、".join(names) if zh else
+            " Also add this project's sections: %s." % ", ".join(names))
+
+
+def flow_doc_problems(root: Path, module: str) -> list:
+    """flow-doc-skeletons: [(level, message)] for a flow v2 module's documents; [] for an old-flow module.
+
+    A document is required once a later one exists (a module still writing its design lacks nothing); every document
+    that exists must carry its skeleton sections, in Chinese or English, possibly saying "不涉及".
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"]:
+        return []
+    found = [("warn", "`spec/%s.md` 的流程标记%s" % (module, {"tier-invalid": "档位无效，按 normal 处理",
+                                                          "tier-below-rule": "档位低于规则判定，按 important 处理"}[p]))
+             for p in flow["problems"]]
+    short = flow["tier"] in SHORT_TIERS
+    docs = [(kind, pattern % module) for kind, pattern in FLOW_DOCS if not (short and kind in ("design", "regression"))]
+    present = [(root / path).is_file() for _, path in docs]
+    extra = project_sections(root)
+    last = max((index for index, here in enumerate(present) if here), default=-1)
+    for index, (kind, path) in enumerate(docs):
+        if not present[index]:
+            if index < last:
+                found.append(("fail", "`%s` 缺失（档位 %s，后面的文档已经写了）" % (path, flow["tier"])))
+            continue
+        wanted = {"requirement": ("bug",) if flow["tier"] == "bug" else
+                  (("requirement", "small") if flow["tier"] == "small" else ("requirement",))}.get(kind, (kind,))
+        try:
+            have = _sections((root / path).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            found.append(("fail", "`%s` 读不了" % path))
+            continue
+        missing = [zh for group in wanted for zh, en in zip(DOC_SECTIONS[group]["zh"], DOC_SECTIONS[group]["en"])
+                   if zh not in have and en not in have]
+        missing += [name for name in extra.get(kind, ()) if name not in have]
+        if missing:
+            found.append(("fail", "`%s` 缺章节：%s" % (path, "、".join(missing))))
+    return found
+
+
+def _v2(root: Path, module: str) -> bool:
+    return flow_marker(root, module)["v2"]
+
+
+def _hold(root: Path, module: str, stage: str, zh: bool) -> str:
+    """What not to do yet while a review is open: the document the stage would write next."""
+    if stage == "BUILDING":
+        return "不要继续构建" if zh else "do not continue the build"
+    doc = {"NEEDS_DESIGN": ("技术方案", "design"), "NEEDS_REGRESSION": ("回归测试文档", "regression document"),
+           "NEEDS_PLAN": (" Plan", "Plan")}[stage]
+    return ("先不要写%s" % doc[0]) if zh else ("do not write the %s yet" % doc[1])
+
+
 def module_state(root: Path, module_id: str) -> dict:
+    """The module's stage; a flow v2 bug/small module the rules call important needs the full documents."""
+    state = _base_state(root, module_id)
+    if state["stage"] in ("NEEDS_PLAN", "BUILDING", "DONE"):
+        flow = flow_marker(root, module_id)
+        if flow["v2"] and flow["tier"] in SHORT_TIERS and effective_tier(root, module_id)["tier"] == "important":
+            state = _base_state(root, module_id, full=True)
+    return state
+
+
+def _base_state(root: Path, module_id: str, full: bool | None = None) -> dict:
+    """module_state without the important() correction: important() reads other modules through this, never recursing.
+
+    full: True asks for the design and regression documents whatever the tier says; None reads the raw flow marker."""
+    if full is None:
+        flow = flow_marker(root, module_id)
+        full = flow["v2"] and flow["tier"] not in SHORT_TIERS
     has_spec = (root / "spec" / f"{module_id}.md").is_file()
     plan = root / "tasks" / module_id / "plan.md"
     has_plan = plan.is_file()
@@ -181,6 +360,10 @@ def module_state(root: Path, module_id: str) -> dict:
     suspended = bool(open_items) and any(line.strip() == SUSPEND_MARKER for line in text.splitlines())
     if not has_spec:
         stage = "NEEDS_SPEC"
+    elif full and not (root / "tasks" / module_id / "design.md").is_file():
+        stage = "NEEDS_DESIGN"
+    elif full and not (root / "tasks" / module_id / "regression.md").is_file():
+        stage = "NEEDS_REGRESSION"
     elif not has_plan:
         stage = "NEEDS_PLAN"
     elif open_items:
@@ -797,7 +980,7 @@ def important(root: Path, module: str) -> list:
             pass
         clash = False
         for other in others:
-            if module_state(root, other)["stage"] == "DONE":
+            if _base_state(root, other)["stage"] == "DONE":  # flow-doc-skeletons: not module_state, which calls here
                 continue
             try:
                 theirs = parse(read(root / "spec" / ("%s.md" % other)))
@@ -977,7 +1160,7 @@ def pre_build_batch(root: Path, module: str, stage: str, spec: str, plan: str) -
     "Before the build" is NEEDS_PLAN, or BUILDING with the Plan still pending; once the Plan is approved (or carries
     no marker, as in older projects) the build rules apply unchanged.
     """
-    if spec != "revised" or not (stage == "NEEDS_PLAN" or (stage == "BUILDING" and plan == "pending")):
+    if spec != "revised" or not (stage in BEFORE_PLAN or (stage == "BUILDING" and plan == "pending")):
         return None
     return spec_baseline(root, module)
 
@@ -988,7 +1171,7 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
     the validated module id only -- never text from the files.
     """
-    if stage not in ("NEEDS_PLAN", "BUILDING"):
+    if stage not in BEFORE_PLAN + ("BUILDING",):
         return "", "", "none", "none"
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
     spec = file_review_state(root / spec_path, "spec")
@@ -1013,10 +1196,14 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
         return codex[0], codex[1], spec, plan
     if zh:
         return review_hint_zh(root, module, stage, cmd, spec, plan, spec_path, plan_path)
-    hold = "do not write the Plan yet" if stage == "NEEDS_PLAN" else "do not continue the build"
+    hold = _hold(root, module, stage, False)
     record = " When the user approves it, record that with %s." % cmd["review-mark"]
+    v2 = stage in BEFORE_PLAN and _v2(root, module)
     if spec == "pending":
         line = "- Review: Spec `%s` is awaiting the user's review." % spec_path
+        if stage in BEFORE_PLAN and cadence_combined(root, module) and v2:
+            return (line, "%s; once the documents up to the Plan are written, present them with the Spec together for one "
+                    "approval.%s" % (doc_step(module, stage, False), record), spec, plan)
         if stage == "NEEDS_PLAN" and cadence_combined(root, module):
             return (line, "write `tasks/%s/plan.md` and `tasks/%s/todo.md`, then present the Spec and the Plan "
                     "together for one approval.%s" % (module, module, record), spec, plan)
@@ -1024,13 +1211,13 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     batch = pre_build_batch(root, module, stage, spec, plan)
     if batch is not None and batch["status"] == "found":
         return ("- Review: Spec `%s` was edited after it was approved (baseline %s)." % (spec_path, batch["commit"][:7]),
-                "the revision may wait for the Plan's review: record the revision in the Spec's change log and write the "
-                "Plan as usual; when presenting the Plan, show the Spec's cumulative diff against the baseline verbatim and "
+                "the revision may wait for the Plan's review: record the revision in the Spec's change log and %s as "
+                "usual; when presenting the Plan, show the Spec's cumulative diff against the baseline verbatim and "
                 "say that approving the Plan also approves the revised Spec, then record both with %s (`--target both`). "
                 "Stop and ask at once if the revision weakens an approved acceptance criterion, makes a decision the Spec "
                 "does not cover, touches an ask-first item in the Spec's Boundaries, or is high-risk or irreversible."
-                % cmd["review-mark"], spec, plan)
-    if batch is not None and stage == "NEEDS_PLAN":
+                % (doc_step(module, stage, False) if v2 else "write the Plan", cmd["review-mark"]), spec, plan)
+    if batch is not None and stage in BEFORE_PLAN:
         why = ("the approved text is not in git (commit the Spec right after approval)" if batch["status"] == "absent"
                else "the baseline could not be checked (%s)" % batch["reason"])
         return ("- Review: Spec `%s` was edited after it was approved." % spec_path,
@@ -1059,10 +1246,14 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
 def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, plan: str, spec_path: str,
                    plan_path: str) -> tuple:
     """review_hint's Chinese wording (hint-language-follow); the same decisions in the same order."""
-    hold = "先不要写 Plan" if stage == "NEEDS_PLAN" else "不要继续构建"
+    hold = _hold(root, module, stage, True)
     record = "用户批准后，用 %s 记下来。" % cmd["review-mark"]
+    v2 = stage in BEFORE_PLAN and _v2(root, module)
     if spec == "pending":
         line = "- 批准: Spec `%s` 正在等用户批准。" % spec_path
+        if stage in BEFORE_PLAN and cadence_combined(root, module) and v2:
+            return (line, "%s；Plan 之前的文档写齐后，连同 Spec 一起交给用户一次批准。%s" % (doc_step(module, stage, True), record),
+                    spec, plan)
         if stage == "NEEDS_PLAN" and cadence_combined(root, module):
             return (line, "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`，然后把 Spec 和 Plan 一起交给用户一次批准。%s"
                     % (module, module, record), spec, plan)
@@ -1070,11 +1261,11 @@ def review_hint_zh(root: Path, module: str, stage: str, cmd: dict, spec: str, pl
     batch = pre_build_batch(root, module, stage, spec, plan)
     if batch is not None and batch["status"] == "found":
         return ("- 批准: Spec `%s` 批准后又改过（基线 %s）。" % (spec_path, batch["commit"][:7]),
-                "开工前的修订可以攒到 Plan 交审一次批：记进 Spec 末尾的变更记录，照常写 Plan；交审 Plan 时原样附上 Spec 相对基线的"
+                "开工前的修订可以攒到 Plan 交审一次批：记进 Spec 末尾的变更记录，照常%s；交审 Plan 时原样附上 Spec 相对基线的"
                 "累计差异，说明批准 Plan 也就批准了修订后的 Spec，批准后用 %s（`--target both`）一起记下。修订削弱了已批准的验收标准、"
                 "做了 Spec 没覆盖的决定、碰到 Spec 的 Boundaries 里的「先问」项，或是高风险、不可逆的操作时，当场停下问用户。"
-                % cmd["review-mark"], spec, plan)
-    if batch is not None and stage == "NEEDS_PLAN":
+                % (doc_step(module, stage, True) if v2 else "写 Plan", cmd["review-mark"]), spec, plan)
+    if batch is not None and stage in BEFORE_PLAN:
         why = ("取不到批准时的原文（Spec 获批后先提交再改）" if batch["status"] == "absent"
                else "基线未判定（%s）" % batch["reason"])
         return ("- 批准: Spec `%s` 批准后又改过。" % spec_path,
@@ -1134,7 +1325,7 @@ def external_review_hint(root: Path, module: str, stage: str, spec: str, plan: s
 
     Fixed wording and the validated module id only.  The plugin records are read only at a checkpoint.
     """
-    if stage == "NEEDS_PLAN" and spec in ("pending", "none"):
+    if stage in BEFORE_PLAN and spec in ("pending", "none"):
         what, where = "Spec", "spec/%s.md" % module
     elif stage == "BUILDING" and plan == "pending":
         what, where = "Plan", "tasks/%s/todo.md" % module
@@ -1234,6 +1425,9 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
     if stage == "NEEDS_SPEC":
         return lines, (("写 `spec/%s.md`，交给协调会话请用户审。" if zh else
                         "write `spec/%s.md` and hand it to the coordinating session for review.") % module)
+    if stage in BEFORE_PLAN and _v2(root, module):
+        return lines, (("%s，写好后交给协调会话。" if zh else "%s, then hand it to the coordinating session.")
+                       % doc_step(module, stage, zh)) + sections_sentence(root, stage, zh)
     if stage == "NEEDS_PLAN":
         return lines, (("写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s），交给协调会话请用户审。" if zh else
                         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
@@ -1674,13 +1868,20 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     if review_line and role_kind != "module":
         counts += "\n" + review_line
+    tier_line = flow_tier_line(root, module, zh)
+    if tier_line:
+        counts += "\n" + tier_line
     external_line = (external_review_hint(root, module, stage, spec_review, plan_review, host, zh)
                      if role_kind != "module" else "")
     if external_line:
         counts += "\n" + external_line
     next_step = {
         "NEEDS_SPEC": "写 `spec/%s.md` 并交审。" % module,
-        "NEEDS_PLAN": "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s）%s。" % (
+        "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", True) + "。",
+        "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", True) + "。",
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", True) + "（例如用 %s）%s。" % (
+            cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else "")) if _v2(root, module) else
+        "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s）%s。" % (
             module, module, cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else ""),
         "BUILDING": "继续用 %s 构建 `%s`：`tasks/%s/todo.md` 里还有 %d 个未勾选项。" % (cmd["build"], module, module,
                                                                                      current["open"]),
@@ -1688,7 +1889,11 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     }[stage] if zh else {
         "NEEDS_SPEC": "write and review `spec/%s.md`." % module,
         # No marker says nothing about approval either way, so the suggestion names the condition.
-        "NEEDS_PLAN": "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
+        "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", False) + ".",
+        "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", False) + ".",
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", False) + " (for example with %s)%s." % (
+            cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else "")) if _v2(root, module) else
+        "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
             module, module, cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else ""),
         "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
                                                                                          current["open"], module),
@@ -1714,6 +1919,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         elif gate and plan_review == "none":
             counts += ("\n- Next gate: %s — the first unchecked `gate` checkpoint in the todo. The Plan has no review "
                        "marker: if the user has not approved it yet, wait for that approval before building." % gate)
+    if not review_step and (stage == "NEEDS_SPEC" or (stage in ("NEEDS_DESIGN", "NEEDS_REGRESSION") and _v2(root, module))):
+        next_step += sections_sentence(root, stage, zh)  # project-sections
     next_step = review_step or next_step
     if role_kind in ("module", "coordinator"):
         role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step, zh)
@@ -1746,7 +1953,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root)] + ([ms_fact] if ms_fact else [])
+                       documentation_baseline_present(root), project_sections(root)] + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,

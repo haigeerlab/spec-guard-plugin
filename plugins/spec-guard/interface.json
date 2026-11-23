@@ -1,5 +1,5 @@
 {
-  "interface": "1.17",
+  "interface": "1.18",
   "mapView": {
     "command": [
       "python3",
@@ -96,6 +96,18 @@
         "sha256": "the first 12 hex digits of the sha256 of the reviewed Spec or Plan bytes in that round -- the file's value in the delegate report's scope.files, not a hash of the report file; the round line keeps only this prefix, not the full digest"
       },
       "meaning": "facts read from the round lines <!-- spec-guard: codex-review round=N blocking=N sha256=<12 hex> --> outside code fences, the same reading reviewMark uses for its two-round cap; every round is listed, also from before a revision, whatever the approval marker says now. No verdict is derived here: a caller checks a Codex approval or the two-round hand-off against reviewApprovedBy and codexRoute itself. An unreadable Spec or Plan fails the whole view (exit 4) like review"
+    },
+    "flow": {
+      "appearsWhen": "per module, always (interface 1.18, spec/flow-doc-skeletons.md)",
+      "fields": {
+        "tier": "the flow v2 tier from the line <!-- spec-guard: flow v2 tier=<tier> --> in spec/<id>.md: bug, small, normal or important; an unknown tier reads as normal, and important when the rules judge the requirement important (see important); null for a module without the line (the old Spec -> Plan flow, unchanged)"
+      },
+      "tierValues": ["bug", "small", "normal", "important"],
+      "stepValues": {
+        "design": "since 1.18, flow v2 normal/important modules only: the requirement is written, tasks/<id>/design.md is not (stage hint NEEDS_DESIGN)",
+        "regression": "since 1.18, flow v2 normal/important modules only: the design is written, tasks/<id>/regression.md is not (stage hint NEEDS_REGRESSION)"
+      },
+      "meaning": "bug and small modules write one document (spec/<id>.md) and go from the requirement straight to the Plan; normal and important modules write the design and the regression document first. Document sections: references/doc-skeletons.md. step keeps spec, plan and build for every other case"
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",
