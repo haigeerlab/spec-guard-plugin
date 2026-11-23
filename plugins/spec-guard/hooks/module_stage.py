@@ -52,6 +52,50 @@ CODEX_ROUND = re.compile(r"<!-- spec-guard: codex-review round=(\d+) blocking=(\
 _DIGEST_MODULE = None
 
 
+# flow-doc-skeletons: a new-flow (S110) module carries this line in spec/<id>.md; without it the old Spec -> Plan
+# flow applies unchanged.  references/doc-skeletons.md is the human-readable copy of DOC_SECTIONS.
+FLOW_MARKER = re.compile(r"<!-- spec-guard: flow v2 tier=(\S+) -->")
+TIERS = ("bug", "small", "normal", "important")
+SHORT_TIERS = ("bug", "small")  # one document: no design, no separate regression document
+DOC_SECTIONS = {
+    "requirement": {"zh": ("目标", "给谁用", "使用场景", "业务规则和异常情形", "不做什么", "成功标准", "待定问题"),
+                    "en": ("Objective", "Users", "Scenarios", "Rules and exceptions", "Out of scope", "Success criteria",
+                           "Open questions")},
+    "small": {"zh": ("做法", "回归用例"), "en": ("Approach", "Regression cases")},
+    "bug": {"zh": ("复现步骤", "预期结果", "回归用例"), "en": ("Steps to reproduce", "Expected result", "Regression cases")},
+    "design": {"zh": ("现状调研", "影响面", "实现方案", "接口和数据改动", "风险与回滚", "方案取舍"),
+               "en": ("Current state", "Impact", "Implementation", "Interface and data changes", "Risks and rollback",
+                      "Alternatives")},
+    "regression": {"zh": ("用例清单", "成功标准对照", "受影响的老功能"),
+                   "en": ("Cases", "Success criteria coverage", "Affected existing features")},
+    "plan": {"zh": ("任务", "检查点"), "en": ("Tasks", "Checkpoints")},
+}
+
+
+def flow_marker(root: Path, module: str) -> dict:
+    """flow-doc-skeletons: the raw flow marker of spec/<id>.md -- never consults important(), so module_state may use it."""
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return {"v2": False, "tier": None, "problems": []}
+    for line in _visible_lines(text.splitlines()):
+        match = FLOW_MARKER.fullmatch(line.strip())
+        if match:
+            tier = match.group(1)
+            if tier in TIERS:
+                return {"v2": True, "tier": tier, "problems": []}
+            return {"v2": True, "tier": "normal", "problems": ["tier-invalid"]}
+    return {"v2": False, "tier": None, "problems": []}
+
+
+def effective_tier(root: Path, module: str) -> dict:
+    """flow-doc-skeletons: the marker's tier, lifted to important when the rules say the requirement is important."""
+    flow = flow_marker(root, module)
+    if flow["v2"] and flow["tier"] != "important" and important(root, module):
+        return {"v2": True, "tier": "important", "problems": flow["problems"] + ["tier-below-rule"]}
+    return flow
+
+
 def review_approved_line(digest: str) -> str:
     return "<!-- spec-guard: review approved %s -->" % digest
 
