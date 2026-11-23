@@ -231,5 +231,90 @@ class HintTest(unittest.TestCase):
             self.assertIn("treated as `normal`", hint(project, zh=False))
 
 
+class ProjectSectionsTest(unittest.TestCase):
+    """project-sections: the declared extra sections join the skeleton for flow v2 modules only."""
+    SECTIONS = {"requirement": ["数据来源"], "design": ["浏览器兼容"], "regression": ["视觉回归"]}
+
+    def config(self, project, sections=None, zh=True):
+        payload = {"version": 1}
+        if zh:
+            payload["artifactLanguage"] = "zh-CN"
+        if sections is not None:
+            payload["projectSections"] = sections
+        project.write(".agent/config.json", json.dumps(payload))
+
+    def problems(self, project):
+        return [message for _level, message in module_stage.flow_doc_problems(project.root, "a")]
+
+    def test_normal_design_needs_the_declared_section(self):
+        with Project() as project:
+            self.config(project, {"design": ["浏览器兼容"]})
+            approved_spec(project)
+            project.write("tasks/a/design.md", "".join("## %s\n\n不涉及\n\n" % n for n in DOC_SECTIONS["design"]["zh"]))
+            self.assertIn("`tasks/a/design.md` 缺章节：浏览器兼容", self.problems(project))
+            with open(project.root / "tasks" / "a" / "design.md", "a", encoding="utf-8") as handle:
+                handle.write("## 浏览器兼容\n\n不涉及\n")
+            self.assertEqual(self.problems(project), [])
+
+    def test_bug_and_small_ignore_design_and_regression_sections_but_not_requirement(self):
+        for tier, own in (("bug", DOC_SECTIONS["bug"]["zh"]),
+                          ("small", DOC_SECTIONS["requirement"]["zh"] + DOC_SECTIONS["small"]["zh"])):
+            with self.subTest(tier=tier), Project() as project:
+                self.config(project, self.SECTIONS)
+                body = "# a\n\n%s\n\n" % marker(tier) + "".join("## %s\n\n不涉及\n\n" % n for n in own)
+                project.write("spec/a.md", body)
+                self.assertEqual(self.problems(project), ["`spec/a.md` 缺章节：数据来源"])
+                project.write("spec/a.md", body + "## 数据来源\n\n不涉及\n")
+                self.assertEqual(self.problems(project), [])
+
+    def test_old_module_and_invalid_setting_are_untouched(self):
+        with Project() as project:
+            self.config(project, self.SECTIONS)
+            project.write("spec/a.md", "# a\n")
+            self.assertEqual(self.problems(project), [])
+            self.config(project, {"design": ["影响面"]})  # invalid: same as a skeleton section
+            approved_spec(project)
+            project.write("tasks/a/design.md", "".join("## %s\n\n不涉及\n\n" % n for n in DOC_SECTIONS["design"]["zh"]))
+            self.assertEqual(self.problems(project), [])
+
+    def test_hint_lists_the_sections_and_is_unchanged_without_them(self):
+        with Project() as project:
+            approved_spec(project)
+            self.config(project)
+            project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
+            plain = module_stage.describe(project.root)
+            self.assertNotIn("另加本项目要求的章节", plain)
+            self.config(project, {"design": ["浏览器兼容", "无障碍"]})
+            self.assertIn("另加本项目要求的章节：浏览器兼容、无障碍。", module_stage.describe(project.root))
+            self.config(project, {"design": ["浏览器兼容"]}, zh=False)
+            self.assertIn("Also add this project's sections: 浏览器兼容.", module_stage.describe(project.root))
+            self.config(project, {"design": ["影响面"]})
+            self.assertNotIn("另加本项目要求的章节", module_stage.describe(project.root))  # invalid: ignored
+
+    def test_needs_spec_says_when_a_requirement_section_is_declared(self):
+        with Project() as project:
+            self.config(project)
+            project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
+            plain = module_stage.describe(project.root)
+            self.config(project, {"design": ["浏览器兼容"]})
+            self.assertNotIn("按新流程写需求文档时", module_stage.describe(project.root))
+            self.config(project, {"requirement": ["数据来源"]})
+            self.assertIn("按新流程写需求文档时，另加本项目要求的章节：数据来源。", module_stage.describe(project.root))
+            self.config(project)
+            self.assertEqual(module_stage.describe(project.root), plain)
+
+    def test_state_code_changes_with_the_sections(self):
+        with Project() as project:
+            approved_spec(project)
+            self.config(project)
+            project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
+            full = module_stage.describe(project.root, state_extra="x")
+            code = full.rsplit("spec-guard-state: ", 1)[1][:8]
+            self.assertNotIn("\n", module_stage.describe(project.root, state_extra="x", last_state=code).strip())
+            self.config(project, {"design": ["浏览器兼容"]})
+            again = module_stage.describe(project.root, state_extra="x", last_state=code)
+            self.assertIn("另加本项目要求的章节：浏览器兼容。", again)
+
+
 if __name__ == "__main__":
     unittest.main()

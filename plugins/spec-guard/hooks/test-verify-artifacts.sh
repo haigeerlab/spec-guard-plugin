@@ -506,6 +506,18 @@ check_absent "bug 档只要需求文档，不要求技术方案与回归" "缺�
 project flow-tier
 flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=huge -->\n' >>"$PROJECT/spec/alpha.md"
 check "档位写错时警告并按 normal 处理" 0 "档位无效，按 normal 处理"
+# project-sections：声明的追加章节并入骨架；配置不合法时只这一项失效、追加章节不生效。
+project flow-sections
+mkdir -p "$PROJECT/.agent"; printf '%s\n' '{"version": 1, "projectSections": {"design": ["浏览器兼容"]}}' >"$PROJECT/.agent/config.json"
+flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=normal -->\n' >>"$PROJECT/spec/alpha.md"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
+check "追加章节：技术方案缺声明的章节时失败" 1 "tasks/alpha/design.md\` 缺章节：浏览器兼容"
+printf '## 浏览器兼容\n\n不涉及\n' >>"$PROJECT/tasks/alpha/design.md"
+check_absent "追加章节：补上标题后通过" "缺章节"
+printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN", "projectSections": {"design": ["影响面"]}}' >"$PROJECT/.agent/config.json"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
+check "追加章节配置不合法：报 projectSections-invalid" 1 "projectSections-invalid"
+check_absent "追加章节配置不合法：追加章节不生效" "缺章节"
 project flow-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' >"$PROJECT/tasks/alpha/plan.md"
 check_absent "老模块不查新流程文档" "缺失（档位"

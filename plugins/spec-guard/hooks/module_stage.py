@@ -258,6 +258,28 @@ def _sections(text: str) -> set:
             if match}
 
 
+def project_sections(root: Path) -> dict:
+    """project-sections: {requirement, design, regression: (section name, ...)} from the project config; empty when unset or invalid."""
+    try:
+        declared = load_config(root)[0].get("projectSections", {})
+    except Exception:  # a failed read changes nothing: verify-artifacts reports the config
+        declared = {}
+    return {doc: tuple(name.strip() for name in declared.get(doc, ())) for doc in ("requirement", "design", "regression")}
+
+
+def sections_sentence(root: Path, stage: str, zh: bool) -> str:
+    """project-sections: the sentence after the next step naming this project's extra sections; empty when none apply."""
+    doc = {"NEEDS_SPEC": "requirement", "NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}.get(stage)
+    names = project_sections(root).get(doc, ()) if doc else ()
+    if not names:
+        return ""
+    if stage == "NEEDS_SPEC":
+        return ("按新流程写需求文档时，另加本项目要求的章节：%s。" % "、".join(names) if zh else
+                " When writing the requirement in the new flow, also add this project's sections: %s." % ", ".join(names))
+    return ("另加本项目要求的章节：%s。" % "、".join(names) if zh else
+            " Also add this project's sections: %s." % ", ".join(names))
+
+
 def flow_doc_problems(root: Path, module: str) -> list:
     """flow-doc-skeletons: [(level, message)] for a flow v2 module's documents; [] for an old-flow module.
 
@@ -273,6 +295,7 @@ def flow_doc_problems(root: Path, module: str) -> list:
     short = flow["tier"] in SHORT_TIERS
     docs = [(kind, pattern % module) for kind, pattern in FLOW_DOCS if not (short and kind in ("design", "regression"))]
     present = [(root / path).is_file() for _, path in docs]
+    extra = project_sections(root)
     last = max((index for index, here in enumerate(present) if here), default=-1)
     for index, (kind, path) in enumerate(docs):
         if not present[index]:
@@ -288,6 +311,7 @@ def flow_doc_problems(root: Path, module: str) -> list:
             continue
         missing = [zh for group in wanted for zh, en in zip(DOC_SECTIONS[group]["zh"], DOC_SECTIONS[group]["en"])
                    if zh not in have and en not in have]
+        missing += [name for name in extra.get(kind, ()) if name not in have]
         if missing:
             found.append(("fail", "`%s` 缺章节：%s" % (path, "、".join(missing))))
     return found
@@ -1403,7 +1427,7 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
                         "write `spec/%s.md` and hand it to the coordinating session for review.") % module)
     if stage in BEFORE_PLAN and _v2(root, module):
         return lines, (("%s，写好后交给协调会话。" if zh else "%s, then hand it to the coordinating session.")
-                       % doc_step(module, stage, zh))
+                       % doc_step(module, stage, zh)) + sections_sentence(root, stage, zh)
     if stage == "NEEDS_PLAN":
         return lines, (("写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s），交给协调会话请用户审。" if zh else
                         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s) and hand them to the "
@@ -1895,6 +1919,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         elif gate and plan_review == "none":
             counts += ("\n- Next gate: %s — the first unchecked `gate` checkpoint in the todo. The Plan has no review "
                        "marker: if the user has not approved it yet, wait for that approval before building." % gate)
+    if not review_step and (stage == "NEEDS_SPEC" or (stage in ("NEEDS_DESIGN", "NEEDS_REGRESSION") and _v2(root, module))):
+        next_step += sections_sentence(root, stage, zh)  # project-sections
     next_step = review_step or next_step
     if role_kind in ("module", "coordinator"):
         role_lines, next_step = role_view(root, role_kind, role_id, by_id, cmd, review_step, zh)
@@ -1927,7 +1953,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root)] + ([ms_fact] if ms_fact else [])
+                       documentation_baseline_present(root), project_sections(root)] + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
