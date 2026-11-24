@@ -11,8 +11,5 @@
     "proposal",
     "workflow"
   ],
-  "homepage": "https://github.com/haigeerlab/spec-guard-plugin",
-  "requires": {
-    "note": "依赖 addyosmani/agent-skills 已安装；Proposal tracker 读取由显式、只读适配器完成"
-  }
+  "homepage": "https://github.com/haigeerlab/spec-guard-plugin"
 }

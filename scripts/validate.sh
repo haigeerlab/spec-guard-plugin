@@ -135,6 +135,8 @@ python3 -B scripts/run_steps_parallel.py \
   --section '═══ 校验器自身的回归 ═══' \
   'bash scripts/test-checkers.sh' \
   'python3 -B scripts/test_check_local_paths.py' \
+  'python3 -B scripts/test_check_frontmatter.py' \
+  'python3 -B scripts/test_ci_workflow.py' \
   'python3 -B scripts/test_pre_push_environment.py' \
   'python3 -B scripts/test_verify_and_commit.py' \
   'python3 -B scripts/test_validate_quick.py' \

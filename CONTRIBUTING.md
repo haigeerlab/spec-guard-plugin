@@ -26,10 +26,16 @@
 
 三个都绿才提。
 
+**CI 跑什么**：`.github/workflows/ci.yml`（workflow 名 `CI`）有四个任务——`validate`（上面三条加 ShellCheck）、
+`python`（在 Python 3.9 与 3.13 上各跑一遍 `validate.sh`；3.9 是 macOS 系统 Python）、`plugin`（`claude plugin validate --strict`
+校验插件与 marketplace 清单，`scripts/check-frontmatter.py` 用 PyYAML 真正解析 skill、command 的 frontmatter），以及汇总任务
+`CI required`。主干保护只要求 `CI required`：它在上游任何一个失败、取消或跳过时失败，所以加任务、改任务名都不用改主干保护。
+每个检查任务最后一步是 `git diff --exit-code`，检查留下改动也算失败。workflow 顶层 `permissions: {}`、checkout 不留凭据、
+action 钉完整 SHA；这些由 `scripts/test_ci_workflow.py` 锁住（需要 PyYAML，本机没有时跳过）。
+
 **显式写 `/bin/bash`**：macOS 上 `bash` 可能是 Homebrew 的 5.x，而 3.2 才是
-这个项目踩过坑的版本。**CI 不替你覆盖这一条** —— `.github/workflows/ci.yml` 只跑
-`ubuntu-latest`（单元素矩阵，为的是不被 macOS runner 排队阻塞 PR），那上面的
-`/bin/bash` 是 5.x。bash 3.2 的语法陷阱在 CI 里只由 `scripts/check-bash32.py`
+这个项目踩过坑的版本。**CI 不替你覆盖这一条** —— CI 只跑 `ubuntu-latest`
+（为的是不被 macOS runner 排队阻塞 PR），那上面的 `/bin/bash` 是 5.x。bash 3.2 的语法陷阱在 CI 里只由 `scripts/check-bash32.py`
 这个静态判据覆盖，真正在 3.2 上跑过的只有你本机那一次。某一次 push 或 PR 是否真的
 跑过 CI，看 Actions 标签页或 `gh pr checks`。本地跑 `scripts/validate.sh` 加上面两条
 回归脚本（即预推送 hook 那一套）是唯一必须满足的门禁。

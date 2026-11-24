@@ -1,5 +1,15 @@
 # Changelog
 
+## [未发布]
+
+### 变更
+
+- **CI 按《插件开发规范》v1.3 改写（plugin-spec-compliance）。** workflow 名改为 `CI`；新增 `python`（3.9、3.13）、`plugin`
+  （`claude plugin validate --strict` 与 `scripts/check-frontmatter.py`）两个任务和汇总任务 `CI required`，主干保护改为只要求它；
+  顶层 `permissions: {}`、checkout 不留凭据、action 钉完整 SHA、每个检查任务末尾 `git diff --exit-code`；新增 `.github/dependabot.yml`（只更新 GitHub Actions，每月，cooldown 7 天）。
+- Claude 清单去掉 Claude Code 不认的 `requires` 字段（只是一句说明，依赖 agent-skills 见 README），marketplace 清单补 `description`，两者通过 `--strict`。
+- `scripts/check-local-paths.py` 在 Python 3.9 上可导入。LICENSE 版权行改为 `haigeerlab`。
+
 ## [0.94.0] - 2026-11-24
 
 S110 开发流程改版的 M1：新流程的文档骨架与项目追加章节（flow-doc-skeletons、project-sections）。接口 1.17 → 1.18。老模块（需求文档没有 `flow v2` 标记）的行为与输出不变。

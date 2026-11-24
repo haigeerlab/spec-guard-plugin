@@ -1,0 +1,9 @@
+# 插件开发规范 C9：只更新 GitHub Actions（workflow 里钉了 SHA），每月一次，新版本发布 7 天后才提。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
