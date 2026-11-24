@@ -1,5 +1,4 @@
 ---
-description: 查看当前 agent-skills 链路状态
 allowed-tools: Bash
 ---
 
