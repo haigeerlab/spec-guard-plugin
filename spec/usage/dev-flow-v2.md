@@ -55,7 +55,7 @@ bug：需求文档写复现步骤和预期，修完补一条回归用例，不�
 | 需求 | 不可配置 | 永远由用户确认 |
 | `design` | `human`／`reviewer` | 技术方案由人批，或第二审查者审过即可（重要需求永远人批；第二审查者可能是同厂商独立会话，厂商写在审查记录里）。`reviewer` 时是否审仍按 `designReview`，但碰老逻辑、跨模块时不论开关都审；不审的普通需求技术方案直接放行 |
 | Plan | 不可配置 | 永远自动批准 |
-| `merge` | `human`／`auto` | 人合，或 ⑦ 通过后自动合 |
+| `merge` | `human`／`auto` | 用户在对话里说『合并』后会话执行（GitHub `--auto`），或 ⑦ 通过后自动合 |
 | `release` | `human`／`prepare`／`auto-confirm`／`auto` | 不变 |
 
 预设：`none`（全人）／`design`（`design=reviewer`）／`merge`（`design=reviewer`、`merge=auto`）。
