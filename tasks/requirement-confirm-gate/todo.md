@@ -6,7 +6,7 @@
 - [x] Task 3：verify-artifacts 对 Codex 批准的警告，回归
 - [x] Task 4：共享检查点规则「需求确认」一节
 - [x] Checkpoint 1（report）：完整检查、变异与实跑
-- [ ] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
+- [x] Checkpoint 2（gate）：最终验收；通过后推送并开 PR，合并由用户进行
 
 ## 证据
 
@@ -20,3 +20,10 @@
   确认后改文档变 revised，提示要用户重新确认。
 - 偏离：Task 3 与 Task 4 合成一个提交 b2a1022（verify-and-commit 拒了 Task 3 那次——工作区有 Task 4 未暂存改动，我用 `| tail` 吞掉了失败码），内容已过全套检查，提交信息已改为写两个任务；Task 4 的断言在改规则之后才写。
 
+
+2026-11-24 用户「验收通过」。
+
+## 外部审查意见
+
+<!-- spec-guard: external-review declined -->
+- Plan 经 Codex 审两轮（轮次行见 plan.md），第 2 轮仍有阻断，转用户批（11-24「Plan 和修订都批准」）；最终验收未另做外部审查。
