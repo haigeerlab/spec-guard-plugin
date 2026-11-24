@@ -1,6 +1,6 @@
 # Todo: plugin-spec-compliance
 
-- [ ] Task 0：提交 Plan 与 todo
+- [x] Task 0：提交 Plan 与 todo（2026-11-24 用户「Plan 批准」）
 - [ ] Task 1：Python 3.9 兼容
 - [ ] Task 2：check-frontmatter.py 与回归
 - [ ] Task 3：清单过 --strict

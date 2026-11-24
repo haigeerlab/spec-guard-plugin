@@ -1,6 +1,6 @@
 # Plan: plugin-spec-compliance
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 Spec：[spec/plugin-spec-compliance.md](../../spec/plugin-spec-compliance.md)（2026-11-24 批准）。
 
