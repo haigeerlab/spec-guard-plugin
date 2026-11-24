@@ -5,7 +5,7 @@
 - [x] Task 2：本仓库文档
 - [x] Task 3：版本与 CHANGELOG
 - [x] Checkpoint 1（report）：本机完整检查与变异
-- [ ] Checkpoint 2（gate）：推送、开 PR、最终验收、按新规则合并、回复两个会话
+- [x] Checkpoint 2（gate）：推送、开 PR、最终验收、按新规则合并、回复两个会话
 
 ## 证据
 - Task 1（2026-11-24）：先改回归，4 项变红（规则仍是旧句）；改规则三行后只剩 `test_no_remote_write_is_authorized_by_default` 红——它禁用「自动合并」，与 Spec 原句冲突。
@@ -17,3 +17,8 @@
 - Spec 修订（2026-11-24，规范 v1.5.1：必需检查已全部通过时 GitHub 拒绝 `--auto`）：用户原话「两项都批准」（F3 第 3 步改为先看 PR 状态；`README.en.md` 补进并行边界）。
   review-mark 重记 Spec 批准（`ab5b52151991`）。先改回归 → 2 失败 1 错误；改规则第 137 行、release-process 第 4 条、CHANGELOG 后 91 例全绿；
   删掉「必需检查已全部通过时直接合并（GitHub：`gh pr merge`），」→ 回归变红，已还原。
+- Checkpoint 2（进行中）：PR #488。9050d67 上 CI：`plugin`、`python (3.9)`、`python (3.13)` 通过；`validate` 只失败于 `test_proposal_promotion_proof.OtherRowPromotionTests` 的 `copytree` 撞上
+  `objects/maintenance.lock`（已知偶发，与本模块无关，另有会话提议），`CI required` 随之失败；已重跑失败任务。v1.6 第 0 步按用户「另开小模块」记账本 EVQX96F。
+- Checkpoint 2（2026-11-24）：重跑后 9050d67 上五项全绿（CI required、validate、plugin、python 3.9／3.13），PR 状态 CLEAN。
+  用户原话「验收通过，合并」（针对 AC1～AC6 证据、文件表与提交表、两处超出 Plan 的说明、Spec 的 v1.5.1 修订差异、给 ecosystem-lead 与 mc-coord 的拟回告）。
+  v1.7 按用户「v1.7 放小模块」记账本 EVQX96F。合并按 F3：本提交推送后 CI 重跑，用 `gh pr merge --auto --squash`。
