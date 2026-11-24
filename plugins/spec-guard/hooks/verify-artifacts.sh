@@ -197,13 +197,17 @@ if command -v python3 >/dev/null 2>&1 && { [ -d spec ] || [ -d tasks ]; }; then
 import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-from module_stage import CHECKED, file_review_state
+from module_stage import CHECKED, file_review_state, requirement_wait
 files = [(path, "spec", path.stem) for path in sorted(Path("spec").glob("*.md")) if path.name != "CAPABILITY-MAP.md"]
 files += [(path, "plan", path.parent.name) for path in sorted(Path("tasks").glob("*/plan.md"))]
 valid = 0
 for path, kind, module in files:
     state = file_review_state(path, kind)
     if state == "none":
+        continue
+    # requirement-confirm-gate: Codex never confirms a flow v2 requirement, its digest matching or not.
+    if kind == "spec" and state in ("codex-approved", "revised") and requirement_wait(Path("."), module) == "codex":
+        print("CODEX %s" % path.as_posix())
         continue
     if state in ("invalid", "unreadable", "revised"):
         print("%s %s" % (state.upper(), path.as_posix()))
@@ -220,6 +224,7 @@ if valid:
         VALID) ok "批准标记有效：${item} 个文件" ;;
         INVALID) bad "批准标记无效：${item}（每个文件至多一行，写法见共享检查点规则「批准标记」）" ;;
         REVISED) warn "${item} 在批准后已修订，需要用户复审；复审通过后用 /spec-guard:review-mark 重新记录" ;;
+        CODEX) warn "新流程需求文档：${item} 只有 Codex 的批准，需求要用户在对话里确认；确认后用 /spec-guard:review-mark 记录" ;;
         BUILT) warn "${item} 待批准，但 ${extra} 已有勾选项；确认用户是否已批准，批准后用 /spec-guard:review-mark 记录" ;;
         UNREADABLE) warn "未验证：${item} 读取失败，没有检查它的批准标记" ;;
       esac

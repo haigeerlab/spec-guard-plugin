@@ -49,6 +49,10 @@
   档位（bug、small、normal、important）在需求总结里提出、随需求一起确认。各份文档写哪些章节、bug 与 small 怎样合成一份，见插件的
   `references/doc-skeletons.md`；阶段提示会依次指向技术方案 `tasks/<id>/design.md`、回归测试文档 `tasks/<id>/regression.md` 与 Plan。
   没有这一行的模块照原来的 Spec → Plan 走，不补、不迁移。
+- **新流程需求由用户确认，不能交接管（requirement-confirm-gate）。** 新流程模块的需求文档每次都要用户在对话里确认，接管档位不能代替，
+  Codex 的批准不算；经所装协作插件转来的用户原话按该插件的规定算用户确认。复述按需求文档的骨架各节加上档位。复述里给谁用、为什么做、
+  怎样算做成、不做什么有一项写不出来，有你自己补的假设，或是重要需求时，先用 `interview-me` 一次问一个问题，问清再复述。用户明说不用拷问时
+  只跳过拷问、不跳过确认；重要需求不能跳过拷问。确认后用 review-mark 记 `approved`，确认前不往下写技术方案、回归文档或 Plan。
 
 ## 阶段交接
 

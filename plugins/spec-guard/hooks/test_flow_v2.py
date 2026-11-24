@@ -638,5 +638,17 @@ class RequirementConfirmFieldTest(unittest.TestCase):
             self.assertTrue(done.stdout.startswith("codex-route-requirement: "), done.stdout + done.stderr)
 
 
+class RequirementConfirmRuleTest(unittest.TestCase):
+    """requirement-confirm-gate (assumption 5): the shared rule says what the hint enforces."""
+
+    def test_rule_text(self):
+        text = (HERE.parent / "references" / "workflow-checkpoints.md").read_text(encoding="utf-8")
+        section = text[text.index("## 需求确认"):text.index("## 阶段交接")]
+        for phrase in ("接管档位不能代替", "Codex 的批准不算", "只跳过拷问、不跳过确认", "重要需求不能跳过拷问",
+                       "经所装协作插件转来的用户原话"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+
 if __name__ == "__main__":
     unittest.main()

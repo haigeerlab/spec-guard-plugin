@@ -521,5 +521,29 @@ check_absent "追加章节配置不合法：追加章节不生效" "缺章节"
 project flow-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' >"$PROJECT/tasks/alpha/plan.md"
 check_absent "老模块不查新流程文档" "缺失（档位"
+# requirement-confirm-gate：新流程需求文档只有 Codex 的批准（指纹匹配或失配）时警告、不判失败；老模块不出这条。
+codex_mark() {  # 给 $PROJECT/spec/alpha.md 写一行按当前正文算的 Codex 批准标记
+  python3 -B - "$HOOKDIR" "$PROJECT/spec/alpha.md" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import review_codex_digest, review_codex_line
+path = Path(sys.argv[2])
+text = path.read_text(encoding="utf-8").replace("<!-- spec-guard: review pending -->\n", "")
+text = "<!-- spec-guard: review pending -->\n" + text
+path.write_text(text.replace("<!-- spec-guard: review pending -->", review_codex_line(review_codex_digest(text))),
+                encoding="utf-8")
+PY
+}
+project flow-codex
+flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=normal -->\n' >>"$PROJECT/spec/alpha.md"
+codex_mark
+check "新流程需求文档只有 Codex 批准时警告、不判失败" 0 "只有 Codex 的批准，需求要用户在对话里确认"
+printf '补一句。\n' >>"$PROJECT/spec/alpha.md"
+check "新流程需求文档 Codex 批准后改过，仍按只有 Codex 批准警告" 0 "只有 Codex 的批准，需求要用户在对话里确认"
+project flow-codex-old
+flow_doc spec/alpha.md "${REQ[@]}"
+codex_mark
+check_absent "老模块的 Codex 批准不出新流程警告" "只有 Codex 的批准"
 
 echo "verify-artifacts regression passed ($PASS cases)"
