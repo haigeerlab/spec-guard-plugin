@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""plugin-spec-compliance (AC5): the CI workflow keeps the shape the plugin development rules ask for.
+
+Needs PyYAML; skipped without it (the macOS system Python has none; CI's plugin job installs it).
+"""
+import importlib.util
+from pathlib import Path
+import re
+import unittest
+
+REPO = Path(__file__).resolve().parent.parent
+WORKFLOWS = sorted((REPO / ".github" / "workflows").glob("*.yml"))
+DEPENDABOT = REPO / ".github" / "dependabot.yml"
+LICENSE = REPO / "LICENSE"
+HAS_YAML = importlib.util.find_spec("yaml") is not None
+SUMMARY = "CI required"
+SHA_PIN = re.compile(r"^[\w.-]+/[\w.-]+(/[\w./-]+)?@[0-9a-f]{40}$")
+
+
+def load(path):
+    import yaml
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    # PyYAML reads the bare key `on` as True.
+    if True in data:
+        data["on"] = data.pop(True)
+    return data
+
+
+@unittest.skipUnless(HAS_YAML, "PyYAML is not installed")
+class WorkflowTest(unittest.TestCase):
+    def test_every_workflow(self):
+        self.assertTrue(WORKFLOWS)
+        for path in WORKFLOWS:
+            with self.subTest(path.name):
+                data = load(path)
+                self.assertEqual(data.get("permissions"), {}, "top-level permissions must be {}")
+                triggers = data.get("on") or {}
+                for event in triggers.values() if isinstance(triggers, dict) else ():
+                    if isinstance(event, dict):
+                        self.assertNotIn("paths", event)
+                        self.assertNotIn("paths-ignore", event)
+                for name, job in data["jobs"].items():
+                    permissions = job.get("permissions")
+                    self.assertIn(permissions, ({}, {"contents": "read"}), "%s: permissions %r" % (name, permissions))
+                    for step in job.get("steps", []):
+                        uses = step.get("uses")
+                        if not uses:
+                            continue
+                        self.assertRegex(uses, SHA_PIN, "%s: %s is not pinned to a full SHA" % (name, uses))
+                        if uses.startswith("actions/checkout@"):
+                            self.assertIs((step.get("with") or {}).get("persist-credentials"), False,
+                                          "%s: checkout must set persist-credentials: false" % name)
+
+    def test_summary_job_needs_every_other_job(self):
+        data = load(REPO / ".github" / "workflows" / "ci.yml")
+        self.assertEqual(data.get("name"), "CI")
+        jobs = data["jobs"]
+        summary = [key for key, job in jobs.items() if job.get("name") == SUMMARY]
+        self.assertEqual(len(summary), 1, "exactly one job is named %r" % SUMMARY)
+        job = jobs[summary[0]]
+        self.assertEqual(set(job.get("needs", [])), set(jobs) - {summary[0]})
+        self.assertEqual(str(job.get("if", "")).replace(" ", ""), "always()")
+        steps = repr(job.get("steps", []))
+        self.assertIn("toJSON(needs)", steps)
+        self.assertIn("success", steps)
+
+    def test_checks_end_with_a_clean_diff(self):
+        data = load(REPO / ".github" / "workflows" / "ci.yml")
+        for name, job in data["jobs"].items():
+            if job.get("name") == SUMMARY:
+                continue
+            with self.subTest(name):
+                self.assertEqual(job["steps"][-1].get("run", "").strip(), "git diff --exit-code")
+
+    def test_python_versions(self):
+        data = load(REPO / ".github" / "workflows" / "ci.yml")
+        versions = data["jobs"]["python"]["strategy"]["matrix"]["python"]
+        self.assertIn("3.9", versions)
+        self.assertTrue(any(version != "3.9" for version in versions))
+
+    def test_plugin_validate_is_strict(self):
+        text = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        self.assertRegex(text, r"@anthropic-ai/claude-code@\d+\.\d+\.\d+ plugin validate --strict plugins/spec-guard")
+        self.assertRegex(text, r"plugin validate --strict \.\s*$|plugin validate --strict \.\n")
+        self.assertIn("scripts/check-frontmatter.py", text)
+
+    def test_dependabot(self):
+        data = load(DEPENDABOT)
+        self.assertEqual(data.get("version"), 2)
+        updates = data.get("updates")
+        self.assertEqual([update["package-ecosystem"] for update in updates], ["github-actions"])
+        self.assertEqual(updates[0]["schedule"]["interval"], "monthly")
+        self.assertEqual(updates[0]["cooldown"]["default-days"], 7)
+
+
+class LicenseTest(unittest.TestCase):
+    def test_copyright_line(self):
+        self.assertIn("Copyright (c) 2026 haigeerlab\n", LICENSE.read_text(encoding="utf-8"))
+
+
+if __name__ == "__main__":
+    unittest.main()

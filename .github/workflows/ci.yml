@@ -1,22 +1,31 @@
-name: Validate
+name: CI
 
+# 插件开发规范 v1.3（spec/plugin-spec-compliance.md）：主干必需检查只认汇总任务「CI required」，
+# 以后加任务、改名都不用再改主干保护；workflow 不加路径过滤，否则必需检查会等不到。
 on:
   push: { branches: [main] }
   pull_request:
   workflow_dispatch:
 
+# 顶层不给任何权限，每个任务按需单独放；checkout 一律不留凭据。
+permissions: {}
+
 jobs:
   validate:
     # Bash 3.2 的已知语法陷阱由 scripts/validate.sh 的静态检查器覆盖；
     # GitHub CI 统一跑 Ubuntu，避免 PR 因 macOS runner 排队而阻塞。
-    # 保留单元素矩阵，使现有 required check 名称保持为 validate (ubuntu-latest)。
+    # 保留单元素矩阵，使检查名仍为 validate (ubuntu-latest)：主干保护切到 CI required 之前它还是必需检查。
     strategy:
       matrix:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: bash 版本
         run: /bin/bash --version | head -1
@@ -41,3 +50,84 @@ jobs:
         # evals/*.sh 此前不在范围里 —— 它们是会真的调模型的脚本，更该被检查
         # evals/*/*.sh：evals/dispatch-cost/ 下的判分与运行脚本（2026-10-08 审查 F19）
         run: npx --yes shellcheck@4.1.0 -S warning plugins/spec-guard/hooks/*.sh scripts/*.sh evals/*.sh evals/*/*.sh
+
+      # 规范 C10：检查跑完后工作区不得有改动（不放进 validate.sh，单独一步）。
+      - name: 检查没有留下改动
+        run: git diff --exit-code
+
+  python:
+    # 规范 C4：macOS 系统 Python 是 3.9，hook 要在它上面能跑；另测一个新版本。
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.13"]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Python 版本
+        run: python3 --version
+      - name: 仓库完整性校验（含全部 Python 回归）
+        run: /bin/bash scripts/validate.sh
+      - name: 检查没有留下改动
+        run: git diff --exit-code
+
+  plugin:
+    # 规范 C7：官方校验带 --strict（不带时缺 description 只报警告）；它不查 YAML 能否解析，另用脚本真正解析。
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: 插件清单与 skill／command 校验（--strict）
+        run: npx --yes @anthropic-ai/claude-code@2.1.328 plugin validate --strict plugins/spec-guard
+      - name: marketplace 清单校验（--strict）
+        run: npx --yes @anthropic-ai/claude-code@2.1.328 plugin validate --strict .
+      - name: 安装 PyYAML
+        run: python3 -m pip install pyyaml==6.0.3
+      - name: frontmatter 按 YAML 解析
+        run: python3 -B scripts/check-frontmatter.py
+      - name: frontmatter 与 CI 形状的回归（需要 PyYAML）
+        run: |
+          python3 -B scripts/test_check_frontmatter.py
+          python3 -B scripts/test_ci_workflow.py
+      - name: 检查没有留下改动
+        run: git diff --exit-code
+
+  required:
+    # 主干保护唯一的必需检查。always()：上游失败或取消时它也要跑，并据此失败。
+    name: CI required
+    if: always()
+    needs: [validate, python, plugin]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: 汇总上游结果
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["NEEDS"])
+          bad = {name: job["result"] for name, job in needs.items() if job["result"] != "success"}
+          for name, job in sorted(needs.items()):
+              print("%s: %s" % (name, job["result"]))
+          sys.exit(1 if bad or not needs else 0)
+          PY
