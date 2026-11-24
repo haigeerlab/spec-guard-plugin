@@ -130,7 +130,7 @@ class CheckpointContractTests(unittest.TestCase):
     def test_plan_checkpoints_are_gate_or_report(self):
         tiers = self.section("## Plan 检查点分级")
         for phrase in ("`gate`", "`report`", "没标级别的中间检查点按 `report`", "最后一个检查点", "记入 todo", "不倒计时",
-                       "测试改不红", "权限被拒", "合并永远由用户"):
+                       "测试改不红", "权限被拒", "合并永远由用户在对话里决定"):
             self.assertIn(phrase, tiers)
         self.assertIn("`gate` 检查点写明的授权", self.section("## 阶段交接"))
 
@@ -206,6 +206,10 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_no_remote_write_is_authorized_by_default(self):
         text = self.target.read_text(encoding="utf-8")
+        # merge-flow-f3: the F3 merge sentence names the platform's auto-merge only after the user says "merge".
+        start = text.index("合并永远由用户在对话里决定：")
+        end = text.index("任何 Plan 都不能代替用户这句话。", start)
+        text = text[:start] + text[end:]
         for phrase in ("默认授权推送", "默认授权开 PR", "默认推送", "自动合并"):
             self.assertNotIn(phrase, text)
         self.assertIn("只有当 Plan 的 `gate` 检查点逐项写明授权", self.section("## Plan 检查点分级"))
@@ -841,6 +845,16 @@ class ConcurrencyBoundaryTests(unittest.TestCase):
             self.assertIn(phrase, body)
         self.assertNotRegex(body, r"parallel[-_]")
 
+    def test_merge_is_decided_by_the_user_in_conversation(self):
+        # merge-flow-f3 (plugin development rules v1.5 F3): the user says "merge" in the conversation, the session runs it.
+        self.assertNotIn("合并永远由用户进行", self.text)
+        start = self.text.index("合并永远由用户在对话里决定：")
+        rule = self.text[start:self.text.index("\n", start)]
+        for phrase in ("明确说『合并』", "必需检查", "`gh pr merge --auto`", "核实已合并", "记下合并提交",
+                       "任何 Plan 都不能代替用户这句话"):
+            self.assertIn(phrase, rule)
+        self.assertIn("的**唯一例外**", self.text[self.text.index("它是「合并永远由用户在对话里决定」"):])
+
     def test_final_acceptance_points_to_the_boundary(self):
         start = self.text.index("- **最终验收列出实际改动的文件。**")
         rule = self.text[start:self.text.index("\n- **", start + 1)]
@@ -853,8 +867,8 @@ class CoordinatorApprovalTests(unittest.TestCase):
     HEADING = "## 协调会话的批准与合并（moduleConcurrency 为 on 时）"
     ORIGINALS = (
         "- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，",
-        "合并永远由用户进行，任何 Plan 都不能授权 agent 合并。",
-        "两种节奏下人工闸门都在，合并永远由用户进行。",
+        "合并永远由用户在对话里决定：用户明确说『合并』后 agent 才执行；平台支持自动合并且主干有必需检查时用自动合并（GitHub：`gh pr merge --auto`，合并方式按本仓库习惯），否则等必需检查全部通过后再合并；合并后核实已合并、记下合并提交，再告诉用户。任何 Plan 都不能代替用户这句话。",
+        "两种节奏下人工闸门都在，合并永远由用户在对话里决定（见「Plan 检查点分级」）。",
     )
 
     def setUp(self):
