@@ -18,6 +18,17 @@ Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md
     怎样算做成、不做什么有一项写不出来、有你自己补的假设，或是重要需求时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。用户在对话里确认后，用 <review-mark> 记下来；
     接管档位不能代替，Codex 的批准不算。确认前不要往下写。」重要需求时在「是重要需求」后附理由（`important()` 的理由码）。英文同义。
   - 模块 checkout：`role_view` 已经把 `review_hint` 的下一步换成「交给协调会话请用户审」，需求确认照此交给协调会话，不另写（B3 中的角色视图部分）；协调会话走普通提示。
+- **第 2 轮审查补充**（Codex 第 2 轮后两轮上限，转用户批；以下各条随本 Plan 一起批）：
+  - 协调会话：`role_view` 的协调分支已把 `review_step` 原样转交（只追加「在这里呈现给用户」），复述与拷问要求因此在协调会话可见；模块 checkout 只说交给协调会话。回归分别断言两种 checkout 的下一步。
+  - 项目级 `DONE`（所有模块已完成、可能没有当前模块）与模块 checkout 的 `DONE` 分支会在 `review_hint` 之前返回：在这两个分支里，按 Build order 找第一个 `requirement_wait` 非 `None` 的新流程模块，
+    有则加一行「- 批准: 需求文档 `spec/<id>.md` 等用户确认。」，下一步换成需求确认的那句；其 id 与结果进状态码。阶段值仍是 `DONE`。
+  - 里程碑停点、越界（scope）、用法草案停点：需求确认与它们同时出现时，各自的事实行都保留；下一步的优先级为 用法草案停点 > 里程碑停点 > 需求确认 > 越界 > 最终验收——
+    前两者讲的是别的模块或整个批次，要先处理；越界与最终验收都在需求确认之后。回归各覆盖一种组合（里程碑、越界）。
+  - `reviewCadence=combined`：项目配置那一行（`config_lines`）不改，老模块输出不变；新流程模块需求待确认时，需求确认那一行末尾加「（批准节奏 combined 不适用于需求确认）」，下一步照旧是需求确认。回归断言 `combined` 下完整提示。
+  - `/map` 表格与待批汇总：新流程模块的「Spec」列与待批汇总按 `requirementConfirm.status` 显示（`confirmed` 显示已批准，其余显示待确认），不再按原始 `codex-approved` 显示 Codex 勾号；`review.spec` 的 JSON 原始值不变。回归断言表格与汇总。
+  - `at` 不用 `-S` 计数：取 `git log --format=%H%x09%cI -- spec/<id>.md`（新到旧），逐个 `git show <commit>:spec/<id>.md` 用 `review_marker_lines` 解析，找到当前批准行连续存在的最早一次提交；
+    HEAD 里没有这一行时为 `None`。只对 `confirmed` 的新流程模块跑，提交数以 50 为上限，超过时为 `None`（不报错）。回归加一例：同一行先在代码围栏里作示例、后挪到围栏外生效。
+  - 读不到需求文档：`/map --json` 按现有约定整体失败（退出 4），不出 `requirementConfirm`；Spec 假设 3「文档读不到时为 `null`」随本 Plan 修订为「读不到时 `/map --json` 整体失败（退出 4，同 `review`）」，见文末「Spec 修订」。
 - **状态码**：`describe` 的 `facts` 加 `requirement_wait(...)` 的结果；`_role_facts` 里模块角色的事实同样加上，`pending`→`codex` 等变化会重发完整提示（B7）。
 - **路由**：`codex_route(root, module, "spec")` 对新流程模块返回 `"requirement"`（排在 takeover 判断之前），`effective_review` 因而把 Codex 批准读成待批，`map_view` 的待批清单随之正确。
   `map_view.CODEX_ROUTE` 与 `interface.json` 的 `values.codexRoute` 加 `"requirement"`，`check-interface.py` 已按常量核对（B6）。这是公开取值的扩展，Spec 假设 7 随本 Plan 修订（见文末「Spec 修订」），交用户批。
@@ -83,8 +94,9 @@ Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md
 ## Spec 修订
 
 Codex 第 1 轮审查指出：新流程需求文档的 Spec 路由是新的取值，会出现在已有的 `/map --json` 字段 `codexRoute.spec` 里。Spec 假设 7 改为：
-「`interface.json` 加 `mapView.requirementConfirm`，`values.codexRoute` 加取值 `requirement`（新流程模块的需求文档只由用户确认），接口 1.18 → 1.19」；AC9 加「新流程模块的 `codexRoute.spec` 为 `requirement`」。要用户批。
+「`interface.json` 加 `mapView.requirementConfirm`，`values.codexRoute` 加取值 `requirement`（新流程模块的需求文档只由用户确认），接口 1.18 → 1.19」；AC9 加「新流程模块的 `codexRoute.spec` 为 `requirement`」。；假设 3 的 `sha256`「文档读不到时为 `null`」改为「读不到时 `/map --json` 整体失败（退出 4，同 `review`）」。两处都要用户批。
 
 ## 外部审查意见
 
 <!-- spec-guard: codex-review round=1 blocking=8 sha256=7c0582c9d8f3 -->
+<!-- spec-guard: codex-review round=2 blocking=2 sha256=96aea495b842 -->
