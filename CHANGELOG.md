@@ -9,6 +9,7 @@
   顶层 `permissions: {}`、checkout 不留凭据、action 钉完整 SHA、每个检查任务末尾 `git diff --exit-code`；新增 `.github/dependabot.yml`（只更新 GitHub Actions，每月，cooldown 7 天）。
 - Claude 清单去掉 Claude Code 不认的 `requires` 字段（只是一句说明，依赖 agent-skills 见 README），marketplace 清单补 `description`，两者通过 `--strict`。
 - `scripts/check-local-paths.py` 在 Python 3.9 上可导入。LICENSE 版权行改为 `haigeerlab`。
+- **CI 的 ShellCheck 改为下载钉住版本的官方发布包（ci-shellcheck-pin）。** 原来用的 npm 包 `shellcheck@4.1.0` 下载前会匿名请求 GitHub API 查最新版，共享 runner IP 被限流时返回 403、PR 合不进去，装的也不是钉住的版本；现在下载 v0.11.0 的 Linux 包、核对 sha256 后使用。
 
 ## [0.94.0] - 2026-11-24
 

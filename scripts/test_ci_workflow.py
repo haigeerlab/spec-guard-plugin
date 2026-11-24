@@ -80,6 +80,27 @@ class WorkflowTest(unittest.TestCase):
         # actions/python-versions ships 3.9 only for Ubuntu 22.04 and 24.04, not for ubuntu-latest (26.04).
         self.assertIn(data["jobs"]["python"]["runs-on"], ("ubuntu-22.04", "ubuntu-24.04"))
 
+    def test_shellcheck_is_pinned_release(self):
+        # ci-shellcheck-pin: the npm package asks the GitHub API for "latest" anonymously (shared runner IPs hit 403),
+        # so CI downloads a pinned official release and checks its sha256 instead.
+        for path in WORKFLOWS:
+            for name, job in load(path)["jobs"].items():
+                for step in job.get("steps", []):
+                    run = step.get("run", "")
+                    with self.subTest(path=path.name, job=name, step=step.get("name")):
+                        self.assertFalse("npx" in run and "shellcheck" in run, "ShellCheck must not come from npx")
+        steps = load(REPO / ".github" / "workflows" / "ci.yml")["jobs"]["validate"]["steps"]
+        install = [i for i, step in enumerate(steps) if "releases/download/${SHELLCHECK_VERSION}/" in step.get("run", "")]
+        self.assertEqual(len(install), 1, "exactly one step downloads the ShellCheck release")
+        step = steps[install[0]]
+        env = step.get("env") or {}
+        self.assertRegex(str(env.get("SHELLCHECK_VERSION", "")), r"^v\d+\.\d+\.\d+$")
+        self.assertRegex(str(env.get("SHELLCHECK_SHA256", "")), r"^[0-9a-f]{64}$")
+        self.assertIn("sha256sum -c", step["run"])
+        checks = [i for i, step in enumerate(steps) if "shellcheck -S warning" in step.get("run", "")]
+        self.assertEqual(len(checks), 1)
+        self.assertGreater(checks[0], install[0], "ShellCheck runs after it is installed")
+
     def test_plugin_validate_is_strict(self):
         text = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
         self.assertRegex(text, r"@anthropic-ai/claude-code@\d+\.\d+\.\d+ plugin validate --strict plugins/spec-guard")
