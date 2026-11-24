@@ -11,7 +11,7 @@
 - `scripts/check-local-paths.py` 在 Python 3.9 上可导入。LICENSE 版权行改为 `haigeerlab`。
 - **CI 的 ShellCheck 改为下载钉住版本的官方发布包（ci-shellcheck-pin）。** 原来用的 npm 包 `shellcheck@4.1.0` 下载前会匿名请求 GitHub API 查最新版，共享 runner IP 被限流时返回 403、PR 合不进去，装的也不是钉住的版本；现在下载 v0.11.0 的 Linux 包、核对 sha256 后使用。
 - **合并改为由用户在对话里决定、会话执行（merge-flow-f3，《插件开发规范》v1.5 F3）。** 共享检查点规则原来写「合并永远由用户进行」，
-  现在改为：用户明确说「合并」后 agent 才执行；平台支持自动合并且主干有必需检查时用自动合并（GitHub：`gh pr merge --auto`），否则等必需检查全部通过再合；
+  现在改为：用户明确说「合并」后 agent 才执行；先看 PR 状态：必需检查已全部通过时直接合并（GitHub：`gh pr merge`），还没跑完时用平台的自动合并（GitHub：`gh pr merge --auto`；检查已通过时 GitHub 会拒绝 `--auto`），平台不支持自动合并时等检查全部通过再合；
   合并后核实已合并、记下合并提交再告诉用户。任何 Plan 都不能代替用户这句话；协调会话本地合并例外的三个条件不变，`merge: auto` 不变。
   `docs/release-process.md`、README、`spec/usage/dev-flow-v2.md` 同步。
 

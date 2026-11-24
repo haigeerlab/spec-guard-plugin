@@ -850,7 +850,7 @@ class ConcurrencyBoundaryTests(unittest.TestCase):
         self.assertNotIn("合并永远由用户进行", self.text)
         start = self.text.index("合并永远由用户在对话里决定：")
         rule = self.text[start:self.text.index("\n", start)]
-        for phrase in ("明确说『合并』", "必需检查", "`gh pr merge --auto`", "核实已合并", "记下合并提交",
+        for phrase in ("明确说『合并』", "必需检查已全部通过时直接合并", "`gh pr merge`", "`gh pr merge --auto`", "核实已合并", "记下合并提交",
                        "任何 Plan 都不能代替用户这句话"):
             self.assertIn(phrase, rule)
         self.assertIn("的**唯一例外**", self.text[self.text.index("它是「合并永远由用户在对话里决定」"):])
@@ -867,7 +867,7 @@ class CoordinatorApprovalTests(unittest.TestCase):
     HEADING = "## 协调会话的批准与合并（moduleConcurrency 为 on 时）"
     ORIGINALS = (
         "- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，",
-        "合并永远由用户在对话里决定：用户明确说『合并』后 agent 才执行；平台支持自动合并且主干有必需检查时用自动合并（GitHub：`gh pr merge --auto`，合并方式按本仓库习惯），否则等必需检查全部通过后再合并；合并后核实已合并、记下合并提交，再告诉用户。任何 Plan 都不能代替用户这句话。",
+        "合并永远由用户在对话里决定：用户明确说『合并』后 agent 才执行；先看 PR 状态，必需检查已全部通过时直接合并（GitHub：`gh pr merge`），检查还没跑完时用平台的自动合并（GitHub：`gh pr merge --auto`），由平台等必需检查通过后合并；平台不支持自动合并时，等必需检查全部通过后再合并；合并方式按本仓库习惯；合并后核实已合并、记下合并提交，再告诉用户。任何 Plan 都不能代替用户这句话。",
         "两种节奏下人工闸门都在，合并永远由用户在对话里决定（见「Plan 检查点分级」）。",
     )
 

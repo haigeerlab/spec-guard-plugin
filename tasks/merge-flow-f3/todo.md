@@ -14,3 +14,6 @@
 - Task 3（2026-11-24）：两份清单升 0.95.0；validate 要求两份 README 的安装命令 `--ref` 与清单一致，同步改为 v0.95.0（README.en.md 超出并行边界，验收时说明）。首次完整检查另有 `test_map_view.test_text_table_unchanged` 跨分钟边界的偶发失败（22:11 对 22:12）。
 - Checkpoint 1（2026-11-24，提交 1be4855 上，macOS `/bin/bash`，`verify-and-commit` 完整档）：`validate.sh`「校验通过 ✅」；phase-guard「passed (541 cases)」；verify-artifacts「passed (120 cases)」。
   变异（各自还原，`git status` 干净）：第 137 行改回旧句 → `test_workflow_checkpoints` 3 失败 2 错误；删掉「任何 Plan 都不能代替用户这句话。」→ 2 失败 2 错误。
+- Spec 修订（2026-11-24，规范 v1.5.1：必需检查已全部通过时 GitHub 拒绝 `--auto`）：用户原话「两项都批准」（F3 第 3 步改为先看 PR 状态；`README.en.md` 补进并行边界）。
+  review-mark 重记 Spec 批准（`ab5b52151991`）。先改回归 → 2 失败 1 错误；改规则第 137 行、release-process 第 4 条、CHANGELOG 后 91 例全绿；
+  删掉「必需检查已全部通过时直接合并（GitHub：`gh pr merge`），」→ 回归变红，已还原。
