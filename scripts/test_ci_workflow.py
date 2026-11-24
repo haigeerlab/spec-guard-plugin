@@ -77,6 +77,8 @@ class WorkflowTest(unittest.TestCase):
         versions = data["jobs"]["python"]["strategy"]["matrix"]["python"]
         self.assertIn("3.9", versions)
         self.assertTrue(any(version != "3.9" for version in versions))
+        # actions/python-versions ships 3.9 only for Ubuntu 22.04 and 24.04, not for ubuntu-latest (26.04).
+        self.assertIn(data["jobs"]["python"]["runs-on"], ("ubuntu-22.04", "ubuntu-24.04"))
 
     def test_plugin_validate_is_strict(self):
         text = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
