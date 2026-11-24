@@ -1,6 +1,7 @@
 {
   "name": "spec-guard-marketplace",
   "owner": { "name": "haigeerlab", "url": "https://github.com/haigeerlab/spec-guard-plugin" },
+  "description": "spec-guard 插件的发布源：agent-skills 的配套插件，支持 Claude Code 和 Codex。",
   "plugins": [
     {
       "name": "spec-guard",
