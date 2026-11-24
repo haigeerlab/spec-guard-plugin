@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.94.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:7dd80bc3ca99066566cce2c68581cc719ff4e4e0"
+      },
+      "observedAt": "2026-11-24T01:33:21Z",
+      "evidence": [
+        "result:the v0.94.0 annotated tag resolves to merge commit 7dd80bc3ca99066566cce2c68581cc719ff4e4e0 (pull request #484); merged==true and main==merge sha were checked before tagging; the CI run on the tagged merge commit succeeded",
+        "result:0.93.0 只发布未安装，宿主从 0.92.0 直接升到 0.94.0，0.93.0 的内容随这次一起装上；Codex hook 由用户在 /hooks 重新批准后 smoke 通过"
+      ]
+    }
+  ]
+}
