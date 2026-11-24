@@ -1,6 +1,6 @@
 # Spec: requirement-confirm-gate
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 37c8db389ca9 -->
 
 ## Objective
 
