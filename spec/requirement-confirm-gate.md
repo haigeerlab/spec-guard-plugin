@@ -44,7 +44,7 @@ autopilot 的合规监测要能从 `/map --json` 读到这次确认（接口 v1 
    - 自动转入拷问的三种情形（同假设 4）。
 6. **verify-artifacts**：新流程模块的需求文档只有 `codex-approved` 时报警告（「Codex 的批准对需求文档不算，需用户确认」），不判失败——
    这和老模块里不合接管档位的 `codex-approved` 同级处理。
-7. **接口与版本**：`interface.json` 加 `mapView.requirementConfirm`，接口 1.18 → 1.19，`check-interface.py` 同步。插件版本不改，M2 在 takeover-redefine 里一次发版。
+7. **接口与版本**：`interface.json` 加 `mapView.requirementConfirm`，`values.codexRoute` 加取值 `requirement`（新流程模块的需求文档只由用户确认），接口 1.18 → 1.19，`check-interface.py` 同步。插件版本不改，M2 在 takeover-redefine 里一次发版。
 8. **不做**：技术方案审批（design-review）；Plan 自动批准（plan-auto-approve）；`takeover` 取值改动（takeover-redefine）；机器判断复述有没有缺口（只能写成规则，由 agent 自查）；
    给老模块补 `requirementConfirm`；改批准标记格式或加时间戳。
 
@@ -67,7 +67,7 @@ autopilot 的合规监测要能从 `/map --json` 读到这次确认（接口 v1 
 - **AC6** 待确认时的下一步提示列出复述的各项、拷问的三种情形和 review-mark，中英文按 `artifactLanguage`；重要需求的提示把「Spec」称为「需求文档」。
 - **AC7** verify-artifacts 对只有 `codex-approved` 的新流程需求文档报警告、不判失败。
 - **AC8** 变异：不区分新旧流程（让 Codex 批准对新流程也算）、`revised` 当 `confirmed`，各让对应回归变红。
-- **AC9** `validate.sh`、phase-guard、verify-artifacts 全绿；`interface.json` 为 1.19，`check-interface.py` 通过。
+- **AC9** `validate.sh`、phase-guard、verify-artifacts 全绿；`interface.json` 为 1.19，`check-interface.py` 通过；新流程模块的 `codexRoute.spec` 为 `requirement`。
 
 ## Boundaries
 
@@ -83,3 +83,7 @@ autopilot 的合规监测要能从 `/map --json` 读到这次确认（接口 v1 
 ## 文档建议
 
 `docs/commands.md` 在 `/map --json` 一句里补 `requirementConfirm`；CHANGELOG 在 M2 发版时（takeover-redefine）一起写。项目没有文档基线。
+
+## 变更记录
+
+- 2026-11-24：假设 7、AC9 加 `codexRoute` 的新取值 `requirement`（Plan 第 1 轮 Codex 审查 B6 引出），待用户批。

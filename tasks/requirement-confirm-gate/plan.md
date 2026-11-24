@@ -6,20 +6,28 @@ Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md
 
 ## 架构决定
 
-- **不能交接管的入口只有一处**：`module_stage.codex_route(root, module, "spec")` 在新流程模块上（`flow_marker(root, module)["v2"]`）返回新原因 `"requirement"`，
-  排在 takeover 判断之前。`effective_review`、`codex_hint`、`map_view` 的待批清单都经它判定，Codex 的批准随之不算（AC3）。重要需求（`"important"`）在新流程模块上也落到 `"requirement"`
-  之后的同一提示里：提示文字合成一句，重要时多写理由，不出两行。
-- **没有标记也算待确认**：在 `describe` 取到 Spec 原始批准状态之后、交给 `review_hint` 之前，新流程模块的 `none` 改读为 `pending`（老模块不动）。只改提示与 `requirementConfirm`，
-  `/map --json` 的 `review.spec` 仍报原始状态，不改已有字段的含义。
-- **提示措辞**：新流程模块 Spec 待确认（`pending`，含上面改读的 `none`，以及 Codex 批准不算时）出「- 批准: 需求文档 `spec/<id>.md` 等用户确认。」；下一步：
-  「在对话正文里复述需求（目标、给谁用、使用场景、业务规则和异常情形、不做什么、成功标准、待定问题，加上档位），问用户是否说完；给谁用、为什么做、怎样算做成、不做什么有一项写不出来、
-  有你自己补的假设，或是重要需求（<理由>）时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。用户在对话里确认后，用 <review-mark> 记下来；接管档位不能代替，Codex 的批准不算。」
-  英文同义。`revised` 沿用现有提示，只把「Spec」改称「需求文档」。`combined` 节奏、`pre_build_batch` 等其余分支对新流程模块不改。
-- **一个取值函数**：`module_stage.requirement_confirm(root, module) -> dict | None`：老模块 `None`；新流程模块按原始状态映射 `approved→confirmed`、`none／pending／codex-approved→pending`、
-  `revised→revised`、`invalid`／`unreadable→invalid`；`by`、`at`、`sha256` 按 Spec 假设 3。`sha256` 用批准标记的同一函数（`review_digest`，内部走 spec-digest 的算法，不另写）。
-  `at`：`git log -1 --format=%cI -S<当前批准标记行> -- spec/<id>.md`（用现有 `_git`），未提交、不在 git 仓库、git 失败时 `None`。只对新流程模块调用 git，老模块零开销。
-- **verify-artifacts**：批准标记那段的 python 已经逐文件算状态；新流程需求文档原始状态为 `codex-approved` 时多输出一行警告类型，shell 侧报
-  「⚠️ 新流程需求文档：`spec/<id>.md` 只有 Codex 的批准，需求要用户在对话里确认」（AC7）。不改判失败的条件。
+- **一个等待判定，排在所有批准分支前面**：新增 `module_stage.requirement_wait(root, module, raw_spec) -> str | None`，只对新流程模块（`flow_marker(...)["v2"]`）返回
+  `"pending"`（原始状态 `none`／`pending`）、`"codex"`（原始状态 `codex-approved`，**不论指纹是否匹配**——`review_state` 对失配的 Codex 标记给 `revised`，所以要另读标记来源：
+  有 Codex 标记行而没有用户批准行即为 `"codex"`）、`"revised"`（用户批准后又改过），已确认、老模块返回 `None`。来源判断复用 `review_marker_lines` 的解析结果，不另写正则。
+- **提示**：`review_hint` 在 `invalid`／`unreadable` 两个分支之后、`effective_review`／`codex_hint`／`combined`／`pre_build_batch`／最终 gate 各分支之前，
+  先看 `requirement_wait`；非 `None` 时直接返回需求确认的一行与下一步，Spec 的状态返回 `pending`（`revised` 时返回 `revised`）。这样合并批准节奏、修订攒批、最终验收都不会盖掉它（B1、B4）。
+  `review_hint` 目前只在 `BEFORE_PLAN` 与 `BUILDING` 运行；新流程模块需求待确认时，`MODULE_DONE` 也运行这一判定（B2），`describe` 不把它当完成交接。
+  `stop_node` 在 Spec 状态为 `pending`／`revised` 时本来就给 `spec-review`；在 `final` 判断前加一条：新流程需求待确认时停在 `spec-review`，`acceptance_step` 因而不生效（B2）。
+  - 一行：「- 批准: 需求文档 `spec/<id>.md` 等用户确认。」；`"codex"` 时「…只有 Codex 的批准，需求要用户在对话里确认。」；`"revised"` 时「…确认后又改过，要用户重新确认。」（英文同义）。
+  - 下一步（三种情形共用）：「在对话正文里复述需求（目标、给谁用、使用场景、业务规则和异常情形、不做什么、成功标准、待定问题，加上档位），问用户是否说完；给谁用、为什么做、
+    怎样算做成、不做什么有一项写不出来、有你自己补的假设，或是重要需求时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。用户在对话里确认后，用 <review-mark> 记下来；
+    接管档位不能代替，Codex 的批准不算。确认前不要往下写。」重要需求时在「是重要需求」后附理由（`important()` 的理由码）。英文同义。
+  - 模块 checkout：`role_view` 已经把 `review_hint` 的下一步换成「交给协调会话请用户审」，需求确认照此交给协调会话，不另写（B3 中的角色视图部分）；协调会话走普通提示。
+- **状态码**：`describe` 的 `facts` 加 `requirement_wait(...)` 的结果；`_role_facts` 里模块角色的事实同样加上，`pending`→`codex` 等变化会重发完整提示（B7）。
+- **路由**：`codex_route(root, module, "spec")` 对新流程模块返回 `"requirement"`（排在 takeover 判断之前），`effective_review` 因而把 Codex 批准读成待批，`map_view` 的待批清单随之正确。
+  `map_view.CODEX_ROUTE` 与 `interface.json` 的 `values.codexRoute` 加 `"requirement"`，`check-interface.py` 已按常量核对（B6）。这是公开取值的扩展，Spec 假设 7 随本 Plan 修订（见文末「Spec 修订」），交用户批。
+- **一个取值函数**：`module_stage.requirement_confirm(root, module) -> dict | None`：老模块 `None`；新流程模块的 `status` 由 `requirement_wait` 推出：`None`→`confirmed`、`pending`／`codex`→`pending`、
+  `revised`→`revised`，原始状态 `invalid`→`invalid`。`by`、`at`、`sha256` 按 Spec 假设 3；`sha256` 用批准标记的同一函数 `review_digest`。
+  读不到需求文档时 `/map --json` 按现有约定整体失败（退出 4，`_review` 抛 `Unreadable`），不会走到这里，所以不另设 `unreadable` 取值（B5）。
+- **`at` 的查法**（B3 中的 git 部分）：只在 `confirmed` 时查。先读 `git show HEAD:spec/<id>.md`，按 `review_marker_lines` 取出它的批准行；与工作区当前的批准行不同（还没提交、或删后重写未提交）时为 `None`。
+  相同时 `git log -1 --format=%cI -S<该行> -- spec/<id>.md`：HEAD 含这一行，而文件里批准行至多一行，最近一次改变它出现次数的提交必是引入它的那次。git 失败、不在仓库时 `None`。
+- **verify-artifacts**：批准标记那段的 python 已经逐文件算状态；新流程需求文档的 `requirement_wait` 为 `"codex"` 时多输出一行，shell 侧报警告
+  「新流程需求文档：`spec/<id>.md` 只有 Codex 的批准，需求要用户在对话里确认」，指纹失配时同样报（AC7）。不改判失败的条件。
 - **接口**：`interface.json` 加 `mapView.requirementConfirm`（描述）与 `mapView.flow.requirementConfirmStatus` 取值表，版本 1.19；`check-interface._flow` 核对取值表与代码常量一致。
 
 ## 任务
@@ -27,20 +35,25 @@ Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md
 编码由我在本会话完成，每个任务先写回归、确认失败再实现。
 
 - **Task 0**：提交本 Plan 与 todo。验证：`validate.sh --quick`。
-- **Task 1**：路由与提示（C1 的前两项）。回归（`test_flow_v2.py` 新类 `RequirementConfirmHintTest`）：新流程模块在项目 `takeover` 为 `{"spec":"codex"}` 时 `codex-approved` 不算批准、提示写明 Codex 的批准不算，老模块同配置下照旧算（AC3）；
-  新流程模块无标记、`pending` 时出「等用户确认」一行与复述各项、拷问三种情形、review-mark（中英，AC6）；`approved` 时这一行消失；`revised` 的提示称「需求文档」；
-  老模块无标记时不出这一行（AC1）；几种情形下阶段值与改动前相同（AC2）。验证：`test_flow_v2`、`test-phase-guard.sh`。
-- **Task 2**：`requirement_confirm` 与 `/map --json`（C1 第三项、C2、C5）。回归：`test_flow_v2.py` 新类覆盖四种 `status` 与 `by`（AC2）、`sha256` 等于 `spec-digest.py text`（AC5）、
-  `at` 在已提交／未提交／非 git 目录三种情形（AC4，用现有 git 夹具模板）；`test_map_view.py` 的 `MODULE_KEYS` 加 `requirementConfirm`、老模块为 `null`；`interface.json` 1.19 与 `check-interface.py`。
-  `docs/commands.md` 的 `/map --json` 一句补字段。验证：`test_flow_v2`、`test_map_view`、`check-interface.py`。
-- **Task 3**：verify-artifacts 警告（C3）。回归：`test-verify-artifacts.sh` 加两例——新流程需求文档只有 `codex-approved` 时报警告、不判失败；老模块同样标记不出这条警告（AC7、AC1）。验证：`test-verify-artifacts.sh`。
-- **Task 4**：规则文字（C4）。`references/workflow-checkpoints.md`「需求确认」一节的「新流程模块的写法」按 Spec 假设 5 改；`test_workflow_checkpoints.py` 若对这一节有逐字断言同步更新。验证：`validate.sh`。
+- **Task 1**：`requirement_wait`、路由、提示与状态码（C1 的前两项）。回归（`test_flow_v2.py` 新类 `RequirementConfirmHintTest`，用 `describe` 的实际输出）：
+  项目 `takeover` 为 `{"spec":"codex"}` 时，新流程模块的 `codex-approved`（指纹匹配与失配两种）不算批准、提示写明，老模块同配置下照旧算（AC3）；
+  新流程模块无标记、`pending` 时出「等用户确认」一行与复述各项、拷问三种情形、review-mark（中英，AC6），`approved` 时这一行消失，`revised` 出重新确认的一行；
+  `reviewCadence=combined`、有修订基线、todo 已全勾（`MODULE_DONE`）、`merge=auto` 且首个未勾选项是最终 gate 这四种情形下，需求待确认时仍显示需求确认、下一步不往下走（B1、B2）；
+  模块 checkout 里需求待确认时下一步是交给协调会话；带 `last_state` 的相邻两次调用在 `pending`→`codex` 时返回完整提示（B7）；老模块无标记不出这一行（AC1）；阶段值与改动前相同（AC2）。
+  验证：`test_flow_v2`、`test-phase-guard.sh`。
+- **Task 2**：`requirement_confirm`、`/map --json`、接口（C1 第三项、C2、C5）。回归：`test_flow_v2.py` 覆盖四种 `status` 与 `by`（AC2）、`sha256` 等于 `spec-digest.py text`（AC5）、
+  `at` 在已提交／未提交／历史上批准过、删掉后在工作区重新写回未提交／非 git 目录五种情形（AC4，用现有 git 夹具模板）；`test_map_view.py` 的 `MODULE_KEYS` 加 `requirementConfirm`、老模块为 `null`，
+  新流程模块的 `codexRoute.spec` 为 `requirement` 且属于公开取值；`interface.json` 1.19 与 `check-interface.py`。`docs/commands.md` 的 `/map --json` 一句补字段。
+  验证：`test_flow_v2`、`test_map_view`、`check-interface.py`。
+- **Task 3**：verify-artifacts 警告（C3）。回归：`test-verify-artifacts.sh` 加三例——新流程需求文档只有 `codex-approved`（指纹匹配、失配各一）时报警告、不判失败；老模块同样标记不出这条警告（AC7、AC1）。验证：`test-verify-artifacts.sh`。
+- **Task 4**：规则文字（C4）。`references/workflow-checkpoints.md`「需求确认」一节的「新流程模块的写法」按 Spec 假设 5 改；`test_flow_v2.py` 加一条断言读这一段的关键句（确认不能被接管代替、「不用拷问」只跳过拷问、重要需求不能跳过拷问）。
+  `test_workflow_checkpoints.py` 不锁这一段（已核对），不改。验证：`test_flow_v2`、`validate.sh`。
 
 ## 会改哪些文件
 
 - 新增：`tasks/requirement-confirm-gate/{plan,todo}.md`。
 - 修改：`plugins/spec-guard/hooks/{module_stage,map_view}.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/hooks/{test_flow_v2,test_map_view}.py`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、
-  `plugins/spec-guard/hooks/test-phase-guard.sh`（仅当已有用例受影响）、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`plugins/spec-guard/references/workflow-checkpoints.md`、`docs/commands.md`。
+  `plugins/spec-guard/hooks/test-phase-guard.sh`（仅当已有用例受影响）、`spec/requirement-confirm-gate.md`（Spec 修订）、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`plugins/spec-guard/references/workflow-checkpoints.md`、`docs/commands.md`。
 - 新增依赖、锁文件：无。
 
 ## 风险
@@ -66,3 +79,12 @@ Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md
 ## 未决问题
 
 - 无。
+
+## Spec 修订
+
+Codex 第 1 轮审查指出：新流程需求文档的 Spec 路由是新的取值，会出现在已有的 `/map --json` 字段 `codexRoute.spec` 里。Spec 假设 7 改为：
+「`interface.json` 加 `mapView.requirementConfirm`，`values.codexRoute` 加取值 `requirement`（新流程模块的需求文档只由用户确认），接口 1.18 → 1.19」；AC9 加「新流程模块的 `codexRoute.spec` 为 `requirement`」。要用户批。
+
+## 外部审查意见
+
+<!-- spec-guard: codex-review round=1 blocking=8 sha256=7c0582c9d8f3 -->
