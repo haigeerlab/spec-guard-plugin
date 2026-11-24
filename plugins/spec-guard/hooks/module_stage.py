@@ -321,6 +321,66 @@ def _v2(root: Path, module: str) -> bool:
     return flow_marker(root, module)["v2"]
 
 
+# requirement-confirm-gate: why a flow v2 requirement still waits for the user; published as requirementConfirm.status.
+REQUIREMENT_WAITS = ("pending", "codex", "revised")
+
+
+def requirement_wait(root: Path, module: str) -> str | None:
+    """requirement-confirm-gate: `pending`, `codex` or `revised` while a v2 requirement waits for the user, else None.
+
+    No marker counts as pending (a v2 requirement is always confirmed by the user).  `codex` is a Codex marker, its
+    digest matching or not: Codex never confirms a requirement, so an edit after it is not a revision of a
+    confirmation.  None for an old-flow module, a confirmed requirement, and an invalid or unreadable marker (those are
+    reported by the review line and verify-artifacts).
+    """
+    if not module or not _v2(root, module):
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    state = review_state(text, "spec")
+    if state in ("none", "pending"):
+        return "pending"
+    if state == "codex-approved":
+        return "codex"
+    if state == "revised":
+        markers = _review_split(text)[0]
+        return "codex" if markers and REVIEW_CODEX_DIGEST.fullmatch(markers[0]) else "revised"
+    return None
+
+
+def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
+    """requirement-confirm-gate: (review line, next step) while a v2 requirement waits for the user's confirmation."""
+    tier = effective_tier(root, module)["tier"]
+    lang = "zh" if zh else "en"
+    names = DOC_SECTIONS["bug" if tier == "bug" else "requirement"][lang] + (
+        DOC_SECTIONS["small"][lang] if tier == "small" else ())
+    reasons = ", ".join(important(root, module))
+    combined = load_config(root)[0].get("reviewCadence") == "combined"
+    path = "spec/%s.md" % module
+    if zh:
+        why = {"pending": "等用户确认", "codex": "只有 Codex 的批准，需求要用户在对话里确认",
+               "revised": "确认后又改过，要用户重新确认"}[wait]
+        return ("- 批准: 需求文档 `%s` %s%s。" % (path, why, "（批准节奏 combined 不适用于需求确认）" if combined else ""),
+                "在对话正文里复述需求（%s，加上档位），问用户是否说完；给谁用、为什么做、怎样算做成、不做什么有一项写不出来、"
+                "有你自己补的假设，或是重要需求%s时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。"
+                "用户在对话里确认后，用 %s 记下来；接管档位不能代替，Codex 的批准不算。确认前不要往下写。"
+                % ("、".join(names), "（本需求是重要需求：%s）" % reasons if reasons else "", cmd["review-mark"]))
+    why = {"pending": "is waiting for the user's confirmation",
+           "codex": "has only Codex's approval; the user confirms requirements in the conversation",
+           "revised": "was edited after it was confirmed; the user confirms it again"}[wait]
+    return ("- Review: the requirement `%s` %s%s." % (path, why, " (reviewCadence combined does not apply to it)"
+                                                    if combined else ""),
+            "restate the requirement in the conversation (%s, plus the tier) and ask the user whether that is everything; "
+            "when who it is for, why, what counts as done or what is out of scope cannot be written, when you filled in "
+            "an assumption yourself, or when it is an important requirement%s, first interview the user with "
+            "agent-skills' interview-me, one question at a time, then restate it. When the user confirms in the "
+            "conversation, record that with %s; the takeover cannot stand in and Codex's approval does not count. Do not "
+            "write further documents until it is confirmed."
+            % (", ".join(names), " (this one is: %s)" % reasons if reasons else "", cmd["review-mark"]))
+
+
 def _hold(root: Path, module: str, stage: str, zh: bool) -> str:
     """What not to do yet while a review is open: the document the stage would write next."""
     if stage == "BUILDING":
@@ -819,6 +879,8 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     A Spec waiting for review holds the Plan back unless the project reviews both at once.  map-review is
     answered by phase-guard.sh itself (no capability map yet).
     """
+    if requirement_wait(root, module):
+        return "spec-review"  # requirement-confirm-gate: the requirement comes before the Plan and the final gate
     kind = None
     final = stage == "BUILDING" and at_final_gate(root, module)
     # pre-build-spec-batch: a revised Spec with a baseline waits for the Plan's review instead of its own.
@@ -1009,6 +1071,8 @@ def important(root: Path, module: str) -> list:
 
 def codex_route(root: Path, module: str, kind: str) -> str:
     """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
+    if kind == "spec" and _v2(root, module):
+        return "requirement"  # requirement-confirm-gate: a v2 requirement is confirmed by the user, whatever the takeover
     if _takeover_item(root, module, kind) != "codex":
         return "takeover"
     if kind == "spec" and important(root, module):
@@ -1171,6 +1235,14 @@ def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False
     Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
     the validated module id only -- never text from the files.
     """
+    # requirement-confirm-gate: a waiting v2 requirement comes before every other review branch, also once the todo is done.
+    wait = requirement_wait(root, module) if stage in BEFORE_PLAN + ("BUILDING", "MODULE_DONE") else None
+    if wait:
+        line, step = requirement_hint(root, module, wait, cmd, zh)
+        plan = "none"
+        if stage == "BUILDING":
+            plan = effective_review(root, module, "plan", file_review_state(root / "tasks" / module / "plan.md", "plan"))[0]
+        return line, step, "revised" if wait == "revised" else "pending", plan
     if stage not in BEFORE_PLAN + ("BUILDING",):
         return "", "", "none", "none"
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
@@ -1404,6 +1476,8 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
                         "`%s` is suspended; resume it with %s, or ask the coordinating session to reassign or clear this "
                         "checkout's role. Do not start other modules here.") % (module, cmd["resume"] % module))
     stage = state["stage"]
+    if stage == "DONE" and requirement_wait(root, module):
+        stage = "MODULE_DONE"  # requirement-confirm-gate: the requirement still waits, so hand it on like any review
     if stage == "DONE":
         lines.append(("- 本 checkout 的模块 `%s`: DONE" if zh else "- This checkout's module `%s`: DONE") % module)
         return lines, (("`%s` 在这个 checkout 里已完成；交回协调会话做最终验收与合并。不要在这里开始别的模块，也不要在这里合并或推送。"
@@ -1465,10 +1539,10 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
         return kind, module
     stage = state["stage"]
     if stage == "DONE" or state["suspended"]:
-        return kind, module, stage, state["suspended"]
+        return kind, module, stage, state["suspended"], requirement_wait(root, module)
     _line, _step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
-            next_gate(root, module) if stage == "BUILDING" else None)
+            next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module))
 
 
 def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
@@ -1770,8 +1844,10 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         hint = ""
     suspended_ids = tuple(s["id"] for s in suspended)
     if stage == "DONE":
+        # requirement-confirm-gate: a finished v2 module whose requirement was never confirmed still waits.
+        waiting = next(((m, w) for m in order for w in (requirement_wait(root, m),) if w), None)
         info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
-                           bool(unmerged and unmerged[0] > 0), deferred] + ([ms_fact] if ms_fact else []),
+                           bool(unmerged and unmerged[0] > 0), deferred, waiting] + ([ms_fact] if ms_fact else []),
                     stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
         notes.extend(suspended_lines)
         if no_todo_note:
@@ -1790,6 +1866,14 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
             return (head + counts + "\n" + "".join(n + "\n" for n in notes)
                     + ("\n建议下一步: " if zh else "\nSuggested next step: ") + ms_step
                     + stop_rules_block("milestone-stop", zh))
+        if waiting:
+            wait_line, wait_step = requirement_hint(root, waiting[0], waiting[1], cmd, zh)
+            notes.append(wait_line)
+            if role_kind not in ("module", "coordinator"):
+                head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
+                return (head + counts + "\n" + "".join(n + "\n" for n in notes)
+                        + ("\n建议下一步: " if zh else "\nSuggested next step: ") + wait_step
+                        + stop_rules_block("spec-review", zh))
         if role_kind in ("module", "coordinator"):
             role_lines, role_step = role_view(root, role_kind, role_id, by_id, cmd, zh=zh)
             head = "当前阶段: **DONE**\n\n- 能力图: 已有\n" if zh else "Current stage: **DONE**\n\n- Capability map: present\n"
@@ -1938,7 +2022,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     sc_fact, sc_line, sc_step = scope_overreach(root, module, stage, zh)
     if sc_line:
         counts += "\n" + sc_line
-    if sc_step and not ms_step and role_kind not in ("module", "coordinator"):
+    if sc_step and not ms_step and not requirement_wait(root, module) and role_kind not in ("module", "coordinator"):
         # takeover-scope-check: a change outside the declared scope is a decision the Spec does not cover.
         node, next_step = "mid-gate", sc_step
     dg_fact, dg_line, dg_step = draft_gate(root, states, module, stage, zh)
@@ -1953,7 +2037,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root), project_sections(root)] + ([ms_fact] if ms_fact else [])
+                       documentation_baseline_present(root), project_sections(root), requirement_wait(root, module)]
+                      + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
