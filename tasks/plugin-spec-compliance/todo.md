@@ -8,7 +8,7 @@
 - [x] Task 5：CONTRIBUTING、维护文档、CHANGELOG
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Checkpoint 2（gate）：推送、开 PR、CI 实测与 AC2 变异
-- [ ] Checkpoint 3（gate）：最终验收；合并由用户进行，合并后经用户原话切主干保护
+- [x] Checkpoint 3（gate）：最终验收；合并由用户进行，合并后经用户原话切主干保护
 
 ## 证据
 
@@ -29,3 +29,4 @@
     `objects/maintenance.lock`（`shutil.Error`），记作模块外跟进。
   - 撤回 0535068（走完整检查）：与 e19cac6 的树相同；这一轮五项全绿（CI required、plugin、python 3.9／3.13、validate）。
   - 越界说明：`commands/phase.md` 只在 AC2 临时提交里动过，撤回后与 main 相同；`scripts/check-local-paths.py`、`scripts/test_ci_workflow.py` 见 Plan「文件」段。
+- Checkpoint 3（2026-11-24）：用户原话「验收通过」（AC1～AC8，PR #487 五项全绿于 1e54853）。AC9（主干保护只要求 `CI required`）在合并后、用户原话后执行，读回结果记在下一个模块的 todo。
