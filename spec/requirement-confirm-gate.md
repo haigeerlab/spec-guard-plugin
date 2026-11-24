@@ -1,6 +1,6 @@
 # Spec: requirement-confirm-gate
 
-<!-- spec-guard: review approved 37c8db389ca9 -->
+<!-- spec-guard: review approved ccbd6003787b -->
 
 ## Objective
 

@@ -1,6 +1,6 @@
 # Todo: requirement-confirm-gate
 
-- [ ] Task 0：提交 Plan 与 todo（Plan 经 Codex 两轮仍有阻断，转用户批）
+- [x] Task 0：提交 Plan 与 todo（Plan 经 Codex 两轮仍有阻断，转用户批；2026-11-24 用户「Plan 和修订都批准」）
 - [ ] Task 1：新流程需求文档的批准路由与待确认提示，回归
 - [ ] Task 2：requirement_confirm、/map --json 字段、接口 1.19，回归
 - [ ] Task 3：verify-artifacts 对 Codex 批准的警告，回归

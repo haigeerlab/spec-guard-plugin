@@ -1,6 +1,6 @@
 # Plan: requirement-confirm-gate
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 Spec：[spec/requirement-confirm-gate.md](../../spec/requirement-confirm-gate.md)（2026-11-24 批准）。
 
