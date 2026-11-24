@@ -105,6 +105,12 @@ def outside_baseline(text):
     return re.sub(r"revision=sha256:[0-9a-f]{64}", "revision=sha256:X", text)
 
 
+def remote_autogc(remote):
+    """receive.autogc from the bare remote's own config only (the environment does not reach receive-pack)."""
+    return subprocess.run(["git", "-C", str(remote), "config", "--local", "--get", "receive.autogc"],
+                          text=True, capture_output=True, check=False).stdout.strip()
+
+
 class ProposalSubmitTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -149,8 +155,15 @@ class ProposalSubmitTests(unittest.TestCase):
         self.git(self.consumer, "remote", "set-url", "origin", str(self.remote))
         self.map_path = self.seed / "spec/CAPABILITY-MAP.md"
 
+    def test_template_remote_runs_no_maintenance_after_push(self):
+        # A local push unsets GIT_CONFIG_COUNT for receive-pack, so only the bare remote's own
+        # config stops it from starting detached maintenance (objects/maintenance.lock races copytree).
+        self.assertEqual(remote_autogc(self._template / "remote.git"), "false")
+
     def build(self):
         self.git(self.root, "init", "--bare", "-b", "trunk", str(self.remote))
+        # receive-pack does not see GIT_CONFIG_COUNT; without this a push starts detached maintenance here.
+        self.git(self.remote, "config", "receive.autogc", "false")
         self.git(self.root, "init", "-b", "trunk", str(self.seed))
         self.git(self.seed, "config", "user.email", "test@example.invalid")
         self.git(self.seed, "config", "user.name", "test")
