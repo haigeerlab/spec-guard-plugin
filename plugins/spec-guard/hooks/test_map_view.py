@@ -23,7 +23,8 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier"}
+               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
+               "requirementConfirm"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -491,6 +492,59 @@ class FlowTest(unittest.TestCase):
         lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/a/`\n- 公共：全局配置\n")
         module, _ = self.module({"spec/a.md": lifted})
         self.assertEqual((module["tier"], module["step"]), ("important", "design"))
+
+
+class RequirementConfirmMapTest(unittest.TestCase):
+    """requirement-confirm-gate: requirementConfirm, the requirement route and how the table shows a v2 requirement."""
+
+    @staticmethod
+    def spec(marker_line=""):
+        return "# a\n\n<!-- spec-guard: flow v2 tier=bug -->\n%s\n## 复现步骤\n\n不涉及\n" % marker_line
+
+    def test_old_module_is_null(self):
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": "# a\n"}) as project:
+            module = project.json()["modules"][0]
+        self.assertIsNone(module["requirementConfirm"])
+        self.assertNotEqual(module["codexRoute"]["spec"], "requirement")
+
+    def test_pending_requirement(self):
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": self.spec()}) as project:
+            data = project.json()
+            table = project.run().stdout
+        module = data["modules"][0]
+        self.assertEqual(module["requirementConfirm"]["status"], "pending")
+        self.assertIsNone(module["requirementConfirm"]["by"])
+        self.assertEqual(module["codexRoute"]["spec"], "requirement")
+        from map_view import CODEX_ROUTE
+        self.assertIn(module["codexRoute"]["spec"], CODEX_ROUTE)
+        self.assertIn({"id": "a", "kind": "spec", "review": "none"}, data["awaitingReview"])
+        self.assertIn("需求 待确认", table)
+        self.assertIn("a Spec（需求待确认）", table)
+
+    def test_codex_approval_shows_as_waiting(self):
+        from module_stage import review_codex_digest, review_codex_line
+        text = self.spec("<!-- spec-guard: review pending -->\n")
+        text = text.replace("<!-- spec-guard: review pending -->", review_codex_line(review_codex_digest(text)))
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": text}) as project:
+            data = project.json()
+            table = project.run().stdout
+        self.assertEqual(data["modules"][0]["requirementConfirm"]["status"], "pending")
+        self.assertNotIn("Codex ✔", table)
+        self.assertIn("需求 待确认", table)
+
+    def test_confirmed_requirement_has_a_commit_time(self):
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": self.spec("<!-- spec-guard: review pending -->\n")}) as project:
+            approve_spec(project.root, "a")
+            project.git("init", "-q")
+            project.git("add", "-A")
+            project.git("commit", "-qm", "base")
+            module = project.json()["modules"][0]
+            table = project.run().stdout
+        confirm = module["requirementConfirm"]
+        self.assertEqual((confirm["status"], confirm["by"]), ("confirmed", "user"))
+        self.assertRegex(confirm["at"], r"^\d{4}-\d\d-\d\dT")
+        self.assertRegex(confirm["sha256"], r"^[0-9a-f]{12}$")
+        self.assertIn("需求 ✔", table)
 
 
 class StatusTest(unittest.TestCase):

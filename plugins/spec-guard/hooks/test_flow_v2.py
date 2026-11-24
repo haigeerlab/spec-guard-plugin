@@ -534,5 +534,109 @@ class RequirementConfirmHintTest(unittest.TestCase):
             self.assertIn(CODEX_ZH, again)
 
 
+class RequirementConfirmFieldTest(unittest.TestCase):
+    """requirement-confirm-gate: requirementConfirm's status, by, at and sha256."""
+    GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
+           "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
+
+    def git(self, project, *args):
+        subprocess.run(self.GIT + list(args), cwd=project.root, check=True, capture_output=True, timeout=30)
+
+    def commit(self, project, message="c"):
+        self.git(project, "add", "-A")
+        self.git(project, "commit", "-qm", message, "--allow-empty")
+
+    def test_four_statuses(self):
+        with Project() as project:
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a"))
+            project.write("spec/a.md", "# a\n")
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a"))
+            pending_spec(project)
+            self.assertEqual(module_stage.requirement_confirm(project.root, "a")["status"], "pending")
+            codex_spec(project)
+            self.assertEqual(module_stage.requirement_confirm(project.root, "a")["status"], "pending")
+            approved_spec(project)
+            confirm = module_stage.requirement_confirm(project.root, "a")
+            self.assertEqual((confirm["status"], confirm["by"], confirm["at"]), ("confirmed", "user", None))
+            project.write("spec/a.md", (project.root / "spec" / "a.md").read_text(encoding="utf-8") + "\n补一句。\n")
+            confirm = module_stage.requirement_confirm(project.root, "a")
+            self.assertEqual((confirm["status"], confirm["by"]), ("revised", None))
+            project.write("spec/a.md", requirement().replace("<!-- spec-guard: review approved -->",
+                                                             "<!-- spec-guard: review pending -->\n<!-- spec-guard: review pending -->"))
+            self.assertEqual(module_stage.requirement_confirm(project.root, "a")["status"], "invalid")
+
+    def test_sha256_is_the_spec_digest(self):
+        with Project() as project:
+            approved_spec(project)
+            path = project.root / "spec" / "a.md"
+            done = subprocess.run([sys.executable, "-B", str(HERE / "spec-digest.py"), "text", str(path)],
+                                  capture_output=True, text=True, check=True)
+            expected = done.stdout.strip()
+            self.assertEqual(module_stage.requirement_confirm(project.root, "a")["sha256"], expected)
+
+    def test_at_follows_the_committed_marker(self):
+        with Project() as project:
+            self.git(project, "init", "-q")
+            pending_spec(project)
+            self.commit(project, "requirement")
+            approved_spec(project)
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a")["at"])  # not committed yet
+            self.commit(project, "confirm")
+            at = module_stage.requirement_confirm(project.root, "a")["at"]
+            confirm_time = subprocess.run(["git", "log", "-1", "--format=%cI"], cwd=project.root, capture_output=True,
+                                          text=True, check=True).stdout.strip()
+            self.assertEqual(at, confirm_time)
+            approved = (project.root / "spec" / "a.md").read_text(encoding="utf-8")
+            # Deleted and committed, then written back without a commit: not the old time.
+            pending_spec(project)
+            self.commit(project, "drop")
+            project.write("spec/a.md", approved)
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a")["at"])
+
+    def test_fenced_example_does_not_date_the_marker(self):
+        with Project() as project:
+            self.git(project, "init", "-q")
+            approved_spec(project)
+            approved = (project.root / "spec" / "a.md").read_text(encoding="utf-8")
+            line = next(l for l in approved.splitlines() if "review approved" in l)
+            body = approved.replace(line + "\n", "")
+            project.write("spec/a.md", body.replace("<!-- spec-guard: flow v2", "```\n%s\n```\n<!-- spec-guard: flow v2" % line, 1))
+            self.commit(project, "example")
+            project.write("spec/a.md", approved)
+            self.commit(project, "confirm")
+            at = module_stage.requirement_confirm(project.root, "a")["at"]
+            confirm_time = subprocess.run(["git", "log", "-1", "--format=%cI"], cwd=project.root, capture_output=True,
+                                          text=True, check=True).stdout.strip()
+            self.assertEqual(at, confirm_time)
+
+    def test_at_outside_git_and_past_the_limit(self):
+        with Project() as project:
+            approved_spec(project)
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a")["at"])
+            self.git(project, "init", "-q")
+            self.commit(project, "confirm")
+            for index in range(module_stage.REQUIREMENT_AT_LIMIT):
+                project.write("spec/a.md", (project.root / "spec" / "a.md").read_text(encoding="utf-8"))
+                project.write("tasks/a/n%d.md" % index, "x\n")
+                self.git(project, "add", "-A")
+                # touch the requirement in each commit without changing the marker
+                path = project.root / "spec" / "a.md"
+                path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+                self.commit(project, "n%d" % index)
+            self.assertIsNone(module_stage.requirement_confirm(project.root, "a")["at"])
+
+    def test_review_mark_refuses_codex_on_a_v2_requirement(self):
+        with Project() as project:
+            pending_spec(project)
+            project.write(".agent/config.json", json.dumps({"version": 1, "takeover": {"spec": "codex"}}))
+            report = project.root / "r.json"
+            report.write_text("{}", encoding="utf-8")
+            done = subprocess.run([sys.executable, "-B", str(HERE / "review_mark.py"), "--project", str(project.root),
+                                   "--module", "a", "--target", "spec", "--state", "codex-approved", "--review",
+                                   str(report)], capture_output=True, text=True)
+            self.assertEqual(done.returncode, 2)
+            self.assertTrue(done.stdout.startswith("codex-route-requirement: "), done.stdout + done.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

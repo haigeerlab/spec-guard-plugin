@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, important,
-                          file_review_state, module_state,
+                          file_review_state, module_state, requirement_confirm,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
@@ -40,9 +40,10 @@ AWAITING = ("pending", "revised", "invalid")
 # interface.json mapView.values.reviewApprovedBy (codex-approval, interface 1.15); null is written as JSON null.
 APPROVED_BY = ("user", "codex", "null")
 # interface.json mapView.values.codexRoute (codex-route-guard, interface 1.16); null is written as JSON null.
-CODEX_ROUTE = ("null", "takeover", "important", "pre-declared")
+CODEX_ROUTE = ("null", "takeover", "important", "pre-declared", "requirement")  # requirement: since 1.19
 REVIEW_WORDS = {"approved": "✔", "codex-approved": "Codex ✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效",
                 "none": "无标记"}
+REQUIREMENT_WORDS = {"confirmed": "✔", "pending": "待确认", "revised": "改过待重新确认", "invalid": "标记无效"}
 RESPONSIBILITY_LIMIT = 40
 CHECKED_LINE = re.compile(r"^\s*[-*+]\s+\[[xX]\]")
 DIFF_FILE = re.compile(r"^diff --git a/\S+ b/tasks/([^/\s]+)/todo\.md$")
@@ -484,6 +485,7 @@ def build(root: Path) -> dict:
             "codexRoute": {kind: codex_route(root, module, kind) or None for kind in ("spec", "plan")},
             "reviewRounds": _review_rounds(root, module),
             "tier": effective_tier(root, module)["tier"],
+            "requirementConfirm": requirement_confirm(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),
@@ -516,7 +518,8 @@ def build(root: Path) -> dict:
     awaiting = [{"id": m["id"], "kind": kind, "review": m["review"][kind]}
                 for m in modules for kind in ("spec", "plan")
                 if m["review"][kind] in AWAITING or (m["review"][kind] == "codex-approved"
-                                                     and m["reviewApprovedBy"][kind] is None)]
+                                                     and m["reviewApprovedBy"][kind] is None)
+                or (kind == "spec" and (m["requirementConfirm"] or {}).get("status") in ("pending", "revised"))]
     active = current["id"] if current is not None and stage != "DONE" else None
     data = {
         "schemaVersion": SCHEMA_VERSION,
@@ -621,7 +624,10 @@ def _worktree_suffix(m: dict) -> str:
 
 def _review_cell(root: Path, m: dict) -> str:
     parts = []
-    if (root / "spec" / (m["id"] + ".md")).is_file():
+    confirm = m.get("requirementConfirm")
+    if confirm:  # requirement-confirm-gate: a v2 requirement shows whether the user confirmed it, never a Codex tick
+        parts.append("需求 " + REQUIREMENT_WORDS[confirm["status"]])
+    elif (root / "spec" / (m["id"] + ".md")).is_file():
         parts.append("Spec " + REVIEW_WORDS[m["review"]["spec"]])
     if (root / "tasks" / m["id"] / "plan.md").is_file():
         parts.append("Plan " + REVIEW_WORDS[m["review"]["plan"]])
@@ -657,8 +663,12 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     else:
         lines.append("关键卡点：无")
     kinds = {"spec": "Spec", "plan": "Plan"}
-    lines.append("待批准：" + ("、".join("%s %s（%s）" % (a["id"], kinds[a["kind"]], REVIEW_WORDS[a["review"]])
-                                       for a in data["awaitingReview"]) or "无"))
+    confirms = {m["id"]: m["requirementConfirm"] for m in data["modules"] if m.get("requirementConfirm")}
+    lines.append("待批准：" + ("、".join(
+        "%s %s（%s）" % (a["id"], kinds[a["kind"]],
+                        "需求" + REQUIREMENT_WORDS[confirms[a["id"]]["status"]] if a["kind"] == "spec" and a["id"] in confirms
+                        else REVIEW_WORDS[a["review"]])
+        for a in data["awaitingReview"]) or "无"))
     if data["nextGate"]:
         lines.append("下一个 gate：" + clean(data["nextGate"]))
     stop = data.get("milestoneStop")

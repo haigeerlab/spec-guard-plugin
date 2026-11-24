@@ -1,5 +1,5 @@
 {
-  "interface": "1.18",
+  "interface": "1.19",
   "mapView": {
     "command": [
       "python3",
@@ -40,7 +40,8 @@
         "null": "the module's takeover gives this step to Codex and no user approval is required",
         "takeover": "the module's takeover does not give this step to Codex",
         "important": "the Spec is judged to be an important requirement",
-        "pre-declared": "the Plan's pre-declared section has content or is malformed"
+        "pre-declared": "the Plan's pre-declared section has content or is malformed",
+        "requirement": "since 1.19: a flow v2 module's requirement (spec/<id>.md), which only the user confirms whatever the takeover; review-mark refuses codex-approved on it (codex-route-requirement)"
       },
       "importantReasons": {
         "multi-module": "per module, in important.reasons (interface 1.15, spec/important-requirement.md): inserted into the capability map in one batch with another module",
@@ -98,16 +99,23 @@
       "meaning": "facts read from the round lines <!-- spec-guard: codex-review round=N blocking=N sha256=<12 hex> --> outside code fences, the same reading reviewMark uses for its two-round cap; every round is listed, also from before a revision, whatever the approval marker says now. No verdict is derived here: a caller checks a Codex approval or the two-round hand-off against reviewApprovedBy and codexRoute itself. An unreadable Spec or Plan fails the whole view (exit 4) like review"
     },
     "flow": {
-      "appearsWhen": "per module, always (interface 1.18, spec/flow-doc-skeletons.md)",
+      "appearsWhen": "per module, always (interface 1.18, spec/flow-doc-skeletons.md; requirementConfirm since 1.19)",
       "fields": {
-        "tier": "the flow v2 tier from the line <!-- spec-guard: flow v2 tier=<tier> --> in spec/<id>.md: bug, small, normal or important; an unknown tier reads as normal, and important when the rules judge the requirement important (see important); null for a module without the line (the old Spec -> Plan flow, unchanged)"
+        "tier": "the flow v2 tier from the line <!-- spec-guard: flow v2 tier=<tier> --> in spec/<id>.md: bug, small, normal or important; an unknown tier reads as normal, and important when the rules judge the requirement important (see important); null for a module without the line (the old Spec -> Plan flow, unchanged)",
+        "requirementConfirm": "since 1.19 (spec/requirement-confirm-gate.md): null for an old-flow module; for a flow v2 module {status, by, at, sha256}: status is one of requirementConfirmStatus; by is \"user\" when confirmed, else null; at is the commit time (ISO 8601) of the earliest commit in the unbroken run back from HEAD whose spec/<id>.md carries the current approval line (outside code fences), null when not confirmed, not committed, outside git, or more than 50 commits of the file back; sha256 is the 12-hex prefix of the sha256 of the whole file, as spec-digest.py text prints it (the same kind of value as reviewRounds.sha256). An unreadable spec/<id>.md fails the whole view (exit 4) like review"
       },
       "tierValues": ["bug", "small", "normal", "important"],
       "stepValues": {
         "design": "since 1.18, flow v2 normal/important modules only: the requirement is written, tasks/<id>/design.md is not (stage hint NEEDS_DESIGN)",
         "regression": "since 1.18, flow v2 normal/important modules only: the design is written, tasks/<id>/regression.md is not (stage hint NEEDS_REGRESSION)"
       },
-      "meaning": "bug and small modules write one document (spec/<id>.md) and go from the requirement straight to the Plan; normal and important modules write the design and the regression document first. Document sections: references/doc-skeletons.md. step keeps spec, plan and build for every other case"
+      "meaning": "bug and small modules write one document (spec/<id>.md) and go from the requirement straight to the Plan; normal and important modules write the design and the regression document first. Document sections: references/doc-skeletons.md. step keeps spec, plan and build for every other case. A flow v2 requirement waiting for the user (requirementConfirm.status pending or revised, also with no approval line) is listed in awaitingReview with its raw review value",
+      "requirementConfirmStatus": {
+        "confirmed": "the user's approval line, its digest matching the text",
+        "pending": "no approval line, review pending, or only Codex's approval (digest matching or not): Codex never confirms a requirement",
+        "revised": "the user approved it, then the text changed; the user confirms it again",
+        "invalid": "the approval line is malformed (see review)"
+      }
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",
@@ -276,7 +284,7 @@
     "confirm": "only previews unless --confirm is added",
     "exitCodes": {
       "0": "ok (preview, written, or no change)",
-      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid; for codex-approved and codex-reviewed also: no --review, a report that is not a completed Codex review with a conclusion or does not match the file on disk, blocking findings (codex-approved), two rounds with blocking findings already, or --target both; for codex-approved also (since 1.16, spec/codex-route-guard.md): codex-route-takeover, codex-route-important or codex-route-pre-declared when the module's takeover does not let Codex approve this file (the same decision as mapView.codexRoute), checked before the report is read and with nothing written; for --target acceptance: a state other than codex-approved, no --review, a module whose takeover is not merge=auto (since 0.91.1 also in the commit before the module started: acceptance-not-auto-at-base), uncommitted changes, a final review that is not a clean Codex review up to HEAD with the Spec on disk, missing or failing check evidence for HEAD, or files outside the module's declared scope"
+      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid; for codex-approved and codex-reviewed also: no --review, a report that is not a completed Codex review with a conclusion or does not match the file on disk, blocking findings (codex-approved), two rounds with blocking findings already, or --target both; for codex-approved also (since 1.16, spec/codex-route-guard.md): codex-route-takeover, codex-route-important, codex-route-pre-declared or (since 1.19) codex-route-requirement when the module's takeover does not let Codex approve this file (the same decision as mapView.codexRoute), checked before the report is read and with nothing written; for --target acceptance: a state other than codex-approved, no --review, a module whose takeover is not merge=auto (since 0.91.1 also in the commit before the module started: acceptance-not-auto-at-base), uncommitted changes, a final review that is not a clean Codex review up to HEAD with the Spec on disk, missing or failing check evidence for HEAD, or files outside the module's declared scope"
     },
     "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges). codex-approved and codex-reviewed (interface 1.15, spec/codex-approval.md) take the /delegate:review JSON saved to a file; each records one round line under the external review section, and codex-approved also writes the Codex marker. Codex's approval is spec-guard's policy under the takeover setting, not the user's approval. --target acceptance --state codex-approved --review <final review> (interface 1.15, spec/codex-final-acceptance.md) records Codex's final acceptance of HEAD for a merge=auto module in the common git directory (since interface 1.16; see mapView.acceptance); the check evidence is read from ~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json (autopilot.check-evidence/v1); nothing tracked is written and the final gate is ticked after the merge",
     "contract": "spec/review-approval-marker.md"

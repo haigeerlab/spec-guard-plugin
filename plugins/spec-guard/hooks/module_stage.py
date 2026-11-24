@@ -145,6 +145,12 @@ def review_digest(text: str) -> str:
     return _DIGEST_MODULE.text_digest(review_body(text))
 
 
+def _text_digest(text: str) -> str:
+    """Digest of the whole text (`spec-digest.py text`); the algorithm lives in spec-digest.py only."""
+    review_digest("")  # loads the digest module
+    return _DIGEST_MODULE.text_digest(text)
+
+
 def review_codex_digest(text: str) -> str:
     """codex-approval (M3 second rework): `review_digest` without the external review section.
 
@@ -348,6 +354,50 @@ def requirement_wait(root: Path, module: str) -> str | None:
         markers = _review_split(text)[0]
         return "codex" if markers and REVIEW_CODEX_DIGEST.fullmatch(markers[0]) else "revised"
     return None
+
+
+# interface.json mapView.flow.requirementConfirmStatus (requirement-confirm-gate, interface 1.19).
+REQUIREMENT_STATUSES = ("confirmed", "pending", "revised", "invalid")
+REQUIREMENT_AT_LIMIT = 50  # commits of spec/<id>.md walked back to date a confirmation; beyond it `at` is null
+
+
+def requirement_confirm(root: Path, module: str) -> dict | None:
+    """requirement-confirm-gate: {status, by, at, sha256} of a v2 requirement; None for an old-flow module."""
+    if not module or not _v2(root, module):
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None  # /map --json fails as a whole on an unreadable Spec before it gets here
+    wait = requirement_wait(root, module)
+    if review_state(text, "spec") == "invalid":
+        status = "invalid"
+    else:
+        status = "confirmed" if wait is None else ("revised" if wait == "revised" else "pending")
+    markers = _review_split(text)[0]
+    return {"status": status, "by": "user" if status == "confirmed" else None,
+            "at": _confirmed_at(root, module, markers[0]) if status == "confirmed" else None,
+            "sha256": _text_digest(text)}  # the whole file, as `spec-digest.py text` prints it (AC5)
+
+
+def _confirmed_at(root: Path, module: str, line: str) -> str | None:
+    """Commit time of the earliest commit in the unbroken run, back from HEAD, whose Spec carries this marker line."""
+    relative = "spec/%s.md" % module
+
+    def carries(commit: str) -> bool:
+        blob = _git(root, "show", "%s:%s" % (commit, relative))
+        return blob is not None and line in _review_split(blob)[0]
+
+    if not carries("HEAD"):
+        return None  # not committed yet, or written back after a committed removal
+    log = _git(root, "log", "-n", str(REQUIREMENT_AT_LIMIT + 1), "--format=%H%x09%cI", "--", relative)
+    rows = [row.split("\t") for row in (log or "").splitlines() if "\t" in row]
+    earliest = None
+    for sha, when in rows[:REQUIREMENT_AT_LIMIT]:
+        if not carries(sha):
+            return earliest
+        earliest = when
+    return earliest if len(rows) <= REQUIREMENT_AT_LIMIT else None
 
 
 def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
