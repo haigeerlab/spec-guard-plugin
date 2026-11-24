@@ -47,7 +47,7 @@ jobs:
       - name: 安装 ShellCheck（官方发布包，核对 sha256）
         env:
           SHELLCHECK_VERSION: v0.11.0
-          SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+          SHELLCHECK_SHA256: 9c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
         run: |
           archive="$RUNNER_TEMP/shellcheck.tar.xz"
           curl -fsSL --retry 3 -o "$archive" \
