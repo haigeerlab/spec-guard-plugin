@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """检查 Git 跟踪的文本文件，阻止写入本机登录名及用户名路径。"""
+from __future__ import annotations  # `re.Pattern | None` on Python 3.9
+
 import getpass
 import os
 from pathlib import Path
