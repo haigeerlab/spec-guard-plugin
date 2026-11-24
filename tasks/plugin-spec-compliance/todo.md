@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交 Plan 与 todo（2026-11-24 用户「Plan 批准」）
 - [x] Task 1：Python 3.9 兼容
-- [ ] Task 2：check-frontmatter.py 与回归
+- [x] Task 2：check-frontmatter.py 与回归
 - [ ] Task 3：清单过 --strict
 - [ ] Task 4：workflow、dependabot、LICENSE，test_ci_workflow.py
 - [ ] Task 5：CONTRIBUTING、维护文档、CHANGELOG
