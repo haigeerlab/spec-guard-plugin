@@ -274,7 +274,11 @@ touch "$local_project/spec/alpha.md"
 injects "有 spec 没 plan 时报告 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
 injects "指出当前模块" "$local_project" 'Current module: `alpha` (next in Build order)'
 # flow-doc-skeletons：带流程标记的模块先要技术方案、再要回归文档；标记去掉后回到原来的 NEEDS_PLAN。
+# requirement-confirm-gate：新流程需求文档没有批准标记也算待确认，所以这里先记一条有效的用户批准。
 printf '# alpha\n\n<!-- spec-guard: flow v2 tier=normal -->\n' >"$local_project/spec/alpha.md"
+injects "新流程需求文档没有标记时等用户确认" "$local_project" 'the requirement `spec/alpha.md` is waiting for the user'"'"'s confirmation'
+python3 -B "$HOOKDIR/review_mark.py" --project "$local_project" --module alpha --target spec --state approved --confirm >/dev/null \
+  || fail "requirement-confirm-gate：review_mark 写批准失败"
 injects "新流程模块缺技术方案时报告 NEEDS_DESIGN" "$local_project" "Current stage: **NEEDS_DESIGN**"
 injects "NEEDS_DESIGN 指向技术方案与骨架" "$local_project" 'write the design `tasks/alpha/design.md`'
 mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"

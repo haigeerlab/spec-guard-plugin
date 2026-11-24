@@ -125,6 +125,12 @@ def _flow(view: dict) -> list:
     found = []
     if block.get("tierValues") != list(module_stage.TIERS):
         found.append("mapView.flow.tierValues 为 %s，代码为 %s" % (block.get("tierValues"), list(module_stage.TIERS)))
+    statuses = block.get("requirementConfirmStatus")  # requirement-confirm-gate: interface 1.19
+    if not isinstance(statuses, dict) or list(statuses) != list(module_stage.REQUIREMENT_STATUSES):
+        found.append("mapView.flow.requirementConfirmStatus 为 %s，代码为 %s"
+                     % (list(statuses) if isinstance(statuses, dict) else statuses, list(module_stage.REQUIREMENT_STATUSES)))
+    if "requirementConfirm" not in block["fields"]:
+        found.append("mapView.flow.fields 缺少 requirementConfirm")
     steps = block.get("stepValues")
     if not isinstance(steps, dict) or set(steps) != set(map_view.FLOW_STEPS.values()):
         found.append("mapView.flow.stepValues 为 %s，代码为 %s"

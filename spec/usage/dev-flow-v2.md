@@ -132,6 +132,7 @@ delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）�
 
 - regression-doc-check：module-crew 的多模块布局提案（mc-coord #22381；需求一级各节写进用法草案，整体联调回归 `spec/usage/<需求>.regression.md`，结论复用 `spec-guard.verification/v1`），
   需要让 `usage_draft.draft_files` 排除 `*.regression.md`；bug／small 的回归用例按同一格式解析、阶段提示提醒补上（ecosystem-lead #22380）；`regression_view --ref` 与用例内容 sha256（#22354）。
+  另：项目追加章节（projectSections）不能只有标题，要有内容或写明「不涉及」——0.94.0 只查标题（project-sections 假设 8），M1 验收时用户同意记到这里（2026-11-24「M1 通过」）。
 - design-review：delegate 的调用方式与报告字段（见 D 节，#22369、#22372）。
 
 ## Milestones
@@ -141,3 +142,5 @@ delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）�
 | M1 | U3, U4 | flow-doc-skeletons, project-sections |
 | M2 | U1, U2, U3, U4 | requirement-confirm-gate, design-review, plan-auto-approve, takeover-redefine |
 | M3 | U1, U2, U3, U4, U5 | regression-doc-check, verification-criteria |
+
+<!-- spec-guard: milestone M1 confirmed flow-doc-skeletons, project-sections -->
