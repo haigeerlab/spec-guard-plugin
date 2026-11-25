@@ -8,7 +8,7 @@
 - [x] Task 5：`/map --json` 与 review-mark
 - [x] Task 6：接口 1.24
 - [x] Checkpoint 1（report）：本机完整检查、老流程比对与变异
-- [ ] Task 7：规则与文档
+- [x] Task 7：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
@@ -24,3 +24,5 @@
   用例：`test_verification.py` `InterfaceTest` 1 例（按模板代入真实路径依次运行三条命令，核对 `check --json` 的键集合）；`check-interface.py` 通过。
 - Checkpoint 1（2026-11-26）：Task 1～6 的每次提交都走了完整档且全绿。老流程输出比对（AC10）：已安装的 0.95.0 与本分支各跑本仓库和老流程夹具，阶段提示与 verify-artifacts 逐字相同；`/map --json` 去掉 `generatedAt` 与本模块新增的两个键（顶层 `usageVerification`、模块的 `verification`）后，逐字段比对只有 `generator.version` 不同（0.95.0 → 0.96.0，regression-doc-check 升的版本号）。
   变异（临时副本）：不查执行者是否作者、patchId 用 HEAD 的 sha、`current` 不看回归文档、最终 gate 不走新流程分支（认 Codex 记录）、`record` 不先校验、`acceptance_step` 不跳过新流程模块，各自让对应用例变红。`current` 不看回归文档那处第一次没拦住（现有用例改文档时也改了提交，补丁一变 `current` 本来就假），补一例只在工作区改回归文档后拦住。还原后全绿。
+- Task 7（2026-11-26）：新文件 `references/verification-report.md`（三步、字段表、怎样算成立、一份完整例子、记下之后）；共享检查点规则新增「新流程模块按回归文档做合并前验证」一条，Codex 最终验收一条写明不用于新流程模块；`node-rules.md` 最终验收停点把 Codex 验收限定到老流程模块，新流程模块看「合并前验证」一行（Q1 A）；`docs/commands.md` 加 `verification.py` 一节、`/map` 段落补 1.24 的字段；CHANGELOG「未发布」加一条。
+  `test_workflow_checkpoints.py`（边界外）断言停点规则里有「最终验收交 Codex」，这句保留、只加了「老流程」限定，该测试不改照样通过；快档校验通过。

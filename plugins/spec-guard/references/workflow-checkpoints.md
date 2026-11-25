@@ -218,7 +218,11 @@ Spec 交给 Codex 的模块，没写并行边界或清单读不到也按重要�
   HEAD 的补丁（`--spec spec/<id>.md`，报告存仓库外；任务说明列出流程文件、写明不算实现范围，并附上检查证据里的命令、退出码、`output_sha256` 与 `tail`），再等 autopilot 在 HEAD 上的检查证据（非作者跑、全部退出 0）；两样齐了、工作区干净、
   没有越界、且本模块开工前就是合并：自动（开工后才放宽的由用户验收，免得补丁靠改配置放宽自己的档位），用 `review-mark --target acceptance --state codex-approved --review <报告>` 记下。记录写在 git 目录、不进提交（提交会让 HEAD
   变掉），记录的提交是 HEAD 或其祖先时阶段提示当最终 gate 已过；合并后补勾并写一句来源。缺任一样或被拒绝就停下等用户，不要自己验收；
-  拟回告写进 todo，不发出，等用户确认（回告是对外发送）。其余模块的最终验收照旧由用户做。
+  拟回告写进 todo，不发出，等用户确认（回告是对外发送）。其余模块的最终验收照旧由用户做。新流程模块不走这一条，见下一条。
+- **新流程模块按回归文档做合并前验证（verification-criteria）**：开工后写代码的会话先用 `verification.py author` 记下自己（阶段提示会给出命令）；
+  合并前由非作者（autopilot）照回归文档逐条执行，写一份 `spec-guard.verification/v1` 报告（格式见插件的 `references/verification-report.md`），
+  `verification.py check` 判它是否成立，成立再用 `verification.py record` 记下。结论绑定当时的补丁与回归文档，任一变了就过期。合并是 auto 时，
+  只有当前、通过的结论才算过最终 gate；合并由用户决定时，验收消息写明结论（没有结论就写明），由用户决定。Codex 最终验收不用于新流程模块。
 - **写出 Spec 或 Plan 交用户批准时标 `pending`**（写文件时直接带上这一行，或用 `review-mark`）。当前模块待批准时，
   阶段提示报告“等待用户批准”，不建议写 Plan 或继续构建；`combined` 节奏下 Spec 待批准时照常写出 Plan，两份一起交审。
 - **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，用 `/spec-guard:review-mark`（Codex：`spec-guard-ops`
