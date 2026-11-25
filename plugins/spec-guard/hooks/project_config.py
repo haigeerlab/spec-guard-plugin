@@ -34,13 +34,25 @@ CADENCES = ("separate", "combined")
 CONCURRENCY = ("off", "on")
 # autonomy-tier: what each tier allows is defined by module-crew; spec-guard only stores, reads and reports it.
 TIERS = ("strict", "standard", "relaxed")
-# takeover-config: who does each step, from strictest to widest.  A preset expands to all four items; a custom
-# object may omit items, which read as human.  Callers (autopilot, module-crew) act on it; spec-guard only stores it.
-ITEMS = {"spec": ("human", "codex"), "plan": ("human", "codex"), "merge": ("human", "auto"),
+# takeover-config / takeover-redefine: who does each step, from strictest to widest.  A preset expands to all three
+# items; a custom object may omit items, which read as human.  Callers (autopilot, module-crew) act on it; spec-guard
+# only stores it.  The requirement and a flow v2 Plan are not configurable (requirement-confirm-gate, plan-auto-approve).
+ITEMS = {"design": ("human", "reviewer"), "merge": ("human", "auto"),
          "release": ("human", "prepare", "auto-confirm", "auto")}
 HUMAN = {item: values[0] for item, values in ITEMS.items()}
-PRESETS = {"none": dict(HUMAN), "plan": dict(HUMAN, plan="codex"),
-           "merge": dict(HUMAN, spec="codex", plan="codex", merge="auto")}
+PRESETS = {"none": dict(HUMAN), "design": dict(HUMAN, design="reviewer"),
+           "merge": dict(HUMAN, design="reviewer", merge="auto")}
+# takeover-redefine (assumptions 4, 5; Q1 A): the old values are read, never written.  The preset `plan` reads as
+# none; the custom items spec and plan no longer apply to flow v2 modules.  Old-flow modules keep their old meaning
+# through legacy(): who approves their Spec and Plan.
+LEGACY_ITEMS = {"spec": ("human", "codex"), "plan": ("human", "codex")}
+LEGACY_PRESETS = {"plan": dict(HUMAN)}
+LEGACY_OF_PRESET = {"none": {"spec": "human", "plan": "human"}, "plan": {"spec": "human", "plan": "codex"},
+                    "design": {"spec": "human", "plan": "codex"}, "merge": {"spec": "codex", "plan": "codex"}}
+ALL_ITEMS = {**ITEMS, **LEGACY_ITEMS}
+LEGACY_NOTE = ("note: takeover=plan is read as none; to keep the second reviewer approving, set design "
+               "(needs the user's words)")
+LEGACY_ITEMS_NOTE = "note: spec and plan no longer apply to flow v2 modules; old-flow modules still read them"
 # Q14 and 8.4 of the S101 plan: spec-guard stores these release values and only hints at the limits; autopilot enforces them.
 RELEASE_LIMITS = ("note: the four pipeline plugins (spec-guard, module-crew, delegate, agent-relay) release at most at prepare",
                   "note: release=auto is only for projects that can roll back quickly; autopilot enforces both limits")
@@ -76,15 +88,41 @@ def valid_sections(value: Any) -> bool:
 
 
 def valid_takeover(value: Any) -> bool:
+    """A takeover value as read: the new presets and items, or the old ones (takeover-redefine assumption 4)."""
     if isinstance(value, str):
-        return value in PRESETS
+        return value in PRESETS or value in LEGACY_PRESETS
     return isinstance(value, dict) and all(
-        isinstance(item, str) and item in ITEMS and value[item] in ITEMS[item] for item in value)
+        isinstance(item, str) and item in ALL_ITEMS and value[item] in ALL_ITEMS[item] for item in value)
+
+
+def legacy_value(value: Any) -> bool:
+    """takeover-redefine: an old value, which set refuses to write (the requirement item never existed)."""
+    if isinstance(value, str):
+        return value in LEGACY_PRESETS
+    return isinstance(value, dict) and bool(set(value) & {"spec", "plan", "requirement"})
 
 
 def expand(value: Any) -> dict[str, str]:
-    """A valid takeover value as all four items."""
-    return dict(PRESETS[value]) if isinstance(value, str) else dict(HUMAN, **value)
+    """A valid takeover value as the three items, old values converted."""
+    if isinstance(value, str):
+        return dict(PRESETS.get(value) or LEGACY_PRESETS[value])
+    return dict(HUMAN, **{item: value[item] for item in ITEMS if item in value})
+
+
+def legacy(value: Any) -> dict[str, str]:
+    """takeover-redefine (Q1 A): who approves an old-flow module's Spec and Plan under this value.
+
+    design=reviewer stands for the old plan=codex; an old item written in a custom object is read as written.
+    """
+    if isinstance(value, str):
+        return dict(LEGACY_OF_PRESET[value])
+    return {"spec": value.get("spec", "human"),
+            "plan": value.get("plan", "codex" if value.get("design") == "reviewer" else "human")}
+
+
+def all_items(value: Any) -> dict[str, str]:
+    """The three items and the old-flow pair, as module_takeover returns them."""
+    return {**expand(value), **legacy(value)}
 
 
 def takeover_wider(items: dict[str, str], than: dict[str, str]) -> bool:
@@ -93,8 +131,8 @@ def takeover_wider(items: dict[str, str], than: dict[str, str]) -> bool:
 
 # takeover-narrow: the order a step is taken back in (Q7, r3 Q13).  A preset steps down the preset ladder; a custom
 # value hands back its outermost non-human item, release first; release goes straight back to human.
-PRESET_LADDER = ("none", "plan", "merge")
-NARROW_ORDER = ("release", "merge", "plan", "spec")
+PRESET_LADDER = ("none", "design", "merge")
+NARROW_ORDER = ("release", "merge", "design")
 SOURCES = ("autopilot", "module-crew", "user")
 REASON_MAX = 200
 SCOPE_PROJECT = "project"
@@ -104,6 +142,8 @@ STAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\Z")
 def narrow_step(value: Any) -> Any:
     """The value one step stricter, or None when it is already the strictest."""
     if isinstance(value, str):
+        if value in LEGACY_PRESETS:
+            return "none"  # takeover-redefine: the old plan stands one step above none (AC6)
         index = PRESET_LADDER.index(value)
         return PRESET_LADDER[index - 1] if index else None
     items = expand(value)
@@ -112,7 +152,8 @@ def narrow_step(value: Any) -> Any:
             items[item] = "human"
             custom = {key: items[key] for key in ITEMS if items[key] != "human"}
             return custom or "none"
-    return None
+    # takeover-redefine: only old items left (e.g. {"plan": "codex"}); handing them back leaves none.
+    return "none" if any(item != "human" for item in legacy(value).values()) else None
 
 
 def narrower_or_equal(value: Any, than: Any) -> bool:
@@ -267,20 +308,48 @@ def module_takeovers(root: Path, module_ids) -> tuple[dict[str, str], dict[str, 
     """
     values, problems = load(root)
     if "takeover" in values:
-        project, source = expand(values["takeover"]), "takeover"
+        project, source = all_items(values["takeover"]), "takeover"
     elif _structural(problems) or "takeover-invalid" in problems:
-        project, source = dict(HUMAN), "default (config invalid)"
+        project, source = all_items("none"), "default (config invalid)"
     else:
-        project, source = dict(HUMAN), "default"
+        project, source = all_items("none"), "default"
     entries = values.get("moduleTakeover", {})
     if "moduleTakeover-invalid" in problems:
         source = "default (config invalid)"
-    return project, {module: (expand(entries[module]), "moduleTakeover") if module in entries
+    return project, {module: (all_items(entries[module]), "moduleTakeover") if module in entries
                      else (dict(project), source) for module in module_ids}
+
+
+def takeover_origin(root: Path, module_id: str) -> str:
+    """takeover-redefine (assumption 8): where a module's takeover comes from, for the phase hint only.
+
+    moduleTakeover, takeover, default, takeover-invalid (the project value is unusable) or moduleTakeover-invalid
+    (the module inherits the project value because the per-module key is unusable).  /map's `source` is unchanged.
+    """
+    values, problems = load(root)
+    if module_id in values.get("moduleTakeover", {}):
+        return "moduleTakeover"
+    if "moduleTakeover-invalid" in problems:
+        return "moduleTakeover-invalid"
+    if "takeover" in values:
+        return "takeover"
+    return "takeover-invalid" if _structural(problems) or "takeover-invalid" in problems else "default"
 
 
 def _items_line(items: dict[str, str]) -> str:
     return " ".join("%s=%s" % (item, items[item]) for item in ITEMS)
+
+
+def _legacy_line(value: Any) -> str:
+    pair = legacy(value)
+    return "old-flow modules: spec=%s plan=%s" % (pair["spec"], pair["plan"])
+
+
+def _legacy_notes(value: Any) -> list[str]:
+    """takeover-redefine: what an old value means now, for show and the set preview."""
+    if isinstance(value, str):
+        return [LEGACY_NOTE] if value in LEGACY_PRESETS else []
+    return [LEGACY_ITEMS_NOTE] if isinstance(value, dict) and set(value) & set(LEGACY_ITEMS) else []
 
 
 def module_concurrency(root: Path) -> bool:
@@ -306,6 +375,12 @@ def summary(root: Path) -> list[dict[str, Any]]:
     for item in items[:len(VALIDATORS)]:
         if (set(problems) & set(STRUCTURAL)) or item["key"] + "-invalid" in problems:
             item["source"] = "default (config invalid)"
+        # takeover-redefine: the value as read -- the three items and the old-flow pair -- next to the stored one.
+        if item["key"] == "takeover":
+            item["effective"], item["legacy"] = expand(item["value"]), legacy(item["value"])
+        elif item["key"] == "moduleTakeover":
+            item["effective"] = {module: expand(value) for module, value in item["value"].items()}
+            item["legacy"] = {module: legacy(value) for module, value in item["value"].items()}
     return items
 
 
@@ -346,6 +421,15 @@ def _show(root: Path, as_json: bool) -> int:
         return 0
     for item in items:
         print("%-16s %-24s source: %-26s edit: %s" % (item["key"], item["value"], item["source"], item["editWith"]))
+        if item["key"] == "takeover":
+            print("%-16s effective: %s · %s" % ("", _items_line(item["effective"]), _legacy_line(item["value"])))
+            for note in _legacy_notes(item["value"]):
+                print("%-16s %s" % ("", note))
+        elif item["key"] == "moduleTakeover":
+            for module, value in item["value"].items():
+                print("%-16s %s: %s · %s" % ("", module, _items_line(item["effective"][module]), _legacy_line(value)))
+                for note in _legacy_notes(value):
+                    print("%-16s %s" % ("", note))
     if "retired-key" in problems:
         text, _ = read_text(root / RELATIVE_PATH)
         document = json.loads(text) if text is not None else {}
@@ -402,6 +486,11 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
         except ValueError:
             print("%s-invalid: --value takes a preset name or a JSON object" % key)
             return 2
+    if key in ("takeover", "moduleTakeover") and value is not None and legacy_value(value):
+        print("takeover-legacy: plan, spec, plan and requirement are old values, read but no longer written; use "
+              "none, design or merge, or an object of design (human/reviewer), merge and release. The old plan "
+              "corresponds to design (needs the user's words)")
+        return 2
     if module is not None and value is not None and not ENTRY_VALID[key](value):
         print("%s-invalid: see spec/%s.md for the accepted values"
               % (key, "module-autonomy" if key == "moduleAutonomy" else "takeover-config"))
@@ -438,6 +527,10 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
     if key in ("takeover", "moduleTakeover") and shown is not None:
         items = expand(shown)
         print("takeover: %s" % _items_line(items))
+        print(_legacy_line(shown))
+        old = values.get("moduleTakeover", {}).get(module) if module is not None else values.get("takeover")
+        for note in (_legacy_notes(old) if old is not None else []):
+            print(note.replace("note: ", "note: before this change, ", 1))
         if module is not None:
             project = expand(values["takeover"]) if "takeover" in values else dict(HUMAN)
             if takeover_wider(items, project):
@@ -467,6 +560,9 @@ def _keep_narrowed(values: dict[str, Any], updated: dict[str, Any]) -> str | Non
     records = dict(values.get("takeoverNarrowed", {}))
     for scope, record in list(records.items()):
         before, after = _scope_value(values, scope), _scope_value(updated, scope)
+        if isinstance(record["from"], str) and record["from"] in LEGACY_PRESETS and after in ("none", "design"):
+            del records[scope]  # takeover-redefine (assumption 4): none or design restores a scope narrowed from plan
+            continue
         if expand(before) == expand(after):
             continue
         if widen_steps(before, after) > 1:

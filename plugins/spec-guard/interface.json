@@ -1,5 +1,5 @@
 {
-  "interface": "1.21",
+  "interface": "1.22",
   "mapView": {
     "command": [
       "python3",
@@ -167,15 +167,17 @@
     "takeover": {
       "appearsWhen": "always, on every module, whatever moduleConcurrency is (interface 1.15, spec/takeover-config.md)",
       "fields": {
-        "spec": "per module; human or codex: who approves the module's Spec",
-        "plan": "per module; human or codex: who approves the module's Plan",
+        "design": "per module; human or reviewer, in effect: human for an important flow v2 requirement whatever the configured value (see designForcedBy)",
         "merge": "per module; human or auto: whether a merge may be automatic",
         "release": "per module; human, prepare, auto-confirm or auto: how far a release may go without the user",
+        "spec": "deprecated since 1.22, removed in the next version: human or codex, who approves an old-flow module's Spec (the old meaning of the value; reported for every module, meaningless for flow v2 modules, whose requirement is always the user's)",
+        "plan": "deprecated since 1.22, removed in the next version: human or codex, who approves an old-flow module's Plan (as spec; a flow v2 Plan is approved automatically, see codexRoute.plan)",
+        "designForcedBy": "since 1.22: important when design is human because the flow v2 requirement is important, else null",
         "source": "per module; moduleTakeover (the module's own entry), takeover (the project value), default (nothing set) or default (config invalid) (the file, takeover or moduleTakeover is invalid; the items are then the next layer's)",
-        "widerThanProject": "per module; true when any item is wider than the project's effective item (orders as in takeover.items); spec-guard only reports it and never caps",
+        "widerThanProject": "per module; true when any item is wider than the project's effective item (the configured design, merge and release, orders as in takeover.items; the forcing by an important requirement is not counted); spec-guard only reports it and never caps",
         "narrowed": "per module; null when the scope the module reads (its own moduleTakeover entry, else the project) has no narrowing record; else {\"from\", \"source\", \"at\"}: the value before the first narrowing, who narrowed last and when (takeover-narrow). The caller-written reason is never included"
       },
-      "meaning": "the same value project_config.module_takeover(root, id) returns; autopilot reads merge and release, module-crew reads spec and plan; spec-guard only stores and reports it, the callers act on it and enforce the release limits"
+      "meaning": "the same value project_config.module_takeover(root, id) returns; autopilot reads design, merge and release; module-crew reads spec and plan until 1.22's deprecation ends; spec-guard only stores and reports it, the callers act on it and enforce the release limits"
     },
     "concurrency": {
       "appearsWhen": "only when .agent/config.json has moduleConcurrency set to on; otherwise none of these fields appear",
@@ -527,18 +529,14 @@
     "key": "takeover",
     "default": "none",
     "presets": {
-      "none": "default; spec, plan, merge and release all human (today's behaviour)",
-      "plan": "plan=codex; the rest human",
-      "merge": "spec=codex, plan=codex, merge=auto; release human"
+      "none": "default; design, merge and release all human",
+      "design": "design=reviewer; merge and release human",
+      "merge": "design=reviewer, merge=auto; release human"
     },
     "items": {
-      "spec": [
+      "design": [
         "human",
-        "codex"
-      ],
-      "plan": [
-        "human",
-        "codex"
+        "reviewer"
       ],
       "merge": [
         "human",
@@ -553,8 +551,24 @@
     },
     "readFrom": "python3 -B hooks/map_view.py --json --project <project-root>: each module's takeover; or project_config.module_takeover(root, id). The raw value is the item whose key is takeover in project_config.py show --format json",
     "writeWith": "python3 -B hooks/project_config.py set --key takeover --value <preset|JSON object> [--confirm]; unset --key takeover [--confirm]; preview unless --confirm",
-    "notes": "a preset name or a custom object of items (missing items read as human); any unknown item or value makes the whole key invalid. Items run from strictest to widest in the order listed. Release auto-confirm and auto are stored as given; the limits (the four pipeline plugins at most prepare, auto only where a release rolls back quickly) are hinted at in the preview and enforced by autopilot. spec-guard's own phase hints and stop rules do not read it in 1.15. Writing it needs the user's own words. spec-guard 0.68.0-0.90.1 ignore the key; 0.67.1 and earlier treat the whole file as invalid. The file may also hold takeoverNarrowed (scope -> {from, to, source, reason, at}), written only by narrow and kept by set; config cannot set or unset it",
-    "contract": "spec/takeover-config.md"
+    "notes": "a preset name or a custom object of items (missing items read as human); any unknown item or value makes the whole key invalid. The requirement and a flow v2 Plan are not configurable. design: whether a normal flow v2 design is let through by the second reviewer (reviewer) or approved by the user (human, also every design that needs no review); an important requirement's design is always the user's. Items run from strictest to widest in the order listed. Release auto-confirm and auto are stored as given; the limits (the four pipeline plugins at most prepare, auto only where a release rolls back quickly) are hinted at in the preview and enforced by autopilot. Writing it needs the user's own words. spec-guard 0.84.0-0.94.0 read the preset design as invalid and ignore only this key; 0.68.0-0.83.x ignore the key; 0.67.1 and earlier treat the whole file as invalid. The file may also hold takeoverNarrowed (scope -> {from, to, source, reason, at}), written only by narrow and kept by set; config cannot set or unset it",
+    "contract": "spec/takeover-config.md, spec/takeover-redefine.md",
+    "legacy": {
+      "presets": {
+        "plan": "read as none (old flow: plan=codex)"
+      },
+      "items": {
+        "spec": [
+          "human",
+          "codex"
+        ],
+        "plan": [
+          "human",
+          "codex"
+        ]
+      },
+      "meaning": "since 1.22 (spec/takeover-redefine.md): old values stay valid and are read converted, never written (set refuses them, takeover-legacy). For a flow v2 module the old preset plan reads as none and the custom items spec and plan do not apply; old merge reads as the new merge. An old-flow module (no flow v2 marker) reads who approves its Spec and Plan from the old meaning: plan or design -> plan=codex; merge -> spec=codex, plan=codex; a custom object as written, with plan=codex where design=reviewer and plan is not written"
+    }
   },
   "moduleTakeover": {
     "config": ".agent/config.json",
@@ -587,7 +601,7 @@
         "user": "the user narrowed by hand"
       }
     },
-    "order": "a preset steps merge -> plan -> none; a custom value hands back its first non-human item in the order release, merge, plan, spec (release goes straight back to human); all human is written as none; already the strictest writes nothing and exits 0",
+    "order": "a preset steps merge -> design -> none (the old plan steps to none); a custom value hands back its first non-human item in the order release, merge, design (release goes straight back to human) and is written in the new form; a value with only old items left is written as none; all human is written as none; already the strictest writes nothing and exits 0. A record from the old plan is removed when set writes none or design",
     "scope": "--module narrows that module (starting from the project value when it has no entry of its own) and writes its moduleTakeover entry; without it the project takeover is narrowed and module entries are left alone",
     "exitCodes": {
       "0": "narrowed, previewed, or already the strictest",

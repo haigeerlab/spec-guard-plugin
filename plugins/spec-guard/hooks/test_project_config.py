@@ -433,14 +433,14 @@ class RetiredAutonomy(unittest.TestCase):
     def test_setting_the_takeover_reminds_of_retired_keys(self):
         # M3 rework: U1 says the preview tells the user the old tier is retired; only show did.
         with Project(self.OLD) as project:
-            out = project.run("set", "--key", "takeover", "--value", "plan")[1]
+            out = project.run("set", "--key", "takeover", "--value", "design")[1]
             self.assertIn("note: autonomyTier, moduleAutonomy are retired and not in effect; the takeover above replaces them", out)
             self.assertIn("unset --key autonomyTier", out)
         with Project({"version": 1, "autonomyTier": "strict"}) as project:
             self.assertIn("note: autonomyTier is retired and not in effect; the takeover above replaces it.",
-                          project.run("set", "--key", "takeover", "--value", "plan")[1])
+                          project.run("set", "--key", "takeover", "--value", "design")[1])
         with Project({"version": 1}) as project:
-            self.assertNotIn("retired", project.run("set", "--key", "takeover", "--value", "plan")[1])
+            self.assertNotIn("retired", project.run("set", "--key", "takeover", "--value", "design")[1])
 
     def test_set_is_refused_unset_works(self):
         for args in (("set", "--key", "autonomyTier", "--value", "strict"),
@@ -460,7 +460,7 @@ class RetiredAutonomy(unittest.TestCase):
 
     def test_writes_keep_the_retired_keys(self):
         with Project(self.OLD) as project:
-            code, out = project.run("set", "--key", "takeover", "--value", "plan", "--confirm")
+            code, out = project.run("set", "--key", "takeover", "--value", "design", "--confirm")
             self.assertEqual(code, 0, out)
             document = json.loads(project.config.read_text(encoding="utf-8"))
             self.assertEqual((document["autonomyTier"], document["moduleAutonomy"]), ("standard", {"alpha": "relaxed"}))
@@ -488,20 +488,21 @@ class RetiredAutonomy(unittest.TestCase):
 
 
 class Takeover(unittest.TestCase):
-    """takeover-config (C1): who approves the Spec and Plan, merges and releases, per project and per module."""
+    """takeover-config (C1) / takeover-redefine: who approves the design, merges and releases, per project and module."""
 
-    HUMAN = {"spec": "human", "plan": "human", "merge": "human", "release": "human"}
+    # module_takeover gives the three items and the old-flow pair (takeover-redefine Q1 A).
+    HUMAN = {"design": "human", "merge": "human", "release": "human", "spec": "human", "plan": "human"}
 
     def doc(self, project):
         return json.loads(project.config.read_text(encoding="utf-8"))
 
     def test_presets_and_custom_round_trip(self):
-        for value in ("none", "plan", "merge"):
+        for value in ("none", "design", "merge"):
             with Project() as project:
                 code, out = project.run("set", "--key", "takeover", "--value", value, "--confirm")
                 self.assertEqual(code, 0, out)
                 self.assertEqual(load(project.root), ({"takeover": value}, []))
-        custom = {"plan": "codex", "release": "prepare"}
+        custom = {"design": "reviewer", "release": "prepare"}
         with Project() as project:
             code, out = project.run("set", "--key", "takeover", "--value", json.dumps(custom), "--confirm")
             self.assertEqual(code, 0, out)
@@ -510,13 +511,70 @@ class Takeover(unittest.TestCase):
     def test_presets_expand(self):
         from project_config import module_takeover
         expected = {"none": self.HUMAN,
-                    "plan": dict(self.HUMAN, plan="codex"),
-                    "merge": dict(self.HUMAN, spec="codex", plan="codex", merge="auto")}
+                    "design": dict(self.HUMAN, design="reviewer", plan="codex"),
+                    "merge": dict(self.HUMAN, design="reviewer", merge="auto", spec="codex", plan="codex")}
         for value, items in expected.items():
             with Project({"version": 1, "takeover": value}) as project:
                 self.assertEqual(module_takeover(project.root, "alpha"), (items, "takeover"), value)
         with Project({"version": 1, "takeover": {"merge": "auto"}}) as project:
             self.assertEqual(module_takeover(project.root, "alpha"), (dict(self.HUMAN, merge="auto"), "takeover"))
+
+    def test_old_values_are_read_converted(self):
+        # takeover-redefine (assumptions 4, 5; AC2): old values stay valid; the three items convert, the old-flow
+        # pair keeps the old meaning.
+        from project_config import module_takeover
+        cases = {"plan": dict(self.HUMAN, plan="codex"),
+                 json.dumps({"spec": "codex", "plan": "codex", "merge": "auto"}):
+                     dict(self.HUMAN, merge="auto", spec="codex", plan="codex"),
+                 json.dumps({"plan": "codex", "release": "prepare"}): dict(self.HUMAN, release="prepare", plan="codex"),
+                 json.dumps({"design": "reviewer"}): dict(self.HUMAN, design="reviewer", plan="codex"),
+                 json.dumps({"plan": "human", "design": "reviewer"}): dict(self.HUMAN, design="reviewer"),
+                 json.dumps({"spec": "codex"}): dict(self.HUMAN, spec="codex")}
+        for raw, items in cases.items():
+            value = raw if raw == "plan" else json.loads(raw)
+            with Project({"version": 1, "takeover": value}) as project:
+                self.assertEqual(load(project.root), ({"takeover": value}, []), raw)
+                self.assertEqual(module_takeover(project.root, "alpha"), (items, "takeover"), raw)
+                self.assertEqual(project.run("check")[0], 0, raw)
+
+    def test_show_gives_the_effective_value_and_notes(self):
+        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"spec": "codex", "merge": "auto"}}}) as project:
+            items = {item["key"]: item for item in summary(project.root)}
+            self.assertEqual(items["takeover"]["value"], "plan")
+            self.assertEqual(items["takeover"]["effective"], {"design": "human", "merge": "human", "release": "human"})
+            self.assertEqual(items["takeover"]["legacy"], {"spec": "human", "plan": "codex"})
+            self.assertEqual(items["moduleTakeover"]["effective"]["alpha"],
+                             {"design": "human", "merge": "auto", "release": "human"})
+            self.assertEqual(items["moduleTakeover"]["legacy"]["alpha"], {"spec": "codex", "plan": "human"})
+            out = project.run("show")[1]
+            self.assertIn("effective: design=human merge=human release=human · old-flow modules: spec=human plan=codex", out)
+            self.assertIn("note: takeover=plan is read as none; to keep the second reviewer approving, set design", out)
+            self.assertIn("alpha: design=human merge=auto release=human · old-flow modules: spec=codex plan=human", out)
+            self.assertIn("note: spec and plan no longer apply to flow v2 modules; old-flow modules still read them", out)
+        with Project({"version": 1, "takeover": "design"}) as project:
+            self.assertNotIn("note:", project.run("show")[1])
+
+    def test_set_refuses_old_values(self):
+        # takeover-redefine (assumption 3; AC1): read but never written, the file stays as it was.
+        values = ["plan", json.dumps({"spec": "codex"}), json.dumps({"plan": "codex", "merge": "auto"}),
+                  json.dumps({"requirement": "codex"})]
+        for value in values:
+            for args in (("set", "--key", "takeover", "--value", value),
+                         ("set", "--key", "moduleTakeover", "--module", "alpha", "--value", value)):
+                with Project({"version": 1, "takeover": "none"}) as project:
+                    before = project.config.read_bytes()
+                    code, out = project.run(*args, "--confirm")
+                    self.assertEqual(code, 2, (args, out))
+                    self.assertIn("takeover-legacy", out)
+                    self.assertEqual(project.config.read_bytes(), before, args)
+
+    def test_preview_tells_what_the_old_value_was(self):
+        with Project({"version": 1, "takeover": "plan"}) as project:
+            code, out = project.run("set", "--key", "takeover", "--value", "design")
+            self.assertEqual(code, 0, out)
+            self.assertIn("takeover: design=reviewer merge=human release=human", out)
+            self.assertIn("old-flow modules: spec=human plan=codex", out)
+            self.assertIn("note: before this change, takeover=plan is read as none", out)
 
     def test_sources(self):
         from project_config import module_takeover
@@ -524,26 +582,27 @@ class Takeover(unittest.TestCase):
             self.assertEqual(module_takeover(project.root, "alpha"), (self.HUMAN, "default"))
         with Project({"version": 1, "takeover": "fast"}) as project:
             self.assertEqual(module_takeover(project.root, "alpha"), (self.HUMAN, "default (config invalid)"))
-        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": "merge"}}) as project:
+        with Project({"version": 1, "takeover": "design", "moduleTakeover": {"alpha": "merge"}}) as project:
             self.assertEqual(module_takeover(project.root, "alpha")[1], "moduleTakeover")
             self.assertEqual(module_takeover(project.root, "alpha")[0]["merge"], "auto")
-            self.assertEqual(module_takeover(project.root, "beta"), (dict(self.HUMAN, plan="codex"), "takeover"))
-        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": "fast"}}) as project:
+            self.assertEqual(module_takeover(project.root, "beta"),
+                             (dict(self.HUMAN, design="reviewer", plan="codex"), "takeover"))
+        with Project({"version": 1, "takeover": "design", "moduleTakeover": {"alpha": "fast"}}) as project:
             self.assertEqual(module_takeover(project.root, "alpha"),
-                             (dict(self.HUMAN, plan="codex"), "default (config invalid)"))
+                             (dict(self.HUMAN, design="reviewer", plan="codex"), "default (config invalid)"))
 
     def test_invalid_values_rejected_without_writing(self):
         bad = ["fast", "{", json.dumps({"spec": "auto"}), json.dumps({"deploy": "human"}),
-               json.dumps({"release": "yes"}), json.dumps(["plan"])]
+               json.dumps({"release": "yes"}), json.dumps({"design": "codex"}), json.dumps(["design"])]
         for value in bad:
             with Project() as project:
                 code, out = project.run("set", "--key", "takeover", "--value", value, "--confirm")
                 self.assertEqual(code, 2, (value, out))
-                self.assertIn("takeover-invalid", out)
+                self.assertTrue("takeover-invalid" in out or "takeover-legacy" in out, (value, out))
                 self.assertFalse(project.config.exists(), value)
-        cases = [("set", "--key", "takeover", "--module", "alpha", "--value", "plan"),
-                 ("set", "--key", "moduleTakeover", "--value", "plan"),
-                 ("set", "--key", "moduleTakeover", "--module", "Bad_Id", "--value", "plan"),
+        cases = [("set", "--key", "takeover", "--module", "alpha", "--value", "design"),
+                 ("set", "--key", "moduleTakeover", "--value", "design"),
+                 ("set", "--key", "moduleTakeover", "--module", "Bad_Id", "--value", "design"),
                  ("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "fast")]
         for args in cases:
             with Project() as project:
@@ -561,22 +620,23 @@ class Takeover(unittest.TestCase):
     def test_module_entries_one_at_a_time(self):
         with Project({"version": 1, "moduleTakeover": {"other": "none"}}) as project:
             code, out = project.run("set", "--key", "moduleTakeover", "--module", "alpha",
-                                    "--value", json.dumps({"plan": "codex"}), "--confirm")
+                                    "--value", json.dumps({"design": "reviewer"}), "--confirm")
             self.assertEqual(code, 0, out)
-            self.assertEqual(self.doc(project)["moduleTakeover"], {"other": "none", "alpha": {"plan": "codex"}})
+            self.assertEqual(self.doc(project)["moduleTakeover"], {"other": "none", "alpha": {"design": "reviewer"}})
             code, out = project.run("unset", "--key", "moduleTakeover", "--module", "other", "--confirm")
             self.assertEqual(code, 0, out)
-            self.assertEqual(self.doc(project)["moduleTakeover"], {"alpha": {"plan": "codex"}})
+            self.assertEqual(self.doc(project)["moduleTakeover"], {"alpha": {"design": "reviewer"}})
 
-    def test_preview_lists_the_four_items(self):
+    def test_preview_lists_the_items(self):
         with Project() as project:
-            code, out = project.run("set", "--key", "takeover", "--value", "plan")
+            code, out = project.run("set", "--key", "takeover", "--value", "merge")
             self.assertEqual(code, 0, out)
-            self.assertIn("spec=human plan=codex merge=human release=human", out)
+            self.assertIn("takeover: design=reviewer merge=auto release=human", out)
+            self.assertIn("old-flow modules: spec=codex plan=codex", out)
             self.assertFalse(project.config.exists())
 
     def test_wider_than_project_note(self):
-        with Project({"version": 1, "takeover": "plan"}) as project:
+        with Project({"version": 1, "takeover": "design"}) as project:
             out = project.run("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "merge")[1]
             self.assertIn("note:", out)
             out = project.run("set", "--key", "moduleTakeover", "--module", "alpha", "--value", "none")[1]
@@ -598,7 +658,7 @@ class Takeover(unittest.TestCase):
 class Narrow(unittest.TestCase):
     """takeover-narrow (C1): one step stricter, no user words, with a record of where it started."""
 
-    FULL = {"spec": "codex", "plan": "codex", "merge": "auto", "release": "auto"}
+    FULL = {"design": "reviewer", "merge": "auto", "release": "auto"}
 
     def doc(self, project):
         return json.loads(project.config.read_text(encoding="utf-8"))
@@ -608,7 +668,7 @@ class Narrow(unittest.TestCase):
 
     def test_preset_order(self):
         with Project({"version": 1, "takeover": "merge"}) as project:
-            for expected in ("plan", "none"):
+            for expected in ("design", "none"):
                 code, out = self.narrow(project)
                 self.assertEqual(code, 0, out)
                 self.assertEqual(self.doc(project)["takeover"], expected)
@@ -618,16 +678,27 @@ class Narrow(unittest.TestCase):
             self.assertIn("already", out)
             self.assertEqual(project.config.read_text(encoding="utf-8"), before)
 
-    def test_custom_order_release_merge_plan_spec(self):
+    def test_custom_order_release_merge_design(self):
         with Project({"version": 1, "takeover": self.FULL}) as project:
-            for expected in ({"spec": "codex", "plan": "codex", "merge": "auto"}, {"spec": "codex", "plan": "codex"},
-                             {"spec": "codex"}, "none"):
+            for expected in ({"design": "reviewer", "merge": "auto"}, {"design": "reviewer"}, "none"):
                 code, out = self.narrow(project)
                 self.assertEqual(code, 0, out)
                 self.assertEqual(self.doc(project)["takeover"], expected)
-        with Project({"version": 1, "takeover": {"plan": "codex", "release": "prepare"}}) as project:
-            self.narrow(project)
-            self.assertEqual(self.doc(project)["takeover"], {"plan": "codex"})
+
+    def test_old_values_narrow_to_new_ones(self):
+        # takeover-redefine (assumption 6; AC6): converted first, written back in the new form.
+        for value, steps in (("plan", ["none"]),
+                             ({"spec": "codex", "plan": "codex", "merge": "auto", "release": "auto"},
+                              [{"merge": "auto"}, "none"]),
+                             ({"plan": "codex", "release": "prepare"}, ["none"]),
+                             ({"plan": "codex"}, ["none"])):
+            with Project({"version": 1, "takeover": value}) as project:
+                for expected in steps:
+                    code, out = self.narrow(project)
+                    self.assertEqual(code, 0, out)
+                    self.assertEqual(self.doc(project)["takeover"], expected, value)
+                self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["from"], value)
+                self.assertIn("already", self.narrow(project)[1], value)
 
     def test_preview_does_not_write(self):
         with Project({"version": 1, "takeover": "merge"}) as project:
@@ -635,7 +706,7 @@ class Narrow(unittest.TestCase):
             code, out = project.run("narrow", "--source", "autopilot", "--reason", "x")
             self.assertEqual(code, 0, out)
             self.assertIn("preview only", out)
-            self.assertIn("spec=human plan=codex merge=human release=human", out)
+            self.assertIn("takeover: design=reviewer merge=human release=human", out)
             self.assertEqual(project.config.read_text(encoding="utf-8"), before)
 
     def test_bad_arguments_write_nothing(self):
@@ -650,26 +721,26 @@ class Narrow(unittest.TestCase):
                 self.assertEqual(project.config.read_text(encoding="utf-8"), before, args)
 
     def test_module_starts_from_the_project_value(self):
-        with Project({"version": 1, "takeover": "plan", "moduleTakeover": {"beta": "merge"}}) as project:
+        with Project({"version": 1, "takeover": "design", "moduleTakeover": {"beta": "merge"}}) as project:
             code, out = self.narrow(project, "--module", "alpha")
             self.assertEqual(code, 0, out)
             document = self.doc(project)
-            self.assertEqual(document["takeover"], "plan")
+            self.assertEqual(document["takeover"], "design")
             self.assertEqual(document["moduleTakeover"], {"beta": "merge", "alpha": "none"})
-            self.assertEqual(document["takeoverNarrowed"]["alpha"]["from"], "plan")
+            self.assertEqual(document["takeoverNarrowed"]["alpha"]["from"], "design")
 
     def test_project_narrow_leaves_module_entries(self):
         with Project({"version": 1, "takeover": "merge", "moduleTakeover": {"beta": "merge"}}) as project:
             self.narrow(project)
             document = self.doc(project)
-            self.assertEqual((document["takeover"], document["moduleTakeover"]), ("plan", {"beta": "merge"}))
+            self.assertEqual((document["takeover"], document["moduleTakeover"]), ("design", {"beta": "merge"}))
 
     def test_record_keeps_the_first_from(self):
         with Project({"version": 1, "takeover": "merge"}) as project:
             self.narrow(project, reason="first")
             record = self.doc(project)["takeoverNarrowed"]["project"]
             self.assertEqual((record["from"], record["to"], record["source"], record["reason"]),
-                             ("merge", "plan", "autopilot", "first"))
+                             ("merge", "design", "autopilot", "first"))
             self.assertTrue(record["at"].endswith("Z"))
             project.run("narrow", "--source", "module-crew", "--reason", "second", "--confirm")
             record = self.doc(project)["takeoverNarrowed"]["project"]
@@ -715,9 +786,9 @@ class Restore(unittest.TestCase):
         self.assertEqual(code, 2, out)
         self.assertIn("one step", out)
         self.assertEqual(self.doc(project)["takeover"], "none")
-        code, out = project.run("set", "--key", "takeover", "--value", "plan", "--confirm")
+        code, out = project.run("set", "--key", "takeover", "--value", "design", "--confirm")
         self.assertEqual(code, 0, out)
-        self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["to"], "plan")
+        self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["to"], "design")
         code, out = project.run("set", "--key", "takeover", "--value", "merge", "--confirm")
         self.assertEqual(code, 0, out)
         self.assertNotIn("takeoverNarrowed", self.doc(project))
@@ -731,12 +802,23 @@ class Restore(unittest.TestCase):
         self.assertEqual(code, 0, out)
 
     def test_custom_value_counts_items(self):
-        full = {"spec": "codex", "plan": "codex", "merge": "auto", "release": "auto"}
+        full = {"design": "reviewer", "merge": "auto", "release": "auto"}
         project = self.narrowed({"version": 1, "takeover": full}, times=2)
         self.assertEqual(project.run("set", "--key", "takeover", "--value", json.dumps(full), "--confirm")[0], 2)
         code, out = project.run("set", "--key", "takeover", "--value",
-                                json.dumps({"spec": "codex", "plan": "codex", "merge": "auto"}), "--confirm")
+                                json.dumps({"design": "reviewer", "merge": "auto"}), "--confirm")
         self.assertEqual(code, 0, out)
+
+    def test_narrowed_from_old_plan_is_restored_by_none_or_design(self):
+        # takeover-redefine (assumption 4 as revised): none (even unchanged) or design restores it.
+        for value in ("none", "design"):
+            project = self.narrowed({"version": 1, "takeover": "plan"})
+            self.assertEqual(self.doc(project)["takeoverNarrowed"]["project"]["from"], "plan")
+            code, out = project.run("set", "--key", "takeover", "--value", value, "--confirm")
+            self.assertEqual(code, 0, (value, out))
+            self.assertNotIn("takeoverNarrowed", self.doc(project), value)
+        project = self.narrowed({"version": 1, "takeover": "plan"})
+        self.assertEqual(project.run("set", "--key", "takeover", "--value", "merge", "--confirm")[0], 2)
 
     def test_module_scope(self):
         project = self.narrowed({"version": 1, "moduleTakeover": {"alpha": "merge"}}, module="alpha")

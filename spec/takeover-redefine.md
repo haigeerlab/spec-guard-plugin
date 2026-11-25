@@ -1,6 +1,6 @@
 # Spec: takeover-redefine
 
-<!-- spec-guard: review approved d9b0d3b3d8b9 -->
+<!-- spec-guard: review approved d4798abe9f9a -->
 
 ## Objective
 
@@ -16,7 +16,7 @@ design-review 目前不看档位（非重要需求审过即放行）。本模块
 `design=human` 时不需要审的技术方案要不要人批（Q2），`/map --json` 里旧的 `spec`、`plan` 两个字段怎么处理（Q3）。
 
 登记：用法草案 dev-flow-v2（用户 2026-11-24「确认插入，Q1–Q6 按推荐」，草案 Q6 定为「切换时把 `takeover=plan` 映射为 `design`，逐个仓库要用户原话」），M2 里程碑。
-需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A；Q3 A」；写 Plan 时修订假设 2、4、C4、AC3、AC8，用户回「按处理办法改，都批准」。
+需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A；Q3 A」；写 Plan 时修订假设 2、4、C4、AC3、AC8，用户回「按处理办法改，都批准」。构建中并行边界补入 `test_stop_rules.py`（其中一条用例按旧默认行为断言），用户回「可以，加进边界并改」。
 
 ## Assumptions
 
@@ -83,7 +83,7 @@ design-review 目前不看档位（非重要需求审过即放行）。本模块
 
 ## 并行边界
 
-- 独占：`spec/takeover-redefine.md`、`tasks/takeover-redefine/`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`README.md`、`CHANGELOG.md`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`
+- 独占：`spec/takeover-redefine.md`、`tasks/takeover-redefine/`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`README.md`、`CHANGELOG.md`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`
 - 公共：无
 
 ## Open questions
