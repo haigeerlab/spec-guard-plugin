@@ -6,7 +6,7 @@
 - [x] Task 3：记录与读取
 - [x] Task 4：阶段提示与最终 gate
 - [x] Task 5：`/map --json` 与 review-mark
-- [ ] Task 6：接口 1.24
+- [x] Task 6：接口 1.24
 - [ ] Checkpoint 1（report）：本机完整检查、老流程比对与变异
 - [ ] Task 7：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
@@ -20,3 +20,5 @@
 - Task 5（2026-11-26）：`/map --json` 每个模块加 `verification`（老流程模块与没有记录为 `null`），顶层加 `usageVerification`（每个 `spec/usage/*.regression.md` 一项，没有时 `{}`）；新流程模块的 `acceptance` 为 `null`。review-mark `--target acceptance` 对新流程模块退出 2 `acceptance-flow-v2`。
   用例：`test_map_view.py` `VerificationMapTest` 2 例（实现前 2 个出错），`TOP_KEYS`／`MODULE_KEYS` 加新键；`test_review_marker.py` `AcceptanceFlowV2` 1 例（实现前失败）。
   旧用例改动及原因：`AcceptanceFlowScope` 两例（plan-auto-approve）原本断言新流程 `merge=auto` 模块的 Codex 最终验收按技术方案影响面查越界；Spec 假设 8 起新流程模块不再走 Codex 验收，改为断言 `acceptance-flow-v2`。新流程模块构建中的越界检查（`scope_overreach`）不变。
+- Task 6（2026-11-26）：`interface.json` 升到 1.24：顶层加 `verification`（`authorCommand`、`checkCommand`、`recordCommand` 原样可跑，`usageArgs`、`confirmArgs` 另列，`schema`、`exitCodes`、问题代码、取值、记录与作者记录的位置），`mapView` 加 `verification`、`usageVerification`，`acceptance` 的说明写明新流程模块为 null。`check-interface.py` 加比对；`scripts/test-checkers.sh` 的接口夹具加 `verification`。
+  用例：`test_verification.py` `InterfaceTest` 1 例（按模板代入真实路径依次运行三条命令，核对 `check --json` 的键集合）；`check-interface.py` 通过。

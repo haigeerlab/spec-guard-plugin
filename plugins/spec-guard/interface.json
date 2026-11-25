@@ -1,5 +1,5 @@
 {
-  "interface": "1.23",
+  "interface": "1.24",
   "mapView": {
     "command": [
       "python3",
@@ -141,11 +141,24 @@
       "meaning": "facts from the approval line and the round lines <!-- spec-guard: design-review round=N blocking=N sha256=<12 hex> vendor=<v> same-vendor=<true|false> criteria=design-v1 report=<64 hex> --> outside code fences, written by reviewMark --target design. Whether a design needs review: important -> the user; impact section lists an existing file at the module's baseline (the parent of the commit that first added spec/<id>.md), or names no path -> reviewed; designReview on -> reviewed; else not required. A cross-module requirement is important by rule. An unreadable design fails the whole view (exit 4) like review"
     },
     "acceptance": {
-      "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",
+      "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null for a flow v2 module (interface 1.24: verified against its regression document, see verification) and unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",
       "fields": {
         "marker": "always codex-approved: Codex accepted the final patch, with a non-author's check evidence on the same commit; the user's own final acceptance is the ticked final gate in the todo and has no record",
         "sha": "the full commit the acceptance is about (HEAD when it was recorded); the phase hint treats the final gate as passed while it is HEAD or an ancestor of HEAD. Since interface 1.16 the record is `$(git rev-parse --git-common-dir)/spec-guard/acceptance/<id>.json` (fields marker, sha, module, report_sha256, report as an absolute path, at): a record written in a linked worktree is also readable from the main checkout and other worktrees. Records written by interface 1.15 at the `--git-path` location are still read as a fallback; a valid record at the new location takes priority. Records are never migrated, deleted or committed"
       }
+    },
+    "verification": {
+      "appearsWhen": "per module, always (interface 1.24, spec/verification-criteria.md); null for an old-flow module and for a flow v2 module with no recorded pre-merge verification",
+      "fields": {
+        "verdict": "pass, pass-with-notes or fail, from the recorded report",
+        "patchId": "the patch the verdict is about (git patch-id --stable of merge-base..head)",
+        "notes": "the titles of the report's notes, in order",
+        "reportSha256": "sha256 of the report file's bytes when it was recorded",
+        "current": "true while the recorded patchId equals the current patch (merge-base of the default branch and HEAD, to HEAD) and the regression document's sha256 is unchanged; only a current verdict other than fail counts as passed, and for a merge=auto module it passes the final gate"
+      }
+    },
+    "usageVerification": {
+      "appearsWhen": "top level, always (interface 1.24, Q2 A): {name: verification or null} for each spec/usage/<name>.regression.md, {} when there is none; the value has the same fields as verification"
     },
     "milestoneStop": {
       "appearsWhen": "always, whatever moduleConcurrency is (interface 1.13, spec/milestone-stop.md)",
@@ -668,5 +681,104 @@
       "documents": "normal and important: tasks/<id>/regression.md; bug and small: the 回归用例 / Regression cases section of spec/<id>.md; --usage <name>: spec/usage/<name>.regression.md"
     },
     "notes": "interface 1.23 (spec/regression-doc-check.md); read-only. Markdown is parsed only here. command runs as written; for an earlier commit append refArgs (the view is built from a shared local clone checked out at that commit, documents read as raw blobs). usageCommand reads a multi-module requirement's integration regression."
+  },
+  "verification": {
+    "authorCommand": [
+      "python3",
+      "-B",
+      "hooks/verification.py",
+      "author",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>"
+    ],
+    "checkCommand": [
+      "python3",
+      "-B",
+      "hooks/verification.py",
+      "check",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>",
+      "--report",
+      "<report path>",
+      "--json"
+    ],
+    "recordCommand": [
+      "python3",
+      "-B",
+      "hooks/verification.py",
+      "record",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>",
+      "--report",
+      "<report path>"
+    ],
+    "usageArgs": [
+      "--usage",
+      "<usage name>"
+    ],
+    "confirmArgs": [
+      "--confirm"
+    ],
+    "schema": "spec-guard.verification/v1",
+    "schemaVersion": 1,
+    "contract": "spec/verification-criteria.md",
+    "format": "references/verification-report.md",
+    "exitCodes": {
+      "0": "author recorded (or already recorded); check: the report stands; record: previewed or written",
+      "1": "the report does not stand; problems lists every code",
+      "2": "usage error, not in the capability map, not a flow v2 module, unreadable report file, or no session id in the environment (author)",
+      "3": "cannot judge: no author record (author-unknown), git unreadable, or no regression document"
+    },
+    "values": {
+      "problem": {
+        "report-invalid": "the report is not JSON, not schema spec-guard.verification/v1, names another module, or a field has the wrong shape (where: which)",
+        "regression-changed": "regression.sha256 is not the current regression document's sha256",
+        "case-missing": "a case of the current regression document has no result",
+        "case-unknown": "the report has a case the document does not",
+        "method-mismatch": "a case's method differs from the document",
+        "manual-without-user": "a manual case has no user-quote evidence with a source",
+        "fail-category-missing": "a fail has no failCategory among run-failure, user-bug, check-failure, wrong-doc",
+        "fail-evidence-missing": "a fail has no evidence",
+        "baseline-evidence-missing": "a baseline-fail has no baselineCommit or no evidence, or the commit is not base or an ancestor of it",
+        "evidence-sha-mismatch": "an evidence file that can be read does not match its sha256 (unreadable files are listed as unverified)",
+        "verdict-inconsistent": "the verdict does not follow the cases: any fail gives fail; else notes give pass-with-notes; else pass",
+        "executor-is-author": "executor.sessionId is among the module's recorded authors",
+        "patch-mismatch": "patchId is not the current patch",
+        "patch-id-wrong": "base and head are readable and patchId is not their patch id (unreadable commits are listed as unverified)",
+        "author-unknown": "the module (for --usage: one of its modules) has no author record; exit 3, the check cannot judge"
+      },
+      "verdict": [
+        "pass",
+        "pass-with-notes",
+        "fail"
+      ],
+      "result": [
+        "pass",
+        "fail",
+        "baseline-fail"
+      ],
+      "failCategory": [
+        "run-failure",
+        "user-bug",
+        "check-failure",
+        "wrong-doc"
+      ],
+      "evidenceType": [
+        "log",
+        "screenshot",
+        "file",
+        "user-quote"
+      ],
+      "checkOutput": "--json: {schemaVersion, established, verdict, patchId, problems [{code, where}], unverified [text]}; on a refusal {schemaVersion, error}",
+      "record": "the common git directory, spec-guard/verification/<module>.json (usage-<name>.json for --usage): {schema, module, usage, verdict, patchId, base, head, regressionSha256, reportSha256, executor, notes [title], at}; never committed",
+      "authors": "the common git directory, spec-guard/authors/<module>.json: [{sessionId, host, at}]; the session id comes only from CLAUDE_CODE_SESSION_ID (host claude-code) or CODEX_THREAD_ID (host codex)"
+    },
+    "notes": "interface 1.24 (spec/verification-criteria.md). The commands run as written; append usageArgs in place of --module <module-id> for a multi-module requirement's integration regression, and confirmArgs to record. check is read-only; author writes without --confirm because it records the session's own fact, not an approval."
   }
 }

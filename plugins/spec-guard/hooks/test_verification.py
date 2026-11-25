@@ -343,5 +343,25 @@ class UsageTest(unittest.TestCase):
         self.assertEqual(verification.verification_state(self.root, usage="demo")["verdict"], "pass")
 
 
+class InterfaceTest(Base):
+    """Task 6: interface.json's verification commands run as written (AC10 first half)."""
+
+    def test_templates(self):
+        entry = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))["verification"]
+        fill = {"<project-root>": str(self.root), "<module-id>": "a", "<report path>": str(self.repo.report())}
+        env = {k: v for k, v in os.environ.items() if k not in ENV_KEYS}
+        env["CLAUDE_CODE_SESSION_ID"] = "author-1"
+        for name in ("authorCommand", "checkCommand", "recordCommand"):
+            command = [fill.get(arg, arg) for arg in entry[name]]
+            done = subprocess.run(command, cwd=HERE.parent, capture_output=True, text=True, env=env)
+            with self.subTest(name=name):
+                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+                if name == "checkCommand":
+                    out = json.loads(done.stdout)
+                    self.assertEqual(set(out), {"schemaVersion", "established", "verdict", "patchId", "problems", "unverified"})
+                    self.assertEqual(out["verdict"] in entry["values"]["verdict"], True)
+        self.assertEqual(entry["schema"], json.loads(self.repo.report().read_text())["schema"])
+
+
 if __name__ == "__main__":
     unittest.main()
