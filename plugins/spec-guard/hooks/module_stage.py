@@ -463,6 +463,219 @@ def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) ->
             % (", ".join(names), " (this one is: %s)" % reasons if reasons else "", cmd["review-mark"]))
 
 
+# design-review: whether a v2 module's design is reviewed, and where that stands (published as designApproval).
+DESIGN_STATUSES = ("not-required", "pending-review", "in-review", "pending-user", "approved", "unreviewed", "revised")
+IMPACT_SECTIONS = (DOC_SECTIONS["design"]["zh"][1], DOC_SECTIONS["design"]["en"][1])
+QUOTED = re.compile(r"`([^`\s]+)`")
+PATHLIKE = re.compile(r"[\w@+-][\w./@+-]*")
+LINE_SUFFIX = re.compile(r":\d+(?:-\d+)?$")
+
+
+def impact_paths(text: str) -> list:
+    """design-review: the paths quoted in backticks under the design's impact section, `:line` suffixes dropped."""
+    found, inside = [], False
+    for line in _visible_lines(text.splitlines()):
+        heading = SECTION_HEADING.match(line)
+        if heading:
+            inside = heading.group(1) in IMPACT_SECTIONS
+            continue
+        if inside:
+            for token in QUOTED.findall(line):
+                token = LINE_SUFFIX.sub("", token).rstrip("/")
+                if PATHLIKE.fullmatch(token) and ("/" in token or "." in token) and ".." not in token.split("/"):
+                    found.append(token)
+    return found
+
+
+def module_baseline(root: Path, module: str) -> str | None:
+    """The commit before spec/<id>.md was first committed; "" when that was the first commit; HEAD when the Spec is
+    not committed; None outside git (then the working tree stands in)."""
+    log = _git(root, "log", "--diff-filter=A", "--format=%H", "--", "spec/%s.md" % module)
+    first = log.splitlines()[-1] if log else None
+    if first:
+        return _git(root, "rev-parse", "--verify", "--quiet", first + "^") or ""
+    return _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
+
+
+def design_requirement(root: Path, module: str) -> dict | None:
+    """design-review (assumption 2): {"need": "user" | "review" | "none", "reason"}; None without a design step.
+
+    In order: an important requirement goes to the user; a design whose impact section lists files that existed
+    before the module started (or names no path at all) is reviewed; so is every design when designReview is on.
+    A cross-module requirement is important by rule already (important(): cross-module), so it reaches the first
+    branch.  Old-flow, bug and small modules have no design.
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"] or flow["tier"] in SHORT_TIERS:
+        return None
+    if flow["tier"] == "important":
+        return {"need": "user", "reason": "important"}
+    try:
+        text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        text = None
+    if text is not None:
+        paths = impact_paths(text)
+        if not paths:
+            return {"need": "review", "reason": "impact-unknown"}
+        base = module_baseline(root, module)
+        for path in paths:
+            if base is None:
+                old = (root / path).exists()
+            else:
+                old = bool(base) and _git(root, "cat-file", "-e", "%s:%s" % (base, path)) is not None
+            if old:
+                return {"need": "review", "reason": "old-files"}
+    if load_config(root)[0].get("designReview") == "on":
+        return {"need": "review", "reason": "configured"}
+    return {"need": "none", "reason": None}
+
+
+def design_approval(root: Path, module: str) -> dict | None:
+    """design-review (assumption 8): the designApproval object of /map --json; None without a design step."""
+    need = design_requirement(root, module)
+    if need is None:
+        return None
+    try:
+        text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        text = ""
+    state = review_state(text, "design") if text else "none"
+    records = design_round_records(text)
+    reviewed = [record for record in records if record["vendor"] != "none"]
+    last = records[-1] if records and records[-1]["vendor"] != "none" else None
+    if state == "approved":
+        status, by = "approved", "user"
+    elif state == "reviewer-approved" and need["need"] != "user":
+        status, by = "approved", "reviewer"
+    elif state == "revised":
+        status, by = "revised", None
+    elif need["need"] == "none":
+        status, by = "not-required", None
+    elif need["need"] == "user":
+        status, by = "pending-user", None
+    elif records and records[-1]["vendor"] == "none":
+        status, by = "unreviewed", None
+    elif reviewed and reviewed[-1]["blocking"]:
+        exhausted = sum(1 for record in reviewed if record["blocking"]) >= 2
+        status, by = ("pending-user" if exhausted else "in-review"), None
+    else:
+        status, by = "pending-review", None
+    return {"status": status, "approvedBy": by, "need": need["need"], "reason": need["reason"],
+            "reviewerVendor": last["vendor"] if last else None, "sameVendor": last["sameVendor"] if last else None,
+            "reportSha256": last["report"] if last else None,
+            "rounds": [{"round": record["round"], "blocking": record["blocking"], "sha256": record["sha256"],
+                        "vendor": None if record["vendor"] == "none" else record["vendor"],
+                        "sameVendor": None if record["vendor"] == "none" else record["sameVendor"]}
+                       for record in records]}
+
+
+def design_waits(root: Path, module: str, stage: str) -> dict | None:
+    """design-review: the designApproval while the design holds the module back, else None.
+
+    It holds at NEEDS_REGRESSION until it is approved or needs no review; later stages only for a revision (a design
+    written before this check existed, with the regression document after it, is not stopped retroactively).
+    """
+    if stage not in ("NEEDS_REGRESSION", "NEEDS_PLAN", "BUILDING"):
+        return None
+    approval = design_approval(root, module)
+    if approval is None or approval["status"] in ("approved", "not-required"):
+        return None
+    if stage != "NEEDS_REGRESSION" and approval["status"] != "revised":
+        return None
+    return approval
+
+
+def design_to_user(approval: dict | None) -> bool:
+    """design-review: the design waits for the user (the design-review stop node)."""
+    return approval is not None and (approval["status"] in ("pending-user", "unreviewed")
+                                     or (approval["status"] == "revised" and approval["need"] == "user"))
+
+
+def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
+    """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise."""
+    approval = design_waits(root, module, stage)
+    if approval is None:
+        return "", ""
+    path = "tasks/%s/design.md" % module
+    review = ("/delegate:review --profile design --backend auto --author-host %s --paths %s --spec spec/%s.md"
+              % (cmd["author-host"], path, module))
+    mark, status = cmd["review-mark"], approval["status"]
+    hold = _hold(root, module, stage, zh)
+    last = approval["rounds"][-1] if approval["rounds"] else None
+    if zh:
+        reason = {"old-files": "影响面列了已有文件", "impact-unknown": "影响面没写出路径，按碰了老逻辑处理",
+                  "configured": "项目开关 designReview 为 on", "important": "重要需求"}[approval["reason"]]
+        run = ("用 `%s` 审一轮（影响面里列的已有文件各加一个 `--spec`；开工前可用 `/delegate:doctor --reviewers --json` "
+               "看有没有可用的审查者），把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下）" % review)
+        to_user = ("在对话正文里写出技术方案六节的要点、第二审查者的意见与你的处理，交用户批；用户在对话里批准后，用 %s "
+                   "`--target design --state approved` 记下来" % mark)
+        if status == "pending-review":
+            return ("- 批准: 技术方案 `%s` 待审（第二审查者；%s）。" % (path, reason),
+                    "%s。没有阻断就用 %s `--target design --state reviewer-approved --review <文件>` 记下，不用用户批；"
+                    "有阻断就用 `--state reviewer-reviewed` 记下这一轮、改完再审，第二轮加 `--previous-report <上一轮报告>`，"
+                    "两轮仍有阻断就交用户批。放行前%s。" % (run, mark, hold))
+        if status == "in-review":
+            return ("- 批准: 技术方案 `%s` 第 %d 轮审查有 %d 条阻断。" % (path, last["round"], last["blocking"]),
+                    "改完后用 `%s --previous-report <上一轮报告>` 复审，第二轮只核对上一轮；没有阻断就用 %s `--target design "
+                    "--state reviewer-approved --review <文件>` 记下，仍有阻断就用 `--state reviewer-reviewed` 记下并交用户批。"
+                    "放行前%s。" % (review, mark, hold))
+        if status == "unreviewed":
+            return ("- 批准: 技术方案 `%s` 没有可用的第二审查者（未审），交用户批。" % path,
+                    "%s；说明这一轮没有第二审查者。批准前%s。" % (to_user, hold))
+        if status == "revised":
+            if approval["need"] == "user":
+                return ("- 批准: 技术方案 `%s` 批准后又改过，要用户重新批。" % path, "%s。批准前%s。" % (to_user, hold))
+            return ("- 批准: 技术方案 `%s` 放行后又改过，要重新审（%s）。" % (path, reason),
+                    "%s，按上一轮的结果用 %s `--target design` 记下（没有阻断 `--state reviewer-approved`，有阻断 "
+                    "`--state reviewer-reviewed`）。放行前%s。" % (run, mark, hold))
+        if approval["reason"] == "important" and not last:
+            return ("- 批准: 技术方案 `%s` 待用户批（重要需求，第二审查者先审一轮）。" % path,
+                    "%s，用 %s `--target design --state reviewer-reviewed --review <文件>` 记下这一轮；然后%s。批准前%s。"
+                    % (run, mark, to_user, hold))
+        why = "重要需求" if approval["reason"] == "important" else "两轮审查仍有阻断"
+        return ("- 批准: 技术方案 `%s` 待用户批（%s）。" % (path, why), "%s。批准前%s。" % (to_user, hold))
+    reason = {"old-files": "its impact section lists existing files",
+              "impact-unknown": "its impact section names no path, so it counts as touching existing code",
+              "configured": "designReview is on", "important": "an important requirement"}[approval["reason"]]
+    run = ("review it once with `%s` (add one `--spec` per existing file the impact section lists; `/delegate:doctor "
+           "--reviewers --json` tells beforehand whether a reviewer is available) and save its standard output, the JSON "
+           "report, to a file outside the repository (for example under `$TMPDIR`)" % review)
+    to_user = ("present it to the user in the conversation -- the points of its six sections, the second reviewer's "
+               "findings and what you did with them; when the user approves it, record that with %s `--target design "
+               "--state approved`" % mark)
+    if status == "pending-review":
+        return ("- Review: the design `%s` awaits a second reviewer (%s)." % (path, reason),
+                "%s. With no blocking item record it with %s `--target design --state reviewer-approved --review <file>`; "
+                "the user need not approve it. With blocking items record the round with `--state reviewer-reviewed`, fix "
+                "them and review again with `--previous-report <the previous report>`; after two blocking rounds the user "
+                "approves it. Until it passes, %s." % (run[0].upper() + run[1:], mark, hold))
+    if status == "in-review":
+        return ("- Review: round %d of the design `%s` has %d blocking item(s)." % (last["round"], path, last["blocking"]),
+                "fix them and review again with `%s --previous-report <the previous report>`; the second round only "
+                "checks the first. Record a clean round with %s `--target design --state reviewer-approved --review "
+                "<file>`, a blocking one with `--state reviewer-reviewed`, and then hand it to the user. Until it passes, "
+                "%s." % (review, mark, hold))
+    if status == "unreviewed":
+        return ("- Review: no second reviewer was available for the design `%s` (unreviewed); the user approves it." % path,
+                "%s, saying that no second reviewer saw it. Until it is approved, %s." % (to_user, hold))
+    if status == "revised":
+        if approval["need"] == "user":
+            return ("- Review: the design `%s` was edited after it was approved; the user approves it again." % path,
+                    "%s. Until it is approved, %s." % (to_user, hold))
+        return ("- Review: the design `%s` was edited after it passed; review it again (%s)." % (path, reason),
+                "%s, and record the round with %s `--target design` (`--state reviewer-approved` when clean, "
+                "`--state reviewer-reviewed` otherwise). Until it passes, %s." % (run, mark, hold))
+    if approval["reason"] == "important" and not last:
+        return ("- Review: the design `%s` awaits the user (an important requirement; a second reviewer reviews it "
+                "first)." % path,
+                "%s, record the round with %s `--target design --state reviewer-reviewed --review <file>`, then %s. "
+                "Until it is approved, %s." % (run[0].upper() + run[1:], mark, to_user, hold))
+    why = "an important requirement" if approval["reason"] == "important" else "two review rounds still blocking"
+    return ("- Review: the design `%s` awaits the user's approval (%s)." % (path, why),
+            "%s. Until it is approved, %s." % (to_user[0].upper() + to_user[1:], hold))
+
+
 def _hold(root: Path, module: str, stage: str, zh: bool) -> str:
     """What not to do yet while a review is open: the document the stage would write next."""
     if stage == "BUILDING":
@@ -745,6 +958,12 @@ COMMANDS_ZH["codex"] = dict(COMMANDS["codex"], **{
 })
 
 
+# design-review: the delegate review command names the host the design was written in.
+for _table in (COMMANDS, COMMANDS_ZH):
+    for _host, _name in ((None, "<claude-code|codex>"), ("claude", "claude-code"), ("codex", "codex")):
+        _table[_host]["author-host"] = _name
+
+
 def commands(host: str | None, zh: bool = False) -> dict:
     return (COMMANDS_ZH if zh else COMMANDS)[host]
 
@@ -938,9 +1157,11 @@ def final_gate_accepted(root: Path, module: str, text: str) -> bool:
 # rules-at-nodes: the stop rules the phase hint attaches at a node, one `## ` section per node in this file.
 NODE_RULES = Path(__file__).resolve().parent.parent / "references" / "node-rules.md"
 NODE_TITLES = {"map-review": "能力图审阅", "spec-review": "Spec 交审", "plan-review": "Plan 交审",
-               "mid-gate": "中途 gate", "final-gate": "最终验收", "milestone-stop": "里程碑停点"}
+               "mid-gate": "中途 gate", "final-gate": "最终验收", "milestone-stop": "里程碑停点",
+               "design-review": "技术方案交审"}
 NODE_LABELS_EN = {"map-review": "capability map review", "spec-review": "Spec review", "plan-review": "Plan review",
-                  "mid-gate": "middle gate", "final-gate": "final acceptance", "milestone-stop": "milestone stop"}
+                  "mid-gate": "middle gate", "final-gate": "final acceptance", "milestone-stop": "milestone stop",
+                  "design-review": "design review"}
 
 
 def first_open_is_gate(root: Path, module: str) -> bool:
@@ -955,7 +1176,7 @@ def first_open_is_gate(root: Path, module: str) -> bool:
 
 
 def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review: str) -> str | None:
-    """The node the current module is at: map-review, spec-review, plan-review, mid-gate, final-gate, or None.
+    """The node the current module is at: map-review, spec-review, design-review, plan-review, mid-gate, final-gate, or None.
 
     Only existing facts are combined (review states, `at_final_gate`); when two apply the later one in that list wins.
     A Spec waiting for review holds the Plan back unless the project reviews both at once.  map-review is
@@ -963,6 +1184,8 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     """
     if requirement_wait(root, module):
         return "spec-review"  # requirement-confirm-gate: the requirement comes before the Plan and the final gate
+    if design_to_user(design_waits(root, module, stage)):
+        return "design-review"  # design-review: the user approves the design before the regression document
     kind = None
     final = stage == "BUILDING" and at_final_gate(root, module)
     # pre-build-spec-batch: a revised Spec with a baseline waits for the Plan's review instead of its own.
@@ -1313,6 +1536,17 @@ def pre_build_batch(root: Path, module: str, stage: str, spec: str, plan: str) -
 
 def review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False) -> tuple:
     """(Review line, replacement next step, Spec state, Plan state) for the current module; empty strings when nothing to say.
+
+    design-review: with nothing else open, a design that has not passed takes the review line (design_hint).
+    """
+    line, step, spec, plan = _review_hint(root, module, stage, cmd, zh)
+    if not line and not step:
+        line, step = design_hint(root, module, stage, cmd, zh)
+    return line, step, spec, plan
+
+
+def _review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = False) -> tuple:
+    """review_hint for the Spec and the Plan.
 
     Only a marker changes anything: a module with no marker keeps today's output.  Fixed wording and
     the validated module id only -- never text from the files.

@@ -283,8 +283,17 @@ injects "新流程模块缺技术方案时报告 NEEDS_DESIGN" "$local_project" 
 injects "NEEDS_DESIGN 指向技术方案与骨架" "$local_project" 'write the design `tasks/alpha/design.md`'
 mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"
 injects "有技术方案缺回归时报告 NEEDS_REGRESSION" "$local_project" "Current stage: **NEEDS_REGRESSION**"
+# design-review：影响面写不出路径按碰老逻辑处理，交第二审查者；只列新文件时不审，直接写回归文档；老模块不受影响。
+injects "技术方案影响面没写路径时待审" "$local_project" 'Review: the design `tasks/alpha/design.md` awaits a second reviewer'
+injects "待审时给出带 --author-host 的审查命令" "$local_project" '/delegate:review --profile design --backend auto --author-host '
+printf '# d\n\n## Impact\n\n- new `src/alpha/new.py`\n' >"$local_project/tasks/alpha/design.md"
+lacks "只列新文件的技术方案不审" "$local_project" 'the design `tasks/alpha/design.md`'
+injects "不审时直接写回归文档" "$local_project" 'write the regression document `tasks/alpha/regression.md`'
 rm -rf "$local_project/tasks/alpha" && : >"$local_project/spec/alpha.md"
 injects "去掉流程标记后回到 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
+mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"
+lacks "老模块有 design.md 也没有技术方案审查" "$local_project" 'the design `tasks/alpha/design.md`'
+rm -rf "$local_project/tasks/alpha"
 if grep -Eqi 'sync-map|spec-github-bridge|spec-gitlab-bridge' <<<"$(run "$local_project")"; then
   fail "legacy tracker advice leaked into local phase output"
 fi
