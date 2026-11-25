@@ -1222,7 +1222,8 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final and not batched):
         kind = "spec-review"
     spec_waits = kind == "spec-review" and not cadence_combined(root, module)
-    if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
+    auto = codex_route(root, module, "plan") == "auto"  # plan-auto-approve: a v2 Plan is never reviewed
+    if not auto and ((stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending"):
         kind = "plan-review"
     if final:
         kind = "final-gate"
@@ -1406,6 +1407,8 @@ def codex_route(root: Path, module: str, kind: str) -> str:
     """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
     if kind == "spec" and _v2(root, module):
         return "requirement"  # requirement-confirm-gate: a v2 requirement is confirmed by the user, whatever the takeover
+    if kind == "plan" and _v2(root, module):
+        return "auto"  # plan-auto-approve: a v2 Plan is approved by being written; nobody reviews it
     if _takeover_item(root, module, kind) != "codex":
         return "takeover"
     if kind == "spec" and important(root, module):
@@ -1424,7 +1427,12 @@ def codex_rounds_exhausted(root: Path, path: str) -> bool:
 
 
 def effective_review(root: Path, module: str, kind: str, raw: str) -> tuple:
-    """codex-approval: (state, approved by) where Codex's approval counts only when the takeover gives it this step."""
+    """codex-approval: (state, approved by) where Codex's approval counts only when the takeover gives it this step.
+
+    plan-auto-approve: a v2 Plan is ("approved", "auto") once tasks/<id>/plan.md exists, whatever marker it carries.
+    """
+    if kind == "plan" and _v2(root, module):
+        return ("approved", "auto") if (root / "tasks" / module / "plan.md").is_file() else ("none", None)
     if raw == "codex-approved":
         return ("approved", "codex") if not codex_route(root, module, kind) else ("pending", None)
     return raw, ("user" if raw == "approved" else None)
@@ -1592,6 +1600,8 @@ def _review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = Fals
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
     spec = file_review_state(root / spec_path, "spec")
     plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
+    if _v2(root, module):
+        plan = "none"  # plan-auto-approve: a v2 Plan's marker does nothing; effective_review approves it below
     for state, path in ((spec, spec_path), (plan, plan_path)):
         if state == "invalid" and zh:
             return ("- 批准: `%s` 里的批准标记无效。" % path,
@@ -2307,8 +2317,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         "NEEDS_SPEC": "写 `spec/%s.md` 并交审。" % module,
         "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", True) + "。",
         "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", True) + "。",
-        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", True) + "（例如用 %s）%s。" % (
-            cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else "")) if _v2(root, module) else
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", True) + "（例如用 %s）。Plan 写完即自动批准，不交审，接着用 %s 开始构建。" % (
+            cmd["plan"], cmd["build"])) if _v2(root, module) else
         "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s）%s。" % (
             module, module, cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else ""),
         "BUILDING": "继续用 %s 构建 `%s`：`tasks/%s/todo.md` 里还有 %d 个未勾选项。" % (cmd["build"], module, module,
@@ -2319,8 +2329,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         # No marker says nothing about approval either way, so the suggestion names the condition.
         "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", False) + ".",
         "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", False) + ".",
-        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", False) + " (for example with %s)%s." % (
-            cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else "")) if _v2(root, module) else
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", False) + " (for example with %s). The Plan is approved automatically "
+                       "once written and is not reviewed; then start the build with %s." % (cmd["plan"], cmd["build"]))
+        if _v2(root, module) else
         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
             module, module, cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else ""),
         "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
@@ -2336,7 +2347,13 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     elif stage == "BUILDING" and not review_step and role_kind != "module":
         gate = next_gate(root, module)
         # A Plan with no marker may still be waiting for the user, so only an approved one is told to keep going.
-        if gate and plan_review == "approved" and zh:
+        auto = plan_review == "approved" and codex_route(root, module, "plan") == "auto"  # plan-auto-approve
+        if gate and auto and zh:
+            counts += "\n- 下一个 gate: %s — Plan 已自动批准；一直做到它为止，`report` 检查点记进 todo 后直接通过，不停下。" % gate
+        elif gate and auto:
+            counts += ("\n- Next gate: %s — Plan approved automatically; keep going until it, a `report` checkpoint is "
+                       "recorded in the todo and passed without stopping." % gate)
+        elif gate and plan_review == "approved" and zh:
             counts += "\n- 下一个 gate: %s — 一直做到它为止；`report` 检查点记进 todo 后直接通过，不停下。" % gate
         elif gate and plan_review == "none" and zh:
             counts += ("\n- 下一个 gate: %s — todo 里第一个未勾选的 `gate` 检查点。Plan 没有批准标记：如果用户还没批准它，"

@@ -363,6 +363,11 @@ def main() -> int:
     if module_id not in [row.module_id for row in parsed.rows]:
         print("not-in-map: %s is not in spec/CAPABILITY-MAP.md" % module_id)
         return 2
+    if args.target in ("plan", "both") and flow_marker(root, module_id)["v2"]:
+        # plan-auto-approve: refused before any file is read, whatever the state, the file or its marker.
+        print("plan-auto: %s is a new-flow module; its Plan is approved by being written and is never reviewed or marked "
+              "(record the requirement with --target spec, the design with --target design)" % module_id)
+        return 2
     if args.target == "acceptance":
         return _acceptance(root, module_id, args.state, args.review, args.confirm)
     if args.state.startswith("reviewer-") and args.target != "design":

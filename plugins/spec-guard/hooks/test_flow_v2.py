@@ -167,7 +167,8 @@ class StageTest(unittest.TestCase):
             approved_spec(project)
             for stage in ("NEEDS_DESIGN", "NEEDS_REGRESSION"):
                 self.assertNotEqual(module_stage.stop_node(project.root, "a", stage, "approved", "none"), "plan-review")
-            self.assertEqual(module_stage.stop_node(project.root, "a", "NEEDS_PLAN", "approved", "none"), "plan-review")
+            # plan-auto-approve: a v2 Plan is approved when written, so NEEDS_PLAN is no longer a Plan review stop.
+            self.assertIsNone(module_stage.stop_node(project.root, "a", "NEEDS_PLAN", "approved", "none"))
 
 
 NEW_ONLY_DESIGN = "# d\n\n## 影响面\n\n- 新增 `src/a/new.py`\n"
@@ -883,6 +884,55 @@ class DesignApprovalTest(unittest.TestCase):
         self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files)",
                       text)
         self.assertIn("Until it passes, do not write the regression document yet.", text)
+
+
+
+class PlanAutoApproveTest(unittest.TestCase):
+    """plan-auto-approve AC2: a v2 Plan is approved by being written; its marker does nothing; old modules unchanged."""
+
+    TODO = "- [ ] t\n- [ ] 最终验收（gate）\n"
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        approved_spec(self.project)
+        self.project.write("tasks/a/design.md", NEW_ONLY_DESIGN)
+        self.project.write("tasks/a/regression.md", "# r\n")
+
+    def effective(self):
+        return module_stage.effective_review(self.project.root, "a", "plan", "none")
+
+    def test_without_a_plan(self):
+        self.assertEqual(module_state(self.project.root, "a")["stage"], "NEEDS_PLAN")
+        self.assertEqual(self.effective(), ("none", None))
+        self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "auto")
+        self.assertIsNone(module_stage.stop_node(self.project.root, "a", "NEEDS_PLAN", "approved", "none"))
+        text = hint(self.project)
+        self.assertIn("Plan 写完即自动批准", text)
+        self.assertNotIn("停点规则（Plan 交审）", text)
+        self.assertIn("approved automatically", hint(self.project, zh=False))
+
+    def test_a_written_plan_is_approved_whatever_its_marker(self):
+        for marker in ("", "<!-- spec-guard: review pending -->\n", "<!-- spec-guard: review approved -->\n",
+                       "<!-- spec-guard: review codex-approved aaaaaaaaaaaa -->\n", "<!-- spec-guard: review bogus -->\n"):
+            with self.subTest(marker=marker):
+                self.project.write("tasks/a/plan.md", "# Plan\n\n%s\n## 任务\n\n- t\n" % marker)
+                self.project.write("tasks/a/todo.md", self.TODO)
+                self.assertEqual(self.effective(), ("approved", "auto"))
+                text = hint(self.project)
+                self.assertIn("Plan 已自动批准", text)
+                self.assertNotIn("先等批准再构建", text)
+                self.assertNotIn("Plan `tasks/a/plan.md`", text)
+                self.assertNotIn("批准标记无效", text)
+                self.assertIn("Plan approved automatically", hint(self.project, zh=False))
+
+    def test_old_module_still_waits(self):
+        self.project.write("spec/a.md", "# a\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n\n<!-- spec-guard: review pending -->\n")
+        self.project.write("tasks/a/todo.md", self.TODO)
+        self.assertNotEqual(self.effective()[1], "auto")
+        self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "takeover")
+        self.assertIn("Plan `tasks/a/plan.md` 正在等用户批准", hint(self.project))
 
 
 if __name__ == "__main__":

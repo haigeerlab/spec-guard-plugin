@@ -1103,5 +1103,36 @@ class DesignMarks(unittest.TestCase):
         self.assertIn("important", out)
 
 
+
+class PlanAutoRefusal(unittest.TestCase):
+    """plan-auto-approve AC3: review-mark refuses --target plan / both on a v2 module before reading any file."""
+
+    def test_every_state_and_shape_refuses_and_writes_nothing(self):
+        for plan in (None, "# Plan: alpha\n\n步骤\n", "# Plan\n\n<!-- spec-guard: review bogus -->\n"):
+            for target in ("plan", "both"):
+                for state in ("pending", "approved", "codex-approved", "codex-reviewed"):
+                    with self.subTest(plan=plan, target=target, state=state), Project() as project:
+                        project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1),
+                                                encoding="utf-8")
+                        if plan is None:
+                            project.plan.unlink()
+                        else:
+                            project.plan.write_text(plan, encoding="utf-8")
+                        before = (project.spec.read_bytes(), project.plan.read_bytes() if plan is not None else None)
+                        code, out = project.run("--module", "alpha", "--target", target, "--state", state,
+                                                "--review", str(project.root / "missing.json"), "--confirm")
+                        self.assertEqual(code, 2, out)
+                        self.assertTrue(out.startswith("plan-auto: "), out)
+                        self.assertEqual((project.spec.read_bytes(),
+                                          project.plan.read_bytes() if plan is not None else None), before)
+                        self.assertEqual(plan is None, not project.plan.exists())
+
+    def test_old_module_is_unchanged(self):
+        with Project() as project:
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "pending", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.states()[1], "pending")
+
+
 if __name__ == "__main__":
     unittest.main()
