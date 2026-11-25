@@ -192,21 +192,27 @@ Codex 0.164 之前，只有新增的 `SessionStart` hook 要信任一次并重�
 
 ## 自动接管（可选）
 
-默认每个 Spec、Plan、最终验收都由你批，合并、发布也由你做。想少介入时，可以给项目或单个模块设「接管档位」，把其中几步交给 Codex 和
-autopilot。不设档位的项目一切照旧。
+默认每份 Spec（新流程叫需求文档）、技术方案、最终验收都由你批，合并、发布也由你做。想少介入时，可以给项目或单个模块设「接管档位」，
+把其中几步交给第二审查者和 autopilot。不设档位的项目一切照旧。
 
-1. **设档位**：对 agent 说「这个项目只接管 Plan」之类的话，agent 用 `/spec-guard:config` 预览四项（Spec、Plan、合并、发布）各由谁做，
-   你确认后写进 `.agent/config.json`（`takeover`，单个模块用 `moduleTakeover`）。预设有 `none`（不接管）、`plan`（只接管 Plan）、
-   `merge`（接管到合并），也可以逐项自定义。放宽一次只升一档；试点先用「只接管 Plan」。
-2. **Codex 审什么**：交给 Codex 的 Spec 或 Plan，agent 用 /delegate:review 请 Codex 审，没有阻断意见才记 `codex-approved`，阶段提示当作已批准、
-   接着往下做；两轮还有阻断或 Codex 不可用就停下交你，不会自己审自己。合并交给自动化的模块，最终验收由 Codex 凭三样证据做：
+**新流程模块**（需求文档带 `<!-- spec-guard: flow v2 tier=… -->` 一行）按「需求文档 → 技术方案 → 回归测试文档 → Plan → 实现」走：
+需求永远由你在对话里确认；技术方案按规则交第二审查者审（碰了老逻辑、项目开了 `designReview`），重要需求的技术方案永远由你批；
+Plan 写完即自动批准，越界、碰 T4 路径、不可逆操作照旧停下问你。没有这一行的老模块照旧规则（Spec → Plan → todo）。
+
+1. **设档位**：对 agent 说「技术方案让第二审查者审过就行」之类的话，agent 用 `/spec-guard:config` 预览三项（技术方案、合并、发布）各由谁做，
+   你确认后写进 `.agent/config.json`（`takeover`，单个模块用 `moduleTakeover`）。预设有 `none`（全由你做；每份技术方案都由你批）、
+   `design`（第二审查者审过即放行技术方案）、`merge`（再加合并自动），也可以逐项自定义。放宽一次只升一档。
+   旧档位照旧能读：`plan` 读作 `none`，老模块仍由 Codex 批 Plan；`plan` 改成 `design` 要你的原话。
+2. **审查怎么做**：第二审查者用 /delegate:review 审技术方案，最多两轮，第二轮只核对上一轮；两轮还有阻断或没有可用的审查者就交你。
+   老模块交给 Codex 的 Spec 或 Plan 同样两轮为限，没有阻断意见才记 `codex-approved`，不会自己审自己。合并交给自动化的模块，最终验收由 Codex 凭三样证据做：
    Codex 审最终补丁无阻断、autopilot 由非作者在同一提交上跑过检查、两者都是当前提交。记录写在 git 目录、不进提交，autopilot 据此合并。
-3. **哪些永远由你批**：能力图；判为重要需求的 Spec（同批拆出多个模块、跨模块、碰高风险路径，由规则判定，不由 agent 自己判）；
-   「预先声明」有内容的 Plan。测试改不红、Spec 没覆盖的决定、高风险不可逆操作、接管模块改到声明范围之外，都照旧停下问你。
+3. **哪些永远由你批**：能力图；需求确认；判为重要需求的需求文档、Spec 与技术方案（同批拆出多个模块、跨模块、碰高风险路径，由规则判定，不由 agent 自己判）；
+   老模块里「预先声明」有内容的 Plan。测试改不红、Spec 没覆盖的决定、高风险不可逆操作、改到声明范围之外，都照旧停下问你。
 4. **出事自动降档**：autopilot 或 module-crew 发现问题时，用只许收窄的入口把档位往严里改一格并记下原因；你想恢复，用 config 说一句，一次升一档。
 
-`/spec-guard:map --json` 每个模块报出档位（`takeover`）、实际由谁批（`reviewApprovedBy`）、是否重要需求（`important`）和 Codex 验收记录
-（`acceptance`），供 autopilot、module-crew 读。规则原文见共享检查点规则的「自治档位与底线」「批准标记」两节。
+`/spec-guard:map --json` 每个模块报出生效档位（`takeover`，重要需求的技术方案已算成由你批）、实际由谁批（`reviewApprovedBy`、`designApproval`）、
+是否重要需求（`important`）和 Codex 验收记录（`acceptance`），供 autopilot、module-crew 读。规则原文见共享检查点规则的「自治档位与底线」「批准标记」
+「技术方案审查」几节。
 
 ## 多模块并行（可选）
 
