@@ -7,7 +7,7 @@
 - [x] Task 4：阶段提示
 - [x] Task 5：联调回归
 - [x] Task 6：接口 1.23
-- [ ] Checkpoint 1（report）：本机完整检查与变异
+- [x] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 7：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
@@ -27,3 +27,7 @@
   偏离 Spec 假设 4 的写法：Spec 把命令模板写成带 `"[--ref <git ref>]"` 的一个数组；module-crew 的 `probe.safe_command` 把模板逐段原样当参数传入（只替换占位符），带方括号那一段会让 argparse 退出 2，module-crew 的最终验收就跑不起来。所以 `command` 只放能原样运行的形式，`--ref` 放在 `refArgs`，`--usage` 放在 `usageCommand`；验收时交用户确认。
   用例：`RegressionInterfaceTest` 1 例（按 `interface.json` 的模板代入真实路径运行，带与不带 `refArgs` 各一次，核对输出键集合与取值）；在临时副本里删掉问题代码 `module-unknown`、给 `command` 加上方括号可选参数，`check-interface.py` 各报一条失败。
 - Task 6 提交前（2026-11-25）：`scripts/test-checkers.sh` 的接口夹具 `mkifc` 没有 `regression_view.py`，「与代码一致 → 放行」一例变红；该文件在并行边界外，停下问用户，用户「可以，加进边界并改」：脚本名列表加 `regression_view`，Spec 并行边界补入并记修订。
+- Checkpoint 1（2026-11-25）：Task 1～6 的每次提交都走了完整档且全绿（最后一次 `d3e10fa2`：phase-guard 549 例、verify-artifacts 146 例）。
+  老流程输出比对（AC9、R1-5）：已安装的 0.95.0 与工作区代码分别跑本仓库（全是老流程模块）和一个老流程临时夹具（三个模块，当前模块分别为构建中、缺 Plan，带 `projectSections`），阶段提示 `additionalContext`、`map_view --json`（去掉 `generatedAt`）、verify-artifacts（逐行输出与退出码）两边逐字相同；第一次跑夹具时没有激活信号、阶段提示两边都是空，补上 `.agent/state.json` 后重跑。
+  `test-verify-artifacts.sh` 加 1 例锁住老流程夹具的计数（3 通过 · 1 警告 · 0 失败）与退出码 0，0.95.0 与工作区对同一夹具都是这个结果。
+  变异（临时副本）：sha256 不压空白、不查 command 用例缺命令、受影响的老功能不看影响面、`draft_files` 不排除 `.regression.md`、注释行算章节内容、bug 完成不看 todo、去掉阶段提示行，各自让对应用例变红（去掉提示行也让 `test-phase-guard.sh` 的新用例变红）。sha256 那处第一次没拦住：用例只改了首尾空白，而解析时首尾空白已去掉；改成同一步骤跨行与单行两种写法后拦住。还原后全绿。

@@ -551,6 +551,8 @@ check_absent "追加章节配置不合法：追加章节不生效" "缺章节"
 project flow-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' >"$PROJECT/tasks/alpha/plan.md"
 check_absent "老模块不查新流程文档" "缺失（档位"
+# regression-doc-check（AC9）：老流程夹具的通过／警告／失败计数与退出码与本模块之前相同。
+check "老流程夹具：计数与退出码不变" 0 "结果: 3 通过 · 1 警告 · 0 失败"
 # design-review：技术方案的批准标记与轮次行写坏、两轮 criteria 不同时失败；重要需求只有第二审查者放行时警告；老模块不查。
 design_round() {  # $1=轮次 $2=criteria：在技术方案的外部审查意见一节追加一行轮次行
   printf '<!-- spec-guard: design-review round=%s blocking=0 sha256=aaaaaaaaaaaa vendor=openai same-vendor=false criteria=%s report=%s -->\n' \

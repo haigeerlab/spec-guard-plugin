@@ -1306,7 +1306,8 @@ class RegressionParseTest(unittest.TestCase):
 
     def test_sha256_ignores_whitespace_and_title_not_content(self):
         base = {c["id"]: c["sha256"] for c in self.parse(CASES_ZH)["cases"]}
-        spaced = CASES_ZH.replace("- 预期：提示已保存", "- 预期：  提示已保存  ").replace("### R1: 正常保存", "### R1: 别的标题")
+        spaced = (CASES_ZH.replace("- 预期：提示已保存", "- 预期：  提示已保存  ").replace("### R1: 正常保存", "### R1: 别的标题")
+                  .replace("- 步骤：打开页面，\n  点保存", "- 步骤：打开页面，   点保存"))  # one line vs two: same words
         self.assertEqual({c["id"]: c["sha256"] for c in self.parse(spaced)["cases"]}, base)
         for old, new in (("提示已保存", "提示失败"), ("tests/test_save.py", "tests/other.py"), ("- 证据：用户原话", "- 证据：截图")):
             changed = {c["id"]: c["sha256"] for c in self.parse(CASES_ZH.replace(old, new))["cases"]}
