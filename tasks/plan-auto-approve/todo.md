@@ -8,7 +8,7 @@
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 5：verify-artifacts 警告
 - [x] Task 6：规则文字
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
 - Task 1（2026-11-25）：`test_flow_v2.py` 新增 `PlanAutoApproveTest` 3 例、`test_review_marker.py` 新增 `PlanAutoRefusal` 2 例（24 个子情形），先跑红（7 处失败、24 处失败）再实现，`test_flow_v2` 65 例、`test_review_marker` 78 例通过；`test_stop_rules.py` 加 `PlanAutoNode` 新旧对照，phase-guard 546 例通过。
@@ -25,3 +25,4 @@
 - Task 5（2026-11-25）：判据在 `module_stage.plan_auto_problems`（只看未完成的新流程模块，范围用同一个 `flow_scope`）：并行边界写坏失败、normal 没有范围警告、Plan 带标记警告；`validate-declared` 的 `ignored` 行在 verify-artifacts 里出警告「预先声明不起作用」。`test-verify-artifacts.sh` 加 7 例，134 例通过；把判据改成直接返回空，第一条新用例就变红。
 - Task 6（2026-11-25）：共享规则新增「## 新流程 Plan 自动批准」（授权什么、不授权什么，越界与 T4 停下后怎么放行）；`node-rules.md`「Plan 交审」「中途 gate」各加一行。`test_workflow_checkpoints.py` 新增 `PlanAutoApproveRuleTests` 3 例（共 31 个短语），96 例通过；`test_stop_rules.py` 通过。
   与 Spec 假设 8 的出入：假设 8 写「『批准标记』一节加一条」，但已有用例 `test_review_markers` 断言那一节不出现「自动批准」（防泛泛的自动批准规则），所以写成紧跟其后的单独一节，内容不变，那条保护保留。
+- Checkpoint 2（2026-11-25）：基于 main `0ba7caf7` 推送，开 PR #494；提议了宿主 PR 监控，用户没有选择打开。最终验收与合并合成一问，用户回「验收通过并合并」。当时 `validate` 未跑完，按 #493 的做法开 GitHub 自动合并（squash，只认头提交 `7f0db60d`）；核实：五项检查（含 `CI required`）SUCCESS，state=MERGED，main 指向合并提交 `27eada19`。回告：发 autopr-design #22967（对方会话没在运行，排队等送达），文字与验收消息里的拟回告相同。
