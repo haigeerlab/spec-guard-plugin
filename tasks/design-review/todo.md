@@ -8,7 +8,7 @@
 - [x] Task 4：`/map --json` 的 `designApproval` 与接口 1.20
 - [x] Task 5：verify-artifacts 的检查
 - [x] Task 6：规则文字与停点规则
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
 - Task 1（2026-11-25）：`test_project_config.py` 先加三例跑红（取值、汇总键集合、set／unset），改 `project_config.py`（`DEFAULTS` 与 `VALIDATORS` 各一项，取值复用 `off`／`on`）后全绿；
@@ -29,3 +29,4 @@
 - Task 4（2026-11-25）：`test_map_view.py` 的模块字段集合加 `designApproval`，新增 `DesignApprovalMapTest` 4 例，先跑红（6 处报错）后实现，整个文件通过。`map_view.py` 只输出 Spec 假设 8 的六个键（`need`、`reason` 只在 `module_stage` 内部用）；`interface.json` 升到 1.20，加 `mapView.designApproval`、reviewMark 的 `--target design` 与拒绝码；`check-interface.py` 新增 `_design_approval`，把一个状态值改名后检查器报错，还原后「interface.json 与代码一致」；`docs/commands.md` 补 review-mark 一段与 `/map --json` 的说明。
 - Task 5（2026-11-25）：判据写在 `module_stage.design_review_problems`，verify-artifacts 在原来查新流程文档的那段 Python 里一起调用，不在 shell 里重写。`test-verify-artifacts.sh` 加 7 例（标记与轮次行有效通过、轮次行写坏失败、两轮 criteria 不同失败、批准标记不带指纹失败、重要需求只有第二审查者放行时警告、老模块不查），127 例通过；把判据改成直接返回空，回归在「轮次行写坏时失败」变红。phase-guard 不涉及这几条（它只读状态，不报格式错误），由 Task 3 的阶段提示用例覆盖同一判据。
 - Task 6（2026-11-25）：`workflow-checkpoints.md` 在「需求确认」之后加「## 技术方案审查」（放行顺序、审查命令与记法、阻断口径、未审、放行后修订）；`node-rules.md` 在「Spec 交审」与「Plan 交审」之间加「## 技术方案交审」。`test_workflow_checkpoints.py` 新增 `DesignReviewRuleTests`（21 个要点短语），停点规则的章节列表与要点表加这一节，92 例通过；`test_stop_rules.py` 的章节用例加 `design-review`，重要需求的停点用例断言附上了这一节的规则，23 例通过。
+- Checkpoint 2（2026-11-25）：变基到 main（含 #491）后推送，开 PR #492；提议了宿主 PR 监控，用户没有选择打开。最终验收与合并合成一问，用户回「验收通过并合并」。合并前核实：validate、python 3.9、python 3.13、plugin、`CI required` 全部 SUCCESS，`mergeStateStatus` 为 CLEAN，头提交 `3de789be` 与本地一致；squash 合并后核实 state=MERGED，main 指向合并提交 `c37dc68a`。回告：发 autopr-design #22934（对方会话没在运行，排队等送达），发 delegate-owner #22935（已发出提醒，等回执），文字与验收消息里的拟回告相同。
