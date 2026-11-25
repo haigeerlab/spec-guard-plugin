@@ -4,7 +4,7 @@
 - [x] Task 1：回归先红后绿，改 ci.yml 与 CHANGELOG
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 2：Proposal 测试模板裸仓库关 receive.autogc（2026-11-25 加入，Spec 假设 7，提交 74664e0）
-- [ ] Checkpoint 2（gate）：推送、开 PR、AC4／AC5 实测、最终验收、按 F3 合并、重推 #488
+- [x] Checkpoint 2（gate）：推送、开 PR、AC4／AC5 实测、最终验收、按 F3 合并、重推 #488
 
 ## 证据
 - Task 1（2026-11-24）：新回归 `test_shellcheck_is_pinned_release` 对旧 `ci.yml` 跑红（2 处：npx 调 shellcheck、没有下载发布包的一步）；改 `ci.yml` 后 `test_ci_workflow` 8 例全绿，`yaml.safe_load` 通过。
@@ -24,3 +24,7 @@
     各加一条只读远端本地配置（`--local`）的回归。原有 `test_template_git_background_maintenance_is_disabled` 读到的是环境变量，所以一直是绿的。
   - 先红后绿：三条回归改前都失败（`'' != 'false'`），改后三个文件在 Python 3.10 与 `/usr/bin/python3` 3.9 下都通过。
     `GIT_TRACE` 统计 promotion_proof 整套：改前 receive-pack 45 次、maintenance 45 次；改后 45 次、0 次（publication 10／0，submit 5／0）。
+  - AC6：修复 74664e0（run 45461463822）与 Spec 修订 428a3f1（run 45536440399）两轮五项全绿，`CI required` 通过。
+- 合并与验收（2026-11-25）：#489 由用户合并，合并提交 b321494b（核实 state=MERGED，树与 428a3f1 相同），main 上该提交的 CI 通过；合并在最终验收之前，
+  之后补交验收，用户原话「验收通过」。#488 随后变基到新 main（能力图 plugin-spec-compliance → ci-shellcheck-pin → merge-flow-f3，CHANGELOG 两条都保留），
+  强推 5dd4c744 后自动合并为 b068db86（核实 main 等于合并提交）。拟回告：无（需求来自用户本人）。
