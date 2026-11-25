@@ -2,7 +2,7 @@
 
 <!-- spec-guard: review approved -->
 
-Spec：[spec/ci-shellcheck-pin.md](../../spec/ci-shellcheck-pin.md)（2026-11-24 批准，Q1 选 A）。
+Spec：[spec/ci-shellcheck-pin.md](../../spec/ci-shellcheck-pin.md)（2026-11-24 批准，Q1 选 A；2026-11-25 用户「Spec、Plan 都批准」，加假设 7 与 Task 2）。
 
 ## 架构决定
 
@@ -41,11 +41,13 @@ Spec：[spec/ci-shellcheck-pin.md](../../spec/ci-shellcheck-pin.md)（2026-11-24
 - **Task 0**：提交本 Plan 与 todo。验证：`verify-and-commit` 快档。
 - **Task 1**：先写回归，对现在的 `ci.yml` 跑红（`npx shellcheck` 那一条失败），再改 `ci.yml` 跑绿。CHANGELOG「未发布」加一条。
   验证：`python3 -B scripts/test_ci_workflow.py`（本机 3.10 有 PyYAML）；`verify-and-commit` 完整档。
+- **Task 2**（2026-11-25 加入，Spec 假设 7）：三个 Proposal 测试的模板裸仓库写 `receive.autogc false`，各加一条只读远端 `--local` 配置的回归，先红后绿。
+  验证：三个文件分别在 3.10 与 `/usr/bin/python3` 3.9 下跑；`GIT_TRACE` 统计远端 maintenance 次数；`verify-and-commit` 完整档。
 
 ## 会改哪些文件
 
 - 新增：`tasks/ci-shellcheck-pin/{plan,todo}.md`。
-- 修改：`.github/workflows/ci.yml`、`scripts/test_ci_workflow.py`、`CHANGELOG.md`。都在 Spec 的并行边界内。
+- 修改：`.github/workflows/ci.yml`、`scripts/test_ci_workflow.py`、`CHANGELOG.md`；Task 2 改 `plugins/spec-guard/hooks/` 下三个 `test_proposal_*.py`。都在 Spec 的并行边界内。
 - 新增依赖：ShellCheck v0.11.0 官方发布包（`shellcheck-v0.11.0.linux.x86_64.tar.xz`，sha256 `8c3be12b…7198`），替换 npm 包 `shellcheck@4.1.0`；锁文件不变。
 
 ## 风险

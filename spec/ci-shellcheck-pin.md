@@ -1,6 +1,6 @@
 # Spec: ci-shellcheck-pin
 
-<!-- spec-guard: review approved 2670be8e2398 -->
+<!-- spec-guard: review approved c854fd19ba25 -->
 
 ## Objective
 
@@ -32,13 +32,19 @@ CI 任务 `validate` 的 ShellCheck 一步用 `npx --yes shellcheck@4.1.0` 安�
    - ShellCheck 检查那一步排在安装步骤之后。
 5. **注释**：删掉 `ci.yml` 里「npm 4.1.0 = 二进制 v0.11.0」那段注释与步骤名里的说法，改为一句说明为什么不用 npm 包（匿名调 API 被限流、版本实为 latest）。
 6. **本机不改**：`scripts/verify-and-commit.sh` 本机仍用 `npx shellcheck@4.1.0`（Q1 用户选 A）。
-7. **不做**：改插件代码、命令、清单版本号与 CHANGELOG 的版本段（只在「未发布」加一条）；改历史 Spec 里的旧命令；给其他平台（macOS、arm64）准备下载包。
+7. **模块内顺带修的偶发失败**（2026-11-25 加入）：PR #489 撤回提交那一轮 CI，`python (3.9)` 偶发失败。原因是 `test_proposal_promotion_proof` 复制模板时，
+   撞上模板裸仓库的 `objects/maintenance.lock`。本机 `GIT_TRACE` 实测：往本地裸仓库推送时，git 先 `unset GIT_CONFIG_COUNT` 再启动 `git-receive-pack`，
+   测试用环境变量关掉的后台维护到不了远端；远端 `receive.autogc` 默认开，每次推送都起 `git maintenance run --auto --detach`。
+   三个共用模板的测试（`test_proposal_promotion_proof.py`、`test_proposal_publication.py`、`test_proposal_submit.py`）在建裸仓库时写 `receive.autogc false`，
+   各加一条只读远端自身配置（`--local`）的回归。不改插件代码。登记：用户 2026-11-25「PR 的 CI 失败了。请找出原因，修复并推送。」，范围由用户回「补进 Spec 边界」。
+8. **不做**：改插件代码、命令、清单版本号与 CHANGELOG 的版本段（只在「未发布」加一条）；改历史 Spec 里的旧命令；给其他平台（macOS、arm64）准备下载包。
 
 ## Contract
 
 - **C1** `.github/workflows/ci.yml` 的 `validate` 任务（假设 1～3、5）。
 - **C2** `scripts/test_ci_workflow.py`（假设 4）。
 - **C3** `CHANGELOG.md` 的「未发布」一条。
+- **C4** 三个 Proposal 测试的模板裸仓库配置与回归（假设 7）。
 
 ## Acceptance criteria
 
@@ -47,16 +53,17 @@ CI 任务 `validate` 的 ShellCheck 一步用 `npx --yes shellcheck@4.1.0` 安�
 - **AC3** 本机：`validate.sh`、phase-guard、verify-artifacts 全绿。
 - **AC4** PR 上 `validate` 的日志里打印出 `version: 0.11.0`，ShellCheck 一步通过，`CI required` 通过。
 - **AC5** 校验失败路径实测：在 PR 上推一个把校验和改错一位的临时提交，安装步骤失败、`CI required` 失败，再撤回恢复全绿。
+- **AC6** 三条新回归改前红、改后绿；`GIT_TRACE` 下跑这三个测试，推送时远端不再启动 `git maintenance`；PR 上五项全绿。
 
 ## Boundaries
 
-- **会做**：C1～C3；推送、开 PR；按 F3 问合并。合并后把 #488（merge-flow-f3）基于新的 main 重新推送，解开能力图里两个模块都插在 plugin-spec-compliance 之后的冲突。
-- **先问再做**：合并；AC5 的临时提交（会让 PR 上一次 CI 故意失败）；任何超出假设 1～6 的改动。
-- **不做**：假设 7 列出的事。
+- **会做**：C1～C4；推送、开 PR；按 F3 问合并。合并后把 #488（merge-flow-f3）基于新的 main 重新推送，解开能力图里两个模块都插在 plugin-spec-compliance 之后的冲突。
+- **先问再做**：合并；AC5 的临时提交（会让 PR 上一次 CI 故意失败）；任何超出假设 1～7 的改动。
+- **不做**：假设 8 列出的事。
 
 ## 并行边界
 
-- 独占：`spec/ci-shellcheck-pin.md`、`tasks/ci-shellcheck-pin/`、`.github/workflows/ci.yml`、`scripts/test_ci_workflow.py`、`CHANGELOG.md`
+- 独占：`spec/ci-shellcheck-pin.md`、`tasks/ci-shellcheck-pin/`、`.github/workflows/ci.yml`、`scripts/test_ci_workflow.py`、`CHANGELOG.md`、`plugins/spec-guard/hooks/test_proposal_promotion_proof.py`、`plugins/spec-guard/hooks/test_proposal_publication.py`、`plugins/spec-guard/hooks/test_proposal_submit.py`
 - 公共：无
 
 ## Open questions
