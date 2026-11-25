@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.95.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-claude",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "claude-code;plugin:spec-guard@spec-guard-marketplace;sha:10954890a308635e6936289928fc9351ed71f4ac"
+      },
+      "observedAt": "2026-11-25T12:11:12Z",
+      "evidence": [
+        "command:claude plugin marketplace update spec-guard-marketplace && claude plugin update spec-guard@spec-guard-marketplace",
+        "result:installed_plugins.json records version 0.95.0, updated at 2026-11-25T12:04:44.569Z and gitCommitSha 10954890a308635e6936289928fc9351ed71f4ac (the tag); the installed plugin directory is identical to the release asset apart from Claude Code's own .in_use marker"
+      ]
+    }
+  ]
+}
