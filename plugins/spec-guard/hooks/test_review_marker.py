@@ -910,5 +910,198 @@ class AcceptanceWidenedLater(AcceptanceFixture):
         self.assertFalse(self.record_path().exists())
 
 
+
+DESIGN = ("# 技术方案：alpha\n\n## 现状调研\n\n现状\n\n## 影响面\n\n- `src/alpha/new.py`\n\n## 实现方案\n\n做法\n\n"
+          "## 接口和数据改动\n\n无\n\n## 风险与回滚\n\n无\n\n## 方案取舍\n\n无\n")
+DESIGN_LINE = (r"<!-- spec-guard: design-review round=(\d+) blocking=(\d+) sha256=[0-9a-f]{12} vendor=(\S+) "
+               r"same-vendor=(true|false) criteria=design-v1 report=([0-9a-f]{64}) -->")
+
+
+class DesignMarks(unittest.TestCase):
+    """design-review C2 (assumptions 5, 6): rounds of a second reviewer on tasks/<id>/design.md."""
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        spec = self.project.spec
+        spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1), encoding="utf-8")
+        not_important(self.project)
+        self.design = self.project.root / "tasks" / "alpha" / "design.md"
+        self.design.write_text(DESIGN, encoding="utf-8")
+
+    def report(self, severities=(), recheck=None, selection="cross_vendor", criteria="design-v1", vendor="openai",
+               same=False, **changes):
+        import hashlib
+        import json
+        relative = "tasks/alpha/design.md"
+        findings = [{"title": "t", "file": relative, "line": None, "trigger": "x", "impact": "y", "evidence": "z",
+                     "suggestion": "w", "unverified": [], "severity": severity} for severity in severities]
+        none = selection == "none"
+        document = {"schema_version": 1, "execution_status": "conditions_missing" if none else "completed",
+                    "review_outcome": "inconclusive" if none else ("findings" if findings else "no_findings_in_scope"),
+                    "backend": None if none else "codex", "criteria": criteria,
+                    "reviewer": {"vendor": None if none else vendor, "backend": None if none else "codex",
+                                 "same_vendor": None if none else same, "selection": selection},
+                    "scope": {"files": {relative: hashlib.sha256(self.design.read_bytes()).hexdigest()}},
+                    "findings": findings, "diagnostics": ["no_reviewer_available"] if none else [],
+                    "recheck": None if recheck is None else {"items": [{"index": index, "status": status}
+                                                                      for index, status in enumerate(recheck)]}}
+        document.update(changes)
+        out = self.project.root / ("design-report-%d.json" % len(list(self.project.root.glob("design-report-*.json"))))
+        out.write_text(json.dumps(document), encoding="utf-8")
+        return str(out)
+
+    def mark(self, state, report=None, confirm=True):
+        args = ["--module", "alpha", "--target", "design", "--state", state]
+        if report is not None:
+            args += ["--review", report]
+        return self.project.run(*args, *(["--confirm"] if confirm else []))
+
+    def text(self):
+        return self.design.read_text(encoding="utf-8")
+
+    def rounds(self):
+        import re
+        return [match.groups() for match in re.finditer(DESIGN_LINE, self.text())]
+
+    def test_clean_round_is_approved_by_the_reviewer(self):
+        import hashlib
+        report = self.report(severities=("suggestion",), same=True)
+        code, out = self.mark("reviewer-approved", report)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(review_state(self.text(), "design"), "reviewer-approved")
+        self.assertEqual(self.rounds(), [("1", "0", "openai", "true",
+                                          hashlib.sha256(Path(report).read_bytes()).hexdigest())])
+        self.design.write_text(self.text() + "- 建议一：采纳。\n", encoding="utf-8")  # a reason keeps the approval
+        self.assertEqual(review_state(self.text(), "design"), "reviewer-approved")
+        self.design.write_text(self.text().replace("做法", "新做法"), encoding="utf-8")
+        self.assertEqual(review_state(self.text(), "design"), "revised")
+
+    def test_only_unresolved_recheck_items_still_block(self):
+        # AC5: the old codex rounds counted findings only and would record this second round as blocking=0.
+        self.assertEqual(self.mark("reviewer-reviewed", self.report(severities=("blocking",)))[0], 0)
+        report = self.report(recheck=("unresolved", "resolved"))
+        code, out = self.mark("reviewer-approved", report)
+        self.assertEqual(code, 2, out)
+        self.assertIn("design-blocking", out)
+        code, out = self.mark("reviewer-reviewed", report)
+        self.assertEqual(code, 0, out)
+        self.assertEqual([item[:2] for item in self.rounds()], [("1", "1"), ("2", "1")])
+        self.assertEqual(review_state(self.text(), "design"), "pending")
+
+    def test_a_second_round_must_recheck_the_first(self):
+        self.assertEqual(self.mark("reviewer-reviewed", self.report(severities=("blocking",)))[0], 0)
+        before = self.text()
+        code, out = self.mark("reviewer-approved", self.report())
+        self.assertEqual(code, 2, out)
+        self.assertIn("design-recheck-missing", out)
+        self.assertEqual(self.text(), before)
+        code, out = self.mark("reviewer-approved", self.report(recheck=("resolved",)))
+        self.assertEqual(code, 0, out)
+        self.assertEqual(review_state(self.text(), "design"), "reviewer-approved")
+
+    def test_two_blocking_rounds_go_to_the_user(self):
+        self.assertEqual(self.mark("reviewer-reviewed", self.report(severities=("blocking",)))[0], 0)
+        self.assertEqual(self.mark("reviewer-reviewed", self.report(recheck=("unresolved",)))[0], 0)
+        for state in ("reviewer-reviewed", "reviewer-approved"):
+            code, out = self.mark(state, self.report(recheck=("resolved",)))
+            self.assertEqual(code, 2, (state, out))
+            self.assertIn("design-rounds-exhausted", out)
+        code, out = self.mark("approved")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(review_state(self.text(), "design"), "approved")
+        self.assertEqual(len(self.rounds()), 2)
+
+    def test_criteria_must_not_change_between_rounds(self):
+        self.assertEqual(self.mark("reviewer-reviewed", self.report(severities=("blocking",)))[0], 0)
+        self.design.write_text(self.text().replace("criteria=design-v1", "criteria=design-v0"), encoding="utf-8")
+        before = self.text()
+        code, out = self.mark("reviewer-approved", self.report(recheck=("resolved",)))
+        self.assertEqual(code, 2, out)
+        self.assertIn("design-criteria-changed", out)
+        self.assertEqual(self.text(), before)
+        code, out = self.mark("reviewer-reviewed", self.report(criteria="severity-v1"))
+        self.assertEqual(code, 2, out)
+        self.assertIn("report-invalid", out)
+
+    def test_no_reviewer_is_recorded_as_unreviewed(self):
+        # AC7 / Q1 A: not a failure; the design goes to the user.
+        for state in ("reviewer-approved", "reviewer-reviewed"):
+            with self.subTest(state=state):
+                self.design.write_text(DESIGN, encoding="utf-8")
+                code, out = self.mark(state, self.report(selection="none"))
+                self.assertEqual(code, 0, out)
+                self.assertIn("unreviewed", out)
+                self.assertEqual([item[:4] for item in self.rounds()], [("1", "0", "none", "false")])
+                self.assertEqual(review_state(self.text(), "design"), "pending")
+        code, out = self.mark("approved")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(review_state(self.text(), "design"), "approved")
+
+    def test_any_backend_counts(self):
+        report = self.report(backend="claude-code", vendor="anthropic", same=True)
+        self.assertEqual(self.mark("reviewer-approved", report)[0], 0)
+        self.assertEqual(self.rounds()[0][2:4], ("anthropic", "true"))
+
+    def test_bad_reports_and_targets_write_nothing(self):
+        import json
+        before = self.text()
+        bad = [self.report(execution_status="failed"), self.report(review_outcome="inconclusive"),
+               self.report(reviewer={"vendor": "openai", "backend": "codex", "same_vendor": None,
+                                     "selection": "cross_vendor"}),
+               self.report(reviewer={"vendor": "openai", "backend": "codex", "same_vendor": False,
+                                     "selection": "guess"}),
+               self.report(scope={"files": {"tasks/alpha/design.md": "0" * 64}}),
+               self.report(recheck={"items": [{"index": 0, "status": "maybe"}]}),
+               str(self.project.root / "missing.json")]
+        for report in bad:
+            code, out = self.mark("reviewer-reviewed", report)
+            self.assertEqual(code, 2, (json.dumps(report), out))
+            self.assertIn("report-invalid", out)
+        self.assertEqual(self.mark("reviewer-approved")[0], 2)  # no --review
+        for state in ("codex-approved", "codex-reviewed"):
+            code, out = self.mark(state, self.report())
+            self.assertEqual(code, 2, out)
+            self.assertIn("design-state", out)
+        code, out = self.project.run("--module", "alpha", "--target", "spec", "--state", "reviewer-approved",
+                                     "--review", self.report(), "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertEqual(self.text(), before)
+
+    def test_only_a_new_flow_module_with_a_design(self):
+        self.project.spec.write_text(SPEC, encoding="utf-8")
+        code, out = self.mark("reviewer-approved", self.report())
+        self.assertEqual(code, 2, out)
+        self.assertIn("design-not-v2", out)
+        self.project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=small -->\n\n", 1),
+                                     encoding="utf-8")
+        code, out = self.mark("pending")
+        self.assertEqual(code, 2, out)
+        self.assertIn("design-not-v2", out)
+        self.project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1),
+                                     encoding="utf-8")
+        self.design.unlink()
+        code, out = self.mark("pending")
+        self.assertEqual(code, 2, out)
+        self.assertIn("file-missing", out)
+
+    def test_the_user_approves_with_a_preview_first(self):
+        code, out = self.mark("approved", confirm=False)
+        self.assertEqual(code, 0, out)
+        self.assertIn("preview only", out)
+        self.assertEqual(self.text(), DESIGN)
+        self.assertEqual(self.mark("approved")[0], 0)
+        self.assertEqual(review_state(self.text(), "design"), "approved")
+        self.design.write_text(self.text().replace("做法", "新做法"), encoding="utf-8")
+        self.assertEqual(review_state(self.text(), "design"), "revised")
+
+    def test_an_important_design_is_still_the_users(self):
+        self.project.spec.write_text(self.project.spec.read_text(encoding="utf-8").replace("tier=normal", "tier=important"),
+                                     encoding="utf-8")
+        code, out = self.mark("reviewer-approved", self.report())
+        self.assertEqual(code, 0, out)
+        self.assertIn("important", out)
+
+
 if __name__ == "__main__":
     unittest.main()

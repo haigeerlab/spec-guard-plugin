@@ -1,6 +1,6 @@
 # Spec: design-review
 
-<!-- spec-guard: review approved eab4d4fd456c -->
+<!-- spec-guard: review approved 236433a444a4 -->
 
 ## Objective
 
@@ -17,7 +17,7 @@
 对外接口与用法草案一致吗：一致。`designReview` 取值与默认值按草案 Q3（`off`）；「碰老逻辑」按 Q5 推荐；审查命令与报告字段按 D 节（delegate #22369、#22372）；
 `designApproval` 字段按 D' 节。草案的 `takeover.design`（`human`／`reviewer`）归 takeover-redefine，本模块不读它（见假设 9）。
 
-登记：用法草案 dev-flow-v2（用户 2026-11-24「确认插入，Q1–Q6 按推荐」），M2 里程碑。需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A」。
+登记：用法草案 dev-flow-v2（用户 2026-11-24「确认插入，Q1–Q6 按推荐」），M2 里程碑。需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A」；同日修订轮次行加 `report` 字段，用户「选 A，同意修订 Spec」。
 
 ## Assumptions
 
@@ -36,7 +36,7 @@
    开工前可用 `/delegate:doctor --reviewers --json` 看有没有可用审查者，只检查、不阻止。
 5. **记录**：用 review-mark 新增 `--target design`，在 `tasks/<id>/design.md` 里写批准标记（与 Spec、Plan 同一格式，指纹用 `spec-digest.py`）和轮次行。
    轮次行沿用 0.93.0 的写法，并补上审查者信息：
-   `<!-- spec-guard: design-review round=<n> blocking=<k> sha256=<12 位> vendor=<厂商> same-vendor=<true|false> criteria=design-v1 -->`；
+   `<!-- spec-guard: design-review round=<n> blocking=<k> sha256=<12 位> vendor=<厂商> same-vendor=<true|false> criteria=design-v1 report=<报告文件的 sha256，64 位> -->`（`report` 为 2026-11-25 修订补上，供假设 8 的 `reportSha256`）；
    **阻断数 = `recheck.items` 里 `unresolved` 的条数 + `findings` 里非 `suggestion` 的条数**（D 节；现有 Codex 轮次只数 `findings`，复审时会把未解决的旧条目记成 0，本模块不沿用这个口径）。
    状态（Q2 A，只用于技术方案，Spec、Plan 的 `codex-*` 不动）：第二审查者审过且阻断为 0 → `reviewer-approved`；有阻断 → `reviewer-reviewed`（改完再审一轮，第二轮只核对上一轮）；
    两轮仍有阻断 → 交用户批；用户批 → `approved`。报告的 `criteria` 两轮必须相同，否则拒绝记录。
@@ -50,7 +50,7 @@
      `approved`（已放行）／`unreviewed`（没有可用审查者，见 Q1）／`revised`（放行后又改过）；
    - `approvedBy`：`approved` 时为 `user` 或 `reviewer`，`not-required` 时为 `null`；
    - `reviewerVendor`、`sameVendor`：取最后一轮的 `vendor`、`same-vendor`，没审过为 `null`；
-   - `reportSha256`：最后一轮报告文件的 sha256（完整 64 位），没审过为 `null`；
+   - `reportSha256`：最后一轮轮次行的 `report`（报告文件的 sha256，完整 64 位），没审过为 `null`；
    - `rounds`：轮次数组，形状同 `reviewRounds` 再加 `vendor`、`sameVendor`。
    接口 1.19 → 1.20，`interface.json` 与 `scripts/check-interface.py` 同步。插件版本不改，M2 在 takeover-redefine 一次发版。
 9. **和接管档位的关系**：本模块不读 `takeover`。草案的 `design: human` 会让普通需求也交用户批，那一项由 takeover-redefine 加上，并按草案在 `/map --json` 给出生效档位。

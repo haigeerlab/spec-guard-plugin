@@ -49,6 +49,14 @@ REVIEW_APPROVED_DIGEST = re.compile(r"<!-- spec-guard: review approved ([0-9a-f]
 # digest, so an edit afterwards reads as `revised`.  Each review round is one line under the external review section.
 REVIEW_CODEX_DIGEST = re.compile(r"<!-- spec-guard: review codex-approved ([0-9a-f]{12}) -->")
 CODEX_ROUND = re.compile(r"<!-- spec-guard: codex-review round=(\d+) blocking=(\d+) sha256=([0-9a-f]{12}) -->")
+# design-review: tasks/<id>/design.md of a new-flow module carries the same marker line (the user's `approved`, or a
+# second reviewer's `reviewer-approved`), both over the text without its external review section, plus one round line
+# per review.  vendor=none records a report in which no reviewer was available (selection "none").
+DESIGN_REVIEW_STATES = ("none", "pending", "approved", "reviewer-approved", "revised", "invalid")
+REVIEW_REVIEWER_DIGEST = re.compile(r"<!-- spec-guard: review reviewer-approved ([0-9a-f]{12}) -->")
+DESIGN_ROUND = re.compile(r"<!-- spec-guard: design-review round=(\d+) blocking=(\d+) sha256=([0-9a-f]{12}) "
+                          r"vendor=([a-z0-9][a-z0-9-]*) same-vendor=(true|false) criteria=([a-z0-9][a-z0-9.-]*) "
+                          r"report=([0-9a-f]{64}) -->")
 _DIGEST_MODULE = None
 
 
@@ -112,6 +120,20 @@ def codex_round_records(text: str) -> list:
             if match]
 
 
+def review_reviewer_line(digest: str) -> str:
+    return "<!-- spec-guard: review reviewer-approved %s -->" % digest
+
+
+def design_round_records(text: str) -> list:
+    """design-review: [{"round", "blocking", "sha256", "vendor", "sameVendor", "criteria", "report"}] from the round
+    lines outside code fences, in file order.  vendor "none" is a round in which no reviewer was available."""
+    return [{"round": int(match.group(1)), "blocking": int(match.group(2)), "sha256": match.group(3),
+             "vendor": match.group(4), "sameVendor": match.group(5) == "true", "criteria": match.group(6),
+             "report": match.group(7)}
+            for match in (DESIGN_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
+            if match]
+
+
 def codex_rounds(text: str) -> list:
     """codex-approval: [(round, blocking)] from the round lines outside code fences, in file order."""
     return [(record["round"], record["blocking"]) for record in codex_round_records(text)]
@@ -170,7 +192,9 @@ def review_codex_digest(text: str) -> str:
 
 
 def review_state(text: str, kind: str) -> str:
-    """`none`, `pending`, `approved`, `revised` (Spec only) or `invalid`; `kind` is `spec` or `plan`."""
+    """`none`, `pending`, `approved`, `revised` (Spec only) or `invalid`; `kind` is `spec` or `plan`.
+
+    `kind` `design` (design-review) reads tasks/<id>/design.md: DESIGN_REVIEW_STATES, never `codex-approved`."""
     markers = _review_split(text)[0]
     if not markers:
         return "none"
@@ -178,6 +202,14 @@ def review_state(text: str, kind: str) -> str:
         return "invalid"
     if markers[0] == REVIEW_PENDING:
         return "pending"
+    if kind == "design":
+        # design-review: both approvals leave out the external review section, where the rounds and reasons go.
+        match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0]) or REVIEW_REVIEWER_DIGEST.fullmatch(markers[0])
+        if not match:
+            return "invalid"
+        if match.group(1) != review_codex_digest(text):
+            return "revised"
+        return "approved" if match.re is REVIEW_APPROVED_DIGEST else "reviewer-approved"
     codex = REVIEW_CODEX_DIGEST.fullmatch(markers[0])
     if codex:
         # 0.91.0/0.91.1 wrote the digest of the whole text; it still counts.

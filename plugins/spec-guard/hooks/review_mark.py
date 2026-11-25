@@ -21,9 +21,11 @@ import json
 from pathlib import Path
 
 from capability_map import MODULE_ID, MapError, parse_map
-from codex_review import inspect as inspect_report, inspect_check, inspect_final
+import re
+
+from codex_review import CONCLUSIONS, REPORT_LIMIT, _invalid, inspect as inspect_report, inspect_check, inspect_final
 from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
-                          file_review_state,
+                          design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
 from tracker_default import _write_atomic
@@ -68,6 +70,8 @@ def _marked(text: str, kind: str, state: str) -> str:
         return _with_marker(text, REVIEW_PENDING)
     if kind == "plan":
         return _with_marker(text, REVIEW_APPROVED)
+    if kind == "design":
+        return _with_marker(text, review_approved_line(review_codex_digest(_with_marker(text, REVIEW_PENDING))))
     # The digest leaves the marker line out, so it is the same before and after the real line goes in.
     return _with_marker(text, review_approved_line(review_digest(_with_marker(text, REVIEW_PENDING))))
 
@@ -115,6 +119,116 @@ def _codex(root: Path, relative: str, kind: str, state: str, report: str | None,
         updated = _with_marker(updated, review_codex_line(review_codex_digest(_with_marker(updated, REVIEW_PENDING))))
     note = ("round %d: %d blocking, %d suggestion(s). Codex's review is not the user's approval: it counts only where "
             "the module's takeover gives this step to codex." % (len(rounds) + 1, found["blocking"], found["suggestions"]))
+    return updated, note
+
+
+SELECTIONS = ("cross_vendor", "same_vendor_fallback", "explicit", "none")
+TOKEN = re.compile(r"[a-z0-9][a-z0-9-]*")
+
+
+def inspect_design(report_path, root, relative):
+    """design-review: a delegate review report about tasks/<id>/design.md, from any backend.
+
+    {"status": "ok" or "unreviewed", "blocking", "suggestions", "sha256", "report", "vendor", "sameVendor", "criteria",
+    "recheck"} or {"status": "invalid", "reason"}.  Blocking counts the unresolved recheck items as well as the findings
+    that are not suggestions (D: a second round reports the first round's findings under recheck, not findings).
+    selection "none" means no reviewer was available: recorded as unreviewed, not a failure (Q1 A).
+    """
+    try:
+        path = Path(report_path)
+        if path.stat().st_size > REPORT_LIMIT:
+            return _invalid("report larger than %d bytes" % REPORT_LIMIT)
+        raw = path.read_bytes()
+        document = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, ValueError) as error:
+        return _invalid("report unreadable: %s" % type(error).__name__)
+    if not isinstance(document, dict) or document.get("schema_version") != 1:
+        return _invalid("not a delegate review report (schema_version 1)")
+    if document.get("criteria") != "design-v1":
+        return _invalid("criteria is %r, not design-v1 (/delegate:review --profile design)" % document.get("criteria"))
+    reviewer = document.get("reviewer")
+    if not isinstance(reviewer, dict) or reviewer.get("selection") not in SELECTIONS:
+        return _invalid("reviewer.selection is not one of %s" % ", ".join(SELECTIONS))
+    try:
+        digest = hashlib.sha256((Path(root) / relative).read_bytes()).hexdigest()
+    except OSError as error:
+        return _invalid("%s unreadable: %s" % (relative, type(error).__name__))
+    files = document["scope"].get("files") if isinstance(document.get("scope"), dict) else None
+    found = {"sha256": digest, "report": hashlib.sha256(raw).hexdigest(), "criteria": "design-v1"}
+    if reviewer["selection"] == "none":
+        if document.get("execution_status") != "conditions_missing":
+            return _invalid("selection none without execution_status conditions_missing")
+        if isinstance(files, dict) and files.get(relative) not in (None, digest):
+            return _invalid("%s on disk differs from the reviewed bytes (sha256)" % relative)
+        return dict(found, status="unreviewed", blocking=0, suggestions=0, vendor="none", sameVendor=False,
+                    recheck=False)
+    if document.get("execution_status") != "completed":
+        return _invalid("review not completed (execution_status %r)" % document.get("execution_status"))
+    if document.get("review_outcome") not in CONCLUSIONS:
+        return _invalid("review has no conclusion (review_outcome %r)" % document.get("review_outcome"))
+    vendor, same = reviewer.get("vendor"), reviewer.get("same_vendor")
+    if not isinstance(vendor, str) or not TOKEN.fullmatch(vendor) or vendor == "none":
+        return _invalid("reviewer.vendor is %r" % vendor)
+    if not isinstance(same, bool):
+        return _invalid("reviewer.same_vendor is %r, not true or false (review with --author-host)" % same)
+    findings = document.get("findings")
+    if not isinstance(findings, list) or not all(isinstance(item, dict) for item in findings):
+        return _invalid("findings is not a list of findings")
+    recheck = document.get("recheck")
+    items = recheck.get("items") if isinstance(recheck, dict) else [] if recheck is None else None
+    if not isinstance(items, list) or not all(isinstance(item, dict) and item.get("status") in ("resolved", "unresolved")
+                                              for item in items):
+        return _invalid("recheck.items is not a list of resolved / unresolved items")
+    if not isinstance(files, dict) or not isinstance(files.get(relative), str):
+        return _invalid("%s is not in the report's scope.files" % relative)
+    if files[relative] != digest:
+        return _invalid("%s on disk differs from the reviewed bytes (sha256)" % relative)
+    suggestions = sum(1 for item in findings if item.get("severity") == "suggestion")
+    unresolved = sum(1 for item in items if item["status"] == "unresolved")
+    return dict(found, status="ok", blocking=len(findings) - suggestions + unresolved, suggestions=suggestions,
+                vendor=vendor, sameVendor=same, recheck=isinstance(recheck, dict))
+
+
+def _design(root: Path, relative: str, state: str, report: str | None, text: str, tier: str):
+    """design-review: (new text, message) or (None, refusal) for a second reviewer's round on the design."""
+    if report is None:
+        return None, "review-missing: --state %s needs --review <the /delegate:review JSON saved to a file>" % state
+    found = inspect_design(report, root, relative)
+    if found["status"] == "invalid":
+        return None, "report-invalid: %s" % found["reason"]
+    records = design_round_records(text)
+    reviewed = [record for record in records if record["vendor"] != "none"]
+    if found["status"] == "ok" and reviewed and reviewed[-1]["blocking"]:
+        if sum(1 for record in reviewed if record["blocking"]) >= ROUND_CAP:
+            return None, ("design-rounds-exhausted: %s already had two rounds with blocking findings; hand it to the "
+                          "user, who approves it with --state approved or sends it back" % relative)
+        if not found["recheck"]:
+            return None, ("design-recheck-missing: the last round had blocking findings; review again with "
+                          "--previous-report <that round's report> so the second round checks the first")
+    changed = sorted({record["criteria"] for record in records} - {found["criteria"]})
+    if changed:
+        return None, ("design-criteria-changed: earlier rounds used %s, this report %s; both rounds must use the same "
+                      "criteria" % (", ".join(changed), found["criteria"]))
+    if state == "reviewer-approved" and found["blocking"]:
+        return None, ("design-blocking: the report has %d blocking item(s) (unresolved recheck items count); fix them "
+                      "and review again, or record this round with --state reviewer-reviewed" % found["blocking"])
+    line = ("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=%s same-vendor=%s criteria=%s "
+            "report=%s -->" % (len(records) + 1, found["blocking"], found["sha256"][:12], found["vendor"],
+                               "true" if found["sameVendor"] else "false", found["criteria"], found["report"]))
+    updated = _with_round(text, line)
+    if found["status"] == "unreviewed":
+        return _with_marker(updated, REVIEW_PENDING), (
+            "round %d: unreviewed -- no second reviewer was available (selection none). Not a failure: the design goes "
+            "to the user, who approves it with --state approved." % (len(records) + 1))
+    if state == "reviewer-approved":
+        updated = _with_marker(updated, review_reviewer_line(review_codex_digest(_with_marker(updated, REVIEW_PENDING))))
+    else:
+        updated = _with_marker(updated, REVIEW_PENDING)
+    note = "round %d: %d blocking, %d suggestion(s), reviewer %s (same vendor: %s)." % (
+        len(records) + 1, found["blocking"], found["suggestions"], found["vendor"], "yes" if found["sameVendor"] else "no")
+    if tier == "important":
+        note += (" The requirement is important: the reviewer's round goes with the design to the user, who approves "
+                 "it with --state approved.")
     return updated, note
 
 
@@ -231,8 +345,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Mark a module's Spec or Plan review state (preview unless --confirm).")
     parser.add_argument("--project", default=".")
     parser.add_argument("--module", required=True)
-    parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance"])
-    parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed"])
+    parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance", "design"])
+    parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed",
+                                                          "reviewer-approved", "reviewer-reviewed"])
     parser.add_argument("--review", help="codex states: the /delegate:review JSON report saved to a file")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args()
@@ -250,7 +365,24 @@ def main() -> int:
         return 2
     if args.target == "acceptance":
         return _acceptance(root, module_id, args.state, args.review, args.confirm)
-    relative = {"spec": "spec/%s.md" % module_id, "plan": "tasks/%s/plan.md" % module_id}
+    if args.state.startswith("reviewer-") and args.target != "design":
+        print("reviewer-state: --state %s is for --target design only; a Spec or Plan uses codex-approved / "
+              "codex-reviewed" % args.state)
+        return 2
+    tier = None
+    if args.target == "design":
+        if args.state.startswith("codex-"):
+            print("design-state: a design is reviewed with --state reviewer-approved / reviewer-reviewed, not %s"
+                  % args.state)
+            return 2
+        flow = flow_marker(root, module_id)
+        if not flow["v2"] or flow["tier"] not in ("normal", "important"):
+            print("design-not-v2: --target design is for a new-flow module of tier normal or important "
+                  "(spec/%s.md has %s)" % (module_id, "tier %s" % flow["tier"] if flow["v2"] else "no flow v2 marker"))
+            return 2
+        tier = effective_tier(root, module_id)["tier"]
+    relative = {"spec": "spec/%s.md" % module_id, "plan": "tasks/%s/plan.md" % module_id,
+                "design": "tasks/%s/design.md" % module_id}
     kinds = ["spec", "plan"] if args.target == "both" else [args.target]
     before = {}
     for kind in kinds:
@@ -267,6 +399,28 @@ def main() -> int:
             print("marker-invalid: %s has more than one review marker or a malformed one; fix it by hand "
                   "(run /spec-guard:verify-artifacts to see it)" % relative[kind])
             return 2
+    if args.state.startswith("reviewer-"):
+        updated, message = _design(root, relative["design"], args.state, args.review, before["design"], tier)
+        print(message)
+        if updated is None:
+            return 2
+        print("".join(difflib.unified_diff(before["design"].splitlines(keepends=True), updated.splitlines(keepends=True),
+                                           fromfile=relative["design"] + " (current)",
+                                           tofile=relative["design"] + " (proposed)")))
+        if not args.confirm:
+            print("\npreview only; nothing was written. Re-run with --confirm to apply.")
+            return 0
+        try:
+            _write_atomic(root / relative["design"], updated)
+        except OSError:
+            print("file-unwritable: %s could not be written" % relative["design"])
+            return 2
+        expected = review_state(updated, "design")
+        if review_state((root / relative["design"]).read_text(encoding="utf-8"), "design") != expected:
+            print("readback-mismatch: %s does not read back as %s" % (relative["design"], expected))
+            return 2
+        print("\nrecorded %s: %s" % (args.state, relative["design"]))
+        return 0
     if args.state.startswith("codex-"):
         if args.target == "both":
             print("codex-one-target: a Codex round is recorded for one file at a time (--target spec or plan)")
