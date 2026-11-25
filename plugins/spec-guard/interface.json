@@ -1,5 +1,5 @@
 {
-  "interface": "1.22",
+  "interface": "1.23",
   "mapView": {
     "command": [
       "python3",
@@ -609,5 +609,64 @@
     },
     "notes": "no user words needed: narrowing is the safe direction (S101 Q6). Writes .agent/config.json, which the caller or the user then commits. Records takeoverNarrowed: the first from stays until the scope is restored to it; while the record exists, config set widens that scope at most one step at a time (exit 2 otherwise). Preview unless --confirm",
     "contract": "spec/takeover-narrow.md"
+  },
+  "regressionView": {
+    "command": [
+      "python3",
+      "-B",
+      "hooks/regression_view.py",
+      "--json",
+      "--project",
+      "<project-root>",
+      "--module",
+      "<module-id>"
+    ],
+    "refArgs": [
+      "--ref",
+      "<git ref>"
+    ],
+    "usageCommand": [
+      "python3",
+      "-B",
+      "hooks/regression_view.py",
+      "--json",
+      "--project",
+      "<project-root>",
+      "--usage",
+      "<usage name>"
+    ],
+    "schemaVersion": 1,
+    "contract": "spec/regression-doc-check.md",
+    "exitCodes": {
+      "0": "ok; problems are listed in the output, not fatal",
+      "2": "usage error, --project is not a directory, not a module id or usage name, or the module is not in the capability map",
+      "3": "stdout is {\"schemaVersion\":1,\"error\":...} with not-flow-v2 (an old-flow module), no-document (the regression document is not written yet) or not-at-ref (with --ref: that commit has no capability map row or no such document)",
+      "4": "stdout is {\"schemaVersion\":1,\"error\":\"unreadable\"}: a document is not UTF-8, the ref does not exist, or the clone at the ref failed"
+    },
+    "values": {
+      "method": {
+        "command": "run the command; command is set",
+        "script": "run the script; command is set",
+        "ai-operate": "an agent operates the product (browser, app) and keeps the evidence",
+        "manual": "the user checks; the evidence is the user's words and where they said them"
+      },
+      "problem": {
+        "case-field-missing": "a case lacks one of steps, expected, method, evidence (where: '<case id> <field>')",
+        "case-method-invalid": "the method is not command, script, ai-operate or manual",
+        "case-command-missing": "a command or script case has no command",
+        "case-command-unexpected": "an ai-operate or manual case has a command",
+        "case-id-duplicate": "the same R<n> twice in one document (where: '<document>:<line>')",
+        "criterion-uncovered": "a success criterion of the requirement has no row in the coverage table (where: the S<n>); not checked for bug or usage",
+        "criterion-unknown": "the coverage table names an S<n> the requirement (or, for --usage, the usage draft) does not have",
+        "case-unknown": "the coverage table names a case that does not exist",
+        "affected-existing-empty": "the design's impact lists files that existed before the module started, and the affected-existing section has no case",
+        "no-cases": "the document has no case",
+        "module-unknown": "--usage only: a module under 'Modules involved' is not in the capability map"
+      },
+      "fields": "top level: schemaVersion, module (null for --usage), usage (null for --module), tier (null for --usage), document, sha256 (of the document's raw bytes; with --ref the raw blob), ref (as given, or null), criteria (S<n> of the requirement or usage draft), cases, problems [{code, where}]; --usage adds modules. Each case: id, title, steps, expected, method, command (null when absent), evidence, criteria (S<n> the coverage table maps to it), affectedExisting, sha256",
+      "caseSha256": "sha256 of the compact JSON (sorted keys, no spaces, UTF-8) of steps, expected, method, command, evidence, each with runs of whitespace collapsed to one space and trimmed; missing fields are empty strings; the id and the title are not part of it",
+      "documents": "normal and important: tasks/<id>/regression.md; bug and small: the 回归用例 / Regression cases section of spec/<id>.md; --usage <name>: spec/usage/<name>.regression.md"
+    },
+    "notes": "interface 1.23 (spec/regression-doc-check.md); read-only. Markdown is parsed only here. command runs as written; for an earlier commit append refArgs (the view is built from a shared local clone checked out at that commit, documents read as raw blobs). usageCommand reads a multi-module requirement's integration regression."
   }
 }

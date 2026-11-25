@@ -434,6 +434,13 @@ check_absent "没有用法草案时不输出用法草案一项" "用法草案"
 project usage-good
 usage_draft alpha U1
 check "合格用法草案通过" 0 "用法草案结构正确（1 份）"
+# regression-doc-check（Q1 A）：联调回归不当作用法草案；格式与涉及的模块要对。
+printf '## 用例清单\n\n### R1: 一起用\n- 步骤：a\n- 预期：b\n- 执行方式：manual\n- 证据：用户原话\n\n## 成功标准 → 联调用例\n\n不涉及\n\n## 涉及的模块\n\n- `alpha`\n' >"$PROJECT/spec/usage/demo.regression.md"
+check "联调回归：合格式时通过、草案照常" 0 "联调回归格式正确：\`spec/usage/demo.regression.md\`（1 条用例）"
+check "联调回归：不被当作用法草案" 0 "用法草案结构正确（1 份）"
+printf '\n- `zeta`\n' >>"$PROJECT/spec/usage/demo.regression.md"
+check "联调回归：涉及的模块不在能力图上时失败" 1 "联调回归问题：module-unknown（zeta）"
+rm -f "$PROJECT/spec/usage/demo.regression.md"
 project usage-bad
 usage_draft alpha U2
 check "用法草案引用不存在的用法判失败并点名" 1 "spec/usage/demo.md: 里程碑 M1 引用了不存在的典型用法 U2"
@@ -493,6 +500,14 @@ flow_doc() {  # $1=文件 $2...=二级标题
   for heading in "$@"; do printf '## %s\n\n不涉及\n\n' "$heading" >>"$file"; done
 }
 REQ=(目标 给谁用 使用场景 业务规则和异常情形 不做什么 成功标准 待定问题)
+good_regression() {  # regression-doc-check：一份合格式的回归文档；$1=command 行（默认 `make test`，传空串表示不写）
+  local command="${1-\`make test\`}"
+  {
+    printf '## 用例清单\n\n### R1: 保存\n- 步骤：点保存\n- 预期：已保存\n- 执行方式：command\n'
+    [ -z "$command" ] || printf -- '- 命令：%s\n' "$command"
+    printf -- '- 证据：运行输出\n\n## 成功标准对照\n\n不涉及\n\n## 受影响的老功能\n\n不涉及\n'
+  } >"$PROJECT/tasks/alpha/regression.md"
+}
 project flow-ok
 flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=normal -->\n' >>"$PROJECT/spec/alpha.md"
 flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
@@ -504,6 +519,12 @@ flow_doc tasks/alpha/regression.md 用例清单 受影响的老功能
 check "新流程模块：回归文档缺章节时失败" 1 "tasks/alpha/regression.md\` 缺章节：成功标准对照"
 flow_doc tasks/alpha/regression.md Cases "Success criteria coverage" "Affected existing features"
 check_absent "新流程模块：英文章节名也认" "缺章节"
+# regression-doc-check：回归文档的用例格式问题判失败；合格式时不报。
+check "回归用例：没有用例时失败" 1 "tasks/alpha/regression.md\` 回归问题：no-cases"
+good_regression
+check_absent "回归用例：合格式时不报" "回归问题"
+good_regression ""
+check "回归用例：command 用例缺命令时失败" 1 "回归问题：case-command-missing（R1）"
 project flow-bug
 flow_doc spec/alpha.md 复现步骤 预期结果 回归用例; printf '<!-- spec-guard: flow v2 tier=bug -->\n' >>"$PROJECT/spec/alpha.md"
 flow_doc tasks/alpha/plan.md 任务 检查点
@@ -519,6 +540,10 @@ flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数�
 check "追加章节：技术方案缺声明的章节时失败" 1 "tasks/alpha/design.md\` 缺章节：浏览器兼容"
 printf '## 浏览器兼容\n\n不涉及\n' >>"$PROJECT/tasks/alpha/design.md"
 check_absent "追加章节：补上标题后通过" "缺章节"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍; printf '## 浏览器兼容\n' >>"$PROJECT/tasks/alpha/design.md"
+check "追加章节：只有标题没有内容时失败" 1 "章节没有内容（section-empty）：浏览器兼容"
+printf '\n不涉及\n' >>"$PROJECT/tasks/alpha/design.md"
+check_absent "追加章节：写了不涉及后通过" "section-empty"
 printf '%s\n' '{"version": 1, "artifactLanguage": "zh-CN", "projectSections": {"design": ["影响面"]}}' >"$PROJECT/.agent/config.json"
 flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
 check "追加章节配置不合法：报 projectSections-invalid" 1 "projectSections-invalid"
@@ -526,6 +551,8 @@ check_absent "追加章节配置不合法：追加章节不生效" "缺章节"
 project flow-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' >"$PROJECT/tasks/alpha/plan.md"
 check_absent "老模块不查新流程文档" "缺失（档位"
+# regression-doc-check（AC9）：老流程夹具的通过／警告／失败计数与退出码与本模块之前相同。
+check "老流程夹具：计数与退出码不变" 0 "结果: 3 通过 · 1 警告 · 0 失败"
 # design-review：技术方案的批准标记与轮次行写坏、两轮 criteria 不同时失败；重要需求只有第二审查者放行时警告；老模块不查。
 design_round() {  # $1=轮次 $2=criteria：在技术方案的外部审查意见一节追加一行轮次行
   printf '<!-- spec-guard: design-review round=%s blocking=0 sha256=aaaaaaaaaaaa vendor=openai same-vendor=false criteria=%s report=%s -->\n' \
@@ -582,7 +609,7 @@ path = Path(sys.argv[1])
 path.write_text(path.read_text(encoding="utf-8").replace("## 影响面\n\n不涉及", "## 影响面\n\n- 改 `src/alpha.py`"), encoding="utf-8")
 PY
 check_absent "新流程：影响面写了路径就不警告" "影响面也没写出路径"
-flow_doc tasks/alpha/regression.md 用例清单 成功标准对照 受影响的老功能
+good_regression
 printf '# Plan\n\n<!-- spec-guard: review pending -->\n\n## 任务\n\n- t\n\n## 检查点\n\n- c\n\n## 预先声明\n\n- 公共路径：坏了\n' >"$PROJECT/tasks/alpha/plan.md"
 printf -- '- [ ] t\n' >"$PROJECT/tasks/alpha/todo.md"
 check "新流程：Plan 带批准标记时警告、不判失败" 0 "新流程 Plan 写完即自动批准，标记不起作用"

@@ -1,5 +1,14 @@
 # Changelog
 
+## [未发布]
+
+### 变更
+
+- **回归测试文档检查（regression-doc-check，S110 M3）。** 新流程回归用例的格式定下来：`### R<n>: <标题>` 加步骤、预期、执行方式（`command`／`script`／`ai-operate`／`manual`）、命令、证据；
+  需求文档的每条成功标准 `S<n>` 都要在对照表里有用例；技术方案影响面列了老文件时「受影响的老功能」至少一条用例。bug／small 的用例写在需求文档的「回归用例」一节（bug 修完补一条）。
+  verify-artifacts 判失败、阶段提示列出问题；新的只读入口 `hooks/regression_view.py --json`（`--ref` 读某个提交上的版本，每条用例带内容 sha256；`--usage` 读多模块需求的联调回归 `spec/usage/<需求>.regression.md`，它不再被当作用法草案）。
+  `projectSections` 声明的章节不能只有标题。`interface.json` 1.23 加 `regressionView`。用法草案 dev-flow-v2 的 U1～U3 三处字面按实现改正。
+
 ## [0.95.0] - 2026-11-25
 
 ### 变更

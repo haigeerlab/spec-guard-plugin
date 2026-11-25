@@ -307,6 +307,39 @@ if command -v python3 >/dev/null 2>&1 && [ -d spec/usage ]; then
   fi
 fi
 
+# regression-doc-check（Q1 A）：多模块需求的整体联调回归 spec/usage/<需求>.regression.md；判据在 regression_view.usage_report。
+if command -v python3 >/dev/null 2>&1 && [ -d spec/usage ] && compgen -G 'spec/usage/*.regression.md' >/dev/null; then
+  if ! USAGE_REG="$(python3 -B -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import regression_view
+root = Path(".")
+for path in sorted((root / "spec" / "usage").glob("*.regression.md")):
+    name = path.name[: -len(".regression.md")]
+    label = "spec/usage/%s" % path.name
+    if not regression_view.USAGE_NAME.fullmatch(name):
+        print("fail\t`%s` 文件名不是有效的需求名" % label)
+        continue
+    try:
+        report = regression_view.usage_report(root, name)
+    except regression_view.ViewError as error:
+        print("fail\t`%s` 读不了（%s）" % (label, error.code))
+        continue
+    for problem in report["problems"]:
+        print("fail\t`%s` 联调回归问题：%s（%s）" % (label, problem["code"], problem["where"]))
+    if not report["problems"]:
+        print("ok\t联调回归格式正确：`%s`（%d 条用例）" % (label, len(report["cases"])))
+' "$HOOKDIR" 2>/dev/null </dev/null)"; then
+    warn '未验证：联调回归检查脚本没有正常运行'
+    USAGE_REG=""
+  fi
+  while IFS=$'\t' read -r level message; do
+    [ -n "$level" ] || continue
+    if [ "$level" = ok ]; then ok "$message"; else bad "$message"; fi
+  done <<<"$USAGE_REG"
+fi
+
 # 延期写法（formal-deferral）：判据来自 module_stage.py 的 DEFERRED；格式不对与检查点延期判失败（照旧算未完成），
 # 像延期的自由文本只给改写提示。没有延期写法时不输出这一项。
 if command -v python3 >/dev/null 2>&1 && [ -d tasks ]; then

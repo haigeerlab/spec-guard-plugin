@@ -48,6 +48,8 @@
 - **新流程模块的写法（S110）。** 按新流程写的模块，在 `spec/<id>.md`（需求文档）里写一行 `<!-- spec-guard: flow v2 tier=<档位> -->`，
   档位（bug、small、normal、important）在需求总结里提出、随需求一起确认。各份文档写哪些章节、bug 与 small 怎样合成一份，见插件的
   `references/doc-skeletons.md`；阶段提示会依次指向技术方案 `tasks/<id>/design.md`、回归测试文档 `tasks/<id>/regression.md` 与 Plan。
+  回归用例按 `references/doc-skeletons.md`「用例格式」写（`### R<n>`、执行方式、证据、成功标准对照、受影响的老功能）；不合格式时
+  verify-artifacts 判失败、阶段提示列出问题；`bug` 修完在需求文档的回归用例一节补一条用例。
   没有这一行的模块照原来的 Spec → Plan 走，不补、不迁移。
 - **新流程需求由用户确认，不能交接管（requirement-confirm-gate）。** 新流程模块的需求文档每次都要用户在对话里确认，接管档位不能代替，
   Codex 的批准不算；经所装协作插件转来的用户原话按该插件的规定算用户确认。复述按需求文档的骨架各节加上档位。复述里给谁用、为什么做、
