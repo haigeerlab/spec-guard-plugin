@@ -598,6 +598,28 @@ def design_review_problems(root: Path, module: str) -> list:
     return found
 
 
+def plan_auto_problems(root: Path, module: str) -> list:
+    """plan-auto-approve (assumptions 2, 4, 10): [(level, message)] for verify-artifacts on an unfinished v2 module.
+
+    The scope is read by the same module_scope.flow_scope the build checks use; changes themselves are not checked here.
+    """
+    if not _v2(root, module) or module_state(root, module)["stage"] == "DONE":
+        return []
+    from module_scope import flow_scope  # late: module_scope imports this module
+    found, problems = flow_scope(root, module), []
+    if found is not None and found["status"] == "invalid":
+        problems.append(("fail", "`spec/%s.md` 的并行边界写坏了或读不了，新流程模块的越界检查无法运行" % module))
+    elif found is not None and found["status"] == "unknown":
+        problems.append(("warn", "`spec/%s.md` 没有并行边界，`tasks/%s/design.md` 的影响面也没写出路径：构建时越界检查会停下" % (module, module)))
+    try:
+        plan = (root / "tasks" / module / "plan.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        plan = ""
+    if plan and _review_split(plan)[0]:
+        problems.append(("warn", "`tasks/%s/plan.md` 带批准标记：新流程 Plan 写完即自动批准，标记不起作用" % module))
+    return problems
+
+
 def design_waits(root: Path, module: str, stage: str) -> dict | None:
     """design-review: the designApproval while the design holds the module back, else None.
 
