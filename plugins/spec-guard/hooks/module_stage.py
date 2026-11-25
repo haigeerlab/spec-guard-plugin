@@ -352,6 +352,52 @@ def flow_doc_problems(root: Path, module: str) -> list:
         missing += [name for name in extra.get(kind, ()) if name not in have]
         if missing:
             found.append(("fail", "`%s` 缺章节：%s" % (path, "、".join(missing))))
+        text = (root / path).read_text(encoding="utf-8")
+        empty = [name for name in extra.get(kind, ()) if name in have and not _section_has_content(text, name)]
+        if empty:  # regression-doc-check: a declared project section needs content or 不涉及 (Q2 A: only these)
+            found.append(("fail", "`%s` 章节没有内容（section-empty）：%s" % (path, "、".join(empty))))
+        if kind == "regression" or (kind == "requirement" and short and any(n in have for n in SHORT_CASES_SECTION)):
+            found += regression_problems(root, module, flow["tier"], path)
+    return found
+
+
+SHORT_CASES_SECTION = ("回归用例", "Regression cases")
+COMMENT_LINE = re.compile(r"^\s*<!--.*-->\s*$")
+
+
+def _section_has_content(text: str, name: str) -> bool:
+    """regression-doc-check: a line under the section that is neither blank nor a lone HTML comment (fenced text counts)."""
+    import regression_view
+    lines = regression_view._section_lines(text, (name,)) or []
+    return any(line.strip() and (in_fence or not COMMENT_LINE.match(line)) for _n, line, in_fence, _m in lines)
+
+
+def regression_problems(root: Path, module: str, tier: str, path: str) -> list:
+    """regression-doc-check: [(level, message)] from regression_view for a flow v2 module's regression cases.
+
+    bug: no case yet is a warning while the work goes on and a failure once the module is done with a real todo
+    (R1-3, R2-3); every other problem fails.
+    """
+    import regression_view
+    try:
+        report = regression_view.module_report(root, module)
+    except regression_view.ViewError:
+        return []  # not v2 or the document is gone: the section checks above already said so
+    found = []
+    for problem in report["problems"]:
+        level = "fail"
+        if tier == "bug" and problem["code"] == "no-cases":
+            state = _base_state(root, module)
+            todo = root / "tasks" / module / "todo.md"
+            text = todo.read_text(encoding="utf-8") if todo.is_file() else ""
+            ticked = bool(CHECKED.search(text)) or bool(state["deferred"])
+            if state["stage"] == "DONE" and state["todo"] and ticked:
+                level = "fail"
+            elif state["stage"] in ("BUILDING", "DONE"):
+                level = "warn"
+            else:
+                continue
+        found.append((level, "`%s` 回归问题：%s（%s）" % (path, problem["code"], problem["where"])))
     return found
 
 

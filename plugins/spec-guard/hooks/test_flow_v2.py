@@ -273,6 +273,9 @@ class ProjectSectionsTest(unittest.TestCase):
             with self.subTest(tier=tier), Project() as project:
                 self.config(project, self.SECTIONS)
                 body = "# a\n\n%s\n\n" % marker(tier) + "".join("## %s\n\n不涉及\n\n" % n for n in own)
+                if tier == "small":  # regression-doc-check: a small module's cases are checked before the build
+                    body = body.replace("## 回归用例\n\n不涉及\n", "## 回归用例\n\n### R1: x\n- 步骤：a\n- 预期：b\n"
+                                                              "- 执行方式：manual\n- 证据：用户原话\n")
                 project.write("spec/a.md", body)
                 self.assertEqual(self.problems(project), ["`spec/a.md` 缺章节：数据来源"])
                 project.write("spec/a.md", body + "## 数据来源\n\n不涉及\n")
@@ -1439,6 +1442,126 @@ class RegressionViewCliTest(unittest.TestCase):
             with self.subTest(args=args):
                 code, out = self.view(self.project.root, "--module", "a", *args)
                 self.assertEqual((code, out["sha256"], out["problems"]), (0, digest, []))
+
+
+
+SHORT_CASE = CASES_EN.split("## Cases\n\n")[1].split("## Success")[0]
+
+
+def flow_problems(project):
+    return module_stage.flow_doc_problems(project.root, "a")
+
+
+class RegressionProblemsTest(unittest.TestCase):
+    """regression-doc-check Task 3: regression problems in flow_doc_problems (verify-artifacts and the hint)."""
+
+    def setUp(self):
+        self.ctx = Project()
+        self.project = self.ctx.__enter__()
+        self.addCleanup(self.ctx.__exit__)
+
+    def write(self, cases, impact="- `src/new.py`", criteria=("S1",)):
+        approved_spec(self.project)
+        self.project.write("spec/a.md", criteria_requirement(*criteria))
+        self.project.write("tasks/a/design.md", "".join("## %s\n\n%s\n\n" % (n, impact if n == "影响面" else "不涉及")
+                                                        for n in DOC_SECTIONS["design"]["zh"]))
+        self.project.write("tasks/a/regression.md", cases)
+
+    def test_valid_document_has_no_problem(self):
+        self.write(CASES_EN)
+        self.assertEqual(flow_problems(self.project), [])
+
+    def test_problem_is_a_failure_with_code_and_place(self):
+        self.write(CASES_EN.replace("Method: ai-operate", "Method: command"))
+        self.assertEqual(flow_problems(self.project),
+                         [("fail", "`tasks/a/regression.md` 回归问题：case-command-missing（R1）")])
+
+    def test_every_criterion_needs_a_case(self):
+        self.write(CASES_EN, criteria=("S1", "S2", "S3"))
+        found = [m for _l, m in flow_problems(self.project)]
+        self.assertIn("`tasks/a/regression.md` 回归问题：criterion-uncovered（S2）", found)
+        self.write(CASES_EN.replace("| S1 | R1 |", "| S1 | R1 |\n| S9 | R1 |"))
+        self.assertIn("criterion-unknown", " ".join(m for _l, m in flow_problems(self.project)))
+
+    def test_old_files_in_the_impact_need_an_affected_case(self):
+        self.project.write("src/old.py", "x = 1\n")
+        self.write(CASES_EN, impact="- `src/old.py`")
+        self.assertEqual(flow_problems(self.project),
+                         [("fail", "`tasks/a/regression.md` 回归问题：affected-existing-empty（tasks/a/regression.md）")])
+        self.write(CASES_EN.replace("## Affected existing features\n\n不涉及\n",
+                                    "## Affected existing features\n\n" + SHORT_CASE.replace("R1", "R2")), impact="- `src/old.py`")
+        self.assertEqual(flow_problems(self.project), [])
+
+    def test_old_module_is_untouched(self):
+        self.project.write("spec/a.md", "# a\n")
+        self.project.write("tasks/a/regression.md", "nothing\n")
+        self.assertEqual(flow_problems(self.project), [])
+
+
+class ShortTierCasesTest(unittest.TestCase):
+    """regression-doc-check Task 3: bug and small cases live in spec/<id>.md (R1-3, R2-3)."""
+
+    def setUp(self):
+        self.ctx = Project()
+        self.project = self.ctx.__enter__()
+        self.addCleanup(self.ctx.__exit__)
+
+    def spec(self, tier, cases=""):
+        own = DOC_SECTIONS["bug"]["zh"] if tier == "bug" else DOC_SECTIONS["requirement"]["zh"] + DOC_SECTIONS["small"]["zh"]
+        body = "# a\n\n%s\n\n" % marker(tier)
+        for name in own:
+            if name == "回归用例":
+                body += "## 回归用例\n\n%s\n\n" % (cases or "不涉及")
+            elif name == "成功标准" and tier == "small":
+                body += "## 成功标准\n\n- **S1** 能做到\n\n"
+            else:
+                body += "## %s\n\n不涉及\n\n" % name
+        self.project.write("spec/a.md", body)
+
+    def test_small_cases_are_checked_like_normal(self):
+        self.spec("small")
+        self.assertIn(("fail", "`spec/a.md` 回归问题：no-cases（spec/a.md）"), flow_problems(self.project))
+        self.spec("small", SHORT_CASE + "| 成功标准 | 用例 |\n|---|---|\n| S1 | R1 |\n")
+        self.assertEqual(flow_problems(self.project), [])
+        self.spec("small", SHORT_CASE)
+        self.assertEqual(flow_problems(self.project), [("fail", "`spec/a.md` 回归问题：criterion-uncovered（S1）")])
+
+    def test_bug_without_a_case_by_stage(self):
+        self.spec("bug")
+        self.assertEqual(flow_problems(self.project), [])  # only the Spec
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- fix\n\n## 检查点\n\n不涉及\n")
+        self.assertEqual([l for l, _m in flow_problems(self.project)], ["warn"])  # a Plan and no todo
+        self.project.write("tasks/a/todo.md", "# Todo\n")
+        self.assertEqual([l for l, _m in flow_problems(self.project)], ["warn"])  # an empty todo
+        self.project.write("tasks/a/todo.md", "- [x] fix\n- [ ] Checkpoint（gate）：验收\n")
+        self.assertEqual([l for l, _m in flow_problems(self.project)], ["warn"])  # building, final gate open
+        self.project.write("tasks/a/todo.md", "- [x] fix\n- [x] Checkpoint（gate）：验收\n")
+        self.assertEqual(flow_problems(self.project), [("fail", "`spec/a.md` 回归问题：no-cases（spec/a.md）")])
+        self.project.write("tasks/a/todo.md", "- [x] fix\n- [ ] 延期：调研；恢复条件：有人要\n")
+        self.assertEqual([l for l, _m in flow_problems(self.project)], ["fail"])  # only a formal deferral left
+        self.spec("bug", SHORT_CASE)
+        self.assertEqual(flow_problems(self.project), [])
+
+    def test_bug_case_format_is_checked(self):
+        self.spec("bug", SHORT_CASE.replace("Method: ai-operate", "Method: guess"))
+        self.assertEqual(flow_problems(self.project), [("fail", "`spec/a.md` 回归问题：case-method-invalid（R1）")])
+
+
+class ProjectSectionContentTest(unittest.TestCase):
+    """regression-doc-check Task 3: a declared project section needs content or 不涉及 (Q2 A: only those)."""
+
+    def test_heading_only_fails_and_skeleton_sections_are_not_checked(self):
+        with Project() as project:
+            project.write(".agent/config.json", json.dumps({"version": 1, "projectSections": {"design": ["浏览器兼容"]}}))
+            approved_spec(project)
+            skeleton = "".join("## %s\n\n" % n for n in DOC_SECTIONS["design"]["zh"])  # skeleton sections left empty
+            for body, expected in (("## 浏览器兼容\n\n<!-- 待写 -->\n", [("fail", "`tasks/a/design.md` 章节没有内容（section-empty）：浏览器兼容")]),
+                                   ("## 浏览器兼容\n", [("fail", "`tasks/a/design.md` 章节没有内容（section-empty）：浏览器兼容")]),
+                                   ("## 浏览器兼容\n\n不涉及\n", []),
+                                   ("## 浏览器兼容\n\n```\nie11\n```\n", [])):
+                with self.subTest(body=body):
+                    project.write("tasks/a/design.md", skeleton + body)
+                    self.assertEqual(flow_problems(project), expected)
 
 
 if __name__ == "__main__":

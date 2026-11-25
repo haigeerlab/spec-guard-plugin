@@ -3,7 +3,7 @@
 - [x] Task 0：提交 Spec 批准、Plan 与 todo（2026-11-25 用户「批准；Q1 A；Q2 A」「按处理办法改，批准」）
 - [x] Task 1：解析与 sha256
 - [x] Task 2：CLI 与 `--ref`
-- [ ] Task 3：接进 `flow_doc_problems` 与 `section-empty`
+- [x] Task 3：接进 `flow_doc_problems` 与 `section-empty`
 - [ ] Task 4：阶段提示
 - [ ] Task 5：联调回归
 - [ ] Task 6：接口 1.23
@@ -16,3 +16,6 @@
   用例：`test_flow_v2.py` `RegressionParseTest` 6 例（中英文各一份、围栏、成功标准编号、sha256 只改空白与标题不变而改内容变、九个问题代码各一份反例）；实现前运行 14 个错误（模块不存在）。
 - Task 2（2026-11-25）：CLI `--json --project (--module|--usage) [--ref]` 与退出码；`--ref` 在临时目录里做共享对象的本地克隆、检出到那个提交，文档字节用 `git cat-file blob` 读原始 blob（R2-1、R2-2）。`module_stage.impact_has_old_files` 从 `design_requirement` 抽出，判定不变（`test_flow_v2.py` 全部通过）。
   用例：`RegressionViewCliTest` 7 例。实现写在这批用例之前，用例一次通过，没有经过先红；补做变异：`--ref` 改读工作区 → 3 例变红；改读克隆的检出文件而不是 blob → `test_ref_bytes_are_the_raw_blob` 变红（样本最初没有 `text eol=crlf`，检出与 blob 字节相同，这处变异没拦住，补上属性后拦住）。
+- Task 3（2026-11-25）：`flow_doc_problems` 接上 `regression_problems`（`regression_view.module_report` 的问题，`tasks/<id>/regression.md` 与 bug／small 的「回归用例」一节；bug 没有用例时：只有 Spec 不报，构建中、有 Plan 无 todo、空 todo 警告，todo 有勾选项且阶段已完成（含只剩正式延期）判失败）与 `section-empty`（只查 `projectSections` 声明的章节，注释行不算内容、代码块算）。
+  用例：`test_flow_v2.py` `RegressionProblemsTest` 5 例、`ShortTierCasesTest` 3 例、`ProjectSectionContentTest` 1 例，实现前 8 个失败；`test-verify-artifacts.sh` 加 5 例（143 例通过）。
+  旧用例改动及原因：`ProjectSectionsTest.test_bug_and_small_…` 与 `test-verify-artifacts.sh` 的 plan-auto-approve 夹具原来用只写「不涉及」的回归用例／回归文档，本模块起 small 与 normal 的回归必须有用例，改成一条合格用例（新增辅助函数 `good_regression`）。
