@@ -55,6 +55,13 @@ DRIFT_MAP = BASE_MAP.replace("Existing capability", "Changed capability")
 
 LEGACY_POLICY = "{ this is not valid policy json"
 
+
+def remote_autogc(remote):
+    """receive.autogc from the bare remote's own config only (the environment does not reach receive-pack)."""
+    return subprocess.run(["git", "-C", str(remote), "config", "--local", "--get", "receive.autogc"],
+                          text=True, capture_output=True, check=False).stdout.strip()
+
+
 class PromotionFixture(unittest.TestCase):
     promotion_map = PROMOTION_MAP
     merge_promotion = False
@@ -116,6 +123,8 @@ class PromotionFixture(unittest.TestCase):
 
     def build(self):
         self.git(self.root, "init", "--bare", "-b", "trunk", str(self.remote))
+        # receive-pack does not see GIT_CONFIG_COUNT; without this a push starts detached maintenance here.
+        self.git(self.remote, "config", "receive.autogc", "false")
         self.git(self.root, "init", "-b", "trunk", str(self.seed))
         self.git(self.seed, "config", "user.email", "test@example.invalid")
         self.git(self.seed, "config", "user.name", "test")
@@ -274,6 +283,9 @@ class PromotionProofStateTests(PromotionFixture):
                     self.assertEqual(
                         self.git(self._template / repository, "config", "--get", key).strip(),
                         expected)
+        # A local push unsets GIT_CONFIG_COUNT for receive-pack, so only the bare remote's own
+        # config stops it from starting detached maintenance (objects/maintenance.lock races copytree).
+        self.assertEqual(remote_autogc(self._template / "remote.git"), "false")
 
     def test_unusable_tracker_or_stage_stops_before_remote_access(self):
         cases = (
