@@ -813,6 +813,21 @@ class Acceptance(AcceptanceFixture):
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
 
 
+class AcceptanceFlowV2(AcceptanceFixture):
+    """verification-criteria (AC8): a flow v2 module is verified against its regression document, not by Codex."""
+
+    def test_refused_for_a_flow_v2_module(self):
+        self.project.spec.write_text(SPEC.replace("\n", "\n<!-- spec-guard: flow v2 tier=normal -->\n", 1) + self.BOUNDARY,
+                                     encoding="utf-8")
+        self.commit("flow v2")
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertIn("acceptance-flow-v2", out)
+        self.assertFalse(self.record_path().exists())
+
+
 class AcceptanceFlowScope(AcceptanceFixture):
     """plan-auto-approve: a merge=auto v2 module's final acceptance checks its boundary plus its design's impact."""
 
@@ -826,22 +841,24 @@ class AcceptanceFlowScope(AcceptanceFixture):
                                                                  encoding="utf-8")
         self.commit("v2 docs")
 
-    def test_impact_only_is_accepted(self):
+    # verification-criteria (assumption 8): a flow v2 module no longer takes a Codex final acceptance at all; its
+    # scope is checked while it is built (scope_overreach stops at a middle gate), its final gate on the verification.
+    def test_impact_only_is_no_longer_accepted_by_codex(self):
         report = self.report()
         self.evidence()
         code, out = self.accept(report)
-        self.assertEqual(code, 0, out)
-        self.assertIn("nothing out of scope", out)
+        self.assertEqual(code, 2, out)
+        self.assertIn("acceptance-flow-v2", out)
 
-    def test_outside_the_impact_still_refuses(self):
+    def test_outside_the_impact_refuses_before_any_scope_check(self):
         (self.root / "README.md").write_text("x\n", encoding="utf-8")
         self.commit("outside")
         report = self.report()
         self.evidence()
         code, out = self.accept(report, "--confirm")
         self.assertEqual(code, 2, out)
-        self.assertIn("acceptance-out-of-scope", out)
-        self.assertIn("README.md", out)
+        self.assertIn("acceptance-flow-v2", out)
+        self.assertFalse(self.record_path().exists())
 
 
 class AcceptanceT4(unittest.TestCase):

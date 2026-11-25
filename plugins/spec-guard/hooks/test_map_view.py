@@ -19,12 +19,12 @@ APPROVED_PLAN = "<!-- spec-guard: review approved -->"
 
 TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "stage", "activeModule",
             "nextGate", "totals", "bottlenecks", "awaitingReview", "modules", "history", "reviewCadence",
-            "deferredTotal", "milestoneStop"}
+            "deferredTotal", "milestoneStop", "usageVerification"}
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm", "designApproval"}
+               "requirementConfirm", "designApproval", "verification"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -1608,6 +1608,44 @@ class AcceptanceTest(unittest.TestCase):
             data = project.json()
             self.assertIsNone(data["modules"][0]["acceptance"])
             self.assertNotEqual(data["modules"][0]["status"], "done")
+
+
+class VerificationMapTest(unittest.TestCase):
+    """verification-criteria Task 5: /map --json verification and usageVerification (AC6, AC9)."""
+
+    def view(self, root):
+        done = subprocess.run([sys.executable, "-B", SCRIPT, "--json", "--project", str(root)],
+                              capture_output=True, text=True)
+        return json.loads(done.stdout)
+
+    def test_module_and_usage_verdicts(self):
+        import os
+        import test_verification as tv
+        import verification
+        repo = tv.Repo(("a", "b"))
+        self.addCleanup(repo.close)
+        root = repo.root
+        data = self.view(root)
+        self.assertEqual((data["modules"][0]["verification"], data["usageVerification"]), (None, {}))
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "author-1"
+        try:
+            verification.add_author(root, "a")
+        finally:
+            os.environ.pop("CLAUDE_CODE_SESSION_ID")
+        self.assertEqual(tv.run(root, "record", "--module", "a", "--report", str(repo.report()), "--confirm").returncode, 0)
+        module = self.view(root)["modules"][0]
+        self.assertEqual(set(module["verification"]), {"verdict", "patchId", "notes", "reportSha256", "current"})
+        self.assertEqual((module["verification"]["verdict"], module["verification"]["current"]), ("pass-with-notes", True))
+        self.assertIsNone(module["acceptance"])
+        repo.write("src/y.py", "y = 1\n")
+        tv.commit(root, "more")
+        self.assertFalse(self.view(root)["modules"][0]["verification"]["current"])
+        repo.write("spec/usage/demo.regression.md", tv.USAGE_REGRESSION)
+        self.assertEqual(self.view(root)["usageVerification"], {"demo": None})
+
+    def test_old_module_is_null(self):
+        with Project([("a", "基础", "—")], ["a"], {"spec/a.md": "# Spec: a\n"}) as project:
+            self.assertIsNone(project.json()["modules"][0]["verification"])
 
 
 if __name__ == "__main__":

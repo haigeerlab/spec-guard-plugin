@@ -297,6 +297,11 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
     if report is None:
         print("review-missing: --target acceptance needs --review <the /delegate:review JSON of the final patch>")
         return 2
+    from module_stage import flow_marker
+    if flow_marker(root, module_id)["v2"]:
+        print("acceptance-flow-v2: %s follows the new flow; its final gate rests on the pre-merge verification against "
+              "its regression document (verification.py check / record), not on a Codex acceptance" % module_id)
+        return 2
     takeover = module_takeover(root, module_id)[0]
     if takeover.get("merge") != "auto":
         print("acceptance-not-auto: %s's takeover has merge=%s; only a merge=auto module is accepted by Codex, "
