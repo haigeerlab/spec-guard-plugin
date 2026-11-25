@@ -271,6 +271,13 @@ class MilestonesTest(Base):
         self.assertEqual(found["alpha"], ("spec/usage/demo.md", "M1"))
         self.assertEqual(usage_draft.draft_files(str(self.root)), ["spec/usage/demo.md"])
 
+    def test_integration_regression_is_not_a_draft(self):
+        # regression-doc-check: spec/usage/<name>.regression.md is the requirement's integration regression, not a draft
+        self.draft(GOOD)
+        (self.root / "spec" / "usage" / "demo.regression.md").write_text("## 用例清单\n\n不涉及\n", encoding="utf-8")
+        self.assertEqual(usage_draft.draft_files(str(self.root)), ["spec/usage/demo.md"])
+        self.assertEqual(usage_draft.milestones(str(self.root))["alpha"], ("spec/usage/demo.md", "M1"))
+
     def test_no_drafts(self):
         self.assertEqual(usage_draft.draft_files(str(self.root)), [])
         self.assertEqual(usage_draft.milestones(str(self.root)), {})

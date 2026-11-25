@@ -1613,5 +1613,63 @@ class RegressionHintTest(unittest.TestCase):
         self.assertNotIn("回归", hint(self.project))
 
 
+
+USAGE_REGRESSION = """# 联调回归
+
+## 用例清单
+
+### R1: 两个模块一起用
+- 步骤：先 a 后 b
+- 预期：b 读到 a 的结果
+- 执行方式：script
+- 命令：`./scripts/e2e.sh`
+- 证据：运行输出
+
+## 成功标准 → 联调用例
+
+| 成功标准 | 用例 |
+|---|---|
+| S2 | R1 |
+
+## 涉及的模块
+
+- `a`
+- `b`
+"""
+
+
+class UsageRegressionTest(unittest.TestCase):
+    """regression-doc-check Task 5 (Q1 A): spec/usage/<name>.regression.md."""
+
+    def report(self, project):
+        import regression_view
+        return regression_view.usage_report(project.root, "demo")
+
+    def test_parses_and_checks(self):
+        with Project(("a", "b")) as project:
+            project.write("spec/usage/demo.md", "# Usage draft: demo\n\n## 成功标准\n\n- **S1** x\n- **S2** y\n")
+            project.write("spec/usage/demo.regression.md", USAGE_REGRESSION)
+            out = self.report(project)
+            self.assertEqual((out["problems"], out["modules"], out["usage"], out["module"]), ([], ["a", "b"], "demo", None))
+            self.assertEqual(out["cases"][0]["criteria"], ["S2"])
+            project.write("spec/usage/demo.regression.md", USAGE_REGRESSION.replace("- `b`", "- `zz`").replace("| S2 |", "| S7 |"))
+            self.assertEqual(sorted(p["code"] for p in self.report(project)["problems"]), ["criterion-unknown", "module-unknown"])
+
+    def test_draft_without_criteria_and_table_without_ids(self):
+        with Project(("a", "b")) as project:
+            project.write("spec/usage/demo.md", "# Usage draft: demo\n\n## Entry points\n\nx\n")
+            project.write("spec/usage/demo.regression.md", USAGE_REGRESSION.replace("| S2 | R1 |\n", ""))
+            self.assertEqual(self.report(project)["problems"], [])
+            project.write("spec/usage/demo.regression.md", USAGE_REGRESSION)
+            self.assertEqual([p["code"] for p in self.report(project)["problems"]], ["criterion-unknown"])
+
+    def test_cli(self):
+        with Project(("a", "b")) as project:
+            project.write("spec/usage/demo.regression.md", USAGE_REGRESSION.replace("| S2 | R1 |\n", ""))
+            done = subprocess.run([sys.executable, "-B", str(HERE / "regression_view.py"), "--json", "--project",
+                                   str(project.root), "--usage", "demo"], capture_output=True, text=True)
+            self.assertEqual((done.returncode, json.loads(done.stdout)["document"]), (0, "spec/usage/demo.regression.md"))
+
+
 if __name__ == "__main__":
     unittest.main()

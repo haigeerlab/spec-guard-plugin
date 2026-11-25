@@ -134,8 +134,9 @@ def draft_files(project):
     folder = os.path.join(project, "spec", "usage")
     if not os.path.isdir(folder):
         return []
+    # regression-doc-check: <name>.regression.md is a requirement's integration regression, read by regression_view
     return ["spec/usage/" + name for name in sorted(os.listdir(folder))
-            if name.endswith(".md") and os.path.isfile(os.path.join(folder, name))]
+            if name.endswith(".md") and not name.endswith(".regression.md") and os.path.isfile(os.path.join(folder, name))]
 
 
 def milestones(project):

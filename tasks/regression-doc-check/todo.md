@@ -5,7 +5,7 @@
 - [x] Task 2：CLI 与 `--ref`
 - [x] Task 3：接进 `flow_doc_problems` 与 `section-empty`
 - [x] Task 4：阶段提示
-- [ ] Task 5：联调回归
+- [x] Task 5：联调回归
 - [ ] Task 6：接口 1.23
 - [ ] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 7：规则与文档
@@ -21,3 +21,5 @@
   旧用例改动及原因：`ProjectSectionsTest.test_bug_and_small_…` 与 `test-verify-artifacts.sh` 的 plan-auto-approve 夹具原来用只写「不涉及」的回归用例／回归文档，本模块起 small 与 normal 的回归必须有用例，改成一条合格用例（新增辅助函数 `good_regression`）。
 - Task 4（2026-11-25）：`regression_line`：新流程模块在写 Plan 或构建中、回归有问题时，阶段提示多一行（问题数、前三个问题代码与位置、跑 verify-artifacts），bug 构建中没有用例时改成补用例提醒；只写固定词、代码、编号与路径。问题数进状态码（`_describe_body` 的事实与 `_role_facts`）。
   用例：`test_flow_v2.py` `RegressionHintTest` 4 例，实现前 3 个失败（老流程那一例本来就通过）；`test-phase-guard.sh` 加 2 例（549 例通过），这 2 例写在实现之后，没有经过先红，留到 Checkpoint 1 用变异核对。
+- Task 5（2026-11-25）：`usage_draft.draft_files` 跳过 `*.regression.md`；verify-artifacts 新增一段，对 `spec/usage/*.regression.md` 跑 `regression_view.usage_report`，格式问题、`module-unknown`、对照表实际引用的未知 `S<n>` 判失败，合格式时报通过。
+  用例：`test_usage_draft.py` 1 例（实现前失败）；`test_flow_v2.py` `UsageRegressionTest` 3 例（解析在 Task 1 已实现，一次通过）；`test-verify-artifacts.sh` 加 3 例（146 例通过）。

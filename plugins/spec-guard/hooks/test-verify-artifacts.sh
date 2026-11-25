@@ -434,6 +434,13 @@ check_absent "没有用法草案时不输出用法草案一项" "用法草案"
 project usage-good
 usage_draft alpha U1
 check "合格用法草案通过" 0 "用法草案结构正确（1 份）"
+# regression-doc-check（Q1 A）：联调回归不当作用法草案；格式与涉及的模块要对。
+printf '## 用例清单\n\n### R1: 一起用\n- 步骤：a\n- 预期：b\n- 执行方式：manual\n- 证据：用户原话\n\n## 成功标准 → 联调用例\n\n不涉及\n\n## 涉及的模块\n\n- `alpha`\n' >"$PROJECT/spec/usage/demo.regression.md"
+check "联调回归：合格式时通过、草案照常" 0 "联调回归格式正确：\`spec/usage/demo.regression.md\`（1 条用例）"
+check "联调回归：不被当作用法草案" 0 "用法草案结构正确（1 份）"
+printf '\n- `zeta`\n' >>"$PROJECT/spec/usage/demo.regression.md"
+check "联调回归：涉及的模块不在能力图上时失败" 1 "联调回归问题：module-unknown（zeta）"
+rm -f "$PROJECT/spec/usage/demo.regression.md"
 project usage-bad
 usage_draft alpha U2
 check "用法草案引用不存在的用法判失败并点名" 1 "spec/usage/demo.md: 里程碑 M1 引用了不存在的典型用法 U2"
