@@ -55,7 +55,7 @@ agent-skills 的 `/spec` 已能把需求拆成能力图和每个模块的 Spec�
 
 | Claude Code | Codex |
 |---|---|
-| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.94.0` |
+| `/plugin marketplace add haigeerlab/spec-guard-plugin` | `codex plugin marketplace add haigeerlab/spec-guard-plugin --ref v0.95.0` |
 | `/plugin install spec-guard@spec-guard-marketplace` | `codex plugin add spec-guard@spec-guard-marketplace` |
 | 开新会话，在 `/hooks` 里查看并信任 spec-guard 的 `UserPromptSubmit` 与两项 `SessionStart` hook | Codex 0.164 起：在命令行版 `codex` 的 `/hooks` 里批准 spec-guard 的 3 个 hook，再开新会话（见[更新与卸载](#更新与卸载)）；更早的版本开新会话即可 |
 
@@ -220,7 +220,7 @@ autopilot。不设档位的项目一切照旧。
 4. `/spec-guard:map` 列出可同时开工的模块、并行边界的重叠，以及各模块 worktree 的进度。
 5. `/spec-guard:checkout-role` 给每个 checkout 标角色：模块 checkout 的阶段提示只指向自己的模块，协调 checkout 不建议构建。
 
-谁写批准标记、谁做本地合并，共享检查点规则里有专门一节（「协调会话的批准与合并」）：远端合并始终由你来做。
+谁写批准标记、谁做本地合并，共享检查点规则里有专门一节（「协调会话的批准与合并」）：远端合并始终由你在对话里决定，你说『合并』后由会话执行。
 
 ## 对外接口
 
