@@ -6,7 +6,7 @@
 - [x] Task 3：审查要求、`designApproval`、阶段提示与停点
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 4：`/map --json` 的 `designApproval` 与接口 1.20
-- [ ] Task 5：verify-artifacts 的检查
+- [x] Task 5：verify-artifacts 的检查
 - [ ] Task 6：规则文字与停点规则
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
@@ -27,3 +27,4 @@
 - Checkpoint 1（2026-11-25）：Task 2、Task 3 的提交都走了完整档且全绿（validate、phase-guard 546 例、verify-artifacts 120 例、ShellCheck 无告警）。变异都在临时副本里做：
   阻断数改回只数 `findings` → `DesignMarks` 2 例失败（含 AC5 那一例）；去掉「影响面列已有文件」 → `DesignRequirementTest`、`DesignApprovalTest` 8 例失败、1 例报错。还原后全绿。
 - Task 4（2026-11-25）：`test_map_view.py` 的模块字段集合加 `designApproval`，新增 `DesignApprovalMapTest` 4 例，先跑红（6 处报错）后实现，整个文件通过。`map_view.py` 只输出 Spec 假设 8 的六个键（`need`、`reason` 只在 `module_stage` 内部用）；`interface.json` 升到 1.20，加 `mapView.designApproval`、reviewMark 的 `--target design` 与拒绝码；`check-interface.py` 新增 `_design_approval`，把一个状态值改名后检查器报错，还原后「interface.json 与代码一致」；`docs/commands.md` 补 review-mark 一段与 `/map --json` 的说明。
+- Task 5（2026-11-25）：判据写在 `module_stage.design_review_problems`，verify-artifacts 在原来查新流程文档的那段 Python 里一起调用，不在 shell 里重写。`test-verify-artifacts.sh` 加 7 例（标记与轮次行有效通过、轮次行写坏失败、两轮 criteria 不同失败、批准标记不带指纹失败、重要需求只有第二审查者放行时警告、老模块不查），127 例通过；把判据改成直接返回空，回归在「轮次行写坏时失败」变红。phase-guard 不涉及这几条（它只读状态，不报格式错误），由 Task 3 的阶段提示用例覆盖同一判据。

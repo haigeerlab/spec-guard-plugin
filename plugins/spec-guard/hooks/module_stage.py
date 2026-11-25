@@ -570,6 +570,34 @@ def design_approval(root: Path, module: str) -> dict | None:
                        for record in records]}
 
 
+DESIGN_ROUND_PREFIX = "<!-- spec-guard: design-review"
+
+
+def design_review_problems(root: Path, module: str) -> list:
+    """design-review (assumption 11): [(level, message)] for verify-artifacts; [] without a design step or design."""
+    need = design_requirement(root, module)
+    path = "tasks/%s/design.md" % module
+    if need is None or not (root / path).is_file():
+        return []
+    try:
+        text = (root / path).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return [("fail", "`%s` 读不了" % path)]
+    found = []
+    if review_state(text, "design") == "invalid":
+        found.append(("fail", "`%s` 的批准标记无效（只能有一行：review pending、approved <指纹> 或 reviewer-approved <指纹>）" % path))
+    broken = [line.strip() for line in _visible_lines(text.splitlines())
+              if line.strip().startswith(DESIGN_ROUND_PREFIX) and not DESIGN_ROUND.fullmatch(line.strip())]
+    if broken:
+        found.append(("fail", "`%s` 有 %d 行技术方案审查轮次行写坏了" % (path, len(broken))))
+    criteria = sorted({record["criteria"] for record in design_round_records(text)})
+    if len(criteria) > 1:
+        found.append(("fail", "`%s` 的审查轮次用了不同的 criteria：%s" % (path, "、".join(criteria))))
+    if need["need"] == "user" and review_state(text, "design") == "reviewer-approved":
+        found.append(("warn", "`%s` 只有第二审查者的放行：重要需求的技术方案要用户批" % path))
+    return found
+
+
 def design_waits(root: Path, module: str, stage: str) -> dict | None:
     """design-review: the designApproval while the design holds the module back, else None.
 
