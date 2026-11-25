@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from capability_map import MapError, parse_map
-from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, important,
+from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
                           design_approval, design_requirement, file_review_state, module_state, requirement_confirm,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -513,6 +513,8 @@ def build(root: Path) -> dict:
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),
+            # verification-criteria (interface 1.24): the recorded pre-merge verification of a flow v2 module, or null.
+            "verification": _verification(root, module),
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
@@ -564,10 +566,35 @@ def build(root: Path) -> dict:
         "reviewCadence": _review_cadence(root),
         "deferredTotal": sum(len(m["deferred"]) for m in modules),
         "milestoneStop": _milestone_stop(root, modules),
+        "usageVerification": _usage_verification(root),
     }
     if concurrent:
         data.update(_concurrency(root, parsed, modules))
     return data
+
+
+VERIFICATION_FIELDS = ("verdict", "patchId", "notes", "reportSha256", "current")  # interface.json mapView.verification
+
+
+def _verification(root: Path, module: str) -> dict | None:
+    """verification-criteria: null for an old-flow module or without a record."""
+    if not flow_marker(root, module)["v2"]:
+        return None
+    import verification
+    return verification.verification_state(root, module)
+
+
+def _usage_verification(root: Path) -> dict:
+    """verification-criteria (Q2 A): {name: record or null} for each spec/usage/<name>.regression.md."""
+    import regression_view
+    import verification
+    folder = root / "spec" / "usage"
+    found = {}
+    for path in sorted(folder.glob("*.regression.md")) if folder.is_dir() else []:
+        name = path.name[: -len(".regression.md")]
+        if regression_view.USAGE_NAME.fullmatch(name):
+            found[name] = verification.verification_state(root, usage=name)
+    return found
 
 
 def _now() -> datetime:

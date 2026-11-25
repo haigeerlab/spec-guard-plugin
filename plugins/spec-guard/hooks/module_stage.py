@@ -372,6 +372,66 @@ def _section_has_content(text: str, name: str) -> bool:
     return any(line.strip() and (in_fence or not COMMENT_LINE.match(line)) for _n, line, in_fence, _m in lines)
 
 
+VERIFICATION_SCRIPT = Path(__file__).resolve().parent / "verification.py"
+
+
+def author_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """verification-criteria (assumption 3): (fact, line) while a flow v2 module is built and no author is recorded."""
+    if stage != "BUILDING" or not module or not _v2(root, module):
+        return None, ""
+    import verification
+    if verification.authors(root, module):
+        return None, ""
+    command = "`python3 -B %s author --project <project-root> --module %s`" % (VERIFICATION_SCRIPT, module)
+    if zh:
+        return ("author", "none"), ("- 作者记录：本模块还没有记下作者会话。写代码的会话先运行 %s（会话 id 取自环境变量，"
+                                    "记在 git 目录里、不进提交），合并前验证据此判断执行者不是作者。" % command)
+    return ("author", "none"), ("- Author record: no authoring session is recorded for this module yet. The session writing "
+                                "the code runs %s first (the session id comes from the environment; the record stays in the "
+                                "git directory, uncommitted); the pre-merge verification uses it to tell the executor is "
+                                "not an author." % command)
+
+
+def verification_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """verification-criteria (assumption 7): (fact, line) at a flow v2 module's final gate: none, stale, fail or passed."""
+    if stage not in ("BUILDING", "DONE") or not module or not _v2(root, module):
+        return None, ""
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None, ""
+    if not final_gate_text(text):
+        return None, ""
+    import verification
+    from project_config import module_takeover
+    auto = module_takeover(root, module)[0].get("merge") == "auto"
+    state = verification.verification_state(root, module)
+    if state is None:
+        kind = "none"
+    elif not state["current"]:
+        kind = "stale"
+    else:
+        kind = state["verdict"]
+    notes = len(state["notes"]) if state else 0
+    zh_words = {"none": "还没有结论；等非作者照回归文档执行（autopilot 的 ⑦），校验成立后用 `verification.py record` 记下"
+                        + ("" if auto else "。没有结论时由用户在最终验收里决定是否合并，验收消息里写明没有结论"),
+                "stale": "结论已过期（补丁或回归文档变了），要重新验证",
+                "fail": "不通过，不要合并；失败的用例与证据见报告",
+                "pass": "通过" + ("，最终 gate 已算过，合并后补勾" if auto else "，验收消息里写明结论"),
+                "pass-with-notes": "通过但附意见（%d 条）" % notes + ("，最终 gate 已算过，合并后补勾" if auto else "，验收消息里写明结论与意见")}
+    en_words = {"none": "no verdict yet; a non-author runs the regression document (autopilot's step 7) and records a "
+                        "standing report with `verification.py record`" + ("" if auto else "; without one the user decides "
+                        "at the final acceptance, and the acceptance message says there is no verdict"),
+                "stale": "the verdict is stale (the patch or the regression document changed); verify again",
+                "fail": "failed; do not merge -- the failing cases and their evidence are in the report",
+                "pass": "passed" + ("; the final gate counts as passed, tick it after the merge" if auto else
+                                    "; state the verdict in the acceptance message"),
+                "pass-with-notes": "passed with notes (%d)" % notes + ("; the final gate counts as passed, tick it after "
+                                   "the merge" if auto else "; state the verdict and the notes in the acceptance message")}
+    line = ("- 合并前验证：%s。" % zh_words[kind]) if zh else ("- Pre-merge verification: %s." % en_words[kind])
+    return ("verification", kind, notes, auto), line
+
+
 REGRESSION_SHOWN = 3
 
 
@@ -1350,8 +1410,8 @@ def acceptance_record(root: Path, module: str) -> dict | None:
     only review-mark --target acceptance writes it. A module without merge=auto has none that counts.
     """
     from project_config import module_takeover  # late: project_config is imported by callers of this module
-    if module_takeover(root, module)[0].get("merge") != "auto":
-        return None
+    if _v2(root, module) or module_takeover(root, module)[0].get("merge") != "auto":
+        return None  # verification-criteria: not used for flow v2 modules
     for path in (acceptance_path(root, module), legacy_acceptance_path(root, module)):
         try:
             document = json.loads(path.read_text(encoding="utf-8")) if path is not None and path.is_file() else None
@@ -1368,6 +1428,14 @@ def final_gate_accepted(root: Path, module: str, text: str) -> bool:
     """The module waits at its final gate and Codex accepted HEAD or an ancestor of it (assumption 5)."""
     if not final_gate_text(text):
         return False
+    if _v2(root, module):
+        # verification-criteria (assumption 7): a flow v2 module's final gate passes on a current, passing pre-merge
+        # verification, and only when its merge is automatic; Codex's acceptance record does not count for it.
+        from project_config import module_takeover
+        if module_takeover(root, module)[0].get("merge") != "auto":
+            return False
+        import verification
+        return verification.passed(verification.verification_state(root, module))
     record = acceptance_record(root, module)
     return record is not None and _git(root, "merge-base", "--is-ancestor", record["sha"], "HEAD") is not None
 
@@ -2101,7 +2169,8 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
     _line, _step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
             next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module),
-            design_fact(root, module, stage), regression_line(root, module, stage, zh)[0])
+            design_fact(root, module, stage), regression_line(root, module, stage, zh)[0],
+            author_line(root, module, stage, zh)[0], verification_line(root, module, stage, zh)[0])
 
 
 def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
@@ -2234,8 +2303,8 @@ def legacy_acceptance_path(root: Path, module: str) -> Path | None:
 
 def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
     """codex-final-acceptance (assumption 6): (fact, next step) at the final gate of a merge=auto module, else (None, "")."""
-    if stage != "BUILDING" or not module or not at_final_gate(root, module):
-        return None, ""
+    if stage != "BUILDING" or not module or not at_final_gate(root, module) or _v2(root, module):
+        return None, ""  # verification-criteria: a flow v2 module is verified against its regression document instead
     from project_config import module_takeover
     if module_takeover(root, module)[0].get("merge") != "auto":
         return None, ""
@@ -2695,6 +2764,12 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     rg_fact, rg_line = regression_line(root, module, stage, zh)
     if rg_line:
         counts += "\n" + rg_line
+    au_fact, au_line = author_line(root, module, stage, zh)
+    if au_line:
+        counts += "\n" + au_line
+    vf_fact, vf_line = verification_line(root, module, stage, zh)
+    if vf_line:
+        counts += "\n" + vf_line
     if dg_step and not ms_step and role_kind not in ("module", "coordinator"):
         # usage-draft-gate: a multi-module batch reviews its usage draft before its first Spec.
         node, next_step = "map-review", dg_step
@@ -2708,7 +2783,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
                        design_fact(root, module, stage) if module else None]
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
-                      + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else []),
+                      + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
+                      + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:

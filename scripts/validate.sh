@@ -185,6 +185,7 @@ python3 -B scripts/run_steps_parallel.py \
   'python3 -B plugins/spec-guard/hooks/test_gate_tick.py' \
   'python3 -B plugins/spec-guard/hooks/test_formal_deferral.py' \
   'python3 -B plugins/spec-guard/hooks/test_usage_draft.py' \
+  'python3 -B plugins/spec-guard/hooks/test_verification.py' \
   'python3 -B plugins/spec-guard/hooks/test_milestone_mark.py' \
   'python3 -B plugins/spec-guard/hooks/test_stop_rules.py' \
   'python3 -B plugins/spec-guard/hooks/test_project_link.py' \

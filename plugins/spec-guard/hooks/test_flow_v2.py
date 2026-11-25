@@ -1698,5 +1698,111 @@ class RegressionInterfaceTest(unittest.TestCase):
                     self.assertIn(out["cases"][0]["method"], entry["values"]["method"])
 
 
+
+class VerificationHintTest(unittest.TestCase):
+    """verification-criteria Task 4: the author line, the four verification states and the final gate (AC7, AC8)."""
+
+    GATE = "- [x] t\n- [ ] Checkpoint 2（gate）：最终验收\n"
+
+    def setUp(self):
+        import os
+        self.ctx = Project()
+        self.project = self.ctx.__enter__()
+        self.addCleanup(self.ctx.__exit__)
+        self.root = self.project.root
+        git(self.root, "init", "-q", "-b", "main")
+        approved_spec(self.project)
+        self.project.write("tasks/a/design.md", "## 影响面\n\n- `src/new.py`\n")
+        self.project.write("tasks/a/regression.md", CASES_EN.replace("| S1 | R1 |\n", ""))
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n\n## 检查点\n\n- c\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+        commit_all(self.root, "base")
+        git(self.root, "switch", "-q", "-c", "feature")
+        self.project.write("src/new.py", "x = 1\n")
+        commit_all(self.root, "change")
+        self.env = {k: os.environ.pop(k) for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID") if k in os.environ}
+        self.addCleanup(os.environ.update, self.env)
+
+    def author(self):
+        import os
+        import verification
+        os.environ["CLAUDE_CODE_SESSION_ID"] = "author-1"
+        try:
+            verification.add_author(self.root, "a")
+        finally:
+            os.environ.pop("CLAUDE_CODE_SESSION_ID")
+
+    def put(self, verdict, patch=None):
+        import hashlib
+        import verification
+        path = verification._record_path(self.root, verification.RECORDS_DIR, "a")
+        sha = hashlib.sha256((self.root / "tasks" / "a" / "regression.md").read_bytes()).hexdigest()
+        verification._write_atomic(path, {"schema": verification.SCHEMA, "module": "a", "usage": None, "verdict": verdict,
+                                          "patchId": patch or verification.current_patch_id(self.root),
+                                          "regressionSha256": sha, "notes": ["n"], "reportSha256": "0" * 64})
+
+    def at_gate(self):
+        self.project.write("tasks/a/todo.md", self.GATE)
+
+    def test_author_line_until_recorded(self):
+        text = hint(self.project)
+        self.assertIn("- 作者记录：", text)
+        self.assertIn("verification.py author --project", text)
+        self.author()
+        self.assertNotIn("- 作者记录：", hint(self.project))
+
+    def test_four_states_at_the_final_gate(self):
+        self.author()
+        self.at_gate()
+        self.assertIn("- 合并前验证：还没有结论", hint(self.project))
+        self.put("pass-with-notes")
+        self.assertIn("- 合并前验证：通过但附意见（1 条）", hint(self.project))
+        self.put("fail")
+        self.assertIn("- 合并前验证：不通过", hint(self.project))
+        self.put("pass", patch="0" * 40)
+        self.assertIn("- 合并前验证：结论已过期", hint(self.project))
+
+    def test_state_code_follows_the_verification(self):
+        self.author()
+        self.at_gate()
+        hint(self.project)
+        none = module_stage.describe(self.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1]
+        self.put("fail")
+        self.assertNotEqual(module_stage.describe(self.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1], none)
+
+    def test_merge_auto_passes_the_final_gate_only_with_a_current_passing_verdict(self):
+        self.author()
+        self.at_gate()
+        route = {"takeover": "merge"}
+        hint(self.project, route=route)
+        self.assertEqual(module_state(self.root, "a")["stage"], "BUILDING")
+        self.put("fail")
+        self.assertEqual(module_state(self.root, "a")["stage"], "BUILDING")
+        self.put("pass", patch="0" * 40)
+        self.assertEqual(module_state(self.root, "a")["stage"], "BUILDING")
+        self.put("pass")
+        self.assertEqual(module_state(self.root, "a")["stage"], "DONE")
+
+    def test_codex_acceptance_record_does_not_count_for_flow_v2(self):
+        self.author()
+        self.at_gate()
+        hint(self.project, route={"takeover": "merge"})
+        path = module_stage.acceptance_path(self.root, "a")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"marker": "codex-approved", "module": "a",
+                                    "sha": git(self.root, "rev-parse", "HEAD")}), encoding="utf-8")
+        self.assertIsNone(module_stage.acceptance_record(self.root, "a"))
+        self.assertEqual(module_state(self.root, "a")["stage"], "BUILDING")
+        self.assertNotIn("本模块合并是自动的，最终验收交 Codex", hint(self.project, route={"takeover": "merge"}))
+
+    def test_merge_human_still_stops_for_the_user(self):
+        self.author()
+        self.at_gate()
+        self.put("pass")
+        text = hint(self.project, route={})
+        self.assertEqual(module_state(self.root, "a")["stage"], "BUILDING")
+        self.assertIn("- 合并前验证：通过", text)
+
+
 if __name__ == "__main__":
     unittest.main()

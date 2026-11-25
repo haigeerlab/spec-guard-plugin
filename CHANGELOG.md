@@ -8,6 +8,9 @@
   需求文档的每条成功标准 `S<n>` 都要在对照表里有用例；技术方案影响面列了老文件时「受影响的老功能」至少一条用例。bug／small 的用例写在需求文档的「回归用例」一节（bug 修完补一条）。
   verify-artifacts 判失败、阶段提示列出问题；新的只读入口 `hooks/regression_view.py --json`（`--ref` 读某个提交上的版本，每条用例带内容 sha256；`--usage` 读多模块需求的联调回归 `spec/usage/<需求>.regression.md`，它不再被当作用法草案）。
   `projectSections` 声明的章节不能只有标题。`interface.json` 1.23 加 `regressionView`。用法草案 dev-flow-v2 的 U1～U3 三处字面按实现改正。
+- **合并前验证的通过标准（verification-criteria，S110 M3）。** 新流程模块合并前由非作者照回归文档执行，报告格式 `spec-guard.verification/v1`（`references/verification-report.md`）；
+  新脚本 `hooks/verification.py`：`author` 记下写代码的会话（阶段提示会给出命令），`check` 只读判断报告是否成立（每条用例都有结果、`manual` 有用户原话、`fail` 属于四类并附证据、结论与用例一致、执行者不是作者、patchId 等于当前补丁、回归文档没变），`record` 成立才把结论写进公共 git 目录。
+  `/map --json` 每个模块加 `verification`、顶层加 `usageVerification`（接口 1.24）；阶段提示在最终 gate 写明验证状态；合并是 auto 的新流程模块以当前、通过的结论算过最终 gate，不再走 Codex 最终验收（`review-mark --target acceptance` 对新流程模块拒绝）。老流程模块不变。
 
 ## [0.95.0] - 2026-11-25
 

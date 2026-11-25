@@ -17,6 +17,7 @@ import module_scope  # noqa: E402
 import module_stage  # noqa: E402
 import project_config  # noqa: E402
 import regression_view  # noqa: E402
+import verification  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
            "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy",
@@ -54,7 +55,7 @@ def problems(path: Path) -> list:
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
     return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _design_approval(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
-            + _review_kinds(path, data) + _regression_view(path, data))
+            + _review_kinds(path, data) + _regression_view(path, data) + _verification(path, data, view))
 
 
 def _progress_facts(view: dict) -> list:
@@ -257,6 +258,30 @@ def _regression_view(path: Path, data: dict) -> list:
                                  ("problem", values.get("problem"), regression_view.PROBLEM_CODES)):
         if not isinstance(got, dict) or set(got) != set(expected):
             found.append("regressionView.values.%s 为 %s，代码为 %s" % (label, sorted(got or {}), sorted(expected)))
+    return found
+
+
+def _verification(path: Path, data: dict, view: dict) -> list:
+    """verification-criteria (1.24): the commands run as written, the problem codes match, /map describes its fields."""
+    entry = data.get("verification")
+    if not isinstance(entry, dict):
+        return ["缺少入口 verification"]
+    found = []
+    for name in ("authorCommand", "checkCommand", "recordCommand"):
+        command = entry.get(name)
+        found += _scripts(path, "verification.%s" % name, command)
+        if any(not isinstance(arg, str) or arg.startswith("[") for arg in command or []):
+            found.append("verification.%s 要能原样运行，可选参数另列" % name)
+    if entry.get("schema") != verification.SCHEMA or entry.get("schemaVersion") != verification.SCHEMA_VERSION:
+        found.append("verification.schema／schemaVersion 与 verification.py 不一致")
+    problems = (entry.get("values") or {}).get("problem")
+    if not isinstance(problems, dict) or set(problems) != set(verification.PROBLEM_CODES):
+        found.append("verification.values.problem 为 %s，代码为 %s" % (sorted(problems or {}), sorted(verification.PROBLEM_CODES)))
+    fields = (view.get("verification") or {}).get("fields")
+    if not isinstance(fields, dict) or set(fields) != set(map_view.VERIFICATION_FIELDS):
+        found.append("mapView.verification.fields 为 %s，代码为 %s" % (sorted(fields or {}), sorted(map_view.VERIFICATION_FIELDS)))
+    if not isinstance(view.get("usageVerification"), dict):
+        found.append("mapView 缺少 usageVerification 说明")
     return found
 
 
