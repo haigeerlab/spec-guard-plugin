@@ -299,6 +299,13 @@ printf '## Cases\n\n### R1: s\n- Steps: a\n- Expected: b\n- Method: command\n- E
 injects "回归文档有问题时提示列出代码" "$local_project" '- Regression: `tasks/alpha/regression.md` has 1 problem(s): case-command-missing (R1)'
 printf '## Cases\n\n### R1: s\n- Steps: a\n- Expected: b\n- Method: manual\n- Evidence: quote\n\n## Success criteria coverage\n\nnone\n\n## Affected existing features\n\nnone\n' >"$local_project/tasks/alpha/regression.md"
 lacks "回归文档合格式时没有这一行" "$local_project" '- Regression: '
+# verification-criteria：构建中还没有作者记录时提示记作者；最终 gate 时报合并前验证的状态。
+printf '# Plan\n\n## Tasks\n\n- t\n\n## Checkpoints\n\n- c\n' >"$local_project/tasks/alpha/plan.md"
+printf -- '- [ ] t\n' >"$local_project/tasks/alpha/todo.md"
+injects "构建中没有作者记录时提示记作者" "$local_project" '- Author record: no authoring session is recorded for this module yet.'
+printf -- '- [x] t\n- [ ] Checkpoint 2 (gate): final acceptance\n' >"$local_project/tasks/alpha/todo.md"
+injects "最终 gate 报合并前验证还没有结论" "$local_project" '- Pre-merge verification: no verdict yet'
+rm -f "$local_project/tasks/alpha/plan.md" "$local_project/tasks/alpha/todo.md"
 if [ "$had_config" = 1 ]; then printf '%s\n' "$cp_config" >"$local_project/.agent/config.json"; else rm -f "$local_project/.agent/config.json"; fi
 rm -rf "$local_project/tasks/alpha" && : >"$local_project/spec/alpha.md"
 injects "去掉流程标记后回到 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
