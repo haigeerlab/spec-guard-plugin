@@ -844,6 +844,39 @@ class AcceptanceFlowScope(AcceptanceFixture):
         self.assertIn("README.md", out)
 
 
+class AcceptanceT4(unittest.TestCase):
+    """plan-auto-approve: the final acceptance's scope check stops on T4 also where the scope itself is not checked."""
+
+    def test_a_bug_without_a_boundary_changing_t4(self):
+        import json
+        import os
+        from review_mark import _outside
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+
+            def git(*args):
+                subprocess.run(["git", "-C", folder, *args], check=True, capture_output=True, env=env)
+
+            def write(relative, text):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(text, encoding="utf-8")
+            write("spec/CAPABILITY-MAP.md", MAP.replace("| beta | y | alpha |\n", "").replace(" → beta", ""))
+            write("src/secret.py", "x\n")
+            write(".github/autopr/risk-paths.json", json.dumps({"schema": "autopilot.risk-paths/v1", "T4": ["src/*.py"],
+                                                                "T3": []}))
+            git("init", "-q")
+            git("add", "-A")
+            git("commit", "-qm", "base")
+            write("spec/alpha.md", "# a\n\n<!-- spec-guard: flow v2 tier=bug -->\n")
+            git("add", "-A")
+            git("commit", "-qm", "spec")
+            self.assertIsNone(_outside(root, "alpha"))
+            write("src/secret.py", "changed\n")
+            self.assertIn("T4 file(s) changed", _outside(root, "alpha"))
+
+
 class AcceptanceWorktrees(AcceptanceFixture):
     """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""
 

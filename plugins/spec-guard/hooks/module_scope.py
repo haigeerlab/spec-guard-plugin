@@ -425,7 +425,8 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
             print("flow-scope-%s: spec/%s.md has no usable boundary and its design's impact section names no usable "
                   "path" % (found["status"], module_id))
             return 4
-        return _report(root, module_id, found["scope"], base, as_json)
+        from module_stage import t4_hits  # late: module_stage is loaded already
+        return _report(root, module_id, found["scope"], base, as_json, t4_hits(root, module_id, base))
     if not scope_applies(root, module_id):
         print("moduleConcurrency is not on in .agent/config.json and the module's takeover is none; the overreach check "
               "does not run")
@@ -444,7 +445,8 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
     return _report(root, module_id, scope, base, as_json)
 
 
-def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json: bool) -> int:
+def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json: bool, t4: dict | None = None) -> int:
+    """The check command's output; `t4` (plan-auto-approve, v2 modules only) adds the T4 changes and whether they stop."""
     if base is None:
         base = default_base(root, module_id)
         if base is None:
@@ -457,13 +459,18 @@ def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json:
     outside = sum(1 for row in rows if row["scope"] == "outside")
     declared = sum(1 for row in rows if row["scope"] == "declared")
     if as_json:
-        print(json.dumps({"module": module_id, "base": base, "files": rows, "outside": outside, "declared": declared},
-                         ensure_ascii=False, sort_keys=True))
+        found = {"module": module_id, "base": base, "files": rows, "outside": outside, "declared": declared}
+        if t4 is not None:
+            found["t4"] = t4
+        print(json.dumps(found, ensure_ascii=False, sort_keys=True))
         return 0
     print("concurrency boundary check: %s against %s" % (module_id, base))
     for row in rows:
         print("  %-9s %s %s" % (row["scope"], row["status"], row["path"]))
     print("outside the boundary: %d" % outside)
+    if t4 is not None:
+        print("T4 changes: %s (%s)%s" % (", ".join(t4["hits"]) or "none", t4["status"],
+                                        "; the module is not an important requirement: stop" if t4["stops"] else ""))
     return 0
 
 

@@ -4,7 +4,7 @@
 - [x] Task 1：自动批准本身与 review-mark 的 `plan-auto`
 - [x] Task 2：`/map --json` 与接口 1.21
 - [x] Task 3：越界
-- [ ] Task 4：T4
+- [x] Task 4：T4
 - [ ] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 5：verify-artifacts 警告
 - [ ] Task 6：规则文字
@@ -17,3 +17,6 @@
 - Task 3（2026-11-25）：`module_scope.flow_scope` 返回 `ok`／`none`／`unknown`／`invalid`；`classify` 对新流程不认预先声明、流程文件算 `flow`；`check` 命令（`none` 退出 3、`unknown`／`invalid` 退出 4）、`declared`（字段不变，新流程 `planApproved` 看 Plan 在不在、`approvedCommit` 为 null）、`validate-declared`（新流程报 `ignored`）、阶段提示 `_flow_overreach`、最终验收 `_outside` 都改走它，老模块分支一字未改。
   用例：`test_module_scope.py` `FlowScope` 8 例先红（5 失败 3 错）后绿，整个文件 65 例；`test_flow_v2.py` `FlowOverreachTest` 6 例、`test_review_marker.py` `AcceptanceFlowScope` 2 例，换回提交前的三个源文件跑，前者 5 例红（剩下 1 例测的是 design-review 原有的「改过即 revised」）、后者 2 例红。phase-guard 546 例通过。
   旧用例 `test_scope_line_stays_but_the_requirement_comes_first` 对新流程模块断言的是旧越界措辞，改成新措辞，用例意图不变。夹具：`FlowScope` 里两例显式传 `--base base`（`Repo` 的基线提交已含 `spec/m.md`）。
+- Task 4（2026-11-25）：`module_stage.t4_hits`（只看 T4，`ok`／`no-list`／`no-base`，`stops` = 有命中且不是重要需求）；`important()` 对新流程模块加读技术方案影响面；阶段提示把越界与 T4 两部分各出一行，`check` 命令的 JSON 加 `t4`（只新流程模块），最终验收的范围检查先查 T4、再看范围。
+  用例：`test_important_requirement.py` `ImpactRiskPath`（新旧对照）、`test_flow_v2.py` `T4Test` 6 例、`test_module_scope.py` `FlowT4`、`test_review_marker.py` `AcceptanceT4`，换回提交前的源文件跑都变红。
+  写用例时发现并修了一处实现漏洞：最终验收在 bug、small 没有边界（`none`）时先返回了，T4 被跳过；改为先查 T4。`AcceptanceFixture` 的能力图是一次插入两个模块，按规则已是重要需求，所以最终验收的 T4 用例另建单模块仓库直接调 `_outside`。

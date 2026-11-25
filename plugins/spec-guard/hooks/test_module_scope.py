@@ -770,5 +770,23 @@ class FlowScope(unittest.TestCase):
         self.assertEqual(validate_declared(repo.root), ["ignored m"])
 
 
+
+class FlowT4(FlowScope):
+    """plan-auto-approve: the check command reports T4 changes and whether they stop the module."""
+
+    def test_check_reports_t4_and_whether_it_stops(self):
+        for tier, impact, stops in (("normal", "- 改 `apps/m/`", True), ("important", "- 改 `apps/m/`、`package-lock.json`", False)):
+            with self.subTest(tier=tier):
+                repo = self.repo(tier=tier, impact=impact)
+                repo.write(".github/autopr/risk-paths.json",
+                           json.dumps({"schema": "autopilot.risk-paths/v1", "T4": ["*.json"], "T3": []}))
+                repo.git("add", "-A")
+                repo.git("commit", "-qm", "risk")
+                repo.write("package-lock.json", "changed\n")
+                code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+                self.assertEqual(code, 0, out)
+                self.assertEqual(json.loads(out)["t4"], {"status": "ok", "hits": ["package-lock.json"], "stops": stops})
+
+
 if __name__ == "__main__":
     unittest.main()

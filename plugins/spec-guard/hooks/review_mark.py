@@ -237,7 +237,12 @@ def _outside(root: Path, module_id: str) -> str | None:
     from module_scope import ScopeError, classify, default_base, flow_scope, parse
     found = flow_scope(root, module_id)
     if found is not None:
-        # plan-auto-approve: a v2 module's scope is its boundary plus its design's impact paths.
+        # plan-auto-approve: a v2 module's scope is its boundary plus its design's impact paths; T4 is checked first,
+        # also where the scope is not checked.
+        from module_stage import t4_hits
+        hits = t4_hits(root, module_id)
+        if hits["stops"]:
+            return "T4 file(s) changed and the module is not an important requirement: %s" % ", ".join(hits["hits"][:5])
         if found["status"] == "none":
             return None  # a bug or small module without a boundary: not checked, as in the phase hint
         if found["status"] != "ok":

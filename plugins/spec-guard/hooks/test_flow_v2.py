@@ -1010,5 +1010,68 @@ class FlowOverreachTest(unittest.TestCase):
         self.assertIn("停点规则（中途 gate）", text)
 
 
+
+class T4Test(FlowOverreachTest):
+    """plan-auto-approve AC6: a T4 change stops a module that is not important; the check stands apart from scope."""
+
+    RISK = {"schema": "autopilot.risk-paths/v1", "T4": ["src/secret/**"], "T3": []}
+
+    def setUp(self):
+        super().setUp()
+        self.project.write("src/secret/k.py", "x\n")
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(self.RISK))
+        self.commit("risk list")
+
+    def test_a_t4_change_stops_a_normal_module(self):
+        self.build(impact="- 改 `src/a/old.py`")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("T4 路径：改到 1 个 T4 文件（`src/secret/k.py`）", text)
+        self.assertIn("停点规则（中途 gate）", text)
+        self.assertIn("高风险文件", module_stage.scope_overreach(self.project.root, "a", "BUILDING", True)[2])
+
+    def test_a_bug_without_a_boundary_is_still_stopped(self):
+        self.build("bug")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：没有并行边界，未检查。", text)
+        self.assertIn("T4 路径：改到 1 个 T4 文件", text)
+        self.assertIn("停点规则（中途 gate）", text)
+
+    def test_an_important_module_changing_its_listed_t4_path_goes_on(self):
+        from module_stage import REVIEW_PENDING, review_approved_line, review_codex_digest
+        self.build("important", impact="- 改 `src/a/old.py`、`src/secret/k.py`")
+        path = self.project.root / "tasks" / "a" / "design.md"
+        text = path.read_text(encoding="utf-8").replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
+        path.write_text(text.replace(REVIEW_PENDING, review_approved_line(review_codex_digest(text))), encoding="utf-8")
+        self.commit("design approved")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertNotIn("T4 路径", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_listing_the_path_makes_the_module_important(self):
+        self.build(impact="- 改 `src/a/old.py`")
+        self.project.write("src/secret/k.py", "changed\n")
+        self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`、`src/secret/k.py`"))
+        self.assertIn("risk-path", module_stage.important(self.project.root, "a"))
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "pending-user")
+
+    def test_an_unreadable_list_is_reported_not_stopped(self):
+        (self.project.root / ".github" / "autopr" / "risk-paths.json").write_text("{", encoding="utf-8")
+        self.commit("broken list, before the module")
+        self.build()
+        text = hint(self.project)
+        self.assertIn("T4 路径：没有可读的风险路径清单，未检查。", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_no_baseline_is_not_taken_for_no_change(self):
+        approved_spec(self.project, "bug")
+        self.project.write("tasks/a/plan.md", "# Plan\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")  # nothing committed: no baseline
+        self.project.write("src/secret/k.py", "changed\n")
+        self.assertIn("T4 路径：没有开工基线可比", hint(self.project))
+
+
 if __name__ == "__main__":
     unittest.main()

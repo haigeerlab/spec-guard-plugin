@@ -1323,7 +1323,7 @@ def risk_hit(pattern: str, path: str) -> bool:
     return walk(0, 0)
 
 
-def _risk_patterns(root: Path) -> list | None:
+def _risk_patterns(root: Path, tiers: tuple = RISK_TIERS) -> list | None:
     try:
         document = json.loads((root / RISK_PATHS).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError):
@@ -1331,7 +1331,7 @@ def _risk_patterns(root: Path) -> list | None:
     if not isinstance(document, dict) or document.get("schema") != RISK_SCHEMA:
         return None
     patterns = []
-    for tier in RISK_TIERS:
+    for tier in tiers:
         items = document.get(tier, [])
         if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
             return None
@@ -1394,6 +1394,9 @@ def important(root: Path, module: str) -> list:
         declared = None
     if declared is not None:
         paths += list(declared.public_paths)
+    if _v2(root, module):
+        # plan-auto-approve: a v2 design's impact section names what the module changes (old modules: unchanged)
+        paths += impact_paths(read(root / "tasks" / module / "design.md"))
     patterns = _risk_patterns(root)
     if patterns is None:
         if codex:
@@ -2060,7 +2063,64 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
         "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, flow_files, cmd["review-mark"], entry))
 
 
+def t4_hits(root: Path, module: str, base: str | None = None) -> dict:
+    """plan-auto-approve: {"status", "hits", "stops"} -- the changed files on the T4 list since the module's baseline.
+
+    status `ok`, `no-list` (no readable risk-path list: not checked) or `no-base` (no baseline or git unreadable: not
+    checked, never taken for "no change").  stops: hits and the module is not an important requirement -- an important
+    one listed the path in its design, which the user approved.
+    """
+    from module_scope import changed_files, default_base  # late: module_scope imports this module
+    patterns = _risk_patterns(root, ("T4",))
+    if patterns is None:
+        return {"status": "no-list", "hits": [], "stops": False}
+    base = base or default_base(root, module)
+    files = changed_files(root, base) if base else None
+    if files is None:
+        return {"status": "no-base", "hits": [], "stops": False}
+    hits = sorted({path for _, path in files if any(risk_hit(pattern, path) for pattern in patterns)})
+    return {"status": "ok", "hits": hits, "stops": bool(hits) and not important(root, module)}
+
+
+def _t4_part(root: Path, module: str, zh: bool) -> tuple:
+    """(fact, line, next step) of the T4 check for a v2 build; ("", "", "") without anything to say."""
+    found = t4_hits(root, module)
+    if found["status"] == "no-list":
+        return (("t4", "no-list"), "- T4 路径：没有可读的风险路径清单，未检查。" if zh else
+                "- T4 paths: no readable risk-path list, not checked.", "")
+    if found["status"] == "no-base":
+        return (("t4", "no-base"), "- T4 路径：没有开工基线可比（需求文档还没提交，或 git 读不了），未检查。" if zh else
+                "- T4 paths: no baseline to compare with (the requirement is not committed, or git is unreadable); not "
+                "checked.", "")
+    if not found["stops"]:
+        return None, "", ""
+    shown = ", ".join("`%s`" % safe_fragment(path) for path in found["hits"][:SCOPE_SHOWN]) + (
+        "…" if len(found["hits"]) > SCOPE_SHOWN else "")
+    if zh:
+        return (("t4", tuple(found["hits"])), "- T4 路径：改到 %d 个 T4 文件（%s），本模块不是重要需求。" % (len(found["hits"]), shown),
+                "停下，说明为什么要改这些高风险文件，交用户决定：同意就把它们补进技术方案影响面或并行边界——模块随之成为重要需求，按重要需求由用户批；"
+                "不同意就撤回这些改动。")
+    return (("t4", tuple(found["hits"])), "- T4 paths: %d T4 file(s) changed (%s), and the module is not an important "
+            "requirement." % (len(found["hits"]), shown), "stop and tell the user why these high-risk files change: if "
+            "they agree, add them to the design's impact section or the boundary -- the module then becomes an important "
+            "requirement, which the user approves; if not, undo those changes.")
+
+
 def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:
+    """plan-auto-approve: the scope part and the T4 part of a v2 build check, joined (assumptions 4, 5)."""
+    facts, lines, steps = [], [], []
+    for fact, line, step in (_scope_part(root, module, found, zh), _t4_part(root, module, zh)):
+        if fact is not None:
+            facts.append(fact)
+        if line:
+            lines.append(line)
+        if step:
+            steps.append(step)
+    return (tuple(facts) or None), "\n".join(lines), ("" if not steps else steps[0] if len(steps) == 1 else
+                                                   (("；另外，" if zh else "; also, ").join(steps)))
+
+
+def _scope_part(root: Path, module: str, found: dict, zh: bool) -> tuple:
     """plan-auto-approve: (fact, line, next step) for a v2 module's build, whatever its takeover (assumption 4)."""
     from module_scope import classify, default_base  # late: module_scope imports this module
     status = found["status"]
