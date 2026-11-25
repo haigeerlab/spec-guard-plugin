@@ -95,11 +95,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from capability_map import parse_map
-from module_stage import design_review_problems, flow_doc_problems
+from module_stage import design_review_problems, flow_doc_problems, plan_auto_problems
 root = Path(".")
 parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
 for module in list(parsed.order) or [row.module_id for row in parsed.rows]:
-    for level, message in flow_doc_problems(root, module) + design_review_problems(root, module):
+    for level, message in flow_doc_problems(root, module) + design_review_problems(root, module) + plan_auto_problems(root, module):
         print("%s\t%s" % (level, message))
 ' "$HOOKDIR" 2>/dev/null </dev/null)"; then
         warn '未验证：新流程文档检查脚本没有正常运行'
@@ -260,6 +260,7 @@ if command -v python3 >/dev/null 2>&1 && [ -f spec/CAPABILITY-MAP.md ] && [ -d t
       case "$kind" in
         ok) ok "预先声明格式正确（${first} 个未完成模块）" ;;
         bad) bad "${second} 的预先声明格式错误: ${first}" ;;
+        ignored) warn "${first} 是新流程模块：Plan 的预先声明不起作用，不授权任何路径（plan-auto-approve）" ;;
         unverified) warn '未验证：能力图读不了，没有检查预先声明' ;;
       esac
     done <<<"$DECLARED_OUT"

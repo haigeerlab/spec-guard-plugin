@@ -126,6 +126,19 @@ class DesignReviewNode(unittest.TestCase):
         self.assertIn("写回归测试文档 `tasks/alpha/regression.md`", out)
 
 
+class PlanAutoNode(unittest.TestCase):
+    """plan-auto-approve: a v2 module at NEEDS_PLAN is not a Plan review; an old one still is."""
+
+    def test_new_and_old(self):
+        v2 = DesignReviewNode().spec("normal")
+        design = "# d\n\n## 影响面\n\n- 新增 `src/alpha/new.py`\n"
+        with Project({"spec/alpha.md": v2, "tasks/alpha/design.md": design, "tasks/alpha/regression.md": "# r\n"}) as p:
+            self.assertIsNone(stop_node(p.root, "alpha", "NEEDS_PLAN", "approved", "none"))
+            self.assertNotIn("停点规则（Plan 交审）", describe(p.root))
+        with Project({"spec/alpha.md": "# alpha\n"}) as p:
+            self.assertEqual(stop_node(p.root, "alpha", "NEEDS_PLAN", "none", "none"), "plan-review")
+
+
 class NodeRules(unittest.TestCase):
     def test_each_kind_reads_its_section(self):
         for kind, title in (("map-review", "## 能力图审阅"), ("spec-review", "## Spec 交审"), ("plan-review", "## Plan 交审"),

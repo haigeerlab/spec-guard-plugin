@@ -561,6 +561,30 @@ check "重要需求：技术方案只有第二审查者放行时警告" 0 "只�
 project design-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# d\n\n<!-- spec-guard: design-review round=x -->\n' >"$PROJECT/tasks/alpha/design.md"
 check_absent "老模块不查技术方案的轮次行" "技术方案审查轮次行"
+# plan-auto-approve：新流程 Plan 带标记、预先声明不起作用时警告；新流程并行边界写坏时失败；normal 没有范围时警告；老模块不变。
+project plan-auto
+flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=normal -->\n' >>"$PROJECT/spec/alpha.md"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
+check "新流程：影响面没写路径、也没有并行边界时警告" 0 "影响面也没写出路径：构建时越界检查会停下"
+python3 - "$PROJECT/tasks/alpha/design.md" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+path.write_text(path.read_text(encoding="utf-8").replace("## 影响面\n\n不涉及", "## 影响面\n\n- 改 `src/alpha.py`"), encoding="utf-8")
+PY
+check_absent "新流程：影响面写了路径就不警告" "影响面也没写出路径"
+flow_doc tasks/alpha/regression.md 用例清单 成功标准对照 受影响的老功能
+printf '# Plan\n\n<!-- spec-guard: review pending -->\n\n## 任务\n\n- t\n\n## 检查点\n\n- c\n\n## 预先声明\n\n- 公共路径：坏了\n' >"$PROJECT/tasks/alpha/plan.md"
+printf -- '- [ ] t\n' >"$PROJECT/tasks/alpha/todo.md"
+check "新流程：Plan 带批准标记时警告、不判失败" 0 "新流程 Plan 写完即自动批准，标记不起作用"
+check "新流程：Plan 的预先声明写坏也只警告不起作用" 0 "Plan 的预先声明不起作用，不授权任何路径"
+check_absent "新流程：预先声明不按格式错误判失败" "的预先声明格式错误"
+printf '\n## 并行边界\n\n- 独占：\n' >>"$PROJECT/spec/alpha.md"
+check "新流程：并行边界写坏时失败" 1 "的并行边界写坏了或读不了"
+project plan-auto-old
+mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n\n<!-- spec-guard: review pending -->\n' >"$PROJECT/tasks/alpha/plan.md"
+printf -- '- [ ] t\n' >"$PROJECT/tasks/alpha/todo.md"
+check_absent "老模块的 Plan 标记不出新流程警告" "新流程 Plan"
 # requirement-confirm-gate：新流程需求文档只有 Codex 的批准（指纹匹配或失配）时警告、不判失败；老模块不出这条。
 codex_mark() {  # 给 $PROJECT/spec/alpha.md 写一行按当前正文算的 Codex 批准标记
   python3 -B - "$HOOKDIR" "$PROJECT/spec/alpha.md" <<'PY'

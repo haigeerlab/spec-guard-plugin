@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from capability_map import MODULE_ID, MapError, parse_map
-from module_stage import module_state, review_state
+from module_stage import flow_marker, module_state, review_state
 from project_config import module_concurrency
 
 HEADINGS = ("## 并行边界", "## Concurrency boundary")
@@ -285,7 +285,10 @@ def _declared_command(root: Path, module_id: str) -> int:
         except (OSError, UnicodeDecodeError):
             print(json.dumps({"module": module_id, "error": "unreadable"}))
             return 4
-    approved, commit = plan_approval(root, module_id)
+    if flow_marker(root, module_id)["v2"]:
+        approved, commit = plan.is_file(), None  # plan-auto-approve: approved by being written, by no commit
+    else:
+        approved, commit = plan_approval(root, module_id)
     scope = declared or DeclaredScope((), (), (), ())
     print(json.dumps({"module": module_id, "planApproved": approved, "approvedCommit": commit,
                       "declared": declared is not None, "publicPaths": list(scope.public_paths),
@@ -337,6 +340,40 @@ def _declared_paths(root: Path, module_id: str) -> tuple:
     return declared.public_paths if declared is not None else ()
 
 
+def flow_scope(root: Path, module_id: str) -> dict | None:
+    """plan-auto-approve (Q1 A): {"status", "scope"} for a v2 module; None for an old-flow module.
+
+    The scope is the requirement's concurrency boundary (when there is one) plus the paths quoted in the design's impact
+    section, a path that is a directory at the module's baseline or in the working tree counting as that directory.
+    `none`: a bug or small module without a boundary (not checked); `unknown`: a normal or important module with no path
+    at all; `invalid`: the boundary is malformed or a document cannot be read.
+    """
+    from module_stage import SHORT_TIERS, effective_tier, impact_paths, module_baseline  # late: imports this module
+    flow = effective_tier(root, module_id)
+    if not flow["v2"]:
+        return None
+    try:
+        boundary = parse((root / "spec" / ("%s.md" % module_id)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ScopeError):
+        return {"status": "invalid", "scope": None}
+    paths = list(boundary.exclusive) if boundary is not None else []
+    design = root / "tasks" / module_id / "design.md"
+    if flow["tier"] not in SHORT_TIERS and design.is_file():
+        try:
+            impact = impact_paths(design.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError):
+            return {"status": "invalid", "scope": None}
+        base = module_baseline(root, module_id)
+        for path in impact:
+            tree = bool(base) and _git(root, "cat-file", "-t", "%s:%s" % (base, path)) == "tree"
+            item = path + "/" if tree or (root / path).is_dir() else path
+            if item not in paths:
+                paths.append(item)
+    if not paths:
+        return {"status": "none" if flow["tier"] in SHORT_TIERS else "unknown", "scope": None}
+    return {"status": "ok", "scope": Scope(tuple(paths), boundary.shared if boundary is not None else ())}
+
+
 FLOW_FILES = ("spec/CAPABILITY-MAP.md", ".agent/config.json", ".agent/state.json")  # M3 rework, Q15 A
 FLOW_DIRS = ("spec/usage/",)
 
@@ -356,8 +393,9 @@ def classify(root: Path, module_id: str, scope: Scope, base: str) -> list | None
     files = changed_files(root, base)
     if files is None:
         return None
-    declared = _declared_paths(root, module_id)
-    flow = _takeover_module(root, module_id)
+    v2 = flow_marker(root, module_id)["v2"]  # plan-auto-approve: nobody approved a v2 Plan's pre-declared section
+    declared = () if v2 else _declared_paths(root, module_id)
+    flow = v2 or _takeover_module(root, module_id)
     rows = []
     for status, path in files:
         where = covers(scope, module_id, path)
@@ -376,6 +414,19 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
     if _git(root, "rev-parse", "--is-inside-work-tree") is None:
         print("not-a-git-repository: the overreach check compares against a git base")
         return 2
+    found = flow_scope(root, module_id)
+    if found is not None:
+        # plan-auto-approve: a v2 module is always checked, against its boundary plus its design's impact paths.
+        if found["status"] == "none":
+            print("flow-scope-none: spec/%s.md is a bug or small module without a concurrency boundary; the overreach "
+                  "check does not run" % module_id)
+            return 3
+        if found["status"] != "ok":
+            print("flow-scope-%s: spec/%s.md has no usable boundary and its design's impact section names no usable "
+                  "path" % (found["status"], module_id))
+            return 4
+        from module_stage import t4_hits  # late: module_stage is loaded already
+        return _report(root, module_id, found["scope"], base, as_json, t4_hits(root, module_id, base))
     if not scope_applies(root, module_id):
         print("moduleConcurrency is not on in .agent/config.json and the module's takeover is none; the overreach check "
               "does not run")
@@ -391,6 +442,11 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
     if scope is None:
         print("no-boundary: spec/%s.md has no concurrency boundary section" % module_id)
         return 4
+    return _report(root, module_id, scope, base, as_json)
+
+
+def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json: bool, t4: dict | None = None) -> int:
+    """The check command's output; `t4` (plan-auto-approve, v2 modules only) adds the T4 changes and whether they stop."""
     if base is None:
         base = default_base(root, module_id)
         if base is None:
@@ -403,13 +459,18 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
     outside = sum(1 for row in rows if row["scope"] == "outside")
     declared = sum(1 for row in rows if row["scope"] == "declared")
     if as_json:
-        print(json.dumps({"module": module_id, "base": base, "files": rows, "outside": outside, "declared": declared},
-                         ensure_ascii=False, sort_keys=True))
+        found = {"module": module_id, "base": base, "files": rows, "outside": outside, "declared": declared}
+        if t4 is not None:
+            found["t4"] = t4
+        print(json.dumps(found, ensure_ascii=False, sort_keys=True))
         return 0
     print("concurrency boundary check: %s against %s" % (module_id, base))
     for row in rows:
         print("  %-9s %s %s" % (row["scope"], row["status"], row["path"]))
     print("outside the boundary: %d" % outside)
+    if t4 is not None:
+        print("T4 changes: %s (%s)%s" % (", ".join(t4["hits"]) or "none", t4["status"],
+                                        "; the module is not an important requirement: stop" if t4["stops"] else ""))
     return 0
 
 
@@ -459,6 +520,15 @@ def validate_declared(root: Path) -> list:
     for module_id in modules:
         plan = root / "tasks" / module_id / "plan.md"
         if not plan.is_file() or module_state(root, module_id)["stage"] == "DONE":
+            continue
+        if flow_marker(root, module_id)["v2"]:
+            # plan-auto-approve: a v2 Plan's pre-declared section authorizes nothing, well-formed or not.
+            try:
+                text = plan.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            if any(line.rstrip() in DECLARED_HEADINGS for line in text.splitlines()):
+                lines.append("ignored %s" % module_id)
             continue
         try:
             declared = parse_declared(plan.read_text(encoding="utf-8"))

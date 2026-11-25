@@ -598,6 +598,28 @@ def design_review_problems(root: Path, module: str) -> list:
     return found
 
 
+def plan_auto_problems(root: Path, module: str) -> list:
+    """plan-auto-approve (assumptions 2, 4, 10): [(level, message)] for verify-artifacts on an unfinished v2 module.
+
+    The scope is read by the same module_scope.flow_scope the build checks use; changes themselves are not checked here.
+    """
+    if not _v2(root, module) or module_state(root, module)["stage"] == "DONE":
+        return []
+    from module_scope import flow_scope  # late: module_scope imports this module
+    found, problems = flow_scope(root, module), []
+    if found is not None and found["status"] == "invalid":
+        problems.append(("fail", "`spec/%s.md` 的并行边界写坏了或读不了，新流程模块的越界检查无法运行" % module))
+    elif found is not None and found["status"] == "unknown":
+        problems.append(("warn", "`spec/%s.md` 没有并行边界，`tasks/%s/design.md` 的影响面也没写出路径：构建时越界检查会停下" % (module, module)))
+    try:
+        plan = (root / "tasks" / module / "plan.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        plan = ""
+    if plan and _review_split(plan)[0]:
+        problems.append(("warn", "`tasks/%s/plan.md` 带批准标记：新流程 Plan 写完即自动批准，标记不起作用" % module))
+    return problems
+
+
 def design_waits(root: Path, module: str, stage: str) -> dict | None:
     """design-review: the designApproval while the design holds the module back, else None.
 
@@ -1222,7 +1244,8 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     if stage == "NEEDS_SPEC" or spec_review == "pending" or (spec_review == "revised" and not final and not batched):
         kind = "spec-review"
     spec_waits = kind == "spec-review" and not cadence_combined(root, module)
-    if (stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending":
+    auto = codex_route(root, module, "plan") == "auto"  # plan-auto-approve: a v2 Plan is never reviewed
+    if not auto and ((stage == "NEEDS_PLAN" and not spec_waits) or plan_review == "pending"):
         kind = "plan-review"
     if final:
         kind = "final-gate"
@@ -1322,7 +1345,7 @@ def risk_hit(pattern: str, path: str) -> bool:
     return walk(0, 0)
 
 
-def _risk_patterns(root: Path) -> list | None:
+def _risk_patterns(root: Path, tiers: tuple = RISK_TIERS) -> list | None:
     try:
         document = json.loads((root / RISK_PATHS).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValueError):
@@ -1330,7 +1353,7 @@ def _risk_patterns(root: Path) -> list | None:
     if not isinstance(document, dict) or document.get("schema") != RISK_SCHEMA:
         return None
     patterns = []
-    for tier in RISK_TIERS:
+    for tier in tiers:
         items = document.get(tier, [])
         if not isinstance(items, list) or not all(isinstance(item, str) for item in items):
             return None
@@ -1393,6 +1416,9 @@ def important(root: Path, module: str) -> list:
         declared = None
     if declared is not None:
         paths += list(declared.public_paths)
+    if _v2(root, module):
+        # plan-auto-approve: a v2 design's impact section names what the module changes (old modules: unchanged)
+        paths += impact_paths(read(root / "tasks" / module / "design.md"))
     patterns = _risk_patterns(root)
     if patterns is None:
         if codex:
@@ -1406,6 +1432,8 @@ def codex_route(root: Path, module: str, kind: str) -> str:
     """codex-approval: "" when Codex may approve this file under the module's takeover, else why the user must."""
     if kind == "spec" and _v2(root, module):
         return "requirement"  # requirement-confirm-gate: a v2 requirement is confirmed by the user, whatever the takeover
+    if kind == "plan" and _v2(root, module):
+        return "auto"  # plan-auto-approve: a v2 Plan is approved by being written; nobody reviews it
     if _takeover_item(root, module, kind) != "codex":
         return "takeover"
     if kind == "spec" and important(root, module):
@@ -1424,7 +1452,12 @@ def codex_rounds_exhausted(root: Path, path: str) -> bool:
 
 
 def effective_review(root: Path, module: str, kind: str, raw: str) -> tuple:
-    """codex-approval: (state, approved by) where Codex's approval counts only when the takeover gives it this step."""
+    """codex-approval: (state, approved by) where Codex's approval counts only when the takeover gives it this step.
+
+    plan-auto-approve: a v2 Plan is ("approved", "auto") once tasks/<id>/plan.md exists, whatever marker it carries.
+    """
+    if kind == "plan" and _v2(root, module):
+        return ("approved", "auto") if (root / "tasks" / module / "plan.md").is_file() else ("none", None)
     if raw == "codex-approved":
         return ("approved", "codex") if not codex_route(root, module, kind) else ("pending", None)
     return raw, ("user" if raw == "approved" else None)
@@ -1592,6 +1625,8 @@ def _review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = Fals
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
     spec = file_review_state(root / spec_path, "spec")
     plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
+    if _v2(root, module):
+        plan = "none"  # plan-auto-approve: a v2 Plan's marker does nothing; effective_review approves it below
     for state, path in ((spec, spec_path), (plan, plan_path)):
         if state == "invalid" and zh:
             return ("- 批准: `%s` 里的批准标记无效。" % path,
@@ -2050,6 +2085,101 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
         "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, flow_files, cmd["review-mark"], entry))
 
 
+def t4_hits(root: Path, module: str, base: str | None = None) -> dict:
+    """plan-auto-approve: {"status", "hits", "stops"} -- the changed files on the T4 list since the module's baseline.
+
+    status `ok`, `no-list` (no readable risk-path list: not checked) or `no-base` (no baseline or git unreadable: not
+    checked, never taken for "no change").  stops: hits and the module is not an important requirement -- an important
+    one listed the path in its design, which the user approved.
+    """
+    from module_scope import changed_files, default_base  # late: module_scope imports this module
+    patterns = _risk_patterns(root, ("T4",))
+    if patterns is None:
+        return {"status": "no-list", "hits": [], "stops": False}
+    base = base or default_base(root, module)
+    files = changed_files(root, base) if base else None
+    if files is None:
+        return {"status": "no-base", "hits": [], "stops": False}
+    hits = sorted({path for _, path in files if any(risk_hit(pattern, path) for pattern in patterns)})
+    return {"status": "ok", "hits": hits, "stops": bool(hits) and not important(root, module)}
+
+
+def _t4_part(root: Path, module: str, zh: bool) -> tuple:
+    """(fact, line, next step) of the T4 check for a v2 build; ("", "", "") without anything to say."""
+    found = t4_hits(root, module)
+    if found["status"] == "no-list":
+        return (("t4", "no-list"), "- T4 路径：没有可读的风险路径清单，未检查。" if zh else
+                "- T4 paths: no readable risk-path list, not checked.", "")
+    if found["status"] == "no-base":
+        return (("t4", "no-base"), "- T4 路径：没有开工基线可比（需求文档还没提交，或 git 读不了），未检查。" if zh else
+                "- T4 paths: no baseline to compare with (the requirement is not committed, or git is unreadable); not "
+                "checked.", "")
+    if not found["stops"]:
+        return None, "", ""
+    shown = ", ".join("`%s`" % safe_fragment(path) for path in found["hits"][:SCOPE_SHOWN]) + (
+        "…" if len(found["hits"]) > SCOPE_SHOWN else "")
+    if zh:
+        return (("t4", tuple(found["hits"])), "- T4 路径：改到 %d 个 T4 文件（%s），本模块不是重要需求。" % (len(found["hits"]), shown),
+                "停下，说明为什么要改这些高风险文件，交用户决定：同意就把它们补进技术方案影响面或并行边界——模块随之成为重要需求，按重要需求由用户批；"
+                "不同意就撤回这些改动。")
+    return (("t4", tuple(found["hits"])), "- T4 paths: %d T4 file(s) changed (%s), and the module is not an important "
+            "requirement." % (len(found["hits"]), shown), "stop and tell the user why these high-risk files change: if "
+            "they agree, add them to the design's impact section or the boundary -- the module then becomes an important "
+            "requirement, which the user approves; if not, undo those changes.")
+
+
+def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:
+    """plan-auto-approve: the scope part and the T4 part of a v2 build check, joined (assumptions 4, 5)."""
+    facts, lines, steps = [], [], []
+    for fact, line, step in (_scope_part(root, module, found, zh), _t4_part(root, module, zh)):
+        if fact is not None:
+            facts.append(fact)
+        if line:
+            lines.append(line)
+        if step:
+            steps.append(step)
+    return (tuple(facts) or None), "\n".join(lines), ("" if not steps else steps[0] if len(steps) == 1 else
+                                                   (("；另外，" if zh else "; also, ").join(steps)))
+
+
+def _scope_part(root: Path, module: str, found: dict, zh: bool) -> tuple:
+    """plan-auto-approve: (fact, line, next step) for a v2 module's build, whatever its takeover (assumption 4)."""
+    from module_scope import classify, default_base  # late: module_scope imports this module
+    status = found["status"]
+    if status == "none":
+        return (("scope", "none"), "- 越界：没有并行边界，未检查。" if zh else
+                "- Out of scope: no concurrency boundary, not checked.", "")
+    if status in ("unknown", "invalid"):
+        if zh:
+            why = ("需求文档的并行边界写坏了或读不了" if status == "invalid" else "没有并行边界，技术方案影响面也没写出路径")
+            return (("scope", status), "- 越界：%s，无法检查改动是否越界。" % why,
+                    "停下，修好需求文档的并行边界或在技术方案影响面写出要改的文件（技术方案按 design-review 重新审或批），再继续构建。")
+        why = ("the requirement's concurrency boundary is malformed or unreadable" if status == "invalid"
+               else "there is no concurrency boundary and the design's impact section names no path")
+        return (("scope", status), "- Out of scope: %s, so the changes cannot be checked." % why,
+                "stop; fix the requirement's concurrency boundary or list the files in the design's impact section (the "
+                "design is then reviewed or approved again under design-review), then continue the build.")
+    base = default_base(root, module)
+    rows = classify(root, module, found["scope"], base) if base else None
+    if rows is None:
+        line = ("- 越界：没有开工基线可比（`spec/%s.md` 没有更早的提交，或 git 读不了），未检查。" % module if zh else
+                "- Out of scope: no baseline to compare with (no commit before `spec/%s.md`, or git unreadable); not "
+                "checked." % module)
+        return ("scope", "unknown-base"), line, ""
+    outside = [safe_fragment(row["path"]) for row in rows if row["scope"] == "outside"]
+    if not outside:
+        return None, "", ""
+    shown = ", ".join("`%s`" % path for path in outside[:SCOPE_SHOWN]) + ("…" if len(outside) > SCOPE_SHOWN else "")
+    if zh:
+        return (("scope", tuple(outside)), "- 越界：%d 个文件超出需求文档的并行边界与技术方案影响面（%s）。" % (len(outside), shown),
+                "停下，逐个说明这些文件为什么要改，交用户决定：同意就补进技术方案影响面或并行边界（技术方案按 design-review 重新审或批），"
+                "不同意就撤回这些改动。")
+    return (("scope", tuple(outside)), "- Out of scope: %d file(s) outside the requirement's boundary and the design's "
+            "impact section (%s)." % (len(outside), shown), "stop and show the user why each of these files has to change: "
+            "if they agree, add them to the design's impact section or the boundary (the design is then reviewed or "
+            "approved again under design-review); if not, undo those changes.")
+
+
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """takeover-scope-check: (fact, line, next step) when a takeover module's build goes outside its declared scope.
 
@@ -2058,10 +2188,13 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """
     if stage != "BUILDING" or not module:
         return None, "", ""
+    from module_scope import ScopeError, classify, default_base, flow_scope, parse  # late: module_scope imports this
+    found = flow_scope(root, module)
+    if found is not None:
+        return _flow_overreach(root, module, found, zh)
     from project_config import module_takeover
     if all(value == "human" for value in module_takeover(root, module)[0].values()):
         return None, "", ""
-    from module_scope import ScopeError, classify, default_base, parse  # late: module_scope imports this module
     try:
         scope = parse((root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ScopeError):
@@ -2307,8 +2440,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         "NEEDS_SPEC": "写 `spec/%s.md` 并交审。" % module,
         "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", True) + "。",
         "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", True) + "。",
-        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", True) + "（例如用 %s）%s。" % (
-            cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else "")) if _v2(root, module) else
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", True) + "（例如用 %s）。Plan 写完即自动批准，不交审，接着用 %s 开始构建。" % (
+            cmd["plan"], cmd["build"])) if _v2(root, module) else
         "写 `tasks/%s/plan.md` 和 `tasks/%s/todo.md`（例如用 %s）%s。" % (
             module, module, cmd["plan"], "；前提是用户已批准 Spec" if spec_review == "none" else ""),
         "BUILDING": "继续用 %s 构建 `%s`：`tasks/%s/todo.md` 里还有 %d 个未勾选项。" % (cmd["build"], module, module,
@@ -2319,8 +2452,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         # No marker says nothing about approval either way, so the suggestion names the condition.
         "NEEDS_DESIGN": doc_step(module, "NEEDS_DESIGN", False) + ".",
         "NEEDS_REGRESSION": doc_step(module, "NEEDS_REGRESSION", False) + ".",
-        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", False) + " (for example with %s)%s." % (
-            cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else "")) if _v2(root, module) else
+        "NEEDS_PLAN": (doc_step(module, "NEEDS_PLAN", False) + " (for example with %s). The Plan is approved automatically "
+                       "once written and is not reviewed; then start the build with %s." % (cmd["plan"], cmd["build"]))
+        if _v2(root, module) else
         "create `tasks/%s/plan.md` and `tasks/%s/todo.md` (for example with %s)%s." % (
             module, module, cmd["plan"], " once the Spec is approved by the user" if spec_review == "none" else ""),
         "BUILDING": "continue %s on `%s`: %d unchecked item(s) in `tasks/%s/todo.md`." % (cmd["build"], module,
@@ -2336,7 +2470,13 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     elif stage == "BUILDING" and not review_step and role_kind != "module":
         gate = next_gate(root, module)
         # A Plan with no marker may still be waiting for the user, so only an approved one is told to keep going.
-        if gate and plan_review == "approved" and zh:
+        auto = plan_review == "approved" and codex_route(root, module, "plan") == "auto"  # plan-auto-approve
+        if gate and auto and zh:
+            counts += "\n- 下一个 gate: %s — Plan 已自动批准；一直做到它为止，`report` 检查点记进 todo 后直接通过，不停下。" % gate
+        elif gate and auto:
+            counts += ("\n- Next gate: %s — Plan approved automatically; keep going until it, a `report` checkpoint is "
+                       "recorded in the todo and passed without stopping." % gate)
+        elif gate and plan_review == "approved" and zh:
             counts += "\n- 下一个 gate: %s — 一直做到它为止；`report` 检查点记进 todo 后直接通过，不停下。" % gate
         elif gate and plan_review == "none" and zh:
             counts += ("\n- 下一个 gate: %s — todo 里第一个未勾选的 `gate` 检查点。Plan 没有批准标记：如果用户还没批准它，"

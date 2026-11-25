@@ -234,11 +234,26 @@ def _design(root: Path, relative: str, state: str, report: str | None, text: str
 
 def _outside(root: Path, module_id: str) -> str | None:
     """takeover-scope-check reused: why the module's changes cannot be accepted as in scope, or None when they are."""
-    from module_scope import ScopeError, classify, default_base, parse
-    try:
-        scope = parse((root / "spec" / ("%s.md" % module_id)).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, ScopeError):
-        scope = None
+    from module_scope import ScopeError, classify, default_base, flow_scope, parse
+    found = flow_scope(root, module_id)
+    if found is not None:
+        # plan-auto-approve: a v2 module's scope is its boundary plus its design's impact paths; T4 is checked first,
+        # also where the scope is not checked.
+        from module_stage import t4_hits
+        hits = t4_hits(root, module_id)
+        if hits["stops"]:
+            return "T4 file(s) changed and the module is not an important requirement: %s" % ", ".join(hits["hits"][:5])
+        if found["status"] == "none":
+            return None  # a bug or small module without a boundary: not checked, as in the phase hint
+        if found["status"] != "ok":
+            return "spec/%s.md has no usable boundary and its design names no usable path (%s)" % (module_id,
+                                                                                                  found["status"])
+        scope = found["scope"]
+    else:
+        try:
+            scope = parse((root / "spec" / ("%s.md" % module_id)).read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ScopeError):
+            scope = None
     if scope is None:
         return "spec/%s.md has no usable concurrency boundary" % module_id
     base = default_base(root, module_id)
@@ -362,6 +377,11 @@ def main() -> int:
         return 2
     if module_id not in [row.module_id for row in parsed.rows]:
         print("not-in-map: %s is not in spec/CAPABILITY-MAP.md" % module_id)
+        return 2
+    if args.target in ("plan", "both") and flow_marker(root, module_id)["v2"]:
+        # plan-auto-approve: refused before any file is read, whatever the state, the file or its marker.
+        print("plan-auto: %s is a new-flow module; its Plan is approved by being written and is never reviewed or marked "
+              "(record the requirement with --target spec, the design with --target design)" % module_id)
         return 2
     if args.target == "acceptance":
         return _acceptance(root, module_id, args.state, args.review, args.confirm)

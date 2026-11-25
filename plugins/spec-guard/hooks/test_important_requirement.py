@@ -111,5 +111,20 @@ class RiskHit(unittest.TestCase):
                 self.assertEqual(risk_hit(pattern, path), expected)
 
 
+
+class ImpactRiskPath(Important):
+    """plan-auto-approve assumption 5: a v2 design's impact paths feed the risk-path rule; an old module's do not."""
+
+    def test_new_flow_reads_the_impact_and_old_flow_does_not(self):
+        design = "# d\n\n## 影响面\n\n- 改 `src/auth/login.py`\n"
+        for marker, expected in (("<!-- spec-guard: flow v2 tier=normal -->\n", True), ("", False)):
+            with self.subTest(v2=expected):
+                self.insert("alpha", specs={"alpha": marker + _spec()})
+                (self.root / "tasks" / "alpha").mkdir(parents=True, exist_ok=True)
+                (self.root / "tasks" / "alpha" / "design.md").write_text(design, encoding="utf-8")
+                self.assertEqual("risk-path" in important(self.root, "alpha"), expected)
+                (self.root / "spec" / "CAPABILITY-MAP.md").unlink()
+
+
 if __name__ == "__main__":
     unittest.main()

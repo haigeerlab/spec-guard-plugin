@@ -167,7 +167,8 @@ class StageTest(unittest.TestCase):
             approved_spec(project)
             for stage in ("NEEDS_DESIGN", "NEEDS_REGRESSION"):
                 self.assertNotEqual(module_stage.stop_node(project.root, "a", stage, "approved", "none"), "plan-review")
-            self.assertEqual(module_stage.stop_node(project.root, "a", "NEEDS_PLAN", "approved", "none"), "plan-review")
+            # plan-auto-approve: a v2 Plan is approved when written, so NEEDS_PLAN is no longer a Plan review stop.
+            self.assertIsNone(module_stage.stop_node(project.root, "a", "NEEDS_PLAN", "approved", "none"))
 
 
 NEW_ONLY_DESIGN = "# d\n\n## 影响面\n\n- 新增 `src/a/new.py`\n"
@@ -493,7 +494,8 @@ class RequirementConfirmHintTest(unittest.TestCase):
             finish_docs(project, todo="- [ ] t\n")
             configure(project, takeover={"merge": "auto"})
             text = module_stage.describe(project.root)
-            self.assertIn("- 越界：`spec/a.md` 没有可用的「并行边界」一节", text)
+            # plan-auto-approve: a v2 module is checked against its boundary plus its design's impact paths.
+            self.assertIn("- 越界：没有并行边界，技术方案影响面也没写出路径", text)
             self.assertIn("建议下一步: " + STEP_ZH, text)
 
     def test_milestone_stop_comes_before_the_requirement(self):
@@ -883,6 +885,192 @@ class DesignApprovalTest(unittest.TestCase):
         self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files)",
                       text)
         self.assertIn("Until it passes, do not write the regression document yet.", text)
+
+
+
+class PlanAutoApproveTest(unittest.TestCase):
+    """plan-auto-approve AC2: a v2 Plan is approved by being written; its marker does nothing; old modules unchanged."""
+
+    TODO = "- [ ] t\n- [ ] 最终验收（gate）\n"
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        approved_spec(self.project)
+        self.project.write("tasks/a/design.md", NEW_ONLY_DESIGN)
+        self.project.write("tasks/a/regression.md", "# r\n")
+
+    def effective(self):
+        return module_stage.effective_review(self.project.root, "a", "plan", "none")
+
+    def test_without_a_plan(self):
+        self.assertEqual(module_state(self.project.root, "a")["stage"], "NEEDS_PLAN")
+        self.assertEqual(self.effective(), ("none", None))
+        self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "auto")
+        self.assertIsNone(module_stage.stop_node(self.project.root, "a", "NEEDS_PLAN", "approved", "none"))
+        text = hint(self.project)
+        self.assertIn("Plan 写完即自动批准", text)
+        self.assertNotIn("停点规则（Plan 交审）", text)
+        self.assertIn("approved automatically", hint(self.project, zh=False))
+
+    def test_a_written_plan_is_approved_whatever_its_marker(self):
+        for marker in ("", "<!-- spec-guard: review pending -->\n", "<!-- spec-guard: review approved -->\n",
+                       "<!-- spec-guard: review codex-approved aaaaaaaaaaaa -->\n", "<!-- spec-guard: review bogus -->\n"):
+            with self.subTest(marker=marker):
+                self.project.write("tasks/a/plan.md", "# Plan\n\n%s\n## 任务\n\n- t\n" % marker)
+                self.project.write("tasks/a/todo.md", self.TODO)
+                self.assertEqual(self.effective(), ("approved", "auto"))
+                text = hint(self.project)
+                self.assertIn("Plan 已自动批准", text)
+                self.assertNotIn("先等批准再构建", text)
+                self.assertNotIn("Plan `tasks/a/plan.md`", text)
+                self.assertNotIn("批准标记无效", text)
+                self.assertIn("Plan approved automatically", hint(self.project, zh=False))
+
+    def test_old_module_still_waits(self):
+        self.project.write("spec/a.md", "# a\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n\n<!-- spec-guard: review pending -->\n")
+        self.project.write("tasks/a/todo.md", self.TODO)
+        self.assertNotEqual(self.effective()[1], "auto")
+        self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "takeover")
+        self.assertIn("Plan `tasks/a/plan.md` 正在等用户批准", hint(self.project))
+
+
+
+class FlowOverreachTest(unittest.TestCase):
+    """plan-auto-approve AC4, AC5: a v2 build is checked against its boundary plus its design's impact, any takeover."""
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        self.project.write("src/a/old.py", "x\n")
+        self.project.write("src/other.py", "x\n")
+        git(self.project.root, "init", "-q")
+        self.commit("base")
+
+    def commit(self, message):
+        git(self.project.root, "add", "-A")
+        git(self.project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", message)
+
+    def build(self, tier="normal", boundary=None, impact="- 改 `src/a/old.py`"):
+        approved_spec(self.project, tier, boundary=boundary)
+        if tier not in ("bug", "small"):
+            self.project.write("tasks/a/design.md", design_text(impact))
+            self.project.write("tasks/a/regression.md", "# r\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n- [ ] 最终验收（gate）\n")
+        self.commit("docs")
+
+    def test_outside_the_impact_stops_and_adding_it_passes(self):
+        self.build()
+        self.project.write("src/a/old.py", "changed\n")
+        self.assertNotIn("越界", hint(self.project))
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/other.py`）", text)
+        self.assertIn("停点规则（中途 gate）", text)
+        self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`、`src/other.py`"))
+        self.assertNotIn("越界", hint(self.project))
+
+    def test_a_reviewed_design_is_revised_by_the_addition(self):
+        from module_stage import REVIEW_PENDING, review_codex_digest, review_reviewer_line
+        self.build()
+        path = self.project.root / "tasks" / "a" / "design.md"
+        text = path.read_text(encoding="utf-8").replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
+        path.write_text(text.replace(REVIEW_PENDING, review_reviewer_line(review_codex_digest(text))), encoding="utf-8")
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "approved")
+        path.write_text(path.read_text(encoding="utf-8").replace("`src/a/old.py`", "`src/a/old.py`、`src/other.py`"),
+                        encoding="utf-8")
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "revised")
+
+    def test_a_pre_declared_path_is_not_authorized(self):
+        self.build()
+        self.project.write("tasks/a/plan.md", "# Plan\n\n<!-- spec-guard: review approved -->\n\n## 任务\n\n- t\n\n"
+                                              "## 预先声明\n\n- 公共路径：`src/other.py`\n")
+        self.commit("plan")
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("越界：1 个文件超出", hint(self.project))
+
+    def test_bug_without_a_boundary_is_not_checked_and_does_not_stop(self):
+        self.build("bug")
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：没有并行边界，未检查。", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_small_with_a_boundary_is_checked(self):
+        self.build("small", boundary="`src/a/`")
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("越界：1 个文件超出", hint(self.project))
+
+    def test_normal_without_any_path_stops(self):
+        self.build(impact="不涉及")
+        text = hint(self.project)
+        self.assertIn("没有并行边界，技术方案影响面也没写出路径", text)
+        self.assertIn("停点规则（中途 gate）", text)
+
+
+
+class T4Test(FlowOverreachTest):
+    """plan-auto-approve AC6: a T4 change stops a module that is not important; the check stands apart from scope."""
+
+    RISK = {"schema": "autopilot.risk-paths/v1", "T4": ["src/secret/**"], "T3": []}
+
+    def setUp(self):
+        super().setUp()
+        self.project.write("src/secret/k.py", "x\n")
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(self.RISK))
+        self.commit("risk list")
+
+    def test_a_t4_change_stops_a_normal_module(self):
+        self.build(impact="- 改 `src/a/old.py`")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("T4 路径：改到 1 个 T4 文件（`src/secret/k.py`）", text)
+        self.assertIn("停点规则（中途 gate）", text)
+        self.assertIn("高风险文件", module_stage.scope_overreach(self.project.root, "a", "BUILDING", True)[2])
+
+    def test_a_bug_without_a_boundary_is_still_stopped(self):
+        self.build("bug")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：没有并行边界，未检查。", text)
+        self.assertIn("T4 路径：改到 1 个 T4 文件", text)
+        self.assertIn("停点规则（中途 gate）", text)
+
+    def test_an_important_module_changing_its_listed_t4_path_goes_on(self):
+        from module_stage import REVIEW_PENDING, review_approved_line, review_codex_digest
+        self.build("important", impact="- 改 `src/a/old.py`、`src/secret/k.py`")
+        path = self.project.root / "tasks" / "a" / "design.md"
+        text = path.read_text(encoding="utf-8").replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
+        path.write_text(text.replace(REVIEW_PENDING, review_approved_line(review_codex_digest(text))), encoding="utf-8")
+        self.commit("design approved")
+        self.project.write("src/secret/k.py", "changed\n")
+        text = hint(self.project)
+        self.assertNotIn("T4 路径", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_listing_the_path_makes_the_module_important(self):
+        self.build(impact="- 改 `src/a/old.py`")
+        self.project.write("src/secret/k.py", "changed\n")
+        self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`、`src/secret/k.py`"))
+        self.assertIn("risk-path", module_stage.important(self.project.root, "a"))
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "pending-user")
+
+    def test_an_unreadable_list_is_reported_not_stopped(self):
+        (self.project.root / ".github" / "autopr" / "risk-paths.json").write_text("{", encoding="utf-8")
+        self.commit("broken list, before the module")
+        self.build()
+        text = hint(self.project)
+        self.assertIn("T4 路径：没有可读的风险路径清单，未检查。", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_no_baseline_is_not_taken_for_no_change(self):
+        approved_spec(self.project, "bug")
+        self.project.write("tasks/a/plan.md", "# Plan\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")  # nothing committed: no baseline
+        self.project.write("src/secret/k.py", "changed\n")
+        self.assertIn("T4 路径：没有开工基线可比", hint(self.project))
 
 
 if __name__ == "__main__":

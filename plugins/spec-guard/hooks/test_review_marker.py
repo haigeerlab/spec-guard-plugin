@@ -813,6 +813,70 @@ class Acceptance(AcceptanceFixture):
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
 
 
+class AcceptanceFlowScope(AcceptanceFixture):
+    """plan-auto-approve: a merge=auto v2 module's final acceptance checks its boundary plus its design's impact."""
+
+    BOUNDARY = ""
+
+    def setUp(self):
+        super().setUp()
+        self.project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1),
+                                     encoding="utf-8")
+        (self.root / "tasks" / "alpha" / "design.md").write_text("# d\n\n## 影响面\n\n- 改 `src/alpha.py`\n",
+                                                                 encoding="utf-8")
+        self.commit("v2 docs")
+
+    def test_impact_only_is_accepted(self):
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report)
+        self.assertEqual(code, 0, out)
+        self.assertIn("nothing out of scope", out)
+
+    def test_outside_the_impact_still_refuses(self):
+        (self.root / "README.md").write_text("x\n", encoding="utf-8")
+        self.commit("outside")
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertIn("acceptance-out-of-scope", out)
+        self.assertIn("README.md", out)
+
+
+class AcceptanceT4(unittest.TestCase):
+    """plan-auto-approve: the final acceptance's scope check stops on T4 also where the scope itself is not checked."""
+
+    def test_a_bug_without_a_boundary_changing_t4(self):
+        import json
+        import os
+        from review_mark import _outside
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+
+            def git(*args):
+                subprocess.run(["git", "-C", folder, *args], check=True, capture_output=True, env=env)
+
+            def write(relative, text):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(text, encoding="utf-8")
+            write("spec/CAPABILITY-MAP.md", MAP.replace("| beta | y | alpha |\n", "").replace(" → beta", ""))
+            write("src/secret.py", "x\n")
+            write(".github/autopr/risk-paths.json", json.dumps({"schema": "autopilot.risk-paths/v1", "T4": ["src/*.py"],
+                                                                "T3": []}))
+            git("init", "-q")
+            git("add", "-A")
+            git("commit", "-qm", "base")
+            write("spec/alpha.md", "# a\n\n<!-- spec-guard: flow v2 tier=bug -->\n")
+            git("add", "-A")
+            git("commit", "-qm", "spec")
+            self.assertIsNone(_outside(root, "alpha"))
+            write("src/secret.py", "changed\n")
+            self.assertIn("T4 file(s) changed", _outside(root, "alpha"))
+
+
 class AcceptanceWorktrees(AcceptanceFixture):
     """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""
 
@@ -1101,6 +1165,37 @@ class DesignMarks(unittest.TestCase):
         code, out = self.mark("reviewer-approved", self.report())
         self.assertEqual(code, 0, out)
         self.assertIn("important", out)
+
+
+
+class PlanAutoRefusal(unittest.TestCase):
+    """plan-auto-approve AC3: review-mark refuses --target plan / both on a v2 module before reading any file."""
+
+    def test_every_state_and_shape_refuses_and_writes_nothing(self):
+        for plan in (None, "# Plan: alpha\n\n步骤\n", "# Plan\n\n<!-- spec-guard: review bogus -->\n"):
+            for target in ("plan", "both"):
+                for state in ("pending", "approved", "codex-approved", "codex-reviewed"):
+                    with self.subTest(plan=plan, target=target, state=state), Project() as project:
+                        project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1),
+                                                encoding="utf-8")
+                        if plan is None:
+                            project.plan.unlink()
+                        else:
+                            project.plan.write_text(plan, encoding="utf-8")
+                        before = (project.spec.read_bytes(), project.plan.read_bytes() if plan is not None else None)
+                        code, out = project.run("--module", "alpha", "--target", target, "--state", state,
+                                                "--review", str(project.root / "missing.json"), "--confirm")
+                        self.assertEqual(code, 2, out)
+                        self.assertTrue(out.startswith("plan-auto: "), out)
+                        self.assertEqual((project.spec.read_bytes(),
+                                          project.plan.read_bytes() if plan is not None else None), before)
+                        self.assertEqual(plan is None, not project.plan.exists())
+
+    def test_old_module_is_unchanged(self):
+        with Project() as project:
+            code, out = project.run("--module", "alpha", "--target", "plan", "--state", "pending", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(project.states()[1], "pending")
 
 
 if __name__ == "__main__":

@@ -1204,5 +1204,37 @@ class DesignReviewRuleTests(unittest.TestCase):
                 self.assertIn(phrase, self.section)
 
 
+
+class PlanAutoApproveRuleTests(unittest.TestCase):
+    """plan-auto-approve assumption 8 (R1-10): what the automatic approval authorizes, and how a stop is released."""
+
+    def setUp(self):
+        plugin = Path(__file__).resolve().parents[1]
+        text = (plugin / CONTRACT).read_text(encoding="utf-8")
+        start = text.index("## 新流程 Plan 自动批准")
+        self.section = text[start:text.index("\n## ", start + 1)]
+        self.rules = (plugin / "references" / "node-rules.md").read_text(encoding="utf-8")
+
+    def test_what_it_authorizes_and_what_not(self):
+        for phrase in ("写完即自动批准", "不交用户、也不交 Codex", "标记不起作用", "`plan-auto`", "推送本分支与开 PR",
+                       "**不授权**合并", "照 F3 由用户在对话里决定", "发布", "删除工作区外的文件", "改全局配置", "外发凭据",
+                       "照旧先问", "「预先声明」不授权任何路径"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+
+    def test_how_a_stop_is_released(self):
+        for phrase in ("**越界**", "需求文档并行边界与技术方案影响面以外", "补进技术方案影响面或并行边界", "按 design-review 重新审或批",
+                       "撤回这些改动", "只记一行「未检查」", "**碰 T4**", "模块不是重要需求", "模块随之成为重要需求",
+                       "不当成没有改动"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+
+    def test_stop_rules_point_the_same_way(self):
+        for phrase in ("新流程模块的 Plan 不交审", "合并、发布照旧另问", "新流程模块因越界或碰 T4 停在这里",
+                       "T4 路径使模块成为重要需求"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.rules)
+
+
 if __name__ == "__main__":
     unittest.main()
