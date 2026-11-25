@@ -4,7 +4,7 @@
 - [x] Task 1：解析与 sha256
 - [x] Task 2：CLI 与 `--ref`
 - [x] Task 3：接进 `flow_doc_problems` 与 `section-empty`
-- [ ] Task 4：阶段提示
+- [x] Task 4：阶段提示
 - [ ] Task 5：联调回归
 - [ ] Task 6：接口 1.23
 - [ ] Checkpoint 1（report）：本机完整检查与变异
@@ -19,3 +19,5 @@
 - Task 3（2026-11-25）：`flow_doc_problems` 接上 `regression_problems`（`regression_view.module_report` 的问题，`tasks/<id>/regression.md` 与 bug／small 的「回归用例」一节；bug 没有用例时：只有 Spec 不报，构建中、有 Plan 无 todo、空 todo 警告，todo 有勾选项且阶段已完成（含只剩正式延期）判失败）与 `section-empty`（只查 `projectSections` 声明的章节，注释行不算内容、代码块算）。
   用例：`test_flow_v2.py` `RegressionProblemsTest` 5 例、`ShortTierCasesTest` 3 例、`ProjectSectionContentTest` 1 例，实现前 8 个失败；`test-verify-artifacts.sh` 加 5 例（143 例通过）。
   旧用例改动及原因：`ProjectSectionsTest.test_bug_and_small_…` 与 `test-verify-artifacts.sh` 的 plan-auto-approve 夹具原来用只写「不涉及」的回归用例／回归文档，本模块起 small 与 normal 的回归必须有用例，改成一条合格用例（新增辅助函数 `good_regression`）。
+- Task 4（2026-11-25）：`regression_line`：新流程模块在写 Plan 或构建中、回归有问题时，阶段提示多一行（问题数、前三个问题代码与位置、跑 verify-artifacts），bug 构建中没有用例时改成补用例提醒；只写固定词、代码、编号与路径。问题数进状态码（`_describe_body` 的事实与 `_role_facts`）。
+  用例：`test_flow_v2.py` `RegressionHintTest` 4 例，实现前 3 个失败（老流程那一例本来就通过）；`test-phase-guard.sh` 加 2 例（549 例通过），这 2 例写在实现之后，没有经过先红，留到 Checkpoint 1 用变异核对。

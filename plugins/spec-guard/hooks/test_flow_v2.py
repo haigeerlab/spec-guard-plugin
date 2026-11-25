@@ -1564,5 +1564,54 @@ class ProjectSectionContentTest(unittest.TestCase):
                     self.assertEqual(flow_problems(project), expected)
 
 
+
+class RegressionHintTest(unittest.TestCase):
+    """regression-doc-check Task 4: the stage hint names regression problems while the Plan or the build is on."""
+
+    def setUp(self):
+        self.ctx = Project()
+        self.project = self.ctx.__enter__()
+        self.addCleanup(self.ctx.__exit__)
+
+    def building(self, cases):
+        approved_spec(self.project)
+        self.project.write("tasks/a/design.md", "## 影响面\n\n- `src/new.py`\n")
+        self.project.write("tasks/a/regression.md", cases.replace("| S1 | R1 |\n", ""))  # requirement() has no S<n>
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n\n## 检查点\n\n- c\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+
+    def test_problems_are_named_and_go_away(self):
+        bad = CASES_EN.replace("Method: ai-operate", "Method: command")
+        self.building(bad)
+        self.assertIn("- 回归文档：`tasks/a/regression.md` 有 1 处问题：case-command-missing（R1）；完整列表跑 verify-artifacts。",
+                      hint(self.project))
+        self.building(CASES_EN)
+        self.assertNotIn("- 回归文档：", hint(self.project))
+        self.building(bad)
+        self.assertIn("- Regression: `tasks/a/regression.md` has 1 problem(s): case-command-missing (R1); run verify-artifacts "
+                      "for the full list.", hint(self.project, zh=False))
+
+    def test_state_code_follows_the_problem_count(self):
+        self.building(CASES_EN.replace("Method: ai-operate", "Method: command"))
+        hint(self.project)
+        one = module_stage.describe(self.project.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1]
+        self.building(CASES_EN.replace("Method: ai-operate", "Method: command").replace("- Expected: saved\n", ""))
+        two = module_stage.describe(self.project.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1]
+        self.assertNotEqual(one, two)
+
+    def test_bug_without_a_case_is_reminded_while_building(self):
+        self.project.write("spec/a.md", "# a\n\n%s\n\n" % marker("bug")
+                           + "".join("## %s\n\n不涉及\n\n" % n for n in DOC_SECTIONS["bug"]["zh"]))
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n\n## 检查点\n\n- c\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+        self.assertIn("- 回归用例：修完在 `spec/a.md` 的回归用例一节补一条用例。", hint(self.project))
+
+    def test_old_module_has_no_line(self):
+        self.project.write("spec/a.md", "# a\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+        self.assertNotIn("回归", hint(self.project))
+
+
 if __name__ == "__main__":
     unittest.main()

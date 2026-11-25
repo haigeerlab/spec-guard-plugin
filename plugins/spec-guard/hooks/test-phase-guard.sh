@@ -294,6 +294,11 @@ had_config=0; [ -f "$local_project/.agent/config.json" ] && had_config=1 && cp_c
 printf '%s\n' '{"version": 1, "takeover": "design"}' >"$local_project/.agent/config.json"
 lacks "只列新文件的技术方案不审" "$local_project" 'the design `tasks/alpha/design.md`'
 injects "不审时直接写回归文档" "$local_project" 'write the regression document `tasks/alpha/regression.md`'
+# regression-doc-check：写 Plan 时回归文档有问题，提示列出问题代码；改好后这一行消失。
+printf '## Cases\n\n### R1: s\n- Steps: a\n- Expected: b\n- Method: command\n- Evidence: log\n\n## Success criteria coverage\n\nnone\n\n## Affected existing features\n\nnone\n' >"$local_project/tasks/alpha/regression.md"
+injects "回归文档有问题时提示列出代码" "$local_project" '- Regression: `tasks/alpha/regression.md` has 1 problem(s): case-command-missing (R1)'
+printf '## Cases\n\n### R1: s\n- Steps: a\n- Expected: b\n- Method: manual\n- Evidence: quote\n\n## Success criteria coverage\n\nnone\n\n## Affected existing features\n\nnone\n' >"$local_project/tasks/alpha/regression.md"
+lacks "回归文档合格式时没有这一行" "$local_project" '- Regression: '
 if [ "$had_config" = 1 ]; then printf '%s\n' "$cp_config" >"$local_project/.agent/config.json"; else rm -f "$local_project/.agent/config.json"; fi
 rm -rf "$local_project/tasks/alpha" && : >"$local_project/spec/alpha.md"
 injects "去掉流程标记后回到 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"

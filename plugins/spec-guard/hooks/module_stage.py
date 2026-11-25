@@ -372,6 +372,42 @@ def _section_has_content(text: str, name: str) -> bool:
     return any(line.strip() and (in_fence or not COMMENT_LINE.match(line)) for _n, line, in_fence, _m in lines)
 
 
+REGRESSION_SHOWN = 3
+
+
+def regression_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """regression-doc-check: (fact, line) for a flow v2 module writing its Plan or building; (None, "") otherwise.
+
+    Fixed words, problem codes, case ids and paths only -- never the document's text.
+    """
+    if not module or stage not in ("NEEDS_PLAN", "BUILDING"):
+        return None, ""
+    flow = effective_tier(root, module)
+    if not flow["v2"]:
+        return None, ""
+    short = flow["tier"] in SHORT_TIERS
+    path = "spec/%s.md" % module if short else "tasks/%s/regression.md" % module
+    if not (root / path).is_file():
+        return None, ""
+    problems = regression_problems(root, module, flow["tier"], path)
+    if not problems:
+        return None, ""
+    marker = "` 回归问题："
+    parts = [message.split(marker, 1)[1] for _level, message in problems if marker in message]
+    if flow["tier"] == "bug" and parts == ["no-cases（%s）" % path]:
+        return ("regression", "bug-no-case"), ("- 回归用例：修完在 `%s` 的回归用例一节补一条用例。" % path if zh else
+                                              "- Regression: once fixed, add a case to the regression cases section of `%s`." % path)
+    shown = parts[:REGRESSION_SHOWN]
+    if zh:
+        line = "- 回归文档：`%s` 有 %d 处问题：%s%s；完整列表跑 verify-artifacts。" % (
+            path, len(parts), "、".join(shown), "等" if len(parts) > len(shown) else "")
+    else:
+        line = "- Regression: `%s` has %d problem(s): %s%s; run verify-artifacts for the full list." % (
+            path, len(parts), ", ".join(p.replace("（", " (").replace("）", ")") for p in shown),
+            ", ..." if len(parts) > len(shown) else "")
+    return ("regression", len(parts)), line
+
+
 def regression_problems(root: Path, module: str, tier: str, path: str) -> list:
     """regression-doc-check: [(level, message)] from regression_view for a flow v2 module's regression cases.
 
@@ -2065,7 +2101,7 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
     _line, _step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
             next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module),
-            design_fact(root, module, stage))
+            design_fact(root, module, stage), regression_line(root, module, stage, zh)[0])
 
 
 def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
@@ -2656,6 +2692,9 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     dg_fact, dg_line, dg_step = draft_gate(root, states, module, stage, zh)
     if dg_line:
         counts += "\n" + dg_line
+    rg_fact, rg_line = regression_line(root, module, stage, zh)
+    if rg_line:
+        counts += "\n" + rg_line
     if dg_step and not ms_step and role_kind not in ("module", "coordinator"):
         # usage-draft-gate: a multi-module batch reviews its usage draft before its first Spec.
         node, next_step = "map-review", dg_step
@@ -2669,7 +2708,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
                        design_fact(root, module, stage) if module else None]
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
-                      + ([ac_fact] if ac_fact else []),
+                      + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh,
                 boundary=boundary_note_line if boundary_note_line in notes else "")
     if zh:
