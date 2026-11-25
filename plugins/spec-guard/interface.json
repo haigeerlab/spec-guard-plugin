@@ -1,5 +1,5 @@
 {
-  "interface": "1.19",
+  "interface": "1.20",
   "mapView": {
     "command": [
       "python3",
@@ -116,6 +116,27 @@
         "revised": "the user approved it, then the text changed; the user confirms it again",
         "invalid": "the approval line is malformed (see review)"
       }
+    },
+    "designApproval": {
+      "appearsWhen": "per module, always (interface 1.20, spec/design-review.md); null for an old-flow module and for flow v2 bug and small modules, which have no design",
+      "fields": {
+        "status": "one of statusValues",
+        "approvedBy": "user or reviewer when status is approved, else null",
+        "reviewerVendor": "the last round's reviewer vendor (delegate report reviewer.vendor, e.g. openai or anthropic); null when no round was recorded or the last one had no reviewer available",
+        "sameVendor": "the last round's reviewer.same_vendor (true when the reviewer is from the same vendor as the host that wrote the design; recorded, not judged); null like reviewerVendor",
+        "reportSha256": "the full sha256 of the last round's report file, from the round line's report field; null like reviewerVendor",
+        "rounds": "every design review round in tasks/<id>/design.md, in file order: the reviewRounds entry fields plus vendor and sameVendor (both null for a round with no reviewer available)"
+      },
+      "statusValues": {
+        "not-required": "the design needs no review: not important, its impact section lists only files that did not exist before the module started, and designReview is off",
+        "pending-review": "a second reviewer must review it and no round is recorded yet (also before the design is written)",
+        "in-review": "the last round had blocking items (unresolved recheck items plus findings that are not suggestions); the second round rechecks the first",
+        "pending-user": "the user approves it: an important requirement (whatever the reviewer said), or two rounds still blocking",
+        "approved": "passed: by the user (the approval line) or by the reviewer (reviewer-approved, not for an important requirement); the digest matches the design without its external review section",
+        "unreviewed": "the last round found no reviewer available (report reviewer.selection none); the user approves it",
+        "revised": "the design changed after it was approved or passed; it is reviewed or approved again"
+      },
+      "meaning": "facts from the approval line and the round lines <!-- spec-guard: design-review round=N blocking=N sha256=<12 hex> vendor=<v> same-vendor=<true|false> criteria=design-v1 report=<64 hex> --> outside code fences, written by reviewMark --target design. Whether a design needs review: important -> the user; impact section lists an existing file at the module's baseline (the parent of the commit that first added spec/<id>.md), or names no path -> reviewed; designReview on -> reviewed; else not required. A cross-module requirement is important by rule. An unreadable design fails the whole view (exit 4) like review"
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",
@@ -276,17 +297,17 @@
       "--module",
       "<module-id>",
       "--target",
-      "<spec|plan|both|acceptance>",
+      "<spec|plan|both|acceptance|design>",
       "--state",
-      "<pending|approved|codex-approved|codex-reviewed>",
+      "<pending|approved|codex-approved|codex-reviewed|reviewer-approved|reviewer-reviewed>",
       "[--review <report file>]"
     ],
     "confirm": "only previews unless --confirm is added",
     "exitCodes": {
       "0": "ok (preview, written, or no change)",
-      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid; for codex-approved and codex-reviewed also: no --review, a report that is not a completed Codex review with a conclusion or does not match the file on disk, blocking findings (codex-approved), two rounds with blocking findings already, or --target both; for codex-approved also (since 1.16, spec/codex-route-guard.md): codex-route-takeover, codex-route-important, codex-route-pre-declared or (since 1.19) codex-route-requirement when the module's takeover does not let Codex approve this file (the same decision as mapView.codexRoute), checked before the report is read and with nothing written; for --target acceptance: a state other than codex-approved, no --review, a module whose takeover is not merge=auto (since 0.91.1 also in the commit before the module started: acceptance-not-auto-at-base), uncommitted changes, a final review that is not a clean Codex review up to HEAD with the Spec on disk, missing or failing check evidence for HEAD, or files outside the module's declared scope"
+      "2": "refused: module not in the capability map, file missing, invalid marker, or approving a Plan while its Spec is pending, revised or invalid; for codex-approved and codex-reviewed also: no --review, a report that is not a completed Codex review with a conclusion or does not match the file on disk, blocking findings (codex-approved), two rounds with blocking findings already, or --target both; for codex-approved also (since 1.16, spec/codex-route-guard.md): codex-route-takeover, codex-route-important, codex-route-pre-declared or (since 1.19) codex-route-requirement when the module's takeover does not let Codex approve this file (the same decision as mapView.codexRoute), checked before the report is read and with nothing written; for --target acceptance: a state other than codex-approved, no --review, a module whose takeover is not merge=auto (since 0.91.1 also in the commit before the module started: acceptance-not-auto-at-base), uncommitted changes, a final review that is not a clean Codex review up to HEAD with the Spec on disk, missing or failing check evidence for HEAD, or files outside the module's declared scope; for --target design (since 1.20, spec/design-review.md): a module that is not flow v2 normal or important (design-not-v2), a codex-* state (design-state), and for reviewer-approved and reviewer-reviewed also: no --review, a report that is not a delegate design-v1 review of the file on disk (report-invalid), two rounds with blocking items already (design-rounds-exhausted), a round after a blocking one without recheck (design-recheck-missing), criteria different from earlier rounds (design-criteria-changed), or blocking items (reviewer-approved: design-blocking); reviewer-* with another target (reviewer-state)"
     },
-    "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges). codex-approved and codex-reviewed (interface 1.15, spec/codex-approval.md) take the /delegate:review JSON saved to a file; each records one round line under the external review section, and codex-approved also writes the Codex marker. Codex's approval is spec-guard's policy under the takeover setting, not the user's approval. --target acceptance --state codex-approved --review <final review> (interface 1.15, spec/codex-final-acceptance.md) records Codex's final acceptance of HEAD for a merge=auto module in the common git directory (since interface 1.16; see mapView.acceptance); the check evidence is read from ~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json (autopilot.check-evidence/v1); nothing tracked is written and the final gate is ticked after the merge",
+    "notes": "approved is written only after the user's explicit approval of that file; with moduleConcurrency on, the coordinating session writes it on the integration checkout (shared rule: the coordinating session's approvals and merges). codex-approved and codex-reviewed (interface 1.15, spec/codex-approval.md) take the /delegate:review JSON saved to a file; each records one round line under the external review section, and codex-approved also writes the Codex marker. Codex's approval is spec-guard's policy under the takeover setting, not the user's approval. --target acceptance --state codex-approved --review <final review> (interface 1.15, spec/codex-final-acceptance.md) records Codex's final acceptance of HEAD for a merge=auto module in the common git directory (since interface 1.16; see mapView.acceptance); the check evidence is read from ~/.autopilot/evidence/<owner>__<repo>/<HEAD>.json (autopilot.check-evidence/v1); nothing tracked is written and the final gate is ticked after the merge. --target design (interface 1.20, spec/design-review.md) works on tasks/<id>/design.md of a flow v2 normal or important module: pending and approved (the user's) as for a Spec; reviewer-reviewed and reviewer-approved take the /delegate:review --profile design JSON from any backend and record one design-review round line (see mapView.designApproval), blocking counting unresolved recheck items plus findings that are not suggestions; reviewer-approved also writes `<!-- spec-guard: review reviewer-approved <digest> -->`. A report with reviewer.selection none is recorded as unreviewed (vendor=none) and leaves the design pending for the user",
     "contract": "spec/review-approval-marker.md"
   },
   "reviewKinds": {

@@ -521,6 +521,46 @@ check_absent "追加章节配置不合法：追加章节不生效" "缺章节"
 project flow-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# Plan\n' >"$PROJECT/tasks/alpha/plan.md"
 check_absent "老模块不查新流程文档" "缺失（档位"
+# design-review：技术方案的批准标记与轮次行写坏、两轮 criteria 不同时失败；重要需求只有第二审查者放行时警告；老模块不查。
+design_round() {  # $1=轮次 $2=criteria：在技术方案的外部审查意见一节追加一行轮次行
+  printf '<!-- spec-guard: design-review round=%s blocking=0 sha256=aaaaaaaaaaaa vendor=openai same-vendor=false criteria=%s report=%s -->\n' \
+    "$1" "$2" "$(printf 'b%.0s' $(seq 64))" >>"$PROJECT/tasks/alpha/design.md"
+}
+reviewer_mark() {  # 给技术方案写一行按当前正文算的第二审查者放行标记
+  python3 -B - "$HOOKDIR" "$PROJECT/tasks/alpha/design.md" <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from module_stage import review_codex_digest, review_reviewer_line
+path = Path(sys.argv[2])
+text = "<!-- spec-guard: review pending -->\n" + path.read_text(encoding="utf-8")
+path.write_text(text.replace("<!-- spec-guard: review pending -->", review_reviewer_line(review_codex_digest(text))),
+                encoding="utf-8")
+PY
+}
+project design-marks
+flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=normal -->\n' >>"$PROJECT/spec/alpha.md"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍 外部审查意见
+design_round 1 design-v1
+reviewer_mark
+check "技术方案：标记与轮次行有效时通过" 0 "能力图通过严格解析"
+check_absent "技术方案：有效时不报轮次行" "技术方案审查轮次行写坏"
+printf '<!-- spec-guard: design-review round=2 blocking=x -->\n' >>"$PROJECT/tasks/alpha/design.md"
+check "技术方案：轮次行写坏时失败" 1 "有 1 行技术方案审查轮次行写坏了"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍 外部审查意见
+design_round 1 design-v1; design_round 2 design-v2
+check "技术方案：两轮 criteria 不同时失败" 1 "的审查轮次用了不同的 criteria：design-v1、design-v2"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
+printf '<!-- spec-guard: review approved -->\n' >>"$PROJECT/tasks/alpha/design.md"
+check "技术方案：批准标记不带指纹时失败" 1 "tasks/alpha/design.md\` 的批准标记无效"
+project design-important
+flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=important -->\n' >>"$PROJECT/spec/alpha.md"
+flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
+reviewer_mark
+check "重要需求：技术方案只有第二审查者放行时警告" 0 "只有第二审查者的放行：重要需求的技术方案要用户批"
+project design-old
+mkdir -p "$PROJECT/tasks/alpha"; printf '# d\n\n<!-- spec-guard: design-review round=x -->\n' >"$PROJECT/tasks/alpha/design.md"
+check_absent "老模块不查技术方案的轮次行" "技术方案审查轮次行"
 # requirement-confirm-gate：新流程需求文档只有 Codex 的批准（指纹匹配或失配）时警告、不判失败；老模块不出这条。
 codex_mark() {  # 给 $PROJECT/spec/alpha.md 写一行按当前正文算的 Codex 批准标记
   python3 -B - "$HOOKDIR" "$PROJECT/spec/alpha.md" <<'PY'

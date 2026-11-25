@@ -52,7 +52,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _design_approval(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data))
 
 
@@ -115,6 +115,24 @@ def _review_rounds(view: dict) -> list:
     if set(fields) != set(map_view.REVIEW_ROUND_FIELDS):
         return ["mapView.reviewRounds.entryFields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.REVIEW_ROUND_FIELDS))]
     return []
+
+
+def _design_approval(view: dict) -> list:
+    """design-review: interface 1.20 describes the designApproval keys, its round entry and its status values."""
+    block = view.get("designApproval")
+    if not isinstance(block, dict) or not isinstance(block.get("fields"), dict):
+        return ["mapView 缺少 designApproval 说明"]
+    found = []
+    if set(block["fields"]) != set(map_view.DESIGN_APPROVAL_FIELDS):
+        found.append("mapView.designApproval.fields 为 %s，代码为 %s"
+                     % (sorted(block["fields"]), sorted(map_view.DESIGN_APPROVAL_FIELDS)))
+    statuses = block.get("statusValues")
+    if not isinstance(statuses, dict) or list(statuses) != list(module_stage.DESIGN_STATUSES):
+        found.append("mapView.designApproval.statusValues 为 %s，代码为 %s"
+                     % (list(statuses) if isinstance(statuses, dict) else statuses, list(module_stage.DESIGN_STATUSES)))
+    if list(map_view.DESIGN_ROUND_FIELDS[:len(map_view.REVIEW_ROUND_FIELDS)]) != list(map_view.REVIEW_ROUND_FIELDS):
+        found.append("designApproval.rounds 的条目应以 reviewRounds 的字段开头")
+    return found
 
 
 def _flow(view: dict) -> list:

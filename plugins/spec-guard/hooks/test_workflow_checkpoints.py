@@ -988,10 +988,13 @@ class SiblingRulesOutTests(unittest.TestCase):
 
 class NodeRulesTests(unittest.TestCase):
     """rules-at-nodes: the stop rules the phase hint attaches at each node, kept in step with the full contract."""
-    TITLES = ("## 能力图审阅", "## Spec 交审", "## Plan 交审", "## 中途 gate", "## 最终验收", "## 里程碑停点")
+    TITLES = ("## 能力图审阅", "## Spec 交审", "## 技术方案交审", "## Plan 交审", "## 中途 gate", "## 最终验收", "## 里程碑停点")
     LIMITS = {"## 最终验收": 3200}
     # What each section must say (Spec C2).
     ELEMENTS = {
+        "## 技术方案交审": ("确认框之前", "只给链接", "技术方案六节", "第二审查者的意见逐条列出", "这一轮没有第二审查者",
+                       "还剩哪几条", "“注意：”", "“批了会怎样：”", "--target design --state approved",
+                       "不能代替重要需求的用户批准"),
         "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "先后顺序", "文档建议", "README", "确认框之前",
                       "只给链接", "不算合并交审", "可复制代码块", "以所装协作插件的规定为准"),
         "## Spec 交审": ("目标", "边界", "总是做", "先问", "不做", "要你确认的假设", "验收标准", "AC1、AC2", "未决问题", "确认框之前",
@@ -1180,6 +1183,25 @@ class UsageDraftRuleTests(unittest.TestCase):
         for heading in ("## Entry points", "## Typical usage", "## Milestones", "| Entry | Does | Module |",
                         "| Milestone | Usage | Modules |", "### U1:"):
             self.assertIn(heading, template)
+
+
+
+class DesignReviewRuleTests(unittest.TestCase):
+    """design-review assumption 10: the shared rule states who passes a design, how it is reviewed, and the edge cases."""
+
+    def setUp(self):
+        text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+        start = text.index("## 技术方案审查")
+        self.section = text[start:text.index("\n## ", start + 1)]
+
+    def test_order_review_and_edge_cases(self):
+        for phrase in ("先中先定", "重要需求：用户批", "跨模块的需求按规则已经是重要需求", "开工前已有的文件", "写不出路径",
+                       "`designReview` 为 `on`", "都不是：不审", "--profile design --backend auto --author-host",
+                       "--state reviewer-approved", "--state reviewer-reviewed", "--previous-report", "第二轮只核对上一轮",
+                       "两轮仍有阻断就交用户批", "`unresolved`", "criteria 必须相同", "同厂商时照记、不判定",
+                       "`none`", "记为「未审」，不当失败", "放行后又改过", "--state approved", "放行之前不写回归测试文档"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
 
 
 if __name__ == "__main__":

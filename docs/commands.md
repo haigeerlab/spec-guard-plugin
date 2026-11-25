@@ -159,6 +159,12 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 再用 `--target acceptance --state codex-approved --review <报告文件>` 记下。记录写在 git 目录里、不进提交，autopilot 据此合并；
 `/map --json` 每个模块的 `acceptance` 报出它（`null` 或 `{marker, sha}`）。缺一样证据或有越界改动就拒绝，停下等你；拟回告不会自动发出。
 
+新流程（`normal`／`important`）模块的技术方案用 `--target design` 记录。重要需求由你批（`--state approved`），第二审查者的意见一并附上；
+影响面列了开工前已有的文件（或写不出路径）、或项目开关 `designReview` 为 `on` 时，agent 用 `/delegate:review --profile design --backend auto --author-host <宿主>` 请第二审查者审一轮，
+没有阻断就用 `--state reviewer-approved --review <报告文件>` 记下、不用你批，有阻断用 `reviewer-reviewed` 记一轮、改完带 `--previous-report` 复审，两轮仍有阻断就交给你；
+阻断数算上复审里仍未解决的旧条目。没有可用的审查者时记为「未审」，交给你批。都不是时不审，技术方案写完直接往下。
+`/map --json` 每个模块的 `designApproval` 报出状态、谁放行的、审查者厂商、是否同厂商、最后一轮报告的 sha256 与每一轮（interface 1.20 起；老模块与 bug、small 为 null）。
+
 接管档位里有任一项不是「人」的模块，构建中还会做越界检查：改到 Spec 并行边界与（已批准的）Plan 预先声明之外的文件，阶段提示就停下来，
 让 agent 逐个说明为什么要改、由你决定；没写并行边界也会停。只读结果用
 `module_scope.py check --module <id> --format json`（`--base` 可省，默认是这个模块 Spec 第一次提交之前的状态），合并前看 `outside` 是不是 0。
@@ -231,7 +237,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、里程碑停点（有用法草案、某个里程碑做完还没确认时）、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位四项与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；新流程模块的档位在 `tier`（老模块为 null），`step` 多了 `design`、`regression` 两个取值，interface 1.18 起；新流程模块的需求确认在 `requirementConfirm`（状态、确认人只能是 user、确认提交时间、需求文档指纹；老模块为 null），`codexRoute` 多了取值 `requirement`，interface 1.19 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位四项与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；新流程模块的档位在 `tier`（老模块为 null），`step` 多了 `design`、`regression` 两个取值，interface 1.18 起；新流程模块的需求确认在 `requirementConfirm`（状态、确认人只能是 user、确认提交时间、需求文档指纹；老模块为 null），`codexRoute` 多了取值 `requirement`，interface 1.19 起；新流程模块技术方案的审查与批准在 `designApproval`（状态、放行人、审查者厂商与是否同厂商、报告 sha256、每一轮；老模块与 bug、small 为 null），interface 1.20 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`

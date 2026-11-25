@@ -97,11 +97,40 @@ class StopNode(unittest.TestCase):
             self.assertIsNone(stop_node(p.root, "alpha", "BUILDING", "none", "approved"))
 
 
+class DesignReviewNode(unittest.TestCase):
+    """design-review: a design waiting for the user stops at its own node; one a reviewer passes does not."""
+
+    def spec(self, tier):
+        from module_stage import review_approved_line, review_digest
+        text = ("# alpha\n\n<!-- spec-guard: review pending -->\n<!-- spec-guard: flow v2 tier=%s -->\n\n"
+                "## 并行边界\n\n- 独占：`src/alpha/`\n" % tier)
+        return text.replace("<!-- spec-guard: review pending -->", review_approved_line(review_digest(text)))
+
+    def node(self, tier):
+        files = {"spec/alpha.md": self.spec(tier),
+                 "tasks/alpha/design.md": "# d\n\n## 影响面\n\n- 新增 `src/alpha/new.py`\n",
+                 ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []})}
+        with Project(files) as p:
+            return stop_node(p.root, "alpha", "NEEDS_REGRESSION", "approved", "none"), describe(p.root)
+
+    def test_important_design_stops_for_the_user(self):
+        node, out = self.node("important")
+        self.assertEqual(node, "design-review")
+        self.assertIn("技术方案 `tasks/alpha/design.md` 待用户批", out)
+        self.assertIn("停点规则（技术方案交审）：", out)
+        self.assertIn("第二审查者的意见逐条列出", out)
+
+    def test_a_design_with_nothing_to_review_does_not_stop(self):
+        node, out = self.node("normal")
+        self.assertIsNone(node)
+        self.assertIn("写回归测试文档 `tasks/alpha/regression.md`", out)
+
+
 class NodeRules(unittest.TestCase):
     def test_each_kind_reads_its_section(self):
         for kind, title in (("map-review", "## 能力图审阅"), ("spec-review", "## Spec 交审"), ("plan-review", "## Plan 交审"),
                             ("mid-gate", "## 中途 gate"), ("final-gate", "## 最终验收"),
-                            ("milestone-stop", "## 里程碑停点")):
+                            ("milestone-stop", "## 里程碑停点"), ("design-review", "## 技术方案交审")):
             with self.subTest(kind=kind):
                 text = node_rules(kind)
                 self.assertTrue(text.startswith(title + "\n"), text[:40])

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, important,
-                          file_review_state, module_state, requirement_confirm,
+                          design_approval, file_review_state, module_state, requirement_confirm,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
@@ -56,6 +56,9 @@ MILESTONE_FIELDS = ("milestoneStop",)  # interface.json milestoneStop (milestone
 ACCEPTANCE_FIELDS = ("marker", "sha")  # interface.json mapView.acceptance (codex-final-acceptance, interface 1.15)
 # interface.json mapView.reviewRounds (review-rounds-in-map, interface 1.17): the keys of one round entry.
 REVIEW_ROUND_FIELDS = ("round", "blocking", "sha256")
+# interface.json mapView.designApproval (design-review, interface 1.20): the object and the keys of one round entry.
+DESIGN_APPROVAL_FIELDS = ("status", "approvedBy", "reviewerVendor", "sameVendor", "reportSha256", "rounds")
+DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor")
 # interface.json mapView.flow (flow-doc-skeletons, interface 1.18): the steps of a flow v2 module before its Plan.
 FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
@@ -125,6 +128,18 @@ def _review_rounds(root: Path, module: str) -> dict:
         except (OSError, UnicodeError):
             raise Unreadable(relative)
     return rounds
+
+
+def _design_approval(root: Path, module: str) -> dict | None:
+    """design-review: module_stage.design_approval with the published keys only; an unreadable design fails the view."""
+    path = root / "tasks" / module / "design.md"
+    if path.exists():
+        try:
+            path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            raise Unreadable("tasks/%s/design.md" % module)
+    approval = design_approval(root, module)
+    return None if approval is None else {key: approval[key] for key in DESIGN_APPROVAL_FIELDS}
 
 
 def _external_review(root: Path, module: str) -> str:
@@ -486,6 +501,7 @@ def build(root: Path) -> dict:
             "reviewRounds": _review_rounds(root, module),
             "tier": effective_tier(root, module)["tier"],
             "requirementConfirm": requirement_confirm(root, module),
+            "designApproval": _design_approval(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),
             # codex-final-acceptance: Codex's final acceptance record (git directory) of a merge=auto module, or null.
             "acceptance": acceptance_record(root, module),

@@ -170,6 +170,9 @@ class StageTest(unittest.TestCase):
             self.assertEqual(module_stage.stop_node(project.root, "a", "NEEDS_PLAN", "approved", "none"), "plan-review")
 
 
+NEW_ONLY_DESIGN = "# d\n\n## 影响面\n\n- 新增 `src/a/new.py`\n"
+
+
 class HintTest(unittest.TestCase):
     def test_new_stages_name_the_document_and_the_skeleton(self):
         with Project() as project:
@@ -180,7 +183,7 @@ class HintTest(unittest.TestCase):
                 text = hint(project, zh)
                 self.assertIn(design, text)
                 self.assertIn("references/doc-skeletons.md", text)
-                project.write("tasks/a/design.md", "# d\n")
+                project.write("tasks/a/design.md", NEW_ONLY_DESIGN)  # design-review: new files only, nothing to review
                 self.assertIn(regression, hint(project, zh))
                 project.write("tasks/a/regression.md", "# r\n")
                 plan = hint(project, zh)
@@ -648,6 +651,238 @@ class RequirementConfirmRuleTest(unittest.TestCase):
                        "经所装协作插件转来的用户原话"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, section)
+
+
+
+def git(root, *args):
+    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True)
+
+
+def design_text(impact="- 新增 `src/a/new.py`"):
+    return "# 技术方案：a\n\n" + "".join("## %s\n\n%s\n\n" % (name, impact if name == "影响面" else "不涉及")
+                                    for name in DOC_SECTIONS["design"]["zh"])
+
+
+class DesignRequirementTest(unittest.TestCase):
+    """design-review AC2: the order in assumption 2, one positive case each, and new files only."""
+
+    def need(self, project):
+        return module_stage.design_requirement(project.root, "a")
+
+    def test_important_goes_to_the_user(self):
+        with Project() as project:
+            approved_spec(project, "important")
+            project.write("tasks/a/design.md", design_text())
+            self.assertEqual(self.need(project), {"need": "user", "reason": "important"})
+
+    def test_cross_module_is_important_by_rule(self):
+        # The cross-module case of assumption 2 reaches the first branch: important() already lifts the tier.
+        with Project() as project:
+            approved_spec(project, "normal", shared="全局配置")
+            project.write("tasks/a/design.md", design_text())
+            self.assertEqual(self.need(project), {"need": "user", "reason": "important"})
+            self.assertIn("cross-module", module_stage.important(project.root, "a"))
+
+    def test_existing_files_at_the_baseline_are_reviewed(self):
+        with Project() as project:
+            project.write("src/a/old.py", "x = 1\n")
+            git(project.root, "init", "-q")
+            git(project.root, "-c", "user.name=t", "-c", "user.email=t@t", "add", "-A")
+            git(project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base")
+            approved_spec(project)
+            git(project.root, "add", "-A")
+            git(project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "spec")
+            project.write("src/a/new.py", "y = 2\n")  # written by the module: new at the baseline
+            git(project.root, "add", "-A")
+            git(project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "code")
+            project.write("tasks/a/design.md", design_text("- 新增 `src/a/new.py`"))
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})
+            for impact in ("- 改 `src/a/old.py:12`", "- 改 `src/a/` 目录"):
+                with self.subTest(impact=impact):
+                    project.write("tasks/a/design.md", design_text(impact))
+                    self.assertEqual(self.need(project), {"need": "review", "reason": "old-files"})
+
+    def test_outside_git_the_working_tree_stands_in(self):
+        with Project() as project:
+            approved_spec(project)
+            project.write("src/a/old.py", "x = 1\n")
+            project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`，新增 `src/a/new.py`"))
+            self.assertEqual(self.need(project), {"need": "review", "reason": "old-files"})
+
+    def test_no_path_counts_as_old_logic(self):
+        with Project() as project:
+            approved_spec(project)
+            project.write("tasks/a/design.md", design_text("不涉及"))
+            self.assertEqual(self.need(project), {"need": "review", "reason": "impact-unknown"})
+
+    def test_the_switch_reviews_every_design(self):
+        with Project() as project:
+            approved_spec(project)
+            project.write("tasks/a/design.md", design_text())
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})
+            project.write(".agent/config.json", json.dumps({"version": 1, "designReview": "on"}))
+            self.assertEqual(self.need(project), {"need": "review", "reason": "configured"})
+            project.write(".agent/config.json", json.dumps({"version": 1, "designReview": "yes"}))  # AC9: off
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})
+
+    def test_no_design_step(self):
+        with Project() as project:
+            project.write("spec/a.md", "# a\n")
+            self.assertIsNone(self.need(project))
+            self.assertIsNone(module_stage.design_approval(project.root, "a"))
+            for tier in ("bug", "small"):
+                approved_spec(project, tier)
+                self.assertIsNone(module_stage.design_approval(project.root, "a"))
+
+
+class DesignApprovalTest(unittest.TestCase):
+    """design-review AC3, AC4, AC6-AC8: the designApproval status, the phase hint and the stop node."""
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+
+    def round(self, n, blocking, vendor="openai", same="false", report="a" * 64):
+        return ("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=%s same-vendor=%s "
+                "criteria=design-v1 report=%s -->" % (n, blocking, "b" * 12, vendor, same, report))
+
+    def design(self, impact="- 改 `src/a/old.py`", marker=None, rounds=()):
+        from module_stage import REVIEW_PENDING, review_approved_line, review_codex_digest, review_reviewer_line
+        text = design_text(impact)
+        if rounds:
+            text += "## 外部审查意见\n\n" + "".join(line + "\n" for line in rounds)
+        if marker:
+            head, _, rest = text.partition("\n")
+            pending = "%s\n\n%s\n%s" % (head, REVIEW_PENDING, rest)
+            line = {"pending": REVIEW_PENDING,
+                    "approved": review_approved_line(review_codex_digest(pending)),
+                    "reviewer-approved": review_reviewer_line(review_codex_digest(pending))}[marker]
+            text = pending.replace(REVIEW_PENDING, line)
+        self.project.write("tasks/a/design.md", text)
+
+    def approval(self):
+        return module_stage.design_approval(self.project.root, "a")
+
+    def stop(self, stage="NEEDS_REGRESSION"):
+        return module_stage.stop_node(self.project.root, "a", stage, "approved", "none")
+
+    def test_not_required_goes_straight_to_the_regression_document(self):
+        # AC3
+        approved_spec(self.project)
+        self.design("- 新增 `src/a/new.py`")
+        self.assertEqual(self.approval()["status"], "not-required")
+        self.assertIsNone(self.approval()["approvedBy"])
+        text = hint(self.project)
+        self.assertIn("写回归测试文档 `tasks/a/regression.md`", text)
+        self.assertNotIn("技术方案 `tasks/a/design.md`", text)
+
+    def test_review_needed_then_passed_by_the_reviewer(self):
+        # AC4
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design()
+        self.assertEqual(self.approval()["status"], "pending-review")
+        text = hint(self.project)
+        self.assertIn("技术方案 `tasks/a/design.md` 待审（第二审查者；影响面列了已有文件）", text)
+        self.assertIn("--author-host <claude-code|codex> --paths tasks/a/design.md --spec spec/a.md", text)
+        self.assertIn("放行前先不要写回归测试文档", text)
+        self.assertNotIn("建议下一步: 写回归测试文档", text)
+        claude = module_stage.design_hint(self.project.root, "a", "NEEDS_REGRESSION",
+                                          module_stage.commands("claude", True), True)[1]
+        self.assertIn("--author-host claude-code ", claude)
+        codex = module_stage.design_hint(self.project.root, "a", "NEEDS_REGRESSION",
+                                         module_stage.commands("codex", False), False)[1]
+        self.assertIn("--author-host codex ", codex)
+        self.assertIsNone(self.stop())
+        self.design(rounds=[self.round(1, 2)])
+        self.assertEqual(self.approval()["status"], "in-review")
+        self.assertIn("--previous-report <上一轮报告>", hint(self.project))
+        self.assertIsNone(self.stop())
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 2), self.round(2, 0, same="true", report="c" * 64)])
+        approval = self.approval()
+        self.assertEqual((approval["status"], approval["approvedBy"]), ("approved", "reviewer"))
+        self.assertEqual((approval["reviewerVendor"], approval["sameVendor"], approval["reportSha256"]),
+                         ("openai", True, "c" * 64))
+        self.assertEqual([item["round"] for item in approval["rounds"]], [1, 2])
+        self.assertIn("写回归测试文档 `tasks/a/regression.md`", hint(self.project))
+
+    def test_two_blocking_rounds_go_to_the_user(self):
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design(rounds=[self.round(1, 2), self.round(2, 1)])
+        self.assertEqual(self.approval()["status"], "pending-user")
+        self.assertIn("待用户批（两轮审查仍有阻断）", hint(self.project))
+        self.assertEqual(self.stop(), "design-review")
+        self.design(marker="approved", rounds=[self.round(1, 2), self.round(2, 1)])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
+        self.assertIsNone(self.stop())
+
+    def test_important_is_always_the_users(self):
+        # AC6
+        approved_spec(self.project, "important")
+        self.design("- 新增 `src/a/new.py`")
+        self.assertEqual(self.approval()["status"], "pending-user")
+        text = hint(self.project)
+        self.assertIn("待用户批（重要需求，第二审查者先审一轮）", text)
+        self.assertIn("/delegate:review --profile design", text)
+        self.assertEqual(self.stop(), "design-review")
+        self.design("- 新增 `src/a/new.py`", marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.assertEqual(self.approval()["status"], "pending-user")
+        self.assertIn("待用户批（重要需求）", hint(self.project))
+        self.design("- 新增 `src/a/new.py`", marker="approved", rounds=[self.round(1, 0)])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
+
+    def test_no_reviewer_goes_to_the_user(self):
+        # AC7
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design(marker="pending", rounds=[self.round(1, 0, vendor="none")])
+        approval = self.approval()
+        self.assertEqual(approval["status"], "unreviewed")
+        self.assertEqual((approval["reviewerVendor"], approval["sameVendor"], approval["reportSha256"]),
+                         (None, None, None))
+        self.assertEqual(approval["rounds"][0]["vendor"], None)
+        self.assertIn("没有可用的第二审查者（未审），交用户批", hint(self.project))
+        self.assertEqual(self.stop(), "design-review")
+        self.design(marker="approved", rounds=[self.round(1, 0, vendor="none")])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
+
+    def test_an_edit_after_passing_is_a_revision(self):
+        # AC8: reviewed again, or approved again by the user, also once the later documents exist.
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        path = self.project.root / "tasks" / "a" / "design.md"
+        path.write_text(path.read_text(encoding="utf-8").replace("不涉及", "改过", 1), encoding="utf-8")
+        self.assertEqual(self.approval()["status"], "revised")
+        self.assertIn("放行后又改过，要重新审", hint(self.project))
+        self.assertIsNone(self.stop())
+        self.project.write("tasks/a/regression.md", "# r\n")
+        self.project.write("tasks/a/plan.md", "# p\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+        self.assertIn("放行后又改过，要重新审", hint(self.project))
+        approved_spec(self.project, "important")
+        self.design(marker="approved", rounds=[self.round(1, 0)])
+        path.write_text(path.read_text(encoding="utf-8").replace("不涉及", "改过", 1), encoding="utf-8")
+        self.assertIn("批准后又改过，要用户重新批", hint(self.project))
+        self.assertEqual(self.stop("BUILDING"), "design-review")
+
+    def test_a_design_from_before_this_check_is_not_stopped_later(self):
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design()
+        self.project.write("tasks/a/regression.md", "# r\n")
+        self.assertEqual(self.approval()["status"], "pending-review")
+        self.assertNotIn("技术方案 `tasks/a/design.md`", hint(self.project))
+
+    def test_english_wording(self):
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+        self.design()
+        text = hint(self.project, zh=False)
+        self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files)",
+                      text)
+        self.assertIn("Until it passes, do not write the regression document yet.", text)
 
 
 if __name__ == "__main__":

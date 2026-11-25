@@ -60,12 +60,13 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en`、`pt-BR` | 未设置 | 新写的 Spec、Plan、todo 正文用这种语言；结构关键字（能力图表头、`## 目标`、勾选框、`gate`／`report`、标记行）不变。已有产物不翻译。恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文 |
 | `reviewCadence` | `separate`／`combined` | `separate` | `combined`：写入能力图后 Spec 与 Plan 一起给出、一次批准；出现预览时没确认过的新决策、范围不清或高风险不可逆改动时仍分两次。见共享检查点规则「批准节奏」 |
 | `moduleConcurrency` | `off`／`on` | `off` | 多模块并行开关：`on` 时打开规划层的并行规则（并行评估、并行边界、可开工列表、角色标记）；本身不开会话、不建 worktree、不发消息、不合并，运行时归 module-crew 插件；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早的 spec-guard 不认识这个键，会把整份配置判为无效（连产物语言也失效），团队成员都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键 |
+| `designReview` | `off`／`on` | `off` | 技术方案审查开关：新流程里档位为普通的模块，`on` 时技术方案交第二审查者审一轮、改一轮，审过即放行；`off` 时不审。技术方案碰到老逻辑（影响面列了已有文件）或跨模块时不论开关都审；重要需求的技术方案永远由用户批。老模块与 bug、小改动不受影响。不注入阶段提示 |
 | `takeover` | 预设 `none`／`plan`／`merge`，或自定义对象 `{"spec","plan","merge","release"}` | `none` | 接管档位：Spec 批准、Plan 批准（`human`／`codex`）、合并（`human`／`auto`）、发布（`human`／`prepare`／`auto-confirm`／`auto`）各由谁做。`plan` 只把 Plan 交给 Codex；`merge` 把 Spec、Plan 交给 Codex 且合并自动；发布只能用自定义打开。自定义里没写的项按 `human`，任何一项写错整个键失效。spec-guard 只存、读、报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制（流水线自用的四个插件最高 `prepare`；`auto` 只给能快速回滚的项目），由 autopilot 拦截。设置或取消要用户在对话里的原话，`--confirm` 前引用；按档位放行的规则落地前，共享检查点规则「自治档位与底线」照旧适用。0.67.1 及更早的 spec-guard 会把含这个键的配置整份判为无效，0.68.0～0.90.1 只忽略它；团队都升级后再设置 |
 | `moduleTakeover` | 对象：模块 id → 同 `takeover` 的值 | 未设置（`{}`） | 按模块的接管档位，没设的模块随 `takeover`。用 `--module` 一次改一个模块；任何一条写错整个键失效。比项目宽时只提醒、不截断。能力图上没有的模块 id 由 verify-artifacts 警告。`/map --json` 每个模块的 `takeover` 报四项与来源。写入同样要用户原话 |
 | `projectSections` | 对象：文档（`requirement`／`design`／`regression`）→ 章节名列表，如 `{"design": ["浏览器兼容"]}` | 未设置（`{}`） | 项目追加章节：新流程模块（需求文档带 `flow v2` 标记）的这几份文档在骨架章节之外必须带上这些章节，内容可以写「不涉及」；`bug`、`small` 只写一份需求文档，只要求 `requirement` 的追加章节；老模块不受影响。章节名非空、最多 40 个字符、不含换行和 `|`、`#`，同一份文档里不重复、不与骨架章节同名，每份最多 10 个；任何一条不对整个键失效。`set --value` 给 JSON 对象，先预览后确认，不需要用户原话（这是项目规矩，不是接管档位）。阶段提示在写到对应文档时列出这些章节。骨架见 `references/doc-skeletons.md` |
 | `autonomyTier`、`moduleAutonomy` | — | — | 已退役（S101），不映射到接管档位：文件里还有时不生效，`show` 标为已退役，verify-artifacts 只警告；不能再 `set`，可以 `unset` 删除。`/map --json` 的 `autonomy` 字段本版仍按它们计算、标为 deprecated，下一版删除 |
 
-设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency`、`takeover`、`moduleTakeover`、`projectSections` 例外：取什么值都不注入，它们的效果只在相应规则的停点或读取它的插件里出现。
+设置了的项会在每轮阶段提示里各出现一行；`separate` 与未设置不注入任何内容。`moduleConcurrency`、`takeover`、`moduleTakeover`、`projectSections`、`designReview` 例外：取什么值都不注入，它们的效果只在相应规则的停点或读取它的插件里出现。
 
 只读汇总、不在这里修改的一项：
 
