@@ -11,7 +11,7 @@
 - [x] Task 7：规则与文档
 - [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告（用户「验收通过并合并」）
 - [x] Task 8（返工，M3 实跑发现，用户「M3 A」）：bug 档修完往需求文档的「回归用例」一节补用例，不再让已确认的需求变成要重新确认——批准指纹不算 bug 档这一节的内容；旧算法批准的需求在内容不变时照样算批准
-- [ ] Checkpoint 3（gate）：完整检查、推送、开 PR、发版后复跑 U3
+- [x] Checkpoint 3（gate）：完整检查、推送、开 PR、发版后复跑 U3（用户「验收通过并合并」「合并 #506，发 0.96.1」）
 
 ## 证据
 - Task 1（2026-11-25）：新文件 `hooks/regression_view.py` 的解析部分：`parse_regression`（三种文档：模块回归、`spec/<id>.md` 的回归用例一节、联调回归）、`criteria_ids`、`case_sha256`（五个字段压空白后按固定键序算，标题与编号不算）。字段名中英文、冒号中英文都认，续行与代码块并入当前字段，围栏里的标题不算用例。
@@ -40,3 +40,4 @@
 - M3 实跑（2026-11-26，安装版 0.96.0）：bug 修完往 `spec/a.md` 的「回归用例」一节补用例后，阶段提示变成「需求文档确认后又改过，要用户重新确认」，`requirementConfirm.status` 为 `revised`，verify-artifacts 多一条「批准后已修订」。用户「M3 A」：这次不通过，追加 Task 8。
 - Task 8（2026-11-26）：`module_stage.review_digest` 对新流程 bug 档需求文档不算「回归用例」一节的内容（标题保留，围栏里的标题不算）；`review_state` 与基线查找同时认 0.96.0 及更早的整份指纹（`whole_review_digest`），旧批准在内容不变时照样有效。小改动照旧算进指纹。写批准标记的 review-mark 走同一个 `review_digest`，不用改。
   用例：`test_flow_v2.py` `BugCaseNoReconfirmTest` 4 例（bug 补用例保持已确认、改复现步骤仍要重新确认；small 补用例仍要重新确认；旧算法的批准照样有效；围栏里的标题不开启这一节），实现前核心那例失败。变异：不看围栏、不去掉这一节、不认旧指纹，各自让对应用例变红。文档：`doc-skeletons.md` 的 bug 一条补一句；CHANGELOG「未发布」；版本 0.96.0 → 0.96.1（两份 plugin.json、两份 README 的 `--ref`）。
+- Checkpoint 3（2026-11-26）：#505 合并（fce30e2f）；0.96.1 发布（#506 合并 e8390a66，资产 sha256 07f65487…d490），本机两侧已装、Codex smoke 通过。用安装版 0.96.1 复跑 U3：bug 修完补用例后 `requirementConfirm.status` 仍为 `confirmed`、阶段提示不再要求重新确认、verify-artifacts 0 警告 0 失败；再改复现步骤则为 `revised`。合并前阶段提示报「16 个文件越界」是误报：越界检查以本模块最初开工前的提交为基线，把之后别的模块的合并也算了进来；#505 实际只改了边界内的 9 个文件。
