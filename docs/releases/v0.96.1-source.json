@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.96.1"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:e8390a6609bdb7bf91fd4a80662329838de1bc4e"
+      },
+      "observedAt": "2026-11-25T18:47:48Z",
+      "evidence": [
+        "result:the v0.96.1 annotated tag resolves to merge commit e8390a6609bdb7bf91fd4a80662329838de1bc4e (pull request #506); merged==true and main==merge sha were checked before tagging; the CI run on the tagged merge commit succeeded",
+        "result:the ChatGPT desktop app restart and main process start time were not verified"
+      ]
+    }
+  ]
+}
