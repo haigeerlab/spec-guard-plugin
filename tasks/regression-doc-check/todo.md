@@ -9,7 +9,7 @@
 - [x] Task 6：接口 1.23
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 7：规则与文档
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告（用户「验收通过并合并」）
 
 ## 证据
 - Task 1（2026-11-25）：新文件 `hooks/regression_view.py` 的解析部分：`parse_regression`（三种文档：模块回归、`spec/<id>.md` 的回归用例一节、联调回归）、`criteria_ids`、`case_sha256`（五个字段压空白后按固定键序算，标题与编号不算）。字段名中英文、冒号中英文都认，续行与代码块并入当前字段，围栏里的标题不算用例。
@@ -34,3 +34,4 @@
 - Task 7（2026-11-25）：`references/doc-skeletons.md` 回归一节写全用例格式（字段表、例子、对照表、受影响的老功能、bug／small、检查在哪里）与多模块联调回归；共享检查点规则「新流程模块的写法」一条引用它；`docs/commands.md` 的 verify-artifacts 表加三行、加 `regression_view.py` 一节；
   `spec/usage/dev-flow-v2.md` 改 U1（只有 `takeover=design`／`merge` 才无需你批）、U2（技术方案先批、再写回归文档）、U3（小改动不走技术方案审查），「后续模块已收到的输入」记已处理；CHANGELOG 新增「未发布」一条；版本 0.95.0 → 0.96.0（两份 plugin.json）。
   提交前快档校验要求两份 README 的安装命令 `--ref` 与清单版本一致；两份 README 在并行边界外，停下问用户，用户「可以，加进边界并改」：改成 `v0.96.0`，Spec 并行边界补入并记修订。
+- Checkpoint 2（2026-11-25）：基于 main `560c5731` 推送，开 PR #500 并绑定到会话；验收消息里提了宿主 PR 监控，由用户决定，没有打开。最终验收与合并合成一问，用户回「验收通过并合并」（同时批准修订后的 Spec：并行边界补入 `scripts/test-checkers.sh`、两份 README）。拟回告发给 mc-coord 与 autopr-design。
