@@ -16,7 +16,7 @@
    也不要只留在本地，避免随 worktree 丢失。
 4. **合并由用户在对话里决定**：agent 问“可以合并吗”，用户回“合并”后，agent 先看 PR 状态：
    必需检查 `CI required` 已通过（`mergeStateStatus` 为 `CLEAN`）时执行 `gh pr merge --squash`；还没跑完时执行
-   `gh pr merge --auto --squash`，由 GitHub 等它通过后合并；agent 核实已合并（第 5 条）再告诉用户合并提交。下面一种情况除外。
+   `gh pr merge --auto --squash`，由 GitHub 等它通过后合并；agent 核实已合并（第 5 条）再告诉用户合并提交。agent 不自己等 CI（不用 `--watch`、定时或循环），等用户叫或宿主通知。下面一种情况除外。
    用户已于 2026-10-13 给出长期授权：发版后的收尾 PR 同时满足“只改
    `docs/releases/` 下的文件与该模块 `todo.md` 末尾的一行”和“CI 通过”时，维护它的 agent 可以自行合并；多改了任何别的
    文件就照常按上面问用户。

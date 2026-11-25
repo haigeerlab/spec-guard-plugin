@@ -107,6 +107,12 @@ class NodeRules(unittest.TestCase):
                 self.assertTrue(text.startswith(title + "\n"), text[:40])
                 self.assertNotIn("\n## ", text)
 
+    def test_final_gate_asks_to_merge_with_the_acceptance(self):
+        # merge-ask-no-wait: the final-gate message asks "accept and merge?" in one question, without waiting on CI.
+        text = node_rules("final-gate")
+        for phrase in ("验收通过、合并吗？", "验收通过并合并", "只验收，先不合", "不等 CI 跑完"):
+            self.assertIn(phrase, text)
+
     def test_missing_file_section_or_kind_is_empty(self):
         self.assertEqual(node_rules("nonsense"), "")
         with tempfile.TemporaryDirectory() as tmp:

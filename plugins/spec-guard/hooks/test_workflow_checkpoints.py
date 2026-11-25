@@ -855,6 +855,16 @@ class ConcurrencyBoundaryTests(unittest.TestCase):
             self.assertIn(phrase, rule)
         self.assertIn("的**唯一例外**", self.text[self.text.index("它是「合并永远由用户在对话里决定」"):])
 
+    def test_merge_timing_and_ci_waiting(self):
+        # merge-ask-no-wait (plugin development rules v1.7): ask with the acceptance, never wait on CI yourself.
+        start = self.text.index("合并的时机与 CI（规范 v1.7）：")
+        rule = self.text[start:self.text.index("\n", start)]
+        for phrase in ("最终验收的交审消息里就问合并", "不等 CI 跑完", "验收通过、合并吗？", "验收通过并合并", "只验收，先不合",
+                       "选后者之后照旧再问一次合并", "验收没过不问合并", "提议打开", "用户批准才开", "宿主没有就跳过",
+                       "`--watch`", "定时任务", "循环", "跑完叫我", "先核实已合并", "记下合并提交再告诉用户"):
+            self.assertIn(phrase, rule)
+        self.assertGreater(start, self.text.index("合并永远由用户在对话里决定："))
+
     def test_final_acceptance_points_to_the_boundary(self):
         start = self.text.index("- **最终验收列出实际改动的文件。**")
         rule = self.text[start:self.text.index("\n- **", start + 1)]
