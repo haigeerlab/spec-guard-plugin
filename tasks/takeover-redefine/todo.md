@@ -7,7 +7,7 @@
 - [x] Task 4：`/map --json` 与接口 1.22
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 5：verify-artifacts
-- [ ] Task 6：规则与文档
+- [x] Task 6：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
@@ -29,3 +29,4 @@
 - Task 5（2026-11-25）：判据在 `design_review_problems`（`design=human` 时只有第二审查者放行也警告，同重要需求）。`test-verify-artifacts.sh` 加 4 例（`human` 警告、`design` 不警告、旧值有效、`design` 取值写错判无效），138 例通过；把判据改回只看重要需求，`human` 那一例变红。
 - Task 6（2026-11-25，部分）：`commands/config.md`（两行、示例、收窄）、共享规则「技术方案审查」「自治档位与底线」、`docs/commands.md`、README「自动接管」一节（补新流程模块的说明，README 原来没有讲新流程的段落）、CHANGELOG「未发布」三条。
   边界外还有 `skills/spec-guard-ops/SKILL.md` 第 191 行与 `docs/concepts.md` 第 81 行写着旧档位，停下问用户。
+- Task 6（2026-11-25，补完）：用户「可以，加进边界并改」，`skills/spec-guard-ops/SKILL.md` 的 `takeover` 说明与收窄一行、`docs/concepts.md` 概念表的「接管档位」一行同步成新档位；Spec 并行边界补入这两个文件。

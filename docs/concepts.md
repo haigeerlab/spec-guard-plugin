@@ -78,5 +78,5 @@ spec-guard 不跨仓库汇总进度。跨仓库的接口约定照上游 `spec-dr
 | 预先声明 | Plan 里可选的一节 `## 预先声明`：列出要改的公共路径、外部依赖、质量与工作区配置、补丁；批准 Plan 即授权这些改动，之后不再逐次问。删除文件、改对外契约、安全例外不能预先声明。`verify-artifacts` 校验格式 |
 | 并行边界 | `moduleConcurrency` 为 `on` 时，每个未完成模块的 Spec 里的一节 `## 并行边界`：写明独占哪些路径、预计碰哪类公共文件。`verify-artifacts` 校验格式，最终验收时标出改到边界外的文件 |
 | Build order 逗号组 | Build order 里用逗号分开的几个模块，例如 `a → b, c → d` 里的 `b, c`，表示可以同时进行。并行开关不是 `on` 时，按从左到右逐个推进 |
-| 接管档位 | `.agent/config.json` 的 `takeover`（`none` 默认、`plan` 只接管 Plan、`merge` 接管到合并，或自定义 Spec、Plan、合并、发布四项）与按模块的 `moduleTakeover`：每项由你做还是交给 AI（Codex 审过就算、自动合并、自动发布）。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 去做。0.91.0 起取代已退役的 `autonomyTier`、`moduleAutonomy`（不映射） |
+| 接管档位 | `.agent/config.json` 的 `takeover`（`none` 默认全由你做、`design` 技术方案由第二审查者审过就算、`merge` 再加自动合并，或自定义技术方案、合并、发布三项；需求与新流程 Plan 不可配）与按模块的 `moduleTakeover`：每项由你做还是交给 AI（第二审查者审过就算、自动合并、自动发布）。旧值 `plan` 读作 `none`，老流程模块仍按旧含义由 Codex 批 Plan。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 去做。0.91.0 起取代已退役的 `autonomyTier`、`moduleAutonomy`（不映射） |
 | Epiq | 本地事项账本用的开源事项工具（[epiq](https://github.com/ljtn/epiq)，MIT），以 MCP 方式接入 Claude Code／Codex；账本数据在项目的 `.epiq/` 与 `__epiq_state__` 状态 worktree 里 |
