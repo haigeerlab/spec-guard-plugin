@@ -497,6 +497,23 @@ def module_baseline(root: Path, module: str) -> str | None:
     return _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
 
 
+def impact_has_old_files(root: Path, module: str, text: str) -> bool | None:
+    """design-review, regression-doc-check: True when the design's impact section lists a file that existed before the
+    module started; None when it names no path at all (callers decide what an unknown impact means)."""
+    paths = impact_paths(text)
+    if not paths:
+        return None
+    base = module_baseline(root, module)
+    for path in paths:
+        if base is None:
+            old = (root / path).exists()
+        else:
+            old = bool(base) and _git(root, "cat-file", "-e", "%s:%s" % (base, path)) is not None
+        if old:
+            return True
+    return False
+
+
 def design_requirement(root: Path, module: str) -> dict | None:
     """design-review (assumption 2): {"need": "user" | "review" | "none", "reason"}; None without a design step.
 
@@ -515,17 +532,11 @@ def design_requirement(root: Path, module: str) -> dict | None:
     except (OSError, UnicodeError):
         text = None
     if text is not None:
-        paths = impact_paths(text)
-        if not paths:
+        old = impact_has_old_files(root, module, text)
+        if old is None:
             return {"need": "review", "reason": "impact-unknown"}
-        base = module_baseline(root, module)
-        for path in paths:
-            if base is None:
-                old = (root / path).exists()
-            else:
-                old = bool(base) and _git(root, "cat-file", "-e", "%s:%s" % (base, path)) is not None
-            if old:
-                return {"need": "review", "reason": "old-files"}
+        if old:
+            return {"need": "review", "reason": "old-files"}
     if load_config(root)[0].get("designReview") == "on":
         return {"need": "review", "reason": "configured"}
     return {"need": "none", "reason": None}

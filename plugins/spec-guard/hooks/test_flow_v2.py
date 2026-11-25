@@ -1203,5 +1203,243 @@ class T4Test(FlowOverreachTest):
         self.assertIn("T4 路径：没有开工基线可比", hint(self.project))
 
 
+
+# regression-doc-check: the case format, its parser and the per-case sha256 (Task 1).
+CASES_ZH = """# 回归
+
+## 用例清单
+
+### R1: 正常保存
+- 步骤：打开页面，
+  点保存
+- 预期：提示已保存
+- 执行方式：command
+- 命令：
+  ```bash
+  python3 -m pytest tests/test_save.py
+  ```
+- 证据：运行输出
+
+### R2：手工核对
+- 步骤：看一眼
+- 预期：没变
+- 执行方式：manual
+- 证据：用户原话
+
+## 成功标准对照
+
+| 成功标准 | 用例 |
+|---|---|
+| S1 | R1、R2 |
+| S2 | R3 |
+
+## 受影响的老功能
+
+### R3: 老的导出
+- 步骤：导出
+- 预期：同以前
+- 执行方式：script
+- 命令：`./scripts/export.sh`
+- 证据：运行输出
+"""
+
+CASES_EN = """# Regression
+
+## Cases
+
+### R1: save
+- Steps: open, save
+- Expected: saved
+- Method: ai-operate
+- Evidence: screenshot
+
+## Success criteria coverage
+
+| Criterion | Cases |
+|---|---|
+| S1 | R1 |
+
+## Affected existing features
+
+不涉及
+"""
+
+
+def criteria_requirement(*ids, tier="normal"):
+    body = "".join("- **%s** 能做到 %s\n" % (sid, sid) for sid in ids)
+    return requirement(tier).replace("## 成功标准\n\n不涉及\n", "## 成功标准\n\n%s" % body)
+
+
+class RegressionParseTest(unittest.TestCase):
+    def parse(self, text, criteria=("S1", "S2")):
+        import regression_view
+        return regression_view.parse_regression(text, "module", list(criteria))
+
+    def test_chinese_document_parses_every_field(self):
+        result = self.parse(CASES_ZH)
+        self.assertEqual(result["problems"], [])
+        r1, r2, r3 = result["cases"]
+        self.assertEqual((r1["id"], r1["title"], r1["method"]), ("R1", "正常保存", "command"))
+        self.assertEqual(r1["steps"], "打开页面，\n点保存")
+        self.assertEqual(r1["command"], "python3 -m pytest tests/test_save.py")
+        self.assertEqual((r1["criteria"], r1["affectedExisting"]), (["S1"], False))
+        self.assertEqual((r2["command"], r2["criteria"]), (None, ["S1"]))
+        self.assertEqual((r3["command"], r3["criteria"], r3["affectedExisting"]), ("./scripts/export.sh", ["S2"], True))
+        self.assertTrue(all(len(case["sha256"]) == 64 for case in result["cases"]))
+
+    def test_english_document_parses(self):
+        result = self.parse(CASES_EN, criteria=("S1",))
+        self.assertEqual(result["problems"], [])
+        self.assertEqual([(c["id"], c["method"], c["evidence"]) for c in result["cases"]], [("R1", "ai-operate", "screenshot")])
+
+    def test_fenced_heading_is_not_a_case(self):
+        text = CASES_EN.replace("## Success criteria coverage", "```\n### R9: no\n```\n\n## Success criteria coverage")
+        self.assertEqual([c["id"] for c in self.parse(text, ("S1",))["cases"]], ["R1"])
+
+    def test_criteria_ids_come_from_the_requirement(self):
+        import regression_view
+        self.assertEqual(regression_view.criteria_ids(criteria_requirement("S1", "S2", "S3")), ["S1", "S2", "S3"])
+        self.assertEqual(regression_view.criteria_ids(requirement()), [])
+
+    def test_sha256_ignores_whitespace_and_title_not_content(self):
+        base = {c["id"]: c["sha256"] for c in self.parse(CASES_ZH)["cases"]}
+        spaced = CASES_ZH.replace("- 预期：提示已保存", "- 预期：  提示已保存  ").replace("### R1: 正常保存", "### R1: 别的标题")
+        self.assertEqual({c["id"]: c["sha256"] for c in self.parse(spaced)["cases"]}, base)
+        for old, new in (("提示已保存", "提示失败"), ("tests/test_save.py", "tests/other.py"), ("- 证据：用户原话", "- 证据：截图")):
+            changed = {c["id"]: c["sha256"] for c in self.parse(CASES_ZH.replace(old, new))["cases"]}
+            with self.subTest(old=old):
+                self.assertNotEqual(changed, base)
+
+    def test_each_problem_code(self):
+        cases = [
+            ("case-field-missing", CASES_EN.replace("- Expected: saved\n", "")),
+            ("case-method-invalid", CASES_EN.replace("Method: ai-operate", "Method: eyeball")),
+            ("case-command-missing", CASES_EN.replace("Method: ai-operate", "Method: command")),
+            ("case-command-unexpected", CASES_EN.replace("- Evidence: screenshot", "- Command: ls\n- Evidence: screenshot")),
+            ("case-id-duplicate", CASES_EN.replace("## Success criteria coverage", CASES_EN.split("## Cases\n\n")[1].split("## Success")[0] + "## Success criteria coverage")),
+            ("criterion-uncovered", CASES_EN),
+            ("criterion-unknown", CASES_EN.replace("| S1 | R1 |", "| S1 | R1 |\n| S9 | R1 |")),
+            ("case-unknown", CASES_EN.replace("| S1 | R1 |", "| S1 | R1, R7 |")),
+            ("no-cases", CASES_EN.split("### R1")[0] + "## Success criteria coverage\n\n不涉及\n\n## Affected existing features\n\n不涉及\n"),
+        ]
+        for code, text in cases:
+            with self.subTest(code=code):
+                criteria = ("S1", "S2") if code == "criterion-uncovered" else ("S1",)
+                codes = [p["code"] for p in self.parse(text, criteria)["problems"]]
+                self.assertIn(code, codes)
+
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                          capture_output=True, text=True, check=True).stdout.strip()
+
+
+def commit_all(root, message="c"):
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", message, "--allow-empty")
+    return git(root, "rev-parse", "HEAD")
+
+
+class RegressionViewCliTest(unittest.TestCase):
+    """regression-doc-check Task 2: the CLI, its exit codes and --ref."""
+
+    def view(self, root, *args):
+        done = subprocess.run([sys.executable, "-B", str(HERE / "regression_view.py"), "--json", "--project", str(root),
+                               *args], capture_output=True, text=True)
+        return done.returncode, (json.loads(done.stdout) if done.stdout.strip() else None)
+
+    def setUp(self):
+        self.ctx = Project()
+        self.project = self.ctx.__enter__()
+        self.addCleanup(self.ctx.__exit__)
+        git(self.project.root, "init", "-q")
+
+    def normal(self, cases=CASES_EN):
+        self.project.write("spec/a.md", criteria_requirement("S1"))
+        self.project.write("tasks/a/design.md", "## 影响面\n\n- `src/new.py`\n")
+        self.project.write("tasks/a/regression.md", cases)
+
+    def test_tiers_read_their_document(self):
+        self.normal()
+        code, out = self.view(self.project.root, "--module", "a")
+        self.assertEqual((code, out["document"], out["tier"], out["problems"]), (0, "tasks/a/regression.md", "normal", []))
+        self.assertEqual(out["sha256"], __import__("hashlib").sha256(CASES_EN.encode()).hexdigest())
+        short = CASES_EN.split("## Cases\n\n")[1].split("## Success")[0]
+        for tier in ("small", "bug"):
+            with self.subTest(tier=tier):
+                spec = (criteria_requirement("S1", tier=tier) if tier == "small" else requirement(tier))
+                spec += "## 回归用例\n\n" + short + ("| 成功标准 | 用例 |\n|---|---|\n| S1 | R1 |\n" if tier == "small" else "")
+                self.project.write("spec/a.md", spec)
+                code, out = self.view(self.project.root, "--module", "a")
+                self.assertEqual((code, out["document"], [c["id"] for c in out["cases"]], out["problems"]),
+                                 (0, "spec/a.md", ["R1"], []))
+
+    def test_errors(self):
+        self.assertEqual(self.view(self.project.root, "--module", "zz")[0], 2)
+        self.project.write("spec/a.md", "# a\n")
+        self.assertEqual(self.view(self.project.root, "--module", "a"), (3, {"schemaVersion": 1, "error": "not-flow-v2"}))
+        self.project.write("spec/a.md", criteria_requirement("S1"))
+        self.assertEqual(self.view(self.project.root, "--module", "a"), (3, {"schemaVersion": 1, "error": "no-document"}))
+        self.assertEqual(self.view(self.project.root, "--usage", "../x")[0], 2)
+
+    def test_ref_reads_that_commit(self):
+        self.normal()
+        first = commit_all(self.project.root)
+        self.normal(CASES_EN.replace("- Expected: saved", "- Expected: changed"))
+        code, old = self.view(self.project.root, "--module", "a", "--ref", first)
+        _code, new = self.view(self.project.root, "--module", "a")
+        self.assertEqual((code, old["ref"], old["cases"][0]["expected"], new["cases"][0]["expected"]),
+                         (0, first, "saved", "changed"))
+        self.assertNotEqual(old["cases"][0]["sha256"], new["cases"][0]["sha256"])
+        self.assertEqual(self.view(self.project.root, "--module", "a", "--ref", "no-such-ref"),
+                         (4, {"schemaVersion": 1, "error": "unreadable"}))
+
+    def test_ref_without_the_document(self):
+        self.project.write("spec/a.md", criteria_requirement("S1"))
+        first = commit_all(self.project.root)
+        self.normal()
+        self.assertEqual(self.view(self.project.root, "--module", "a", "--ref", first),
+                         (3, {"schemaVersion": 1, "error": "not-at-ref"}))
+
+    def test_ref_tier_comes_from_that_commit(self):
+        short = CASES_EN.split("## Cases\n\n")[1].split("## Success")[0]
+        self.project.write("spec/a.md", criteria_requirement("S1", tier="small") + "## 回归用例\n\n" + short
+                           + "| 成功标准 | 用例 |\n|---|---|\n| S1 | R1 |\n")
+        first = commit_all(self.project.root)
+        self.normal()
+        code, out = self.view(self.project.root, "--module", "a", "--ref", first)
+        self.assertEqual((code, out["tier"], out["document"]), (0, "small", "spec/a.md"))
+
+    def test_ref_sees_a_batch_insert_as_important(self):
+        self.project.write("spec/CAPABILITY-MAP.md", "# Capability Map: t\n\n| Module id | Responsibility | Depends on |\n"
+                           "|---|---|---|\n| z | x | — |\n\nBuild order: z\n")
+        commit_all(self.project.root)
+        self.project.write("spec/CAPABILITY-MAP.md", "# Capability Map: t\n\n| Module id | Responsibility | Depends on |\n"
+                           "|---|---|---|\n| z | x | — |\n| a | x | — |\n| b | x | — |\n\nBuild order: z → a → b\n")
+        self.project.write("spec/a.md", criteria_requirement("S1", tier="small"))
+        self.project.write("tasks/a/regression.md", CASES_EN)
+        first = commit_all(self.project.root)
+        code, out = self.view(self.project.root, "--module", "a", "--ref", first)
+        self.assertEqual((code, out["tier"], out["document"]), (0, "important", "tasks/a/regression.md"))
+
+    def test_ref_bytes_are_the_raw_blob(self):
+        crlf = CASES_EN.replace("\n", "\r\n")
+        self.project.write("spec/a.md", criteria_requirement("S1"))
+        (self.project.root / "tasks" / "a").mkdir(parents=True)
+        (self.project.root / "tasks" / "a" / "regression.md").write_bytes(crlf.encode())
+        # text eol=crlf: the blob is stored with LF, a checkout writes CRLF -- only the raw blob gives the blob's digest
+        self.project.write(".gitattributes", "tasks/a/regression.md text eol=crlf export-ignore export-subst\n")
+        first = commit_all(self.project.root)
+        blob = subprocess.run(["git", "-C", str(self.project.root), "cat-file", "blob", first + ":tasks/a/regression.md"],
+                              capture_output=True, check=True).stdout
+        sha = __import__("hashlib").sha256
+        self.assertNotEqual(blob, crlf.encode())
+        for args, digest in (((), sha(crlf.encode()).hexdigest()), (("--ref", first), sha(blob).hexdigest())):
+            with self.subTest(args=args):
+                code, out = self.view(self.project.root, "--module", "a", *args)
+                self.assertEqual((code, out["sha256"], out["problems"]), (0, digest, []))
+
+
 if __name__ == "__main__":
     unittest.main()
