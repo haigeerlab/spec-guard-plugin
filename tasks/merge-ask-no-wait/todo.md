@@ -3,7 +3,7 @@
 - [x] Task 0：提交 Plan 与 todo（2026-11-25 用户「Plan 批准」）
 - [x] Task 1：回归先红后绿，改共享规则、node-rules、release-process 与 CHANGELOG
 - [x] Checkpoint 1（report）：本机完整检查与变异
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并（含本机三套与 CI required 结果）、按 F3 合并、补记 CI 结论
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并（含本机三套与 CI required 结果）、按 F3 合并、补记 CI 结论
 
 ## 证据
 - Task 1（2026-11-25）：先写两条回归跑红（`test_merge_timing_and_ci_waiting` 找不到新段而报错；`test_final_gate_asks_to_merge_with_the_acceptance` 断言失败），
@@ -14,6 +14,8 @@
   verify-artifacts「passed (120 cases)」；repo-artifacts 0 失败。同一提交的第一次完整档因机器负载 24～41 让 `test_map_view` 两例子进程超时（30 秒），
   单独重跑 113 例全绿，第二次完整档通过；这次改动没碰 `map_view`。
   变异（AC4，临时脚本逐个删掉锁住的短语、跑对应用例、还原）：共享规则新段 16 个短语、`node-rules.md` 4 个短语，20 个全部变红；还原后 `git status` 干净。
+- Checkpoint 2（2026-11-25，PR #491）：推送 99601b38、开 PR；开 PR 后提议 Auto-fix，用户没开。最终验收按新规则与合并合成一问，用户原话「验收通过并合并」（AC6 第一步）。
+  验收时 PR 上 `CI required` 还在跑，没有自己等；本提交推送后按 F3 开 `--auto --squash`，合并结果与 CI 结论在下次被叫醒时核实补记。
 
 ## 外部审查意见
 
