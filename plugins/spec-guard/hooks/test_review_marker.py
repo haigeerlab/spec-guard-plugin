@@ -813,6 +813,37 @@ class Acceptance(AcceptanceFixture):
         self.assertRefused(self.accept(report, "--confirm"), "out-of-scope")
 
 
+class AcceptanceFlowScope(AcceptanceFixture):
+    """plan-auto-approve: a merge=auto v2 module's final acceptance checks its boundary plus its design's impact."""
+
+    BOUNDARY = ""
+
+    def setUp(self):
+        super().setUp()
+        self.project.spec.write_text(SPEC.replace("\n\n", "\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n", 1),
+                                     encoding="utf-8")
+        (self.root / "tasks" / "alpha" / "design.md").write_text("# d\n\n## 影响面\n\n- 改 `src/alpha.py`\n",
+                                                                 encoding="utf-8")
+        self.commit("v2 docs")
+
+    def test_impact_only_is_accepted(self):
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report)
+        self.assertEqual(code, 0, out)
+        self.assertIn("nothing out of scope", out)
+
+    def test_outside_the_impact_still_refuses(self):
+        (self.root / "README.md").write_text("x\n", encoding="utf-8")
+        self.commit("outside")
+        report = self.report()
+        self.evidence()
+        code, out = self.accept(report, "--confirm")
+        self.assertEqual(code, 2, out)
+        self.assertIn("acceptance-out-of-scope", out)
+        self.assertIn("README.md", out)
+
+
 class AcceptanceWorktrees(AcceptanceFixture):
     """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""
 

@@ -677,5 +677,98 @@ class Declared(unittest.TestCase):
         self.assertEqual(self.command(repo, "--module", "m")[0], 2)
 
 
+
+class FlowScope(unittest.TestCase):
+    """plan-auto-approve (Q1 A): a v2 module's scope is its boundary plus its design's impact paths."""
+
+    MAP = ("# Capability Map\n| Module id | Responsibility | Depends on |\n|---|---|---|\n| m | x | — |\n\n"
+           "Build order: m\n")
+
+    def repo(self, tier="normal", boundary=None, impact="- 改 `apps/m/`，新增 `apps/m/new.py`", switch=None):
+        repo = Repo(switch=switch, boundary=None).__enter__()
+        self.addCleanup(repo.__exit__, None, None, None)
+        (repo.root / "spec" / "m.md").unlink()
+        repo.write("spec/CAPABILITY-MAP.md", self.MAP)
+        repo.git("add", "-A")
+        repo.git("commit", "-qm", "before the module")
+        text = "# m\n\n<!-- spec-guard: flow v2 tier=%s -->\n" % tier
+        if boundary is not None:
+            text += "\n## 并行边界\n\n%s\n" % boundary
+        repo.write("spec/m.md", text)
+        if impact is not None and tier not in ("bug", "small"):
+            repo.write("tasks/m/design.md", "# d\n\n## 影响面\n\n%s\n" % impact)
+        repo.git("add", "-A")
+        repo.git("commit", "-qm", "spec")
+        return repo
+
+    def flow(self, repo):
+        from module_scope import flow_scope
+        return flow_scope(repo.root, "m")
+
+    def test_impact_paths_make_the_scope(self):
+        found = self.flow(self.repo())
+        self.assertEqual(found["status"], "ok")
+        self.assertEqual(set(found["scope"].exclusive), {"apps/m/", "apps/m/new.py"})
+
+    def test_boundary_and_impact_add_up(self):
+        found = self.flow(self.repo(boundary="- 独占：`docs/m.md`"))
+        self.assertEqual(set(found["scope"].exclusive), {"docs/m.md", "apps/m/", "apps/m/new.py"})
+
+    def test_four_statuses(self):
+        self.assertEqual(self.flow(self.repo(impact="不涉及"))["status"], "unknown")
+        self.assertEqual(self.flow(self.repo(tier="small"))["status"], "none")
+        self.assertEqual(self.flow(self.repo(tier="bug", boundary="- 独占：`apps/m/`"))["status"], "ok")
+        self.assertEqual(self.flow(self.repo(boundary="- 独占："))["status"], "invalid")
+
+    def test_check_command_runs_with_impact_only_whatever_the_switch(self):
+        repo = self.repo()
+        repo.write("apps/m/old.py", "changed\n")
+        repo.write("apps/other/keep.py", "changed\n")
+        code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+        self.assertEqual(code, 0, out)
+        rows = {row["path"]: row["scope"] for row in json.loads(out)["files"]}
+        self.assertEqual(rows["apps/m/old.py"], "exclusive")
+        self.assertEqual(rows["apps/other/keep.py"], "outside")
+
+    def test_check_command_says_unchecked_or_stops(self):
+        code, out = self.repo(tier="small").run("check", "--module", "m")
+        self.assertEqual(code, 3, out)
+        self.assertIn("flow-scope-none", out)
+        code, out = self.repo(impact="不涉及").run("check", "--module", "m")
+        self.assertEqual(code, 4, out)
+        self.assertIn("flow-scope-unknown", out)
+
+    def test_a_v2_plan_pre_declares_nothing(self):
+        repo = self.repo()
+        repo.write("tasks/m/plan.md", "# Plan: m\n\n<!-- spec-guard: review approved -->\n\n## 预先声明\n\n"
+                                      "- 公共路径：`package-lock.json`\n")
+        repo.git("add", "-A")
+        repo.git("commit", "-qm", "plan")
+        repo.write("package-lock.json", "changed\n")
+        code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+        self.assertEqual(code, 0, out)
+        rows = {row["path"]: row["scope"] for row in json.loads(out)["files"]}
+        self.assertEqual(rows["package-lock.json"], "outside")
+
+    def test_declared_query_keeps_its_fields(self):
+        repo = self.repo()
+        code, out = repo.run("declared", "--module", "m")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(json.loads(out)["planApproved"], False)  # no Plan yet
+        repo.write("tasks/m/plan.md", "# Plan: m\n\n## 预先声明\n\n- 公共路径：`package-lock.json`\n")
+        code, out = repo.run("declared", "--module", "m")
+        found = json.loads(out)
+        self.assertEqual((found["planApproved"], found["approvedCommit"]), (True, None))
+        self.assertEqual(set(found), {"module", "planApproved", "approvedCommit", "declared", "publicPaths",
+                                      "dependencies", "configs", "patches"})
+
+    def test_validate_declared_ignores_a_v2_section(self):
+        from module_scope import validate_declared
+        repo = self.repo()
+        repo.write("tasks/m/plan.md", "# Plan: m\n\n## 预先声明\n\n- 公共路径：坏了\n")
+        repo.write("tasks/m/todo.md", "- [ ] t\n")
+        self.assertEqual(validate_declared(repo.root), ["ignored m"])
+
+
 if __name__ == "__main__":
     unittest.main()

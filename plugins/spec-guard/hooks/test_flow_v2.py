@@ -494,7 +494,8 @@ class RequirementConfirmHintTest(unittest.TestCase):
             finish_docs(project, todo="- [ ] t\n")
             configure(project, takeover={"merge": "auto"})
             text = module_stage.describe(project.root)
-            self.assertIn("- 越界：`spec/a.md` 没有可用的「并行边界」一节", text)
+            # plan-auto-approve: a v2 module is checked against its boundary plus its design's impact paths.
+            self.assertIn("- 越界：没有并行边界，技术方案影响面也没写出路径", text)
             self.assertIn("建议下一步: " + STEP_ZH, text)
 
     def test_milestone_stop_comes_before_the_requirement(self):
@@ -933,6 +934,80 @@ class PlanAutoApproveTest(unittest.TestCase):
         self.assertNotEqual(self.effective()[1], "auto")
         self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "takeover")
         self.assertIn("Plan `tasks/a/plan.md` 正在等用户批准", hint(self.project))
+
+
+
+class FlowOverreachTest(unittest.TestCase):
+    """plan-auto-approve AC4, AC5: a v2 build is checked against its boundary plus its design's impact, any takeover."""
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        self.project.write("src/a/old.py", "x\n")
+        self.project.write("src/other.py", "x\n")
+        git(self.project.root, "init", "-q")
+        self.commit("base")
+
+    def commit(self, message):
+        git(self.project.root, "add", "-A")
+        git(self.project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", message)
+
+    def build(self, tier="normal", boundary=None, impact="- 改 `src/a/old.py`"):
+        approved_spec(self.project, tier, boundary=boundary)
+        if tier not in ("bug", "small"):
+            self.project.write("tasks/a/design.md", design_text(impact))
+            self.project.write("tasks/a/regression.md", "# r\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n- [ ] 最终验收（gate）\n")
+        self.commit("docs")
+
+    def test_outside_the_impact_stops_and_adding_it_passes(self):
+        self.build()
+        self.project.write("src/a/old.py", "changed\n")
+        self.assertNotIn("越界", hint(self.project))
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/other.py`）", text)
+        self.assertIn("停点规则（中途 gate）", text)
+        self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`、`src/other.py`"))
+        self.assertNotIn("越界", hint(self.project))
+
+    def test_a_reviewed_design_is_revised_by_the_addition(self):
+        from module_stage import REVIEW_PENDING, review_codex_digest, review_reviewer_line
+        self.build()
+        path = self.project.root / "tasks" / "a" / "design.md"
+        text = path.read_text(encoding="utf-8").replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
+        path.write_text(text.replace(REVIEW_PENDING, review_reviewer_line(review_codex_digest(text))), encoding="utf-8")
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "approved")
+        path.write_text(path.read_text(encoding="utf-8").replace("`src/a/old.py`", "`src/a/old.py`、`src/other.py`"),
+                        encoding="utf-8")
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "revised")
+
+    def test_a_pre_declared_path_is_not_authorized(self):
+        self.build()
+        self.project.write("tasks/a/plan.md", "# Plan\n\n<!-- spec-guard: review approved -->\n\n## 任务\n\n- t\n\n"
+                                              "## 预先声明\n\n- 公共路径：`src/other.py`\n")
+        self.commit("plan")
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("越界：1 个文件超出", hint(self.project))
+
+    def test_bug_without_a_boundary_is_not_checked_and_does_not_stop(self):
+        self.build("bug")
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：没有并行边界，未检查。", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_small_with_a_boundary_is_checked(self):
+        self.build("small", boundary="`src/a/`")
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("越界：1 个文件超出", hint(self.project))
+
+    def test_normal_without_any_path_stops(self):
+        self.build(impact="不涉及")
+        text = hint(self.project)
+        self.assertIn("没有并行边界，技术方案影响面也没写出路径", text)
+        self.assertIn("停点规则（中途 gate）", text)
 
 
 if __name__ == "__main__":

@@ -2060,6 +2060,44 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
         "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, flow_files, cmd["review-mark"], entry))
 
 
+def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:
+    """plan-auto-approve: (fact, line, next step) for a v2 module's build, whatever its takeover (assumption 4)."""
+    from module_scope import classify, default_base  # late: module_scope imports this module
+    status = found["status"]
+    if status == "none":
+        return (("scope", "none"), "- 越界：没有并行边界，未检查。" if zh else
+                "- Out of scope: no concurrency boundary, not checked.", "")
+    if status in ("unknown", "invalid"):
+        if zh:
+            why = ("需求文档的并行边界写坏了或读不了" if status == "invalid" else "没有并行边界，技术方案影响面也没写出路径")
+            return (("scope", status), "- 越界：%s，无法检查改动是否越界。" % why,
+                    "停下，修好需求文档的并行边界或在技术方案影响面写出要改的文件（技术方案按 design-review 重新审或批），再继续构建。")
+        why = ("the requirement's concurrency boundary is malformed or unreadable" if status == "invalid"
+               else "there is no concurrency boundary and the design's impact section names no path")
+        return (("scope", status), "- Out of scope: %s, so the changes cannot be checked." % why,
+                "stop; fix the requirement's concurrency boundary or list the files in the design's impact section (the "
+                "design is then reviewed or approved again under design-review), then continue the build.")
+    base = default_base(root, module)
+    rows = classify(root, module, found["scope"], base) if base else None
+    if rows is None:
+        line = ("- 越界：没有开工基线可比（`spec/%s.md` 没有更早的提交，或 git 读不了），未检查。" % module if zh else
+                "- Out of scope: no baseline to compare with (no commit before `spec/%s.md`, or git unreadable); not "
+                "checked." % module)
+        return ("scope", "unknown-base"), line, ""
+    outside = [safe_fragment(row["path"]) for row in rows if row["scope"] == "outside"]
+    if not outside:
+        return None, "", ""
+    shown = ", ".join("`%s`" % path for path in outside[:SCOPE_SHOWN]) + ("…" if len(outside) > SCOPE_SHOWN else "")
+    if zh:
+        return (("scope", tuple(outside)), "- 越界：%d 个文件超出需求文档的并行边界与技术方案影响面（%s）。" % (len(outside), shown),
+                "停下，逐个说明这些文件为什么要改，交用户决定：同意就补进技术方案影响面或并行边界（技术方案按 design-review 重新审或批），"
+                "不同意就撤回这些改动。")
+    return (("scope", tuple(outside)), "- Out of scope: %d file(s) outside the requirement's boundary and the design's "
+            "impact section (%s)." % (len(outside), shown), "stop and show the user why each of these files has to change: "
+            "if they agree, add them to the design's impact section or the boundary (the design is then reviewed or "
+            "approved again under design-review); if not, undo those changes.")
+
+
 def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """takeover-scope-check: (fact, line, next step) when a takeover module's build goes outside its declared scope.
 
@@ -2068,10 +2106,13 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """
     if stage != "BUILDING" or not module:
         return None, "", ""
+    from module_scope import ScopeError, classify, default_base, flow_scope, parse  # late: module_scope imports this
+    found = flow_scope(root, module)
+    if found is not None:
+        return _flow_overreach(root, module, found, zh)
     from project_config import module_takeover
     if all(value == "human" for value in module_takeover(root, module)[0].values()):
         return None, "", ""
-    from module_scope import ScopeError, classify, default_base, parse  # late: module_scope imports this module
     try:
         scope = parse((root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ScopeError):
