@@ -8,7 +8,7 @@
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 5：verify-artifacts
 - [x] Task 6：规则与文档
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告（用户「验收通过并合并」）
 
 ## 证据
 - Task 1（2026-11-25）：`project_config` 新三项 `ITEMS`、预设 `none`／`design`／`merge`；旧值 `valid_takeover` 照认，`expand` 换算出新三项、`legacy` 换算出老流程的 `spec`／`plan`，`module_takeovers` 每个模块返回五个键；`set` 遇到旧写法（含 `requirement`）退出 2、拒绝码 `takeover-legacy`；`show` 的 JSON 加 `effective`／`legacy`，文本加一行生效值与两条 `note:`，`set` 预览加老流程一行和「改前是旧值」的提示。
@@ -30,3 +30,6 @@
 - Task 6（2026-11-25，部分）：`commands/config.md`（两行、示例、收窄）、共享规则「技术方案审查」「自治档位与底线」、`docs/commands.md`、README「自动接管」一节（补新流程模块的说明，README 原来没有讲新流程的段落）、CHANGELOG「未发布」三条。
   边界外还有 `skills/spec-guard-ops/SKILL.md` 第 191 行与 `docs/concepts.md` 第 81 行写着旧档位，停下问用户。
 - Task 6（2026-11-25，补完）：用户「可以，加进边界并改」，`skills/spec-guard-ops/SKILL.md` 的 `takeover` 说明与收窄一行、`docs/concepts.md` 概念表的「接管档位」一行同步成新档位；Spec 并行边界补入这两个文件。
+- Checkpoint 2（2026-11-25）：基于 main `78136978` 推送，开 PR #496；验收消息里提议了宿主 PR 监控，用户没有选择打开。最终验收与合并合成一问，用户回「验收通过并合并」。
+  合并时五项检查（含 `CI required`）全部 SUCCESS、mergeStateStatus CLEAN，用 `gh pr merge --squash --match-head-commit 6f416824` 合并；核实 state=MERGED，main 指向合并提交 `45c7970d`。
+  回告：autopr-design #23015、mc-coord #23016，文字与验收消息里的拟回告相同（发送时对方会话的收条未确认）。
