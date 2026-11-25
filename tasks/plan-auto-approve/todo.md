@@ -5,7 +5,7 @@
 - [x] Task 2：`/map --json` 与接口 1.21
 - [x] Task 3：越界
 - [x] Task 4：T4
-- [ ] Checkpoint 1（report）：本机完整检查与变异
+- [x] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 5：verify-artifacts 警告
 - [ ] Task 6：规则文字
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
@@ -20,3 +20,5 @@
 - Task 4（2026-11-25）：`module_stage.t4_hits`（只看 T4，`ok`／`no-list`／`no-base`，`stops` = 有命中且不是重要需求）；`important()` 对新流程模块加读技术方案影响面；阶段提示把越界与 T4 两部分各出一行，`check` 命令的 JSON 加 `t4`（只新流程模块），最终验收的范围检查先查 T4、再看范围。
   用例：`test_important_requirement.py` `ImpactRiskPath`（新旧对照）、`test_flow_v2.py` `T4Test` 6 例、`test_module_scope.py` `FlowT4`、`test_review_marker.py` `AcceptanceT4`，换回提交前的源文件跑都变红。
   写用例时发现并修了一处实现漏洞：最终验收在 bug、small 没有边界（`none`）时先返回了，T4 被跳过；改为先查 T4。`AcceptanceFixture` 的能力图是一次插入两个模块，按规则已是重要需求，所以最终验收的 T4 用例另建单模块仓库直接调 `_outside`。
+- Checkpoint 1（2026-11-25）：Task 1～4 的提交都走完整档且全绿（phase-guard 546 例、verify-artifacts 127 例）。变异在临时副本里做，各自在两个入口变红：
+  `effective_review` 不给新流程 `auto` → `PlanAutoApproveTest` 5 处、`PlanAutoMapTest` 1 处失败；`classify` 对新流程照旧认预先声明 → `FlowOverreachTest`、`FlowScope` 各 1 处；T4 去掉「不是重要需求」 → `T4Test`（已是重要需求改影响面里的 T4 路径）、`FlowT4`（`stops`）各 1 处。还原后全绿。
