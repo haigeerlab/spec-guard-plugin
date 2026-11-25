@@ -1804,5 +1804,55 @@ class VerificationHintTest(unittest.TestCase):
         self.assertIn("- 合并前验证：通过", text)
 
 
+
+class BugCaseNoReconfirmTest(unittest.TestCase):
+    """regression-doc-check Task 8 (M3 run, user "M3 A"): adding a case to a confirmed bug requirement keeps it confirmed."""
+
+    CASE = "### R1: 修复后不报错\n- 步骤：运行\n- 预期：不报错\n- 执行方式：command\n- 命令：`make t`\n- 证据：运行输出\n"
+
+    def spec(self, tier):
+        own = DOC_SECTIONS["bug"]["zh"] if tier == "bug" else DOC_SECTIONS["requirement"]["zh"] + DOC_SECTIONS["small"]["zh"]
+        return ("# a\n\n<!-- spec-guard: review pending -->\n%s\n\n" % marker(tier)
+                + "".join("## %s\n\n不涉及\n\n" % name for name in own))
+
+    def confirm(self, project, text):
+        from module_stage import review_approved_line, review_digest
+        project.write("spec/a.md", text.replace("<!-- spec-guard: review pending -->", review_approved_line(review_digest(text))))
+
+    def edit(self, project, old, new):
+        text = (project.root / "spec" / "a.md").read_text(encoding="utf-8")
+        project.write("spec/a.md", text.replace(old, new, 1))
+
+    def test_a_bug_case_added_after_confirmation_keeps_it_confirmed(self):
+        with Project() as project:
+            self.confirm(project, self.spec("bug"))
+            self.edit(project, "## 回归用例\n\n不涉及\n", "## 回归用例\n\n" + self.CASE)
+            self.assertIsNone(module_stage.requirement_wait(project.root, "a"))
+            self.assertEqual(module_stage.requirement_confirm(project.root, "a")["status"], "confirmed")
+            self.edit(project, "## 复现步骤\n\n不涉及\n", "## 复现步骤\n\n点保存\n")
+            self.assertEqual(module_stage.requirement_wait(project.root, "a"), "revised")
+
+    def test_a_small_case_still_counts(self):
+        with Project() as project:
+            self.confirm(project, self.spec("small"))
+            self.edit(project, "## 回归用例\n\n不涉及\n", "## 回归用例\n\n" + self.CASE)
+            self.assertEqual(module_stage.requirement_wait(project.root, "a"), "revised")
+
+    def test_an_approval_written_by_the_old_algorithm_still_stands(self):
+        from module_stage import review_approved_line, review_body
+        with Project() as project:
+            text = self.spec("bug").replace("## 回归用例\n\n不涉及\n", "## 回归用例\n\n" + self.CASE)
+            whole = module_stage._text_digest(review_body(text))  # 0.96.0 and earlier: the whole body
+            project.write("spec/a.md", text.replace("<!-- spec-guard: review pending -->", review_approved_line(whole)))
+            self.assertIsNone(module_stage.requirement_wait(project.root, "a"))
+
+    def test_a_fenced_heading_does_not_open_the_section(self):
+        with Project() as project:
+            text = self.spec("bug").replace("## 预期结果\n\n不涉及\n", "## 预期结果\n\n```\n## 回归用例\n```\n不涉及\n")
+            self.confirm(project, text)
+            self.edit(project, "```\n不涉及\n", "```\n不报错\n")
+            self.assertEqual(module_stage.requirement_wait(project.root, "a"), "revised")
+
+
 if __name__ == "__main__":
     unittest.main()
