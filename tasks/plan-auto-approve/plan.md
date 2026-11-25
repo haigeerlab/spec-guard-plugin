@@ -1,8 +1,8 @@
 # Plan: plan-auto-approve
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
-Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25 批准，Q1 A、Q2 A）。
+Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25 批准，Q1 A、Q2 A）；Codex 审两轮仍有阻断，交用户；2026-11-25 用户「Plan 和 Spec 修订都批准」（Spec 修订：假设 10）。
 
 ## 架构决定
 

@@ -1,6 +1,6 @@
 # Spec: plan-auto-approve
 
-<!-- spec-guard: review approved 7df8b56469dd -->
+<!-- spec-guard: review approved 9bbc70fed280 -->
 
 ## Objective
 

@@ -1,6 +1,6 @@
 # Todo: plan-auto-approve
 
-- [ ] Task 0：提交 Plan 与 todo
+- [x] Task 0：提交 Plan 与 todo（2026-11-25 用户「Plan 和 Spec 修订都批准」）
 - [ ] Task 1：自动批准本身与 review-mark 的 `plan-auto`
 - [ ] Task 2：`/map --json` 与接口 1.21
 - [ ] Task 3：越界
