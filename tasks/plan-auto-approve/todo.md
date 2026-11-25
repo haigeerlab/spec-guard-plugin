@@ -7,7 +7,7 @@
 - [x] Task 4：T4
 - [x] Checkpoint 1（report）：本机完整检查与变异
 - [x] Task 5：verify-artifacts 警告
-- [ ] Task 6：规则文字
+- [x] Task 6：规则文字
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
@@ -23,3 +23,5 @@
 - Checkpoint 1（2026-11-25）：Task 1～4 的提交都走完整档且全绿（phase-guard 546 例、verify-artifacts 127 例）。变异在临时副本里做，各自在两个入口变红：
   `effective_review` 不给新流程 `auto` → `PlanAutoApproveTest` 5 处、`PlanAutoMapTest` 1 处失败；`classify` 对新流程照旧认预先声明 → `FlowOverreachTest`、`FlowScope` 各 1 处；T4 去掉「不是重要需求」 → `T4Test`（已是重要需求改影响面里的 T4 路径）、`FlowT4`（`stops`）各 1 处。还原后全绿。
 - Task 5（2026-11-25）：判据在 `module_stage.plan_auto_problems`（只看未完成的新流程模块，范围用同一个 `flow_scope`）：并行边界写坏失败、normal 没有范围警告、Plan 带标记警告；`validate-declared` 的 `ignored` 行在 verify-artifacts 里出警告「预先声明不起作用」。`test-verify-artifacts.sh` 加 7 例，134 例通过；把判据改成直接返回空，第一条新用例就变红。
+- Task 6（2026-11-25）：共享规则新增「## 新流程 Plan 自动批准」（授权什么、不授权什么，越界与 T4 停下后怎么放行）；`node-rules.md`「Plan 交审」「中途 gate」各加一行。`test_workflow_checkpoints.py` 新增 `PlanAutoApproveRuleTests` 3 例（共 31 个短语），96 例通过；`test_stop_rules.py` 通过。
+  与 Spec 假设 8 的出入：假设 8 写「『批准标记』一节加一条」，但已有用例 `test_review_markers` 断言那一节不出现「自动批准」（防泛泛的自动批准规则），所以写成紧跟其后的单独一节，内容不变，那条保护保留。
