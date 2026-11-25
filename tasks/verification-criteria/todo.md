@@ -9,7 +9,7 @@
 - [x] Task 6：接口 1.24
 - [x] Checkpoint 1（report）：本机完整检查、老流程比对与变异
 - [x] Task 7：规则与文档
-- [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告（用户「验收通过并合并」）
 
 ## 证据
 - Task 1～3（2026-11-26）：新文件 `hooks/verification.py`：`author`（会话 id 只读环境变量，记在公共 git 目录 `spec-guard/authors/<id>.json`，同一会话一条）、`current_patch_id`（默认分支取 `origin/HEAD`，没有时 `main`）、`check`（Spec 假设 4 的全部问题代码，含修订后的 `patch-id-wrong`）、`record` 与 `verification_state`（`current` 看当前补丁与回归文档 sha256），联调回归 `--usage` 的作者为各模块作者的合集。`scripts/validate.sh` 登记 `test_verification.py`。
@@ -26,3 +26,4 @@
   变异（临时副本）：不查执行者是否作者、patchId 用 HEAD 的 sha、`current` 不看回归文档、最终 gate 不走新流程分支（认 Codex 记录）、`record` 不先校验、`acceptance_step` 不跳过新流程模块，各自让对应用例变红。`current` 不看回归文档那处第一次没拦住（现有用例改文档时也改了提交，补丁一变 `current` 本来就假），补一例只在工作区改回归文档后拦住。还原后全绿。
 - Task 7（2026-11-26）：新文件 `references/verification-report.md`（三步、字段表、怎样算成立、一份完整例子、记下之后）；共享检查点规则新增「新流程模块按回归文档做合并前验证」一条，Codex 最终验收一条写明不用于新流程模块；`node-rules.md` 最终验收停点把 Codex 验收限定到老流程模块，新流程模块看「合并前验证」一行（Q1 A）；`docs/commands.md` 加 `verification.py` 一节、`/map` 段落补 1.24 的字段；CHANGELOG「未发布」加一条。
   `test_workflow_checkpoints.py`（边界外）断言停点规则里有「最终验收交 Codex」，这句保留、只加了「老流程」限定，该测试不改照样通过；快档校验通过。
+- Checkpoint 2（2026-11-26）：基于 main `bbd12171` 推送，开 PR #501 并绑定到会话；验收消息里提了宿主 PR 监控，由用户决定，没有打开。最终验收与合并合成一问，用户回「验收通过并合并」。拟回告发给 autopr-design 与 mc-coord。收尾文档建议：README「自动接管」一节对新流程模块的最终验收描述已过时，建议合并后单开只改两份 README 的小 PR（另问用户）。
