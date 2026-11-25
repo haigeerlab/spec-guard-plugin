@@ -1,11 +1,15 @@
 # Todo: merge-ask-no-wait
 
 - [x] Task 0：提交 Plan 与 todo（2026-11-25 用户「Plan 批准」）
-- [ ] Task 1：回归先红后绿，改共享规则、node-rules、release-process 与 CHANGELOG
+- [x] Task 1：回归先红后绿，改共享规则、node-rules、release-process 与 CHANGELOG
 - [ ] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并（含本机三套与 CI required 结果）、按 F3 合并、补记 CI 结论
 
 ## 证据
+- Task 1（2026-11-25）：先写两条回归跑红（`test_merge_timing_and_ci_waiting` 找不到新段而报错；`test_final_gate_asks_to_merge_with_the_acceptance` 断言失败），
+  改共享规则（F3 那行之后另起一个物理行）、`node-rules.md`、`docs/release-process.md` 第 4 条与 CHANGELOG 后，`test_workflow_checkpoints` 92 例、`test_stop_rules` 22 例全绿；
+  其中原有 `test_no_remote_write_is_authorized_by_default`（新段仍过禁用词检查）与 `ORIGINALS` 一组照常通过。
+  注入：阶段提示到最终 gate 时由 `module_stage.py` 第 970 行取 `node_rules("final-gate")`；`module_stage.py . --node-rules final-gate` 输出第 14 行即新的一条。
 
 ## 外部审查意见
 
