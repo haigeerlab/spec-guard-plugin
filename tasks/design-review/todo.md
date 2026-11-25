@@ -5,7 +5,7 @@
 - [x] Task 2：`inspect_design` 与 `review_mark --target design`
 - [x] Task 3：审查要求、`designApproval`、阶段提示与停点
 - [x] Checkpoint 1（report）：本机完整检查与变异
-- [ ] Task 4：`/map --json` 的 `designApproval` 与接口 1.20
+- [x] Task 4：`/map --json` 的 `designApproval` 与接口 1.20
 - [ ] Task 5：verify-artifacts 的检查
 - [ ] Task 6：规则文字与停点规则
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
@@ -26,3 +26,4 @@
   与 Plan 的出入：Plan 写「跨模块复用 `important()` 的判定」。实际上跨模块（`cross-module`）已经被现有规则升为重要需求，按假设 2 的顺序先落到「重要需求 → 用户批」，所以没有另写跨模块分支，由 `test_cross_module_is_important_by_rule` 锁住。只在 `NEEDS_REGRESSION` 时拦，之后的阶段只在「放行后又改过」时提示，免得已经写完回归文档的老技术方案被回头拦下。
 - Checkpoint 1（2026-11-25）：Task 2、Task 3 的提交都走了完整档且全绿（validate、phase-guard 546 例、verify-artifacts 120 例、ShellCheck 无告警）。变异都在临时副本里做：
   阻断数改回只数 `findings` → `DesignMarks` 2 例失败（含 AC5 那一例）；去掉「影响面列已有文件」 → `DesignRequirementTest`、`DesignApprovalTest` 8 例失败、1 例报错。还原后全绿。
+- Task 4（2026-11-25）：`test_map_view.py` 的模块字段集合加 `designApproval`，新增 `DesignApprovalMapTest` 4 例，先跑红（6 处报错）后实现，整个文件通过。`map_view.py` 只输出 Spec 假设 8 的六个键（`need`、`reason` 只在 `module_stage` 内部用）；`interface.json` 升到 1.20，加 `mapView.designApproval`、reviewMark 的 `--target design` 与拒绝码；`check-interface.py` 新增 `_design_approval`，把一个状态值改名后检查器报错，还原后「interface.json 与代码一致」；`docs/commands.md` 补 review-mark 一段与 `/map --json` 的说明。

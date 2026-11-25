@@ -24,7 +24,7 @@ MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step"
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm"}
+               "requirementConfirm", "designApproval"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -545,6 +545,52 @@ class RequirementConfirmMapTest(unittest.TestCase):
         self.assertRegex(confirm["at"], r"^\d{4}-\d\d-\d\dT")
         self.assertRegex(confirm["sha256"], r"^[0-9a-f]{12}$")
         self.assertIn("需求 ✔", table)
+
+
+class DesignApprovalMapTest(unittest.TestCase):
+    """design-review AC1, assumption 8: designApproval per module."""
+
+    SPEC = "# a\n\n<!-- spec-guard: flow v2 tier=normal -->\n\n## 并行边界\n\n- 独占：`src/a/`\n"
+    RISK = '{"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}'
+
+    def module(self, files):
+        files = dict({"spec/a.md": self.SPEC, ".github/autopr/risk-paths.json": self.RISK}, **files)
+        with Project([("a", "基础", "—")], ["a"], files) as project:
+            approve_spec(project.root, "a")
+            return project.json()["modules"][0]
+
+    def test_old_bug_and_small_modules_are_null(self):
+        for spec in ("# a\n", self.SPEC.replace("normal", "bug"), self.SPEC.replace("normal", "small")):
+            with self.subTest(spec=spec[:40]):
+                self.assertIsNone(self.module({"spec/a.md": spec})["designApproval"])
+
+    def test_not_required(self):
+        approval = self.module({"tasks/a/design.md": "# d\n\n## 影响面\n\n- `src/a/new.py`\n"})["designApproval"]
+        self.assertEqual(approval, {"status": "not-required", "approvedBy": None, "reviewerVendor": None,
+                                    "sameVendor": None, "reportSha256": None, "rounds": []})
+
+    def test_reviewer_approved_with_rounds(self):
+        from map_view import DESIGN_APPROVAL_FIELDS, DESIGN_ROUND_FIELDS
+        from module_stage import REVIEW_PENDING, review_codex_digest, review_reviewer_line
+        rounds = "".join("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=anthropic same-vendor=%s "
+                         "criteria=design-v1 report=%s -->\n" % (n, b, "1" * 12, same, r * 64)
+                         for n, b, same, r in ((1, 1, "false", "a"), (2, 0, "true", "c")))
+        text = "# d\n\n%s\n\n## 影响面\n\n- `src/a/new.py`\n\n## 外部审查意见\n\n%s" % (REVIEW_PENDING, rounds)
+        text = text.replace(REVIEW_PENDING, review_reviewer_line(review_codex_digest(text)))
+        approval = self.module({"tasks/a/design.md": text,
+                                ".agent/config.json": '{"version": 1, "designReview": "on"}'})["designApproval"]
+        self.assertEqual(set(approval), set(DESIGN_APPROVAL_FIELDS))
+        self.assertEqual((approval["status"], approval["approvedBy"], approval["reviewerVendor"], approval["sameVendor"],
+                          approval["reportSha256"]), ("approved", "reviewer", "anthropic", True, "c" * 64))
+        self.assertEqual(approval["rounds"][0], {"round": 1, "blocking": 1, "sha256": "1" * 12, "vendor": "anthropic",
+                                                 "sameVendor": False})
+        self.assertEqual(set(approval["rounds"][0]), set(DESIGN_ROUND_FIELDS))
+
+    def test_statuses_are_the_published_ones(self):
+        import json as _json
+        from module_stage import DESIGN_STATUSES
+        interface = _json.loads((PLUGIN_JSON.parent.parent / "interface.json").read_text(encoding="utf-8"))
+        self.assertEqual(list(interface["mapView"]["designApproval"]["statusValues"]), list(DESIGN_STATUSES))
 
 
 class StatusTest(unittest.TestCase):
