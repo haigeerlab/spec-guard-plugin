@@ -736,7 +736,7 @@ want pass "tests-registered: 读不到运行器时说的是没找到，不是把
 IFC="$ROOT/scripts/check-interface.py"
 mkifc() {  # $1=目录 $2=python 表达式，对 data（正确的 interface.json）做的改动，空=不改
   rm -rf "$1"; mkdir -p "$1/hooks"
-  for script in map_view module_scope checkout_role review_mark gate_tick project_config; do : > "$1/hooks/$script.py"; done
+  for script in map_view module_scope checkout_role review_mark gate_tick project_config regression_view; do : > "$1/hooks/$script.py"; done
   mkdir -p "$1/references"; cp "$ROOT/plugins/spec-guard/references/workflow-checkpoints.md" "$1/references/"
   python3 - "$ROOT/plugins/spec-guard/interface.json" "$1/interface.json" "${2:-}" <<'PY'
 import json, sys

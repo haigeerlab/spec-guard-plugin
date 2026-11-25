@@ -16,6 +16,7 @@ import map_view  # noqa: E402
 import module_scope  # noqa: E402
 import module_stage  # noqa: E402
 import project_config  # noqa: E402
+import regression_view  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
            "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy",
@@ -53,7 +54,7 @@ def problems(path: Path) -> list:
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
     return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _design_approval(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
-            + _review_kinds(path, data))
+            + _review_kinds(path, data) + _regression_view(path, data))
 
 
 def _progress_facts(view: dict) -> list:
@@ -235,6 +236,27 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
         names = {(keyed or (lambda key: key))(key) for key in got} if isinstance(got, dict) else None
         if names != expected:
             found.append("%s 的取值为 %s，代码为 %s" % (label, sorted(names) if names is not None else got, sorted(expected)))
+    return found
+
+
+def _regression_view(path: Path, data: dict) -> list:
+    """regression-doc-check (1.23): the entry names real scripts and lists the methods and problem codes the parser uses."""
+    entry = data.get("regressionView")
+    if not isinstance(entry, dict):
+        return ["缺少入口 regressionView"]
+    found = _scripts(path, "regressionView.command", entry.get("command"))
+    found += _scripts(path, "regressionView.usageCommand", entry.get("usageCommand"))
+    if any(not isinstance(arg, str) or arg.startswith("[") for arg in entry.get("command") or []):
+        found.append("regressionView.command 要能原样运行，可选参数放在 refArgs")
+    if entry.get("refArgs") != ["--ref", "<git ref>"]:
+        found.append("regressionView.refArgs 应为 [\"--ref\", \"<git ref>\"]")
+    if entry.get("schemaVersion") != regression_view.SCHEMA_VERSION:
+        found.append("regressionView.schemaVersion 与 regression_view.SCHEMA_VERSION 不一致")
+    values = entry.get("values") if isinstance(entry.get("values"), dict) else {}
+    for label, got, expected in (("method", values.get("method"), regression_view.METHODS),
+                                 ("problem", values.get("problem"), regression_view.PROBLEM_CODES)):
+        if not isinstance(got, dict) or set(got) != set(expected):
+            found.append("regressionView.values.%s 为 %s，代码为 %s" % (label, sorted(got or {}), sorted(expected)))
     return found
 
 

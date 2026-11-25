@@ -1671,5 +1671,31 @@ class UsageRegressionTest(unittest.TestCase):
             self.assertEqual((done.returncode, json.loads(done.stdout)["document"]), (0, "spec/usage/demo.regression.md"))
 
 
+
+class RegressionInterfaceTest(unittest.TestCase):
+    """regression-doc-check Task 6: interface.json's regressionView runs as written and describes the output."""
+
+    def test_command_template_runs_and_matches_the_fields(self):
+        entry = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))["regressionView"]
+        with Project() as project:
+            git(project.root, "init", "-q")
+            project.write("spec/a.md", criteria_requirement("S1"))
+            project.write("tasks/a/regression.md", CASES_EN)
+            first = commit_all(project.root)
+            fill = {"<project-root>": str(project.root), "<module-id>": "a", "<git ref>": first}
+            for extra in ([], entry["refArgs"]):
+                with self.subTest(ref=bool(extra)):
+                    command = [fill.get(arg, arg) for arg in entry["command"] + extra]
+                    done = subprocess.run(command, cwd=HERE.parent, capture_output=True, text=True)
+                    self.assertEqual(done.returncode, 0, done.stderr)
+                    out = json.loads(done.stdout)
+                    self.assertEqual(out["schemaVersion"], entry["schemaVersion"])
+                    self.assertEqual(set(out), {"schemaVersion", "module", "usage", "tier", "document", "sha256", "ref",
+                                                "criteria", "cases", "problems"})
+                    self.assertEqual(set(out["cases"][0]), {"id", "title", "steps", "expected", "method", "command",
+                                                            "evidence", "criteria", "affectedExisting", "sha256"})
+                    self.assertIn(out["cases"][0]["method"], entry["values"]["method"])
+
+
 if __name__ == "__main__":
     unittest.main()

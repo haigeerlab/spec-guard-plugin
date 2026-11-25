@@ -6,7 +6,7 @@
 - [x] Task 3：接进 `flow_doc_problems` 与 `section-empty`
 - [x] Task 4：阶段提示
 - [x] Task 5：联调回归
-- [ ] Task 6：接口 1.23
+- [x] Task 6：接口 1.23
 - [ ] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 7：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
@@ -23,3 +23,7 @@
   用例：`test_flow_v2.py` `RegressionHintTest` 4 例，实现前 3 个失败（老流程那一例本来就通过）；`test-phase-guard.sh` 加 2 例（549 例通过），这 2 例写在实现之后，没有经过先红，留到 Checkpoint 1 用变异核对。
 - Task 5（2026-11-25）：`usage_draft.draft_files` 跳过 `*.regression.md`；verify-artifacts 新增一段，对 `spec/usage/*.regression.md` 跑 `regression_view.usage_report`，格式问题、`module-unknown`、对照表实际引用的未知 `S<n>` 判失败，合格式时报通过。
   用例：`test_usage_draft.py` 1 例（实现前失败）；`test_flow_v2.py` `UsageRegressionTest` 3 例（解析在 Task 1 已实现，一次通过）；`test-verify-artifacts.sh` 加 3 例（146 例通过）。
+- Task 6（2026-11-25）：`interface.json` 升到 1.23，加 `regressionView`（`command`、`refArgs`、`usageCommand`、`schemaVersion`、`contract`、`exitCodes`、`values` 的执行方式、问题代码、字段、用例 sha256 算法与文档位置）；`check-interface.py` 比对脚本存在、`command` 能原样运行、`refArgs`、`schemaVersion`、执行方式与问题代码和代码一致。
+  偏离 Spec 假设 4 的写法：Spec 把命令模板写成带 `"[--ref <git ref>]"` 的一个数组；module-crew 的 `probe.safe_command` 把模板逐段原样当参数传入（只替换占位符），带方括号那一段会让 argparse 退出 2，module-crew 的最终验收就跑不起来。所以 `command` 只放能原样运行的形式，`--ref` 放在 `refArgs`，`--usage` 放在 `usageCommand`；验收时交用户确认。
+  用例：`RegressionInterfaceTest` 1 例（按 `interface.json` 的模板代入真实路径运行，带与不带 `refArgs` 各一次，核对输出键集合与取值）；在临时副本里删掉问题代码 `module-unknown`、给 `command` 加上方括号可选参数，`check-interface.py` 各报一条失败。
+- Task 6 提交前（2026-11-25）：`scripts/test-checkers.sh` 的接口夹具 `mkifc` 没有 `regression_view.py`，「与代码一致 → 放行」一例变红；该文件在并行边界外，停下问用户，用户「可以，加进边界并改」：脚本名列表加 `regression_view`，Spec 并行边界补入并记修订。
