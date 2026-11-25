@@ -214,29 +214,51 @@ draft; projects without `spec/usage/` see no change.
 
 ## Automatic takeover (optional)
 
-By default you approve every Spec, Plan and final acceptance, and you merge and release yourself. To step in less, give the project or a
-single module a takeover setting that hands some of these steps to Codex and autopilot. Projects without one see no change.
+By default you approve every Spec (a requirement document in the new flow), design and final acceptance, and you merge and release
+yourself. To step in less, give the project or a single module a takeover setting that hands some of these steps to a second reviewer and
+autopilot. Projects without one see no change.
 
-1. **Set it**: tell the agent something like "take over the Plans in this project". It previews with `/spec-guard:config` who does each of
-   the four steps (Spec, Plan, merge, release) and writes `.agent/config.json` once you confirm (`takeover`; `moduleTakeover` for one
-   module). Presets are `none`, `plan` (Plans only) and `merge` (up to the merge), or set each step yourself. Widening goes one step at a
-   time; start a pilot with Plans only.
-2. **What Codex reviews**: for a Spec or Plan given to Codex, the agent has Codex review it with /delegate:review and records
-   `codex-approved` only when nothing blocks; the stage hint then treats it as approved and moves on. Blocking findings after two rounds, or
-   Codex being unavailable, stop the work and come to you; the agent never reviews its own work. For a module whose merge is automated,
-   Codex does the final acceptance on three pieces of evidence: its review of the final patch has nothing blocking, autopilot ran the checks
-   on the same commit as a non-author, and both are about the current commit. The record stays in the git directory, uncommitted, and
-   autopilot merges on it.
-3. **What always stays with you**: the capability map; a Spec judged an important requirement (several modules from one request,
-   cross-module, or touching high-risk paths, decided by rule and not by the agent); a Plan whose "预先声明" (pre-declared) section is not
-   empty. Tests that cannot be made to fail, decisions the Spec does not cover, high-risk irreversible steps and changes outside a takeover
-   module's declared scope still stop and ask you.
+**New-flow modules** (the requirement document carries a `<!-- spec-guard: flow v2 tier=… -->` line) go requirement → design → regression
+document → Plan → build → pre-merge verification. You always confirm the requirement in the conversation. The design goes to a second
+reviewer by rule (it touches existing code, or the project turned `designReview` on), and an important requirement's design is always
+yours to approve. Once the design is through, the regression document lists cases with steps, expected result, method (`command`,
+`script`, `ai-operate` or `manual`) and evidence; every success criterion needs a case, and affected existing features are listed when the
+design touches existing files (bug and small modules put their cases in the requirement document; a bug adds one once fixed).
+`verify-artifacts` fails a document that does not follow this, and the stage hint names the problems. The Plan is approved automatically
+as soon as it is written; going out of scope, touching T4 paths and irreversible steps still stop and ask you. Before the merge a session
+that is **not an author** (autopilot) runs the regression document case by case; the verdict is pass, pass with notes, or fail, and only
+provable problems block (a failing run, a bug a user would hit, a check that does not pass, a wrong document); style notes are recorded,
+not blocking. Modules without the line keep the old rules (Spec → Plan → todo).
+
+1. **Set it**: tell the agent something like "let a second reviewer pass the designs". It previews with `/spec-guard:config` who does each
+   of the three steps (design, merge, release) and writes `.agent/config.json` once you confirm (`takeover`; `moduleTakeover` for one
+   module). Presets are `none` (all yours; you approve every design), `design` (a second reviewer's pass lets a design through) and `merge`
+   (plus an automatic merge), or set each step yourself. Widening goes one step at a time. The old values still read: `plan` reads as
+   `none` and old-flow modules keep Codex approving their Plans; changing `plan` to `design` needs your words.
+2. **How reviews work**: the second reviewer reviews the design with /delegate:review, at most two rounds, the second only checking the
+   first; blocking findings after two rounds, or no reviewer available, come to you. An old-flow Spec or Plan given to Codex has the same
+   two-round limit and is recorded `codex-approved` only when nothing blocks; the agent never reviews its own work.
+   **Pre-merge verification** (new-flow modules): the session writing the code records itself as an author when it starts; the non-author
+   writes a report after running the regression (format in
+   [`plugins/spec-guard/references/verification-report.md`](plugins/spec-guard/references/verification-report.md)), and spec-guard checks
+   that it stands -- every case has a result, a manual case has your words, the verdict follows the cases, the executor is not an author,
+   and the verdict is bound to the patch and regression document of that moment (it lapses when either changes). Only then is it recorded,
+   in the git directory, uncommitted. A new-flow module whose merge is automated passes its final acceptance only on a current, passing
+   verdict; where the merge is yours, the acceptance tells you the verdict (or that there is none, and you decide). An old-flow module
+   whose merge is automated still has Codex do the final acceptance on three pieces of evidence: its review of the final patch has nothing
+   blocking, autopilot ran the checks on the same commit as a non-author, and both are about the current commit.
+3. **What always stays with you**: the capability map; requirement confirmation; the requirement, Spec and design of an important
+   requirement (several modules from one request, cross-module, or touching high-risk paths, decided by rule and not by the agent); an
+   old-flow Plan whose "预先声明" (pre-declared) section is not empty. Tests that cannot be made to fail, decisions the Spec does not cover,
+   high-risk irreversible steps and changes outside the declared scope still stop and ask you.
 4. **Automatic step-down**: when autopilot or module-crew sees trouble it narrows the setting one step through a narrow-only entry and
    records why; to restore it, say so through config, one step at a time.
 
-`/spec-guard:map --json` reports per module the takeover (`takeover`), who approved each file in effect (`reviewApprovedBy`), whether it is
-an important requirement (`important`) and Codex's acceptance record (`acceptance`), for autopilot and module-crew to read. The rules are in
-the "自治档位与底线" and "批准标记" sections of the shared checkpoint rules.
+`/spec-guard:map --json` reports per module the takeover in effect (`takeover`, with an important requirement's design already counted as
+yours), who actually approved (`reviewApprovedBy`, `designApproval`), whether it is an important requirement (`important`), the pre-merge
+verification verdict (`verification`; a multi-module requirement's integration regression is under the top-level `usageVerification`) and
+an old-flow module's Codex acceptance record (`acceptance`), for autopilot and module-crew to read. The rules are in the "自治档位与底线",
+"批准标记" and "技术方案审查" sections and the "新流程模块按回归文档做合并前验证" entry of the shared checkpoint rules.
 
 ## Developing several modules at once (optional)
 
