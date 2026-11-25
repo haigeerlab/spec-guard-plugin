@@ -117,6 +117,8 @@ class DesignReviewNode(unittest.TestCase):
         node, out = self.node("important")
         self.assertEqual(node, "design-review")
         self.assertIn("技术方案 `tasks/alpha/design.md` 待用户批", out)
+        self.assertIn("停点规则（技术方案交审）：", out)
+        self.assertIn("第二审查者的意见逐条列出", out)
 
     def test_a_design_with_nothing_to_review_does_not_stop(self):
         node, out = self.node("normal")
@@ -128,7 +130,7 @@ class NodeRules(unittest.TestCase):
     def test_each_kind_reads_its_section(self):
         for kind, title in (("map-review", "## 能力图审阅"), ("spec-review", "## Spec 交审"), ("plan-review", "## Plan 交审"),
                             ("mid-gate", "## 中途 gate"), ("final-gate", "## 最终验收"),
-                            ("milestone-stop", "## 里程碑停点")):
+                            ("milestone-stop", "## 里程碑停点"), ("design-review", "## 技术方案交审")):
             with self.subTest(kind=kind):
                 text = node_rules(kind)
                 self.assertTrue(text.startswith(title + "\n"), text[:40])
