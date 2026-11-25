@@ -30,6 +30,15 @@ GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
 
 
+GENERATED = re.compile(r"\d{4}-\d\d-\d\d \d\d:\d\d")
+
+
+def steady(text, root):
+    """A table compared across two runs: the project path and the header's generation time (to the minute) taken out,
+    so two runs either side of a minute boundary still compare equal."""
+    return GENERATED.sub("<generated>", text.replace(str(root), "ROOT"), count=1)
+
+
 def spec_approved(module):
     """A Spec carrying a valid digest approval, made with the plugin's own marker tool."""
     return "# %s\n\nbody\n" % module
@@ -182,10 +191,9 @@ class AutonomyTest(unittest.TestCase):
 
     def test_text_table_unchanged(self):
         with self.project() as plain:
-            baseline = plain.run().stdout
+            baseline = steady(plain.run().stdout, plain.root)
         with self.project({"moduleAutonomy": {"a": "relaxed"}}) as project:
-            self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
-                             baseline.replace(str(plain.root), "ROOT"))
+            self.assertEqual(steady(project.run().stdout, project.root), baseline)
 
 
 
@@ -278,11 +286,10 @@ class TakeoverTest(unittest.TestCase):
 
     def test_autonomy_and_text_unchanged(self):
         with self.project() as plain:
-            baseline = plain.run().stdout
+            baseline = steady(plain.run().stdout, plain.root)
             autonomy = [m["autonomy"] for m in plain.json()["modules"]]
         with self.project({"takeover": "merge", "moduleTakeover": {"a": "none"}}) as project:
-            self.assertEqual(project.run().stdout.replace(str(project.root), "ROOT"),
-                             baseline.replace(str(plain.root), "ROOT"))
+            self.assertEqual(steady(project.run().stdout, project.root), baseline)
             self.assertEqual([m["autonomy"] for m in project.json()["modules"]], autonomy)
 
 
@@ -490,7 +497,7 @@ class ReviewRoundsTest(unittest.TestCase):
         outputs = []
         for files in (plain, with_rounds):
             with Project([("a", "基础", "—")], ["a"], files) as project:
-                outputs.append(project.run().stdout.replace(str(project.root), "ROOT"))
+                outputs.append(steady(project.run().stdout, project.root))
         self.assertEqual(outputs[0], outputs[1])
 
 
