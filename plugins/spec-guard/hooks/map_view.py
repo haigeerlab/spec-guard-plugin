@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, important,
-                          design_approval, file_review_state, module_state, requirement_confirm,
+                          design_approval, design_requirement, file_review_state, module_state, requirement_confirm,
                           gate_checkpoints, next_gate, project_stage, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
@@ -63,7 +63,8 @@ DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor")
 FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
 AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
-TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "source", "widerThanProject", "narrowed")
+# takeover-redefine (interface 1.22): the three items, the deprecated old-flow pair, and why design is forced.
+TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "spec", "plan", "designForcedBy", "source", "widerThanProject", "narrowed")
 # takeover-narrow: the record fields /map shows; the caller-written reason stays out of it.
 NARROWED_FIELDS = ("from", "source", "at")
 
@@ -422,6 +423,13 @@ def _review_cadence(root: Path) -> dict:
     return {"value": item["value"], "source": item["source"]}
 
 
+def _effective_takeover(root: Path, module: str, items: dict) -> dict:
+    """takeover-redefine (assumption 7): design as in effect -- an important flow v2 requirement's design is the user's."""
+    need = design_requirement(root, module)
+    forced = "important" if need is not None and need["reason"] == "important" else None
+    return {**items, "design": "human" if forced else items["design"], "designForcedBy": forced}
+
+
 def _narrowed(record):
     """takeover-narrow: where the module's effective takeover was narrowed from, without the reason."""
     return {field: record[field] for field in NARROWED_FIELDS} if record else None
@@ -510,7 +518,7 @@ def build(root: Path) -> dict:
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
             "autonomy": {"tier": tiers[module][0], "source": tiers[module][1],
                          "widerThanProject": wider(tiers[module][0], project_tier)},
-            "takeover": {**takeovers[module][0], "source": takeovers[module][1],
+            "takeover": {**_effective_takeover(root, module, takeovers[module][0]), "source": takeovers[module][1],
                          "widerThanProject": takeover_wider(takeovers[module][0], project_takeover),
                          "narrowed": _narrowed(narrowings.get(module if module in own else SCOPE_PROJECT))},
         })

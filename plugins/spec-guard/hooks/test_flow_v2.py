@@ -110,11 +110,16 @@ def approved_spec(project, tier="normal", **kw):
     project.write("spec/a.md", text.replace("<!-- spec-guard: review pending -->", review_approved_line(review_digest(text))))
 
 
-def hint(project, zh=True):
+# takeover-redefine: the design-review cases were written for the route where a second reviewer's pass lets a design
+# through, which is now takeover design=reviewer; the default (none) sends every design to the user.
+REVIEWER_ROUTE = {"takeover": "design"}
+
+
+def hint(project, zh=True, route=None):
+    config = {"version": 1, **(REVIEWER_ROUTE if route is None else route)}
     if zh:
-        project.write(".agent/config.json", json.dumps({"version": 1, "artifactLanguage": "zh-CN"}))
-    else:
-        (project.root / ".agent" / "config.json").unlink(missing_ok=True)
+        config["artifactLanguage"] = "zh-CN"
+    project.write(".agent/config.json", json.dumps(config))
     project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
     return module_stage.describe(project.root)
 
@@ -737,12 +742,41 @@ class DesignRequirementTest(unittest.TestCase):
                 self.assertIsNone(module_stage.design_approval(project.root, "a"))
 
 
+class TakeoverImportantTest(unittest.TestCase):
+    """takeover-redefine (R2-1): the takeover never makes a flow v2 requirement important; old modules unchanged."""
+
+    def test_unknowns_do_not_count_for_v2(self):
+        values = ("none", "design", "merge", "plan", {"spec": "codex", "plan": "codex", "merge": "auto"})
+        with Project() as project:
+            approved_spec(project, boundary=None)  # no boundary, no risk list: both unknowns would apply
+            for value in values:
+                with self.subTest(value=value):
+                    configure(project, takeover=value)
+                    self.assertEqual(module_stage.important(project.root, "a"), [])
+            configure(project, takeover="design")
+            project.write("tasks/a/design.md", design_text())
+            self.assertEqual(module_stage.design_approver(project.root, "a"), "reviewer")
+            configure(project, takeover="none")
+            self.assertEqual(module_stage.design_approver(project.root, "a"), "user")
+
+    def test_old_module_keeps_the_unknowns(self):
+        with Project() as project:
+            project.write("spec/a.md", "# a\n")
+            for value, expected in (("merge", ["cross-unknown", "risk-unknown"]),
+                                    ({"spec": "codex"}, ["cross-unknown", "risk-unknown"]),
+                                    ("design", []), ("plan", []), ("none", [])):
+                with self.subTest(value=value):
+                    configure(project, takeover=value)
+                    self.assertEqual(module_stage.important(project.root, "a"), expected)
+
+
 class DesignApprovalTest(unittest.TestCase):
     """design-review AC3, AC4, AC6-AC8: the designApproval status, the phase hint and the stop node."""
 
     def setUp(self):
         self.project = Project().__enter__()
         self.addCleanup(self.project.__exit__, None, None, None)
+        self.project.write(".agent/config.json", json.dumps({"version": 1, **REVIEWER_ROUTE}))
 
     def round(self, n, blocking, vendor="openai", same="false", report="a" * 64):
         return ("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=%s same-vendor=%s "
@@ -785,7 +819,7 @@ class DesignApprovalTest(unittest.TestCase):
         self.design()
         self.assertEqual(self.approval()["status"], "pending-review")
         text = hint(self.project)
-        self.assertIn("技术方案 `tasks/a/design.md` 待审（第二审查者；影响面列了已有文件）", text)
+        self.assertIn("技术方案 `tasks/a/design.md` 待审（第二审查者；影响面列了已有文件；接管档位 design=reviewer（项目的 takeover））", text)
         self.assertIn("--author-host <claude-code|codex> --paths tasks/a/design.md --spec spec/a.md", text)
         self.assertIn("放行前先不要写回归测试文档", text)
         self.assertNotIn("建议下一步: 写回归测试文档", text)
@@ -813,7 +847,7 @@ class DesignApprovalTest(unittest.TestCase):
         self.project.write("src/a/old.py", "x\n")
         self.design(rounds=[self.round(1, 2), self.round(2, 1)])
         self.assertEqual(self.approval()["status"], "pending-user")
-        self.assertIn("待用户批（两轮审查仍有阻断）", hint(self.project))
+        self.assertIn("待用户批（两轮审查仍有阻断；接管档位 design=reviewer（项目的 takeover））", hint(self.project))
         self.assertEqual(self.stop(), "design-review")
         self.design(marker="approved", rounds=[self.round(1, 2), self.round(2, 1)])
         self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
@@ -882,10 +916,105 @@ class DesignApprovalTest(unittest.TestCase):
         self.project.write("src/a/old.py", "x\n")
         self.design()
         text = hint(self.project, zh=False)
-        self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files)",
+        self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files; takeover design=reviewer (the project's takeover))",
                       text)
         self.assertIn("Until it passes, do not write the regression document yet.", text)
 
+
+
+class HumanDesignRouteTest(unittest.TestCase):
+    """takeover-redefine AC3, AC4 (assumptions 2, 8; Q2 A): under design=human the user approves every design."""
+
+    round = DesignApprovalTest.round
+    design = DesignApprovalTest.design
+    approval = DesignApprovalTest.approval
+    stop = DesignApprovalTest.stop
+
+    def setUp(self):
+        self.project = Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        approved_spec(self.project)
+        self.project.write("src/a/old.py", "x\n")
+
+    def human(self, **config):
+        return hint(self.project, route=config)
+
+    def test_reviewed_then_the_user_approves(self):
+        self.design()
+        self.assertEqual(self.approval()["status"], "pending-review")
+        text = self.human()
+        self.assertIn("待审（第二审查者；影响面列了已有文件；接管档位 design=human（默认，没设 takeover））", text)
+        self.assertIn("这不算放行，接着交用户批", text)
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("pending-user", None))
+        self.assertEqual(self.stop(), "design-review")
+        self.assertIn("待用户批（第二审查者已审完；接管档位 design=human（默认，没设 takeover））", self.human())
+        self.design(marker="approved", rounds=[self.round(1, 0)])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
+        # the reviewer route is unchanged: the same pass lets it through
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.human(takeover="design")
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "reviewer"))
+
+    def test_an_edit_before_the_user_approves_is_reviewed_again(self):
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.human()
+        self.assertEqual(self.approval()["status"], "pending-user")
+        path = self.project.root / "tasks" / "a" / "design.md"
+        path.write_text(path.read_text(encoding="utf-8").replace("不涉及", "补一句", 1), encoding="utf-8")
+        self.assertEqual(self.approval()["status"], "revised")
+        self.assertNotEqual(self.stop(), "design-review")
+        text = self.human()
+        self.assertIn("放行后又改过，要重新审", text)
+        self.assertIn("审完交用户批", text)
+
+    def test_no_review_needed_goes_to_the_user(self):
+        self.design("- 新增 `src/a/new.py`")
+        self.assertEqual(self.approval()["status"], "pending-user")
+        self.assertEqual(self.stop(), "design-review")
+        self.assertIn("待用户批（不需要第二审查者；接管档位 design=human（默认，没设 takeover））", self.human())
+        self.assertIn("待用户批（不需要第二审查者；接管档位 design=human（模块的 moduleTakeover））",
+                      self.human(takeover="design", moduleTakeover={"a": "none"}))
+        self.assertIn("接管档位 design=human（继承项目的 takeover，模块的 moduleTakeover 无效）",
+                      self.human(takeover="none", moduleTakeover={"a": "fast"}))
+        self.assertIn("no second reviewer is needed; takeover design=human (the project's takeover)",
+                      hint(self.project, zh=False, route={"takeover": "none"}))
+        self.human(takeover="design")
+        self.assertEqual(self.approval()["status"], "not-required")
+
+    def test_a_lapsed_reviewer_pass_holds_the_build(self):
+        # R1-5: the takeover went from design=reviewer to human after the reviewer's pass
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.human(takeover="design")
+        self.assertIsNone(module_stage.design_waits(self.project.root, "a", "BUILDING"))
+        self.human()
+        self.assertEqual(module_stage.design_waits(self.project.root, "a", "BUILDING")["status"], "pending-user")
+        self.assertEqual(self.stop("BUILDING"), "design-review")
+
+    def test_the_state_code_follows_the_review(self):
+        # R2-3: pending-review -> in-review keeps the stage and the stop node, so the code must carry the design
+        def code():
+            self.human(takeover="design")
+            return module_stage.describe(self.project.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1][:8]
+        self.design()
+        first = code()
+        self.design(rounds=[self.round(1, 2)])
+        self.assertEqual(self.approval()["status"], "in-review")
+        self.assertNotEqual(code(), first)
+
+    def test_module_checkout_follows_the_route(self):
+        # R2-4
+        cmd = module_stage.commands(None, True)
+        self.design()
+        by_id = {"a": module_state(self.project.root, "a")}
+        self.human(takeover="design")
+        step = module_stage.role_view(self.project.root, "module", "a", by_id, cmd, "", True)[1]
+        self.assertIn("第二审查者", step)
+        self.assertNotIn("请用户审", step)
+        self.design("- 新增 `src/a/new.py`")
+        self.human()
+        step = module_stage.role_view(self.project.root, "module", "a", by_id, cmd, "", True)[1]
+        self.assertIn("交给协调会话请用户审", step)
 
 
 class PlanAutoApproveTest(unittest.TestCase):
@@ -933,7 +1062,7 @@ class PlanAutoApproveTest(unittest.TestCase):
         self.project.write("tasks/a/todo.md", self.TODO)
         self.assertNotEqual(self.effective()[1], "auto")
         self.assertEqual(module_stage.codex_route(self.project.root, "a", "plan"), "takeover")
-        self.assertIn("Plan `tasks/a/plan.md` 正在等用户批准", hint(self.project))
+        self.assertIn("Plan `tasks/a/plan.md` 正在等用户批准", hint(self.project, route={}))
 
 
 
@@ -945,6 +1074,7 @@ class FlowOverreachTest(unittest.TestCase):
         self.addCleanup(self.project.__exit__, None, None, None)
         self.project.write("src/a/old.py", "x\n")
         self.project.write("src/other.py", "x\n")
+        self.project.write(".agent/config.json", json.dumps({"version": 1, **REVIEWER_ROUTE}))
         git(self.project.root, "init", "-q")
         self.commit("base")
 

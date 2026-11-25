@@ -109,7 +109,10 @@ class DesignReviewNode(unittest.TestCase):
     def node(self, tier):
         files = {"spec/alpha.md": self.spec(tier),
                  "tasks/alpha/design.md": "# d\n\n## 影响面\n\n- 新增 `src/alpha/new.py`\n",
-                 ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []})}
+                 ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}),
+                 # takeover-redefine: the reviewer route (design=reviewer); under the default design=human a design
+                 # that needs no review goes to the user (test_flow_v2.HumanDesignRouteTest).
+                 ".agent/config.json": json.dumps({"version": 1, "takeover": "design"})}
         with Project(files) as p:
             return stop_node(p.root, "alpha", "NEEDS_REGRESSION", "approved", "none"), describe(p.root)
 

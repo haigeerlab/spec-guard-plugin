@@ -1166,6 +1166,26 @@ class DesignMarks(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("important", out)
 
+    def test_design_human_records_the_round_and_waits_for_the_user(self):
+        # takeover-redefine (C4 as revised, AC3): the clean round is recorded; it does not let the design through.
+        import json
+        from module_stage import design_approval
+        cfg = self.project.root / ".agent" / "config.json"
+        cfg.parent.mkdir(exist_ok=True)
+        for takeover, says in (("none", True), ("design", False)):
+            with self.subTest(takeover=takeover):
+                cfg.write_text(json.dumps({"version": 1, "takeover": takeover}), encoding="utf-8")
+                self.design.write_text(DESIGN, encoding="utf-8")
+                code, out = self.mark("reviewer-approved", self.report())
+                self.assertEqual(code, 0, out)
+                self.assertEqual(review_state(self.text(), "design"), "reviewer-approved")
+                self.assertEqual("design=human" in out, says, out)
+                status = design_approval(self.project.root, "alpha")["status"]
+                self.assertEqual(status, "pending-user" if says else "approved")
+        cfg.write_text(json.dumps({"version": 1, "takeover": "none"}), encoding="utf-8")
+        self.assertEqual(self.mark("approved")[0], 0)
+        self.assertEqual(design_approval(self.project.root, "alpha")["approvedBy"], "user")
+
 
 
 class PlanAutoRefusal(unittest.TestCase):

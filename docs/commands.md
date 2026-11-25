@@ -101,24 +101,28 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en` | 未设置 |
 | `reviewCadence` | `separate`／`combined` | `separate` |
 | `moduleConcurrency` | `off`／`on` | `off` |
-| `takeover` | 预设 `none`／`plan`／`merge`，或自定义四项 | `none` |
+| `takeover` | 预设 `none`／`design`／`merge`，或自定义三项 | `none` |
 | `moduleTakeover` | 模块 id → 同 `takeover` 的值 | 未设置 |
 | `projectSections` | 文档 → 追加章节名列表，如 `{"design": ["浏览器兼容"]}` | 未设置 |
 
-`takeover`（接管档位）定 Spec 批准、Plan 批准、合并、发布四项各由你做还是交给 AI：`none` 全由你做（等于以前的流程），`plan`
-只把 Plan 交给 Codex 审，`merge` 把 Spec、Plan 交给 Codex 审并且审查通过后自动合并；发布只能用自定义打开（`human`／`prepare`／
-`auto-confirm`／`auto`）。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 读它去做。用说话的方式设置，
-先预览四项、你确认后才写：
+`takeover`（接管档位）定技术方案、合并、发布三项各由你做还是交给 AI；需求永远由你确认，新流程 Plan 永远自动批准，两者不可配。
+`none` 全由你做（每份技术方案都由你批，不需要审的也一样），`design` 让第二审查者审过即放行技术方案（重要需求仍由你批），`merge` 再加审查通过后自动合并；
+发布只能用自定义打开（`human`／`prepare`／`auto-confirm`／`auto`）。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 读它去做。
+用说话的方式设置，先预览三项、你确认后才写：
 
 ```text
-这个项目只接管 Plan
+技术方案让第二审查者审过就行
 ```
+
+旧值照旧能读、不再写入（`set` 拒绝，`takeover-legacy`）：预设 `plan` 读作 `none`，旧 `merge` 读作新 `merge`，自定义里的 `spec`、`plan`
+对新流程模块不生效；老流程模块仍按旧含义读谁批 Spec、Plan（`plan`、`design` 都是 Codex 批 Plan）。`show` 列出生效值，存的是旧值时加提示。
+0.84.0～0.94.0 的 spec-guard 读到 `design` 只忽略这个键，团队都升级后再设。
 
 `moduleTakeover` 给单个模块另设档位，用 `set --key moduleTakeover --module <模块 id> --value <值>` 一次改一个，没设的模块随项目；
 比项目宽时只提醒、不截断。能力图上没有的模块 id 由 verify-artifacts 警告。设置时要你在对话里的原话。原来的 `autonomyTier`、
 `moduleAutonomy` 已退役，不映射到接管档位；文件里还有时不生效，可以 `unset` 删掉。团队都升级到 0.91.0 后再设。
 
-出事时 autopilot 或 module-crew 会用 `narrow` 自动把档位往严里收一格（先收发布，再收合并、Plan、Spec），不用问你，并在
+出事时 autopilot 或 module-crew 会用 `narrow` 自动把档位往严里收一格（先收发布，再收合并、技术方案；预设按 `merge` → `design` → `none`），不用问你，并在
 `.agent/config.json` 里记下原因；这个文件改了之后要提交。想恢复时照常说一句，比如「恢复成接管到合并」；收窄过的档位一次只能升一格，
 差两格就分两次说。`/map --json` 里每个模块的 `takeover.narrowed` 写着从哪一档收下来、谁收的、什么时候。
 
@@ -240,7 +244,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 谁；只算挂起造成的阻塞，等人交付、等审查结论看不到）、待批准、下一个 gate、里程碑停点（有用法草案、某个里程碑做完还没确认时）、未合入主线与未推送的提交数。进行中与挂起两格带距今多久（上次勾选、已挂多久），取自已提交的
 git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一格再写"N 项勾选未提交（最后一次提交多久前）"，JSON 另给开工
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
-结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位四项与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；新流程模块的档位在 `tier`（老模块为 null），`step` 多了 `design`、`regression` 两个取值，interface 1.18 起；新流程模块的需求确认在 `requirementConfirm`（状态、确认人只能是 user、确认提交时间、需求文档指纹；老模块为 null），`codexRoute` 多了取值 `requirement`，interface 1.19 起；新流程模块技术方案的审查与批准在 `designApproval`（状态、放行人、审查者厂商与是否同厂商、报告 sha256、每一轮；老模块与 bug、small 为 null），interface 1.20 起；新流程模块的 Plan 自动批准，`reviewApprovedBy`、`codexRoute` 的 plan 一项多了取值 `auto`，interface 1.21 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
+结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；新流程模块的档位在 `tier`（老模块为 null），`step` 多了 `design`、`regression` 两个取值，interface 1.18 起；新流程模块的需求确认在 `requirementConfirm`（状态、确认人只能是 user、确认提交时间、需求文档指纹；老模块为 null），`codexRoute` 多了取值 `requirement`，interface 1.19 起；新流程模块技术方案的审查与批准在 `designApproval`（状态、放行人、审查者厂商与是否同厂商、报告 sha256、每一轮；老模块与 bug、small 为 null），interface 1.20 起；新流程模块的 Plan 自动批准，`reviewApprovedBy`、`codexRoute` 的 plan 一项多了取值 `auto`，interface 1.21 起；`takeover` 改为 `design`、`merge`、`release` 三项的生效值，加 `designForcedBy`，`spec`、`plan` 两项只剩老流程含义、标为 deprecated，interface 1.22 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
 
 ### `/spec-guard:cost-report`

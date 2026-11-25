@@ -234,6 +234,11 @@ printf '{"version": 1, "moduleTakeover": {"alpha": "fast"}}\n' > "$PROJECT/.agen
 check "moduleTakeover 取值写错判无效" 1 "项目配置无效: moduleTakeover-invalid"
 printf '{"version": 1, "takeover": {"spec": "auto"}}\n' > "$PROJECT/.agent/config.json"
 check "takeover 取值写错判无效" 1 "项目配置无效: takeover-invalid"
+# takeover-redefine：旧值只读不写，文件里有旧预设 plan、带 spec／plan 的旧自定义时照常有效。
+printf '{"version": 1, "takeover": "plan", "moduleTakeover": {"alpha": {"spec": "codex", "plan": "codex", "merge": "auto"}}}\n' > "$PROJECT/.agent/config.json"
+check "旧值 plan 与带 spec、plan 的旧自定义照常有效" 0 "项目配置有效"
+printf '{"version": 1, "takeover": {"design": "codex"}}\n' > "$PROJECT/.agent/config.json"
+check "design 取值写错判无效" 1 "项目配置无效: takeover-invalid"
 # takeover-config：已退役的 autonomyTier、moduleAutonomy（哪怕写错）只警告、不判失败。
 printf '{"version": 1, "autonomyTier": "fast", "moduleAutonomy": {"ghost": "strict"}}\n' > "$PROJECT/.agent/config.json"
 check "已退役的档位键只警告" 0 "项目配置里有已退役的 autonomyTier 或 moduleAutonomy"
@@ -545,6 +550,10 @@ design_round 1 design-v1
 reviewer_mark
 check "技术方案：标记与轮次行有效时通过" 0 "能力图通过严格解析"
 check_absent "技术方案：有效时不报轮次行" "技术方案审查轮次行写坏"
+# takeover-redefine：默认档位 design=human 时，第二审查者放行不算数，警告；takeover=design 时不警告。
+check "接管档位 design=human：技术方案只有第二审查者放行时警告" 0 "只有第二审查者的放行：接管档位 design=human的技术方案要用户批"
+mkdir -p "$PROJECT/.agent" && printf '{"version": 1, "takeover": "design"}\n' > "$PROJECT/.agent/config.json"
+check_absent "接管档位 design=reviewer：第二审查者放行不警告" "只有第二审查者的放行"
 printf '<!-- spec-guard: design-review round=2 blocking=x -->\n' >>"$PROJECT/tasks/alpha/design.md"
 check "技术方案：轮次行写坏时失败" 1 "有 1 行技术方案审查轮次行写坏了"
 flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍 外部审查意见

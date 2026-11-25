@@ -531,11 +531,27 @@ def design_requirement(root: Path, module: str) -> dict | None:
     return {"need": "none", "reason": None}
 
 
+def design_approver(root: Path, module: str) -> str:
+    """takeover-redefine (assumption 2): who lets a flow v2 design through -- "user" or "reviewer".
+
+    An important requirement is always the user's; otherwise the module's takeover item `design` decides.
+    """
+    if effective_tier(root, module)["tier"] == "important":
+        return "user"
+    from project_config import module_takeover  # late: project_config is imported by callers of this module
+    return "reviewer" if module_takeover(root, module)[0]["design"] == "reviewer" else "user"
+
+
 def design_approval(root: Path, module: str) -> dict | None:
-    """design-review (assumption 8): the designApproval object of /map --json; None without a design step."""
+    """design-review (assumption 8): the designApproval object of /map --json; None without a design step.
+
+    takeover-redefine: under design=human a reviewer's clean round (reviewer-approved, bound to the text by its
+    digest) still waits for the user; a design that needs no review goes straight to the user (Q2 A).
+    """
     need = design_requirement(root, module)
     if need is None:
         return None
+    approver = "user" if need["need"] == "user" else design_approver(root, module)
     try:
         text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
@@ -546,22 +562,25 @@ def design_approval(root: Path, module: str) -> dict | None:
     last = records[-1] if records and records[-1]["vendor"] != "none" else None
     if state == "approved":
         status, by = "approved", "user"
-    elif state == "reviewer-approved" and need["need"] != "user":
+    elif state == "reviewer-approved" and approver == "reviewer":
         status, by = "approved", "reviewer"
+    elif need["need"] == "none" and approver == "reviewer":
+        status, by = "not-required", None
     elif state == "revised":
         status, by = "revised", None
-    elif need["need"] == "none":
-        status, by = "not-required", None
-    elif need["need"] == "user":
+    elif need["need"] in ("none", "user"):
         status, by = "pending-user", None
     elif records and records[-1]["vendor"] == "none":
         status, by = "unreviewed", None
+    elif state == "reviewer-approved":
+        status, by = "pending-user", None  # takeover-redefine: reviewed and clean, the user approves it
     elif reviewed and reviewed[-1]["blocking"]:
         exhausted = sum(1 for record in reviewed if record["blocking"]) >= 2
         status, by = ("pending-user" if exhausted else "in-review"), None
     else:
         status, by = "pending-review", None
     return {"status": status, "approvedBy": by, "need": need["need"], "reason": need["reason"],
+            "approver": approver, "marker": state,
             "reviewerVendor": last["vendor"] if last else None, "sameVendor": last["sameVendor"] if last else None,
             "reportSha256": last["report"] if last else None,
             "rounds": [{"round": record["round"], "blocking": record["blocking"], "sha256": record["sha256"],
@@ -593,8 +612,10 @@ def design_review_problems(root: Path, module: str) -> list:
     criteria = sorted({record["criteria"] for record in design_round_records(text)})
     if len(criteria) > 1:
         found.append(("fail", "`%s` 的审查轮次用了不同的 criteria：%s" % (path, "、".join(criteria))))
-    if need["need"] == "user" and review_state(text, "design") == "reviewer-approved":
-        found.append(("warn", "`%s` 只有第二审查者的放行：重要需求的技术方案要用户批" % path))
+    if review_state(text, "design") == "reviewer-approved" and (need["need"] == "user"
+                                                                or design_approver(root, module) == "user"):
+        why = "重要需求" if need["need"] == "user" else "接管档位 design=human"
+        found.append(("warn", "`%s` 只有第二审查者的放行：%s的技术方案要用户批" % (path, why)))
     return found
 
 
@@ -631,19 +652,47 @@ def design_waits(root: Path, module: str, stage: str) -> dict | None:
     approval = design_approval(root, module)
     if approval is None or approval["status"] in ("approved", "not-required"):
         return None
-    if stage != "NEEDS_REGRESSION" and approval["status"] != "revised":
+    # takeover-redefine (R1-5): a reviewer's pass that no longer counts (the takeover became design=human, or the
+    # requirement became important) holds every later stage too.
+    lapsed = approval["status"] == "pending-user" and approval["marker"] == "reviewer-approved"
+    if stage != "NEEDS_REGRESSION" and approval["status"] != "revised" and not lapsed:
         return None
     return approval
+
+
+def design_fact(root: Path, module: str, stage: str) -> tuple | None:
+    """takeover-redefine (R2-3): what of a waiting design changes the next step, for the state code."""
+    approval = design_waits(root, module, stage)
+    return None if approval is None else (approval["status"], approval["approver"], len(approval["rounds"]))
 
 
 def design_to_user(approval: dict | None) -> bool:
     """design-review: the design waits for the user (the design-review stop node)."""
     return approval is not None and (approval["status"] in ("pending-user", "unreviewed")
-                                     or (approval["status"] == "revised" and approval["need"] == "user"))
+                                     or (approval["status"] == "revised" and approval["need"] != "review"))
+
+
+ORIGIN_ZH = {"moduleTakeover": "模块的 moduleTakeover", "takeover": "项目的 takeover", "default": "默认，没设 takeover",
+             "takeover-invalid": "默认，takeover 无效", "moduleTakeover-invalid": "继承项目的 takeover，模块的 moduleTakeover 无效"}
+ORIGIN_EN = {"moduleTakeover": "the module's moduleTakeover", "takeover": "the project's takeover",
+             "default": "the default, no takeover set", "takeover-invalid": "the default, takeover is invalid",
+             "moduleTakeover-invalid": "the project's takeover, the module's moduleTakeover is invalid"}
+
+
+def _design_route(root: Path, module: str, approval: dict, zh: bool) -> str:
+    """takeover-redefine (assumption 8): which takeover route the design is on, and where that comes from."""
+    from project_config import takeover_origin  # late: project_config is imported by callers of this module
+    origin = (ORIGIN_ZH if zh else ORIGIN_EN)[takeover_origin(root, module)]
+    value = "reviewer" if approval["approver"] == "reviewer" else "human"
+    return ("接管档位 design=%s（%s）" if zh else "takeover design=%s (%s)") % (value, origin)
 
 
 def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
-    """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise."""
+    """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise.
+
+    takeover-redefine: under design=human the reviewer's clean round is recorded as before and then goes to the
+    user; a design that needs no review goes to the user at once (Q2 A).  Both routes name the takeover's origin.
+    """
     approval = design_waits(root, module, stage)
     if approval is None:
         return "", ""
@@ -653,76 +702,102 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
     mark, status = cmd["review-mark"], approval["status"]
     hold = _hold(root, module, stage, zh)
     last = approval["rounds"][-1] if approval["rounds"] else None
+    user = approval["approver"] == "user"
+    important = approval["reason"] == "important"
+    route = "" if important else _design_route(root, module, approval, zh)
+    exhausted = sum(1 for record in approval["rounds"] if record["blocking"] and record["vendor"]) >= 2
     if zh:
         reason = {"old-files": "影响面列了已有文件", "impact-unknown": "影响面没写出路径，按碰了老逻辑处理",
-                  "configured": "项目开关 designReview 为 on", "important": "重要需求"}[approval["reason"]]
+                  "configured": "项目开关 designReview 为 on", "important": "重要需求", None: "不需要第二审查者"}[approval["reason"]]
+        why = "%s；%s" % (reason, route) if route else reason
         run = ("用 `%s` 审一轮（影响面里列的已有文件各加一个 `--spec`；开工前可用 `/delegate:doctor --reviewers --json` "
                "看有没有可用的审查者），把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下）" % review)
         to_user = ("在对话正文里写出技术方案六节的要点、第二审查者的意见与你的处理，交用户批；用户在对话里批准后，用 %s "
                    "`--target design --state approved` 记下来" % mark)
+        clean = ("没有阻断就用 %s `--target design --state reviewer-approved --review <文件>` 记下，这不算放行，接着交用户批"
+                 % mark if user else
+                 "没有阻断就用 %s `--target design --state reviewer-approved --review <文件>` 记下，不用用户批" % mark)
         if status == "pending-review":
-            return ("- 批准: 技术方案 `%s` 待审（第二审查者；%s）。" % (path, reason),
-                    "%s。没有阻断就用 %s `--target design --state reviewer-approved --review <文件>` 记下，不用用户批；"
-                    "有阻断就用 `--state reviewer-reviewed` 记下这一轮、改完再审，第二轮加 `--previous-report <上一轮报告>`，"
-                    "两轮仍有阻断就交用户批。放行前%s。" % (run, mark, hold))
+            return ("- 批准: 技术方案 `%s` 待审（第二审查者；%s）。" % (path, why),
+                    "%s。%s；有阻断就用 `--state reviewer-reviewed` 记下这一轮、改完再审，第二轮加 `--previous-report <上一轮报告>`，"
+                    "两轮仍有阻断就交用户批。放行前%s。" % (run, clean, hold))
         if status == "in-review":
-            return ("- 批准: 技术方案 `%s` 第 %d 轮审查有 %d 条阻断。" % (path, last["round"], last["blocking"]),
-                    "改完后用 `%s --previous-report <上一轮报告>` 复审，第二轮只核对上一轮；没有阻断就用 %s `--target design "
-                    "--state reviewer-approved --review <文件>` 记下，仍有阻断就用 `--state reviewer-reviewed` 记下并交用户批。"
-                    "放行前%s。" % (review, mark, hold))
+            return ("- 批准: 技术方案 `%s` 第 %d 轮审查有 %d 条阻断（%s）。" % (path, last["round"], last["blocking"], why),
+                    "改完后用 `%s --previous-report <上一轮报告>` 复审，第二轮只核对上一轮；%s，仍有阻断就用 `--state reviewer-reviewed` "
+                    "记下并交用户批。放行前%s。" % (review, clean, hold))
         if status == "unreviewed":
             return ("- 批准: 技术方案 `%s` 没有可用的第二审查者（未审），交用户批。" % path,
                     "%s；说明这一轮没有第二审查者。批准前%s。" % (to_user, hold))
         if status == "revised":
-            if approval["need"] == "user":
-                return ("- 批准: 技术方案 `%s` 批准后又改过，要用户重新批。" % path, "%s。批准前%s。" % (to_user, hold))
-            return ("- 批准: 技术方案 `%s` 放行后又改过，要重新审（%s）。" % (path, reason),
-                    "%s，按上一轮的结果用 %s `--target design` 记下（没有阻断 `--state reviewer-approved`，有阻断 "
-                    "`--state reviewer-reviewed`）。放行前%s。" % (run, mark, hold))
-        if approval["reason"] == "important" and not last:
+            if approval["need"] != "review":
+                return ("- 批准: 技术方案 `%s` 批准后又改过，要用户重新批（%s）。" % (path, why), "%s。批准前%s。" % (to_user, hold))
+            return ("- 批准: 技术方案 `%s` 放行后又改过，要重新审（%s）。" % (path, why),
+                    "%s，按结果用 %s `--target design` 记下（没有阻断 `--state reviewer-approved`，有阻断 `--state reviewer-reviewed`）%s。"
+                    "放行前%s。" % (run, mark, "，审完交用户批" if user else "", hold))
+        if important and not last:
             return ("- 批准: 技术方案 `%s` 待用户批（重要需求，第二审查者先审一轮）。" % path,
                     "%s，用 %s `--target design --state reviewer-reviewed --review <文件>` 记下这一轮；然后%s。批准前%s。"
                     % (run, mark, to_user, hold))
-        why = "重要需求" if approval["reason"] == "important" else "两轮审查仍有阻断"
-        return ("- 批准: 技术方案 `%s` 待用户批（%s）。" % (path, why), "%s。批准前%s。" % (to_user, hold))
+        if important:
+            cause = "重要需求"
+        elif approval["need"] == "none":
+            cause = "不需要第二审查者；%s" % route
+        elif exhausted:
+            cause = "两轮审查仍有阻断；%s" % route
+        else:
+            cause = "第二审查者已审完；%s" % route
+        return ("- 批准: 技术方案 `%s` 待用户批（%s）。" % (path, cause), "%s。批准前%s。" % (to_user, hold))
     reason = {"old-files": "its impact section lists existing files",
               "impact-unknown": "its impact section names no path, so it counts as touching existing code",
-              "configured": "designReview is on", "important": "an important requirement"}[approval["reason"]]
+              "configured": "designReview is on", "important": "an important requirement",
+              None: "no second reviewer is needed"}[approval["reason"]]
+    why = "%s; %s" % (reason, route) if route else reason
     run = ("review it once with `%s` (add one `--spec` per existing file the impact section lists; `/delegate:doctor "
            "--reviewers --json` tells beforehand whether a reviewer is available) and save its standard output, the JSON "
            "report, to a file outside the repository (for example under `$TMPDIR`)" % review)
     to_user = ("present it to the user in the conversation -- the points of its six sections, the second reviewer's "
                "findings and what you did with them; when the user approves it, record that with %s `--target design "
                "--state approved`" % mark)
+    clean = ("With no blocking item record it with %s `--target design --state reviewer-approved --review <file>`; that "
+             "does not let it through, the user approves it next" % mark if user else
+             "With no blocking item record it with %s `--target design --state reviewer-approved --review <file>`; the "
+             "user need not approve it" % mark)
     if status == "pending-review":
-        return ("- Review: the design `%s` awaits a second reviewer (%s)." % (path, reason),
-                "%s. With no blocking item record it with %s `--target design --state reviewer-approved --review <file>`; "
-                "the user need not approve it. With blocking items record the round with `--state reviewer-reviewed`, fix "
+        return ("- Review: the design `%s` awaits a second reviewer (%s)." % (path, why),
+                "%s. %s. With blocking items record the round with `--state reviewer-reviewed`, fix "
                 "them and review again with `--previous-report <the previous report>`; after two blocking rounds the user "
-                "approves it. Until it passes, %s." % (run[0].upper() + run[1:], mark, hold))
+                "approves it. Until it passes, %s." % (run[0].upper() + run[1:], clean, hold))
     if status == "in-review":
-        return ("- Review: round %d of the design `%s` has %d blocking item(s)." % (last["round"], path, last["blocking"]),
+        return ("- Review: round %d of the design `%s` has %d blocking item(s) (%s)." % (last["round"], path,
+                                                                                     last["blocking"], why),
                 "fix them and review again with `%s --previous-report <the previous report>`; the second round only "
-                "checks the first. Record a clean round with %s `--target design --state reviewer-approved --review "
-                "<file>`, a blocking one with `--state reviewer-reviewed`, and then hand it to the user. Until it passes, "
-                "%s." % (review, mark, hold))
+                "checks the first. %s; record a blocking one with `--state reviewer-reviewed`, and then hand it to the "
+                "user. Until it passes, %s." % (review, clean, hold))
     if status == "unreviewed":
         return ("- Review: no second reviewer was available for the design `%s` (unreviewed); the user approves it." % path,
                 "%s, saying that no second reviewer saw it. Until it is approved, %s." % (to_user, hold))
     if status == "revised":
-        if approval["need"] == "user":
-            return ("- Review: the design `%s` was edited after it was approved; the user approves it again." % path,
+        if approval["need"] != "review":
+            return ("- Review: the design `%s` was edited after it was approved; the user approves it again (%s)." % (path, why),
                     "%s. Until it is approved, %s." % (to_user, hold))
-        return ("- Review: the design `%s` was edited after it passed; review it again (%s)." % (path, reason),
+        return ("- Review: the design `%s` was edited after it passed; review it again (%s)." % (path, why),
                 "%s, and record the round with %s `--target design` (`--state reviewer-approved` when clean, "
-                "`--state reviewer-reviewed` otherwise). Until it passes, %s." % (run, mark, hold))
-    if approval["reason"] == "important" and not last:
+                "`--state reviewer-reviewed` otherwise)%s. Until it passes, %s."
+                % (run, mark, ", then hand it to the user" if user else "", hold))
+    if important and not last:
         return ("- Review: the design `%s` awaits the user (an important requirement; a second reviewer reviews it "
                 "first)." % path,
                 "%s, record the round with %s `--target design --state reviewer-reviewed --review <file>`, then %s. "
                 "Until it is approved, %s." % (run[0].upper() + run[1:], mark, to_user, hold))
-    why = "an important requirement" if approval["reason"] == "important" else "two review rounds still blocking"
-    return ("- Review: the design `%s` awaits the user's approval (%s)." % (path, why),
+    if important:
+        cause = "an important requirement"
+    elif approval["need"] == "none":
+        cause = "no second reviewer is needed; %s" % route
+    elif exhausted:
+        cause = "two review rounds still blocking; %s" % route
+    else:
+        cause = "the second reviewer has reviewed it; %s" % route
+    return ("- Review: the design `%s` awaits the user's approval (%s)." % (path, cause),
             "%s. Until it is approved, %s." % (to_user[0].upper() + to_user[1:], hold))
 
 
@@ -1369,7 +1444,9 @@ def important(root: Path, module: str) -> list:
     list.  cross-unknown (no boundary) and risk-unknown (no readable list) count only where the Spec is Codex's.
     """
     from module_scope import ScopeError, overlap, parse, parse_declared  # late: module_scope imports this module
-    codex = _takeover_item(root, module, "spec") == "codex"
+    # takeover-redefine (R2-1): a flow v2 requirement is always the user's, so the unknowns never count for it --
+    # otherwise design=reviewer would make every module of a project without a risk list important.
+    codex = not _v2(root, module) and _takeover_item(root, module, "spec") == "codex"
     reasons = []
     try:
         if any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
@@ -1869,6 +1946,15 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
     review_line, own_step, _spec, _plan = review_hint(root, module, stage, cmd, zh)
     if review_line:
         lines.append(review_line)
+    approval = design_waits(root, module, stage)
+    if own_step and approval is not None and not design_to_user(approval) and own_step == design_hint(
+            root, module, stage, cmd, zh)[1]:
+        # takeover-redefine (R2-4): the second reviewer, not the user, lets this design through; do it here.
+        return lines, (("`%s` 的技术方案待第二审查者审（见上面的批准行）：在这个 checkout 里照批准行发起审查并记下结果；"
+                        "放行前不要继续。审完要用户批的，再交给协调会话。" if zh else
+                        "`%s`'s design awaits the second reviewer (see the Review line above): run the review in this "
+                        "checkout as the Review line says and record it; do not continue until it passes. Where the user "
+                        "approves it after the review, hand it to the coordinating session then.") % module)
     if own_step:
         return lines, (("`%s` 有待处理的批准（见上面的批准行）：交给协调会话请用户审，批准经集成分支到达这个 checkout 之前不要继续。"
                         if zh else
@@ -1921,7 +2007,8 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
         return kind, module, stage, state["suspended"], requirement_wait(root, module)
     _line, _step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
-            next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module))
+            next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module),
+            design_fact(root, module, stage))
 
 
 def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
@@ -2521,7 +2608,8 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
-                       documentation_baseline_present(root), project_sections(root), requirement_wait(root, module)]
+                       documentation_baseline_present(root), project_sections(root), requirement_wait(root, module),
+                       design_fact(root, module, stage) if module else None]
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []),

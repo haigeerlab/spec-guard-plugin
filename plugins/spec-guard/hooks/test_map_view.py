@@ -190,15 +190,17 @@ class AutonomyTest(unittest.TestCase):
 
 
 class TakeoverTest(unittest.TestCase):
-    """takeover-config (C2): each module's takeover items and source; the text table and autonomy are unchanged."""
+    """takeover-config (C2) / takeover-redefine (interface 1.22): each module's takeover items and source."""
     ROWS = [("a", "基础", "—"), ("b", "下游", "a")]
-    HUMAN = {"spec": "human", "plan": "human", "merge": "human", "release": "human"}
+    HUMAN = {"design": "human", "merge": "human", "release": "human", "spec": "human", "plan": "human",
+             "designForcedBy": None}
 
-    def project(self, config=None):
-        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
+    def project(self, config=None, files=None):
+        base = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
+        base.update(files or {})
         if config is not None:
-            files[".agent/config.json"] = json.dumps(dict(version=1, **config))
-        return Project(self.ROWS, ["a", "b"], files)
+            base[".agent/config.json"] = json.dumps(dict(version=1, **config))
+        return Project(self.ROWS, ["a", "b"], base)
 
     def takeover(self, project):
         return {m["id"]: m["takeover"] for m in project.json()["modules"]}
@@ -208,22 +210,59 @@ class TakeoverTest(unittest.TestCase):
             self.assertEqual(self.takeover(project), {
                 m: dict(self.HUMAN, source="default", widerThanProject=False, narrowed=None) for m in ("a", "b")})
 
+    def test_keys_match_the_interface(self):
+        from map_view import TAKEOVER_FIELDS
+        interface = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(interface["mapView"]["takeover"]["fields"]), set(TAKEOVER_FIELDS))
+        with self.project({"takeover": "design"}) as project:
+            for row in self.takeover(project).values():
+                self.assertEqual(set(row), set(TAKEOVER_FIELDS))
+
     def test_module_entry_and_project_value(self):
-        with self.project({"takeover": "plan", "moduleTakeover": {"a": "merge"}}) as project:
+        with self.project({"takeover": "design", "moduleTakeover": {"a": "merge"}}) as project:
             self.assertEqual(self.takeover(project), {
-                "a": {"spec": "codex", "plan": "codex", "merge": "auto", "release": "human",
-                      "source": "moduleTakeover", "widerThanProject": True, "narrowed": None},
-                "b": dict(self.HUMAN, plan="codex", source="takeover", widerThanProject=False, narrowed=None)})
+                "a": dict(self.HUMAN, design="reviewer", merge="auto", spec="codex", plan="codex",
+                          source="moduleTakeover", widerThanProject=True, narrowed=None),
+                "b": dict(self.HUMAN, design="reviewer", plan="codex", source="takeover", widerThanProject=False,
+                          narrowed=None)})
         with self.project({"takeover": "merge", "moduleTakeover": {"a": {"release": "prepare"}}}) as project:
             self.assertEqual(self.takeover(project)["a"],
                              dict(self.HUMAN, release="prepare", source="moduleTakeover", widerThanProject=True,
                                   narrowed=None))
 
+    def test_old_values_and_the_old_flow_pair(self):
+        # takeover-redefine AC5, Q3 A: an old-flow module keeps its old meaning; routes and approvers are unchanged.
+        for config, pair in (({"takeover": "plan"}, ("human", "codex")), ({"takeover": "design"}, ("human", "codex")),
+                             ({"takeover": {"spec": "codex", "merge": "auto"}}, ("codex", "human")),
+                             ({"takeover": "none"}, ("human", "human"))):
+            from module_stage import REVIEW_PENDING, review_codex_digest, review_codex_line
+            pending = "# Plan\n\n%s\n" % REVIEW_PENDING
+            plan = pending.replace(REVIEW_PENDING, review_codex_line(review_codex_digest(pending)))
+            with self.project(config, {"tasks/a/plan.md": plan}) as project:
+                rows = {m["id"]: m for m in project.json()["modules"]}
+                self.assertEqual((rows["a"]["takeover"]["spec"], rows["a"]["takeover"]["plan"]), pair, config)
+                self.assertEqual(rows["a"]["codexRoute"]["plan"], None if pair[1] == "codex" else "takeover", config)
+                self.assertEqual(rows["a"]["reviewApprovedBy"]["plan"], "codex" if pair[1] == "codex" else None, config)
+
+    def test_flow_v2_module_reports_the_pair_and_the_forced_design(self):
+        v2 = "# a\n\n<!-- spec-guard: review approved -->\n<!-- spec-guard: flow v2 tier=%s -->\n"
+        with self.project({"takeover": {"spec": "codex", "plan": "codex", "merge": "auto"}},
+                          {"spec/a.md": v2 % "normal"}) as project:
+            row = self.takeover(project)["a"]
+            self.assertEqual((row["spec"], row["plan"], row["design"], row["designForcedBy"]),
+                             ("codex", "codex", "human", None))
+        with self.project({"takeover": "design"}, {"spec/a.md": v2 % "important"}) as project:
+            row = self.takeover(project)["a"]
+            self.assertEqual((row["design"], row["designForcedBy"], row["widerThanProject"]), ("human", "important", False))
+        with self.project({"takeover": "design"}, {"spec/a.md": v2 % "normal"}) as project:
+            row = self.takeover(project)["a"]
+            self.assertEqual((row["design"], row["designForcedBy"]), ("reviewer", None))
+
     def test_invalid_entries_fall_back(self):
-        with self.project({"takeover": "plan", "moduleTakeover": {"a": "fast"}}) as project:
+        with self.project({"takeover": "design", "moduleTakeover": {"a": "fast"}}) as project:
             self.assertEqual(self.takeover(project)["a"],
-                             dict(self.HUMAN, plan="codex", source="default (config invalid)", widerThanProject=False,
-                                  narrowed=None))
+                             dict(self.HUMAN, design="reviewer", plan="codex", source="default (config invalid)",
+                                  widerThanProject=False, narrowed=None))
 
     def test_narrowed(self):
         record = {"from": "merge", "to": "plan", "source": "autopilot", "reason": "secret words",
@@ -554,7 +593,9 @@ class DesignApprovalMapTest(unittest.TestCase):
     RISK = '{"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}'
 
     def module(self, files):
-        files = dict({"spec/a.md": self.SPEC, ".github/autopr/risk-paths.json": self.RISK}, **files)
+        # takeover-redefine: these cases were written for the reviewer route (takeover design); see test_human_route.
+        files = dict({"spec/a.md": self.SPEC, ".github/autopr/risk-paths.json": self.RISK,
+                      ".agent/config.json": json.dumps({"version": 1, "takeover": "design"})}, **files)
         with Project([("a", "基础", "—")], ["a"], files) as project:
             approve_spec(project.root, "a")
             return project.json()["modules"][0]
@@ -563,6 +604,13 @@ class DesignApprovalMapTest(unittest.TestCase):
         for spec in ("# a\n", self.SPEC.replace("normal", "bug"), self.SPEC.replace("normal", "small")):
             with self.subTest(spec=spec[:40]):
                 self.assertIsNone(self.module({"spec/a.md": spec})["designApproval"])
+
+    def test_human_route(self):
+        # takeover-redefine Q2 A: under design=human a design that needs no review waits for the user.
+        approval = self.module({"tasks/a/design.md": "# d\n\n## 影响面\n\n- `src/a/new.py`\n",
+                                ".agent/config.json": json.dumps({"version": 1})})["designApproval"]
+        self.assertEqual((approval["status"], approval["approvedBy"]), ("pending-user", None))
+        self.assertNotIn("approver", approval)
 
     def test_not_required(self):
         approval = self.module({"tasks/a/design.md": "# d\n\n## 影响面\n\n- `src/a/new.py`\n"})["designApproval"]
@@ -578,7 +626,7 @@ class DesignApprovalMapTest(unittest.TestCase):
         text = "# d\n\n%s\n\n## 影响面\n\n- `src/a/new.py`\n\n## 外部审查意见\n\n%s" % (REVIEW_PENDING, rounds)
         text = text.replace(REVIEW_PENDING, review_reviewer_line(review_codex_digest(text)))
         approval = self.module({"tasks/a/design.md": text,
-                                ".agent/config.json": '{"version": 1, "designReview": "on"}'})["designApproval"]
+                                ".agent/config.json": '{"version": 1, "designReview": "on", "takeover": "design"}'})["designApproval"]
         self.assertEqual(set(approval), set(DESIGN_APPROVAL_FIELDS))
         self.assertEqual((approval["status"], approval["approvedBy"], approval["reviewerVendor"], approval["sameVendor"],
                           approval["reportSha256"]), ("approved", "reviewer", "anthropic", True, "c" * 64))

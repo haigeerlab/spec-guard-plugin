@@ -287,8 +287,14 @@ injects "有技术方案缺回归时报告 NEEDS_REGRESSION" "$local_project" "C
 injects "技术方案影响面没写路径时待审" "$local_project" 'Review: the design `tasks/alpha/design.md` awaits a second reviewer'
 injects "待审时给出带 --author-host 的审查命令" "$local_project" '/delegate:review --profile design --backend auto --author-host '
 printf '# d\n\n## Impact\n\n- new `src/alpha/new.py`\n' >"$local_project/tasks/alpha/design.md"
+# takeover-redefine（Q2 A）：默认档位 design=human 时，不需要审的技术方案也交用户批；takeover=design 时才直接放行。
+injects "design=human 时不审的技术方案交用户批" "$local_project" 'awaits the user'"'"'s approval (no second reviewer is needed; takeover design=human'
+mkdir -p "$local_project/.agent"
+had_config=0; [ -f "$local_project/.agent/config.json" ] && had_config=1 && cp_config="$(cat "$local_project/.agent/config.json")"
+printf '%s\n' '{"version": 1, "takeover": "design"}' >"$local_project/.agent/config.json"
 lacks "只列新文件的技术方案不审" "$local_project" 'the design `tasks/alpha/design.md`'
 injects "不审时直接写回归文档" "$local_project" 'write the regression document `tasks/alpha/regression.md`'
+if [ "$had_config" = 1 ]; then printf '%s\n' "$cp_config" >"$local_project/.agent/config.json"; else rm -f "$local_project/.agent/config.json"; fi
 rm -rf "$local_project/tasks/alpha" && : >"$local_project/spec/alpha.md"
 injects "去掉流程标记后回到 NEEDS_PLAN" "$local_project" "Current stage: **NEEDS_PLAN**"
 mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"

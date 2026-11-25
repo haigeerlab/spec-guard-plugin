@@ -61,10 +61,16 @@
 - **重要需求：用户批。** 第二审查者照审一轮，他的意见和你的处理写进交审正文（停点规则「技术方案交审」）。跨模块的需求按规则已经是重要需求。
 - **碰了老逻辑：必审。** 影响面一节列了开工前已有的文件（开工基线是需求文档首次提交时的父提交），或者写不出路径，都交第二审查者审。
 - **项目开关 `designReview` 为 `on`：审。**
-- **都不是：不审**，技术方案写完直接写回归测试文档。
+- **都不是：不审。**
+
+谁放行再看接管档位的 `design` 一项（`/map --json` 的 `takeover.design`，已算入重要需求）：
+
+- **`reviewer`（预设 `design`、`merge`）**：审过没有阻断即放行，不审的直接写回归测试文档。
+- **`human`（默认 `none`）**：要审的照样先交第二审查者审，审完连同意见交用户批；不审的也交用户批。第二审查者没有阻断时照样记
+  `reviewer-approved`，这不算放行；用户批之前改了技术方案，要重新审。
 
 审查用阶段提示给的命令：`/delegate:review --profile design --backend auto --author-host <claude-code|codex>`，影响面里列的已有文件各加一个 `--spec`；
-报告存在仓库外（例如 `$TMPDIR`）。没有阻断就用 review-mark `--target design --state reviewer-approved --review <报告>` 记下，不用用户批；
+报告存在仓库外（例如 `$TMPDIR`）。没有阻断就用 review-mark `--target design --state reviewer-approved --review <报告>` 记下（`reviewer` 档位不用用户批）；
 有阻断用 `--state reviewer-reviewed` 记下这一轮，改完带 `--previous-report <上一轮报告>` 复审，第二轮只核对上一轮；两轮仍有阻断就交用户批。
 阻断数 = 复审里仍是 `unresolved` 的旧条目 + 不是 `suggestion` 的新发现；两轮的 criteria 必须相同。审查者和写方案的宿主同厂商时照记、不判定。
 
@@ -173,9 +179,11 @@ Plan 里的每个检查点标为 `gate` 或 `report`，写在检查点标题的�
 
 ## 自治档位与底线
 
-项目可以在 `.agent/config.json` 设接管档位：`takeover`（项目）与 `moduleTakeover`（单个模块），定 Spec 批准、Plan 批准、合并、发布
-四项各由人做还是交给 AI。预设 `none`（默认，等于今天的做法）、`plan`（只接管 Plan）、`merge`（接管到合并），也可以自定义每一项。
-spec-guard 只存、读、报告来源；Spec、Plan 由 Codex 批见「批准标记」一节，合并与发布由 autopilot、module-crew 读它放行。设置或取消要用户
+项目可以在 `.agent/config.json` 设接管档位：`takeover`（项目）与 `moduleTakeover`（单个模块），定技术方案（`human`／`reviewer`）、合并、发布
+三项各由人做还是交给 AI；需求永远由用户确认，新流程 Plan 永远自动批准。预设 `none`（默认，全由人做）、`design`（第二审查者审过即放行技术方案）、
+`merge`（再加合并自动），也可以自定义每一项。旧值只读不写：`plan` 读作 `none`，老流程模块仍按旧含义读谁批 Spec、Plan（`plan`、`design`
+都是 Codex 批 Plan，`merge` 是 Codex 批 Spec 和 Plan）。
+spec-guard 只存、读、报告来源；技术方案由谁放行见「技术方案审查」一节，老模块的 Spec、Plan 由 Codex 批见「批准标记」一节，合并与发布由 autopilot、module-crew 读它放行。设置或取消要用户
 在对话里的原话（说明设成什么），`--confirm` 前在回复里引用。原来的 `autonomyTier`、`moduleAutonomy` 已退役、不映射：文件里还有时
 不生效，config 标为已退役，可用 unset 删除。
 

@@ -17,6 +17,17 @@
 - **最终验收一结束就问合并，会话不自己等 CI（merge-ask-no-wait，《插件开发规范》v1.7）。** 共享检查点规则在 F3 那段之后新增一段：
   验收消息里合成一问「验收通过、合并吗？」，不等 CI；开 PR 后宿主有 PR 监控时提议、用户批准才开；不用 `--watch`、定时或循环自己等 CI，
   要等就请用户跑完叫一声；下次被叫醒先核实已合并再告诉用户。最终验收停点与 `docs/release-process.md` 同步。
+- **技术方案审查（design-review，S110 M2）。** 新流程 `normal`／`important` 模块写完技术方案后，按规则定由谁放行：重要需求由用户批；
+  影响面列了开工前已有的文件（或写不出路径）、项目开了 `designReview` 时交第二审查者审，最多两轮、第二轮只核对上一轮，两轮仍有阻断或没有可用审查者就交用户。
+  review-mark 加 `--target design`（`reviewer-approved`／`reviewer-reviewed`，轮次行记厂商、是否同厂商、判据与报告 sha256）；`/map --json` 加 `designApproval`（接口 1.20）。
+- **新流程 Plan 写完即自动批准（plan-auto-approve，S110 M2）。** 不交人也不交 AI；review-mark 对新流程 Plan 拒绝（`plan-auto`）；构建中照查越界
+  （并行边界加技术方案影响面）与 T4 路径，命中就停在中途 gate；Plan 的预先声明对新流程不授权任何路径；`/map --json` 的 Plan 批准人与路线多了 `auto`（接口 1.21）。
+- **接管档位重定义（takeover-redefine，S110 M2）。** `takeover`／`moduleTakeover` 改为 `design`（`human`／`reviewer`）、`merge`、`release` 三项，
+  预设 `none`／`design`／`merge`；需求与新流程 Plan 不可配。`design=human`（默认）时每份技术方案都由用户批，第二审查者的放行只作意见。
+  旧值只读不写：`plan` 读作 `none`、旧 `merge` 读作新 `merge`，老流程模块仍按旧含义读谁批 Spec、Plan；`set` 拒收旧写法（`takeover-legacy`），
+  `show` 给生效值与提示；收窄阶梯 `merge` → `design` → `none`。`/map --json` 的 `takeover` 给生效值（重要需求的 `design` 为 `human`，`designForcedBy`），
+  `spec`、`plan` 两项标为 deprecated、下一版删除（接口 1.22）。**升级注意**：没设档位的项目，新流程模块不需要审的技术方案也会停下等你批；
+  原来用 `takeover=plan` 的项目，想沿用「AI 代批」请在对话里说一句改成 `design`。0.84.0～0.94.0 读到 `design` 只忽略这个键，团队都升级后再设。
 
 ## [0.94.0] - 2026-11-24
 

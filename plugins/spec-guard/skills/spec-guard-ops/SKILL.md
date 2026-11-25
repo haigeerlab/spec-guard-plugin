@@ -188,15 +188,18 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键。
-- `takeover`：接管档位，预设 `none`（默认）、`plan`、`merge`，或自定义对象 `{"spec","plan","merge","release"}`（Spec、Plan 为 `human`／`codex`，
-  合并为 `human`／`auto`，发布为 `human`／`prepare`／`auto-confirm`／`auto`，没写的项按 `human`），取什么值都不注入阶段提示；spec-guard 只存、读、
-  报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制，由 autopilot 拦截。设置或取消要用户在对话里的原话，
-  `--confirm` 前引用；按档位放行的规则落地前不低于共享检查点规则「自治档位与底线」。0.67.1 及更早版本会把含这个键的配置整份判为无效，
-  0.68.0～0.90.1 只忽略它，团队都升级后再设置。
+- `takeover`：接管档位，预设 `none`（默认）、`design`、`merge`，或自定义对象 `{"design","merge","release"}`（技术方案为 `human`／`reviewer`，
+  合并为 `human`／`auto`，发布为 `human`／`prepare`／`auto-confirm`／`auto`，没写的项按 `human`）；需求永远由用户确认、新流程 Plan 永远自动批准，两者不可配。
+  `none` 时每份技术方案都由用户批，`design` 让第二审查者审过即放行（重要需求仍由用户批），见共享检查点规则「技术方案审查」。
+  旧值只读不写（`set` 拒绝，`takeover-legacy`）：`plan` 读作 `none`、旧 `merge` 读作新 `merge`，自定义里的 `spec`、`plan` 对新流程模块不生效；
+  老流程模块仍按旧含义读谁批 Spec、Plan（`plan`、`design` 都是 Codex 批 Plan，`merge` 是 Codex 批 Spec 和 Plan）；`show` 给生效值，存的是旧值时加 `note:`。
+  取什么值都不注入阶段提示；spec-guard 只存、读、报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制，由 autopilot 拦截。
+  设置或取消要用户在对话里的原话，`--confirm` 前引用。0.84.0～0.94.0 读到 `design` 只忽略这个键，0.67.1 及更早版本会把含这个键的配置整份判为无效，
+  团队都升级后再设置。
 - `moduleTakeover`：按模块的接管档位，对象（模块 id → 同 `takeover` 的值），没设的模块随 `takeover`。`set --key moduleTakeover --module <id> --value <值>`
   一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。比项目宽时预览多一行 `note:`，只提醒不截断。写入要用户原话。
 - 出事收窄：`project_config.py narrow --source <autopilot|module-crew|user> --reason <一行> [--module <id>] [--confirm]`，往严里改一格、不需要用户原话
-  （预设 `merge`→`plan`→`none`；自定义按发布、合并、Plan、Spec 交还一项），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
+  （预设 `merge`→`design`→`none`，旧值 `plan` 收到 `none`；自定义按发布、合并、技术方案交还一项、写回新格式），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
   回到收窄前的值后记录删除。`takeoverNarrowed` 不能直接 `set`／`unset`。
 - 接管模块（档位任一项不是 human）构建中做越界检查：`module_scope.py check --module <id> --format json`（`--base` 可省，默认取 Spec 第一次提交的父提交），
   已批准 Plan 的预先声明公共路径记为 `declared`；阶段提示报越界或没有并行边界时停下，逐个说明交用户。

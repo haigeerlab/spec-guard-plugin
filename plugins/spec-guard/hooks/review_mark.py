@@ -25,7 +25,7 @@ import re
 
 from codex_review import CONCLUSIONS, REPORT_LIMIT, _invalid, inspect as inspect_report, inspect_check, inspect_final
 from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
-                          design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
+                          design_approver, design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           review_state, spec_baseline)
 from tracker_default import _write_atomic
@@ -229,6 +229,10 @@ def _design(root: Path, relative: str, state: str, report: str | None, text: str
     if tier == "important":
         note += (" The requirement is important: the reviewer's round goes with the design to the user, who approves "
                  "it with --state approved.")
+    elif design_approver(root, Path(relative).parent.name) == "user":
+        # takeover-redefine (C4 as revised): recorded as before, but under design=human it does not let it through.
+        note += (" The module's takeover has design=human: this round does not let the design through; it goes with "
+                 "the design to the user, who approves it with --state approved.")
     return updated, note
 
 
