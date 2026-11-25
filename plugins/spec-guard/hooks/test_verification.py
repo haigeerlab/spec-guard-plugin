@@ -300,6 +300,12 @@ class RecordTest(Base):
         commit(self.root, "more")
         self.assertFalse(verification.verification_state(self.root, "a")["current"])
 
+    def test_an_edited_regression_document_makes_it_stale_with_the_same_patch(self):
+        import verification
+        self.assertEqual(run(self.root, "record", "--module", "a", "--report", str(self.repo.report()), "--confirm").returncode, 0)
+        self.repo.write("tasks/a/regression.md", TWO_CASES.replace("saved", "saved!"))  # not committed: same patch
+        self.assertFalse(verification.verification_state(self.root, "a")["current"])
+
     def test_refuses_an_unestablished_report(self):
         import verification
         done = run(self.root, "record", "--module", "a", "--report", str(self.repo.report(patchId="0" * 40)), "--confirm")
