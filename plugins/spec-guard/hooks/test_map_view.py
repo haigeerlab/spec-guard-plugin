@@ -593,6 +593,37 @@ class DesignApprovalMapTest(unittest.TestCase):
         self.assertEqual(list(interface["mapView"]["designApproval"]["statusValues"]), list(DESIGN_STATUSES))
 
 
+class PlanAutoMapTest(unittest.TestCase):
+    """plan-auto-approve AC2, assumption 7: a v2 Plan reads as approved by auto; the raw marker stays a fact."""
+
+    SPEC = DesignApprovalMapTest.SPEC
+    DESIGN = "# d\n\n## 影响面\n\n- `src/a/new.py`\n"
+
+    def module(self, files):
+        files = dict({"spec/a.md": self.SPEC, ".github/autopr/risk-paths.json": DesignApprovalMapTest.RISK,
+                      "tasks/a/design.md": self.DESIGN, "tasks/a/regression.md": "# r\n"}, **files)
+        with Project([("a", "基础", "—")], ["a"], files) as project:
+            approve_spec(project.root, "a")
+            data = project.json()
+        return data["modules"][0], data["awaitingReview"]
+
+    def test_without_a_plan(self):
+        module, awaiting = self.module({})
+        self.assertEqual((module["reviewApprovedBy"]["plan"], module["codexRoute"]["plan"]), (None, "auto"))
+
+    def test_a_pending_marker_is_a_fact_not_a_wait(self):
+        module, awaiting = self.module({"tasks/a/plan.md": "# Plan\n\n%s\n" % PENDING, "tasks/a/todo.md": "- [ ] t\n"})
+        self.assertEqual(module["review"]["plan"], "pending")
+        self.assertEqual(module["reviewApprovedBy"]["plan"], "auto")
+        self.assertEqual(module["codexRoute"]["plan"], "auto")
+        self.assertNotIn({"id": "a", "kind": "plan", "review": "pending"}, awaiting)
+
+    def test_values_are_published(self):
+        from map_view import APPROVED_BY, CODEX_ROUTE
+        self.assertIn("auto", APPROVED_BY)
+        self.assertIn("auto", CODEX_ROUTE)
+
+
 class StatusTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

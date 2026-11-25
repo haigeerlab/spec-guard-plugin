@@ -38,9 +38,9 @@ STATUSES = ("done", "in_progress", "suspended", "blocked", "ready", "not_ready")
 ICONS = {"done": "✅", "in_progress": "🔨", "suspended": "⏸", "blocked": "⛔", "ready": "🟢", "not_ready": "○"}
 AWAITING = ("pending", "revised", "invalid")
 # interface.json mapView.values.reviewApprovedBy (codex-approval, interface 1.15); null is written as JSON null.
-APPROVED_BY = ("user", "codex", "null")
+APPROVED_BY = ("user", "codex", "auto", "null")  # auto: since 1.21 (plan-auto-approve)
 # interface.json mapView.values.codexRoute (codex-route-guard, interface 1.16); null is written as JSON null.
-CODEX_ROUTE = ("null", "takeover", "important", "pre-declared", "requirement")  # requirement: since 1.19
+CODEX_ROUTE = ("null", "takeover", "important", "pre-declared", "requirement", "auto")  # requirement: 1.19; auto: 1.21
 REVIEW_WORDS = {"approved": "✔", "codex-approved": "Codex ✔", "pending": "待批准", "revised": "改过待重审", "invalid": "标记无效",
                 "none": "无标记"}
 REQUIREMENT_WORDS = {"confirmed": "✔", "pending": "待确认", "revised": "改过待重新确认", "invalid": "标记无效"}
@@ -533,9 +533,10 @@ def build(root: Path) -> dict:
     suspended.sort(key=lambda m: (-m["blocks"]["count"], m["position"]))
     awaiting = [{"id": m["id"], "kind": kind, "review": m["review"][kind]}
                 for m in modules for kind in ("spec", "plan")
-                if m["review"][kind] in AWAITING or (m["review"][kind] == "codex-approved"
+                if not (kind == "plan" and m["codexRoute"]["plan"] == "auto")  # plan-auto-approve: never waits
+                and (m["review"][kind] in AWAITING or (m["review"][kind] == "codex-approved"
                                                      and m["reviewApprovedBy"][kind] is None)
-                or (kind == "spec" and (m["requirementConfirm"] or {}).get("status") in ("pending", "revised"))]
+                or (kind == "spec" and (m["requirementConfirm"] or {}).get("status") in ("pending", "revised")))]
     active = current["id"] if current is not None and stage != "DONE" else None
     data = {
         "schemaVersion": SCHEMA_VERSION,
