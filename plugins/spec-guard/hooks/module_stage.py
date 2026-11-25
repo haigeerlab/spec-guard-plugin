@@ -157,20 +157,47 @@ def review_body(text: str) -> str:
 
 
 def review_digest(text: str) -> str:
-    """Digest of the text without its marker line; the algorithm lives in spec-digest.py only."""
+    """Digest of the text without its marker line; the algorithm lives in spec-digest.py only.
+
+    regression-doc-check Task 8: a flow v2 bug requirement leaves the body of its regression cases section out, so the
+    case added once the bug is fixed does not undo the user's confirmation.  `whole_review_digest` is the digest
+    0.96.0 and earlier wrote; review_state accepts both."""
+    return whole_review_digest(_without_bug_cases(review_body(text)))
+
+
+def whole_review_digest(body: str) -> str:
     global _DIGEST_MODULE
     if _DIGEST_MODULE is None:
         import importlib.util
         spec = importlib.util.spec_from_file_location("spec_guard_digest", Path(__file__).with_name("spec-digest.py"))
         _DIGEST_MODULE = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(_DIGEST_MODULE)
-    return _DIGEST_MODULE.text_digest(review_body(text))
+    return _DIGEST_MODULE.text_digest(body)
+
+
+BUG_CASE_SECTIONS = ("回归用例", "Regression cases")  # DOC_SECTIONS["bug"]'s last section, in both languages
+
+
+def _without_bug_cases(body: str) -> str:
+    """The body with a bug requirement's regression cases section emptied (its heading kept); other text unchanged."""
+    lines = body.splitlines(keepends=True)
+    visible = _visible_lines(lines)
+    if not any((m := FLOW_MARKER.fullmatch(line.strip())) and m.group(1) == "bug" for line in visible):
+        return body
+    kept, inside = [], False
+    for raw, seen in zip(lines, visible):
+        heading = SECTION_HEADING.match(seen.rstrip("\r\n"))
+        if heading:
+            inside = heading.group(1) in BUG_CASE_SECTIONS
+            kept.append(raw)
+        elif not inside:
+            kept.append(raw)
+    return "".join(kept)
 
 
 def _text_digest(text: str) -> str:
     """Digest of the whole text (`spec-digest.py text`); the algorithm lives in spec-digest.py only."""
-    review_digest("")  # loads the digest module
-    return _DIGEST_MODULE.text_digest(text)
+    return whole_review_digest(text)
 
 
 def review_codex_digest(text: str) -> str:
@@ -219,7 +246,7 @@ def review_state(text: str, kind: str) -> str:
     match = REVIEW_APPROVED_DIGEST.fullmatch(markers[0])
     if not match:
         return "invalid"
-    return "approved" if match.group(1) == review_digest(text) else "revised"
+    return "approved" if match.group(1) in (review_digest(text), whole_review_digest(review_body(text))) else "revised"
 
 
 def deferred_items(text: str) -> list:
@@ -1815,7 +1842,7 @@ def spec_baseline(root: Path, module: str) -> dict:
                 text = shown.stdout.decode("utf-8")
             except UnicodeError:
                 continue
-            if review_digest(text) == match.group(1):
+            if match.group(1) in (review_digest(text), whole_review_digest(review_body(text))):
                 return {"status": "found", "commit": sha, "text": text}
     except (OSError, subprocess.SubprocessError) as error:
         return {"status": "unverified", "reason": type(error).__name__}
