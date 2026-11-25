@@ -1,6 +1,6 @@
 # Spec: design-review
 
-<!-- spec-guard: review approved e65313c1f107 -->
+<!-- spec-guard: review approved eab4d4fd456c -->
 
 ## Objective
 
@@ -55,7 +55,8 @@
    接口 1.19 → 1.20，`interface.json` 与 `scripts/check-interface.py` 同步。插件版本不改，M2 在 takeover-redefine 一次发版。
 9. **和接管档位的关系**：本模块不读 `takeover`。草案的 `design: human` 会让普通需求也交用户批，那一项由 takeover-redefine 加上，并按草案在 `/map --json` 给出生效档位。
    在那之前：普通需求按假设 2，重要需求用户批。现有 `takeover=plan`（Plan 交 Codex）对技术方案没有作用。
-10. **规则文字**：共享检查点规则加「技术方案审查」一小节（假设 2、4～7 的要点）；停点规则 `node-rules.md` 加「技术方案交审」一节（交用户批时正文要写全技术方案六节的要点、第二审查者的意见与处理）。
+10. **规则文字**：共享检查点规则加「技术方案审查」一小节（假设 2、4～7 的要点）；停点规则 `node-rules.md` 加「技术方案交审」一节（交用户批时正文要写全技术方案六节的要点、第二审查者的意见与处理），
+    `module_stage.py` 的停点种类加 `design-review`：技术方案要用户批（`pending-user`、`unreviewed`、`revised` 且要用户批）时就停在这里。
 11. **verify-artifacts**：技术方案的批准标记或轮次行写坏 → 失败；轮次行的 `criteria` 两轮不同 → 失败；重要需求的技术方案只有 `reviewer-approved` → 警告「重要需求的技术方案要用户批」。
     修改这些判据时 phase-guard 与 verify-artifacts 两边的正反回归一起改（项目不变量）。
 12. **不做**：审查标准本身（归 delegate 的 `design-v1`）；`takeover.design` 与生效档位（takeover-redefine）；Plan 自动批准（plan-auto-approve）；
@@ -94,7 +95,7 @@
 
 ## 并行边界
 
-- 独占：`spec/design-review.md`、`tasks/design-review/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`
+- 独占：`spec/design-review.md`、`tasks/design-review/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`
 - 公共：无
 
 ## Open questions
