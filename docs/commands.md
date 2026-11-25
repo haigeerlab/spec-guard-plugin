@@ -85,6 +85,9 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | Plan 的「预先声明」格式（有这一节时，不看并行开关） | ❌ |
 | 多模块批次：同一次提交插入、还没完成的模块有 2 个及以上，是否有用法草案覆盖 | 缺草案 ⚠️（每批一条，写明模块与提交）；读不到 git 未判定 ⚠️ |
 | 用法草案 `spec/usage/*.md`（有这个目录时）：三节与表格、用法与里程碑对得上、模块在能力图上且只归一个里程碑、入口的模块在里程碑里、Build order 顺序、里程碑确认记录的写法 | ❌；里程碑里的模块没有入口、确认后里程碑的模块变了 ⚠️ |
+| 新流程模块的回归用例（`tasks/<id>/regression.md`，bug／small 为需求文档的「回归用例」一节）：字段、执行方式、命令、编号、成功标准对照、受影响的老功能 | ❌（bug 构建中还没有用例 ⚠️，todo 全勾后 ❌） |
+| `projectSections` 声明的章节只有标题、没有内容 | ❌（写「不涉及」即可） |
+| 多模块需求的联调回归 `spec/usage/<需求>.regression.md`：用例格式、涉及的模块在能力图上、对照表里的 `S<n>` 在用法草案里有 | ❌ |
 | 任务目录里 `plan.md`、`todo.md` 以外文件的未勾选项 | ⚠️（不计入阶段） |
 | `state.json` 里残留已退役的 `tracker` 字段 | ⚠️ |
 
@@ -246,6 +249,18 @@ git 历史，不设阈值；工作区比 HEAD 多勾了几项时，进行中一�
 时间、最后一次提交时间、批准节奏的生效值和来源，以及每个模块 gate 检查点的总数与已勾数（见 `interface.json` 的 `progressFacts`）。已完成与未就绪默认折叠，`--all` 全部展开。`--json` 给全量
 结果（`schemaVersion` 1，字段与稳定性承诺见插件根目录 `interface.json` 的 `mapView`；里程碑停点在顶层 `milestoneStop`，interface 1.13 起；按它派活的调用方在停点期间不开任何新模块，不论属于哪个里程碑或草案；每个模块的接管档位与来源在 `takeover`，interface 1.15 起；Spec、Plan 能否由 Codex 批及原因在 `codexRoute`，interface 1.16 起；Spec、Plan 每轮 Codex 审查的轮次、阻断数与被审文件 sha256 前 12 位在 `reviewRounds`，interface 1.17 起；新流程模块的档位在 `tier`（老模块为 null），`step` 多了 `design`、`regression` 两个取值，interface 1.18 起；新流程模块的需求确认在 `requirementConfirm`（状态、确认人只能是 user、确认提交时间、需求文档指纹；老模块为 null），`codexRoute` 多了取值 `requirement`，interface 1.19 起；新流程模块技术方案的审查与批准在 `designApproval`（状态、放行人、审查者厂商与是否同厂商、报告 sha256、每一轮；老模块与 bug、small 为 null），interface 1.20 起；新流程模块的 Plan 自动批准，`reviewApprovedBy`、`codexRoute` 的 plan 一项多了取值 `auto`，interface 1.21 起；`takeover` 改为 `design`、`merge`、`release` 三项的生效值，加 `designForcedBy`，`spec`、`plan` 两项只剩老流程含义、标为 deprecated，interface 1.22 起；旧的 `autonomy` 本版仍在、标为 deprecated），供其他插件读取，可用
 `--project <路径>` 从项目外调用。退出码：3 没有能力图，4 能力图或模块文件读不出，2 参数或路径错误。
+
+### `regression_view.py`（给其他插件读）
+
+```bash
+python3 -B hooks/regression_view.py --json --project <路径> --module <id> [--ref <git ref>]
+python3 -B hooks/regression_view.py --json --project <路径> --usage <需求>
+```
+
+只读：把新流程模块的回归用例读成 JSON（编号、标题、步骤、预期、执行方式、命令、证据、覆盖的成功标准、是否受影响的老功能、每条用例内容的 sha256），
+连同整份文档的 sha256 与问题列表；`--ref` 读那个提交上的版本（在临时目录里做本地克隆，文档按原始 blob 读）；`--usage` 读多模块需求的联调回归。
+回归 Markdown 只在这里解析，autopilot、module-crew 读它的输出；字段与退出码见 `interface.json` 的 `regressionView`（interface 1.23 起）。
+退出码：3 不是新流程模块、文档还没写或那个提交上没有，4 读不了，2 参数错误或模块不在能力图上。
 
 ### `/spec-guard:cost-report`
 

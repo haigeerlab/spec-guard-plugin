@@ -8,7 +8,7 @@
 - [x] Task 5：联调回归
 - [x] Task 6：接口 1.23
 - [x] Checkpoint 1（report）：本机完整检查与变异
-- [ ] Task 7：规则与文档
+- [x] Task 7：规则与文档
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
@@ -31,3 +31,6 @@
   老流程输出比对（AC9、R1-5）：已安装的 0.95.0 与工作区代码分别跑本仓库（全是老流程模块）和一个老流程临时夹具（三个模块，当前模块分别为构建中、缺 Plan，带 `projectSections`），阶段提示 `additionalContext`、`map_view --json`（去掉 `generatedAt`）、verify-artifacts（逐行输出与退出码）两边逐字相同；第一次跑夹具时没有激活信号、阶段提示两边都是空，补上 `.agent/state.json` 后重跑。
   `test-verify-artifacts.sh` 加 1 例锁住老流程夹具的计数（3 通过 · 1 警告 · 0 失败）与退出码 0，0.95.0 与工作区对同一夹具都是这个结果。
   变异（临时副本）：sha256 不压空白、不查 command 用例缺命令、受影响的老功能不看影响面、`draft_files` 不排除 `.regression.md`、注释行算章节内容、bug 完成不看 todo、去掉阶段提示行，各自让对应用例变红（去掉提示行也让 `test-phase-guard.sh` 的新用例变红）。sha256 那处第一次没拦住：用例只改了首尾空白，而解析时首尾空白已去掉；改成同一步骤跨行与单行两种写法后拦住。还原后全绿。
+- Task 7（2026-11-25）：`references/doc-skeletons.md` 回归一节写全用例格式（字段表、例子、对照表、受影响的老功能、bug／small、检查在哪里）与多模块联调回归；共享检查点规则「新流程模块的写法」一条引用它；`docs/commands.md` 的 verify-artifacts 表加三行、加 `regression_view.py` 一节；
+  `spec/usage/dev-flow-v2.md` 改 U1（只有 `takeover=design`／`merge` 才无需你批）、U2（技术方案先批、再写回归文档）、U3（小改动不走技术方案审查），「后续模块已收到的输入」记已处理；CHANGELOG 新增「未发布」一条；版本 0.95.0 → 0.96.0（两份 plugin.json）。
+  提交前快档校验要求两份 README 的安装命令 `--ref` 与清单版本一致；两份 README 在并行边界外，停下问用户，用户「可以，加进边界并改」：改成 `v0.96.0`，Spec 并行边界补入并记修订。

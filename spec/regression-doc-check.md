@@ -1,6 +1,6 @@
 # Spec: regression-doc-check
 
-<!-- spec-guard: review approved 700b5705af63 -->
+<!-- spec-guard: review approved 3b7caea1ec8c -->
 
 ## Objective
 
@@ -14,7 +14,7 @@
 bug／small 的回归用例（假设 6）、多模块需求的整体联调回归（假设 7，module-crew 的提案，Q1）。草案有三处字面与 M2 实现不一致，本模块改草案（假设 9）。
 
 登记：用法草案 dev-flow-v2（用户 2026-11-24「确认插入，Q1–Q6 按推荐」），M3 里程碑；草案「后续模块已收到的输入」一节列的五项（mc-coord #22381、ecosystem-lead #22380、#22354、M1 验收时的 projectSections、M2 实跑的三处字面差异）都在本 Spec 处理。
-需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A」。构建中并行边界补入 `scripts/test-checkers.sh`（接口夹具只为固定几个脚本建空文件，`regressionView` 引用的 `regression_view.py` 不在其中），用户回「可以，加进边界并改」。
+需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A」。构建中并行边界补入 `scripts/test-checkers.sh`（接口夹具只为固定几个脚本建空文件，`regressionView` 引用的 `regression_view.py` 不在其中），用户回「可以，加进边界并改」；同样补入 `README.md`、`README.en.md`（版本升到 0.96.0 后安装命令的 `--ref` 要同步），用户回「可以，加进边界并改」。
 
 ## Assumptions
 
@@ -97,7 +97,7 @@ bug／small 的回归用例（假设 6）、多模块需求的整体联调回归
 
 ## 并行边界
 
-- 独占：`spec/regression-doc-check.md`、`tasks/regression-doc-check/`、`plugins/spec-guard/hooks/regression_view.py`、`plugins/spec-guard/hooks/test_regression_view.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/usage_draft.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_usage_draft.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`scripts/test-checkers.sh`、`plugins/spec-guard/references/doc-skeletons.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`docs/commands.md`、`spec/usage/dev-flow-v2.md`、`CHANGELOG.md`、`plugins/spec-guard/.claude-plugin/plugin.json`、`plugins/spec-guard/.codex-plugin/plugin.json`
+- 独占：`spec/regression-doc-check.md`、`tasks/regression-doc-check/`、`plugins/spec-guard/hooks/regression_view.py`、`plugins/spec-guard/hooks/test_regression_view.py`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/usage_draft.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_usage_draft.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`scripts/test-checkers.sh`、`plugins/spec-guard/references/doc-skeletons.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`docs/commands.md`、`spec/usage/dev-flow-v2.md`、`CHANGELOG.md`、`README.md`、`README.en.md`、`plugins/spec-guard/.claude-plugin/plugin.json`、`plugins/spec-guard/.codex-plugin/plugin.json`
 - 公共：无
 
 ## Open questions
