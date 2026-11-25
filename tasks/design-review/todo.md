@@ -1,7 +1,7 @@
 # Todo: design-review
 
 - [x] Task 0：提交 Plan、todo 与 Spec 边界修订（2026-11-25 用户「Plan 和 Spec 修订都批准」）
-- [ ] Task 1：`designReview` 配置键
+- [x] Task 1：`designReview` 配置键
 - [ ] Task 2：`inspect_design` 与 `review_mark --target design`
 - [ ] Task 3：审查要求、`designApproval`、阶段提示与停点
 - [ ] Checkpoint 1（report）：本机完整检查与变异
@@ -11,3 +11,8 @@
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
 
 ## 证据
+- Task 1（2026-11-25）：`test_project_config.py` 先加三例跑红（取值、汇总键集合、set／unset），改 `project_config.py`（`DEFAULTS` 与 `VALIDATORS` 各一项，取值复用 `off`／`on`）后全绿；
+  `commands/config.md` 表格加一行、「不注入」名单加 `designReview`。`test_flow_v2`、`test_map_view` 照常通过（配置键集合只在 `test_project_config` 里写死）。
+- Task 2 的事实核对（2026-11-25）：delegate 0.12.2 `interface.json`：`review.profiles.design.criteria = design-v1`，`review.reviewer.selections` 为
+  `cross_vendor`／`same_vendor_fallback`／`explicit`／`none`，`unreviewed = no_reviewer_available`，`vendors` 为 codex→openai、claude-code→anthropic；
+  一份真实报告的顶层键有 `criteria`、`reviewer{vendor, backend, same_vendor, selection}`、`scope.files`（路径→sha256）、`execution_status`、`review_outcome`、`recheck`，与 Spec 假设 5 一致。

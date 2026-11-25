@@ -70,6 +70,14 @@ class Load(unittest.TestCase):
         for value in ("Combined", "both", "", 1, None):
             self.assertEqual(self.check({"version": 1, "reviewCadence": value}), ({}, ["reviewCadence-invalid"]))
 
+    def test_design_review_values(self):
+        # design-review: on / off, default off; any other value invalidates only this key.
+        for value in ("off", "on"):
+            self.assertEqual(self.check({"version": 1, "designReview": value}), ({"designReview": value}, []), value)
+        for value in (True, "ON", 1, "", None, "yes"):
+            self.assertEqual(self.check({"version": 1, "artifactLanguage": "en", "designReview": value}),
+                             ({"artifactLanguage": "en"}, ["designReview-invalid"]), value)
+
     def test_module_concurrency_values(self):
         for value in ("off", "on"):
             self.assertEqual(self.check({"version": 1, "moduleConcurrency": value}),
@@ -188,7 +196,8 @@ class Summary(unittest.TestCase):
             items = {item["key"]: item for item in summary(project.root)}
         self.assertEqual(set(items), {"artifactLanguage", "reviewCadence", "moduleConcurrency",
                                       "takeover", "moduleTakeover", "takeoverNarrowed",
-                                      "projectSections", "trackerDefault"})
+                                      "projectSections", "designReview", "trackerDefault"})
+        self.assertEqual((items["designReview"]["value"], items["designReview"]["source"]), ("off", "default"))
         self.assertEqual((items["artifactLanguage"]["value"], items["artifactLanguage"]["source"]),
                          ("zh-CN", ".agent/config.json"))
         self.assertEqual((items["reviewCadence"]["value"], items["reviewCadence"]["source"]),
@@ -284,6 +293,18 @@ class Cli(unittest.TestCase):
             self.assertEqual(load(project.root), ({}, []))
             items = {item["key"]: item for item in summary(project.root)}
             self.assertEqual(items["moduleConcurrency"]["source"], "default")
+
+    def test_design_review_set_and_unset(self):
+        with Project() as project:
+            code, out = project.run("set", "--key", "designReview", "--value", "on", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({"designReview": "on"}, []))
+            code, out = project.run("unset", "--key", "designReview", "--confirm")
+            self.assertEqual(code, 0, out)
+            self.assertEqual(load(project.root), ({}, []))
+            code, out = project.run("set", "--key", "designReview", "--value", "yes", "--confirm")
+            self.assertEqual(code, 2)
+            self.assertIn("designReview-invalid", out)
 
     def test_module_concurrency_rejects_other_values(self):
         with Project() as project:

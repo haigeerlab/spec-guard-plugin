@@ -48,7 +48,7 @@ RELEASE_LIMITS = ("note: the four pipeline plugins (spec-guard, module-crew, del
 # belongs to one key and leaves the rest of the file in effect.
 STRUCTURAL = ("unreadable", "not-json", "not-an-object", "version-invalid")
 DEFAULTS = {"reviewCadence": "separate", "moduleConcurrency": "off", "takeover": "none", "moduleTakeover": {},
-            "takeoverNarrowed": {}, "projectSections": {}}
+            "takeoverNarrowed": {}, "projectSections": {}, "designReview": "off"}
 # project-sections: which flow v2 documents a project may extend, and the limits on one section name.
 SECTION_DOCS = {"requirement": ("requirement", "small", "bug"), "design": ("design",), "regression": ("regression",)}
 SECTION_LIMIT, SECTION_COUNT = 40, 10
@@ -151,6 +151,8 @@ VALIDATORS = {
     # takeover-narrow: written only by narrow (and kept in step by set); config cannot set or unset it.
     "takeoverNarrowed": valid_narrowed,
     "projectSections": valid_sections,
+    # design-review: whether a normal flow v2 module's design goes to a second reviewer (old logic and cross-module always do).
+    "designReview": lambda value: value in CONCURRENCY,
 }
 MANAGED = ("takeoverNarrowed",)
 # takeover-config: retired keys (S101, "autonomyTier 退役吧"), not mapped to takeover.  A file that still has them is
