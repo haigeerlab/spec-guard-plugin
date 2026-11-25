@@ -37,7 +37,7 @@
    接口 1.20 → 1.21，`interface.json` 与 `scripts/check-interface.py` 同步。插件版本不改，M2 在 takeover-redefine 一次发版。
 8. **规则文字**：共享检查点规则「批准标记」一节加「新流程 Plan 自动批准」一条（假设 2～6 的要点）；停点规则「Plan 交审」加一行「新流程模块的 Plan 不交审」，中途 gate 加越界与 T4 的放行办法。
 9. **和接管档位的关系**：本模块不改 `takeover` 的取值与读法。老模块的 `plan: codex` 照旧；新流程模块不读 `plan` 这一项（草案 A 节「Plan 不可配置」）。档位重定义归 takeover-redefine。
-10. **共享判据**：越界与 T4 的判定写在 `module_stage.py`／`module_scope.py`，phase-guard 与 verify-artifacts 调同一个函数；改判据时两边的正反回归一起改（项目不变量）。
+10. **共享判据**：越界与 T4 的判定只写一处（`module_scope.flow_scope`、`module_stage.t4_hits`），构建中的检查由阶段提示、`module_scope.py check` 与最终验收的范围检查共用；verify-artifacts 和现在一样不查构建中的改动，它调同一个 `flow_scope` 查范围本身（并行边界写坏判失败，normal／important 没有范围给警告）。改判据时各入口的正反回归一起改（项目不变量）。（2026-11-25 写 Plan 时修订：原文「phase-guard 与 verify-artifacts 调同一个函数」与 verify-artifacts 的现状不符。）
 11. **不做**：takeover 新取值与兼容（takeover-redefine）；回归文档检查（regression-doc-check）；合并前验证（verification-criteria）；技术方案审查本身（design-review 已做）；给老模块的 Plan 改规则或补标记。
 
 ## Contract

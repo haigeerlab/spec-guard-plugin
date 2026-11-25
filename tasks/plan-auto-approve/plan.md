@@ -21,18 +21,20 @@ Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25
 - **用到范围的入口都改走 `flow_scope`**（R1-3）：阶段提示的 `scope_overreach`；`module_scope.py check`（新流程模块不论接管档位都检查；`none` 退出 3 并说明未检查，`unknown`／`invalid` 退出 4）；
   最终验收的 `review_mark._outside`（新流程模块用 `flow_scope`，`none` 时不判越界，其余约束不变）。老模块三处的判定一字不改。
 - **预先声明在新流程里不起作用**（R1-5）：
-  - `module_scope.py declared` 对新流程模块输出 `planApproved: true`、`approvedCommit: null`，并多一个字段 `autoApproved: true`（老模块为 `false`）；
+  - `module_scope.py declared` 的字段集合不变（R2-1）：新流程模块有 Plan 时 `planApproved: true`、`approvedCommit: null`（自动批准没有批准提交），老模块输出一字不改；
     预先声明照旧解析和报告（写坏时照旧退出 4，这是文件事实），但不授权任何路径；
   - `validate-declared` 对新流程模块不报 `bad`，改报 `ignored <id>`，verify-artifacts 据此警告「新流程 Plan 的预先声明不起作用」。
 - **T4 独立于越界**（R1-2、R1-6）：
   - 构建中用 `module_scope.changed_files(root, base)` 单独取改动文件，命中 T4 且模块不是重要需求时停在中途 gate；`flow_scope` 是 `none`／`unknown`／`invalid` 时照样查 T4；
   - 读不到风险路径清单时出「T4 路径：没有可读的风险路径清单，未检查」、不停下；
+  - 拿不到改动列表时（R2-3）：需求文档还没提交（没有开工基线）、基线不是有效提交、或 git 列改动失败，都出一行「越界与 T4：没有开工基线可比（原因），未检查」，不当成「没有改动」；
+    不停下（探测失败只降级、不当事实，项目不变量），同现有越界检查的「未判定」；
   - `important()` 的风险路径来源加技术方案影响面，**只对新流程模块**；老模块即使有 `design.md` 也不读。
 - **共享判据与 verify-artifacts**（R1-8）：越界与 T4 的判定只在 `module_scope.flow_scope`、`module_stage.t4_hits` 两个函数里，阶段提示、`check` 命令、最终验收都调它们。
   verify-artifacts 和现在一样不查构建中的改动（takeover-scope-check 也只在阶段提示里查），它调 `flow_scope` 查新流程模块的范围本身：`invalid` 判失败，`unknown` 警告；
   另外警告新流程 Plan 带批准标记、预先声明不起作用。
 - **`map_view`**：`reviewApprovedBy.plan` 取 `effective_review` 的批准人（新增 `auto`）；`codexRoute.plan` 取 `codex_route`（新增 `auto`）；`awaitingReview` 跳过新流程模块的 Plan。
-  `APPROVED_BY`、`CODEX_ROUTE` 两组取值与 `declared` 的 `autoApproved` 进 `interface.json` 1.21。
+  `review.plan` 仍报文件里的原始标记（R2-2）。`APPROVED_BY`、`CODEX_ROUTE` 两组取值与 `declared` 在新流程下的含义进 `interface.json` 1.21。
 
 ## 任务
 
@@ -42,18 +44,20 @@ Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25
   - `test_review_marker.py`：`plan`／`both` 在文件缺失、标记写坏、带 `--confirm` 时都退出 2、拒绝码 `plan-auto`、Spec 与 Plan 字节不变（AC3）；
   - `test_stop_rules.py`：新流程 `NEEDS_PLAN` 不是 `plan-review`，老模块仍是。
   再实现。验证：这三个测试文件。
-- **Task 2**：`/map --json` 与接口 1.21。`test_map_view.py` 写无 Plan、有 Plan 两种情形的 `reviewApprovedBy.plan`、`codexRoute.plan` 与 `awaitingReview`，先红后实现；
+- **Task 2**：`/map --json` 与接口 1.21。`test_map_view.py` 写无 Plan、有 Plan 两种情形的 `reviewApprovedBy.plan`、`codexRoute.plan` 与 `awaitingReview`；
+  同一个用例里 Plan 带旧 `pending` 标记，断言 `review.plan == "pending"`、`reviewApprovedBy.plan == "auto"`、`codexRoute.plan == "auto"`、`awaitingReview` 不列它（R2-2）。先红后实现；
   `interface.json`、`check-interface.py`、`docs/commands.md`。验证：`test_map_view.py`、`check-interface.py`。
 - **Task 3**：新流程的范围与三个入口。先写会红的用例：
   - `test_module_scope.py`：`flow_scope` 的四种状态（含边界写坏、normal 影响面为空）；`classify` 对新流程不认预先声明；`check` 命令对只有影响面、没有并行边界的模块能检查；
-    `declared` 输出 `autoApproved`；`validate-declared` 报 `ignored`；
+    `declared` 对新流程模块给出 `planApproved: true`、`approvedCommit: null`，老模块字段集合不变；`validate-declared` 报 `ignored`；
   - `test_review_marker.py`：merge=auto 的新流程模块只有影响面、没有并行边界时，最终验收的范围检查不拒绝；改到范围外仍拒绝；
   - `test_flow_v2.py`（git 夹具）：AC4（越界停下、补进影响面后不报、技术方案变 `revised`、预先声明不授权）、AC5（bug 无边界只记一行、有边界按它查）。
   再实现。验证：这三个测试文件、`test-phase-guard.sh`。
 - **Task 4**：T4。先写会红的用例：
   - `test_important_requirement.py`：同样的 T3／T4 影响面，新流程模块判为重要需求、老模块不变；
   - `test_flow_v2.py`：不是重要需求的模块改 T4 文件停下；没有并行边界的 bug 改 T4 文件时同时出「越界未检查」和 T4 停下；已是重要需求、技术方案已由用户批准、改的正是影响面里的 T4 路径时**不**停下；
-    用户同意后把路径补进影响面，模块转为重要需求、技术方案转为待用户批；风险路径清单读不了只记一行。
+    用户同意后把路径补进影响面，模块转为重要需求、技术方案转为待用户批；风险路径清单读不了只记一行；
+    需求文档未提交、改动列表取不到时出「未检查」一行、不当成没有改动（R2-3）。
   再实现。验证：这两个测试文件。
 - **Task 5**：verify-artifacts（C5）。`test-verify-artifacts.sh` 加正反例：新流程 Plan 带标记警告、预先声明不起作用警告、新流程并行边界写坏失败、normal 无范围警告，老模块输出不变。
   验证：`test-verify-artifacts.sh`。
@@ -64,10 +68,10 @@ Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25
 
 ## 检查点
 
-- Checkpoint 1（report）：Task 1～4 完成后，本机三套检查全绿。变异各自让回归变红后还原，并且每个变异都要在两个入口上看到红（阶段提示一侧与 `check` 命令或最终验收一侧）（R1-8）：
-  - `effective_review` 不再给新流程 Plan `auto`；
-  - `classify` 对新流程照旧认预先声明；
-  - T4 检查去掉「不是重要需求」的条件（由「已是重要需求、改的是影响面里的 T4 路径不停下」那一例抓，R1-9）。
+- Checkpoint 1（report）：Task 1～4 完成后，本机三套检查全绿。变异各自让回归变红后还原，每个变异写明在哪两个入口看到红（R1-8、R2-4）：
+  - `effective_review` 不再给新流程 Plan `auto`：阶段提示（`test_flow_v2`）与 `/map --json`（`test_map_view`）；
+  - `classify` 对新流程照旧认预先声明：阶段提示（`test_flow_v2`）与 `check` 命令（`test_module_scope`）；
+  - T4 检查去掉「不是重要需求」的条件：阶段提示（`test_flow_v2` 的「已是重要需求、改的是影响面里的 T4 路径不停下」，R1-9）与 `check` 命令（`test_module_scope` 的同一情形）。
   记进 todo，不停下。
 - Checkpoint 2（gate）：全部任务完成后，本机三套检查与 `check-interface.py` 全绿。推送本分支、开 PR（Plan 批准即授权）；开 PR 后提议打开宿主 PR 监控，用户批准才开。
   然后交最终验收，同一条消息里问「验收通过、合并吗？」，证据含 PR 上 `CI required` 的结果（没跑完照实写，不自己等）；合并前核实 `CI required` 通过，没通过不合并；
@@ -105,3 +109,10 @@ Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25
   合并前核实 `CI required` 通过、没通过不合并，AC8 的证据在合并前补齐。已在 Checkpoint 2 写明「合并前核实」。
 - 对 R1-8 的说明：verify-artifacts 现在不查构建中的改动（takeover-scope-check 也只在阶段提示里查）。Spec 假设 10 的「两边调同一个函数」按「判据只写一处」落实：
   构建中的越界与 T4 由阶段提示、`check` 命令、最终验收三处共用，verify-artifacts 用同一个 `flow_scope` 查范围本身。
+<!-- spec-guard: codex-review round=2 blocking=4 sha256=48bdee479683 -->
+
+第 2 轮处理（2026-11-25）：上一轮 8 条已解决；仍未解决 3 条，新意见 4 条。
+- R2-1（`declared` 别加新字段）、R2-2（`review.plan` 保留原始标记并断言）、R2-3（拿不到改动列表时的处理）、R2-4（变异写明观察入口）采纳，见上文标注。R2-1 同时解决了上一轮 R1-5 的残留。
+- R1-8（verify-artifacts 也要调共享判据）仍未解决：verify-artifacts 从来不查构建中的改动。这里按「判据只写一处」落实，并提议修订 Spec 假设 10 的文字，交用户与本 Plan 一起批。
+- R1-11（CI 没跑完就问合并）仍不采纳，理由同第 1 轮：这是用户已批准的 F3 规范 v1.7。
+- 两轮仍有阻断，按规则交用户批。注：第 2 轮轮次行记的是 `blocking=4`，只数了新发现，没算 3 条仍未解决的复查条目（Codex 轮次的计数口径缺口，design-review 只修了技术方案一侧）。
