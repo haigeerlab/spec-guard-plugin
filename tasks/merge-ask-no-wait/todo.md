@@ -2,7 +2,7 @@
 
 - [x] Task 0：提交 Plan 与 todo（2026-11-25 用户「Plan 批准」）
 - [x] Task 1：回归先红后绿，改共享规则、node-rules、release-process 与 CHANGELOG
-- [ ] Checkpoint 1（report）：本机完整检查与变异
+- [x] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并（含本机三套与 CI required 结果）、按 F3 合并、补记 CI 结论
 
 ## 证据
@@ -10,6 +10,10 @@
   改共享规则（F3 那行之后另起一个物理行）、`node-rules.md`、`docs/release-process.md` 第 4 条与 CHANGELOG 后，`test_workflow_checkpoints` 92 例、`test_stop_rules` 22 例全绿；
   其中原有 `test_no_remote_write_is_authorized_by_default`（新段仍过禁用词检查）与 `ORIGINALS` 一组照常通过。
   注入：阶段提示到最终 gate 时由 `module_stage.py` 第 970 行取 `node_rules("final-gate")`；`module_stage.py . --node-rules final-gate` 输出第 14 行即新的一条。
+- Checkpoint 1（2026-11-25，提交 4a128deb 上，macOS `/bin/bash`，完整档）：`validate.sh`「校验通过 ✅」（264s）；phase-guard「passed (541 cases)」；
+  verify-artifacts「passed (120 cases)」；repo-artifacts 0 失败。同一提交的第一次完整档因机器负载 24～41 让 `test_map_view` 两例子进程超时（30 秒），
+  单独重跑 113 例全绿，第二次完整档通过；这次改动没碰 `map_view`。
+  变异（AC4，临时脚本逐个删掉锁住的短语、跑对应用例、还原）：共享规则新段 16 个短语、`node-rules.md` 4 个短语，20 个全部变红；还原后 `git status` 干净。
 
 ## 外部审查意见
 
