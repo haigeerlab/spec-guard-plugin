@@ -4,7 +4,7 @@
 - [x] Task 1：`designReview` 配置键
 - [x] Task 2：`inspect_design` 与 `review_mark --target design`
 - [x] Task 3：审查要求、`designApproval`、阶段提示与停点
-- [ ] Checkpoint 1（report）：本机完整检查与变异
+- [x] Checkpoint 1（report）：本机完整检查与变异
 - [ ] Task 4：`/map --json` 的 `designApproval` 与接口 1.20
 - [ ] Task 5：verify-artifacts 的检查
 - [ ] Task 6：规则文字与停点规则
@@ -24,3 +24,5 @@
   `test_flow_v2.py` 新增 `DesignRequirementTest` 7 例、`DesignApprovalTest` 8 例：换回提交前的 `module_stage.py` 跑，15 例全红（14 错 1 失败），新版全绿，整个文件 62 例通过；`test_stop_rules.py` 加 2 例（23 例通过）；`test-phase-guard.sh` 加 5 例（546 例通过）。
   旧用例 `test_new_stages_name_the_document_and_the_skeleton` 的技术方案原来只写 `# d`，按 Plan「写不出路径按必审」现在会出审查命令，夹具改成只列新文件，断言不变。
   与 Plan 的出入：Plan 写「跨模块复用 `important()` 的判定」。实际上跨模块（`cross-module`）已经被现有规则升为重要需求，按假设 2 的顺序先落到「重要需求 → 用户批」，所以没有另写跨模块分支，由 `test_cross_module_is_important_by_rule` 锁住。只在 `NEEDS_REGRESSION` 时拦，之后的阶段只在「放行后又改过」时提示，免得已经写完回归文档的老技术方案被回头拦下。
+- Checkpoint 1（2026-11-25）：Task 2、Task 3 的提交都走了完整档且全绿（validate、phase-guard 546 例、verify-artifacts 120 例、ShellCheck 无告警）。变异都在临时副本里做：
+  阻断数改回只数 `findings` → `DesignMarks` 2 例失败（含 AC5 那一例）；去掉「影响面列已有文件」 → `DesignRequirementTest`、`DesignApprovalTest` 8 例失败、1 例报错。还原后全绿。
