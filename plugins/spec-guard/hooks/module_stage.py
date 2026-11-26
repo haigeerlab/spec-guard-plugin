@@ -2336,8 +2336,8 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
     if module_takeover(root, module)[0].get("merge") != "auto":
         return None, ""
     entry = "--target acceptance --state codex-approved --review <report>"
-    from module_scope import FLOW_DIRS, FLOW_FILES, default_base  # late: module_scope imports this module
-    base = default_base(root, module)
+    from module_scope import FLOW_DIRS, FLOW_FILES, scope_base  # late: module_scope imports this module
+    base = scope_base(root, module)  # rework-scope-baseline: a rework is reviewed from its own start
     flow_files = ("、" if zh else ", ").join("`%s`" % path for path in FLOW_FILES + FLOW_DIRS)
     # M3 second rework: name the start of the review range instead of leaving the agent to work it out.
     start_zh = "（`%s`，即 `--base %s`）" % (base[:12], base[:12]) if base else ""
@@ -2368,11 +2368,11 @@ def t4_hits(root: Path, module: str, base: str | None = None) -> dict:
     checked, never taken for "no change").  stops: hits and the module is not an important requirement -- an important
     one listed the path in its design, which the user approved.
     """
-    from module_scope import changed_files, default_base  # late: module_scope imports this module
+    from module_scope import changed_files, scope_base  # late: module_scope imports this module
     patterns = _risk_patterns(root, ("T4",))
     if patterns is None:
         return {"status": "no-list", "hits": [], "stops": False}
-    base = base or default_base(root, module)
+    base = base or scope_base(root, module)
     files = changed_files(root, base) if base else None
     if files is None:
         return {"status": "no-base", "hits": [], "stops": False}
@@ -2404,6 +2404,17 @@ def _t4_part(root: Path, module: str, zh: bool) -> tuple:
             "requirement, which the user approves; if not, undo those changes.")
 
 
+def _rework_note(root: Path, module: str, zh: bool) -> str:
+    """rework-scope-baseline (assumption 4): how a rework's overreach is counted; "" for a first build."""
+    from module_scope import rework_info  # late: module_scope imports this module
+    rework = rework_info(root, module)
+    if rework is None:
+        return ""
+    if rework["start"] is None:
+        return "；返工：还没提交，与 HEAD 比较" if zh else "; rework: not committed yet, compared with HEAD"
+    return ("；返工：从提交 `%s` 起算" if zh else "; rework: counted from commit `%s`") % rework["start"][:12]
+
+
 def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:
     """plan-auto-approve: the scope part and the T4 part of a v2 build check, joined (assumptions 4, 5)."""
     facts, lines, steps = [], [], []
@@ -2420,7 +2431,7 @@ def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:
 
 def _scope_part(root: Path, module: str, found: dict, zh: bool) -> tuple:
     """plan-auto-approve: (fact, line, next step) for a v2 module's build, whatever its takeover (assumption 4)."""
-    from module_scope import classify, default_base  # late: module_scope imports this module
+    from module_scope import classify, scope_base  # late: module_scope imports this module
     status = found["status"]
     if status == "none":
         return (("scope", "none"), "- 越界：没有并行边界，未检查。" if zh else
@@ -2435,7 +2446,7 @@ def _scope_part(root: Path, module: str, found: dict, zh: bool) -> tuple:
         return (("scope", status), "- Out of scope: %s, so the changes cannot be checked." % why,
                 "stop; fix the requirement's concurrency boundary or list the files in the design's impact section (the "
                 "design is then reviewed or approved again under design-review), then continue the build.")
-    base = default_base(root, module)
+    base = scope_base(root, module)
     rows = classify(root, module, found["scope"], base) if base else None
     if rows is None:
         line = ("- 越界：没有开工基线可比（`spec/%s.md` 没有更早的提交，或 git 读不了），未检查。" % module if zh else
@@ -2447,11 +2458,12 @@ def _scope_part(root: Path, module: str, found: dict, zh: bool) -> tuple:
         return None, "", ""
     shown = ", ".join("`%s`" % path for path in outside[:SCOPE_SHOWN]) + ("…" if len(outside) > SCOPE_SHOWN else "")
     if zh:
-        return (("scope", tuple(outside)), "- 越界：%d 个文件超出需求文档的并行边界与技术方案影响面（%s）。" % (len(outside), shown),
+        return (("scope", tuple(outside)), "- 越界：%d 个文件超出需求文档的并行边界与技术方案影响面（%s）%s。"
+                % (len(outside), shown, _rework_note(root, module, zh)),
                 "停下，逐个说明这些文件为什么要改，交用户决定：同意就补进技术方案影响面或并行边界（技术方案按 design-review 重新审或批），"
                 "不同意就撤回这些改动。")
     return (("scope", tuple(outside)), "- Out of scope: %d file(s) outside the requirement's boundary and the design's "
-            "impact section (%s)." % (len(outside), shown), "stop and show the user why each of these files has to change: "
+            "impact section (%s)%s." % (len(outside), shown, _rework_note(root, module, zh)), "stop and show the user why each of these files has to change: "
             "if they agree, add them to the design's impact section or the boundary (the design is then reviewed or "
             "approved again under design-review); if not, undo those changes.")
 
@@ -2464,7 +2476,7 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
     """
     if stage != "BUILDING" or not module:
         return None, "", ""
-    from module_scope import ScopeError, classify, default_base, flow_scope, parse  # late: module_scope imports this
+    from module_scope import ScopeError, classify, flow_scope, parse, scope_base  # late: module_scope imports this
     found = flow_scope(root, module)
     if found is not None:
         return _flow_overreach(root, module, found, zh)
@@ -2482,7 +2494,7 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
         return (("scope", "no-boundary"), "- Out of scope: `spec/%s.md` has no usable concurrency boundary, so the changes "
                 "cannot be checked." % module, "stop and show the user which files this module changes; once they agree, "
                 "add the concurrency boundary to the Spec, have it reviewed again, then continue the build.")
-    base = default_base(root, module)
+    base = scope_base(root, module)
     rows = classify(root, module, scope, base) if base else None
     if rows is None:
         line = ("- 越界：基线未判定（`spec/%s.md` 没有更早的提交可比），越界检查没有运行。" % module if zh else
@@ -2493,10 +2505,11 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
         return None, "", ""
     shown = ", ".join("`%s`" % path for path in outside[:SCOPE_SHOWN]) + ("…" if len(outside) > SCOPE_SHOWN else "")
     if zh:
-        return (("scope", tuple(outside)), "- 越界：%d 个文件超出 Spec 的并行边界与 Plan 的预先声明（%s）。" % (len(outside), shown),
+        return (("scope", tuple(outside)), "- 越界：%d 个文件超出 Spec 的并行边界与 Plan 的预先声明（%s）%s。"
+                % (len(outside), shown, _rework_note(root, module, zh)),
                 "停下，逐个说明这些文件为什么要改，交用户决定：同意就补进 Spec 并行边界或 Plan 预先声明并复审，不同意就撤回这些改动。")
     return (("scope", tuple(outside)), "- Out of scope: %d file(s) outside the Spec's boundary and the Plan's pre-declared "
-            "paths (%s)." % (len(outside), shown), "stop and show the user why each of these files has to change: if they "
+            "paths (%s)%s." % (len(outside), shown, _rework_note(root, module, zh)), "stop and show the user why each of these files has to change: if they "
             "agree, add them to the Spec's concurrency boundary or the Plan's pre-declared section and have it reviewed "
             "again; if not, undo those changes.")
 

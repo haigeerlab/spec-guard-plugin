@@ -504,7 +504,7 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
 def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json: bool, t4: dict | None = None) -> int:
     """The check command's output; `t4` (plan-auto-approve, v2 modules only) adds the T4 changes and whether they stop."""
     if base is None:
-        base = default_base(root, module_id)
+        base = scope_base(root, module_id)  # rework-scope-baseline: a rework is checked from its own start
         if base is None:
             print("base-unknown: spec/%s.md was not committed after an earlier commit; give --base" % module_id)
             return 2

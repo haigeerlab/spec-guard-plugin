@@ -238,7 +238,7 @@ def _design(root: Path, relative: str, state: str, report: str | None, text: str
 
 def _outside(root: Path, module_id: str) -> str | None:
     """takeover-scope-check reused: why the module's changes cannot be accepted as in scope, or None when they are."""
-    from module_scope import ScopeError, classify, default_base, flow_scope, parse
+    from module_scope import ScopeError, classify, flow_scope, parse, scope_base
     found = flow_scope(root, module_id)
     if found is not None:
         # plan-auto-approve: a v2 module's scope is its boundary plus its design's impact paths; T4 is checked first,
@@ -260,7 +260,7 @@ def _outside(root: Path, module_id: str) -> str | None:
             scope = None
     if scope is None:
         return "spec/%s.md has no usable concurrency boundary" % module_id
-    base = default_base(root, module_id)
+    base = scope_base(root, module_id)  # rework-scope-baseline; _merge_at_base keeps default_base on purpose
     rows = classify(root, module_id, scope, base) if base else None
     if rows is None:
         return "no base commit to compare with"

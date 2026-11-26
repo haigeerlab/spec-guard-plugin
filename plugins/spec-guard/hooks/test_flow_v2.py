@@ -1854,5 +1854,56 @@ class BugCaseNoReconfirmTest(unittest.TestCase):
             self.assertEqual(module_stage.requirement_wait(project.root, "a"), "revised")
 
 
+
+class ReworkOverreachTest(FlowOverreachTest):
+    """rework-scope-baseline Task 2: a rework is checked from its first commit; the hint names it (AC2, AC6, AC7)."""
+
+    def rework(self, commit=True):
+        self.build()
+        self.project.write("src/a/old.py", "built\n")
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n")
+        self.commit("done")
+        self.project.write("src/later.py", "another module\n")
+        self.commit("another module merges")
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n- [ ] 返工\n- [ ] 返工验收（gate）\n")
+        if commit:
+            self.commit("rework")
+        return git(self.project.root, "rev-parse", "HEAD")
+
+    def test_another_modules_files_are_not_counted(self):
+        start = self.rework()
+        self.project.write("src/a/old.py", "reworked\n")
+        self.assertNotIn("越界", hint(self.project))
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/other.py`）；返工：从提交 `%s` 起算。"
+                      % start[:12], text)
+        self.assertNotIn("src/later.py", text)
+
+    def test_a_rework_not_committed_yet_compares_with_head(self):
+        self.rework(commit=False)
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("（`src/other.py`）；返工：还没提交，与 HEAD 比较。", hint(self.project))
+
+    def test_first_build_wording_is_unchanged(self):
+        self.build()
+        self.project.write("src/other.py", "changed\n")
+        self.assertIn("越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/other.py`）。", hint(self.project))
+
+    def test_start_of_the_module_stays_the_old_base(self):
+        import module_scope
+        self.rework()
+        self.assertEqual(module_stage.module_baseline(self.project.root, "a"),
+                         module_scope.default_base(self.project.root, "a"))
+        self.assertNotEqual(module_scope.scope_base(self.project.root, "a"), module_scope.default_base(self.project.root, "a"))
+
+    def test_merge_at_base_reads_the_start_of_the_module(self):
+        import review_mark
+        self.rework()
+        self.project.write(".agent/config.json", json.dumps({"version": 1, "takeover": "merge"}))
+        self.commit("widen later")
+        self.assertEqual(review_mark._merge_at_base(self.project.root, "a"), "human")
+
+
 if __name__ == "__main__":
     unittest.main()
