@@ -4,6 +4,10 @@
 
 ### 移除
 
+- **阶段提示里的上下文边界提示（remove-context-hint）。** 原来模块之间上下文达到窗口 70% 时多一行「模块边界: 本会话上下文约 N k token…」，
+  让 agent 给出 `/compact` 或 `/clear`。用户反馈它常在离额度还远时就弹出、误导人，决定去掉。数字本身取自宿主写进会话记录的用量；提前弹出
+  至少有两处是 spec-guard 自己造成的：70% 只是建议线，Claude 的会话记录没有窗口大小、读数过 200k 时按 1000k 估算。这一行连同只为它存在的
+  上下文读数、窗口估算与无人值守判断一并删除；压缩后的阶段恢复、位置行、收件记账提醒与其他提示不变。需要释放上下文时随时自己发 `/compact` 或 `/clear`。
 - **退役的 `autonomyTier`、`moduleAutonomy` 接口与 `/map --json` 的 `autonomy` 字段（takeover-config 返工）。** 它们 0.91.0（接口 1.15）起就已退役、只留一版过渡；
   功能盘点核对过 autopilot、module-crew、decision-inbox 的代码，都不再读。现在 `interface.json` 删掉这三个条目，接口升到 **1.25**（次版本：module-crew 读 spec-guard 接口时要求主版本一致）；
   `project_config` 里只为这个字段算档位的 `module_tier` 等函数一并删除。配置文件里还留着这两个键时照旧：不生效、`show` 标已退役、verify-artifacts 只警告、

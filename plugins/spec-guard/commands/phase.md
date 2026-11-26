@@ -65,7 +65,7 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 各阶段都有；呈现结果时把它一并告诉用户，agent 请用户审阅或确认时也应说明这个位置。不在 git 仓库里时没有这一行。
 
 `.agent/config.json` 的 `artifactLanguage` 恰好是 `zh-CN` 时，说明文字改用中文（hint-language-follow）：例如
-``位置: 分支 `<分支>` · worktree `<目录>`。…``、`- 能力图: 已有`、`建议下一步: …`、`- 模块边界: …`。
+``位置: 分支 `<分支>` · worktree `<目录>`。…``、`- 能力图: 已有`、`建议下一步: …`。
 标题行 `## spec-guard local workflow`、阶段代码、命令、路径、模块 id 与标记行不变；阶段行中文写 `当前阶段: **<阶段>**`，
 英文写 `Current stage: **<阶段>**`。未设、其他语言或配置无效时，输出为英文（quiet-injection 起英文输出里不再夹固定的中文标签；
 停点规则正文只有中文，能力图无效时引用的解析器诊断原样保留）。
@@ -75,14 +75,12 @@ CLAUDE_PROJECT_DIR="$PROJECT" bash "$ROOT/hooks/phase-guard.sh"
 上下文用量。每轮 hook 从会话记录里找最近一次 spec-guard 注入（Claude 的 `hook_additional_context` 附件、Codex 的 developer 消息，
 不认用户或助手消息里的文字）：状态码相同就只给一行
 ``spec-guard: <阶段> · `<模块>` · <N> unchecked · branch `<分支>` (unchanged; see the earlier phase hint for details)``
-（中文为「未勾选 <N> · 分支 …（状态未变，完整说明见此前的阶段提示）」），后面可能另起一行附模块边界行或记账提醒。新会话、压缩之后、
+（中文为「未勾选 <N> · 分支 …（状态未变，完整说明见此前的阶段提示）」），后面可能另起一行附记账提醒。新会话、压缩之后、
 会话记录读不到或找不到上一次注入、状态码不同，都给完整内容；`MAP_INVALID`、`UNKNOWN` 这类诊断不带状态码，每轮完整。
 本命令手工运行时没有会话记录，所以总是完整输出。
 
-上下文提醒只在模块边界出现（宿主在 hook 输入里给出会话记录 `transcript_path` 时才读得到大小）：`MODULE_DONE` / `DONE`，以及当前模块
-还没有 Spec 的 `NEEDS_SPEC`，达到窗口 70% 时事实列表末尾有一行带大小的 `- Module boundary: …`，让 agent 把一条可直接复制的
-命令单独放进代码块：接着做相关工作时是 `/compact`，换到不相关工作时是 `/clear`；低于 70% 或读不到大小时没有这一行。模块进行中
-（`NEEDS_PLAN`、`BUILDING`）不再提醒，上下文交给宿主管理（quiet-injection，决定 D6）。
+阶段提示不按上下文大小提醒释放上下文（0.97.0 删掉了原来的 `- Module boundary: …` 一行）；上下文交给宿主管理，用户需要时自己发
+`/compact` 或 `/clear`。
 
 命令写法按宿主给（codex-command-wording）：Claude Code 里 `/compact` 后面带 agent 填好的一句聚焦说明，插件命令写作
 `/spec-guard:add-module` 这类斜杠命令和 `/build`、`/plan`；Codex 的 `/compact` 不能带参数，只给 `/compact`，插件命令写作 `` `$spec-guard-ops` ``

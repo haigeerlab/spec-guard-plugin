@@ -64,9 +64,8 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 
 当前模块取 `.agent/state.json` 的 `activeModule`，否则取 Build order 里第一个未完成的模块。其他可能出现的行：
 `Location:`（分支与 worktree）、`Paused:`（插队时被暂停的模块）、`Suspended:`（挂起的模块）、`Linked project`（项目指向）、
-`Project config`（配置无效或有键被忽略）、模块边界提醒。模块边界提醒只在模块之间（`MODULE_DONE`、`DONE`）、会话上下文达到
-窗口 70% 时出现，建议 `/compact` 或 `/clear`；模块进行中不提醒。Claude 的会话记录不带窗口大小，只有读数超过 200k 时按 1M 窗口估算，
-否则不出这一行；读不到用量（例如新会话第一轮）也不出。
+`Project config`（配置无效或有键被忽略）。0.97.0 起不再有按上下文大小给出的「模块边界」提醒；要释放上下文时随时自己发
+`/compact` 或 `/clear`。
 
 ### `/spec-guard:verify-artifacts`
 
