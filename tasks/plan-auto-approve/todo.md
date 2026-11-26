@@ -12,7 +12,7 @@
 - [x] Task 7：`own_doc` 与 `t4_hits` 去掉本模块文档与流程记账（返工，Spec 假设 12、14）
 - [x] Task 8：`important()` 去掉本模块文档（返工，Spec 假设 13）
 - [x] Task 9：规则文字与版本 0.97.1
-- [ ] Checkpoint 3（report）：完整档、变异、沙盒复跑与老输出比对
+- [x] Checkpoint 3（report）：完整档、变异、沙盒复跑与老输出比对
 - [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
 
 ## 证据
@@ -34,3 +34,4 @@
 - Task 7（2026-11-26）：`module_stage.own_doc`（`spec/<id>.md` 与 `tasks/<id>/` 下 `OWN_DOCS` 四个文件名，只比字符串）、`T4_FLOW_FILES`（能力图、`.agent/state.json`）；`t4_hits` 对新流程模块比清单前去掉这两类。用例：`test_flow_v2.py` `T4OwnDocsTest` 3 例（只改自己文档不停；别的模块文档、`tasks/a/notes.md`、`spec/usage/`、风险清单本身、`.agent/config.json` 各自照旧停；老模块命中不变）、`test_module_scope.py` `FlowT4` 一例（`check --json` 的 `t4`）、`test_review_marker.py` `AcceptanceT4` 一例（最终验收）。实现前 7 处 + 2 处失败（老模块一例实现前已通过，锁住现状），实现后三个文件 328 例通过。夹具注意：两个模块同批写进能力图按规则就是重要需求、T4 不停，所以夹具只放一个模块。
 - Task 8（2026-11-26）：`important()` 对新流程模块拼好边界、预先声明、影响面的路径后，去掉 `own_doc` 认出的文件与 `tasks/<id>/` 目录项。用例：`test_important_requirement.py` `OwnDocsRiskPath` 3 例（边界与影响面只写自己文档不判 `risk-path`；另列 `.github/ci.yml` 或影响面写别的模块的 `spec/beta.md` 照旧判；老模块照旧判），实现前第一例失败，另两例实现前已通过、锁住现状；与 `test_flow_v2.py` 共 170 例通过。风险清单写在 `check()` 里而不是 `setUp`，否则继承来的老用例换了清单会变红。
 - Task 9（2026-11-26）：共享检查点规则重要需求一段与「碰 T4」一条各补一句；`test_workflow_checkpoints.py` 加 `test_own_documents_are_not_t4`（3 个短语，旧规则文件里一个都没有，即改前会红）；CHANGELOG「未发布 · 修复」一条；版本 0.97.0 → 0.97.1（两份 plugin.json、两份 README 的 `--ref`）。Task 8 与 Task 9 因检查脚本要求工作区全部暂存，合在一个提交里。
+- Checkpoint 3（2026-11-26）：Task 7、8+9 的提交都走完整档且全绿。变异（临时副本）：`t4_hits` 不去掉 `own_doc` → 7 处失败；`.agent/config.json` 也去掉 → 1 处；`important()` 不去掉 `tasks/<id>/` 目录项 → 1 处；去掉 `_v2` 判断 → 1 处；还原后全绿。沙盒 drill-pow 只读复跑（克隆到暂存目录、检出 `c2ec343`，基线 `21217fd^`）：`t4_hits` 从 8 个命中降到只剩 `.agent/config.json`，`stops` 为 True——在这个提交上 `src/calc.py` 还不是 T3，drill-pow 不是重要需求，所以开工时给自己设 `moduleTakeover: merge` 会停一次交用户（Q1 A 的预期代价）。已安装的 0.97.0 与本分支对本仓库的阶段提示、verify-artifacts 逐字相同。
