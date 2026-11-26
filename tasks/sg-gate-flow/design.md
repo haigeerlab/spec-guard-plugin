@@ -164,10 +164,10 @@
     收窄措辞由我起草，随回归测试文档交用户看，用户批过才写进文件；已同步告诉 lead。附录 A 仍保留原文，作为比对基准。
   - **收窄后的措辞（随本次重新批准一起定）**：
     - 第 162～163 行，原句「建 tag、Release 和发版不由会话做：由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行。」换成：
-      「建 tag、Release 和发版：装了 autopilot 的仓库不由会话做，由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行；没装的仓库照旧在用户确认后由会话执行。」
+      「建 tag、Release 和发版：生效档位把发版交给 autopilot（`release` 不是 `human`）的模块不由会话做，由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行；`release` 是 `human` 的照旧在用户确认后由会话执行。」
     - 第 331 行，原文括号「（发版由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行）」换成：
-      「（装了 autopilot 的仓库由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行；没装的仓库在用户确认后由会话执行）」。
-    - 「装了 autopilot」指仓库有 autopilot 的 caller workflow（`.github/workflows/autopilot-admission.yml`），与长期授权第 2 条「本仓库主干的必需检查里已经有 `autopilot/verified`」不是一回事：前者只决定发版由谁执行，后者决定能不能自动合并。
+      「（生效档位把发版交给 autopilot 的，由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行；`release` 是 `human` 的在用户确认后由会话执行）」。
+    - 按档位判断而不按「仓库有没有 autopilot 的 workflow」：本仓库已经有 caller workflow，但 hub 的发版（模块 3）还没上线、档位是 `none`，按档位判断时发版仍由会话在用户确认后执行，不会出现没人能发版的空档。
 
 ## 第二审查者意见
 
