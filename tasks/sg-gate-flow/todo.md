@@ -22,3 +22,4 @@
   `test_workflow_checkpoints.py`：钉旧原文的 9 处改为钉新原文（预估 8 处，多出 `**不授权**合并` 一个短语），断言不删；`test_no_remote_write_is_authorized_by_default` 的「自动合并」不出现改为「出现的行必须写明 autopilot」，并排除「出事处理」一节（那里只是参考时长）。新增 `IncidentSection` 4 例、`GateFlowRules` 5 例（对旧规则文件必然红：两节和新句子都不存在）。106 例全过，快档通过。
 - Task 7（2026-11-27）：`interface.json` 升 1.26（各新字段在前面各 Task 里已写说明），版本 0.97.1 → 0.98.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 直接写 `## [0.98.0] - 2026-11-27`（不留 `[未发布]`）。`InterfaceFields` 3 例先红（版本仍是 1.25）后绿。
 - 最终验收（2026-11-27）：R1～R14 全部通过，最后一次完整档全绿（validate、phase-guard 516 例、verify-artifacts 147 例）。推送分支 `claude/sg-gate-flow`，开 PR #522 并绑定，验收时 head 为 `f350f1a8`。合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
+- 合并与发版（2026-11-26）：PR #522 squash 合并，合并提交 `b96de49f`；用户「授权发布 0.98.0」，tag `v0.98.0`，包 sha256 `f493f32c…28c8c2`，本机两边安装并逐文件比对，Codex smoke 通过（用户重新批准 hook、重开 ChatGPT 后），四份证据在 `docs/releases/v0.98.0-*.json`。
