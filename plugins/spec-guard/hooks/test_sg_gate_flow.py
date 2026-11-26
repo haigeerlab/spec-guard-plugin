@@ -265,7 +265,8 @@ class OverallDesign(unittest.TestCase):
     def test_every_other_state_holds(self):
         cases = {"missing": (None, "missing", "fail"), "pending": (overall_text("pending"), "pending", "fail"),
                  "revised": (overall_text().replace("内容", "改过"), "revised", "fail"),
-                 "codex": (overall_text("codex"), "pending", "fail"), "none": (overall_text(None), "pending", "fail")}
+                 "codex": (overall_text("codex"), "pending", "fail"), "none": (overall_text(None), "pending", "fail"),
+                 "codex-edited": (overall_text("codex").replace("内容", "改过"), "pending", "fail")}
         for name, (text, status, level) in cases.items():
             with self.subTest(case=name):
                 line, step, found, problems = self.look(text)

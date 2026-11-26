@@ -5,7 +5,7 @@
 - [x] Task 3：总体技术方案关卡
 - [x] Task 4：里程碑不阻塞
 - [x] Task 5：先说一句
-- [ ] Checkpoint 1（report）：完整档与变异
+- [x] Checkpoint 1（report）：完整档与变异
 - [ ] Task 6：规则文字
 - [ ] Task 7：接口与版本
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
@@ -17,3 +17,4 @@
   用例：`OverallDesign` 6 例、`OverallReviewMark` 3 例、`OverallConsistency` 2 例。**这一项先写了实现后写用例，没有先看到红**；第一次跑有 2 处失败（reviewer 状态的拒绝码不对），改顺序后全过。用例能不能拦住回归，留到 Checkpoint 1 用变异补证。`test_map_view.py` 的 `MODULE_KEYS` 加 `overallDesign`，124 例全过。
 - Task 4（2026-11-27）：`module_stage.milestone_blocking`（里程碑里每个模块的 `module_preset` 都是 `autopilot` 才为 False）；`milestone_stop` 不阻塞时事实行写「autopilot 档，不阻塞，写进汇报」、下一步为空（不替换成「先不开下一个模块」），状态码事实记 `report`。`/map --json` 的 `milestoneStop` 加 `blocking`，表格文字在不阻塞时加一句；`interface.json` 写上。用例 `MilestoneBlocking` 2 例先红（3 处失败 1 处报错）后绿；其余档位与改动前逐字相同由同一用例比对。`test_map_view.py` 的 `test_stop` 补 `blocking: True` 的预期。
 - Task 5（2026-11-27）：新流程模块在 `NEEDS_REGRESSION`、`NEEDS_PLAN`、`BUILDING`，没有停点（`stop_node` 为 None）、没有待批文档、不是模块或协调角色时，下一步末尾加「先用一句话告诉用户接下来做什么」。用例 `SayFirst` 2 例先红（3 个阶段都没有）后绿；写用例时 BUILDING 夹具的技术方案影响面没写路径，越界检查正确地停在中途 gate，夹具补上路径。phase-guard 516 例、`test_flow_v2`、`test_stop_rules`、`test_review_marker`、`test_map_view` 全过。
+- Checkpoint 1（2026-11-27）：Task 1～5 的提交都走完整档且全绿（phase-guard 516 例、verify-artifacts 147 例）。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），9 个：release_preauth 不看确认、milestone_blocking 恒 False、overall 把 revised 当 approved、Codex 批过又改过的标记算批准、review-mark overall 收 Codex 状态、去掉同一草案一致性检查、先说一句不看停点、module_preset 不看模块条目、发版一问不看档位。第一次跑 8 个变红、1 个（Codex 批过又改过）没红——用例没覆盖这一分支；`OverallDesign` 补 `codex-edited` 一例后单独复跑这个变异变红。还原后 `test_sg_gate_flow.py` 33 例全过。Task 3 先写实现后写用例缺的「先红」由这几个变异补证。
