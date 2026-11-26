@@ -4,7 +4,7 @@
 - [x] Task 1：AC1 回归先红，再删提示、读数与无人值守判断
 - [x] Task 2：文档、英文提示比对脚本与 CHANGELOG
 - [x] Checkpoint 1（report）：完整档、变异与老输出比对
-- [ ] Checkpoint 2（gate）：推送、开 PR、最终验收并同时问合并
+- [x] Checkpoint 2（gate）：推送、开 PR、最终验收并同时问合并
 
 ## 证据
 - Task 0（2026-11-26）：能力图插入 remove-context-hint；Spec 批准（「批准；Q1 A；Q2 A」）；Plan 经 Codex 两轮：第一轮 3 条阻断＋1 条建议全部采纳，第二轮余 1 条未证实、新 1 条，交用户「按改法改，批准」。
@@ -12,3 +12,4 @@
 - Task 2 进行中（2026-11-26）：`evals/hint-english-diff.sh` 删 claude-850k、codex-230k 两个变体与夹具（比对照样通过）；`docs/commands.md`、`docs/workflow.md`（两处）、`docs/design.md`（两处）、`commands/phase.md`（三处）改为不再有上下文提醒；CHANGELOG「未发布 · 移除」一条。AC4 检索另发现 `references/workflow-checkpoints.md:555` 那段规则还在讲这条提示，该文件不在并行边界内，停下问用户。
 - Task 2 完成（2026-11-26）：用户同意后把 `references/workflow-checkpoints.md` 与 `hooks/test_workflow_checkpoints.py` 加进并行边界（Spec 改两处，重记批准）；规则段落改为「阶段提示不按上下文大小提醒释放上下文」，`/compact` 代码块、不建议开新会话等其余规则照留；规则回归必须出现的词由「70%」改为「不按上下文大小提醒」，并加断言不得再有「70%」；「一句话」出自旧规则「用一句话说明可以释放上下文」，一并从必需词里去掉。
 - Checkpoint 1（2026-11-26）：Task 1、2 的提交都走完整档且全绿（ShellCheck 无告警）。变异（临时副本）：`describe` 输出里加回一行 `- Module boundary: …` → 阶段回归多处变红（含 AC1「判断不了宿主时 DONE 700k 也不应出现边界行」），还原即全绿。已安装的 0.96.2 与本分支比对：本仓库与 DONE、MODULE_DONE、BUILDING 三个夹具 × 无读数／低读数（100k）／带收件包装 × UserPromptSubmit／SessionStart，共 24 种组合逐字相同（AC2、AC3）；DONE、MODULE_DONE 在 800k 时旧版各有 1 行边界行，去掉后与本分支逐字相同（AC1）。
+- Checkpoint 2（2026-11-26）：推送并开 PR #514、已绑定；最终验收（含构建中修订的 Spec）与合并合成一问，用户「验收通过并合并」。拟回告：合并后给 ecosystem-lead 发验收时给出的原文。
