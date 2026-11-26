@@ -1,6 +1,6 @@
 # Plan: takeover-config
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 Spec：[spec/takeover-config.md](../../spec/takeover-config.md)（2026-11-21 批准，Q2 A：「接管到合并」预设包含 Spec）。
 
@@ -75,8 +75,10 @@ Spec：[spec/takeover-config.md](../../spec/takeover-config.md)（2026-11-21 批
 
 - **只删「拿退役键算档位」这一条线**：`map_view` 的 `autonomy` 字段、`AUTONOMY_FIELDS`、对 `module_tiers` 与 `wider` 的调用；`project_config` 的 `_legacy`（重读两个退役键，只供 `module_tiers` 用）、`_project_tier`、`module_tier`、`module_tiers`、`wider`（全仓只有这一处用），以及 `_RETIRED` 上方「只有 module_tier 读它们」那句注释（R5-1）。`_legacy_line`、`_legacy_notes` 是 takeover 的显示用，名字像但不属于这一线，不动。
 - **识别与清理入口不动**（Q1 A）：`_RETIRED` 校验、`retired-key` 问题代码、`TIERS`（校验旧值要用）、`set` 拒绝、`unset` 可用、阶段提示过滤 `retired-key`、verify-artifacts 的警告，全部原样。
-- **接口 1.25**（Q2 A）：`interface.json` 删 `autonomyTier`、`moduleAutonomy` 两个条目与 `mapView.autonomy`，版本 1.24 → 1.25。`check-interface.py` 删 `_autonomy` 与两条取值比对，改为检查这三处**不再出现**（防止有人照旧文档加回去）。
+- **接口 1.25**（Q2 A）：`interface.json` 删 `autonomyTier`、`moduleAutonomy` 两个条目与 `mapView.autonomy`，版本 1.24 → 1.25。`check-interface.py` 删 `_autonomy`、两条取值比对，并把 `autonomyTier`、`moduleAutonomy` 从必需入口 `ENTRIES` 里拿掉（R6-1），改为检查这三处**不再出现**（防止有人照旧文档加回去）。
 - **测试**：`test_map_view.py` 模块键集合去掉 `autonomy`，删 `AutonomyTest` 一类与快照里对 `autonomy` 的处理；加一例「模块对象没有 `autonomy` 键」，再加一例断言 `interface.json` 顶层 `interface` 正好是 `"1.25"`（R5-2；以后升接口时一起改这一行）。`test_project_config.py` 删 `module_tier` 那组断言，退役键的 show／check／set／unset 用例保留（AC10）。`test-checkers.sh` 删原来「缺 autonomyTier／autonomy 说明 → 报错」等反例，改为「接口里又出现 `autonomyTier`／`moduleAutonomy`／`mapView.autonomy` → 报错」三例。
+
+第二轮审查（R6-1）交用户，2026-11-26 用户「按改法改，批准」。
 
 ## 返工任务
 
@@ -89,3 +91,4 @@ Spec：[spec/takeover-config.md](../../spec/takeover-config.md)（2026-11-21 批
 ## 外部审查意见
 
 <!-- spec-guard: codex-review round=1 blocking=2 sha256=15a8950ac97e -->
+<!-- spec-guard: codex-review round=2 blocking=1 sha256=b8f370040ddf -->
