@@ -1,7 +1,8 @@
 # Spec: sg-gate-flow
 
 <!-- spec-guard: flow v2 tier=important -->
-<!-- spec-guard: review pending -->
+
+<!-- spec-guard: review approved 6229ba372e82 -->
 
 ## 目标
 
