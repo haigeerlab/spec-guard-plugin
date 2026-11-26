@@ -25,19 +25,23 @@
 
 ## 影响面
 
+路径都从仓库根目录写起；越界检查按这里引用的路径判定范围。
+
 | 文件 | 改什么 |
 |---|---|
-| `hooks/module_stage.py` | 新标记 `release-preauth`、`overall-design` 的解析；需求确认提示里的发版一问；总体技术方案一关；里程碑停点按预设决定阻不阻塞；连着做之前先说一句 |
-| `hooks/project_config.py` | 预设 `autopilot`；带 `preset` 键的对象；收窄阶梯；新函数 `module_preset` |
-| `hooks/map_view.py` | `takeover.releasePreauth`、`takeover.preset`、`milestoneStop.blocking`、`flow.overallDesign` |
-| `hooks/verify-artifacts.py`（及它调用的检查） | 新标记的格式；总体技术方案文件存在、批准标记格式与新鲜度（指纹失效判失败）；同一份用法草案里的模块指向不同总体技术方案时提醒 |
-| `hooks/review_mark.py` | `--target overall`：给总体技术方案记批准，只认用户 |
-| `references/workflow-checkpoints.md` | 六处逐字替换；新增「出事处理」「总体技术方案」两节；需求确认一节加发版一问与总体技术方案的提出；第 154 行加指向；里程碑停点一节加 autopilot 不阻塞 |
-| `references/doc-skeletons.md` | 总体技术方案的骨架、两行新标记 |
-| `commands/config.md` 与 Codex 侧 config 说明 | 新预设与带 `preset` 的写法 |
-| `interface.json` | 升 `1.26`，只加字段 |
-| 测试 | `test_workflow_checkpoints.py` 改八处并加新断言；`test_flow_v2.py`、`test_project_config.py`、`test_map_view.py`、`test_review_marker.py`、`test-phase-guard.sh` 加正反例 |
-| `CHANGELOG.md`、两份 `plugin.json`、两份 README 的 `--ref` | 版本号（次版本） |
+| `plugins/spec-guard/hooks/module_stage.py` | 新标记 `release-preauth`、`overall-design` 的解析；需求确认提示里的发版一问；总体技术方案一关；里程碑停点按预设决定阻不阻塞；连着做之前先说一句；verify-artifacts 用到的新检查 |
+| `plugins/spec-guard/hooks/project_config.py` | 预设 `autopilot`；带 `preset` 键的对象；收窄阶梯；新函数 `module_preset` |
+| `plugins/spec-guard/hooks/map_view.py` | `takeover.releasePreauth`、`takeover.preset`、`milestoneStop.blocking`、`flow.overallDesign` |
+| `plugins/spec-guard/hooks/review_mark.py` | `--target overall`：给总体技术方案记批准，只认用户 |
+| `plugins/spec-guard/hooks/verify-artifacts.sh` | 接上新标记格式、总体技术方案文件与批准新鲜度、同一草案指向一致的检查 |
+| `plugins/spec-guard/references/workflow-checkpoints.md` | 六处逐字替换（O1 那一句按用户批的收窄措辞）；新增「出事处理」「总体技术方案」两节；需求确认一节加发版一问与总体技术方案的提出；第 154 行加指向；里程碑停点一节加 autopilot 不阻塞 |
+| `plugins/spec-guard/references/doc-skeletons.md`、`plugins/spec-guard/references/node-rules.md` | 总体技术方案的骨架、两行新标记；停点规则里对应的一行 |
+| `plugins/spec-guard/commands/config.md`、`plugins/spec-guard/commands/review-mark.md`、`plugins/spec-guard/skills/spec-guard-ops/` | 新预设与带 `preset` 的写法；`--target overall` |
+| `plugins/spec-guard/interface.json` | 升 `1.26`，只加字段 |
+| `plugins/spec-guard/hooks/test_sg_gate_flow.py`（新）、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh` | 改八处钉旧原文的断言并加新断言；正反例 |
+| `scripts/validate.sh` | 登记新测试文件 |
+| `docs/commands.md`、`docs/workflow.md` | 新预设、两行标记、总体技术方案一关的使用者说明 |
+| `CHANGELOG.md`、`plugins/spec-guard/.claude-plugin/plugin.json`、`plugins/spec-guard/.codex-plugin/plugin.json`、`README.md`、`README.en.md` | 版本号（次版本）与变更说明 |
 
 只读调用方：module-crew 要读 `milestoneStop.blocking` 才会在 autopilot 档下不停；不读的话照旧停，只会更严，不会更松。hub 模块 3 要读 `releasePreauth`。
 
@@ -158,6 +162,12 @@
   - 我的建议：这两句的意思收窄为「装了 autopilot 的仓库由 autopilot 执行；其余照旧在用户确认后由会话执行」。
   - **已定（用户 2026-11-27「批准；O1 A」）**：按建议收窄。附录 A 第 162～163 行与第 331 行里关于发版的那一句，实现时换成收窄后的措辞，其余文字逐字照抄；
     收窄措辞由我起草，随回归测试文档交用户看，用户批过才写进文件；已同步告诉 lead。附录 A 仍保留原文，作为比对基准。
+  - **收窄后的措辞（随本次重新批准一起定）**：
+    - 第 162～163 行，原句「建 tag、Release 和发版不由会话做：由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行。」换成：
+      「建 tag、Release 和发版：装了 autopilot 的仓库不由会话做，由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行；没装的仓库照旧在用户确认后由会话执行。」
+    - 第 331 行，原文括号「（发版由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行）」换成：
+      「（装了 autopilot 的仓库由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行；没装的仓库在用户确认后由会话执行）」。
+    - 「装了 autopilot」指仓库有 autopilot 的 caller workflow（`.github/workflows/autopilot-admission.yml`），与长期授权第 2 条「本仓库主干的必需检查里已经有 `autopilot/verified`」不是一回事：前者只决定发版由谁执行，后者决定能不能自动合并。
 
 ## 第二审查者意见
 
