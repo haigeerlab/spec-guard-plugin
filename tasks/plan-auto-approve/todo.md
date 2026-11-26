@@ -9,6 +9,11 @@
 - [x] Task 5：verify-artifacts 警告
 - [x] Task 6：规则文字
 - [x] Checkpoint 2（gate）：推送、开 PR、提议宿主 PR 监控、最终验收并同时问合并、拟回告
+- [ ] Task 7：`own_doc` 与 `t4_hits` 去掉本模块文档与流程记账（返工，Spec 假设 12、14）
+- [ ] Task 8：`important()` 去掉本模块文档（返工，Spec 假设 13）
+- [ ] Task 9：规则文字与版本 0.97.1
+- [ ] Checkpoint 3（report）：完整档、变异、沙盒复跑与老输出比对
+- [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
 
 ## 证据
 - Task 1（2026-11-25）：`test_flow_v2.py` 新增 `PlanAutoApproveTest` 3 例、`test_review_marker.py` 新增 `PlanAutoRefusal` 2 例（24 个子情形），先跑红（7 处失败、24 处失败）再实现，`test_flow_v2` 65 例、`test_review_marker` 78 例通过；`test_stop_rules.py` 加 `PlanAutoNode` 新旧对照，phase-guard 546 例通过。
