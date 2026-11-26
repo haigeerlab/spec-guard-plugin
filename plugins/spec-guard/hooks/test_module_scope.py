@@ -1003,6 +1003,16 @@ class ReworkMergeBase(ReworkBase):
         self.assertIsNone(module_scope.rework_trim(self.root, "m"))
         self.assertEqual(module_scope.scope_base(self.root, "m"), module_scope.rework_info(self.root, "m")["base"])
 
+    def test_a_base_newer_than_the_merge_base_is_kept(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw")
+        self.write("apps/other/before.py")  # on the branch, before the rework starts: not the rework's change
+        self.commit("unrelated, before the rework")
+        self.reopen("apps/m/b.py")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), [])
+
     def test_a_first_build_is_unchanged(self):
         import module_scope
         self.git("switch", "-q", "-c", "fb")
