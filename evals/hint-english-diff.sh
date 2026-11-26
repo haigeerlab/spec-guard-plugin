@@ -153,20 +153,12 @@ codex_home = work / "codex-home"
 w(codex_home / "config.toml", '[plugins."delegate@dm"]\nenabled = true\n')
 empty_home = work / "empty-home"
 empty_home.mkdir()
-transcript = work / "transcript.jsonl"
-w(transcript, json.dumps({"type": "assistant", "isSidechain": False, "message": {"usage": {
-    "input_tokens": 1, "cache_read_input_tokens": 849999, "cache_creation_input_tokens": 0}}}) + "\n")
-rollout = work / "rollout.jsonl"
-w(rollout, json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {
-    "last_token_usage": {"input_tokens": 230000}, "model_context_window": 258400}}}) + "\n")
 
 VARIANTS = {
     "claude": dict(host="claude"),
     "codex": dict(host="codex"),
     "unknown-host": dict(host=None),
     "session-start": dict(host="claude", event="SessionStart"),
-    "claude-850k": dict(host="claude", stdin={"session_id": "s", "transcript_path": str(transcript), "prompt": "p"}),
-    "codex-230k": dict(host="codex", stdin={"session_id": "s", "transcript_path": str(rollout), "prompt": "p"}),
     "linked-session": dict(host="claude", stdin={"session_id": "sess-x"}),
 }
 
