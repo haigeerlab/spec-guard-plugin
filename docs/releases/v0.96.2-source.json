@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.96.2"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:d653563dc66609ec6f185f71fdebd69c449920ae"
+      },
+      "observedAt": "2026-11-26T04:08:52Z",
+      "evidence": [
+        "result:the v0.96.2 annotated tag resolves to merge commit d653563dc66609ec6f185f71fdebd69c449920ae (pull request #510); merged==true and main==merge sha were checked before tagging; the CI run on the tagged merge commit succeeded",
+        "result:ChatGPT 主进程启动时间未能核实；用户在对话里说已重开（「做完了，继续」），本机未独立核实"
+      ]
+    }
+  ]
+}
