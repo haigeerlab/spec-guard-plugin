@@ -49,7 +49,17 @@ import module_stage  # noqa: E402
 import map_view  # noqa: E402
 from module_stage import DOC_SECTIONS, review_approved_line, review_digest  # noqa: E402
 
-CMD = {"review-mark": "/spec-guard:review-mark", "milestone-mark": "/spec-guard:milestone-mark"}
+CMD = {"review-mark": "/spec-guard:review-mark", "milestone-mark": "/spec-guard:milestone-mark",
+       "author-host": "claude-code"}
+REVIEW_MARK = str(HERE / "review_mark.py")
+OVERALL = "<!-- spec-guard: overall-design spec/overall/x.md -->"
+
+
+def draft(modules):
+    """A usage draft with one milestone of these modules."""
+    return ("# Usage draft: demo\n\n## Entry points\n\n| Entry | Does | Module |\n|---|---|---|\n| `/demo` | runs | %s |\n\n"
+            "## Typical usage\n\n### U1: run\nRun it.\n\n## Milestones\n\n| Milestone | Usage | Modules |\n|---|---|---|\n"
+            "| M1 | U1 | %s |\n" % (modules[0], ", ".join(modules)))
 PREAUTH = "<!-- spec-guard: release-preauth yes -->"
 
 
@@ -220,6 +230,128 @@ class ReleasePreauth(unittest.TestCase):
             project.write("spec/b.md", requirement())
             self.assertIsNone(project.takeover("a")["preset"])
             self.assertEqual(project.takeover("b")["preset"], "autopilot")
+
+
+def overall_text(state="approved", body="内容"):
+    """spec/overall/x.md with a user approval bound to its text, a pending marker, or a Codex marker."""
+    text = "# 总体技术方案\n\n%s\n" % body
+    if state == "approved":
+        return text.replace("\n\n", "\n\n%s\n" % review_approved_line(review_digest(text)), 1)
+    if state == "pending":
+        return text.replace("\n\n", "\n\n<!-- spec-guard: review pending -->\n", 1)
+    if state == "codex":
+        return text.replace("\n\n", "\n\n%s\n" % module_stage.review_codex_line(module_stage.review_codex_digest(text)), 1)
+    return text
+
+
+class OverallDesign(unittest.TestCase):
+    """R3: the overall design holds a confirmed requirement until the user approves it."""
+
+    def look(self, overall=None, line=OVERALL, confirmed=True):
+        with MapProject() as project:
+            project.write("spec/a.md", requirement([line] if line else [], approved=confirmed))
+            if overall is not None:
+                project.write("spec/overall/x.md", overall)
+            line_, step, _s, _p = module_stage.review_hint(project.root, "a", "NEEDS_DESIGN", CMD, True)
+            data = next(m for m in map_view.build(project.root)["modules"] if m["id"] == "a")
+            return line_, step, data["overallDesign"], module_stage.overall_problems(project.root, "a")
+
+    def test_approved_lets_it_through(self):
+        line, step, found, problems = self.look(overall_text())
+        self.assertEqual(found, {"path": "spec/overall/x.md", "status": "approved"})
+        self.assertNotIn("总体技术方案", line)
+        self.assertEqual(problems, [])
+
+    def test_every_other_state_holds(self):
+        cases = {"missing": (None, "missing", "fail"), "pending": (overall_text("pending"), "pending", "fail"),
+                 "revised": (overall_text().replace("内容", "改过"), "revised", "fail"),
+                 "codex": (overall_text("codex"), "pending", "fail"), "none": (overall_text(None), "pending", "fail")}
+        for name, (text, status, level) in cases.items():
+            with self.subTest(case=name):
+                line, step, found, problems = self.look(text)
+                self.assertEqual(found["status"], status)
+                self.assertIn("总体技术方案", line)
+                self.assertIn("先不要写技术方案", step)
+                self.assertIn("--target overall", step)
+                self.assertEqual(problems[0][0], level)
+
+    def test_bad_path_is_invalid(self):
+        for path in ("docs/x.md", "spec/overall/X.md", "spec/overall/../a.md"):
+            with self.subTest(path=path):
+                line, _step, found, problems = self.look(overall_text(), "<!-- spec-guard: overall-design %s -->" % path)
+                self.assertEqual(found, {"path": None, "status": "invalid"})
+                self.assertEqual(problems[0][0], "fail")
+
+    def test_unconfirmed_requirement_comes_first_and_only_warns(self):
+        line, _step, found, problems = self.look(overall_text("pending"), confirmed=False)
+        self.assertIn("需求文档", line)
+        self.assertEqual(problems[0][0], "warn")
+
+    def test_no_line_no_gate(self):
+        line, _step, found, problems = self.look(None, line=None)
+        self.assertIsNone(found)
+        self.assertNotIn("总体技术方案", line)
+        self.assertEqual(problems, [])
+
+    def test_holds_under_autopilot_too(self):
+        # R10: the gate never belongs to a preset
+        with MapProject({"takeover": "autopilot"}) as project:
+            project.write("spec/a.md", requirement([OVERALL]))
+            project.write("spec/overall/x.md", overall_text("codex"))
+            self.assertIn("总体技术方案", module_stage.review_hint(project.root, "a", "NEEDS_DESIGN", CMD, True)[0])
+
+
+class OverallReviewMark(unittest.TestCase):
+    """R4: review-mark --target overall writes only the user's states."""
+
+    def run_mark(self, state, line=OVERALL):
+        with MapProject() as project:
+            project.write("spec/a.md", requirement([line] if line else []))
+            project.write("spec/overall/x.md", overall_text(None))
+            code, out = project.run(REVIEW_MARK, "--module", "a", "--target", "overall", "--state", state, "--confirm")
+            return code, out, (project.root / "spec" / "overall" / "x.md").read_text(encoding="utf-8")
+
+    def test_user_states_are_written(self):
+        code, out, text = self.run_mark("approved")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(module_stage.review_state(text, "spec"), "approved")
+        code, out, text = self.run_mark("pending")
+        self.assertEqual((code, module_stage.review_state(text, "spec")), (0, "pending"), out)
+
+    def test_other_states_are_refused(self):
+        for state in ("codex-approved", "codex-reviewed", "reviewer-approved", "reviewer-reviewed"):
+            with self.subTest(state=state):
+                code, out, text = self.run_mark(state)
+                self.assertEqual(code, 2)
+                self.assertIn("overall-user-only", out)
+                self.assertEqual(text, overall_text(None))
+
+    def test_no_line_is_refused(self):
+        code, out, text = self.run_mark("approved", line=None)
+        self.assertEqual(code, 2)
+        self.assertIn("overall-none", out)
+        self.assertEqual(text, overall_text(None))
+
+
+class OverallConsistency(unittest.TestCase):
+    """R5: modules of one usage draft point to the same overall design."""
+
+    def problems(self, second):
+        with MapProject(ids=("a", "b")) as project:
+            project.write("spec/usage/demo.md", draft(["a", "b"]))
+            project.write("spec/a.md", requirement([OVERALL]))
+            project.write("spec/b.md", requirement(["<!-- spec-guard: overall-design %s -->" % second]))
+            for name in ("x", "y"):
+                project.write("spec/overall/%s.md" % name, overall_text())
+            return module_stage.overall_problems(project.root, "a")
+
+    def test_different_files_warn(self):
+        problems = self.problems("spec/overall/y.md")
+        self.assertEqual([level for level, _ in problems], ["warn"])
+        self.assertIn("spec/overall/y.md", problems[0][1])
+
+    def test_same_file_is_quiet(self):
+        self.assertEqual(self.problems("spec/overall/x.md"), [])
 
 
 if __name__ == "__main__":

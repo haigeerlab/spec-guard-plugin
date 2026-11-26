@@ -104,8 +104,10 @@
       "appearsWhen": "per module, always (interface 1.18, spec/flow-doc-skeletons.md; requirementConfirm since 1.19)",
       "fields": {
         "tier": "the flow v2 tier from the line <!-- spec-guard: flow v2 tier=<tier> --> in spec/<id>.md: bug, small, normal or important; an unknown tier reads as normal, and important when the rules judge the requirement important (see important); null for a module without the line (the old Spec -> Plan flow, unchanged)",
-        "requirementConfirm": "since 1.19 (spec/requirement-confirm-gate.md): null for an old-flow module; for a flow v2 module {status, by, at, sha256}: status is one of requirementConfirmStatus; by is \"user\" when confirmed, else null; at is the commit time (ISO 8601) of the earliest commit in the unbroken run back from HEAD whose spec/<id>.md carries the current approval line (outside code fences), null when not confirmed, not committed, outside git, or more than 50 commits of the file back; sha256 is the 12-hex prefix of the sha256 of the whole file, as spec-digest.py text prints it (the same kind of value as reviewRounds.sha256). An unreadable spec/<id>.md fails the whole view (exit 4) like review"
+        "requirementConfirm": "since 1.19 (spec/requirement-confirm-gate.md): null for an old-flow module; for a flow v2 module {status, by, at, sha256}: status is one of requirementConfirmStatus; by is \"user\" when confirmed, else null; at is the commit time (ISO 8601) of the earliest commit in the unbroken run back from HEAD whose spec/<id>.md carries the current approval line (outside code fences), null when not confirmed, not committed, outside git, or more than 50 commits of the file back; sha256 is the 12-hex prefix of the sha256 of the whole file, as spec-digest.py text prints it (the same kind of value as reviewRounds.sha256). An unreadable spec/<id>.md fails the whole view (exit 4) like review",
+        "overallDesign": "since 1.26 (spec/sg-gate-flow.md): null for an old-flow module or when spec/<id>.md has no line <!-- spec-guard: overall-design spec/overall/<name>.md -->; else {path, status}: path is that file (null when the line or path is malformed), status is one of overallDesignStatus. Only the user approves it (review-mark --target overall); a Codex or reviewer marker reads as pending. A confirmed requirement whose overall design is not approved holds the module before its design"
       },
+      "overallDesignStatus": ["approved", "missing", "pending", "revised", "invalid"],
       "tierValues": ["bug", "small", "normal", "important"],
       "stepValues": {
         "design": "since 1.18, flow v2 normal/important modules only: the requirement is written, tasks/<id>/design.md is not (stage hint NEEDS_DESIGN)",
@@ -306,7 +308,7 @@
       "--module",
       "<module-id>",
       "--target",
-      "<spec|plan|both|acceptance|design>",
+      "<spec|plan|both|acceptance|design|overall>",
       "--state",
       "<pending|approved|codex-approved|codex-reviewed|reviewer-approved|reviewer-reviewed>",
       "[--review <report file>]"
