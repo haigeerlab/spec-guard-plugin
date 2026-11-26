@@ -64,6 +64,10 @@ _DIGEST_MODULE = None
 # flow applies unchanged.  references/doc-skeletons.md is the human-readable copy of DOC_SECTIONS.
 FLOW_MARKER = re.compile(r"<!-- spec-guard: flow v2 tier=(\S+) -->")
 TIERS = ("bug", "small", "normal", "important")
+# sg-gate-flow (rules 1-3): the user's answer to "release when done?", one line of its own under the flow marker, inside
+# the requirement's approval digest (review_body only drops the review marker lines).  Only `yes` means anything.
+RELEASE_PREAUTH = re.compile(r"<!-- spec-guard: release-preauth (\S+) -->")
+RELEASE_AUTO = ("auto-confirm", "auto")  # release items that hand the release to autopilot and allow pre-authorisation
 SHORT_TIERS = ("bug", "small")  # one document: no design, no separate regression document
 DOC_SECTIONS = {
     "requirement": {"zh": ("目标", "给谁用", "使用场景", "业务规则和异常情形", "不做什么", "成功标准", "待定问题"),
@@ -94,6 +98,37 @@ def flow_marker(root: Path, module: str) -> dict:
                 return {"v2": True, "tier": tier, "problems": []}
             return {"v2": True, "tier": "normal", "problems": ["tier-invalid"]}
     return {"v2": False, "tier": None, "problems": []}
+
+
+def release_preauth_line(text: str) -> str | None:
+    """sg-gate-flow: "yes", "invalid" (a release-preauth line with any other value) or None (no such line)."""
+    for line in _visible_lines(text.splitlines()):
+        match = RELEASE_PREAUTH.fullmatch(line.strip())
+        if match:
+            return "yes" if match.group(1) == "yes" else "invalid"
+    return None
+
+
+def release_allowed(root: Path, module: str) -> bool:
+    """sg-gate-flow (rule 1): the module's effective takeover hands the release to autopilot."""
+    from project_config import module_takeover  # late: project_config is imported by callers of this module
+    return module_takeover(root, module)[0]["release"] in RELEASE_AUTO
+
+
+def release_preauth(root: Path, module: str) -> bool | None:
+    """sg-gate-flow (rule 3): /map --json takeover.releasePreauth.
+
+    None for an old-flow module or a takeover that does not let autopilot release; True when the requirement carries
+    `release-preauth yes` and its confirmation stands (the line is inside the digest, so an edit voids both); else False.
+    """
+    if not _v2(root, module) or not release_allowed(root, module):
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    confirmed = requirement_wait(root, module) is None and review_state(text, "spec") != "invalid"
+    return confirmed and release_preauth_line(text) == "yes"
 
 
 def effective_tier(root: Path, module: str) -> dict:
@@ -610,14 +645,17 @@ def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) ->
     reasons = ", ".join(important(root, module))
     combined = load_config(root)[0].get("reviewCadence") == "combined"
     path = "spec/%s.md" % module
+    ask = release_allowed(root, module)  # sg-gate-flow (rule 1): only then is "release when done?" asked
     if zh:
         why = {"pending": "等用户确认", "codex": "只有 Codex 的批准，需求要用户在对话里确认",
                "revised": "确认后又改过，要用户重新确认"}[wait]
         return ("- 批准: 需求文档 `%s` %s%s。" % (path, why, "（批准节奏 combined 不适用于需求确认）" if combined else ""),
                 "在对话正文里复述需求（%s，加上档位），问用户是否说完；给谁用、为什么做、怎样算做成、不做什么有一项写不出来、"
-                "有你自己补的假设，或是重要需求%s时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。"
+                "有你自己补的假设，或是重要需求%s时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。%s"
                 "用户在对话里确认后，用 %s 记下来；接管档位不能代替，Codex 的批准不算。确认前不要往下写。"
-                % ("、".join(names), "（本需求是重要需求：%s）" % reasons if reasons else "", cmd["review-mark"]))
+                % ("、".join(names), "（本需求是重要需求：%s）" % reasons if reasons else "",
+                   "本模块的档位把发版交给 autopilot：复述时一并问「做完自动发版吗？」，答是就在流程标记行下面写一行 "
+                   "`<!-- spec-guard: release-preauth yes -->` 再记确认，答否不写。" if ask else "", cmd["review-mark"]))
     why = {"pending": "is waiting for the user's confirmation",
            "codex": "has only Codex's approval; the user confirms requirements in the conversation",
            "revised": "was edited after it was confirmed; the user confirms it again"}[wait]
@@ -626,10 +664,13 @@ def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) ->
             "restate the requirement in the conversation (%s, plus the tier) and ask the user whether that is everything; "
             "when who it is for, why, what counts as done or what is out of scope cannot be written, when you filled in "
             "an assumption yourself, or when it is an important requirement%s, first interview the user with "
-            "agent-skills' interview-me, one question at a time, then restate it. When the user confirms in the "
+            "agent-skills' interview-me, one question at a time, then restate it.%s When the user confirms in the "
             "conversation, record that with %s; the takeover cannot stand in and Codex's approval does not count. Do not "
             "write further documents until it is confirmed."
-            % (", ".join(names), " (this one is: %s)" % reasons if reasons else "", cmd["review-mark"]))
+            % (", ".join(names), " (this one is: %s)" % reasons if reasons else "",
+               " This module's takeover hands the release to autopilot: with the restatement, ask \"release when done?\"; "
+               "on yes write `<!-- spec-guard: release-preauth yes -->` under the flow marker before recording the "
+               "confirmation, on no write nothing." if ask else "", cmd["review-mark"]))
 
 
 # design-review: whether a v2 module's design is reviewed, and where that stands (published as designApproval).

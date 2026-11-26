@@ -25,11 +25,11 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
                           design_approval, design_requirement, file_review_state, module_state, requirement_confirm,
-                          gate_checkpoints, next_gate, project_stage, unmerged_commits)
+                          gate_checkpoints, next_gate, project_stage, release_preauth, unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
 from project_config import (ITEMS as TAKEOVER_ITEMS, SCOPE_PROJECT, load as load_config, module_concurrency,
-                            module_takeovers, summary as config_summary, takeover_wider)
+                            module_preset, module_takeovers, summary as config_summary, takeover_wider)
 import usage_draft
 
 SCHEMA_VERSION = 1
@@ -63,7 +63,9 @@ DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor")
 FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
 # interface.json mapView.takeover (takeover-config, interface 1.15)
 # takeover-redefine (interface 1.22): the three items, the deprecated old-flow pair, and why design is forced.
-TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "spec", "plan", "designForcedBy", "source", "widerThanProject", "narrowed")
+# sg-gate-flow (interface 1.26): the release pre-authorisation and the preset the effective takeover names.
+TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "spec", "plan", "designForcedBy", "source", "widerThanProject", "narrowed",
+                   "releasePreauth", "preset")
 # takeover-narrow: the record fields /map shows; the caller-written reason stays out of it.
 NARROWED_FIELDS = ("from", "source", "at")
 
@@ -518,7 +520,8 @@ def build(root: Path) -> dict:
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
             "takeover": {**_effective_takeover(root, module, takeovers[module][0]), "source": takeovers[module][1],
                          "widerThanProject": takeover_wider(takeovers[module][0], project_takeover),
-                         "narrowed": _narrowed(narrowings.get(module if module in own else SCOPE_PROJECT))},
+                         "narrowed": _narrowed(narrowings.get(module if module in own else SCOPE_PROJECT)),
+                         "releasePreauth": release_preauth(root, module), "preset": module_preset(root, module)},
         })
 
     state, ticks, suspended_write = history(root)

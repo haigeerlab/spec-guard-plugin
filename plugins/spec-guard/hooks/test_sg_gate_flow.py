@@ -45,6 +45,41 @@ class Project:
         return done.returncode, done.stdout + done.stderr
 
 
+import module_stage  # noqa: E402
+import map_view  # noqa: E402
+from module_stage import DOC_SECTIONS, review_approved_line, review_digest  # noqa: E402
+
+CMD = {"review-mark": "/spec-guard:review-mark", "milestone-mark": "/spec-guard:milestone-mark"}
+PREAUTH = "<!-- spec-guard: release-preauth yes -->"
+
+
+def requirement(extra=(), approved=True, tier="normal", body="不涉及"):
+    """spec/a.md of a flow v2 module; `extra` are marker lines under the flow marker; approved binds the digest."""
+    head = "# a\n\n<!-- spec-guard: flow v2 tier=%s -->\n%s" % (tier, "".join(line + "\n" for line in extra))
+    text = head + "\n" + "".join("## %s\n\n%s\n\n" % (name, body) for name in DOC_SECTIONS["requirement"]["zh"])
+    if approved:
+        text = text.replace("# a\n\n", "# a\n\n%s\n" % review_approved_line(review_digest(text)), 1)
+    return text
+
+
+class MapProject(Project):
+    """A project with a capability map of the given modules."""
+
+    def __init__(self, config=None, ids=("a",)):
+        super().__init__(config)
+        self.ids = ids
+
+    def __enter__(self):
+        super().__enter__()
+        rows = "".join("| %s | x | — |\n" % module for module in self.ids)
+        self.write("spec/CAPABILITY-MAP.md", "# Capability Map: t\n\n| Module id | Responsibility | Depends on |\n"
+                   "|---|---|---|\n%s\nBuild order: %s\n" % (rows, " → ".join(self.ids)))
+        return self
+
+    def takeover(self, module="a"):
+        return next(m for m in map_view.build(self.root)["modules"] if m["id"] == module)["takeover"]
+
+
 AUTOPILOT = {"design": "reviewer", "merge": "auto", "release": "auto-confirm"}
 
 
@@ -128,6 +163,63 @@ class NarrowAndGates(unittest.TestCase):
         for name, items in project_config.PRESETS.items():
             with self.subTest(preset=name):
                 self.assertEqual(set(items), {"design", "merge", "release"})
+
+
+class ReleaseQuestion(unittest.TestCase):
+    """R1: the release question is asked only where the takeover lets autopilot release."""
+
+    def hint(self, config):
+        with MapProject(config) as project:
+            project.write("spec/a.md", requirement(approved=False))
+            return module_stage.requirement_hint(project.root, "a", "pending", CMD, True)[1], \
+                module_stage.requirement_hint(project.root, "a", "pending", CMD, False)[1]
+
+    def test_asked_under_autopilot(self):
+        for config in ({"takeover": "autopilot"}, {"takeover": {"release": "auto"}}):
+            with self.subTest(config=config):
+                zh, en = self.hint(config)
+                self.assertIn("做完自动发版吗？", zh)
+                self.assertIn("release-preauth yes", zh)
+                self.assertIn("release-preauth yes", en)
+
+    def test_not_asked_otherwise_and_unchanged(self):
+        base = self.hint(None)
+        for config in ({"takeover": {"preset": "autopilot", "release": "human"}}, {"takeover": "merge"},
+                       {"takeover": {"release": "prepare"}}):
+            with self.subTest(config=config):
+                self.assertEqual(self.hint(config), base)
+                self.assertNotIn("做完自动发版吗", base[0])
+
+
+class ReleasePreauth(unittest.TestCase):
+    """R2: /map --json takeover.releasePreauth."""
+
+    def value(self, spec, config=None):
+        with MapProject(config if config is not None else {"takeover": "autopilot"}) as project:
+            project.write("spec/a.md", spec)
+            return project.takeover()["releasePreauth"]
+
+    def test_true_when_confirmed_and_allowed(self):
+        self.assertIs(self.value(requirement([PREAUTH])), True)
+
+    def test_false_after_an_edit_or_without_the_line(self):
+        edited = requirement([PREAUTH]).replace("不涉及", "改过", 1)
+        self.assertIs(self.value(edited), False)
+        self.assertIs(self.value(requirement()), False)
+        self.assertIs(self.value(requirement([PREAUTH], approved=False)), False)
+        self.assertIs(self.value(requirement(["<!-- spec-guard: release-preauth maybe -->"])), False)
+
+    def test_null_when_not_allowed_or_old_flow(self):
+        self.assertIsNone(self.value(requirement([PREAUTH]), {"takeover": {"preset": "autopilot", "release": "human"}}))
+        self.assertIsNone(self.value(requirement([PREAUTH]), {}))
+        self.assertIsNone(self.value("# a\n\n" + PREAUTH + "\n"))
+
+    def test_preset_field(self):
+        with MapProject({"takeover": {"merge": "auto"}, "moduleTakeover": {"b": "autopilot"}}, ids=("a", "b")) as project:
+            project.write("spec/a.md", requirement())
+            project.write("spec/b.md", requirement())
+            self.assertIsNone(project.takeover("a")["preset"])
+            self.assertEqual(project.takeover("b")["preset"], "autopilot")
 
 
 if __name__ == "__main__":
