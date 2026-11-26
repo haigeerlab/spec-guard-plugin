@@ -13,7 +13,7 @@
 - [x] Task 8：`important()` 去掉本模块文档（返工，Spec 假设 13）
 - [x] Task 9：规则文字与版本 0.97.1
 - [x] Checkpoint 3（report）：完整档、变异、沙盒复跑与老输出比对
-- [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
+- [x] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
 
 ## 证据
 - Task 1（2026-11-25）：`test_flow_v2.py` 新增 `PlanAutoApproveTest` 3 例、`test_review_marker.py` 新增 `PlanAutoRefusal` 2 例（24 个子情形），先跑红（7 处失败、24 处失败）再实现，`test_flow_v2` 65 例、`test_review_marker` 78 例通过；`test_stop_rules.py` 加 `PlanAutoNode` 新旧对照，phase-guard 546 例通过。
@@ -35,3 +35,8 @@
 - Task 8（2026-11-26）：`important()` 对新流程模块拼好边界、预先声明、影响面的路径后，去掉 `own_doc` 认出的文件与 `tasks/<id>/` 目录项。用例：`test_important_requirement.py` `OwnDocsRiskPath` 3 例（边界与影响面只写自己文档不判 `risk-path`；另列 `.github/ci.yml` 或影响面写别的模块的 `spec/beta.md` 照旧判；老模块照旧判），实现前第一例失败，另两例实现前已通过、锁住现状；与 `test_flow_v2.py` 共 170 例通过。风险清单写在 `check()` 里而不是 `setUp`，否则继承来的老用例换了清单会变红。
 - Task 9（2026-11-26）：共享检查点规则重要需求一段与「碰 T4」一条各补一句；`test_workflow_checkpoints.py` 加 `test_own_documents_are_not_t4`（3 个短语，旧规则文件里一个都没有，即改前会红）；CHANGELOG「未发布 · 修复」一条；版本 0.97.0 → 0.97.1（两份 plugin.json、两份 README 的 `--ref`）。Task 8 与 Task 9 因检查脚本要求工作区全部暂存，合在一个提交里。
 - Checkpoint 3（2026-11-26）：Task 7、8+9 的提交都走完整档且全绿。变异（临时副本）：`t4_hits` 不去掉 `own_doc` → 7 处失败；`.agent/config.json` 也去掉 → 1 处；`important()` 不去掉 `tasks/<id>/` 目录项 → 1 处；去掉 `_v2` 判断 → 1 处；还原后全绿。沙盒 drill-pow 只读复跑（克隆到暂存目录、检出 `c2ec343`，基线 `21217fd^`）：`t4_hits` 从 8 个命中降到只剩 `.agent/config.json`，`stops` 为 True——在这个提交上 `src/calc.py` 还不是 T3，drill-pow 不是重要需求，所以开工时给自己设 `moduleTakeover: merge` 会停一次交用户（Q1 A 的预期代价）。已安装的 0.97.0 与本分支对本仓库的阶段提示、verify-artifacts 逐字相同。
+- Checkpoint 4（2026-11-26）：基于 main `4dc79ba7` 推送，开 PR #517 并绑定；最终验收与合并合成一问，用户「验收通过，CI 过了就合」。Plan 用户直接批准、没有要外部审查。拟回告：给 ecosystem-lead（#23255）写明修了什么、哪些照旧算（合并后发）。
+
+## 外部审查意见
+
+<!-- spec-guard: external-review declined -->
