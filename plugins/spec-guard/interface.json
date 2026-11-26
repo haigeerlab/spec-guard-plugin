@@ -505,7 +505,8 @@
     "presets": {
       "none": "default; design, merge and release all human",
       "design": "design=reviewer; merge and release human",
-      "merge": "design=reviewer, merge=auto; release human"
+      "merge": "design=reviewer, merge=auto; release human",
+      "autopilot": "since 1.26 (spec/sg-gate-flow.md): design=reviewer, merge=auto, release=auto-confirm; never the factory default, a project or module names it. A custom object may carry \"preset\": <name> (any preset above) and override items: {\"preset\": \"autopilot\", \"release\": \"human\"}; without it unnamed items read as human"
     },
     "items": {
       "design": [
