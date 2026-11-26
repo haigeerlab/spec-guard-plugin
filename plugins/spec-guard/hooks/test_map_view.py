@@ -169,7 +169,7 @@ class RetiredAutonomyTest(unittest.TestCase):
 
     def test_interface_version(self):
         data = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["interface"], "1.25")  # bump together with interface.json
+        self.assertEqual(data["interface"], "1.26")  # bump together with interface.json
 
 
 class TakeoverTest(unittest.TestCase):

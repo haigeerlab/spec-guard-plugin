@@ -7,7 +7,7 @@
 - [x] Task 5：先说一句
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 6：规则文字
-- [ ] Task 7：接口与版本
+- [x] Task 7：接口与版本
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
@@ -20,3 +20,4 @@
 - Checkpoint 1（2026-11-27）：Task 1～5 的提交都走完整档且全绿（phase-guard 516 例、verify-artifacts 147 例）。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），9 个：release_preauth 不看确认、milestone_blocking 恒 False、overall 把 revised 当 approved、Codex 批过又改过的标记算批准、review-mark overall 收 Codex 状态、去掉同一草案一致性检查、先说一句不看停点、module_preset 不看模块条目、发版一问不看档位。第一次跑 8 个变红、1 个（Codex 批过又改过）没红——用例没覆盖这一分支；`OverallDesign` 补 `codex-edited` 一例后单独复跑这个变异变红。还原后 `test_sg_gate_flow.py` 33 例全过。Task 3 先写实现后写用例缺的「先红」由这几个变异补证。
 - Task 6（2026-11-27）：`workflow-checkpoints.md` 六处按附录 A 逐字替换（第 162～163 行与第 331 行的发版一句按 O1 A 收窄，原文取自总账 `cae816e`，用脚本提取、替换前断言原段只出现一次）；新增「总体技术方案」「出事处理」两节（后者为用户批过的附录 B 原文）；第 154 行补指向；「需求确认」加发版一问与总体技术方案两条；「里程碑停点」加 autopilot 不阻塞。`doc-skeletons.md` 加两行标记与总体技术方案章节表；`node-rules.md` 最终验收与里程碑各补一句（最终验收一节超 3200 字节上限后压短）；`commands/config.md`、`commands/review-mark.md`、Codex 侧 `spec-guard-ops/SKILL.md`、`docs/commands.md`、`docs/workflow.md` 同步。
   `test_workflow_checkpoints.py`：钉旧原文的 9 处改为钉新原文（预估 8 处，多出 `**不授权**合并` 一个短语），断言不删；`test_no_remote_write_is_authorized_by_default` 的「自动合并」不出现改为「出现的行必须写明 autopilot」，并排除「出事处理」一节（那里只是参考时长）。新增 `IncidentSection` 4 例、`GateFlowRules` 5 例（对旧规则文件必然红：两节和新句子都不存在）。106 例全过，快档通过。
+- Task 7（2026-11-27）：`interface.json` 升 1.26（各新字段在前面各 Task 里已写说明），版本 0.97.1 → 0.98.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 直接写 `## [0.98.0] - 2026-11-27`（不留 `[未发布]`）。`InterfaceFields` 3 例先红（版本仍是 1.25）后绿。

@@ -433,5 +433,31 @@ class SayFirst(unittest.TestCase):
         self.assertFalse(self.says(self.hint({"tasks/a/design.md": approved_design().replace("`src/a.py`", "`src/b.py`", 1)})))
 
 
+class InterfaceFields(unittest.TestCase):
+    """R12: interface 1.26 only adds fields."""
+
+    def setUp(self):
+        self.data = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))
+
+    def test_version(self):
+        self.assertEqual(self.data["interface"], "1.26")
+
+    def test_new_fields_are_described(self):
+        view = self.data["mapView"]
+        for field in ("releasePreauth", "preset"):
+            with self.subTest(field=field):
+                self.assertIn("1.26", view["takeover"]["fields"][field])
+        self.assertIn("1.26", view["flow"]["fields"]["overallDesign"])
+        self.assertEqual(view["flow"]["overallDesignStatus"], list(module_stage.OVERALL_STATUSES))
+        self.assertIn("1.26", view["milestoneStop"]["blocking"])
+        self.assertIn("autopilot", json.dumps(self.data, ensure_ascii=False))
+        self.assertIn("overall", json.dumps(self.data["reviewMark"], ensure_ascii=False))
+
+    def test_old_pair_kept(self):
+        fields = self.data["mapView"]["takeover"]["fields"]
+        self.assertIn("spec", fields)
+        self.assertIn("plan", fields)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 {
-  "interface": "1.25",
+  "interface": "1.26",
   "mapView": {
     "command": [
       "python3",
