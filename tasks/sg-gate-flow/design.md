@@ -30,7 +30,7 @@
 | `hooks/module_stage.py` | 新标记 `release-preauth`、`overall-design` 的解析；需求确认提示里的发版一问；总体技术方案一关；里程碑停点按预设决定阻不阻塞；连着做之前先说一句 |
 | `hooks/project_config.py` | 预设 `autopilot`；带 `preset` 键的对象；收窄阶梯；新函数 `module_preset` |
 | `hooks/map_view.py` | `takeover.releasePreauth`、`takeover.preset`、`milestoneStop.blocking`、`flow.overallDesign` |
-| `hooks/verify-artifacts.py`（及它调用的检查） | 新标记的格式、总体技术方案文件存在与批准标记格式 |
+| `hooks/verify-artifacts.py`（及它调用的检查） | 新标记的格式；总体技术方案文件存在、批准标记格式与新鲜度（指纹失效判失败）；同一份用法草案里的模块指向不同总体技术方案时提醒 |
 | `hooks/review_mark.py` | `--target overall`：给总体技术方案记批准，只认用户 |
 | `references/workflow-checkpoints.md` | 六处逐字替换；新增「出事处理」「总体技术方案」两节；需求确认一节加发版一问与总体技术方案的提出；第 154 行加指向；里程碑停点一节加 autopilot 不阻塞 |
 | `references/doc-skeletons.md` | 总体技术方案的骨架、两行新标记 |
@@ -64,7 +64,8 @@
 - `overall_wait(root, module)`：模块需求已确认、有 `overall-design` 行，而文件缺失、标记缺失、`pending` 或指纹失效时，返回原因（`missing`、`pending`、`revised`、`invalid`）；否则返回 `None`。
 - 阶段提示：`overall_wait` 有值时，排在需求确认之后、模块技术方案审查之前，下一步写「写总体技术方案 `spec/overall/<名字>.md` 并交用户批；批准前先不要写技术方案」。用 `_hold` 的现有文字，不新加阶段名，阶段仍是 `NEEDS_DESIGN`。
 - 需求确认一节加一句：复述时提出这次要不要总体技术方案；项目还没有任何代码时默认提出「要」；用户确认后写 `overall-design` 行。
-- `/map --json`：`flow.overallDesign = {"path", "status"}`，没有这一行时为 `null`。
+- `/map --json`：每个模块的 `flow` 对象（现有，放着 `tier`、`requirementConfirm`）加 `overallDesign`：老流程模块或没有这一行时为 `null`；否则 `{"path", "status"}`，`status` 取 `approved`、`missing`（文件不在）、`pending`（没有标记或标记是 pending）、`revised`（批准后改过）、`invalid`（标记写坏或路径不合规）之一，与 `overall_wait` 同一判据。
+- verify-artifacts：`overall-design` 行格式错、路径不合规、文件缺失判失败；文件在但批准失效时，模块已过需求确认就判失败，没过只提醒。同一份用法草案（`spec/usage/<需求>.md`）里写了 `overall-design` 的模块指向不同文件时提醒（需求文档规则 7「同一需求的模块指向同一个文件」；单模块需求没有草案，不查）。
 
 ### 3. 里程碑
 
@@ -84,7 +85,7 @@
 
 - `PRESETS["autopilot"] = {"design": "reviewer", "merge": "auto", "release": "auto-confirm"}`。`DEFAULTS["takeover"]` 仍是 `"none"`。
 - `valid_takeover`：对象可以带 `"preset"` 键，值必须是 `PRESETS` 里的名字（旧的 `plan` 不行）。`expand`：带 `preset` 的对象，先取该预设的三项，再用对象里写的项覆盖；不带 `preset` 的照旧，没写的项按 `human` 读。
-- `legacy`：带 `preset` 的对象，老流程那一对取 `LEGACY_OF_PRESET[预设]`，`autopilot` 当 `merge` 处理。
+- `legacy`：带 `preset` 的对象，对象里写了的 `spec`／`plan` 照写的读（和现在一样「as written」）；没写的取 `LEGACY_OF_PRESET[预设]`（`autopilot` 当 `merge` 处理），对象里另写了 `design` 时仍按现有规则从 `design=reviewer` 推 `plan`。
 - `PRESET_LADDER = ("none", "design", "merge", "autopilot")`，收窄 `autopilot` 得到 `merge`。带 `preset` 的对象收窄时，先展开成三项，再按现有 `NARROW_ORDER` 一项一项收回，结果是不带 `preset` 的对象。
 - `/spec-guard:config`：`set takeover autopilot`、`set takeover '{"preset":"autopilot","release":"human"}'`。写入仍要用户原话，预览和确认的流程不变。
 - `/map --json`：`takeover.preset`，取 `module_preset` 的值。
@@ -97,9 +98,10 @@
 ### 7. 接口
 
 `interface.json` 升 `1.26`，新增以下内容，都写明说明和出现条件：
+- `reviewMark` 的 `--target` 加 `overall`（只接受 `pending`、`approved`，拒绝码 `overall-user-only`）；
 - `mapView.takeover.releasePreauth`、`mapView.takeover.preset`；
 - `mapView.milestoneStop.blocking`；
-- `mapView.flow.overallDesign`；
+- `mapView.flow.overallDesign` 与它的 `status` 取值表；
 - 需求文档的两行标记；
 - 预设 `autopilot` 与带 `preset` 的对象。
 
@@ -113,16 +115,20 @@
 | `/map --json` 每个模块 `takeover.preset` | 字段 | 预设名或 `null` | 不读 |
 | `/map --json` 顶层 `milestoneStop.blocking` | 字段 | `true` / `false` | module-crew 照旧按非空停，更严 |
 | `/map --json` 每个模块 `flow.overallDesign` | 字段 | `{"path","status"}` 或 `null` | 不读 |
+| `review_mark.py --target` | 新值 `overall` | 只接受 `pending`、`approved` | 旧版拒绝这个值（参数错误） |
 | `spec/<id>.md` | 两行标记 | `release-preauth yes`；`overall-design spec/overall/<名字>.md` | 旧版 spec-guard 不认这两行：不问发版，不出这一关 |
-| `.agent/config.json` `takeover`／`moduleTakeover` | 预设 `autopilot`，对象可带 `preset` | 见上 | 旧版 spec-guard 读到会判 `takeover-invalid`，退回 `none`，更严 |
+| `.agent/config.json` `takeover`／`moduleTakeover` | 预设 `autopilot`，对象可带 `preset` | 见上 | 旧版 spec-guard 读到会判无效，退回下一层：`moduleTakeover` 无效时整张表作废、各模块取项目的值；项目 `takeover` 无效时取 `none`。下一层都不会比 `autopilot` 宽，所以只会更严 |
 | `spec/overall/<名字>.md` | 新文件 | 带批准标记 | — |
 
 ## 风险与回滚
 
-- **旧版读到新配置**：旧版 spec-guard 读到 `autopilot` 或带 `preset` 的对象会判无效，退回 `none`，只会更严。本仓库和消费者升级前不要写这些值。
+- **旧版读到新配置**：旧版 spec-guard 读到 `autopilot` 或带 `preset` 的对象会判无效，退回下一层（`moduleTakeover` 作废时各模块取项目的值，项目无效时取 `none`），都不会比 `autopilot` 宽，只会更严；但 `moduleTakeover` 里别的模块的设置也会一起作废。本仓库和消费者升级前不要写这些值。
 - **规则文字变了，自动化跟不上**：六处换成新措辞后，「交给 autopilot」这条路要 hub 模块 2 做完、B 批的必需检查加上才走得通。在那之前，长期授权的条件不满足，全部走人工路，和现在一样。
 - **出事处理收紧了 PR 以后的修复**：同一原因修两次就停，对所有档位生效。本仓库原来没有次数上限，这是行为变化，CHANGELOG 要写明。
-- **回滚**：这是一个 PR，revert 合并提交即可。配置里写了 `autopilot` 的项目，回滚后会判无效、退回 `none`。
+- **回滚**：这是一个 PR，revert 合并提交即可恢复代码与规则。回滚不是完整撤销，有三件事要知道：
+  - 回滚后旧版不认 `overall-design` 行，总体技术方案这一关随之消失，指向它的模块直接往下走；回滚前要先告诉用户这些模块的方案批没批，没批的由用户决定先停还是照旧往下。
+  - 需求文档里已写的 `release-preauth` 行留在文件里不起作用（hub 读不到字段按没有提前授权处理）。
+  - 配置里写了 `autopilot` 的项目按上一条退回下一层。
 
 ## 方案取舍
 
@@ -151,6 +157,18 @@
   逐字照抄的话，hub 模块 3 上线之前，本仓库和外部项目都没有人能按规则发版。
   - 我的建议：这两句的意思收窄为「装了 autopilot 的仓库由 autopilot 执行；其余照旧在用户确认后由会话执行」。
   - 已批措辞不由我改，已报 lead，等它定或转你定。O1 定下之前，附录 A 先按原文列出。
+
+## 第二审查者意见
+
+第 1 轮：Codex（gpt-5.6-sol，effort high，`/delegate:review --profile design`），2026-11-27，5 条阻断、2 条建议，全部采纳：
+
+1. `overall` 没进 reviewMark 接口：采纳，接口一节加上。
+2. 带 `preset` 的对象丢掉旧流程显式写的 spec／plan：采纳，`legacy` 改成写了的照写读。
+3. `moduleTakeover` 无效时实际退回项目值而不是 `none`：采纳，兼容与风险两处改写。
+4. revert 会让总体技术方案关卡消失：采纳，回滚一条写明不是完整撤销、回滚前要做什么。
+5. verify-artifacts 漏了总体方案批准的新鲜度：采纳。
+6. 同一需求多模块指向同一文件没有校验（建议）：采纳，按用法草案查，单模块需求不查。
+7. `overallDesign` 的位置与状态取值没定义（建议）：采纳，放进现有的 `flow` 对象，五种状态。
 
 ## 附录 A：六处改后全文（逐字）
 
@@ -227,3 +245,5 @@
   其他步骤按这一步平常要多久判断，停下时写明等了多久、平常多久、依据是什么。
 - **CI 变红怎么分**：装了 autopilot 的仓库，CI 变红的分类、自动重跑与收紧档位由 autopilot 做，会话只处理它交过来的「能修的」；没装的，CI 变红按「能修的」处理，修不了交用户。
 ```
+
+<!-- spec-guard: design-review round=1 blocking=5 sha256=e483490f9170 vendor=openai same-vendor=false criteria=design-v1 report=8cf08531b59dff134756dbb7bf26aa4739c506caa0b2d93e32c5543f83972189 -->
