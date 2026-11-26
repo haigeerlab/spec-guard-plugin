@@ -83,7 +83,7 @@ CLAUDE_PROJECT_DIR=/path/to/test-project /bin/bash plugins/spec-guard/hooks/phas
 无输出只表示两个激活信号都不满足；非零 hook 错误应注入可诊断的 JSON 信息。
 
 <!-- shared:begin -->
-## 自动驾驶长期授权（用户 2026-11-XX 批准）
+## 自动驾驶长期授权（用户 2026-11-26 批准）
 
 六个插件仓库的 CLAUDE.md 与 AGENTS.md 都有本节，逐字相同；措辞由用户批准，改动也要用户批准。本节只放宽下面写明的三件事，每件事只在它自己的条件全部满足时生效；其他「先问」照旧。
 
