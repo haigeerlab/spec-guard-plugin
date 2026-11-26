@@ -8,7 +8,7 @@
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 6：规则文字
 - [x] Task 7：接口与版本
-- [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
+- [x] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
 - Task 1（2026-11-27）：`project_config.py` 加 `autopilot` 预设（reviewer／auto／auto-confirm，不是出厂默认）、对象可带 `preset` 键（`expand` 先取预设再覆盖，`legacy` 写了的照写、写了 design 时由它推 plan）、`PRESET_LADDER` 加一格、新函数 `module_preset`；拒绝旧值的提示补上新写法。`test_sg_gate_flow.py` 新建（`PresetConfig` 8 例、`NarrowAndGates` 4 例），实现前 6 处失败 7 处报错，实现后全过；`test_project_config`、`test_map_view`、`test_flow_v2`、`test_review_marker` 照旧全过。新测试登记进 `scripts/validate.sh`。
@@ -21,3 +21,4 @@
 - Task 6（2026-11-27）：`workflow-checkpoints.md` 六处按附录 A 逐字替换（第 162～163 行与第 331 行的发版一句按 O1 A 收窄，原文取自总账 `cae816e`，用脚本提取、替换前断言原段只出现一次）；新增「总体技术方案」「出事处理」两节（后者为用户批过的附录 B 原文）；第 154 行补指向；「需求确认」加发版一问与总体技术方案两条；「里程碑停点」加 autopilot 不阻塞。`doc-skeletons.md` 加两行标记与总体技术方案章节表；`node-rules.md` 最终验收与里程碑各补一句（最终验收一节超 3200 字节上限后压短）；`commands/config.md`、`commands/review-mark.md`、Codex 侧 `spec-guard-ops/SKILL.md`、`docs/commands.md`、`docs/workflow.md` 同步。
   `test_workflow_checkpoints.py`：钉旧原文的 9 处改为钉新原文（预估 8 处，多出 `**不授权**合并` 一个短语），断言不删；`test_no_remote_write_is_authorized_by_default` 的「自动合并」不出现改为「出现的行必须写明 autopilot」，并排除「出事处理」一节（那里只是参考时长）。新增 `IncidentSection` 4 例、`GateFlowRules` 5 例（对旧规则文件必然红：两节和新句子都不存在）。106 例全过，快档通过。
 - Task 7（2026-11-27）：`interface.json` 升 1.26（各新字段在前面各 Task 里已写说明），版本 0.97.1 → 0.98.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 直接写 `## [0.98.0] - 2026-11-27`（不留 `[未发布]`）。`InterfaceFields` 3 例先红（版本仍是 1.25）后绿。
+- 最终验收（2026-11-27）：R1～R14 全部通过，最后一次完整档全绿（validate、phase-guard 516 例、verify-artifacts 147 例）。推送分支 `claude/sg-gate-flow`，开 PR #522 并绑定，验收时 head 为 `f350f1a8`。合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
