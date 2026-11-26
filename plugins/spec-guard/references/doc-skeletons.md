@@ -47,6 +47,37 @@
 | 预期结果 | Expected result |
 | 回归用例 | Regression cases |
 
+### 需求文档里的两行可选标记（sg-gate-flow）
+
+都写在流程标记行下面、各占一行，都在需求的批准指纹里（确认后改动就要重新确认）：
+
+```text
+<!-- spec-guard: release-preauth yes -->
+<!-- spec-guard: overall-design spec/overall/<名字>.md -->
+```
+
+- `release-preauth yes`：档位把发版交给 autopilot（`release` 是 `auto-confirm`／`auto`）时，用户在需求确认时答「做完自动发版」才写；只认 `yes`。
+- `overall-design`：需求确认时定了要总体技术方案才写；同一需求的模块指向同一个文件，路径只能是 `spec/overall/<kebab-case>.md`。
+
+## 总体技术方案 `spec/overall/<名字>.md`
+
+全新项目或全新模块的需求共用一份，能力图批准之后、第一个模块开工之前写，只由用户批（`review-mark --target overall`）。章节：
+
+| 中文 | English |
+|---|---|
+| 现状调研 | Current state |
+| 影响面 | Impact |
+| 技术选型 | Technology choices |
+| 架构 | Architecture |
+| 目录结构 | Directory layout |
+| 数据模型 | Data model |
+| 实现方案 | Implementation |
+| 接口和数据改动 | Interface and data changes |
+| 风险与回滚 | Risks and rollback |
+| 方案取舍 | Alternatives |
+
+各节写多细、要不要画图，由技术方案大纲（自动驾驶模块 6）细化；本版只检查文件、标记与批准，不检查章节。
+
 ## 技术方案 `tasks/<id>/design.md`
 
 | 中文 | English |

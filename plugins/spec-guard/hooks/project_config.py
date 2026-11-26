@@ -41,14 +41,19 @@ ITEMS = {"design": ("human", "reviewer"), "merge": ("human", "auto"),
          "release": ("human", "prepare", "auto-confirm", "auto")}
 HUMAN = {item: values[0] for item, values in ITEMS.items()}
 PRESETS = {"none": dict(HUMAN), "design": dict(HUMAN, design="reviewer"),
-           "merge": dict(HUMAN, design="reviewer", merge="auto")}
+           "merge": dict(HUMAN, design="reviewer", merge="auto"),
+           # sg-gate-flow (rule 17): never the factory default; a project or module names it to use it.
+           "autopilot": dict(HUMAN, design="reviewer", merge="auto", release="auto-confirm")}
+# sg-gate-flow (rule 19): a custom object may name a preset; the items it writes override that preset's.
+PRESET_KEY = "preset"
 # takeover-redefine (assumptions 4, 5; Q1 A): the old values are read, never written.  The preset `plan` reads as
 # none; the custom items spec and plan no longer apply to flow v2 modules.  Old-flow modules keep their old meaning
 # through legacy(): who approves their Spec and Plan.
 LEGACY_ITEMS = {"spec": ("human", "codex"), "plan": ("human", "codex")}
 LEGACY_PRESETS = {"plan": dict(HUMAN)}
 LEGACY_OF_PRESET = {"none": {"spec": "human", "plan": "human"}, "plan": {"spec": "human", "plan": "codex"},
-                    "design": {"spec": "human", "plan": "codex"}, "merge": {"spec": "codex", "plan": "codex"}}
+                    "design": {"spec": "human", "plan": "codex"}, "merge": {"spec": "codex", "plan": "codex"},
+                    "autopilot": {"spec": "codex", "plan": "codex"}}
 ALL_ITEMS = {**ITEMS, **LEGACY_ITEMS}
 LEGACY_NOTE = ("note: takeover=plan is read as none; to keep the second reviewer approving, set design "
                "(needs the user's words)")
@@ -92,7 +97,8 @@ def valid_takeover(value: Any) -> bool:
     if isinstance(value, str):
         return value in PRESETS or value in LEGACY_PRESETS
     return isinstance(value, dict) and all(
-        isinstance(item, str) and item in ALL_ITEMS and value[item] in ALL_ITEMS[item] for item in value)
+        (item == PRESET_KEY and isinstance(value[item], str) and value[item] in PRESETS) or
+        (isinstance(item, str) and item in ALL_ITEMS and value[item] in ALL_ITEMS[item]) for item in value)
 
 
 def legacy_value(value: Any) -> bool:
@@ -106,7 +112,7 @@ def expand(value: Any) -> dict[str, str]:
     """A valid takeover value as the three items, old values converted."""
     if isinstance(value, str):
         return dict(PRESETS.get(value) or LEGACY_PRESETS[value])
-    return dict(HUMAN, **{item: value[item] for item in ITEMS if item in value})
+    return dict(PRESETS[value.get(PRESET_KEY, "none")], **{item: value[item] for item in ITEMS if item in value})
 
 
 def legacy(value: Any) -> dict[str, str]:
@@ -116,8 +122,12 @@ def legacy(value: Any) -> dict[str, str]:
     """
     if isinstance(value, str):
         return dict(LEGACY_OF_PRESET[value])
-    return {"spec": value.get("spec", "human"),
-            "plan": value.get("plan", "codex" if value.get("design") == "reviewer" else "human")}
+    base = LEGACY_OF_PRESET[value.get(PRESET_KEY, "none")]
+    if "design" in value:  # sg-gate-flow design review 1 #2: a written design still decides an unwritten plan
+        plan = "codex" if value["design"] == "reviewer" else "human"
+    else:
+        plan = base["plan"]
+    return {"spec": value.get("spec", base["spec"]), "plan": value.get("plan", plan)}
 
 
 def all_items(value: Any) -> dict[str, str]:
@@ -131,7 +141,7 @@ def takeover_wider(items: dict[str, str], than: dict[str, str]) -> bool:
 
 # takeover-narrow: the order a step is taken back in (Q7, r3 Q13).  A preset steps down the preset ladder; a custom
 # value hands back its outermost non-human item, release first; release goes straight back to human.
-PRESET_LADDER = ("none", "design", "merge")
+PRESET_LADDER = ("none", "design", "merge", "autopilot")
 NARROW_ORDER = ("release", "merge", "design")
 SOURCES = ("autopilot", "module-crew", "user")
 REASON_MAX = 200
@@ -267,6 +277,25 @@ def module_takeovers(root: Path, module_ids) -> tuple[dict[str, str], dict[str, 
         source = "default (config invalid)"
     return project, {module: (all_items(entries[module]), "moduleTakeover") if module in entries
                      else (dict(project), source) for module in module_ids}
+
+
+def module_preset(root: Path, module_id: str) -> str | None:
+    """sg-gate-flow (rule 21): the preset the module's effective takeover names, or None for an object without one.
+
+    The layer is the one module_takeovers reads (module entry, project, default); an invalid layer falls through the
+    same way, so the name always matches the items that function returns.
+    """
+    values, problems = load(root)
+    entries = {} if "moduleTakeover-invalid" in problems else values.get("moduleTakeover", {})
+    if module_id in entries:
+        value = entries[module_id]
+    elif "takeover" in values:
+        value = values["takeover"]
+    else:
+        value = "none"
+    if isinstance(value, str):
+        return value if value in PRESETS else "none"  # an old preset (plan) reads as none
+    return value.get(PRESET_KEY)
 
 
 def takeover_origin(root: Path, module_id: str) -> str:
@@ -437,7 +466,9 @@ def _change(root: Path, key: str, value: str | None, confirm: bool, module: str 
             return 2
     if key in ("takeover", "moduleTakeover") and value is not None and legacy_value(value):
         print("takeover-legacy: plan, spec, plan and requirement are old values, read but no longer written; use "
-              "none, design or merge, or an object of design (human/reviewer), merge and release. The old plan "
+              "none, design, merge or autopilot, or an object of design (human/reviewer), merge and release "
+              "(it may name a preset to start from, e.g. {\"preset\": \"autopilot\", \"release\": \"human\"}). "
+              "The old plan "
               "corresponds to design (needs the user's words)")
         return 2
     if module is not None and value is not None and not ENTRY_VALID[key](value):

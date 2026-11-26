@@ -64,6 +64,14 @@ _DIGEST_MODULE = None
 # flow applies unchanged.  references/doc-skeletons.md is the human-readable copy of DOC_SECTIONS.
 FLOW_MARKER = re.compile(r"<!-- spec-guard: flow v2 tier=(\S+) -->")
 TIERS = ("bug", "small", "normal", "important")
+# sg-gate-flow (rules 1-3): the user's answer to "release when done?", one line of its own under the flow marker, inside
+# the requirement's approval digest (review_body only drops the review marker lines).  Only `yes` means anything.
+RELEASE_PREAUTH = re.compile(r"<!-- spec-guard: release-preauth (\S+) -->")
+RELEASE_AUTO = ("auto-confirm", "auto")
+# sg-gate-flow (rules 6-8): a requirement that needs an overall design names the one file its modules share.
+OVERALL_DESIGN = re.compile(r"<!-- spec-guard: overall-design (\S+) -->")
+OVERALL_PATH = re.compile(r"spec/overall/[a-z0-9]+(?:-[a-z0-9]+)*\.md")
+OVERALL_STATUSES = ("approved", "missing", "pending", "revised", "invalid")  # release items that hand the release to autopilot and allow pre-authorisation
 SHORT_TIERS = ("bug", "small")  # one document: no design, no separate regression document
 DOC_SECTIONS = {
     "requirement": {"zh": ("目标", "给谁用", "使用场景", "业务规则和异常情形", "不做什么", "成功标准", "待定问题"),
@@ -94,6 +102,130 @@ def flow_marker(root: Path, module: str) -> dict:
                 return {"v2": True, "tier": tier, "problems": []}
             return {"v2": True, "tier": "normal", "problems": ["tier-invalid"]}
     return {"v2": False, "tier": None, "problems": []}
+
+
+def release_preauth_line(text: str) -> str | None:
+    """sg-gate-flow: "yes", "invalid" (a release-preauth line with any other value) or None (no such line)."""
+    for line in _visible_lines(text.splitlines()):
+        match = RELEASE_PREAUTH.fullmatch(line.strip())
+        if match:
+            return "yes" if match.group(1) == "yes" else "invalid"
+    return None
+
+
+def release_allowed(root: Path, module: str) -> bool:
+    """sg-gate-flow (rule 1): the module's effective takeover hands the release to autopilot."""
+    from project_config import module_takeover  # late: project_config is imported by callers of this module
+    return module_takeover(root, module)[0]["release"] in RELEASE_AUTO
+
+
+def release_preauth(root: Path, module: str) -> bool | None:
+    """sg-gate-flow (rule 3): /map --json takeover.releasePreauth.
+
+    None for an old-flow module or a takeover that does not let autopilot release; True when the requirement carries
+    `release-preauth yes` and its confirmation stands (the line is inside the digest, so an edit voids both); else False.
+    """
+    if not _v2(root, module) or not release_allowed(root, module):
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    confirmed = requirement_wait(root, module) is None and review_state(text, "spec") != "invalid"
+    return confirmed and release_preauth_line(text) == "yes"
+
+
+def overall_design(root: Path, module: str) -> dict | None:
+    """sg-gate-flow: {"path", "status"} of the overall design a flow v2 module points to; None without the line.
+
+    Only the user approves it (rule 8): a Codex or reviewer marker counts as pending.  `invalid` covers a bad line or
+    path (path then None) and a malformed marker; `revised` an approval whose digest no longer matches the file.
+    """
+    if not _v2(root, module):
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    lines = [match.group(1) for line in _visible_lines(text.splitlines())
+             if (match := OVERALL_DESIGN.fullmatch(line.strip()))]
+    if not lines:
+        return None
+    if len(lines) > 1 or not OVERALL_PATH.fullmatch(lines[0]):
+        return {"path": None, "status": "invalid"}
+    path = lines[0]
+    try:
+        design = (root / path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {"path": path, "status": "missing"}
+    except (OSError, UnicodeError):
+        return {"path": path, "status": "invalid"}
+    state = review_state(design, "spec")
+    status = {"approved": "approved", "revised": "revised", "invalid": "invalid"}.get(state, "pending")
+    if state == "revised" and REVIEW_CODEX_DIGEST.fullmatch(_review_split(design)[0][0]):
+        status = "pending"  # a Codex marker never approved it, edited or not
+    return {"path": path, "status": status}
+
+
+def overall_problems(root: Path, module: str) -> list:
+    """sg-gate-flow (verify-artifacts): [(level, message)] about a module's overall-design line and file.
+
+    A bad line or path, or a missing file, fails.  An approval that is not in effect fails once the requirement is
+    confirmed (the gate is then holding work back) and only warns before.  Modules of one usage draft pointing to
+    different files warn (rule 7: one requirement shares one overall design).
+    """
+    found = overall_design(root, module)
+    if found is None:
+        return []
+    spec = "`spec/%s.md`" % module
+    if found["path"] is None:
+        return [("fail", "%s 的 overall-design 行写坏了：只能有一行，路径只能是 `spec/overall/<kebab-case>.md`" % spec)]
+    if found["status"] == "missing":
+        return [("fail", "%s 指向的总体技术方案 `%s` 不存在" % (spec, found["path"]))]
+    problems = []
+    if found["status"] != "approved":
+        level = "warn" if requirement_wait(root, module) else "fail"
+        problems.append((level, "%s 指向的总体技术方案 `%s` 没有生效的用户批准（%s）" % (spec, found["path"], found["status"])))
+    try:
+        owners = usage_draft.milestones(str(root))
+    except Exception:  # an unreadable draft is reported by the usage-draft check itself
+        owners = {}
+    draft = owners.get(module, (None,))[0]
+    if draft:
+        others = sorted({(other, seen["path"]) for other, (label, _m) in owners.items() if label == draft and other != module
+                         for seen in (overall_design(root, other),) if seen and seen["path"] and seen["path"] != found["path"]})
+        if others:
+            problems.append(("warn", "%s 与同一份用法草案 `%s` 里的 %s 指向不同的总体技术方案" % (
+                spec, draft, "、".join("`%s`（%s）" % pair for pair in others))))
+    return problems
+
+
+def overall_wait(root: Path, module: str) -> dict | None:
+    """sg-gate-flow (rule 8): the overall design a confirmed requirement still waits for; None when nothing holds."""
+    found = overall_design(root, module)
+    if found is None or found["status"] == "approved" or requirement_wait(root, module):
+        return None
+    return found
+
+
+def overall_hint(found: dict, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
+    """sg-gate-flow: (review line, next step) while the overall design holds the module."""
+    path = found["path"] or "spec/overall/<name>.md"
+    hold = _hold(None, module, stage, zh)
+    mark = "%s --target overall --module %s" % (cmd["review-mark"], module)
+    if zh:
+        why = {"missing": "还没写", "pending": "等用户批", "revised": "批准后又改过，要用户重新批",
+               "invalid": "标记行或文件写坏了（路径只能是 `spec/overall/<kebab-case>.md`）"}[found["status"]]
+        return ("- 批准: 总体技术方案 `%s` %s（只由用户批，Codex 的批准不算）。" % (path, why),
+                "写或改好总体技术方案（章节见插件 `references/doc-skeletons.md`），在对话正文里写出要点交用户批；用户在对话里批准后用 "
+                "%s --state approved 记下来。批准前%s。" % (mark, hold))
+    why = {"missing": "is not written yet", "pending": "waits for the user's approval",
+           "revised": "was edited after it was approved; the user approves it again",
+           "invalid": "has a malformed line or file (the path must be `spec/overall/<kebab-case>.md`)"}[found["status"]]
+    return ("- Review: the overall design `%s` %s (only the user approves it; Codex's approval does not count)." % (path, why),
+            "write or fix the overall design (sections in the plugin's `references/doc-skeletons.md`), put its points in "
+            "the conversation and ask the user to approve; once they do, record it with %s --state approved. Until "
+            "then %s." % (mark, hold))
 
 
 def effective_tier(root: Path, module: str) -> dict:
@@ -610,14 +742,17 @@ def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) ->
     reasons = ", ".join(important(root, module))
     combined = load_config(root)[0].get("reviewCadence") == "combined"
     path = "spec/%s.md" % module
+    ask = release_allowed(root, module)  # sg-gate-flow (rule 1): only then is "release when done?" asked
     if zh:
         why = {"pending": "等用户确认", "codex": "只有 Codex 的批准，需求要用户在对话里确认",
                "revised": "确认后又改过，要用户重新确认"}[wait]
         return ("- 批准: 需求文档 `%s` %s%s。" % (path, why, "（批准节奏 combined 不适用于需求确认）" if combined else ""),
                 "在对话正文里复述需求（%s，加上档位），问用户是否说完；给谁用、为什么做、怎样算做成、不做什么有一项写不出来、"
-                "有你自己补的假设，或是重要需求%s时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。"
+                "有你自己补的假设，或是重要需求%s时，先用 agent-skills 的 interview-me 一次问一个问题，问清再复述。%s"
                 "用户在对话里确认后，用 %s 记下来；接管档位不能代替，Codex 的批准不算。确认前不要往下写。"
-                % ("、".join(names), "（本需求是重要需求：%s）" % reasons if reasons else "", cmd["review-mark"]))
+                % ("、".join(names), "（本需求是重要需求：%s）" % reasons if reasons else "",
+                   "本模块的档位把发版交给 autopilot：复述时一并问「做完自动发版吗？」，答是就在流程标记行下面写一行 "
+                   "`<!-- spec-guard: release-preauth yes -->` 再记确认，答否不写。" if ask else "", cmd["review-mark"]))
     why = {"pending": "is waiting for the user's confirmation",
            "codex": "has only Codex's approval; the user confirms requirements in the conversation",
            "revised": "was edited after it was confirmed; the user confirms it again"}[wait]
@@ -626,10 +761,13 @@ def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) ->
             "restate the requirement in the conversation (%s, plus the tier) and ask the user whether that is everything; "
             "when who it is for, why, what counts as done or what is out of scope cannot be written, when you filled in "
             "an assumption yourself, or when it is an important requirement%s, first interview the user with "
-            "agent-skills' interview-me, one question at a time, then restate it. When the user confirms in the "
+            "agent-skills' interview-me, one question at a time, then restate it.%s When the user confirms in the "
             "conversation, record that with %s; the takeover cannot stand in and Codex's approval does not count. Do not "
             "write further documents until it is confirmed."
-            % (", ".join(names), " (this one is: %s)" % reasons if reasons else "", cmd["review-mark"]))
+            % (", ".join(names), " (this one is: %s)" % reasons if reasons else "",
+               " This module's takeover hands the release to autopilot: with the restatement, ask \"release when done?\"; "
+               "on yes write `<!-- spec-guard: release-preauth yes -->` under the flow marker before recording the "
+               "confirmation, on no write nothing." if ask else "", cmd["review-mark"]))
 
 
 # design-review: whether a v2 module's design is reviewed, and where that stands (published as designApproval).
@@ -1433,6 +1571,8 @@ def stop_node(root: Path, module: str, stage: str, spec_review: str, plan_review
     """
     if requirement_wait(root, module):
         return "spec-review"  # requirement-confirm-gate: the requirement comes before the Plan and the final gate
+    if stage in BEFORE_PLAN + ("BUILDING",) and overall_wait(root, module):
+        return "design-review"  # sg-gate-flow: the user approves the overall design like a design
     if design_to_user(design_waits(root, module, stage)):
         return "design-review"  # design-review: the user approves the design before the regression document
     kind = None
@@ -1825,6 +1965,10 @@ def _review_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool = Fals
         return line, step, "revised" if wait == "revised" else "pending", plan
     if stage not in BEFORE_PLAN + ("BUILDING",):
         return "", "", "none", "none"
+    overall = overall_wait(root, module)
+    if overall:  # sg-gate-flow (rule 8): the overall design comes right after the requirement
+        line, step = overall_hint(overall, module, stage, cmd, zh)
+        return line, step, "approved", "none"
     spec_path, plan_path = "spec/%s.md" % module, "tasks/%s/plan.md" % module
     spec = file_review_state(root / spec_path, "spec")
     plan = file_review_state(root / plan_path, "plan") if stage == "BUILDING" else "none"
@@ -2169,6 +2313,12 @@ def describe(root: Path, host: str | None = None,
     return brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
 
 
+def milestone_blocking(root: Path, modules) -> bool:
+    """sg-gate-flow (rules 9-11): False only when every module of the milestone names the autopilot preset."""
+    from project_config import module_preset  # late: project_config is imported by callers of this module
+    return not modules or any(module_preset(root, module) != "autopilot" for module in modules)
+
+
 def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
     """milestone-stop: (fact, line, next step) for the first finished, unconfirmed milestone of a usage draft.
 
@@ -2190,6 +2340,14 @@ def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
     modules = [safe_fragment(item) for item in found["modules"]]
     usages = [safe_fragment(item) for item in found["usages"]]
     fact = ("stop", draft, milestone, tuple(modules))
+    if not milestone_blocking(root, found["modules"]):
+        # sg-gate-flow: an autopilot milestone is reported, never a stop; the confirmation can still be recorded later.
+        line = ("- 里程碑: `%s` 的 %s 已完成，未确认（模块 %s；autopilot 档，不阻塞，写进汇报；用户事后要确认时用 %s）"
+                % (draft, milestone, "、".join(modules), cmd["milestone-mark"]) if zh else
+                "- Milestone: %s of `%s` is done and not confirmed (modules %s; autopilot, not a stop -- put it in the "
+                "report; the user can still record it later with %s)" % (milestone, draft, ", ".join(modules),
+                                                                       cmd["milestone-mark"]))
+        return ("report", draft, milestone, tuple(modules)), line, ""
     if zh:
         line = "- 里程碑停点: `%s` 的 %s（模块 %s 已全部完成，未确认）" % (draft, milestone, "、".join(modules))
         step = ("先不开下一个模块：按 `%s` 里 %s 的典型用法 %s 实际跑一遍，把命令与输出摆给用户判定；用户明确说通过后，用 %s "
@@ -2746,6 +2904,12 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     if dg_step and not ms_step and role_kind not in ("module", "coordinator"):
         # usage-draft-gate: a multi-module batch reviews its usage draft before its first Spec.
         node, next_step = "map-review", dg_step
+    if (node is None and not review_step and stage in ("NEEDS_REGRESSION", "NEEDS_PLAN", "BUILDING")
+            and _v2(root, module) and role_kind not in ("module", "coordinator")):
+        # sg-gate-flow (rule 24): the next steps run on without a stop, so the user hears what comes before it starts.
+        next_step += (" 接着要连着做几步时，先用一句话告诉用户接下来做什么，再开始；这不是停点，不等回答。" if zh else
+                      " Before going on through several steps, tell the user in one sentence what comes next, then "
+                      "start; this is not a stop and needs no answer.")
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
@@ -2753,7 +2917,8 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
                        documentation_baseline_present(root), project_sections(root), requirement_wait(root, module),
-                       design_fact(root, module, stage) if module else None]
+                       design_fact(root, module, stage) if module else None,
+                       overall_wait(root, module) if module else None]
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])

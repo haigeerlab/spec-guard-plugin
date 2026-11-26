@@ -95,11 +95,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 from capability_map import parse_map
-from module_stage import design_review_problems, flow_doc_problems, plan_auto_problems
+from module_stage import design_review_problems, flow_doc_problems, overall_problems, plan_auto_problems
 root = Path(".")
 parsed = parse_map(root / "spec" / "CAPABILITY-MAP.md")
 for module in list(parsed.order) or [row.module_id for row in parsed.rows]:
-    for level, message in flow_doc_problems(root, module) + design_review_problems(root, module) + plan_auto_problems(root, module):
+    for level, message in flow_doc_problems(root, module) + design_review_problems(root, module) + plan_auto_problems(root, module) + overall_problems(root, module):
         print("%s\t%s" % (level, message))
 ' "$HOOKDIR" 2>/dev/null </dev/null)"; then
         warn '未验证：新流程文档检查脚本没有正常运行'

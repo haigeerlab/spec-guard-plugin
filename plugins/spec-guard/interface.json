@@ -1,5 +1,5 @@
 {
-  "interface": "1.25",
+  "interface": "1.26",
   "mapView": {
     "command": [
       "python3",
@@ -104,8 +104,10 @@
       "appearsWhen": "per module, always (interface 1.18, spec/flow-doc-skeletons.md; requirementConfirm since 1.19)",
       "fields": {
         "tier": "the flow v2 tier from the line <!-- spec-guard: flow v2 tier=<tier> --> in spec/<id>.md: bug, small, normal or important; an unknown tier reads as normal, and important when the rules judge the requirement important (see important); null for a module without the line (the old Spec -> Plan flow, unchanged)",
-        "requirementConfirm": "since 1.19 (spec/requirement-confirm-gate.md): null for an old-flow module; for a flow v2 module {status, by, at, sha256}: status is one of requirementConfirmStatus; by is \"user\" when confirmed, else null; at is the commit time (ISO 8601) of the earliest commit in the unbroken run back from HEAD whose spec/<id>.md carries the current approval line (outside code fences), null when not confirmed, not committed, outside git, or more than 50 commits of the file back; sha256 is the 12-hex prefix of the sha256 of the whole file, as spec-digest.py text prints it (the same kind of value as reviewRounds.sha256). An unreadable spec/<id>.md fails the whole view (exit 4) like review"
+        "requirementConfirm": "since 1.19 (spec/requirement-confirm-gate.md): null for an old-flow module; for a flow v2 module {status, by, at, sha256}: status is one of requirementConfirmStatus; by is \"user\" when confirmed, else null; at is the commit time (ISO 8601) of the earliest commit in the unbroken run back from HEAD whose spec/<id>.md carries the current approval line (outside code fences), null when not confirmed, not committed, outside git, or more than 50 commits of the file back; sha256 is the 12-hex prefix of the sha256 of the whole file, as spec-digest.py text prints it (the same kind of value as reviewRounds.sha256). An unreadable spec/<id>.md fails the whole view (exit 4) like review",
+        "overallDesign": "since 1.26 (spec/sg-gate-flow.md): null for an old-flow module or when spec/<id>.md has no line <!-- spec-guard: overall-design spec/overall/<name>.md -->; else {path, status}: path is that file (null when the line or path is malformed), status is one of overallDesignStatus. Only the user approves it (review-mark --target overall); a Codex or reviewer marker reads as pending. A confirmed requirement whose overall design is not approved holds the module before its design"
       },
+      "overallDesignStatus": ["approved", "missing", "pending", "revised", "invalid"],
       "tierValues": ["bug", "small", "normal", "important"],
       "stepValues": {
         "design": "since 1.18, flow v2 normal/important modules only: the requirement is written, tasks/<id>/design.md is not (stage hint NEEDS_DESIGN)",
@@ -163,9 +165,10 @@
     "milestoneStop": {
       "appearsWhen": "always, whatever moduleConcurrency is (interface 1.13, spec/milestone-stop.md)",
       "fields": {
-        "milestoneStop": "top level; null when the project has no usage draft (spec/usage/*.md) or no milestone is waiting; {\"file\": \"spec/usage/<requirement>.md\", \"milestone\": \"M<n>\", \"modules\": [...], \"usages\": [\"U<n>\", ...]} for the first milestone (drafts by file name, milestones in table order) whose modules all have status done and which has no confirmation line naming exactly those modules; {\"error\": \"unreadable\", \"detail\": ...} when a draft cannot be read or names a module not in the map (never null in that case)"
+        "milestoneStop": "top level; null when the project has no usage draft (spec/usage/*.md) or no milestone is waiting; {\"file\": \"spec/usage/<requirement>.md\", \"milestone\": \"M<n>\", \"modules\": [...], \"usages\": [\"U<n>\", ...], \"blocking\": true|false} for the first milestone (drafts by file name, milestones in table order) whose modules all have status done and which has no confirmation line naming exactly those modules; {\"error\": \"unreadable\", \"detail\": ...} when a draft cannot be read or names a module not in the map (never null in that case)"
       },
-      "meaning": "the stage hint stops at this milestone until the user passes it and /spec-guard:milestone-mark records it; a caller that dispatches modules by this view should start no new module meanwhile, whichever milestone or draft it belongs to (modules not in any draft included), and lets modules already in progress finish; startable, stage and every other field are unchanged"
+      "blocking": "since 1.26 (spec/sg-gate-flow.md): false only when every module of the milestone names the autopilot preset (takeover.preset); the stage hint then only reports it and a caller does not hold new modules back. true otherwise, with the meaning below. The error object carries no blocking",
+      "meaning": "when blocking is true, the stage hint stops at this milestone until the user passes it and /spec-guard:milestone-mark records it; a caller that dispatches modules by this view should start no new module meanwhile, whichever milestone or draft it belongs to (modules not in any draft included), and lets modules already in progress finish; startable, stage and every other field are unchanged"
     },
     "takeover": {
       "appearsWhen": "always, on every module, whatever moduleConcurrency is (interface 1.15, spec/takeover-config.md)",
@@ -178,7 +181,9 @@
         "designForcedBy": "since 1.22: important when design is human because the flow v2 requirement is important, else null",
         "source": "per module; moduleTakeover (the module's own entry), takeover (the project value), default (nothing set) or default (config invalid) (the file, takeover or moduleTakeover is invalid; the items are then the next layer's)",
         "widerThanProject": "per module; true when any item is wider than the project's effective item (the configured design, merge and release, orders as in takeover.items; the forcing by an important requirement is not counted); spec-guard only reports it and never caps",
-        "narrowed": "per module; null when the scope the module reads (its own moduleTakeover entry, else the project) has no narrowing record; else {\"from\", \"source\", \"at\"}: the value before the first narrowing, who narrowed last and when (takeover-narrow). The caller-written reason is never included"
+        "narrowed": "per module; null when the scope the module reads (its own moduleTakeover entry, else the project) has no narrowing record; else {\"from\", \"source\", \"at\"}: the value before the first narrowing, who narrowed last and when (takeover-narrow). The caller-written reason is never included",
+        "releasePreauth": "since 1.26 (spec/sg-gate-flow.md): per module; null for an old-flow module or when the effective release is not auto-confirm or auto; true when spec/<id>.md carries the line <!-- spec-guard: release-preauth yes --> and the user's confirmation of the requirement stands (the line is inside its digest, so an edit after the confirmation voids both); false otherwise (no line, another value, not confirmed, or confirmation voided). Whether it is void by a T4 change or a major version is autopilot's to judge; a caller that cannot read it treats it as null",
+        "preset": "since 1.26: per module; the preset name the effective value names -- a preset string (the old plan reads as none), or the \"preset\" key of a custom object; null for an object without one. Taken from the same layer as the items (moduleTakeover, takeover, default)"
       },
       "meaning": "the same value project_config.module_takeover(root, id) returns; autopilot reads design, merge and release; module-crew reads spec and plan until 1.22's deprecation ends; spec-guard only stores and reports it, the callers act on it and enforce the release limits"
     },
@@ -304,7 +309,7 @@
       "--module",
       "<module-id>",
       "--target",
-      "<spec|plan|both|acceptance|design>",
+      "<spec|plan|both|acceptance|design|overall>",
       "--state",
       "<pending|approved|codex-approved|codex-reviewed|reviewer-approved|reviewer-reviewed>",
       "[--review <report file>]"
@@ -505,7 +510,8 @@
     "presets": {
       "none": "default; design, merge and release all human",
       "design": "design=reviewer; merge and release human",
-      "merge": "design=reviewer, merge=auto; release human"
+      "merge": "design=reviewer, merge=auto; release human",
+      "autopilot": "since 1.26 (spec/sg-gate-flow.md): design=reviewer, merge=auto, release=auto-confirm; never the factory default, a project or module names it. A custom object may carry \"preset\": <name> (any preset above) and override items: {\"preset\": \"autopilot\", \"release\": \"human\"}; without it unnamed items read as human"
     },
     "items": {
       "design": [

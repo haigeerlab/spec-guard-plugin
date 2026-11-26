@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.98.0] - 2026-11-27
+
+### 新增
+
+- **关卡流程按自动驾驶第一版调整（sg-gate-flow，自动驾驶模块 4）。** 接口升到 **1.26**，只加字段，老流程模块与没升级的调用方行为不变。
+  - **预设 `autopilot`**：技术方案交第二审查者、合并自动、发布 `auto-confirm`。它**不是**出厂默认（出厂仍是 `none`），要在 `takeover` 或 `moduleTakeover` 里写明才生效；
+    自定义对象可带 `"preset"` 从某个预设起改，例如 `{"preset":"autopilot","release":"human"}`。收窄阶梯为 `autopilot` → `merge` → `design` → `none`。
+    `/map --json` 的 `takeover` 加 `preset`。0.97.x 及更早读到这些值会判无效、退回下一层（只会更严），团队都升级后再设。
+  - **做完自动发版吗**：档位把发布交给 autopilot（`auto-confirm`／`auto`）时，需求确认时多问一句；答是在需求文档写 `<!-- spec-guard: release-preauth yes -->`，
+    它在批准指纹里，确认后改动即失效。`/map --json` 的 `takeover.releasePreauth` 给 `true`／`false`／`null`；作废条件（碰 T4、升主版本号）由 autopilot 判。
+  - **总体技术方案关卡**：全新项目或全新模块的需求，在需求确认时定下要，模块需求文档写 `<!-- spec-guard: overall-design spec/overall/<名字>.md -->`；
+    能力图批准后、模块开工前写这份方案，只由用户批（`review-mark --target overall`），没批时阶段提示停在这一关。`/map --json` 每个模块加 `overallDesign`，verify-artifacts 查标记、文件与批准。
+  - **里程碑在 autopilot 档不阻塞**：里程碑里每个模块都是 `autopilot` 时只报「已完成，未确认」、写进汇报，`milestoneStop` 加 `blocking: false`；其余档位逐字照旧。
+  - **连着做之前先说一句**：新流程模块要不停地连着做几步时，阶段提示要求先用一句话告诉用户接下来做什么。
+
+### 变更
+
+- **远端合并改为两种情况。** 共享规则里「合并永远由用户在对话里决定」换成模块 1 用户批过的措辞：新流程模块、档位合并是 `auto`、仓库长期授权的条件都满足时交给 autopilot；
+  其余照旧由用户在对话里说「合并」，问合并时写明 PR 当前的 head 提交，之后有新提交要重新问。发版一句按用户决定（O1 A）收窄为：档位把发布交给 autopilot 的由它执行，
+  `release` 是 `human` 的照旧在用户确认后由会话执行。在 autopilot 的必需检查加上之前，各仓库实际仍全部走人工路。
+- **新增「出事处理」一节，开 PR 以后同一原因最多修两次。** 适用所有档位：PR 上测试暴露的代码问题、合并前验证没过、审查有阻断，同一原因修两次还不行就停下交用户；
+  修的过程中不改已有测试与回归用例；等得明显过久要说。构建中本地的失败照旧自己修、不计次数。
+
 ## [0.97.1] - 2026-11-26
 
 ### 修复

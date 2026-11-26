@@ -24,7 +24,7 @@ MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step"
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm", "designApproval", "verification"}
+               "requirementConfirm", "designApproval", "verification", "overallDesign"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -144,7 +144,8 @@ class MilestoneStopTest(unittest.TestCase):
     def test_stop(self):
         with self.project(self.DRAFT) as project:
             self.assertEqual(project.json()["milestoneStop"],
-                             {"file": "spec/usage/demo.md", "milestone": "M1", "modules": ["a"], "usages": ["U1"]})
+                             {"file": "spec/usage/demo.md", "milestone": "M1", "modules": ["a"], "usages": ["U1"],
+                              "blocking": True})
             self.assertIn("里程碑停点：spec/usage/demo.md 的 M1（模块 a 已全部完成，未确认）", project.run().stdout)
 
     def test_unreadable_draft_is_not_null(self):
@@ -168,7 +169,7 @@ class RetiredAutonomyTest(unittest.TestCase):
 
     def test_interface_version(self):
         data = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["interface"], "1.25")  # bump together with interface.json
+        self.assertEqual(data["interface"], "1.26")  # bump together with interface.json
 
 
 class TakeoverTest(unittest.TestCase):
@@ -190,7 +191,8 @@ class TakeoverTest(unittest.TestCase):
     def test_without_config(self):
         with self.project() as project:
             self.assertEqual(self.takeover(project), {
-                m: dict(self.HUMAN, source="default", widerThanProject=False, narrowed=None) for m in ("a", "b")})
+                m: dict(self.HUMAN, source="default", widerThanProject=False, narrowed=None, releasePreauth=None,
+                        preset="none") for m in ("a", "b")})
 
     def test_keys_match_the_interface(self):
         from map_view import TAKEOVER_FIELDS
@@ -204,13 +206,14 @@ class TakeoverTest(unittest.TestCase):
         with self.project({"takeover": "design", "moduleTakeover": {"a": "merge"}}) as project:
             self.assertEqual(self.takeover(project), {
                 "a": dict(self.HUMAN, design="reviewer", merge="auto", spec="codex", plan="codex",
-                          source="moduleTakeover", widerThanProject=True, narrowed=None),
+                          source="moduleTakeover", widerThanProject=True, narrowed=None, releasePreauth=None,
+                          preset="merge"),
                 "b": dict(self.HUMAN, design="reviewer", plan="codex", source="takeover", widerThanProject=False,
-                          narrowed=None)})
+                          narrowed=None, releasePreauth=None, preset="design")})
         with self.project({"takeover": "merge", "moduleTakeover": {"a": {"release": "prepare"}}}) as project:
             self.assertEqual(self.takeover(project)["a"],
                              dict(self.HUMAN, release="prepare", source="moduleTakeover", widerThanProject=True,
-                                  narrowed=None))
+                                  narrowed=None, releasePreauth=None, preset=None))
 
     def test_old_values_and_the_old_flow_pair(self):
         # takeover-redefine AC5, Q3 A: an old-flow module keeps its old meaning; routes and approvers are unchanged.
@@ -244,7 +247,7 @@ class TakeoverTest(unittest.TestCase):
         with self.project({"takeover": "design", "moduleTakeover": {"a": "fast"}}) as project:
             self.assertEqual(self.takeover(project)["a"],
                              dict(self.HUMAN, design="reviewer", plan="codex", source="default (config invalid)",
-                                  widerThanProject=False, narrowed=None))
+                                  widerThanProject=False, narrowed=None, releasePreauth=None, preset="design"))
 
     def test_narrowed(self):
         record = {"from": "merge", "to": "plan", "source": "autopilot", "reason": "secret words",

@@ -27,7 +27,7 @@ from codex_review import CONCLUSIONS, REPORT_LIMIT, _invalid, inspect as inspect
 from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
                           design_approver, design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
-                          review_state, spec_baseline)
+                          overall_design, review_state, spec_baseline)
 from tracker_default import _write_atomic
 
 
@@ -369,7 +369,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Mark a module's Spec or Plan review state (preview unless --confirm).")
     parser.add_argument("--project", default=".")
     parser.add_argument("--module", required=True)
-    parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance", "design"])
+    parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance", "design", "overall"])
     parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed",
                                                           "reviewer-approved", "reviewer-reviewed"])
     parser.add_argument("--review", help="codex states: the /delegate:review JSON report saved to a file")
@@ -394,6 +394,22 @@ def main() -> int:
         return 2
     if args.target == "acceptance":
         return _acceptance(root, module_id, args.state, args.review, args.confirm)
+    overall = None
+    if args.target == "overall":
+        # sg-gate-flow (rule 8): only the user approves an overall design; no Codex or reviewer state applies.
+        if args.state not in ("pending", "approved"):
+            print("overall-user-only: an overall design is approved by the user only; --state %s does not apply"
+                  % args.state)
+            return 2
+        found = overall_design(root, module_id)
+        if found is None:
+            print("overall-none: spec/%s.md has no overall-design line (or is not a new-flow module)" % module_id)
+            return 2
+        if found["path"] is None:
+            print("overall-invalid: spec/%s.md has a malformed overall-design line; the path must be "
+                  "spec/overall/<kebab-case>.md, once" % module_id)
+            return 2
+        overall = found["path"]
     if args.state.startswith("reviewer-") and args.target != "design":
         print("reviewer-state: --state %s is for --target design only; a Spec or Plan uses codex-approved / "
               "codex-reviewed" % args.state)
@@ -411,7 +427,7 @@ def main() -> int:
             return 2
         tier = effective_tier(root, module_id)["tier"]
     relative = {"spec": "spec/%s.md" % module_id, "plan": "tasks/%s/plan.md" % module_id,
-                "design": "tasks/%s/design.md" % module_id}
+                "design": "tasks/%s/design.md" % module_id, "overall": overall}
     kinds = ["spec", "plan"] if args.target == "both" else [args.target]
     before = {}
     for kind in kinds:

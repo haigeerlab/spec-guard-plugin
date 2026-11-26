@@ -127,3 +127,15 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 todo 里的最终 gate 现在不勾：记录的提交是 HEAD 或其祖先时阶段提示当它已过，合并后补勾并写一句来源。拟回告写进 todo，不发出。
 合并不是 auto 的模块被拒绝，最终验收照旧由用户做；本模块开工前的提交里合并还不是 auto（开工后才放宽）的也拒绝（`acceptance-not-auto-at-base`），
 免得补丁靠改 `.agent/config.json` 给自己开自动合并。
+
+## 总体技术方案（`--target overall`）
+
+需求确认时定了要总体技术方案的模块，`spec/<id>.md` 里有一行 `<!-- spec-guard: overall-design spec/overall/<名字>.md -->`。
+那份方案只由用户批：在对话正文里写出要点交用户，用户明确批准后记下（带指纹，之后改动方案要重新批）：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target overall --state approved --confirm
+```
+
+只接受 `pending`、`approved`；Codex 与第二审查者的状态一律拒绝（`overall-user-only`）。模块没有这一行时拒绝（`overall-none`），
+行或路径写坏时拒绝（`overall-invalid`，路径只能是 `spec/overall/<kebab-case>.md`）。同一需求的几个模块指向同一份方案，记一次即可。

@@ -103,13 +103,15 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `artifactLanguage` | 语言标签，如 `zh-CN`、`en` | 未设置 |
 | `reviewCadence` | `separate`／`combined` | `separate` |
 | `moduleConcurrency` | `off`／`on` | `off` |
-| `takeover` | 预设 `none`／`design`／`merge`，或自定义三项 | `none` |
+| `takeover` | 预设 `none`／`design`／`merge`／`autopilot`，或自定义三项（可带 `preset`） | `none` |
 | `moduleTakeover` | 模块 id → 同 `takeover` 的值 | 未设置 |
 | `projectSections` | 文档 → 追加章节名列表，如 `{"design": ["浏览器兼容"]}` | 未设置 |
 
 `takeover`（接管档位）定技术方案、合并、发布三项各由你做还是交给 AI；需求永远由你确认，新流程 Plan 永远自动批准，两者不可配。
 `none` 全由你做（每份技术方案都由你批，不需要审的也一样），`design` 让第二审查者审过即放行技术方案（重要需求仍由你批），`merge` 再加审查通过后自动合并；
-发布只能用自定义打开（`human`／`prepare`／`auto-confirm`／`auto`）。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 读它去做。
+`autopilot` 在 `merge` 之上再把发布设为 `auto-confirm`：需求确认时会问你「做完自动发版吗？」，答是就记成提前授权；它不是出厂默认，要写明才生效，
+装了 autopilot 的项目才用得上。其余发布取值用自定义打开（`human`／`prepare`／`auto-confirm`／`auto`）；自定义对象可带 `"preset"` 从某个预设起改，
+例如 `{"preset":"autopilot","release":"human"}` 是「其余照 autopilot，发布由你」。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 读它去做。
 用说话的方式设置，先预览三项、你确认后才写：
 
 ```text
@@ -124,7 +126,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 比项目宽时只提醒、不截断。能力图上没有的模块 id 由 verify-artifacts 警告。设置时要你在对话里的原话。原来的 `autonomyTier`、
 `moduleAutonomy` 已退役，不映射到接管档位；文件里还有时不生效，可以 `unset` 删掉。团队都升级到 0.91.0 后再设。
 
-出事时 autopilot 或 module-crew 会用 `narrow` 自动把档位往严里收一格（先收发布，再收合并、技术方案；预设按 `merge` → `design` → `none`），不用问你，并在
+出事时 autopilot 或 module-crew 会用 `narrow` 自动把档位往严里收一格（先收发布，再收合并、技术方案；预设按 `autopilot` → `merge` → `design` → `none`），不用问你，并在
 `.agent/config.json` 里记下原因；这个文件改了之后要提交。想恢复时照常说一句，比如「恢复成接管到合并」；收窄过的档位一次只能升一格，
 差两格就分两次说。`/map --json` 里每个模块的 `takeover.narrowed` 写着从哪一档收下来、谁收的、什么时候。
 
@@ -183,7 +185,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 记录用法草案的一个里程碑已确认：`--draft spec/usage/<需求>.md --milestone M<n>`，先预览、`--confirm` 才在草案的 Milestones 表之后写一行
 `<!-- spec-guard: milestone M<n> confirmed <模块, …> -->`。阶段提示报「里程碑停点」时，agent 先按本里程碑的典型用法实际跑一遍、把证据给你看，
 你明确说通过后才用它记下，阶段提示随后转到下一个模块；你说不通过就在本里程碑补任务或改草案。确认后里程碑又加了模块，记录失效，
-新模块做完后会再停一次。拒绝（退出 2、不写文件）：里程碑不存在、有模块没完成、前面还有没确认的里程碑。
+新模块做完后会再停一次。里程碑里每个模块的档位都是 `autopilot` 时不停，只在汇报里报「已完成，未确认」，你事后想确认照样用它记。拒绝（退出 2、不写文件）：里程碑不存在、有模块没完成、前面还有没确认的里程碑。
 
 ### `/spec-guard:checkout-role`
 
