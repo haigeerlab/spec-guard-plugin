@@ -25,7 +25,7 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
                           design_approval, design_requirement, file_review_state, module_state, requirement_confirm,
-                          gate_checkpoints, next_gate, overall_design, project_stage, release_preauth,
+                          gate_checkpoints, milestone_blocking, next_gate, overall_design, project_stage, release_preauth,
                           unmerged_commits)
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
@@ -416,7 +416,9 @@ def _milestone_stop(root: Path, modules: list):
         return None
     if found["status"] == "unverified":
         return {"error": "unreadable", "detail": found["reason"]}
-    return {key: found[key] for key in ("file", "milestone", "modules", "usages")}
+    # sg-gate-flow (interface 1.26): blocking is false only when every module of the milestone names autopilot.
+    return dict({key: found[key] for key in ("file", "milestone", "modules", "usages")},
+                blocking=milestone_blocking(root, found["modules"]))
 
 
 def _review_cadence(root: Path) -> dict:
@@ -728,8 +730,9 @@ def render(data: dict, root: Path, expand_all: bool) -> str:
     if stop and stop.get("error"):
         lines.append("里程碑停点：未判定（%s）" % clean(stop["detail"]))
     elif stop:
-        lines.append("里程碑停点：%s 的 %s（模块 %s 已全部完成，未确认）"
-                     % (clean(stop["file"]), clean(stop["milestone"]), clean("、".join(stop["modules"]))))
+        lines.append("里程碑停点：%s 的 %s（模块 %s 已全部完成，未确认%s）"
+                     % (clean(stop["file"]), clean(stop["milestone"]), clean("、".join(stop["modules"])),
+                        "" if stop.get("blocking", True) else "；autopilot 档，不阻塞"))
     head = data["head"]
     merged = ("%d 个提交（相对 %s）" % (head["unmerged"]["count"], head["unmerged"]["base"])
               if head["unmerged"] else "判断不了")

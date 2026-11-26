@@ -3,8 +3,8 @@
 - [x] Task 1：预设 `autopilot` 与带 `preset` 的对象
 - [x] Task 2：提前授权
 - [x] Task 3：总体技术方案关卡
-- [ ] Task 4：里程碑不阻塞
-- [ ] Task 5：先说一句
+- [x] Task 4：里程碑不阻塞
+- [x] Task 5：先说一句
 - [ ] Checkpoint 1（report）：完整档与变异
 - [ ] Task 6：规则文字
 - [ ] Task 7：接口与版本
@@ -15,3 +15,5 @@
 - Task 2（2026-11-27）：`module_stage.py` 加 `RELEASE_PREAUTH`、`release_preauth_line`、`release_allowed`、`release_preauth`；`requirement_hint` 在档位把发版交给 autopilot 时多一句「做完自动发版吗？」（中英文），不交时逐字不变。`/map --json` 的 `takeover` 加 `releasePreauth`、`preset`，`interface.json` 写上两个字段的说明。`test_sg_gate_flow.py` 加 `ReleaseQuestion` 2 例、`ReleasePreauth` 4 例，实现前 2 处失败 4 处报错，实现后 18 例全过。`test_map_view.py` 三条钉死档位对象全部字段的用例（`test_without_config`、`test_module_entry_and_project_value`、`test_invalid_entries_fall_back`）补上两个新字段的预期值，原断言不删；124 例全过。
 - Task 3（2026-11-27）：`module_stage.py` 加 `OVERALL_DESIGN`、`OVERALL_PATH`、`overall_design`（五种状态，Codex 或审查者标记算 pending）、`overall_wait`、`overall_hint`、`overall_problems`；`_review_hint` 在需求确认之后、模块技术方案之前拦，`stop_node` 记作 design-review，状态码加 `overall_wait`。`review_mark.py` 加 `--target overall`（只收 pending／approved，拒绝码 `overall-user-only`、`overall-none`、`overall-invalid`，检查放在 reviewer 状态的通用拒绝之前）。`/map --json` 每个模块加 `overallDesign`，`interface.json` 写字段、状态取值与 reviewMark 的 `overall`。`verify-artifacts.sh` 接上 `overall_problems`。
   用例：`OverallDesign` 6 例、`OverallReviewMark` 3 例、`OverallConsistency` 2 例。**这一项先写了实现后写用例，没有先看到红**；第一次跑有 2 处失败（reviewer 状态的拒绝码不对），改顺序后全过。用例能不能拦住回归，留到 Checkpoint 1 用变异补证。`test_map_view.py` 的 `MODULE_KEYS` 加 `overallDesign`，124 例全过。
+- Task 4（2026-11-27）：`module_stage.milestone_blocking`（里程碑里每个模块的 `module_preset` 都是 `autopilot` 才为 False）；`milestone_stop` 不阻塞时事实行写「autopilot 档，不阻塞，写进汇报」、下一步为空（不替换成「先不开下一个模块」），状态码事实记 `report`。`/map --json` 的 `milestoneStop` 加 `blocking`，表格文字在不阻塞时加一句；`interface.json` 写上。用例 `MilestoneBlocking` 2 例先红（3 处失败 1 处报错）后绿；其余档位与改动前逐字相同由同一用例比对。`test_map_view.py` 的 `test_stop` 补 `blocking: True` 的预期。
+- Task 5（2026-11-27）：新流程模块在 `NEEDS_REGRESSION`、`NEEDS_PLAN`、`BUILDING`，没有停点（`stop_node` 为 None）、没有待批文档、不是模块或协调角色时，下一步末尾加「先用一句话告诉用户接下来做什么」。用例 `SayFirst` 2 例先红（3 个阶段都没有）后绿；写用例时 BUILDING 夹具的技术方案影响面没写路径，越界检查正确地停在中途 gate，夹具补上路径。phase-guard 516 例、`test_flow_v2`、`test_stop_rules`、`test_review_marker`、`test_map_view` 全过。

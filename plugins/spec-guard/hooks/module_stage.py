@@ -2313,6 +2313,12 @@ def describe(root: Path, host: str | None = None,
     return brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
 
 
+def milestone_blocking(root: Path, modules) -> bool:
+    """sg-gate-flow (rules 9-11): False only when every module of the milestone names the autopilot preset."""
+    from project_config import module_preset  # late: project_config is imported by callers of this module
+    return not modules or any(module_preset(root, module) != "autopilot" for module in modules)
+
+
 def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
     """milestone-stop: (fact, line, next step) for the first finished, unconfirmed milestone of a usage draft.
 
@@ -2334,6 +2340,14 @@ def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
     modules = [safe_fragment(item) for item in found["modules"]]
     usages = [safe_fragment(item) for item in found["usages"]]
     fact = ("stop", draft, milestone, tuple(modules))
+    if not milestone_blocking(root, found["modules"]):
+        # sg-gate-flow: an autopilot milestone is reported, never a stop; the confirmation can still be recorded later.
+        line = ("- 里程碑: `%s` 的 %s 已完成，未确认（模块 %s；autopilot 档，不阻塞，写进汇报；用户事后要确认时用 %s）"
+                % (draft, milestone, "、".join(modules), cmd["milestone-mark"]) if zh else
+                "- Milestone: %s of `%s` is done and not confirmed (modules %s; autopilot, not a stop -- put it in the "
+                "report; the user can still record it later with %s)" % (milestone, draft, ", ".join(modules),
+                                                                       cmd["milestone-mark"]))
+        return ("report", draft, milestone, tuple(modules)), line, ""
     if zh:
         line = "- 里程碑停点: `%s` 的 %s（模块 %s 已全部完成，未确认）" % (draft, milestone, "、".join(modules))
         step = ("先不开下一个模块：按 `%s` 里 %s 的典型用法 %s 实际跑一遍，把命令与输出摆给用户判定；用户明确说通过后，用 %s "
@@ -2890,6 +2904,12 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     if dg_step and not ms_step and role_kind not in ("module", "coordinator"):
         # usage-draft-gate: a multi-module batch reviews its usage draft before its first Spec.
         node, next_step = "map-review", dg_step
+    if (node is None and not review_step and stage in ("NEEDS_REGRESSION", "NEEDS_PLAN", "BUILDING")
+            and _v2(root, module) and role_kind not in ("module", "coordinator")):
+        # sg-gate-flow (rule 24): the next steps run on without a stop, so the user hears what comes before it starts.
+        next_step += (" 接着要连着做几步时，先用一句话告诉用户接下来做什么，再开始；这不是停点，不等回答。" if zh else
+                      " Before going on through several steps, tell the user in one sentence what comes next, then "
+                      "start; this is not a stop and needs no answer.")
     stop = stop_rules_block(node, zh) if role_kind not in ("module", "coordinator") else ""
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]

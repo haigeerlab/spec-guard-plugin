@@ -144,7 +144,8 @@ class MilestoneStopTest(unittest.TestCase):
     def test_stop(self):
         with self.project(self.DRAFT) as project:
             self.assertEqual(project.json()["milestoneStop"],
-                             {"file": "spec/usage/demo.md", "milestone": "M1", "modules": ["a"], "usages": ["U1"]})
+                             {"file": "spec/usage/demo.md", "milestone": "M1", "modules": ["a"], "usages": ["U1"],
+                              "blocking": True})
             self.assertIn("里程碑停点：spec/usage/demo.md 的 M1（模块 a 已全部完成，未确认）", project.run().stdout)
 
     def test_unreadable_draft_is_not_null(self):

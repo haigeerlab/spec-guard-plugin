@@ -354,5 +354,83 @@ class OverallConsistency(unittest.TestCase):
         self.assertEqual(self.problems("spec/overall/x.md"), [])
 
 
+class MilestoneBlocking(unittest.TestCase):
+    """R6: a finished, unconfirmed milestone does not hold autopilot modules back."""
+
+    def look(self, config):
+        with MapProject(config, ids=("a", "b", "c")) as project:
+            project.write("spec/usage/demo.md", draft(["a", "b"]))
+            for module in ("a", "b"):
+                project.write("spec/%s.md" % module, "# %s\n" % module)
+                project.write("tasks/%s/plan.md" % module, "# Plan\n")
+                project.write("tasks/%s/todo.md" % module, "- [x] done\n")
+            project.write("spec/c.md", "# c\n")
+            states = [module_stage.module_state(project.root, m) for m in ("a", "b", "c")]
+            fact, line, step = module_stage.milestone_stop(project.root, states, CMD, True)
+            stop = map_view.build(project.root)["milestoneStop"]
+            return line, step, stop
+
+    def test_autopilot_reports_without_stopping(self):
+        for config in ({"takeover": "autopilot"},
+                       {"takeover": {"preset": "autopilot", "release": "human"}},
+                       {"takeover": "none", "moduleTakeover": {"a": "autopilot", "b": "autopilot"}}):
+            with self.subTest(config=config):
+                line, step, stop = self.look(config)
+                self.assertIn("不阻塞", line)
+                self.assertEqual(step, "")
+                self.assertIs(stop["blocking"], False)
+
+    def test_anything_else_stops_as_before(self):
+        base = self.look(None)
+        self.assertIs(base[2]["blocking"], True)
+        self.assertIn("先不开下一个模块", base[1])
+        for config in ({"takeover": "merge"}, {"takeover": {"merge": "auto", "release": "auto-confirm"}},
+                       {"takeover": "autopilot", "moduleTakeover": {"b": "merge"}}):
+            with self.subTest(config=config):
+                self.assertEqual(self.look(config), base)
+
+
+SAY_FIRST = ("先用一句话告诉用户", "tell the user in one sentence")
+
+
+def approved_design(body="`src/a.py`"):
+    """tasks/a/design.md with every design section and the user's approval bound to it."""
+    text = "# 技术方案\n\n" + "".join("## %s\n\n%s\n\n" % (name, body) for name in DOC_SECTIONS["design"]["zh"])
+    return text.replace("\n\n", "\n\n%s\n" % review_approved_line(module_stage.review_codex_digest(
+        text.replace("\n\n", "\n\n<!-- spec-guard: review pending -->\n", 1))), 1)
+
+
+class SayFirst(unittest.TestCase):
+    """R11: before going on through several steps without a stop, say what comes next."""
+
+    def hint(self, files, spec=None):
+        with MapProject() as project:
+            project.write("spec/a.md", spec if spec is not None else requirement())
+            for path, text in files.items():
+                project.write(path, text)
+            return module_stage.describe(project.root)
+
+    def says(self, text):
+        return any(phrase in text for phrase in SAY_FIRST)
+
+    def test_said_when_the_next_steps_do_not_stop(self):
+        regression = "# r\n\n## 用例清单\n\n不涉及\n\n## 成功标准对照\n\n不涉及\n\n## 受影响的老功能\n\n不涉及\n"
+        cases = {"NEEDS_REGRESSION": {"tasks/a/design.md": approved_design()},
+                 "NEEDS_PLAN": {"tasks/a/design.md": approved_design(), "tasks/a/regression.md": regression},
+                 "BUILDING": {"tasks/a/design.md": approved_design(), "tasks/a/regression.md": regression,
+                              "tasks/a/plan.md": "# Plan\n\n## 任务\n\n- one\n\n## 检查点\n\n不涉及\n",
+                              "tasks/a/todo.md": "- [ ] one\n- [ ] 最终验收（gate）\n"}}
+        for stage, files in cases.items():
+            with self.subTest(stage=stage):
+                text = self.hint(files)
+                self.assertIn(stage, text)
+                self.assertTrue(self.says(text), text)
+
+    def test_not_said_while_a_gate_waits_or_for_old_flow(self):
+        self.assertFalse(self.says(self.hint({}, requirement(approved=False))))
+        self.assertFalse(self.says(self.hint({}, "# a\n\n<!-- spec-guard: review pending -->\n")))
+        self.assertFalse(self.says(self.hint({"tasks/a/design.md": approved_design().replace("`src/a.py`", "`src/b.py`", 1)})))
+
+
 if __name__ == "__main__":
     unittest.main()

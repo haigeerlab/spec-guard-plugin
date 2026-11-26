@@ -165,9 +165,10 @@
     "milestoneStop": {
       "appearsWhen": "always, whatever moduleConcurrency is (interface 1.13, spec/milestone-stop.md)",
       "fields": {
-        "milestoneStop": "top level; null when the project has no usage draft (spec/usage/*.md) or no milestone is waiting; {\"file\": \"spec/usage/<requirement>.md\", \"milestone\": \"M<n>\", \"modules\": [...], \"usages\": [\"U<n>\", ...]} for the first milestone (drafts by file name, milestones in table order) whose modules all have status done and which has no confirmation line naming exactly those modules; {\"error\": \"unreadable\", \"detail\": ...} when a draft cannot be read or names a module not in the map (never null in that case)"
+        "milestoneStop": "top level; null when the project has no usage draft (spec/usage/*.md) or no milestone is waiting; {\"file\": \"spec/usage/<requirement>.md\", \"milestone\": \"M<n>\", \"modules\": [...], \"usages\": [\"U<n>\", ...], \"blocking\": true|false} for the first milestone (drafts by file name, milestones in table order) whose modules all have status done and which has no confirmation line naming exactly those modules; {\"error\": \"unreadable\", \"detail\": ...} when a draft cannot be read or names a module not in the map (never null in that case)"
       },
-      "meaning": "the stage hint stops at this milestone until the user passes it and /spec-guard:milestone-mark records it; a caller that dispatches modules by this view should start no new module meanwhile, whichever milestone or draft it belongs to (modules not in any draft included), and lets modules already in progress finish; startable, stage and every other field are unchanged"
+      "blocking": "since 1.26 (spec/sg-gate-flow.md): false only when every module of the milestone names the autopilot preset (takeover.preset); the stage hint then only reports it and a caller does not hold new modules back. true otherwise, with the meaning below. The error object carries no blocking",
+      "meaning": "when blocking is true, the stage hint stops at this milestone until the user passes it and /spec-guard:milestone-mark records it; a caller that dispatches modules by this view should start no new module meanwhile, whichever milestone or draft it belongs to (modules not in any draft included), and lets modules already in progress finish; startable, stage and every other field are unchanged"
     },
     "takeover": {
       "appearsWhen": "always, on every module, whatever moduleConcurrency is (interface 1.15, spec/takeover-config.md)",
