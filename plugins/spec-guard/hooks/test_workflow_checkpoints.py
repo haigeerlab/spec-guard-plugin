@@ -157,12 +157,13 @@ class CheckpointContractTests(unittest.TestCase):
 
     def test_batch_review_and_continuous_build(self):
         batch = self.section("## 按需求批量前置审")
-        for phrase in ("批量批准", "activeModule", "Build order", "70%", "不自行开新会话", "`/clear`"):
+        for phrase in ("批量批准", "activeModule", "Build order", "不按上下文大小提醒", "不自行开新会话", "`/clear`"):
             self.assertIn(phrase, batch)
-        # quiet-injection (D6): the middle of a module gets no context hint, so the rule names none.
+        # quiet-injection (D6), remove-context-hint: no context hint at all, so the rule names no threshold.
         self.assertNotIn("80%", batch)
-        # context-hint-no-paste: one sentence, never the pasted handoff text.
-        for phrase in ("/compact", "一句话", "不贴交接文本"):
+        self.assertNotIn("70%", batch)
+        # context-hint-no-paste: never the pasted handoff text ("one sentence" went with the hint, remove-context-hint).
+        for phrase in ("/compact", "不贴交接文本"):
             self.assertIn(phrase, batch)
         self.assertNotIn("给出 `/spec-guard:handoff` 的交接文本", batch)
         # context-after-compact: /compact or /clear by relatedness; no new session, no handoff command.

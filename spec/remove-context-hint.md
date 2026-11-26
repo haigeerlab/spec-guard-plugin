@@ -1,6 +1,6 @@
 # Spec: remove-context-hint
 
-<!-- spec-guard: review approved b2b3ef6d578b -->
+<!-- spec-guard: review approved 30c3da9eec8d -->
 
 ## Objective
 
@@ -29,7 +29,7 @@
    - 对应的测试（`test-phase-guard.sh` 的边界行场景、`test_session_context.py` 里读数与无人值守的用例、`evals/hint-english-diff.sh` 里比对这一行的部分）。
 2. **不动什么**：SessionStart（compact）后的阶段恢复与「上下文刚被压缩」那句；位置行；宿主判断；`last_state`（quiet-injection 的状态码比对）；收件记账提示（`--received`）；项目根目录解析（`--resolve-root`）；其他所有阶段提示与停点规则。阶段判定、状态码不变。
 3. **会话事实的输出格式**：`session_context.py` 现在按行输出七项给 `phase-guard.sh`。删掉的几项不留空行占位，两边一起改成只剩用到的几项（两个文件都是本插件自己的，没有外部读取方）。
-4. **文档**：`docs/commands.md`、`docs/workflow.md`、`docs/design.md`、`commands/phase.md` 里讲这条提醒的句子删掉或改写；`docs/troubleshooting.md` 里 `/compact` 代码块那条与这一行无关，留着；历史目录（`docs/retirements/`、`docs/reports/`、`docs/releases/`）不改。CHANGELOG「未发布」加一条「移除」。
+4. **文档**：`docs/commands.md`、`docs/workflow.md`、`docs/design.md`、`commands/phase.md` 里讲这条提醒的句子删掉或改写；`docs/troubleshooting.md` 里 `/compact` 代码块那条与这一行无关，留着；历史目录（`docs/retirements/`、`docs/reports/`、`docs/releases/`）不改。共享检查点规则（`references/workflow-checkpoints.md`）里「连续构建时遇到模块边界的上下文提示」那段改为不再有这条提示（构建中发现，2026-11-26 用户「可以，加进边界并改」；钉住旧措辞「70%」的 `test_workflow_checkpoints.py` 断言随之改，用户同样回「可以，加进边界并改」）。CHANGELOG「未发布」加一条「移除」。
 5. **能力图**（Q2 A）：context-hint-thresholds、boundary-hint-70、boundary-hint-unknown-size、unattended-run-hint、unattended-long-first-record 等老模块的行留在能力图里不动（它们是已完成的历史，其中几个还有别的部分仍在用），本模块那一行写明删掉了它们的提示。
 6. **版本**：并进 0.97.0（同批已有 #512、#513）；版本号已是 0.97.0，本模块不改。不改接口（`interface.json` 不含这条提示）。
 
@@ -49,7 +49,7 @@
 
 ## 并行边界
 
-- 独占：`spec/remove-context-hint.md`、`tasks/remove-context-hint/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/phase-guard.sh`、`plugins/spec-guard/hooks/session_context.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test_session_context.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`evals/hint-english-diff.sh`、`plugins/spec-guard/commands/phase.md`、`docs/commands.md`、`docs/workflow.md`、`docs/design.md`、`CHANGELOG.md`、`spec/CAPABILITY-MAP.md`
+- 独占：`spec/remove-context-hint.md`、`tasks/remove-context-hint/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/phase-guard.sh`、`plugins/spec-guard/hooks/session_context.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test_session_context.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`evals/hint-english-diff.sh`、`plugins/spec-guard/commands/phase.md`、`docs/commands.md`、`docs/workflow.md`、`docs/design.md`、`CHANGELOG.md`、`spec/CAPABILITY-MAP.md`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`
 - 公共：无
 
 ## Open questions
