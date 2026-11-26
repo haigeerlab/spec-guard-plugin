@@ -147,3 +147,4 @@ delegate 侧已定（delegate-owner #22369，用户在 delegate 会话确认）�
 
 <!-- spec-guard: milestone M1 confirmed flow-doc-skeletons, project-sections -->
 <!-- spec-guard: milestone M2 confirmed requirement-confirm-gate, design-review, plan-auto-approve, takeover-redefine -->
+<!-- spec-guard: milestone M3 confirmed regression-doc-check, verification-criteria -->
