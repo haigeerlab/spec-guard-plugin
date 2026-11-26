@@ -1,6 +1,6 @@
 # Plan: takeover-config
 
-<!-- spec-guard: review approved -->
+<!-- spec-guard: review pending -->
 
 Spec：[spec/takeover-config.md](../../spec/takeover-config.md)（2026-11-21 批准，Q2 A：「接管到合并」预设包含 Spec）。
 
@@ -61,3 +61,27 @@ Spec：[spec/takeover-config.md](../../spec/takeover-config.md)（2026-11-21 批
 ## 未决问题
 
 - 无。
+
+## 返工：删除退役接口（2026-11-26，Spec 假设 11～13，Q1 A、Q2 A）
+
+## 预先声明
+
+- 公共路径：无
+- 外部依赖：无
+- 质量与工作区配置：无
+- 补丁：无
+
+## 返工架构决定
+
+- **只删「拿退役键算档位」这一条线**：`map_view` 的 `autonomy` 字段、`AUTONOMY_FIELDS`、对 `module_tiers` 与 `wider` 的调用；`project_config` 的 `_project_tier`、`module_tier`、`module_tiers`、`wider`（全仓只有这一处用）。
+- **识别与清理入口不动**（Q1 A）：`_RETIRED` 校验、`retired-key` 问题代码、`TIERS`（校验旧值要用）、`set` 拒绝、`unset` 可用、阶段提示过滤 `retired-key`、verify-artifacts 的警告，全部原样。
+- **接口 1.25**（Q2 A）：`interface.json` 删 `autonomyTier`、`moduleAutonomy` 两个条目与 `mapView.autonomy`，版本 1.24 → 1.25。`check-interface.py` 删 `_autonomy` 与两条取值比对，改为检查这三处**不再出现**（防止有人照旧文档加回去）。
+- **测试**：`test_map_view.py` 模块键集合去掉 `autonomy`，删 `AutonomyTest` 一类与快照里对 `autonomy` 的处理；加一例「模块对象没有 `autonomy` 键」。`test_project_config.py` 删 `module_tier` 那组断言，退役键的 show／check／set／unset 用例保留（AC10）。`test-checkers.sh` 删原来「缺 autonomyTier／autonomy 说明 → 报错」等反例，改为「接口里又出现 `autonomyTier`／`moduleAutonomy`／`mapView.autonomy` → 报错」三例。
+
+## 返工任务
+
+- **Task 6**：先改测试让它们红：`test_map_view.py`（没有 `autonomy` 键）、`test-checkers.sh`（三处又出现就报错）。再删代码与接口条目、升 1.25。验证：`test_map_view.py`、`test_project_config.py`、`check-interface.py`、`test-checkers.sh`。
+- **Task 7**：文档。`commands/config.md`、`skills/spec-guard-ops/SKILL.md`、`docs/commands.md`、`docs/concepts.md`、`docs/design.md`、`references/workflow-checkpoints.md` 里说 `/map` 还按这两个键算、或 `autonomy` 字段「下一版删」的句子改成已删除；`test_workflow_checkpoints.py` 跟着改；CHANGELOG「未发布」加一条「移除」，写明三个接口条目与接口 1.25。验证：快档、`git grep` 只剩历史记录（AC11）。
+- **Checkpoint 3（report）**：完整档三条全绿；变异（临时副本）：`map_view` 加回 `autonomy` 字段、`check-interface.py` 不查三处缺失，各自让用例变红；已安装的 0.96.2 与本分支比对：本仓库的阶段提示、verify-artifacts 逐字相同，`/map --json` 只差 `autonomy` 键与接口版本；临时项目里留着两个退役键时 `show`、`check`、`set`、`unset` 的输出逐字相同（AC10）。
+- **Checkpoint 4（gate）**：推送、开 PR；最终验收与合并合成一问；发 0.97.0 另取授权（两件都合并后）。拟回告：给 ecosystem-lead「接口 1.25 移除了三个退役条目」，发版时再通知一次。
+

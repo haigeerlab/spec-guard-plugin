@@ -8,3 +8,10 @@
 - [x] Task 5：说明文字 — `references/workflow-checkpoints.md`「自治档位与底线」开头一段改为接管档位（takeover、moduleTakeover、预设、原话、autonomyTier 已退役不映射），底线一段不动；`commands/config.md`（描述、可配置项表三行、takeover 与 moduleTakeover 的写法与 note）、`skills/spec-guard-ops/SKILL.md`（config 一节）、`docs/commands.md`（verify-artifacts 表、config 表与说明、`/map --json` 的 takeover）、`docs/concepts.md`（自治档位一行改为接管档位）。`test_workflow_checkpoints.py` 的档位断言改为新文字（改前 2 失败，改后 89 例通过）；`validate.sh --quick` 通过。`docs/design.md` 里 1.11 的 autonomyTier 历史描述没改（不在 Plan 的文件表里）。
 - [x] Checkpoint 1（report）：完整检查、变异验证与临时项目实跑 — 主机 macOS 27.2 arm64，系统 `/bin/bash` 3.2.57：`validate.sh` 通过，phase-guard 524 例、verify-artifacts 100 例通过，`codex-plugin-smoke.sh --selftest` 通过，ShellCheck 0.11.0（`-S warning`，本分支改过的 .sh）通过。变异（临时目录副本）：`module_takeovers` 忽略模块值 → `Takeover` 1 失败；`merge` 预设把 Spec 展开成 human → 1 失败；另有 Task 4 的 `retired-key` 过滤变异 → phase-guard 第 25 段失败。临时项目实跑：留着旧 autonomyTier、moduleAutonomy 时 `show` 标 retired、`check` 输出 `ok (ignored: retired-key)`；`set takeover merge` 预览列 `spec=codex plan=codex merge=auto release=human`；beta 设自定义含 `release: auto` 时出宽于项目 note 与两行发布限制提示；`/map --json` 读回四项与来源，旧 `autonomy` 照旧；`set autonomyTier` 退出 2，文件保留旧键。已就 module-crew 是否直接写旧键问 mc-coord（bridge）。
 - [x] Checkpoint 2（gate）：最终验收；通过后推送并开本模块 PR，合并由用户进行 — 2026-11-21 用户「验收通过」（针对 AC1–AC7 证据、Checkpoint 1、文件表与提交表、module_stage 3 行偏离 Plan、16 个文件超出并行边界的说明、mc-coord 对旧键读取的答复）；Spec 与 Plan 批准后未改。
+
+## 返工：删除退役接口（2026-11-26）
+
+- [ ] Task 6：删 `/map` 的 `autonomy`、`module_tier` 一线代码与三个接口条目，接口 1.25
+- [ ] Task 7：文档与 CHANGELOG
+- [ ] Checkpoint 3（report）：完整档、变异与老输出比对
+- [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
