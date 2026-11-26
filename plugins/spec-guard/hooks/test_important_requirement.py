@@ -126,5 +126,36 @@ class ImpactRiskPath(Important):
                 (self.root / "spec" / "CAPABILITY-MAP.md").unlink()
 
 
+class OwnDocsRiskPath(Important):
+    """plan-auto-approve rework (assumption 13, AC11, AC12): a v2 module's own documents in its boundary or impact are
+    not risk paths, its `tasks/<id>/` directory entry included; anything else on the list still is."""
+
+    V2 = "<!-- spec-guard: flow v2 tier=normal -->\n"
+
+    def check(self, exclusive, impact=None, marker=V2):
+        # set here, not in setUp: the inherited cases run with the parent's list
+        self.risk({"schema": "autopilot.risk-paths/v1", "T4": ["spec/**", "tasks/**", ".github/**"], "T3": []})
+        self.insert("alpha", specs={"alpha": marker + _spec(exclusive)})
+        if impact is not None:
+            (self.root / "tasks" / "alpha").mkdir(parents=True, exist_ok=True)
+            (self.root / "tasks" / "alpha" / "design.md").write_text("# d\n\n## 影响面\n\n%s\n" % impact,
+                                                                      encoding="utf-8")
+        return "risk-path" in important(self.root, "alpha")
+
+    def test_own_documents_are_not_risk_paths(self):
+        self.assertFalse(self.check("`spec/alpha.md`、`tasks/alpha/`、`src/a/`",
+                                    impact="- 改 `src/a/x.py`，写 `tasks/alpha/regression.md`"))
+
+    def test_another_listed_risk_path_still_counts(self):
+        for exclusive, impact in (("`spec/alpha.md`、`tasks/alpha/`、`.github/ci.yml`", None),
+                                  ("`spec/alpha.md`、`tasks/alpha/`", "- 改 `spec/beta.md`")):
+            with self.subTest(exclusive=exclusive, impact=impact):
+                self.assertTrue(self.check(exclusive, impact=impact))
+                (self.root / "spec" / "CAPABILITY-MAP.md").unlink()
+
+    def test_an_old_module_still_counts_its_own_documents(self):
+        self.assertTrue(self.check("`spec/alpha.md`、`tasks/alpha/`", marker=""))
+
+
 if __name__ == "__main__":
     unittest.main()

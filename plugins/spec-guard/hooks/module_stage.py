@@ -1620,6 +1620,8 @@ def important(root: Path, module: str) -> list:
     if _v2(root, module):
         # plan-auto-approve: a v2 design's impact section names what the module changes (old modules: unchanged)
         paths += impact_paths(read(root / "tasks" / module / "design.md"))
+        # rework (assumption 13): its own documents, or its tasks/<id>/ directory entry, are not risk paths
+        paths = [path for path in paths if not own_doc(module, path) and path != "tasks/%s/" % module]
     patterns = _risk_patterns(root)
     if patterns is None:
         if codex:

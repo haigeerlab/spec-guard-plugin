@@ -1230,6 +1230,15 @@ class PlanAutoApproveRuleTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
 
+    def test_own_documents_are_not_t4(self):
+        """plan-auto-approve rework (assumption 15): what the T4 check and the risk-path rule leave out, and what not."""
+        text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+        for phrase in ("新流程模块自己的这几份文档与能力图、`.agent/state.json` 不算",
+                       "`.agent/config.json`、用法草案、别的模块的文档与风险清单本身照旧算",
+                       "本模块自己的文档（`spec/<id>.md`、`tasks/<id>/` 下的 design、regression、plan、todo，或整个 `tasks/<id>/`）不算风险路径"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
     def test_stop_rules_point_the_same_way(self):
         for phrase in ("新流程模块的 Plan 不交审", "合并、发布照旧另问", "新流程模块因越界或碰 T4 停在这里",
                        "T4 路径使模块成为重要需求"):
