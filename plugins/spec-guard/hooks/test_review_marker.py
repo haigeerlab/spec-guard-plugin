@@ -893,6 +893,35 @@ class AcceptanceT4(unittest.TestCase):
             write("src/secret.py", "changed\n")
             self.assertIn("T4 file(s) changed", _outside(root, "alpha"))
 
+    def test_the_module_documents_do_not_stop_the_acceptance(self):
+        """plan-auto-approve rework (AC9): a list naming spec/** and tasks/** does not stop a module on its own docs."""
+        import json
+        import os
+        from review_mark import _outside
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+            env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+
+            def git(*args):
+                subprocess.run(["git", "-C", folder, *args], check=True, capture_output=True, env=env)
+
+            def write(relative, text):
+                (root / relative).parent.mkdir(parents=True, exist_ok=True)
+                (root / relative).write_text(text, encoding="utf-8")
+            write("spec/CAPABILITY-MAP.md", MAP.replace("| beta | y | alpha |\n", "").replace(" → beta", ""))
+            write(".github/autopr/risk-paths.json", json.dumps({"schema": "autopilot.risk-paths/v1",
+                                                                "T4": ["spec/**", "tasks/**"], "T3": []}))
+            git("init", "-q")
+            git("add", "-A")
+            git("commit", "-qm", "base")
+            write("spec/alpha.md", "# a\n\n<!-- spec-guard: flow v2 tier=bug -->\n")
+            write("tasks/alpha/plan.md", "# Plan\n")
+            write("tasks/alpha/todo.md", "- [x] t\n")
+            git("add", "-A")
+            git("commit", "-qm", "spec")
+            self.assertIsNone(_outside(root, "alpha"))
+
 
 class AcceptanceWorktrees(AcceptanceFixture):
     """codex-route-guard (AC4, AC5): shared records, legacy fallback and unchanged ancestry checks."""

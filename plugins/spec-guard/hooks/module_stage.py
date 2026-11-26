@@ -2294,6 +2294,17 @@ def acceptance_step(root: Path, module: str, stage: str, cmd: dict, zh: bool) ->
         "Write the drafted reply into the todo and do not send it until the user confirms." % (start_en, module, flow_files, cmd["review-mark"], entry))
 
 
+OWN_DOCS = ("design.md", "regression.md", "plan.md", "todo.md")  # plan-auto-approve rework: the v2 documents in tasks/<id>/
+# plan-auto-approve rework (Q1 A, Q3 A): flow bookkeeping a v2 module writes as it starts.  Not module_scope.FLOW_FILES:
+# that one holds .agent/config.json (takeover levels) and goes with spec/usage/, which both stay T4.
+T4_FLOW_FILES = ("spec/CAPABILITY-MAP.md", ".agent/state.json")
+
+
+def own_doc(module: str, path: str) -> bool:
+    """plan-auto-approve rework: the path is one of the module's own five documents (names only, nothing is read)."""
+    return path == "spec/%s.md" % module or any(path == "tasks/%s/%s" % (module, name) for name in OWN_DOCS)
+
+
 def t4_hits(root: Path, module: str, base: str | None = None) -> dict:
     """plan-auto-approve: {"status", "hits", "stops"} -- the changed files on the T4 list since the module's baseline.
 
@@ -2309,6 +2320,8 @@ def t4_hits(root: Path, module: str, base: str | None = None) -> dict:
     files = changed_files(root, base) if base else None
     if files is None:
         return {"status": "no-base", "hits": [], "stops": False}
+    if _v2(root, module):  # rework (assumption 12): its own documents and the flow bookkeeping are not T4
+        files = [(status, path) for status, path in files if not own_doc(module, path) and path not in T4_FLOW_FILES]
     hits = sorted({path for _, path in files if any(risk_hit(pattern, path) for pattern in patterns)})
     return {"status": "ok", "hits": hits, "stops": bool(hits) and not important(root, module)}
 

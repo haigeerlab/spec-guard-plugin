@@ -1206,6 +1206,84 @@ class T4Test(FlowOverreachTest):
         self.assertIn("T4 路径：没有开工基线可比", hint(self.project))
 
 
+class T4OwnDocsTest(unittest.TestCase):
+    """plan-auto-approve rework (assumption 12): a v2 module's own five documents, the map and `.agent/state.json`
+    are not T4; everything else on the list still is (AC9, AC10, AC12)."""
+
+    RISK = {"schema": "autopilot.risk-paths/v1", "T4": ["spec/**", "tasks/**", ".agent/**", ".github/**"], "T3": []}
+
+    def setUp(self):
+        self.project = Project().__enter__()  # one module: a batch of two would make it important by rule
+        self.addCleanup(self.project.__exit__, None, None, None)
+        self.project.write("src/a/old.py", "x\n")
+        self.project.write("spec/b.md", "# b\n")
+        self.project.write("tasks/b/plan.md", "# Plan\n")
+        self.project.write("spec/usage/draft.md", "# draft\n")
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(self.RISK))
+        hint(self.project)  # writes the config and state the hint reads, so they are part of the baseline
+        self.project.write(".agent/state.json", json.dumps({"activeModule": ""}))
+        git(self.project.root, "init", "-q")
+        self.commit("base")
+        self.base = git(self.project.root, "rev-parse", "HEAD").strip()
+
+    def commit(self, message):
+        git(self.project.root, "add", "-A")
+        git(self.project.root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", message)
+
+    def docs(self, v2=True):
+        if v2:
+            approved_spec(self.project, "normal")
+        else:
+            self.project.write("spec/a.md", "# Spec: a\n\n<!-- spec-guard: review approved -->\n")
+        self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`"))
+        self.project.write("tasks/a/regression.md", "# r\n")
+        self.project.write("tasks/a/plan.md", "# Plan\n\n## 任务\n\n- t\n")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n- [ ] 最终验收（gate）\n")
+        path = self.project.root / "spec" / "CAPABILITY-MAP.md"
+        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        self.project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
+        self.commit("docs")
+        self.project.write("src/a/old.py", "changed\n")
+
+    def test_own_documents_and_flow_bookkeeping_are_not_t4(self):
+        self.docs()
+        self.assertEqual(module_stage.t4_hits(self.project.root, "a"), {"status": "ok", "hits": [], "stops": False})
+        text = hint(self.project)
+        self.assertNotIn("T4 路径", text)
+        self.assertNotIn("停点规则（中途 gate）", text)
+
+    def test_everything_else_on_the_list_still_stops(self):
+        self.docs()
+        for path in ("spec/b.md", "tasks/b/plan.md", "tasks/a/notes.md", "spec/usage/draft.md",
+                     ".github/autopr/risk-paths.json"):
+            with self.subTest(path=path):
+                original = (self.project.root / path).read_text(encoding="utf-8") if (
+                    self.project.root / path).exists() else None
+                changed = json.dumps({**self.RISK, "notes": ["x"]}) if path.endswith(".json") else (
+                    (original or "") + "changed\n")
+                self.project.write(path, changed)
+                try:
+                    found = module_stage.t4_hits(self.project.root, "a")
+                    self.assertEqual((found["hits"], found["stops"]), ([path], True))
+                finally:
+                    if original is None:
+                        (self.project.root / path).unlink()
+                    else:
+                        self.project.write(path, original)
+        config = self.project.root / ".agent" / "config.json"
+        config.write_text(config.read_text(encoding="utf-8").replace("}", ', "moduleTakeover": {"a": "merge"}}'),
+                          encoding="utf-8")
+        found = module_stage.t4_hits(self.project.root, "a")
+        self.assertEqual((found["hits"], found["stops"]), ([".agent/config.json"], True))
+
+    def test_an_old_module_still_counts_its_own_documents(self):
+        self.docs(v2=False)
+        found = module_stage.t4_hits(self.project.root, "a", self.base)
+        self.assertEqual(found["hits"], [".agent/state.json", "spec/CAPABILITY-MAP.md", "spec/a.md",
+                                         "tasks/a/design.md", "tasks/a/plan.md", "tasks/a/regression.md",
+                                         "tasks/a/todo.md"])
+
+
 
 # regression-doc-check: the case format, its parser and the per-case sha256 (Task 1).
 CASES_ZH = """# 回归
