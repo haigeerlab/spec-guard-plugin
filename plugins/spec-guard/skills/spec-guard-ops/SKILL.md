@@ -204,7 +204,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - 接管模块（档位任一项不是 human）构建中做越界检查：`module_scope.py check --module <id> --format json`（`--base` 可省，默认取 Spec 第一次提交的父提交），
   已批准 Plan 的预先声明公共路径记为 `declared`；阶段提示报越界或没有并行边界时停下，逐个说明交用户。
 - `autonomyTier`、`moduleAutonomy`：已退役、不映射。文件里还有时不生效，`show` 标为已退役，不能再 `set`，可以 `unset` 删除；`/map --json` 的 `autonomy`
-  字段本版仍按它们计算、标为 deprecated。
+  字段已在 0.97.0（接口 1.25）删除。
 
 设置或取消先预览，用户确认后才加 `--confirm`；只写 `.agent/config.json` 这一个文件并读回核对：
 

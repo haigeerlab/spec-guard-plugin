@@ -406,7 +406,7 @@ class RetiredAutonomy(unittest.TestCase):
     """takeover-config (C1, Spec assumption 8): autonomyTier and moduleAutonomy are retired, not mapped.
 
     A file that still has them stays valid, shows them as retired and keeps them on writes; they can be removed
-    but not set.  module_tier still reads them, only for /map's deprecated autonomy field.
+    but not set.  Nothing reads them any more (the rework removed /map's autonomy field and module_tier).
     """
 
     OLD = {"version": 1, "reviewCadence": "combined", "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed"}}
@@ -464,20 +464,6 @@ class RetiredAutonomy(unittest.TestCase):
             self.assertEqual(code, 0, out)
             document = json.loads(project.config.read_text(encoding="utf-8"))
             self.assertEqual((document["autonomyTier"], document["moduleAutonomy"]), ("standard", {"alpha": "relaxed"}))
-
-    def test_module_tier_still_reads_them(self):
-        from project_config import module_tier
-        with Project() as project:
-            self.assertEqual(module_tier(project.root, "alpha"), ("strict", "default"))
-        with Project({"version": 1, "autonomyTier": "standard"}) as project:
-            self.assertEqual(module_tier(project.root, "alpha"), ("standard", "autonomyTier"))
-        with Project({"version": 1, "autonomyTier": "fast"}) as project:
-            self.assertEqual(module_tier(project.root, "alpha"), ("strict", "default (config invalid)"))
-        with Project({"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "relaxed"}}) as project:
-            self.assertEqual(module_tier(project.root, "alpha"), ("relaxed", "moduleAutonomy"))
-            self.assertEqual(module_tier(project.root, "beta"), ("standard", "autonomyTier"))
-        with Project({"version": 1, "autonomyTier": "standard", "moduleAutonomy": {"alpha": "fast"}}) as project:
-            self.assertEqual(module_tier(project.root, "alpha"), ("standard", "default (config invalid)"))
 
     def test_phase_hint_ignores_them(self):
         from module_stage import config_lines

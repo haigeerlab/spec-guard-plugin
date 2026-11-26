@@ -29,7 +29,7 @@ from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, ac
 from checkout_role import MARKER, read_marker
 from module_scope import Scope, ScopeError, overlap, parse as parse_scope
 from project_config import (ITEMS as TAKEOVER_ITEMS, SCOPE_PROJECT, load as load_config, module_concurrency,
-                            module_takeovers, module_tiers, summary as config_summary, takeover_wider, wider)
+                            module_takeovers, summary as config_summary, takeover_wider)
 import usage_draft
 
 SCHEMA_VERSION = 1
@@ -61,7 +61,6 @@ DESIGN_APPROVAL_FIELDS = ("status", "approvedBy", "reviewerVendor", "sameVendor"
 DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor")
 # interface.json mapView.flow (flow-doc-skeletons, interface 1.18): the steps of a flow v2 module before its Plan.
 FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
-AUTONOMY_FIELDS = ("tier", "source", "widerThanProject")  # interface.json mapView.autonomy (module-autonomy, interface 1.14; deprecated in 1.15)
 # interface.json mapView.takeover (takeover-config, interface 1.15)
 # takeover-redefine (interface 1.22): the three items, the deprecated old-flow pair, and why design is forced.
 TAKEOVER_FIELDS = (*TAKEOVER_ITEMS, "spec", "plan", "designForcedBy", "source", "widerThanProject", "narrowed")
@@ -479,7 +478,6 @@ def build(root: Path) -> dict:
         else:
             status[module] = "not_ready"
 
-    project_tier, tiers = module_tiers(root, order)
     project_takeover, takeovers = module_takeovers(root, order)
     config_values = load_config(root)[0]
     narrowings, own = config_values.get("takeoverNarrowed", {}), config_values.get("moduleTakeover", {})
@@ -518,8 +516,6 @@ def build(root: Path) -> dict:
             "externalReview": _external_review(root, module),
             "gates": _gates(todo) if todo_path.is_file() else None,
             "deferred": [{"item": item, "resumeWhen": resume} for item, resume in state["deferred"]],
-            "autonomy": {"tier": tiers[module][0], "source": tiers[module][1],
-                         "widerThanProject": wider(tiers[module][0], project_tier)},
             "takeover": {**_effective_takeover(root, module, takeovers[module][0]), "source": takeovers[module][1],
                          "widerThanProject": takeover_wider(takeovers[module][0], project_takeover),
                          "narrowed": _narrowed(narrowings.get(module if module in own else SCOPE_PROJECT))},

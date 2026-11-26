@@ -2,6 +2,13 @@
 
 ## [未发布]
 
+### 移除
+
+- **退役的 `autonomyTier`、`moduleAutonomy` 接口与 `/map --json` 的 `autonomy` 字段（takeover-config 返工）。** 它们 0.91.0（接口 1.15）起就已退役、只留一版过渡；
+  功能盘点核对过 autopilot、module-crew、decision-inbox 的代码，都不再读。现在 `interface.json` 删掉这三个条目，接口升到 **1.25**（次版本：module-crew 读 spec-guard 接口时要求主版本一致）；
+  `project_config` 里只为这个字段算档位的 `module_tier` 等函数一并删除。配置文件里还留着这两个键时照旧：不生效、`show` 标已退役、verify-artifacts 只警告、
+  不能 `set`、可以 `unset` 删掉。
+
 ### 修复
 
 - **返工分支同步过默认分支后，越界检查不再误报（rework-scope-baseline）。** 0.96.2 起返工从返工开始的提交算起，但把默认分支 merge 进返工分支、

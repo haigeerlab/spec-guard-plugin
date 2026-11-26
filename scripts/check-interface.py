@@ -20,7 +20,7 @@ import regression_view  # noqa: E402
 import verification  # noqa: E402
 
 ENTRIES = ("moduleConcurrency", "scopeCheck", "checkoutRole", "reviewMark", "gateTick",
-           "scopeOverlap", "declaredScope", "autonomyTier", "moduleAutonomy",
+           "scopeOverlap", "declaredScope",
            "takeover", "moduleTakeover", "takeoverNarrow")  # crew-interface: 1.1; gate-tick: 1.7;
 # scope-overlap-interface: 1.10; pre-declared-scope and autonomy-tier: 1.11; module-autonomy: 1.14; takeover-config: 1.15
 MAP_VIEW_KEYS = ("command", "schemaVersion", "contract", "exitCodes", "values")
@@ -54,7 +54,7 @@ def problems(path: Path) -> list:
             found.append("mapView.values.%s 的取值为 %s，代码为 %s"
                          % (key, sorted(got) if isinstance(got, dict) else got, sorted(expected)))
     found += _scripts(path, "mapView.command", view.get("command"))
-    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _design_approval(view) + _flow(view) + _autonomy(view) + _takeover_view(view) + _concurrency(path, data, view)
+    return (found + _progress_facts(view) + _deferral(view) + _milestone(view) + _acceptance(view) + _review_rounds(view) + _design_approval(view) + _flow(view) + _autonomy_gone(data, view) + _takeover_view(view) + _concurrency(path, data, view)
             + _review_kinds(path, data) + _regression_view(path, data) + _verification(path, data, view))
 
 
@@ -158,15 +158,15 @@ def _flow(view: dict) -> list:
     return found
 
 
-def _autonomy(view: dict) -> list:
-    """module-autonomy: interface 1.14 describes every per-module autonomy field map_view writes."""
-    block = view.get("autonomy")
-    fields = block.get("fields") if isinstance(block, dict) else None
-    if not isinstance(fields, dict):
-        return ["mapView 缺少 autonomy 说明"]
-    if set(fields) != set(map_view.AUTONOMY_FIELDS):
-        return ["mapView.autonomy.fields 为 %s，代码为 %s" % (sorted(fields), sorted(map_view.AUTONOMY_FIELDS))]
-    return []
+RETIRED_ENTRIES = ("autonomyTier", "moduleAutonomy")  # takeover-config rework: removed in interface 1.25
+
+
+def _autonomy_gone(data: dict, view: dict) -> list:
+    """takeover-config rework (1.25): the retired entries and /map's autonomy field stay removed."""
+    found = ["入口 %s 已在 1.25 删除，不应再出现" % key for key in RETIRED_ENTRIES if key in data]
+    if "autonomy" in view:
+        found.append("mapView.autonomy 已在 1.25 删除，不应再出现")
+    return found
 
 
 def _takeover_view(view: dict) -> list:
@@ -227,8 +227,6 @@ def _concurrency(path: Path, data: dict, view: dict) -> list:
               ("checkoutRole.values.role", data["checkoutRole"].get("values", {}).get("role"), set(checkout_role.ROLE_KINDS),
                lambda key: key.split()[0]),
               ("moduleConcurrency.values", data["moduleConcurrency"].get("values"), set(project_config.CONCURRENCY), None),
-              ("autonomyTier.values", data["autonomyTier"].get("values"), set(project_config.TIERS), None),
-              ("moduleAutonomy.values", data["moduleAutonomy"].get("values"), set(project_config.TIERS), None),
               ("scopeOverlap.values.error", data["scopeOverlap"].get("values", {}).get("error"),
                set(module_scope.OVERLAP_ERRORS), None),
               ("declaredScope.values.error", data["declaredScope"].get("values", {}).get("error"),

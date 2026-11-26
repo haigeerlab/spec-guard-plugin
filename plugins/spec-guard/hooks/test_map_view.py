@@ -23,7 +23,7 @@ TOP_KEYS = {"schemaVersion", "generatedAt", "generator", "project", "head", "sta
 MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step", "progress",
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
-               "autonomy", "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
+               "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
                "requirementConfirm", "designApproval", "verification"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
@@ -155,46 +155,20 @@ class MilestoneStopTest(unittest.TestCase):
             self.assertIn("里程碑停点：未判定", project.run().stdout)
 
 
-class AutonomyTest(unittest.TestCase):
-    """module-autonomy: each module's effective tier and its source; the text table is unchanged."""
-    ROWS = [("a", "基础", "—"), ("b", "下游", "a")]
+class RetiredAutonomyTest(unittest.TestCase):
+    """takeover-config rework (assumptions 11, 13): /map no longer carries the retired autonomy field; interface 1.25."""
 
-    def project(self, config=None):
-        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n"}
-        if config is not None:
-            files[".agent/config.json"] = json.dumps(dict(version=1, **config))
-        return Project(self.ROWS, ["a", "b"], files)
+    def test_no_autonomy_field(self):
+        files = {"spec/a.md": "# a\n", "tasks/a/plan.md": "# Plan\n", "tasks/a/todo.md": "- [x] one\n",
+                 ".agent/config.json": json.dumps({"version": 1, "autonomyTier": "standard",
+                                                   "moduleAutonomy": {"a": "relaxed"}})}
+        with Project([("a", "基础", "—")], ["a"], files) as project:
+            for module in project.json()["modules"]:
+                self.assertNotIn("autonomy", module)
 
-    def autonomy(self, project):
-        return {m["id"]: m["autonomy"] for m in project.json()["modules"]}
-
-    def test_without_config(self):
-        with self.project() as project:
-            self.assertEqual(self.autonomy(project), {
-                "a": {"tier": "strict", "source": "default", "widerThanProject": False},
-                "b": {"tier": "strict", "source": "default", "widerThanProject": False}})
-
-    def test_module_entry_and_project_tier(self):
-        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "relaxed", "b": "strict"}}) as project:
-            self.assertEqual(self.autonomy(project), {
-                "a": {"tier": "relaxed", "source": "moduleAutonomy", "widerThanProject": True},
-                "b": {"tier": "strict", "source": "moduleAutonomy", "widerThanProject": False}})
-        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "standard"}}) as project:
-            self.assertEqual(self.autonomy(project), {
-                "a": {"tier": "standard", "source": "moduleAutonomy", "widerThanProject": False},
-                "b": {"tier": "standard", "source": "autonomyTier", "widerThanProject": False}})
-
-    def test_invalid_entries_fall_back(self):
-        with self.project({"autonomyTier": "standard", "moduleAutonomy": {"a": "fast"}}) as project:
-            self.assertEqual(self.autonomy(project)["a"],
-                             {"tier": "standard", "source": "default (config invalid)", "widerThanProject": False})
-
-    def test_text_table_unchanged(self):
-        with self.project() as plain:
-            baseline = steady(plain.run().stdout, plain.root)
-        with self.project({"moduleAutonomy": {"a": "relaxed"}}) as project:
-            self.assertEqual(steady(project.run().stdout, project.root), baseline)
-
+    def test_interface_version(self):
+        data = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["interface"], "1.25")  # bump together with interface.json
 
 
 class TakeoverTest(unittest.TestCase):
@@ -284,13 +258,11 @@ class TakeoverTest(unittest.TestCase):
         with self.project() as project:
             self.assertIsNone(self.takeover(project)["a"]["narrowed"])
 
-    def test_autonomy_and_text_unchanged(self):
+    def test_text_unchanged(self):
         with self.project() as plain:
             baseline = steady(plain.run().stdout, plain.root)
-            autonomy = [m["autonomy"] for m in plain.json()["modules"]]
         with self.project({"takeover": "merge", "moduleTakeover": {"a": "none"}}) as project:
             self.assertEqual(steady(project.run().stdout, project.root), baseline)
-            self.assertEqual([m["autonomy"] for m in project.json()["modules"]], autonomy)
 
 
 class CodexReviewTest(unittest.TestCase):
@@ -1311,7 +1283,6 @@ def snapshot(project):
     data.pop("generatedAt")
     data.pop("reviewCadence")  # map-progress-facts: its source reports an invalid config; checked in ProgressFactsTest
     for module in data["modules"]:
-        module.pop("autonomy")  # module-autonomy: its source reports an invalid config too; checked in AutonomyTest
         module.pop("takeover")  # takeover-config: same, checked in TakeoverTest
     done = project.run()
     assert done.returncode == 0, done.stderr

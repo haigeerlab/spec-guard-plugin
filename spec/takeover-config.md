@@ -1,6 +1,6 @@
 # Spec: takeover-config
 
-<!-- spec-guard: review approved b738ecacdff4 -->
+<!-- spec-guard: review approved e4e87436357e -->
 
 ## Objective
 
@@ -15,6 +15,10 @@
 
 登记：S101 自动接管，合并方案 r2、r3 经用户批准（总账 `bfce091`、`1d5fd45`、`c7c0d48`；autopr-design #21876，ecosystem-lead #21841、
 #21864、#21883 转述）。用户在本会话确认需求「说完了」、确认插入能力图「确认插入；Q1 B」。账本 T1T36MR。
+
+**返工（2026-11-26，0.97.0）**：假设 8 说好的「下一版删」一直没做。功能盘点核对过三家调用方（autopilot、module-crew、decision-inbox）的代码，已经没有谁读 `/map` 的 `autonomy` 字段、
+`interface.json` 的 `autonomyTier`／`moduleAutonomy` 条目。用户经 ecosystem-lead 转达「按你的建议做」（#23169），在本会话回「两件都做，Claude 写码」；返工 Spec 2026-11-26 用户回「批准；Q1 A；Q2 A」。
+本次只删死代码与退役接口，见假设 11～13；module-crew 那边自己的读取代码由 ecosystem-lead 另请它删。
 
 ## Assumptions
 
@@ -53,6 +57,16 @@
     `interface.json` 新增 `takeover`、`moduleTakeover` 条目，`autonomyTier`、`moduleAutonomy` 与 `mapView.autonomy` 标 retired／deprecated。
 11. **旧版本兼容**：0.68.0 起不认识的键只忽略；说明与 CHANGELOG 提醒「团队都升级后再设置」。版本号不在本模块改（0.91.0 在 `codex-final-acceptance`）。
 
+11. **删掉什么**（返工）：
+    - `/map --json` 每个模块的 `autonomy` 字段（`map_view.AUTONOMY_FIELDS` 与计算它的代码）；
+    - `project_config` 里只为它服务的 `module_tier`、`project_tier`（读 `autonomyTier`／`moduleAutonomy` 算档位）；
+    - `interface.json` 的 `autonomyTier`、`moduleAutonomy` 两个条目与 `mapView.autonomy`；`check-interface.py`、`scripts/test-checkers.sh` 夹具里对应的比对；
+    - 文档里描述这两个键「还在 `/map` 里算」的句子。
+12. **文件里还留着这两个键怎么办**（返工，Q1 A）：照旧认作 `retired-key`——不生效、`show` 标「已退役」、`check` 与 verify-artifacts 只警告、
+    `set` 拒绝、`unset` 可用。只删「拿它们算档位」的代码，留下识别与清理的入口。
+13. **接口 1.25**（返工，Q2 A）：删的是 1.15 起就标了 deprecated、没人读的字段，按次版本升；不升 2.0，因为 module-crew 读 spec-guard 接口时要求主版本一致，
+    升 2.0 会让它整体不认。CHANGELOG 与发版通知写明「移除了 `mapView.autonomy`、`autonomyTier`、`moduleAutonomy` 三个接口条目」。版本号沿用同批的 0.97.0，本返工不再改。
+
 ## Contract
 
 ### C1 配置（`hooks/project_config.py`）
@@ -90,16 +104,29 @@
 - **AC6** verify-artifacts：能力图上没有的 id、已退役的键各报警告不判失败；不合法值判失败（`test-verify-artifacts.sh`）。
 - **AC7** `interface.json` 1.15，`check-interface.py` 通过，改掉字段名时变红；`validate.sh`、`test-phase-guard.sh`、`test-verify-artifacts.sh` 全绿。
 
+- **AC9**（返工）`/map --json` 的模块对象里没有 `autonomy` 键，其余键与改前相同；`interface.json` 版本 1.25，没有 `autonomyTier`、`moduleAutonomy`、`mapView.autonomy`；`check-interface.py` 与 `test-checkers.sh` 通过。
+- **AC10**（返工）文件里还有 `autonomyTier`／`moduleAutonomy` 时，`show`、`check`、verify-artifacts、`set`、`unset` 的结果与 0.96.2 相同（AC3 不变）；阶段提示不变。
+- **AC11**（返工）仓库里除 CHANGELOG、`spec/`、`tasks/`、`docs/releases/` 的历史记录外，没有代码或文档再说 `/map` 会按这两个键计算。
+
+## Open questions（返工）
+
+- **Q1 文件里还留着这两个键怎么办？**（2026-11-26 用户选 A）
+  - A（推荐）：照旧认作 `retired-key`，警告、`unset` 可清（假设 12）。不打扰还没清的项目，代码只多留一个识别分支。
+  - B：当成不认识的键（`unknown-key`），只忽略。代价：提示里不再说它们是退役键、该改设 `takeover`；`unset` 能不能清要看不认识的键的规则。
+- **Q2 接口版本怎么升？**（2026-11-26 用户选 A）
+  - A（推荐）：1.24 → 1.25（假设 13）。
+  - B：升 2.0。代价：module-crew 现在会因主版本不一致整体不认 spec-guard，要它同步改。
+
 ## Boundaries
 
 - **会做**：C1～C4 及回归。
-- **先问再做**：改阶段提示或停点规则的行为；改预设的展开；删掉 `autonomy` 字段（本版只标 deprecated）。
+- **先问再做**：改阶段提示或停点规则的行为；改预设的展开；删掉 `autonomy` 字段（本版只标 deprecated；返工时用户已同意删，见假设 11）。
 - **不做**：按档位放行任何事（后续模块）；收窄入口与恢复限档（`takeover-narrow`）；发布限制的拦截（autopilot）；改 module-crew、autopilot 的读取方；
   改版本号与发版。
 
 ## 并行边界
 
-- 独占：`spec/takeover-config.md`、`tasks/takeover-config/`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/commands/config.md`
+- 独占：`spec/takeover-config.md`、`tasks/takeover-config/`、`plugins/spec-guard/hooks/project_config.py`、`plugins/spec-guard/hooks/test_project_config.py`、`plugins/spec-guard/commands/config.md`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`scripts/test-checkers.sh`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/skills/spec-guard-ops/SKILL.md`、`docs/commands.md`、`docs/concepts.md`、`docs/design.md`、`CHANGELOG.md`
 - 公共：无
 
 ## 文档建议
