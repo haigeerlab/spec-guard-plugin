@@ -1898,10 +1898,17 @@ class ReworkOverreachTest(FlowOverreachTest):
         self.assertNotEqual(module_scope.scope_base(self.project.root, "a"), module_scope.default_base(self.project.root, "a"))
 
     def test_merge_at_base_reads_the_start_of_the_module(self):
+        import module_scope
         import review_mark
-        self.rework()
+        self.build()
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n")
+        self.commit("done")
+        # widened after the module was done and before the rework: the rework base sees merge=auto, the start does not
         self.project.write(".agent/config.json", json.dumps({"version": 1, "takeover": "merge"}))
-        self.commit("widen later")
+        self.commit("widen")
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n- [ ] 返工\n")
+        self.commit("rework")
+        self.assertIsNotNone(module_scope.rework_info(self.project.root, "a"))
         self.assertEqual(review_mark._merge_at_base(self.project.root, "a"), "human")
 
 
