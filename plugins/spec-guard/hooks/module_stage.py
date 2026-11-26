@@ -1168,25 +1168,10 @@ def unmerged_commits(root: Path) -> tuple | None:
     return int(count), ref[len(prefix):] if ref.startswith(prefix) else ref
 
 
-# context-hint-no-paste: the agent says one sentence and never pastes handoff text.
-NO_PASTE = "do not paste handoff text"
-# slash-command-code-block: a host that adds a Run button to shell-tagged code blocks sends `/compact` to a
-# terminal, so the block must not carry a shell language tag and the user is told where the command goes.
-SLASH_BLOCK = ("it is a slash command for the chat message box, not a shell command, so give the code block no "
-               "language tag or `text` (never bash, sh, zsh or shell) and tell the user in one sentence to send it "
-               "in the message box, not to run it in a terminal")
-
-# context-after-compact: free context in place -- /compact for related work, /clear for unrelated work (the
-# hosts' documented criterion); never suggest a new session, which loses the peers a session talks to.
-FREE_BOUNDARY = ("Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next "
-                 "work is unrelated; " + NO_PASTE + ". "
-                 "This stage summary carries over, the conversation does not need to.")
-
 # codex-command-wording: the commands the injection names, per host. None (host unknown) keeps the wording from
 # before the change, word for word. Codex plugins expose skills, not slash commands ($name mentions them), and
 # Codex's /compact takes no inline text (codex-rs/tui/src/slash_command.rs, supports_inline_args); Claude Code's
-# `/compact [instructions]` does (code.claude.com/docs/en/commands). Only /compact and /clear are typed by the
-# user, so only they come as a ready-to-copy command.
+# `/compact [instructions]` does (code.claude.com/docs/en/commands).
 COMMANDS = {
     None: {
         "add-module": "/spec-guard:add-module (Codex: spec-guard-ops add-module)",
@@ -1198,7 +1183,6 @@ COMMANDS = {
         "milestone-mark": "`/spec-guard:milestone-mark` (Codex: spec-guard-ops milestone-mark)",
         "plan": "`/plan`",
         "build": "`/build`",
-        "free-next": FREE_BOUNDARY,
         # delegate-interface-check: %(review)s and %(doctor)s come from delegate's interface.json or its defaults.
         "delegate-review": ("`%(review)s` (Codex: `delegate:delegate-routing`) (whether it can run is decided by "
                             "`%(doctor)s`)"),
@@ -1211,13 +1195,7 @@ COMMANDS["claude"] = dict(COMMANDS[None], **{
     "milestone-mark": "`/spec-guard:milestone-mark`",
     "delegate-review": "`%(review)s` (whether it can run is decided by `%(doctor)s`)",
     "doc-verify": "`/spec-guard:documentation-verification %s`",
-    "free-next": ("Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence "
-                  "focus on the next module and its next step, filled in, or /clear if the next work is unrelated; "
-                  + SLASH_BLOCK + "; " + NO_PASTE
-                  + ". This stage summary carries over, the conversation does not need to."),
 })
-CODEX_COMPACT = ("one ready-to-copy command in its own code block: /compact (Codex's /compact takes no focus text), "
-                 "or /clear if the next work is unrelated; " + SLASH_BLOCK + "; " + NO_PASTE + ".")
 COMMANDS["codex"] = {
     "add-module": "`$spec-guard-ops` add-module",
     "verify": "`$spec-guard-ops` verify-artifacts",
@@ -1228,8 +1206,6 @@ COMMANDS["codex"] = {
     "milestone-mark": "`$spec-guard-ops` milestone-mark",
     "plan": "`$planning-and-task-breakdown`",
     "build": "`$incremental-implementation`",
-    "free-next": ("Give the user " + CODEX_COMPACT
-                  + " This stage summary carries over, the conversation does not need to."),
     "delegate-review": "`delegate:delegate-routing` (whether it can run is decided by delegate's own doctor check)",
     "checkout-role": "`$spec-guard-ops` checkout-role",
     "map": "`$spec-guard-ops` map",
@@ -1238,26 +1214,15 @@ COMMANDS["codex"] = {
 
 # hint-language-follow: the same entries with Chinese prose, used only when hint_language is zh-CN.  Commands,
 # skill names and paths are unchanged; only the words around them are translated.
-NO_PASTE_ZH = "不要粘贴交接文字"
-SLASH_BLOCK_ZH = ("这是发在对话输入框里的斜杠命令，不是 shell 命令，所以代码块不加语言标记，也不写 `text`（不要写 bash、sh、zsh "
-                  "或 shell），并用一句话告诉用户把它发在输入框里，不要在终端里运行")
-CARRIES_OVER_ZH = "这份阶段摘要会保留下来，对话本身不需要保留。"
-CODEX_COMPACT_ZH = ("一条可直接复制的命令，单独放在一个代码块里：/compact（Codex 的 /compact 不接重点文字），下一步工作不相关时"
-                    "改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。")
 COMMANDS_ZH = {
     None: dict(COMMANDS[None], **{
-        "free-next": ("用一句话告诉用户：接着做下一个模块时可以用 /compact 并写明以它为重点，下一步工作不相关时用 /clear；"
-                      + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
         "delegate-review": "`%(review)s`（Codex: `delegate:delegate-routing`）（能不能运行由 `%(doctor)s` 判定）",
     }),
 }
 COMMANDS_ZH["claude"] = dict(COMMANDS_ZH[None], **{
     "delegate-review": "`%(review)s`（能不能运行由 `%(doctor)s` 判定）",
-    "free-next": ("给用户一条可直接复制的命令，单独放在一个代码块里：/compact 后面跟一句写好的重点（下一个模块及其下一步），"
-                  "下一步工作不相关时改用 /clear；" + SLASH_BLOCK_ZH + "；" + NO_PASTE_ZH + "。" + CARRIES_OVER_ZH),
 })
 COMMANDS_ZH["codex"] = dict(COMMANDS["codex"], **{
-    "free-next": "给用户" + CODEX_COMPACT_ZH + CARRIES_OVER_ZH,
     "doc-verify": "`$spec-guard-ops` 的 documentation 核验（模块 `%s`）",
     "delegate-review": "`delegate:delegate-routing`（能不能运行以 delegate 自己的体检为准）",
 })
@@ -1271,35 +1236,6 @@ for _table in (COMMANDS, COMMANDS_ZH):
 
 def commands(host: str | None, zh: bool = False) -> dict:
     return (COMMANDS_ZH if zh else COMMANDS)[host]
-
-
-# context-hint-thresholds, boundary-hint-70: a module boundary suggests freeing context from 70% of the context window.
-# quiet-injection (D6): the middle of a module gets no hint; the host manages context there.  Claude transcripts
-# carry no window: only once a reading went over 200k does phase-guard.sh pass an estimated 1M window (and say so);
-# otherwise it passes none and no boundary line is given (quiet-injection rework 1).
-
-
-def _k(tokens: int) -> int:
-    return (tokens + 500) // 1000
-
-
-def thresholds(window: int | None, zh: bool = False, estimated: bool = False) -> tuple:
-    """(boundary tokens, boundary note) for a context window; (None, "") when there is no window to judge by."""
-    if not window:
-        return None, ""
-    boundary = -(-window * 7 // 10)  # ceil, in integers
-    if estimated:
-        return boundary, (("达到或超过按 %d k 窗口估算的 70%%" if zh else "at or over 70%% of an estimated %d k window")
-                          % _k(window))
-    return boundary, ("达到或超过 %d k 窗口的 70%%" if zh else "at or over 70%% of the %d k window") % _k(window)
-
-
-def boundary_line(tokens: int, note: str, host: str | None = None, zh: bool = False) -> str:
-    if zh:
-        return ("- 模块边界: 本会话上下文约 %d k token（%s）；这是释放上下文的好时机。%s"
-                % (_k(tokens), note, COMMANDS_ZH[host]["free-next"]))
-    return ("- Module boundary: this session's context is about %d k tokens (%s); a good point to free context. %s"
-            % (_k(tokens), note, COMMANDS[host]["free-next"]))
 
 
 def unreadable_map(reason: str, zh: bool = False) -> str:
@@ -2214,24 +2150,21 @@ def brief_line(root: Path, stage: str, module: str | None, open_items: int | Non
     return "spec-guard: " + " · ".join(parts) + tail + " " + STATE_MARK % code
 
 
-def describe(root: Path, context_tokens: int | None = None, context_window: int | None = None,
-             unattended: bool = False, host: str | None = None, window_estimated: bool = False,
+def describe(root: Path, host: str | None = None,
              state_extra: str | None = None, last_state: str | None = None) -> str:
     """The stage hint; with `state_extra` (the hook's own facts: location, linked project) it ends with the state code.
 
-    When `last_state` equals that code, only the one line comes back, followed by the module-boundary line if this
-    turn has one.  Diagnostics (an unreadable or invalid map) carry no code, so they are never shortened.
+    When `last_state` equals that code, only the one line comes back.  Diagnostics (an unreadable or invalid map) carry no code, so they are never shortened.
     """
     root = Path(root)
     info: dict = {}
-    text = _describe_body(root, context_tokens, context_window, unattended, host, window_estimated, info)
+    text = _describe_body(root, host, info)
     if state_extra is None or "facts" not in info:
         return text
     code = state_key(*info["facts"], state_extra)
     if last_state != code:
         return text + "\n\n" + STATE_MARK % code
-    line = brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
-    return line + ("\n" + info["boundary"] if info["boundary"] else "")
+    return brief_line(root, info["stage"], info["module"], info["open"], code, info["zh"])
 
 
 def milestone_stop(root: Path, states: list, cmd: dict, zh: bool) -> tuple:
@@ -2517,8 +2450,7 @@ def scope_overreach(root: Path, module: str, stage: str, zh: bool) -> tuple:
             "again; if not, undo those changes.")
 
 
-def _describe_body(root: Path, context_tokens: int | None, context_window: int | None, unattended: bool,
-                   host: str | None, window_estimated: bool, info: dict) -> str:
+def _describe_body(root: Path, host: str | None, info: dict) -> str:
     zh = hint_language(root) == "zh-CN"  # hint-language-follow: English stays byte-identical to 0.67.0
     cmd = commands(host, zh)
     try:
@@ -2568,13 +2500,6 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     active_state = by_id.get(active) if active else None
     static_notes = tuple(notes)
     role_facts = _role_facts(root, role_kind, role_id, by_id, cmd, zh)
-    boundary_at, boundary_note = thresholds(context_window, zh, window_estimated)
-    # boundary-hint-unknown-size: no reading means no hint; a new session's first turn has no usage yet.
-    boundary_note_line = (boundary_line(context_tokens, boundary_note, host, zh)
-                          if context_tokens is not None and boundary_at is not None and context_tokens >= boundary_at
-                          else "")
-    if unattended:  # unattended-run-hint: nobody to tell about /compact or /clear; the stage facts stay
-        boundary_note_line = ""
     no_todo_note = ""
     if active_state and active_state["stage"] == "DONE" and plan_without_todo(active_state):
         no_todo_note = ("- activeModule `%s` 有 Plan 但没有 `tasks/%s/todo.md`，所以按已完成计；还有工作要做就补上 todo。"
@@ -2617,7 +2542,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
         waiting = next(((m, w) for m in order for w in (requirement_wait(root, m),) if w), None)
         info.update(facts=["DONE", current["id"] if current else None, zh, static_notes, role_facts, suspended_ids,
                            bool(unmerged and unmerged[0] > 0), deferred, waiting] + ([ms_fact] if ms_fact else []),
-                    stage="DONE", module=None, open=None, zh=zh, boundary=boundary_note_line)
+                    stage="DONE", module=None, open=None, zh=zh)
         notes.extend(suspended_lines)
         if no_todo_note:
             notes.append(no_todo_note)
@@ -2626,8 +2551,6 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
                           "- activeModule `%s` is already done and can be cleared.") % current["id"])
         if hint:
             notes.append(hint)
-        if boundary_note_line:
-            notes.append(boundary_note_line)
         if ms_line:
             notes.append(ms_line)
         if ms_step and role_kind not in ("module", "coordinator"):
@@ -2710,14 +2633,6 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
     else:
         module_done = ("`%s` is done; next unfinished module in Build order is `%s` (%s). "
                        "Set activeModule to it before building." % (module, pending["id"], pending["stage"]))
-    if stage == "MODULE_DONE":
-        if boundary_note_line:
-            notes.append(boundary_note_line)
-    elif stage == "NEEDS_SPEC" and context_tokens is not None:
-        # phase-hint-gaps: a module with no Spec yet has not started, so this is a module boundary too -- the final
-        # acceptance commit usually switches activeModule, and MODULE_DONE is never seen.  An unknown size adds nothing.
-        if boundary_note_line:
-            notes.append(boundary_note_line)
     review_line, review_step, spec_review, plan_review = review_hint(root, module, stage, cmd, zh)
     if review_line and role_kind != "module":
         counts += "\n" + review_line
@@ -2828,8 +2743,7 @@ def _describe_body(root: Path, context_tokens: int | None, context_window: int |
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
                       + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
-                stage=stage, module=module, open=current["open"], zh=zh,
-                boundary=boundary_note_line if boundary_note_line in notes else "")
+                stage=stage, module=module, open=current["open"], zh=zh)
     if zh:
         return ("当前阶段: **%s**\n\n- 能力图: 已有\n- 当前模块: `%s`（%s）\n%s\n%s\n建议下一步: %s%s"
                 % (stage, module, "Build order 中下一个" if source == "next in Build order" else source, counts,
@@ -2843,10 +2757,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("root", nargs="?", default=".")
-    parser.add_argument("--context-tokens", type=int)
-    parser.add_argument("--context-window", type=int)
-    parser.add_argument("--window-estimated", action="store_true")  # quiet-injection: Claude's window is inferred
-    parser.add_argument("--unattended", action="store_true")
     parser.add_argument("--host", choices=["claude", "codex"])
     # phase-hint-gaps: IDLE and MAP_ONLY are answered by phase-guard.sh itself; it asks for the project-config lines
     # here so they come from the one implementation.
@@ -2877,5 +2787,4 @@ if __name__ == "__main__":
     if args.config_lines:
         print("\n".join(config_lines(Path(args.root), args.host)))
         raise SystemExit(0)
-    print(describe(Path(args.root), args.context_tokens, args.context_window, args.unattended, args.host,
-                   args.window_estimated, args.state_extra, args.last_state))
+    print(describe(Path(args.root), args.host, args.state_extra, args.last_state))

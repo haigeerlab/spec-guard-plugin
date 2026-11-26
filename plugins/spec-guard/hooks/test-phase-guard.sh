@@ -8,7 +8,7 @@ PASS=0
 
 fail() { echo "  ❌ $1" >&2; exit 1; }
 
-# 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（unattended-run-hint）；用例按需显式设置。
+# 跑测试的会话自己的 CLAUDE_CODE_SESSION_ATTENDED 不得漏进被测 hook（输出不随它变化，见 part_10、part_32）；用例按需显式设置。
 # 宿主信号（codex-command-wording）：跑测试的宿主自己的 PLUGIN_ROOT／SPEC_GUARD_HOST 不得漏进被测 hook；用例要指定宿主时设 SG_HOST。
 # 插件记录（delegate-review-hint）：跑测试的机器上装的插件不得漏进被测 hook；默认指向空目录，用例要伪造安装时设
 # SG_CLAUDE_HOME／SG_CODEX_HOME。
@@ -52,25 +52,6 @@ $out"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
 
-# 模块完成行：恰好一行，位于 Suggested next step 之前（fresh-session-hint 第 9 条）。
-# boundary-hint-unknown-size：读不到上下文大小时不出这一行，所以喂一份恰好 700k 的会话记录，断言带大小的那一行。
-boundary() {  # $1=用例名 $2=项目目录
-  local out bt="$WORK/boundary-transcript.jsonl"
-  transcript "$bt" 699999
-  out="$(env -u CLAUDE_CODE_SESSION_ATTENDED -u PLUGIN_ROOT -u SPEC_GUARD_HOST \
-    CLAUDE_CONFIG_DIR="$WORK/no-claude-home" CODEX_HOME="$WORK/no-codex-home" CLAUDE_PROJECT_DIR="$2" \
-    /bin/bash "$HOOKDIR/phase-guard.sh" <<<"{\"session_id\":\"s\",\"transcript_path\":\"$bt\",\"prompt\":\"p\"}")"
-  python3 -c '
-import json, sys
-text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
-line = sys.argv[1]
-assert text.count(line) == 1 and text.count("Module boundary") == 1, text
-assert text.index(line) < text.index("Suggested next step"), text
-' "$(sized_boundary 700 "$EST_1M")" <<<"$out" || fail "$1: 模块完成行缺失、重复或位置不对
-$out"
-  echo "  ✅ $1"; PASS=$((PASS + 1))
-}
-
 map() {  # $1=项目目录
   mkdir -p "$1/spec"
   printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
@@ -100,28 +81,6 @@ raw_of() {  # 从 hook JSON 取 additionalContext 原文（含状态码）
 transcript() {  # $1=文件 $2=cache_read_input_tokens（input 1、cache_creation 0）
   printf '{"type":"assistant","isSidechain":false,"message":{"usage":{"input_tokens":1,"cache_read_input_tokens":%s,"cache_creation_input_tokens":0}}}\n' "$2" > "$1"
 }
-# context-hint-thresholds、quiet-injection（D6）：只有模块边界达到窗口 70% 才出带大小的 Module boundary 行，模块进行中不再有
-# 上下文行。Claude 没有窗口：尾部有读数超过 200k 按 1M 估算，否则读不出窗口、不出边界行（quiet-injection 返工 1）。
-# transcript 写入的总量 = 第二个参数 + 1。
-EST_1M='at or over 70% of an estimated 1000 k window'
-sized_boundary() {  # $1=N k $2=阈值说明
-  printf -- "- Module boundary: this session's context is about %s k tokens (%s); a good point to free context. Give the user one ready-to-copy command in its own code block: /compact followed by a one-sentence focus on the next module and its next step, filled in, or /clear if the next work is unrelated; it is a slash command for the chat message box, not a shell command, so give the code block no language tag or \`text\` (never bash, sh, zsh or shell) and tell the user in one sentence to send it in the message box, not to run it in a terminal; do not paste handoff text. This stage summary carries over, the conversation does not need to." "$1" "$2"
-}
-done_has_only() {  # $1=用例名 $2=期望的 Module boundary 行（空=没有）
-  python3 -c '
-import sys
-t, want = sys.stdin.read(), sys.argv[1]
-assert "Session context" not in t, t
-if want:
-    assert t.count(want) == 1 and t.count("Module boundary") == 1, t
-    assert t.index(want) < t.index("Suggested next step"), t
-else:
-    assert "Module boundary" not in t, t
-' "$2" <<<"$out" || fail "$1
-$out"
-  echo "  ✅ $1"; PASS=$((PASS + 1))
-}
-
 codex_rollout() {  # $1=文件 $2=last_token_usage.input_tokens（窗口 258400）
   printf '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":%s},"model_context_window":258400}}}\n' "$2" > "$1"
 }
@@ -369,7 +328,6 @@ injects "MODULE_DONE 仍指出当前模块" "$stages" 'Current module: `alpha` (
 injects "MODULE_DONE 指向 Build order 中第一个未完成模块" "$stages" '`beta`'
 injects "MODULE_DONE 报告该模块自己的阶段" "$stages" 'NEEDS_PLAN'
 lacks "MODULE_DONE 不再冒充项目 DONE" "$stages" "Current stage: **DONE**"
-boundary "MODULE_DONE 有模块完成行" "$stages"
 printf '# Plan\n' > "$stages/tasks/beta/plan.md"
 # 全部完成且 activeModule 不在图中：回退后仍是项目 DONE（与拆分前同一场景）。
 printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
@@ -379,19 +337,16 @@ injects "DONE 指向 /spec-guard:add-module" "$stages" "/spec-guard:add-module"
 injects "DONE 先确认需求再插入模块" "$stages" "For new work, first summarise the requirement and ask the user whether it is complete, then insert a module with /spec-guard:add-module"
 injects "DONE 把 Proposal 作为可选的留痕方式" "$stages" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 附全局计数" "$stages" "Modules 2 · Specs 2 · Plans 2 · In progress 0 · Done 2"
-boundary "DONE 有模块完成行" "$stages"
 # 全部完成但 activeModule 仍指向已完成模块：仍是项目 DONE，并提示可清除。
 printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
 injects "全部完成且 activeModule 未清除时仍报告 DONE" "$stages" "Current stage: **DONE**"
 injects "全部完成且 activeModule 未清除时指向 add-module" "$stages" "/spec-guard:add-module"
 injects "全部完成且 activeModule 未清除时提示可清除" "$stages" 'activeModule `alpha` is already done and can be cleared'
-boundary "DONE 且 activeModule 未清除时有模块完成行" "$stages"
 lacks "全部完成时不出现模块级提示" "$stages" "before building it"
 # 全部完成且没有 activeModule：输出不带清除提示。
 printf '{"activeModule":""}\n' > "$stages/.agent/state.json"
 injects "全部完成且无 activeModule 时报告 DONE" "$stages" "Current stage: **DONE**"
 lacks "全部完成且无 activeModule 时无清除提示" "$stages" "can be cleared"
-boundary "DONE 且无 activeModule 时有模块完成行" "$stages"
 rm "$stages/spec/beta.md"
 injects "缺 Spec 的模块报告 NEEDS_SPEC" "$stages" "Current stage: **NEEDS_SPEC**"
 lacks "requirement-confirm：NEEDS_SPEC 不提确认需求" "$stages" "whether it is complete"
@@ -494,7 +449,6 @@ printf '%s\n' '- [x] u1' > "$paused/tasks/urgent/todo.md"
 injects "插队完成后报告 MODULE_DONE" "$paused" "Current stage: **MODULE_DONE**"
 injects "MODULE_DONE 显示被暂停的模块" "$paused" '- Paused: `infra` (1 unchecked item(s)); resume it after `urgent`.'
 injects "MODULE_DONE 点名被暂停的模块" "$paused" 'resume paused module `infra` (BUILDING). Set activeModule to it.'
-boundary "有暂停模块的 MODULE_DONE 有模块完成行" "$paused"
 printf '%s\n' '- [x] a' '- [x] b' > "$paused/tasks/infra/todo.md"
 lacks "没有被暂停模块时不出现 Paused" "$paused" "Paused"
 printf '%s\n' '- [ ] a' '- [ ] b' > "$paused/tasks/infra/todo.md"
@@ -554,7 +508,6 @@ printf '{"activeModule":"alpha"}\n' > "$notodo/.agent/state.json"
 NOTODO_NOTE='activeModule `alpha` has a plan but no `tasks/alpha/todo.md`, so it counts as done; add the todo if work remains.'
 injects "无 todo 的 activeModule 且项目未完成时报告 MODULE_DONE" "$notodo" "Current stage: **MODULE_DONE**"
 injects "MODULE_DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
-boundary "缺 todo 的 MODULE_DONE 有模块完成行" "$notodo"
 python3 -c '
 import json, sys
 text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
@@ -567,7 +520,6 @@ printf '%s\n' '- [x] a' '- [x] b' > "$notodo/tasks/beta/todo.md"
 injects "无 todo 的 activeModule 且全部完成时报告 DONE" "$notodo" "Current stage: **DONE**"
 injects "DONE 给出缺 todo 提醒" "$notodo" "$NOTODO_NOTE"
 injects "DONE 仍保留可清除提示" "$notodo" 'activeModule `alpha` is already done and can be cleared'
-boundary "缺 todo 的 DONE 有模块完成行" "$notodo"
 python3 -c '
 import json, sys
 text = json.loads(sys.stdin.read())["hookSpecificOutput"]["additionalContext"]
@@ -729,7 +681,6 @@ injects "DONE 且领先时建议先推送合并" "$um_done" "$PUSHFIRST"
 injects "DONE 且领先时也先确认需求" "$um_done" "for new work, first summarise the requirement and ask the user whether it is complete, then insert a module with"
 injects "DONE 且领先时仍保留 add-module 与 Proposal 指引" "$um_done" "use a Proposal when the addition needs a recorded, reviewed decision"
 injects "DONE 且领先时仍报告 DONE" "$um_done" "Current stage: **DONE**"
-boundary "DONE 且领先时有模块完成行" "$um_done"
 # 只读：运行 hook 前后引用与工作区状态不变。
 refs_before="$(git -C "$um_done" for-each-ref)"; status_before="$(git -C "$um_done" status --porcelain)"
 run "$um_done" >/dev/null
@@ -772,7 +723,6 @@ two_commits "$um_mod"
 injects "MODULE_DONE 且领先时报告未合并提交" "$um_mod" "$HINT"
 injects "MODULE_DONE 且领先时在原建议前加先推送合并" "$um_mod" "Suggested next step: $PUSHFIRST; then \`alpha\` is done; next unfinished module"
 injects "MODULE_DONE 且领先时仍报告 MODULE_DONE" "$um_mod" "Current stage: **MODULE_DONE**"
-boundary "MODULE_DONE 且领先时有模块完成行" "$um_mod"
 
 um_build="$WORK/um-build"
 unmerged_fixture "$um_build" '- [ ] open'
@@ -784,14 +734,7 @@ lacks "BUILDING 且领先时没有模块完成行" "$um_build" "Module boundary"
 }
 
 part_9() {
-# 上下文行（fresh-session-hint 第 2、8、9 条）：经标准输入的 hook 输入读会话记录，超过 200k 才提示。
-# context-hint-no-paste：任何注入都不得再要求 agent 贴交接文本（2026-10-07 用户在接近满窗时仍看到被贴出的交接文本）。
-line="$(sized_boundary 1 x)"
-case "$line" in *paste-ready*|*"for paste"*) fail "上下文提示仍要求贴交接文本: $line" ;; esac
-case "$line" in *"do not paste handoff text"*) ;; *) fail "上下文提示缺少不贴交接文本的说明: $line" ;; esac
-# context-after-compact：按相关性建议 /compact 或 /clear，不再建议开新会话，也不再提交接命令。
-case "$line" in *"/clear if the next work is unrelated"*) ;; *) fail "上下文提示缺少 /clear 的建议: $line" ;; esac
-case "$line" in *"new session"*|*"spec-guard handoff"*|*spec-guard:handoff*) fail "上下文提示不应建议新会话或交接命令: $line" ;; esac
+# 读数再高，模块进行中也没有上下文行（模块边界提示行已删除，见 part_32）；会话记录的读取只读，输入不可用时输出不变。
 build_fixture ctx
 
 # quiet-injection（D6）：模块进行中不再有上下文行，达到 80% 也一样。
@@ -862,69 +805,6 @@ for root in sys.argv[1:]:
 before="$(snap)"; run_input "$ctx" "$HOOK_INPUT" >/dev/null; [ "$before" = "$(snap)" ] || fail "上下文读取必须只读"
 echo "  ✅ 上下文读取只读"; PASS=$((PASS + 1))
 
-printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 且 800k 时只出带大小的 Module boundary 行" "$(sized_boundary 800 "$EST_1M")"
-transcript "$T" 699999
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 恰好 700k 时出带大小的 Module boundary 行" "$(sized_boundary 700 "$EST_1M")"
-transcript "$T" 699998
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "DONE 低于 700k（699,999）时不出 Module boundary 行" ""
-transcript "$T" 499999
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "boundary-hint-70：DONE 500k 不再出 Module boundary 行" ""
-# quiet-injection 返工 1（0W0ZWWT）：尾部读数都不超过 200k 时读不出窗口（1M 会话也会落在这里），不按 200k 估算、不出边界行。
-for reading in 139999 163999 199999; do
-  transcript "$T" "$reading"
-  out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-  done_has_only "Claude 读数不超过 200k（$((reading + 1))）：读不出窗口，DONE 不出 Module boundary 行" ""
-done
-transcript "$T" 250000
-transcript "$WORK/later.jsonl" 299999
-cat "$WORK/later.jsonl" >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，300k 不出" ""
-transcript "$T" 250000
-transcript "$WORK/later.jsonl" 749999
-cat "$WORK/later.jsonl" >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，750k 出行" "$(sized_boundary 750 "$EST_1M")"
-transcript "$T" 250000
-transcript "$WORK/later.jsonl" 149999
-cat "$WORK/later.jsonl" >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 早先有读数超过 200k：按 1M 窗口估算，150k 不出" ""
-out="$(run "$ctx" | context_of)"
-done_has_only "boundary-hint-unknown-size：DONE 读不到大小时不出 Module boundary 行" ""
-out="$(SG_HOST=codex run "$ctx" | context_of)"
-done_has_only "boundary-hint-unknown-size：Codex DONE 读不到大小时不出 Module boundary 行" ""
-out="$(cd "$ctx" && env -u CLAUDE_PROJECT_DIR -u PLUGIN_ROOT -u SPEC_GUARD_HOST /bin/bash "$HOOKDIR/phase-guard.sh" </dev/null | context_of)"
-done_has_only "boundary-hint-unknown-size：判断不了宿主时 DONE 读不到大小也不出" ""
-
-# Codex：窗口取自同一条 token_count（258400）；DONE 70% = 180880，BUILDING 80% = 206720。
-codex_rollout "$T" 180880
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex DONE 达到窗口 70% 时出带大小的行" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
-codex_rollout "$T" 180879
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex DONE 低于窗口 70% 时不出行" ""
-codex_rollout "$T" 129200
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "boundary-hint-70：Codex DONE 窗口 50% 不再出行" ""
-# context-after-compact：压缩记录比最近一条读数新时，按压缩后的大小判断（2026-10-08 实测压缩后首轮仍报 601k）。
-transcript "$T" 601429
-printf '%s\n' '{"type":"system","subtype":"compact_boundary","compactMetadata":{"preTokens":601658,"postTokens":13951}}' >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Claude 刚压缩完（601k → 14k）不出 Module boundary 行" ""
-codex_rollout "$T" 223005
-printf '%s\n' '{"type":"compacted","payload":{}}' \
-  '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":0},"model_context_window":258400}}}' >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex 刚压缩完不出 Module boundary 行" ""
-printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":180880},"model_context_window":258400}}}' >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-done_has_only "压缩之后的新读数照常判断" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 codex_rollout "$T" 206720
 [ "$(run_input "$ctx" "$HOOK_INPUT" | context_of)" = "$plain_building" ] || fail "D6：Codex BUILDING 达到窗口 80% 也不应有上下文行"
@@ -935,9 +815,9 @@ part_10() {
 # 本段用到前面段落的夹具：各段在自己的目录里跑，这里再建一份。
 build_fixture git-project ctx
 
-# unattended-run-hint：没人在场的运行（claude -p 设 CLAUDE_CODE_SESSION_ATTENDED=0；codex exec 的会话记录首条
-# session_meta 写 source:"exec"）不出那两行「请告诉用户 /compact、/clear」，其余逐字相同；拿不准时照旧。
-codex_meta() {  # $1=文件 $2=source 的 JSON 值；之后追加一条会触发上下文行的 token_count
+# 没人在场的运行（claude -p 设 CLAUDE_CODE_SESSION_ATTENDED=0；codex exec 的会话记录首条 session_meta 写 source:"exec"）
+# 与有人在场的输出逐字相同：阶段提示里不再有按在场与否取舍的内容（无人值守判断已随上下文边界提示删除）。
+codex_meta() {  # $1=文件 $2=source 的 JSON 值；之后追加一条带窗口的 token_count
   printf '{"type":"session_meta","payload":{"originator":"x","source":%s}}\n' "$2" > "$1"
   printf '%s\n' '{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":206720},"model_context_window":258400}}}' >> "$1"
 }
@@ -949,48 +829,22 @@ $out
 $2"
   echo "  ✅ $1"; PASS=$((PASS + 1))
 }
-has_ctx() {  # $1=用例名：仍有 Module boundary 行（D6 之后模块边界是唯一的上下文提示）
-  grep -F -- "- Module boundary:" >/dev/null <<<"$out" || fail "$1: 有人在场时应保留边界行
-$out"
-  echo "  ✅ $1"; PASS=$((PASS + 1))
-}
 printf '%s\n' '- [x] done' > "$ctx/tasks/alpha/todo.md"
+plain_done="$(run "$ctx" | context_of)"
 transcript "$T" 799999
 out="$(ATTENDED=0 run_input "$ctx" "$HOOK_INPUT" | context_of)"
-same_as "claude -p（ATTENDED=0）DONE 800k：去掉边界行，其余逐字相同" "$(run "$ctx" | context_of)"
+same_as "claude -p（ATTENDED=0）DONE 800k：与无读数时逐字相同" "$plain_done"
 out="$(ATTENDED=1 run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "交互会话（ATTENDED=1）DONE 800k：照旧有边界行"
-out="$(ATTENDED=yes run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "ATTENDED 不是 0 时按有人在场"
+same_as "交互会话（ATTENDED=1）DONE 800k：与无读数时逐字相同" "$plain_done"
 codex_meta "$T" '"exec"'
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-same_as "codex exec（source=exec）DONE 80%：去掉边界行，其余逐字相同" "$(SG_HOST=codex run "$ctx" | context_of)"
+same_as "codex exec（source=exec）DONE 80%：与无读数时逐字相同" "$(SG_HOST=codex run "$ctx" | context_of)"
 codex_meta "$T" '"vscode"'
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "Codex 桌面（source=vscode）：照旧有边界行"
-codex_meta "$T" '{"subagent":"x"}'
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "source 不是字符串 exec 时按有人在场"
-{ printf '%s\n' 'not json'; tail -1 "$T"; } > "$T.bad"; mv "$T.bad" "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "会话记录首条损坏时按有人在场"
-codex_meta "$T" '"vscode"'
-printf '%s\n' '{"type":"session_meta","payload":{"source":"exec"}}' >> "$T"
-out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-has_ctx "只看首条记录：后面出现 source=exec 不算"
-# boundary-hint-unknown-size：读不到大小时不出边界行，对照改为喂一份 700k 的会话记录，比较带大小的那一行。
-transcript "$WORK/done-700k.jsonl" 699999
-DONE_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$WORK/done-700k.jsonl\",\"prompt\":\"p\"}"
-DONE_LINE="$(sized_boundary 700 "$EST_1M")"
-plain_done_unattended="$(ATTENDED=0 run_input "$ctx" "$DONE_INPUT" | context_of)"
-out="$(run_input "$ctx" "$DONE_INPUT" | context_of)"
-grep -F -- "$DONE_LINE" >/dev/null <<<"$out" || fail "DONE 有人在场应有 Module boundary 行"
-python3 -c 'import sys; t=sys.stdin.read(); b=sys.argv[1]; print(t.replace(b + "\n", "", 1), end="")' "$DONE_LINE" <<<"$out" > "$WORK/done-without-boundary"
-out="$plain_done_unattended"
-same_as "claude -p（ATTENDED=0）DONE：只去掉 Module boundary 行" "$(cat "$WORK/done-without-boundary")"
+same_as "Codex 桌面（source=vscode）DONE 80%：与无读数时逐字相同" "$(SG_HOST=codex run "$ctx" | context_of)"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 
-# MODULE_DONE 与 DONE 同一规则。
+# MODULE_DONE 的阶段提示不因读数而变（边界行已删，见 part_32）。
 md="$WORK/ctx-module-done"
 mkdir -p "$md/spec" "$md/tasks/alpha" "$md/.agent"
 printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$md/CLAUDE.md"
@@ -1002,10 +856,7 @@ transcript "$T" 699999
 out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
 grep -F "MODULE_DONE" >/dev/null <<<"$out" || fail "夹具应为 MODULE_DONE
 $out"
-done_has_only "MODULE_DONE 达到 700k 时出带大小的行" "$(sized_boundary 700 "$EST_1M")"
-transcript "$T" 599999
-out="$(run_input "$md" "$HOOK_INPUT" | context_of)"
-done_has_only "MODULE_DONE 600k（低于 700k）时不出行" ""
+same_as "MODULE_DONE 700k：与无读数时逐字相同" "$(run "$md" | context_of)"
 
 idle_ctx="$WORK/idle-ctx"
 mkdir -p "$idle_ctx"; printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$idle_ctx/CLAUDE.md"
@@ -1434,23 +1285,21 @@ printf '%s\n' '- [x] open' > "$cw/tasks/alpha/todo.md"
 out="$(SG_HOST=codex run "$cw" | context_of)"; codex_text "NEEDS_PLAN"
 expect "Codex NEEDS_PLAN：\$planning-and-task-breakdown" '(for example with `$planning-and-task-breakdown`)'
 printf '# Plan\n' > "$cw/tasks/beta/plan.md"; printf '%s\n' '- [x] b' > "$cw/tasks/beta/todo.md"
-# boundary-hint-unknown-size：读不到大小时不出模块完成行，所以喂一份达到窗口 70% 的 Codex 记录再查它的写法。
+# 读数不影响写法：喂一份达到窗口 70% 的 Codex 记录，查 DONE 的命令写法仍按 Codex。
 codex_rollout "$WORK/cw-done-rollout.jsonl" 180880
 out="$(env -u PLUGIN_ROOT SPEC_GUARD_HOST=codex CLAUDE_PROJECT_DIR="$cw" /bin/bash "$HOOKDIR/phase-guard.sh" \
   <<<"{\"session_id\":\"s\",\"transcript_path\":\"$WORK/cw-done-rollout.jsonl\"}" | context_of)"; codex_text "DONE"
 expect "Codex DONE：\$spec-guard-ops add-module" 'insert a module with `$spec-guard-ops` add-module at this checkpoint'
-expect "Codex 模块完成行：/compact 不带聚焦说明" "/compact (Codex's /compact takes no focus text), or /clear if the next work is unrelated"
-expect "Codex 模块完成行：斜杠命令不是 shell 命令" 'it is a slash command for the chat message box, not a shell command'
-expect "Codex 模块完成行：代码块不带 shell 语言标签" 'give the code block no language tag or `text` (never bash, sh, zsh or shell)'
-expect "Codex 模块完成行：发到消息输入框而不是终端" 'send it in the message box, not to run it in a terminal'
-[ "$(grep -c 'it is a slash command' <<<"$out")" = 1 ] || fail "Codex 模块完成行的斜杠命令说明应恰好一处
+grep -F '/compact' >/dev/null <<<"$out" && fail "remove-context-hint：Codex DONE 窗口 70% 也不应提示 /compact
 $out"
+echo "  ✅ remove-context-hint：Codex DONE 窗口 70% 不提示 /compact"; PASS=$((PASS + 1))
 transcript "$WORK/cw-done-700k.jsonl" 699999
 out="$(cd "$cw" && env -u CLAUDE_PROJECT_DIR -u PLUGIN_ROOT -u SPEC_GUARD_HOST /bin/bash "$HOOKDIR/phase-guard.sh" \
   <<<"{\"transcript_path\":\"$WORK/cw-done-700k.jsonl\"}" | context_of)"
+grep -F 'Module boundary' >/dev/null <<<"$out" && fail "判断不了宿主时 DONE 700k 也不应出现边界行
+$out"
 grep -F 'slash command' >/dev/null <<<"$out" && fail "判断不了宿主时不应出现斜杠命令说明
 $out"
-expect "判断不了宿主时模块完成行仍是改前原文（阈值说明按 Claude 估算）" "- Module boundary: this session's context is about 700 k tokens (at or over 70% of an estimated 1000 k window); a good point to free context. Say in one sentence that the user can /compact with a focus on the next module, or /clear if the next work is unrelated; do not paste handoff text."
 grep -F 'followed by a one-sentence focus' >/dev/null <<<"$out" && fail "Codex 的 /compact 不应要求聚焦说明
 $out"
 printf '%s\n' '- [x] built' '- [ ] review' '<!-- spec-guard: suspended -->' > "$cw/tasks/alpha/todo.md"
@@ -1969,9 +1818,7 @@ $2" ;; esac
 transcript "$T" 899999
 printf '%s\n' '- [x] open' > "$ctx/tasks/alpha/todo.md"
 out="$(run_input "$ctx" "$HOOK_INPUT" | context_of)"
-grep -F -- "$(sized_boundary 900 "$EST_1M")" >/dev/null <<<"$out" || fail "对照：UserPromptSubmit DONE 900k 应有边界行
-$out"
-echo "  ✅ 对照：UserPromptSubmit 照旧报 900k"; PASS=$((PASS + 1))
+no_size "UserPromptSubmit DONE 900k：不出边界行" "$out"
 out="$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
 no_size "SessionStart DONE 900k：不报压缩前的大小，不出边界行" "$out"
 grep -F "Context was just compacted" >/dev/null <<<"$out" || fail "SessionStart 仍应有压缩后的核对提醒"
@@ -1980,46 +1827,6 @@ codex_rollout "$T" 250000
 no_size "SessionStart Codex DONE 250k：不出边界行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
 printf '%s\n' '- [ ] open' > "$ctx/tasks/alpha/todo.md"
 no_size "SessionStart Codex BUILDING 250k：不出上下文行" "$(run_start "$ctx" "$HOOK_INPUT" | context_of)"
-
-# D5：alpha 已完成、beta 还没有 Spec（NEEDS_SPEC）——验收提交同时切换 activeModule 后的下一轮就是这样。
-two="$WORK/two"
-mkdir -p "$two/spec" "$two/tasks/alpha"
-printf '%s\n' '<!-- BEGIN:agent-skills-convention -->' > "$two/CLAUDE.md"
-printf '%s\n' '# Capability Map' '| Module id | Responsibility | Depends on |' '|---|---|---|' \
-  '| alpha | x | — |' '| beta | y | alpha |' '' 'Build order: alpha → beta' > "$two/spec/CAPABILITY-MAP.md"
-touch "$two/spec/alpha.md"; printf '# Plan\n' > "$two/tasks/alpha/plan.md"; printf '%s\n' '- [x] done' > "$two/tasks/alpha/todo.md"
-transcript "$T" 699999
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-grep -F "**NEEDS_SPEC**" >/dev/null <<<"$out" || fail "夹具应为 NEEDS_SPEC
-$out"
-done_has_only "NEEDS_SPEC 700k：出带大小的边界行" "$(sized_boundary 700 "$EST_1M")"
-transcript "$T" 599999
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 600k（低于 700k）：都不出" ""
-transcript "$T" 849999
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 850k：只出边界行，不另出上下文行" "$(sized_boundary 850 "$EST_1M")"
-transcript "$T" 99999
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 100k：都不出" ""
-out="$(run "$two" | context_of)"
-done_has_only "NEEDS_SPEC 读不到大小：都不出" ""
-transcript "$T" 699999
-out="$(ATTENDED=0 run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_SPEC 700k 无人值守：都不出" ""
-codex_rollout "$T" 180880
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "Codex NEEDS_SPEC 达到窗口 70%：出带大小的边界行" "$(sized_boundary 181 'at or over 70% of the 258 k window')"
-transcript "$T" 599999
-touch "$two/spec/beta.md"
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "NEEDS_PLAN 600k：都不出" ""
-mkdir -p "$two/tasks/beta"; printf '# Plan\n' > "$two/tasks/beta/plan.md"; printf '%s\n' '- [ ] open' > "$two/tasks/beta/todo.md"
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "BUILDING 600k：都不出" ""
-transcript "$T" 849999
-out="$(run_input "$two" "$HOOK_INPUT" | context_of)"
-done_has_only "D6：BUILDING 850k：都不出" ""
 
 # D1：IDLE（没有能力图）与 MAP_ONLY（有能力图、没有模块 Spec）也带项目配置行，放在建议之前；没配置时逐字不变。
 for kind in IDLE MAP_ONLY; do
@@ -2252,8 +2059,8 @@ printf '%s\n' '- [x] a' '- [x] b' > "$zm/tasks/beta/todo.md"
 zh_check "boundary-hint-unknown-size：zh-CN DONE 读不到大小时不出模块边界行" "$zm" +"当前阶段: **DONE**" -"模块边界" "${ENGLISH_ONLY[@]}"
 transcript "$WORK/zh-done-700k.jsonl" 699999
 printf '{"session_id":"s","transcript_path":"%s","prompt":"p"}' "$WORK/zh-done-700k.jsonl" > "$WORK/zh-done-input"
-SG_INPUT="$WORK/zh-done-input" zh_check "zh-CN：DONE" "$zm" +"当前阶段: **DONE**" \
-  +"- 模块边界: 本会话上下文约 700 k token（达到或超过按 1000 k 窗口估算的 70%）；这是释放上下文的好时机。给用户一条可直接复制的命令" \
+SG_INPUT="$WORK/zh-done-input" zh_check "zh-CN：DONE（700k 读数也没有模块边界行）" "$zm" +"当前阶段: **DONE**" \
+  -"模块边界" -"本会话上下文约" \
   +"建议下一步: 能力图里每个模块都有 Plan，且没有未勾选的 todo 项。要做新工作，先总结需求、问用户是否说完，确认后再在这个检查点用 /spec-guard:add-module (Codex: spec-guard-ops add-module) 插入一个模块；" \
   "${ENGLISH_ONLY[@]}"
 git -C "$zm" add -A >/dev/null; git -C "$zm" -c user.name=t -c user.email=t@e -c commit.gpgsign=false commit -qm a
@@ -2703,12 +2510,15 @@ rm -rf "$q/.epiq"
 printf '%s\n' '- [x] one' '- [x] two' '- [x] three' '- [x] Checkpoint 1（gate）：final' > "$q/tasks/alpha/todo.md"
 printf '{"activeModule":"alpha"}\n' > "$q/.agent/state.json"
 full_done="$(run "$q" | raw_of)"; claude_injected "$TR" "$full_done"
+low_out="$(run_input "$q" "$INPUT" | raw_of)"
+is_line "MODULE_DONE 一行形式" "$low_out" 'spec-guard: MODULE_DONE · `alpha` · 0 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
 transcript "$WORK/usage.jsonl" 699999; cat "$WORK/usage.jsonl" >> "$TR"
 out="$(run_input "$q" "$INPUT" | raw_of)"
-is_line "MODULE_DONE 一行形式" "$out" 'spec-guard: MODULE_DONE · `alpha` · 0 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
-[ "$(sed -n 2p <<<"$out")" = "$(sized_boundary 700 "$EST_1M")" ] || fail "一行形式后应另起一行附边界行
+is_line "MODULE_DONE 高读数（700k）的一行形式" "$out" 'spec-guard: MODULE_DONE · `alpha` · 0 unchecked · branch `main` (unchanged; see the earlier phase hint for details)'
+[ "$(printf '%s' "$out" | wc -l | tr -d ' ')" = 0 ] || fail "remove-context-hint：高读数时一行形式后不应再有第二行
 $out"
-echo "  ✅ 一行形式后另起一行附边界行"; PASS=$((PASS + 1))
+[ "$(code_in <<<"$out")" = "$(code_in <<<"$low_out")" ] || fail "remove-context-hint：高读数与低读数的状态码应相同"
+echo "  ✅ 高读数下一行形式恰好一行，状态码与低读数相同"; PASS=$((PASS + 1))
 rm -f "$q/.agent/state.json"
 
 # 停点：进入那一轮完整并附停点规则，同一节点下一轮一行（Q1 A）。
@@ -3246,7 +3056,54 @@ $out"
 echo "  ✅ 验收记录在 HEAD 或其祖先上时最终 gate 当作已过，转到下一个模块"; PASS=$((PASS + 1))
 }
 
-PARTS=31
+part_32() {
+# remove-context-hint（AC1）：不论读数多高，阶段提示里都不再有上下文边界提示行。
+# 夹具用原来一定会出这一行的情形：Claude 读数 800k（超过 200k，原按 1M 窗口估算、过 70%）、Codex 带窗口且过 70%。
+build_fixture stages
+T="$WORK/rh-transcript.jsonl"
+INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$T\",\"prompt\":\"p\"}"
+LOW_INPUT="{\"session_id\":\"s\",\"transcript_path\":\"$WORK/rh-low.jsonl\",\"prompt\":\"p\"}"
+no_line() {  # $1=用例名 $2=项目目录 $3=期望的阶段：Claude 与 Codex 的高读数下都没有边界行，也不因读数而变
+  local name="$1" dir="$2" stage="$3" host out base
+  transcript "$WORK/rh-low.jsonl" 1
+  for host in claude codex; do
+    if [ "$host" = claude ]; then transcript "$T" 799999; else codex_rollout "$T" 180880; fi
+    out="$(run_input "$dir" "$INPUT" | context_of)"
+    python3 -c '
+import sys
+t, stage = sys.stdin.read(), sys.argv[1]
+assert "Current stage: **%s**" % stage in t or "当前阶段: **%s**" % stage in t, t
+for banned in ("Module boundary", "模块边界: 本会话上下文约", "a good point to free context", "这是释放上下文的好时机",
+               "do not paste handoff text", "不要粘贴交接文字"):
+    assert banned not in t, (banned, t)
+' "$stage" <<<"$out" || fail "${name}（${host}）：高读数下不应再有边界行
+$out"
+    base="$(run_input "$dir" "$LOW_INPUT" | context_of)"
+    [ "$out" = "$base" ] || fail "${name}（${host}）：高读数与低读数的输出应逐字相同"
+    [ "$out" = "$(ATTENDED=0 run_input "$dir" "$INPUT" | context_of)" ] || fail "${name}（${host}）：ATTENDED=0 输出应逐字相同"
+    [ "$out" = "$(ATTENDED=1 run_input "$dir" "$INPUT" | context_of)" ] || fail "${name}（${host}）：ATTENDED=1 输出应逐字相同"
+    echo "  ✅ ${name}（${host}）：高读数下没有边界行，与低读数、有无人值守逐字相同"; PASS=$((PASS + 1))
+  done
+}
+printf '%s\n' '- [x] done' > "$stages/tasks/alpha/todo.md"
+printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+no_line "MODULE_DONE" "$stages" MODULE_DONE
+printf '# Plan\n' > "$stages/tasks/beta/plan.md"; printf '%s\n' '- [x] done' > "$stages/tasks/beta/todo.md"
+printf '{"activeModule":"ghost"}\n' > "$stages/.agent/state.json"
+no_line "DONE" "$stages" DONE
+rm "$stages/spec/beta.md"
+no_line "NEEDS_SPEC" "$stages" NEEDS_SPEC
+# 中文同样没有：zh-CN 夹具，阶段仍分别是 NEEDS_SPEC、DONE、MODULE_DONE。
+printf '{"version": 1, "artifactLanguage": "zh-CN"}\n' > "$stages/.agent/config.json"
+no_line "zh-CN NEEDS_SPEC" "$stages" NEEDS_SPEC
+touch "$stages/spec/beta.md"
+no_line "zh-CN DONE" "$stages" DONE
+rm "$stages/tasks/beta/plan.md" "$stages/tasks/beta/todo.md"
+printf '{"activeModule":"alpha"}\n' > "$stages/.agent/state.json"
+no_line "zh-CN MODULE_DONE" "$stages" MODULE_DONE
+}
+
+PARTS=32
 PIDS=()
 for n in $(seq 1 "$PARTS"); do
   (

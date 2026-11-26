@@ -296,40 +296,20 @@ fi
 
 RECEIPT="$(receipt_hint)"
 
-# 会话事实（session_context.py，只读）：第一行是主会话上下文 token 数，第二行是位置行，读不到为空。
-# hook 输入已在上面读过，这里转交那一行原文。
+# 会话事实（session_context.py，只读）：三行——位置行、宿主（codex 或空）、会话记录里最近一次 spec-guard 注入的状态码
+# （quiet-injection；压缩之后、读不到或没有时为空）。读不到的为空。hook 输入已在上面读过，这里转交那一行原文。
 FACTS="$(printf '%s' "$HOOK_INPUT" | python3 "$HOOKDIR/session_context.py" . ${ZH:+--lang zh-CN} 2>/dev/null)" || FACTS=""
-TOKENS="${FACTS%%$'\n'*}"
-case "$TOKENS" in ''|*[!0-9]*) TOKENS="" ;; esac
-# phase-hint-gaps：压缩后那一次（SessionStart）宿主还没把压缩记录写进会话记录，读到的是压缩前最后一轮的用量；
-# 刚压缩完大小必然已降，按 0 处理，不出上下文行与边界行。下一轮 UserPromptSubmit 照常读。
-[ "$EVENT" != SessionStart ] || TOKENS=0
-LOCATION=""
-case "$FACTS" in *$'\n'*) LOCATION="${FACTS#*$'\n'}" ;; esac
-# 第三行是 Codex 记录里的上下文窗口（Claude 为空）。
-WINDOW=""
-case "$LOCATION" in *$'\n'*) WINDOW="${LOCATION#*$'\n'}" ;; esac
-# 第四行是 unattended（claude -p、codex exec）或空：没人在场时不出「请告诉用户 /compact、/clear」那一行。
-# 第五行是宿主（codex 或空），第六行是 over-200k 或空（Claude 尾部有读数超过 200k，quiet-injection 按 1M 估算窗口），
-# 第七行是会话记录里最近一次 spec-guard 注入的状态码（quiet-injection；压缩之后、读不到或没有时为空）。
-UNATTENDED="" FACT_HOST="" OVER="" LAST=""
-REST="$WINDOW"
-case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
-[ "${REST%%$'\n'*}" != unattended ] || UNATTENDED=1
-case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
+LOCATION="${FACTS%%$'\n'*}"
+REST=""
+case "$FACTS" in *$'\n'*) REST="${FACTS#*$'\n'}" ;; esac
 FACT_HOST="${REST%%$'\n'*}"
-case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
-[ "${REST%%$'\n'*}" != over-200k ] || OVER=1
 case "$REST" in *$'\n'*) REST="${REST#*$'\n'}" ;; *) REST="" ;; esac
 LAST="${REST%%$'\n'*}"
 case "$LAST" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;; *) LAST="" ;; esac
 # 压缩后（SessionStart）总是给完整内容。
 [ "$EVENT" != SessionStart ] || LAST=""
-WINDOW="${WINDOW%%$'\n'*}"
-case "$WINDOW" in ''|*[!0-9]*) WINDOW="" ;; esac
-LOCATION="${LOCATION%%$'\n'*}"
 # 宿主（codex-command-wording）：命令提示按宿主给写法。显式的 SPEC_GUARD_HOST 优先（Codex 的 spec-guard-ops 手动
-# 运行时会带 CLAUDE_PROJECT_DIR）；其次是第五行，hook 输入本身说明是 Codex（turn_id 或 session_meta）；再看环境：
+# 运行时会带 CLAUDE_PROJECT_DIR）；其次是第二行，hook 输入本身说明是 Codex（turn_id 或 session_meta）；再看环境：
 # Claude Code 给 hook 设 CLAUDE_PROJECT_DIR，Codex 只设 PLUGIN_ROOT（两边都设的 CLAUDE_PLUGIN_ROOT 不能用）。
 # 都判断不了时 HOST 为空，输出与改前逐字相同。
 case "${SPEC_GUARD_HOST:-}" in
@@ -342,12 +322,6 @@ case "${SPEC_GUARD_HOST:-}" in
          else HOST=""; fi ;;
     esac ;;
 esac
-# quiet-injection（Q2 A，返工 1）：Claude 的记录里没有窗口；尾部有读数超过 200k 才能断定是 1M，按 1M 估算并在提示里写明是估算。
-# 读数都不超过 200k 时分不出 200k 还是 1M，不设窗口，也就不出边界行（按 200k 估算会让 1M 会话在 140k～200k 误报）。
-WINDOW_ESTIMATED=""
-if [ -z "$WINDOW" ] && [ -n "$TOKENS" ] && [ "$HOST" != codex ] && [ -n "$OVER" ]; then
-  WINDOW_ESTIMATED=1 WINDOW=1000000
-fi
 if [ "$HOST" = codex ]; then VERIFY_CMD='`$spec-guard-ops` verify-artifacts'; else VERIFY_CMD='`/spec-guard:verify-artifacts`'; fi
 # 位置行放在标题与阶段行（“当前阶段”／“Current stage”）之间，所有阶段都带；不在 git 仓库里时没有这一行。
 HEADER="## spec-guard local workflow"
@@ -504,9 +478,9 @@ Suggested next step: confirm with the user that the first module's requirement i
 fi
 
 # 按模块判断当前在哪一步（module_stage.py，只读）；它失败时注入诊断，而不是静默。
-if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${TOKENS:+--context-tokens "$TOKENS"} ${WINDOW:+--context-window "$WINDOW"} ${WINDOW_ESTIMATED:+--window-estimated} ${UNATTENDED:+--unattended} ${HOST:+--host "$HOST"} --state-extra "$STATE_EXTRA" ${LAST:+--last-state "$LAST"} 2>/dev/null)"; then
+if STAGE="$(python3 "$HOOKDIR/module_stage.py" . ${HOST:+--host "$HOST"} --state-extra "$STATE_EXTRA" ${LAST:+--last-state "$LAST"} 2>/dev/null)"; then
   case "$STAGE" in
-    'spec-guard: '*) emit "$STAGE" ;;  # quiet-injection：状态码与上一次相同，只给一行（后面可能附边界行）
+    'spec-guard: '*) emit "$STAGE" ;;  # quiet-injection：状态码与上一次相同，只给一行
     *) emit "${HEADER}
 
 ${STAGE}" ;;

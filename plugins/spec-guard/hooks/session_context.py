@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Read-only session facts for the phase hint: the main-session context size and location.
+"""Read-only session facts for the phase hint: the location, the host and the state code of the last injection.
 
-Only the last usage numbers are read; no transcript content ever leaves this module.
+Only those three facts leave this module; no other transcript content does.
 Anything unreadable is "unknown" (None), never a guess.
 """
 from __future__ import annotations
@@ -21,60 +21,12 @@ INPUT_LIMIT = 1024 * 1024
 INPUT_WAIT = 1.0
 
 
-def _count(value) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
-
-
-def _usage(record) -> int | None:
-    """Context size carried by one transcript record, or None if it carries none."""
+def _is_compaction(record) -> bool:
+    """True when `record` is a host's compaction record: Claude's compact_boundary or Codex's compacted."""
     if not isinstance(record, dict):
-        return None
-    if record.get("type") == "assistant" and record.get("isSidechain") is not True:
-        message = record.get("message")
-        usage = message.get("usage") if isinstance(message, dict) else None
-        if not isinstance(usage, dict):
-            return None
-        parts = [_count(usage.get(key)) for key in
-                 ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")]
-        return None if None in parts else sum(parts)
-    payload = record.get("payload")
-    if isinstance(payload, dict) and payload.get("type") == "token_count":
-        info = payload.get("info")
-        last = info.get("last_token_usage") if isinstance(info, dict) else None
-        # Codex input_tokens already includes the cached part.
-        return _count(last.get("input_tokens")) if isinstance(last, dict) else None
-    return None
-
-
-def _compacted(record) -> int | None:
-    """Context size right after a compaction record, 0 when it records none; None if the record is not one.
-
-    context-after-compact: Claude's compact_boundary carries postTokens; Codex's compacted record carries no size
-    and is followed by a zero token_count, so it counts as below every threshold.
-    """
-    if not isinstance(record, dict):
-        return None
-    if record.get("type") == "system" and record.get("subtype") == "compact_boundary":
-        meta = record.get("compactMetadata")
-        post = _count(meta.get("postTokens")) if isinstance(meta, dict) else None
-        return post if post is not None else 0
-    if record.get("type") == "compacted":
-        return 0
-    return None
-
-
-def _window(record) -> int | None:
-    """Codex's model context window on a token_count record; Claude records carry none."""
-    payload = record.get("payload") if isinstance(record, dict) else None
-    info = payload.get("info") if isinstance(payload, dict) else None
-    window = info.get("model_context_window") if isinstance(info, dict) else None
-    return window if isinstance(window, int) and not isinstance(window, bool) and window > 0 else None
-
-
-def context_tokens(transcript_path) -> int | None:
-    """Context size of the last main-session turn, read from the last TAIL_LIMIT bytes."""
-    usage = context_usage(transcript_path)
-    return usage[0] if usage else None
+        return False
+    return ((record.get("type") == "system" and record.get("subtype") == "compact_boundary")
+            or record.get("type") == "compacted")
 
 
 def tail_lines(transcript_path) -> list | None:
@@ -100,32 +52,6 @@ def _records(lines):
             yield json.loads(line)
         except ValueError:
             continue
-
-
-def context_usage(transcript_path, lines=None) -> tuple | None:
-    """(context size, model context window or None) of the last main-session turn, from one record."""
-    if lines is None:
-        lines = tail_lines(transcript_path)
-    if lines is None:
-        return None
-    for record in _records(lines):
-        tokens = _usage(record)
-        if tokens:  # zero is a synthetic record (e.g. after an interruption), not a reading
-            return tokens, _window(record)
-        compacted = _compacted(record)
-        if compacted is not None:  # newer than any reading: the pre-compaction size no longer applies
-            return compacted, None
-    return None
-
-
-# quiet-injection (Q2 A): Claude records carry no window.  Its standard window is 200k, so a reading over that
-# can only come from a 1M window.
-STANDARD_WINDOW = 200_000
-
-
-def over_standard_window(lines) -> bool:
-    """True when any main-session reading in the tail is over STANDARD_WINDOW."""
-    return any((_usage(record) or 0) > STANDARD_WINDOW for record in _records(lines or []))
 
 
 # quiet-injection (D5): the state code of the last spec-guard injection, so the hook can give one line when nothing
@@ -159,7 +85,7 @@ def last_state(lines) -> str | None:
     An injection without a code (a diagnostic) also gives None, so the next turn is full again.
     """
     for record in _records(lines or []):
-        if _compacted(record) is not None:
+        if _is_compaction(record):
             return None
         for text in reversed(_injected(record)):
             if _OURS.search(text):
@@ -169,22 +95,8 @@ def last_state(lines) -> str | None:
 
 
 # A Codex rollout's first record carries the whole base instructions (19-24 KB measured on 2026-10-08); the read
-# stays bounded but leaves ample room (unattended-long-first-record).
+# stays bounded but leaves ample room.
 FIRST_RECORD_LIMIT = 1 << 20
-
-
-def unattended(transcript_path) -> bool:
-    """True only when the host says nobody attends this run (unattended-run-hint).
-
-    Claude Code sets CLAUDE_CODE_SESSION_ATTENDED=0 for `claude -p` (measured 2026-10-08, undocumented); a Codex
-    `codex exec` rollout starts with a session_meta record whose source is "exec". Anything else, including an
-    unreadable transcript, counts as attended, so an interactive session never loses its hints.
-    """
-    if os.environ.get("CLAUDE_CODE_SESSION_ATTENDED") == "0":
-        return True
-    record = _first_record(transcript_path)
-    payload = record.get("payload") if isinstance(record, dict) and record.get("type") == "session_meta" else None
-    return isinstance(payload, dict) and payload.get("source") == "exec"
 
 
 def _first_record(transcript_path):
@@ -349,32 +261,20 @@ def main() -> None:
     except Exception:  # a hook helper must never break the stage injection
         text, path = "", None
     try:
-        lines = tail_lines(path)
-        usage = context_usage(path, lines)
-        over = over_standard_window(lines)
-        last = last_state(lines)
+        last = last_state(tail_lines(path))
     except Exception:
-        usage, over, last = None, False, None
-    try:
-        nobody = unattended(path)
-    except Exception:
-        nobody = False
-    tokens, window = usage if usage else (None, None)
+        last = None
     try:
         lang = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--lang" else None
         location = location_line(sys.argv[1] if len(sys.argv) > 1 else ".", lang)
     except Exception:
         location = None
-    print("" if tokens is None else tokens)
-    print(location or "")
-    print("" if window is None else window)
-    print("unattended" if nobody else "")
     try:
         host = host_from_hook_input(text, path)
     except Exception:
         host = None
+    print(location or "")
     print(host or "")
-    print("over-200k" if over else "")
     print(last or "")
 
 
