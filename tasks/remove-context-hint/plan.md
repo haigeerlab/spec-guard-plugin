@@ -1,6 +1,6 @@
 # Plan: remove-context-hint
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved -->
 
 Spec：[spec/remove-context-hint.md](../../spec/remove-context-hint.md)（2026-11-26 批准，Q1 A、Q2 A）。
 
@@ -30,12 +30,14 @@ Spec：[spec/remove-context-hint.md](../../spec/remove-context-hint.md)（2026-1
 ## 外部审查意见
 
 - 第一轮（Codex）：R1-1 `_count` 与 `postTokens` 只为读数存在 → 采纳；R1-2 三行协议的读取方未核对 → 采纳，已核对；R1-3 高读数一行模式缺精确断言 → 采纳；R1-4（建议）模块说明 → 采纳。
+<!-- spec-guard: codex-review round=2 blocking=1 sha256=a1bbaff074c9 -->
+- 第二轮（Codex）：R1-2 仍判未证实（它只看得到两个文件）→ 改成 Task 1 的验证步骤；R2-1 AC4 检索清单漏名字 → 补全。两条交用户，2026-11-26 用户「按改法改，批准」。
 
 ## 任务
 
 - **Task 0**：提交 Spec 批准、能力图新行、本 Plan 与 todo。验证：快档。
-- **Task 1**：先写会红的回归：`test-phase-guard.sh` 的 AC1 场景（实现前这几例会因为出了边界行而失败）；`test_session_context.py` 的三行输出一例。再改 `module_stage.py`、`session_context.py`、`phase-guard.sh`，删掉旧用例。验证：`test-phase-guard.sh`、`test_session_context.py`、`test_flow_v2.py`。
-- **Task 2**：文档、`evals/hint-english-diff.sh`、CHANGELOG。验证：快档，`git grep -n -e boundary_line -e context_tokens -e context_window -e window_estimated -e over-200k -e postTokens -e '上下文约' -e 'Module boundary: this session'` 在历史目录与 CHANGELOG 旧条目之外为空（AC4）。
+- **Task 1**：（验证里另跑一次全仓 `git grep session_context.py`，确认普通模式只有 `phase-guard.sh` 一个读取方，结果记进 todo，R1-2）先写会红的回归：`test-phase-guard.sh` 的 AC1 场景（实现前这几例会因为出了边界行而失败）；`test_session_context.py` 的三行输出一例。再改 `module_stage.py`、`session_context.py`、`phase-guard.sh`，删掉旧用例。验证：`test-phase-guard.sh`、`test_session_context.py`、`test_flow_v2.py`。
+- **Task 2**：文档、`evals/hint-english-diff.sh`、CHANGELOG。验证：快档，`git grep -n -e boundary_line -e context_tokens -e context_window -e window_estimated -e over-200k -e postTokens -e _usage -e _window -e context_usage -e model_context_window -e unattended -e _count -e --context-tokens -e --context-window -e --window-estimated -e --unattended -e '上下文约' -e 'Module boundary: this session'`（R2-1） 在历史目录与 CHANGELOG 旧条目之外为空（AC4）。
 - **Checkpoint 1（report）**：完整档三条全绿；变异（临时副本）：在 `_describe_body` 里加回一行固定的边界文字 → AC1 用例变红；还原后全绿。已安装的 0.96.2 与本分支比对（AC2、AC3）：本仓库与几种老流程夹具在没有读数或读数低于 70% 时的阶段提示与状态码逐字相同；高读数的一行模式下，0.96.2 的输出去掉边界行后与本分支逐字相同（R1-3）；SessionStart（compact）那次注入逐字相同；带收件包装的提示词，收件记账那行逐字相同。
 - **Checkpoint 2（gate）**：推送、开 PR；最终验收与合并合成一问；发 0.97.0 另取授权，发之前先告诉 ecosystem-lead（agent-relay 同步发版）。拟回告：给 ecosystem-lead「上下文边界提示已删，数字来源的核实结果见 Spec」。
 
