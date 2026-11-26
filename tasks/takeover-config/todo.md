@@ -11,7 +11,12 @@
 
 ## 返工：删除退役接口（2026-11-26）
 
-- [ ] Task 6：删 `/map` 的 `autonomy`、`module_tier` 一线代码与三个接口条目，接口 1.25
+- [x] Task 6：删 `/map` 的 `autonomy`、`module_tier` 一线代码与三个接口条目，接口 1.25
 - [ ] Task 7：文档与 CHANGELOG
 - [ ] Checkpoint 3（report）：完整档、变异与老输出比对
 - [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
+
+### 返工证据
+
+- Task 6（2026-11-26）：先改测试：`test_map_view.py` 模块键集合去掉 `autonomy`，删 `AutonomyTest`，加 `RetiredAutonomyTest` 两例（模块对象没有 `autonomy`；`interface` 正好是 1.25），`TakeoverTest` 的旧断言改为只比文字、快照不再弹出 `autonomy`；`test_project_config.py` 删 `module_tier` 那例，退役键的 show／check／set／unset 用例保留；`test-checkers.sh` 删 6 个旧反例，加 3 个「又出现就报错」。实现前 6 例失败。再删：`map_view` 的 `autonomy` 字段、`AUTONOMY_FIELDS`、对 `module_tiers`／`wider` 的导入与调用；`project_config` 的 `_legacy`、`_project_tier`、`module_tier`、`module_tiers`、`wider` 与过时注释；`interface.json` 三个条目，版本 1.25；`check-interface.py` 从 `ENTRIES` 拿掉两项、删 `_autonomy` 与两条取值比对，加 `_autonomy_gone`。之后 `test_map_view`＋`test_project_config` 202 例、检查器回归 176 例、`check-interface.py` 全部通过。
+

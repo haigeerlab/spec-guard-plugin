@@ -197,8 +197,8 @@ VALIDATORS = {
 }
 MANAGED = ("takeoverNarrowed",)
 # takeover-config: retired keys (S101, "autonomyTier 退役吧"), not mapped to takeover.  A file that still has them is
-# valid (problem "retired-key"), keeps them on writes and can unset them; they cannot be set.  Only module_tier reads
-# them, for /map's deprecated autonomy field.
+# valid (problem "retired-key"), keeps them on writes and can unset them; they cannot be set.  Nothing reads their
+# values any more: /map's autonomy field and module_tier were removed in interface 1.25.
 RETIRED = {
     "autonomyTier": lambda value: value in TIERS,
     "moduleAutonomy": lambda value: isinstance(value, dict) and all(
@@ -242,57 +242,6 @@ def load(root: Path) -> tuple[dict[str, Any], list[str]]:
             else:
                 problems.append(key + "-invalid")
     return values, problems
-
-
-def _legacy(root: Path) -> tuple[dict[str, Any], list[str]]:
-    """The retired keys as they were read before takeover-config: (valid values, ["<key>-invalid", ...] or structural)."""
-    values, problems = load(root)
-    if _structural(problems):
-        return {}, problems
-    text, _ = read_text(Path(root) / RELATIVE_PATH)
-    document = json.loads(text) if text is not None else {}
-    legacy, invalid = {}, []
-    for key, valid in RETIRED.items():
-        if key in document:
-            if valid(document[key]):
-                legacy[key] = document[key]
-            else:
-                invalid.append(key + "-invalid")
-    return legacy, invalid
-
-
-def _project_tier(values: dict[str, Any], problems: list[str]) -> tuple[str, str]:
-    if "autonomyTier" in values:
-        return values["autonomyTier"], "autonomyTier"
-    if _structural(problems) or "autonomyTier-invalid" in problems:
-        return "strict", "default (config invalid)"
-    return "strict", "default"
-
-
-def module_tier(root: Path, module_id: str) -> tuple[str, str]:
-    """module-autonomy: the only reader of a module's effective tier, as (tier, source).
-
-    A module's own entry wins; otherwise the project's autonomyTier applies.  An invalid moduleAutonomy
-    sends every module back to the project tier with the source "default (config invalid)".  spec-guard
-    never caps the tier: a cap from elsewhere is the caller's to apply.
-    """
-    return module_tiers(root, [module_id])[1][module_id]
-
-
-def module_tiers(root: Path, module_ids) -> tuple[str, dict[str, tuple[str, str]]]:
-    """(project tier, {id: (tier, source)}) from one read of the file; module_tier is this for one id."""
-    values, problems = _legacy(root)
-    entries = values.get("moduleAutonomy", {})
-    project, source = _project_tier(values, problems)
-    if "moduleAutonomy-invalid" in problems:
-        source = "default (config invalid)"
-    return project, {module: (entries[module], "moduleAutonomy") if module in entries else (project, source)
-                     for module in module_ids}
-
-
-def wider(tier: str, than: str) -> bool:
-    """TIERS runs from strict to relaxed."""
-    return TIERS.index(tier) > TIERS.index(than)
 
 
 def module_takeover(root: Path, module_id: str) -> tuple[dict[str, str], str]:

@@ -802,16 +802,13 @@ mkifc "$TMP/ifc-declared" 'del data["declaredScope"]'
 want fail "interface: 缺 1.11 的 declaredScope 入口 → 报错" python3 "$IFC" "$TMP/ifc-declared/interface.json"
 mkifc "$TMP/ifc-declared-error" 'del data["declaredScope"]["values"]["error"]["bad-dependency"]'
 want fail "interface: declaredScope 的 error 少一个码 → 报错" python3 "$IFC" "$TMP/ifc-declared-error/interface.json"
-# autonomy-tier：interface 1.11 的 autonomyTier 入口，取值与 project_config.TIERS 一致。
-mkifc "$TMP/ifc-tier" 'del data["autonomyTier"]'
-want fail "interface: 缺 1.11 的 autonomyTier 入口 → 报错" python3 "$IFC" "$TMP/ifc-tier/interface.json"
-mkifc "$TMP/ifc-tier-less" 'del data["autonomyTier"]["values"]["relaxed"]'
-want fail "interface: autonomyTier 少一档 → 报错" python3 "$IFC" "$TMP/ifc-tier-less/interface.json"
-# module-autonomy：interface 1.14 的 moduleAutonomy 入口与 mapView.autonomy 说明，字段与取值和代码一致。
-mkifc "$TMP/ifc-modtier" 'del data["moduleAutonomy"]'
-want fail "interface: 缺 1.14 的 moduleAutonomy 入口 → 报错" python3 "$IFC" "$TMP/ifc-modtier/interface.json"
-mkifc "$TMP/ifc-modtier-less" 'del data["moduleAutonomy"]["values"]["relaxed"]'
-want fail "interface: moduleAutonomy 少一档 → 报错" python3 "$IFC" "$TMP/ifc-modtier-less/interface.json"
+# takeover-config 返工：1.25 删掉了 autonomyTier、moduleAutonomy、mapView.autonomy，再出现就报错。
+mkifc "$TMP/ifc-tier-back" 'data["autonomyTier"] = {"key": "autonomyTier"}'
+want fail "interface: 已删除的 autonomyTier 又出现 → 报错" python3 "$IFC" "$TMP/ifc-tier-back/interface.json"
+mkifc "$TMP/ifc-modtier-back" 'data["moduleAutonomy"] = {"key": "moduleAutonomy"}'
+want fail "interface: 已删除的 moduleAutonomy 又出现 → 报错" python3 "$IFC" "$TMP/ifc-modtier-back/interface.json"
+mkifc "$TMP/ifc-autonomy-back" 'data["mapView"]["autonomy"] = {"fields": {}}'
+want fail "interface: 已删除的 mapView.autonomy 又出现 → 报错" python3 "$IFC" "$TMP/ifc-autonomy-back/interface.json"
 # takeover-config：interface 1.15 的 takeover、moduleTakeover 入口与 mapView.takeover 说明，字段与取值和代码一致。
 mkifc "$TMP/ifc-takeover" 'del data["takeover"]'
 want fail "interface: 缺 1.15 的 takeover 入口 → 报错" python3 "$IFC" "$TMP/ifc-takeover/interface.json"
@@ -842,10 +839,6 @@ mkifc "$TMP/ifc-narrow-source" 'data["takeoverNarrow"]["values"]["source"].pop("
 want fail "interface: takeoverNarrow 的来源少一个 → 报错" python3 "$IFC" "$TMP/ifc-narrow-source/interface.json"
 mkifc "$TMP/ifc-map-takeover-field" 'data["mapView"]["takeover"]["fields"]["extra"] = "x"'
 want fail "interface: mapView.takeover 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-map-takeover-field/interface.json"
-mkifc "$TMP/ifc-autonomy" 'del data["mapView"]["autonomy"]'
-want fail "interface: mapView 缺 1.14 的 autonomy 说明 → 报错" python3 "$IFC" "$TMP/ifc-autonomy/interface.json"
-mkifc "$TMP/ifc-autonomy-field" 'data["mapView"]["autonomy"]["fields"]["cap"] = "x"'
-want fail "interface: autonomy 多一个字段 → 报错" python3 "$IFC" "$TMP/ifc-autonomy-field/interface.json"
 # review-card-sections：interface 1.5 的 reviewKinds，正好七个契约代码，小项名都在共享检查点规则里。
 mkifc "$TMP/ifc-kinds" 'del data["reviewKinds"]'
 want fail "interface: 缺 reviewKinds → 报错" python3 "$IFC" "$TMP/ifc-kinds/interface.json"
