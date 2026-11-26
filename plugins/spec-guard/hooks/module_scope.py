@@ -329,6 +329,62 @@ def default_base(root: Path, module_id: str) -> str | None:
     return parent.strip() if parent else None
 
 
+
+REWORK_HISTORY = 200  # rework-scope-baseline: commits of the module's todo looked at, newest first
+
+
+def _todo_state(text: str | None) -> str | None:
+    """`open` (an unchecked item), `finished` (items, none unchecked; a formal deferral counts as done), else None."""
+    from module_stage import CHECKED, UNCHECKED, deferred_items  # late: module_stage imports this module
+    if text is None:
+        return None
+    if UNCHECKED.search(text):
+        return "open"
+    return "finished" if CHECKED.search(text) or deferred_items(text) else None
+
+
+def rework_info(root: Path, module_id: str) -> dict | None:
+    """rework-scope-baseline (Q1 A): {"base", "start"} while a finished module is reworked, else None.
+
+    In the todo's history (newest first) take the latest open state -- the work tree when it has an unchecked item --
+    and the nearest finished commit before it; the rework starts at the oldest open commit after that one, and the
+    comparison base is its parent.  A rework still only in the work tree compares with HEAD (`start` is None).  A
+    rework whose tasks are all ticked again keeps that base, so the final acceptance still sees only the rework.
+    A module never finished, a todo without history, or git failing gives None: callers fall back to default_base.
+    """
+    relative = "tasks/%s/todo.md" % module_id
+    try:
+        work = (root / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        work = None
+    log = _git(root, "log", "-n", str(REWORK_HISTORY), "--format=%H", "--", relative)
+    if log is None:
+        return None
+    states = [("work", _todo_state(work))] if _todo_state(work) == "open" else []
+    for commit in log.split():
+        shown = _git(root, "show", "%s:%s" % (commit, relative))
+        states.append((commit, _todo_state(shown)))
+    latest_open = next((index for index, (_c, state) in enumerate(states) if state == "open"), None)
+    if latest_open is None:
+        return None
+    finished = next((index for index in range(latest_open + 1, len(states)) if states[index][1] == "finished"), None)
+    if finished is None:
+        return None
+    start = next(index for index in range(finished - 1, latest_open - 1, -1) if states[index][1] == "open")
+    commit = states[start][0]
+    if commit == "work":
+        head = _git(root, "rev-parse", "--verify", "--quiet", "HEAD")
+        return {"base": head.strip(), "start": None} if head else None
+    parent = _git(root, "rev-parse", "--verify", "--quiet", commit + "^")
+    return {"base": parent.strip(), "start": commit} if parent else None
+
+
+def scope_base(root: Path, module_id: str) -> str | None:
+    """The base the overreach and T4 checks compare with: the rework's, or default_base for a first build."""
+    rework = rework_info(root, module_id)
+    return rework["base"] if rework else default_base(root, module_id)
+
+
 def _declared_paths(root: Path, module_id: str) -> tuple:
     """Public paths an approved, unchanged Plan pre-declares (pre-declared-scope's approval); () otherwise."""
     if not plan_approval(root, module_id)[0]:
@@ -448,7 +504,7 @@ def _check(root: Path, module_id: str, base: str | None, as_json: bool) -> int:
 def _report(root: Path, module_id: str, scope: Scope, base: str | None, as_json: bool, t4: dict | None = None) -> int:
     """The check command's output; `t4` (plan-auto-approve, v2 modules only) adds the T4 changes and whether they stop."""
     if base is None:
-        base = default_base(root, module_id)
+        base = scope_base(root, module_id)  # rework-scope-baseline: a rework is checked from its own start
         if base is None:
             print("base-unknown: spec/%s.md was not committed after an earlier commit; give --base" % module_id)
             return 2

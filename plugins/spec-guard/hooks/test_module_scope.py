@@ -788,5 +788,118 @@ class FlowT4(FlowScope):
                 self.assertEqual(json.loads(out)["t4"], {"status": "ok", "hits": ["package-lock.json"], "stops": stops})
 
 
+
+class ReworkBase(unittest.TestCase):
+    """rework-scope-baseline: a rework of a finished module is compared from the rework's first commit (Q1 A)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.git("init", "-q")
+        self.write("apps/m/old.py")
+        self.write("apps/other/keep.py")
+        self.c0 = self.commit("base")
+        self.write("spec/m.md", "# Spec: m\n\n## 并行边界\n\n- 独占：`apps/m/`、`spec/m.md`、`tasks/m/`\n- 公共：无\n")
+        self.write("tasks/m/todo.md", "- [ ] t\n")
+        self.c1 = self.commit("spec")
+
+    def git(self, *args):
+        env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+        env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+        return subprocess.run(["git", "-C", str(self.root), *args], check=True, capture_output=True, text=True,
+                              env=env).stdout.strip()
+
+    def write(self, path, text="x\n"):
+        target = self.root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-qm", message)
+        return self.git("rev-parse", "HEAD")
+
+    def outside(self):
+        import module_scope
+        scope = parse((self.root / "spec" / "m.md").read_text(encoding="utf-8"))
+        rows = module_scope.classify(self.root, "m", scope, module_scope.scope_base(self.root, "m"))
+        return sorted(row["path"] for row in rows if row["scope"] == "outside")
+
+    def finish_then_other(self):
+        self.write("apps/m/a.py")
+        self.write("tasks/m/todo.md", "- [x] t\n")
+        self.done = self.commit("done")
+        self.write("apps/other/x.py")
+        self.other = self.commit("another module merges")
+
+    def test_first_build_keeps_the_old_base(self):
+        import module_scope
+        self.write("apps/m/a.py")
+        self.assertIsNone(module_scope.rework_info(self.root, "m"))
+        self.assertEqual(module_scope.scope_base(self.root, "m"), module_scope.default_base(self.root, "m"))
+        self.assertEqual(module_scope.scope_base(self.root, "m"), self.c0)
+
+    def test_rework_counts_from_its_first_commit(self):
+        import module_scope
+        self.finish_then_other()
+        self.write("tasks/m/todo.md", "- [x] t\n- [ ] rework\n")
+        self.write("apps/m/b.py")
+        start = self.commit("rework")
+        self.assertEqual(module_scope.rework_info(self.root, "m"), {"base": self.other, "start": start})
+        self.assertEqual(self.outside(), [])  # apps/other/x.py belongs to the other module
+        self.write("apps/other/y.py")  # a real overreach of the rework itself
+        self.assertEqual(self.outside(), ["apps/other/y.py"])
+
+    def test_rework_only_in_the_work_tree(self):
+        import module_scope
+        self.finish_then_other()
+        self.write("tasks/m/todo.md", "- [x] t\n- [ ] rework\n")
+        head = self.git("rev-parse", "HEAD")
+        self.assertEqual(module_scope.rework_info(self.root, "m"), {"base": head, "start": None})
+        self.assertEqual(self.outside(), [])
+
+    def test_still_the_rework_base_once_its_tasks_are_ticked(self):
+        import module_scope
+        self.finish_then_other()
+        self.write("tasks/m/todo.md", "- [x] t\n- [ ] rework\n")
+        start = self.commit("rework")
+        self.write("tasks/m/todo.md", "- [x] t\n- [x] rework\n")
+        self.commit("rework done")
+        self.assertEqual(module_scope.rework_info(self.root, "m"), {"base": self.other, "start": start})
+
+    def test_the_latest_rework_wins(self):
+        import module_scope
+        self.finish_then_other()
+        self.write("tasks/m/todo.md", "- [x] t\n- [ ] r1\n")
+        self.commit("rework 1")
+        self.write("tasks/m/todo.md", "- [x] t\n- [x] r1\n")
+        self.commit("rework 1 done")
+        self.write("apps/other/z.py")
+        later = self.commit("yet another module")
+        self.write("tasks/m/todo.md", "- [x] t\n- [x] r1\n- [ ] r2\n")
+        start = self.commit("rework 2")
+        self.assertEqual(module_scope.rework_info(self.root, "m"), {"base": later, "start": start})
+
+    def test_only_formal_deferrals_count_as_finished(self):
+        import module_scope
+        self.write("tasks/m/todo.md", "- [ ] 延期：调研；恢复条件：有人要\n")
+        self.commit("only a deferral left")
+        self.write("apps/other/x.py")
+        other = self.commit("another module")
+        self.write("tasks/m/todo.md", "- [ ] 延期：调研；恢复条件：有人要\n- [ ] rework\n")
+        start = self.commit("rework")
+        self.assertEqual(module_scope.rework_info(self.root, "m"), {"base": other, "start": start})
+
+    def test_outside_git_falls_back(self):
+        import module_scope
+        with tempfile.TemporaryDirectory() as plain:
+            root = Path(plain)
+            (root / "tasks" / "m").mkdir(parents=True)
+            (root / "tasks" / "m" / "todo.md").write_text("- [x] t\n- [ ] r\n", encoding="utf-8")
+            self.assertIsNone(module_scope.rework_info(root, "m"))
+            self.assertIsNone(module_scope.scope_base(root, "m"))
+
+
 if __name__ == "__main__":
     unittest.main()
