@@ -15,6 +15,13 @@ LICENSE = REPO / "LICENSE"
 HAS_YAML = importlib.util.find_spec("yaml") is not None
 SUMMARY = "CI required"
 SHA_PIN = re.compile(r"^[\w.-]+/[\w.-]+(/[\w./-]+)?@[0-9a-f]{40}$")
+# autopilot module 1 A6: the two hub callers need exactly what the hub's reusable workflow asks for, nothing more.
+HUB_CALLERS = {
+    "haigeerlab/autopilot-hub/.github/workflows/admission.yml":
+        {"contents": "read", "checks": "write", "pull-requests": "write", "issues": "write"},
+    "haigeerlab/autopilot-hub/.github/workflows/degrade.yml":
+        {"contents": "read", "issues": "write", "pull-requests": "read", "actions": "read"},
+}
 
 
 def load(path):
@@ -41,6 +48,13 @@ class WorkflowTest(unittest.TestCase):
                         self.assertNotIn("paths-ignore", event)
                 for name, job in data["jobs"].items():
                     permissions = job.get("permissions")
+                    caller = job.get("uses")
+                    if caller:
+                        self.assertRegex(caller, SHA_PIN, "%s: %s is not pinned to a full SHA" % (name, caller))
+                        allowed = HUB_CALLERS.get(caller.split("@")[0])
+                        self.assertIsNotNone(allowed, "%s: %s is not a known hub caller" % (name, caller))
+                        self.assertEqual(permissions, allowed, "%s: permissions %r" % (name, permissions))
+                        continue
                     self.assertIn(permissions, ({}, {"contents": "read"}), "%s: permissions %r" % (name, permissions))
                     for step in job.get("steps", []):
                         uses = step.get("uses")
