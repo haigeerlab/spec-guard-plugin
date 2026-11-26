@@ -787,6 +787,20 @@ class FlowT4(FlowScope):
                 self.assertEqual(code, 0, out)
                 self.assertEqual(json.loads(out)["t4"], {"status": "ok", "hits": ["package-lock.json"], "stops": stops})
 
+    def test_check_leaves_out_the_module_documents(self):
+        """plan-auto-approve rework (AC9): the module's own documents are not reported as T4 changes."""
+        repo = self.repo()
+        repo.write(".github/autopr/risk-paths.json",
+                   json.dumps({"schema": "autopilot.risk-paths/v1", "T4": ["spec/**", "tasks/**"], "T3": []}))
+        repo.git("add", "-A")
+        repo.git("commit", "-qm", "risk")
+        repo.write("spec/m.md", (repo.root / "spec" / "m.md").read_text(encoding="utf-8") + "\nmore\n")
+        repo.write("tasks/m/plan.md", "# Plan\n")
+        repo.write("tasks/m/todo.md", "- [ ] t\n")
+        code, out = repo.run("check", "--module", "m", "--base", "base", "--format", "json")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(json.loads(out)["t4"], {"status": "ok", "hits": [], "stops": False})
+
 
 
 class ReworkBase(unittest.TestCase):

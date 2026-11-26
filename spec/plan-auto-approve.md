@@ -1,6 +1,6 @@
 # Spec: plan-auto-approve
 
-<!-- spec-guard: review approved 9bbc70fed280 -->
+<!-- spec-guard: review approved cf1ef4dba30c -->
 
 ## Objective
 
@@ -13,6 +13,13 @@
 对外接口与用法草案一致吗：一致。入口表「Plan」一行、A 节「Plan 不可配置、永远自动批准」。草案没有细说「越界」拿什么比、「照拦」后怎样放行，本 Spec 在假设 4～6 补上，见 Q1、Q2。
 
 登记：用法草案 dev-flow-v2（用户 2026-11-24「确认插入，Q1–Q6 按推荐」），M2 里程碑。需求确认沿用草案的确认，本 Spec 交审即确认范围；2026-11-25 用户回「批准；Q1 A；Q2 A」。
+
+**返工（2026-11-26，0.97.0 之后，目标 0.97.1）**：新流程模块自己的文档被判成 T4。ecosystem-lead 转报 autopr-design 的沙盒演练（bridge #23255，账本 8Z37JYJ）：各仓 `risk-paths.json` 把 `spec/**`、`tasks/**`、`.agent/**` 列为 T4，新流程模块一写完需求文档就「改到 T4 文件」。
+用户「先发 0.97.0，T4 下版修」；返工假设 2026-11-26 用户回「确认，Q1 A；Q2 A」，返工 Spec 用户回「批准；Q3 A」。写 Spec 前在沙盒只读复现（drill-pow 文档那次提交）：
+- 命中 8 个：本模块文档 5 个（`spec/drill-pow.md`，`tasks/drill-pow/` 下 design、regression、plan、todo），流程文件 3 个（能力图、`.agent/state.json`、`.agent/config.json`）。lead 建议只除外前 5 个，还会剩 3 个。
+- drill-pow 本身没停下：影响面的 `src/calc.py` 在沙盒是 T3，它已是重要需求。不是重要需求的新流程模块，在这类仓库里每个都会停在中途 gate。
+- 同类问题在重要需求判定：并行边界里写自己的文档（本仓库的写法就是 `spec/<id>.md`、`tasks/<id>/`），按风险清单会把每个模块都判成重要需求。
+返工见假设 12～15。
 
 ## Assumptions
 
@@ -39,6 +46,13 @@
 9. **和接管档位的关系**：本模块不改 `takeover` 的取值与读法。老模块的 `plan: codex` 照旧；新流程模块不读 `plan` 这一项（草案 A 节「Plan 不可配置」）。档位重定义归 takeover-redefine。
 10. **共享判据**：越界与 T4 的判定只写一处（`module_scope.flow_scope`、`module_stage.t4_hits`），构建中的检查由阶段提示、`module_scope.py check` 与最终验收的范围检查共用；verify-artifacts 和现在一样不查构建中的改动，它调同一个 `flow_scope` 查范围本身（并行边界写坏判失败，normal／important 没有范围给警告）。改判据时各入口的正反回归一起改（项目不变量）。（2026-11-25 写 Plan 时修订：原文「phase-guard 与 verify-artifacts 调同一个函数」与 verify-artifacts 的现状不符。）
 11. **不做**：takeover 新取值与兼容（takeover-redefine）；回归文档检查（regression-doc-check）；合并前验证（verification-criteria）；技术方案审查本身（design-review 已做）；给老模块的 Plan 改规则或补标记。
+12. **构建中的 T4 不算本模块文档与流程记账**（返工）：只对新流程模块，`t4_hits` 比风险清单之前，先去掉下面这些改动：
+    - 本模块自己的 5 个文档：`spec/<id>.md`，`tasks/<id>/design.md`、`tasks/<id>/regression.md`、`tasks/<id>/plan.md`、`tasks/<id>/todo.md`。只认这几个文件名，`tasks/<id>/` 下别的文件照旧查。
+    - 两个流程记账文件：`spec/CAPABILITY-MAP.md`、`.agent/state.json`（返工 Q1 A）。
+    照旧算 T4 的：别的模块的文档；`.agent/config.json`（装着批准节奏与接管档位，给模块设档位就是授权变化，开工设档位时会停一次交用户）；用法草案 `spec/usage/`（Q3，推荐 A）；风险清单本身。老模块不变。
+13. **重要需求判定同样不算本模块文档**（返工 Q2 A）：新流程模块的风险路径检查（并行边界、预先声明、技术方案影响面里的路径）先去掉本模块的 5 个文档，再比风险清单。边界里写成目录 `tasks/<id>/` 的一项也算本模块文档、去掉（本仓库与模板的写法就是这样，不去掉 Q2 就修不到）。流程记账文件这里不除外（它们不会出现在边界或影响面里，写了照旧算）。老模块不变。
+14. **只写一处**：本模块文档的认法写成 `module_stage` 里一个函数，假设 12、13 共用；`t4_hits` 的三个调用方（阶段提示、`module_scope.py check`、review-mark 的最终验收）不用各自改。`t4_hits` 输出形状不变，接口版本不变（仍是 1.25）。
+15. **规则文字与版本**：共享检查点规则「碰 T4」一条补一句「新流程模块自己的 5 个文档与能力图、`.agent/state.json` 不算」，重要需求判定一段补一句「新流程模块边界与影响面里本模块自己的文档不算风险路径」；CHANGELOG「未发布」加一条；版本 0.97.0 → 0.97.1（两份 plugin.json、两份 README 的 `--ref`）。
 
 ## Contract
 
@@ -49,6 +63,8 @@
 - **C5** `hooks/verify-artifacts.sh`：新流程 Plan 带标记时警告（假设 2）。
 - **C6** `references/workflow-checkpoints.md`、`references/node-rules.md`：规则文字（假设 8）。
 - **C7** `interface.json` 1.21、`scripts/check-interface.py`、`docs/commands.md`（假设 7）。
+- **C8** `hooks/module_stage.py`：本模块文档的认法，`t4_hits` 与 `important` 共用（返工，假设 12～14）。
+- **C9** `references/workflow-checkpoints.md` 两处规则文字、CHANGELOG、版本 0.97.1（返工，假设 15）。
 
 ## Acceptance criteria
 
@@ -60,6 +76,10 @@
 - **AC6** T4：影响面列了 T4 路径的模块按规则是重要需求（`important.reasons` 含 `risk-path`）；不是重要需求的模块改到 T4 文件时停在中途 gate；风险路径清单读不了时出「未检查」一行、不停下。
 - **AC7** 需求待确认、技术方案待审或待批时，Plan 之前照旧拦住（requirement-confirm-gate、design-review 的回归不变）。
 - **AC8** 本机 `validate.sh`、phase-guard、verify-artifacts 全绿；`check-interface.py` 通过；PR 上 `CI required` 通过。
+- **AC9**（返工）风险清单把 `spec/**`、`tasks/**`、`.agent/**` 列为 T4 时，不是重要需求的新流程模块只改了自己的 5 个文档、能力图、`.agent/state.json` 和非 T4 的代码：阶段提示、`module_scope.py check`、review-mark 的最终验收都不报 T4。
+- **AC10**（返工）同样的清单下，下列改动照旧报 T4、停在中途 gate：别的模块的 `spec/<other>.md` 或 `tasks/<other>/plan.md`；本模块的 `tasks/<id>/` 下 5 个文档以外的文件；`.agent/config.json`；`spec/usage/` 下的文件；风险清单本身。
+- **AC11**（返工）并行边界只列了 `spec/<id>.md`、`tasks/<id>/` 和非风险路径的新流程模块，`important.reasons` 不含 `risk-path`；边界或影响面列了别的 T3／T4 路径时照旧含。
+- **AC12**（返工）老模块在同样的清单下，T4 命中与重要需求判定和 0.97.0 一样（回归锁住）。
 
 ## Boundaries
 
@@ -69,7 +89,7 @@
 
 ## 并行边界
 
-- 独占：`spec/plan-auto-approve.md`、`tasks/plan-auto-approve/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/module_scope.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_module_scope.py`、`plugins/spec-guard/hooks/test_important_requirement.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`
+- 独占：`spec/plan-auto-approve.md`、`tasks/plan-auto-approve/`、`plugins/spec-guard/hooks/module_stage.py`、`plugins/spec-guard/hooks/module_scope.py`、`plugins/spec-guard/hooks/review_mark.py`、`plugins/spec-guard/hooks/map_view.py`、`plugins/spec-guard/hooks/verify-artifacts.sh`、`plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/node-rules.md`、`plugins/spec-guard/interface.json`、`scripts/check-interface.py`、`docs/commands.md`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_module_scope.py`、`plugins/spec-guard/hooks/test_important_requirement.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh`、`CHANGELOG.md`、`README.md`、`README.en.md`、`plugins/spec-guard/.claude-plugin/plugin.json`、`plugins/spec-guard/.codex-plugin/plugin.json`
 - 公共：无
 
 ## Open questions
@@ -82,6 +102,10 @@
   - A（推荐）：算。原来批 Plan 就授权推送本分支与开 PR（检查点 2 照写），自动批准沿用这一项；合并照 F3 由用户在对话里决定，发布另要授权，其余不可逆操作照旧问。
     代价：新流程模块从写需求到开 PR，用户只在需求确认（和需要时的技术方案批准）露面一次。
   - B：不算。每个新流程模块开 PR 前问一次用户。代价：多一次打扰，和草案「Plan 不交人」的意图不完全一致。
+
+- **Q3 用法草案 `spec/usage/` 算不算 T4？**（返工，2026-11-26 用户选 A）返工 Q1 只问了三个流程文件，没问用法草案。越界检查把它当流程文件放行。
+  - A（推荐）：照旧算。改用法草案是改接口约定（本 Spec「先问再做」），新流程模块构建中本就不该改它；真要改，停一次交用户正合适。
+  - B：不算，和越界检查一致。代价：构建中改了用法草案不再被 T4 拦。
 
 ## 文档建议
 

@@ -99,6 +99,47 @@ Spec：[spec/plan-auto-approve.md](../../spec/plan-auto-approve.md)（2026-11-25
 - 质量与工作区配置：无
 - 补丁：无
 
+## 返工：本模块文档与流程记账不算 T4（2026-11-26，Spec 假设 12～15，Q1 A、Q2 A、Q3 A）
+
+预先声明不变（四行仍为「无」）。
+
+- **一个函数 `module_stage.own_doc(module, path)`**（假设 14）：`path` 是 `spec/<id>.md`，或 `tasks/<id>/` 下的 `design.md`、`regression.md`、`plan.md`、`todo.md` 之一 → True；其余 False。
+  文件名写成常量 `OWN_DOCS = ("design.md", "regression.md", "plan.md", "todo.md")`。只比字符串，不读文件。
+- **`t4_hits`**（假设 12）：新流程模块（`_v2`）在比风险清单前，去掉 `own_doc` 为 True 的路径，以及常量 `T4_FLOW_FILES = ("spec/CAPABILITY-MAP.md", ".agent/state.json")` 里的路径。
+  这里不复用 `module_scope.FLOW_FILES`：那份含 `.agent/config.json`，加上 `FLOW_DIRS` 的 `spec/usage/`，两者按 Q1 A、Q3 A 都照旧算 T4。
+  老模块不进 `t4_hits`（调用方只对新流程模块调它），仍加 `_v2` 判断，免得以后有人对老模块调它时口径不清。
+- **`important()`**（假设 13）：新流程模块拼好 `paths`（边界、预先声明、影响面）后，比风险清单前去掉 `own_doc` 为 True 的路径，以及等于 `tasks/<id>/` 的目录项。
+  老模块的 `paths` 不动。`T4_FLOW_FILES` 不在这里去掉。
+- **调用方不改**：阶段提示 `_t4_part`、`module_scope.py check`、review-mark 的 `_outside` 都只调 `t4_hits`，输出形状不变，接口仍是 1.25。
+
+### 返工任务
+
+- **Task 7**：`own_doc`、`t4_hits` 去掉本模块文档与流程记账。先写会红的用例，再实现：
+  - `test_flow_v2.py` 的 `T4Test` 加三例，风险清单 T4 为 `spec/**`、`tasks/**`、`.agent/**`。
+    1. 非重要模块只改本模块 5 个文档、能力图、`.agent/state.json` 和非风险代码，阶段提示不出 T4 一行（AC9）。
+    2. 分别改别的模块的 `spec/<other>.md`、`tasks/<other>/plan.md`、本模块 `tasks/<id>/notes.md`、`.agent/config.json`、`spec/usage/x.md`、风险清单本身，各自照旧停（AC10）。
+    3. 老模块同样的改动，`t4_hits` 的命中与 0.97.0 相同（AC12）。
+  - `test_module_scope.py` 的 `FlowT4` 加一例：`check --json` 的 `t4.hits` 不含本模块文档（AC9）。
+  - `test_review_marker.py` 的 `AcceptanceT4` 加一例：最终验收不因本模块文档拒绝（AC9）。
+  - 验证：上面三个文件。
+- **Task 8**：`important()` 去掉本模块文档。`test_important_requirement.py` 的 `ImpactRiskPath` 加三例：
+  1. 边界只列 `spec/<id>.md`、`tasks/<id>/` 的新流程模块，`reasons` 不含 `risk-path`（AC11）。
+  2. 边界或影响面再列一个 T4 代码路径，照旧含（AC11）。
+  3. 老模块边界列 `spec/<id>.md`，照旧含（AC12）。
+  - 先红后绿。验证：该文件与 `test_flow_v2.py`。
+- **Task 9**：规则文字与版本（假设 15）。`workflow-checkpoints.md` 的「碰 T4」与重要需求判定那段各补一句；`test_workflow_checkpoints.py` 若对这两段有短语断言就补上。
+  CHANGELOG「未发布 · 修复」一条；版本 0.97.0 → 0.97.1（两份 plugin.json、两份 README 的 `--ref`）。验证：快档。
+- **Checkpoint 3（report）**：
+  - 完整档三条全绿。
+  - 变异（临时副本），各让对应用例变红，还原后全绿：
+    - `t4_hits` 不去掉 `own_doc`；
+    - 把 `.agent/config.json` 也去掉；
+    - `important()` 不去掉目录项 `tasks/<id>/`；
+    - 去掉 `_v2` 判断。
+  - 沙盒 drill-pow 只读复跑（基线为文档那次提交的父提交，比到 `c2ec343`）：`t4_hits` 的命中从 8 个降到只剩 `.agent/config.json`。
+  - 已安装的 0.97.0 与本分支对本仓库的阶段提示、verify-artifacts 逐字比对。
+- **Checkpoint 4（gate）**：推送、开 PR；最终验收与合并合成一问；发 0.97.1 另取授权。拟回告：给 ecosystem-lead（#23255）写明修了什么、哪些照旧算。
+
 ## 外部审查意见
 
 <!-- spec-guard: codex-review round=1 blocking=11 sha256=33bd35226a2b -->
