@@ -1,7 +1,8 @@
 # Spec: sg-review-rules
 
 <!-- spec-guard: flow v2 tier=important -->
-<!-- spec-guard: review pending -->
+
+<!-- spec-guard: review approved ea902b45fcd1 -->
 
 ## 目标
 
