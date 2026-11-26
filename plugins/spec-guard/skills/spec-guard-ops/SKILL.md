@@ -188,7 +188,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
   恰好为 `zh-CN` 时，阶段提示的说明文字也用中文；其他值的阶段提示为英文。
 - `reviewCadence`：`separate`（默认）或 `combined`，含义见共享检查点规则「批准节奏」。
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键。
-- `takeover`：接管档位，预设 `none`（默认）、`design`、`merge`，或自定义对象 `{"design","merge","release"}`（技术方案为 `human`／`reviewer`，
+- `takeover`：接管档位，预设 `none`（默认）、`design`、`merge`、`autopilot`（design=reviewer、merge=auto、release=auto-confirm，要写明才生效），或自定义对象 `{"design","merge","release"}`，对象可带 `"preset"` 从某个预设起改（技术方案为 `human`／`reviewer`，
   合并为 `human`／`auto`，发布为 `human`／`prepare`／`auto-confirm`／`auto`，没写的项按 `human`）；需求永远由用户确认、新流程 Plan 永远自动批准，两者不可配。
   `none` 时每份技术方案都由用户批，`design` 让第二审查者审过即放行（重要需求仍由用户批），见共享检查点规则「技术方案审查」。
   旧值只读不写（`set` 拒绝，`takeover-legacy`）：`plan` 读作 `none`、旧 `merge` 读作新 `merge`，自定义里的 `spec`、`plan` 对新流程模块不生效；
@@ -199,7 +199,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `moduleTakeover`：按模块的接管档位，对象（模块 id → 同 `takeover` 的值），没设的模块随 `takeover`。`set --key moduleTakeover --module <id> --value <值>`
   一次改一个模块，`unset` 带 `--module` 去掉一个、不带去掉整个键；任一条写错整个键失效。比项目宽时预览多一行 `note:`，只提醒不截断。写入要用户原话。
 - 出事收窄：`project_config.py narrow --source <autopilot|module-crew|user> --reason <一行> [--module <id>] [--confirm]`，往严里改一格、不需要用户原话
-  （预设 `merge`→`design`→`none`，旧值 `plan` 收到 `none`；自定义按发布、合并、技术方案交还一项、写回新格式），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
+  （预设 `autopilot`→`merge`→`design`→`none`，旧值 `plan` 收到 `none`；自定义按发布、合并、技术方案交还一项、写回新格式），记下 `takeoverNarrowed`；收窄过的范围用 `set` 恢复时一次只升一格，
   回到收窄前的值后记录删除。`takeoverNarrowed` 不能直接 `set`／`unset`。
 - 接管模块（档位任一项不是 human）构建中做越界检查：`module_scope.py check --module <id> --format json`（`--base` 可省，默认取 Spec 第一次提交的父提交），
   已批准 Plan 的预先声明公共路径记为 `declared`；阶段提示报越界或没有并行边界时停下，逐个说明交用户。
@@ -279,6 +279,8 @@ Spec 批准后内容有变即判为批准后已修订，需复审后重新记录
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|plan|both> --state <pending|approved>
 python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state approved --confirm
 ```
+
+总体技术方案（`spec/<id>.md` 里有 `overall-design` 行时）用 `--target overall --state approved`，只认用户批准，Codex 与审查者状态一律拒绝（`overall-user-only`）。
 
 `pending` 在把 Spec 或 Plan 交给用户审阅时写，也可以写文件时直接带上这一行。交审时在对话正文里按小项呈现内容，名称与顺序同 session-protocol 契约的交审小项，
 每项写全（Spec：目标、边界（总是做、先问、不做三档）、要你确认的假设（含关键决策与取舍）、验收标准、未决问题，之后是附加项文档建议；

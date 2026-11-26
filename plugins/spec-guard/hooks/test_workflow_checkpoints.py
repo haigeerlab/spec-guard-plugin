@@ -130,7 +130,7 @@ class CheckpointContractTests(unittest.TestCase):
     def test_plan_checkpoints_are_gate_or_report(self):
         tiers = self.section("## Plan 检查点分级")
         for phrase in ("`gate`", "`report`", "没标级别的中间检查点按 `report`", "最后一个检查点", "记入 todo", "不倒计时",
-                       "测试改不红", "权限被拒", "合并永远由用户在对话里决定"):
+                       "测试改不红", "权限被拒", "远端合并分两种情况"):
             self.assertIn(phrase, tiers)
         self.assertIn("`gate` 检查点写明的授权", self.section("## 阶段交接"))
 
@@ -208,11 +208,19 @@ class CheckpointContractTests(unittest.TestCase):
     def test_no_remote_write_is_authorized_by_default(self):
         text = self.target.read_text(encoding="utf-8")
         # merge-flow-f3: the F3 merge sentence names the platform's auto-merge only after the user says "merge".
-        start = text.index("合并永远由用户在对话里决定：")
-        end = text.index("任何 Plan 都不能代替用户这句话。", start)
+        # sg-gate-flow: the two-case paragraph (handed to autopilot, or the user decides) is where it may be named.
+        start = text.index("远端合并分两种情况。")
+        end = text.index("任何 Plan 都不能代替用户这句话", start)
         text = text[:start] + text[end:]
-        for phrase in ("默认授权推送", "默认授权开 PR", "默认推送", "自动合并"):
+        for phrase in ("默认授权推送", "默认授权开 PR", "默认推送"):
             self.assertNotIn(phrase, text)
+        # sg-gate-flow: outside that paragraph auto-merge is only ever autopilot's to open, never the session's default;
+        # the incident section only names how long to wait after it was opened.
+        incident = text.index("## 出事处理")
+        text = text[:incident] + text[text.index("\n## ", incident + 1):]
+        for line in text.splitlines():
+            if "自动合并" in line:
+                self.assertIn("autopilot", line)
         self.assertIn("只有当 Plan 的 `gate` 检查点逐项写明授权", self.section("## Plan 检查点分级"))
 
     def test_templates_point_at_checkpoint_tiers(self):
@@ -712,7 +720,7 @@ class CheckpointContractTests(unittest.TestCase):
         # project-config: separate stays the default; combined merges one module's Spec and Plan review.
         cadence = self.section("## 批准节奏")
         for phrase in ("`.agent/config.json`", "`reviewCadence`", "`separate`", "`combined`", "默认",
-                       "一次批准", "新决策", "范围不清", "高风险", "合并永远由用户"):
+                       "一次批准", "新决策", "范围不清", "高风险", "远端合并按「Plan 检查点分级」里「远端合并分两种情况」一段"):
             self.assertIn(phrase, cadence)
 
     def test_the_convention_block_is_short(self):
@@ -849,22 +857,23 @@ class ConcurrencyBoundaryTests(unittest.TestCase):
     def test_merge_is_decided_by_the_user_in_conversation(self):
         # merge-flow-f3 (plugin development rules v1.5 F3): the user says "merge" in the conversation, the session runs it.
         self.assertNotIn("合并永远由用户进行", self.text)
-        start = self.text.index("合并永远由用户在对话里决定：")
+        self.assertNotIn("合并永远由用户在对话里决定", self.text)  # sg-gate-flow: replaced by the two cases
+        start = self.text.index("**由用户决定**：")
         rule = self.text[start:self.text.index("\n", start)]
         for phrase in ("明确说『合并』", "必需检查已全部通过时直接合并", "`gh pr merge`", "`gh pr merge --auto`", "核实已合并", "记下合并提交",
                        "任何 Plan 都不能代替用户这句话"):
             self.assertIn(phrase, rule)
-        self.assertIn("的**唯一例外**", self.text[self.text.index("它是「合并永远由用户在对话里决定」"):])
+        self.assertIn("的**唯一例外**", self.text[self.text.index("本地合并原本由用户在对话里决定"):])
 
     def test_merge_timing_and_ci_waiting(self):
         # merge-ask-no-wait (plugin development rules v1.7): ask with the acceptance, never wait on CI yourself.
-        start = self.text.index("合并的时机与 CI（规范 v1.7）：")
+        start = self.text.index("合并的时机与 CI（规范 v1.8）：")
         rule = self.text[start:self.text.index("\n", start)]
         for phrase in ("最终验收的交审消息里就问合并", "不等 CI 跑完", "验收通过、合并吗？", "验收通过并合并", "只验收，先不合",
                        "选后者之后照旧再问一次合并", "验收没过不问合并", "提议打开", "用户批准才开", "宿主没有就跳过",
                        "`--watch`", "定时任务", "循环", "跑完叫我", "先核实已合并", "记下合并提交再告诉用户"):
             self.assertIn(phrase, rule)
-        self.assertGreater(start, self.text.index("合并永远由用户在对话里决定："))
+        self.assertGreater(start, self.text.index("**由用户决定**："))
 
     def test_final_acceptance_points_to_the_boundary(self):
         start = self.text.index("- **最终验收列出实际改动的文件。**")
@@ -878,8 +887,9 @@ class CoordinatorApprovalTests(unittest.TestCase):
     HEADING = "## 协调会话的批准与合并（moduleConcurrency 为 on 时）"
     ORIGINALS = (
         "- **`approved` 只在用户明确批准这份 Spec 或 Plan 之后，",
-        "合并永远由用户在对话里决定：用户明确说『合并』后 agent 才执行；先看 PR 状态，必需检查已全部通过时直接合并（GitHub：`gh pr merge`），检查还没跑完时用平台的自动合并（GitHub：`gh pr merge --auto`），由平台等必需检查通过后合并；平台不支持自动合并时，等必需检查全部通过后再合并；合并方式按本仓库习惯；合并后核实已合并、记下合并提交，再告诉用户。任何 Plan 都不能代替用户这句话。",
-        "两种节奏下人工闸门都在，合并永远由用户在对话里决定（见「Plan 检查点分级」）。",
+        # sg-gate-flow: the merge sentences as the user approved them in autopilot module 1 (③-2), verbatim.
+        '**由用户决定**：其余所有情况，用户明确说『合并』后 agent 才执行；先看 PR 状态，必需检查已全部通过时直接合并（GitHub：`gh pr merge`），检查还没跑完时用平台的自动合并（GitHub：`gh pr merge --auto`），由平台等必需检查通过后合并；平台不支持自动合并时，等必需检查全部通过后再合并；合并方式按本仓库习惯；合并后核实已合并、记下合并提交，再告诉用户。任何 Plan 都不能代替用户这句话，也不能把档位从人改成 `auto`。',
+        "两种节奏下人工闸门都在；远端合并按「Plan 检查点分级」里「远端合并分两种情况」一段，交给 autopilot 或由用户在对话里决定。",
     )
 
     def setUp(self):
@@ -905,7 +915,7 @@ class CoordinatorApprovalTests(unittest.TestCase):
         body = self.section()
         for phrase in ("唯一例外", "三个条件", "同一时刻只有一个", "集成基线", "交审", "一致", "转达",
                        "模块分支", "集成分支", "提交", "重新", "不改写已推送或已被同步的历史", "由运行时",
-                       "重新取得", "推送和远端合并", "只由用户"):
+                       "重新取得", "推送和远端合并", "不因本节的例外而放宽"):
             self.assertIn(phrase, body)
         self.assertNotRegex(body, r"parallel[-_]")
 
@@ -1218,7 +1228,7 @@ class PlanAutoApproveRuleTests(unittest.TestCase):
 
     def test_what_it_authorizes_and_what_not(self):
         for phrase in ("写完即自动批准", "不交用户、也不交 Codex", "标记不起作用", "`plan-auto`", "推送本分支与开 PR",
-                       "**不授权**合并", "照 F3 由用户在对话里决定", "发布", "删除工作区外的文件", "改全局配置", "外发凭据",
+                       "**不授权**会话自己合并", "照 F3 由用户在对话里决定", "发布", "删除工作区外的文件", "改全局配置", "外发凭据",
                        "照旧先问", "「预先声明」不授权任何路径"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
@@ -1244,6 +1254,87 @@ class PlanAutoApproveRuleTests(unittest.TestCase):
                        "T4 路径使模块成为重要需求"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.rules)
+
+
+class IncidentSection(unittest.TestCase):
+    """sg-gate-flow R8: the incident section the merge wording points to, scoped to after the PR."""
+
+    def setUp(self):
+        self.text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+        start = self.text.index("\n## 出事处理\n")
+        self.section = self.text[start:self.text.index("\n## ", start + 1)]
+
+    def test_place(self):
+        self.assertLess(self.text.index("## Plan 检查点分级"), self.text.index("## 出事处理"))
+        self.assertLess(self.text.index("## 出事处理"), self.text.index("## 批准节奏"))
+
+    def test_only_after_the_pr_and_every_tier(self):
+        for phrase in ("开 PR 以后", "所有档位都适用", "本地写代码时测试没过、写错了", "不计次数"):
+            self.assertIn(phrase, self.section)
+
+    def test_rules(self):
+        for phrase in ("同一个原因最多修两次", "算同一个原因", "算修一次", "不改已有的测试和回归用例", "新写的测试不受这条限制",
+                       "不自己下结论放行", "不自动撤回", "60 分钟", "30 分钟", "等了多久、平常多久、依据是什么",
+                       "由 autopilot 做", "没装的"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, self.section)
+
+    def test_pointers(self):
+        self.assertIn("照旧自己修（开 PR 以后出的事见「出事处理」）", self.text)
+        self.assertIn("按「出事处理」走", self.text)
+
+
+class GateFlowRules(unittest.TestCase):
+    """sg-gate-flow R7: the approved merge wording (O1 narrowed), the release question, the overall design, milestones."""
+
+    def setUp(self):
+        self.text = (Path(__file__).resolve().parents[1] / CONTRACT).read_text(encoding="utf-8")
+
+    def test_approved_wording_verbatim(self):
+        for sentence in (
+                "远端合并分两种情况。**交给 autopilot**：同时满足——带 `flow v2` 标记的模块；生效档位里合并是 `auto`；所在仓库的长期授权写明的其余条件都满足。",
+                "合并的时机与 CI（规范 v1.8）：属于「交给 autopilot」那种情况的模块不问合并：",
+                "问的时候写明 PR 当前的 head 提交，用户批准的就是这个提交，之后推了新提交要重新问；",
+                "装了 autopilot 的仓库由它的本机巡检盯 CI，有结果时通知会话；",
+                "**不授权**会话自己合并（按「Plan 检查点分级」里「远端合并分两种情况」一段，交给 autopilot 或照 F3 由用户在对话里决定）",
+                "本地合并原本由用户在对话里决定（见「Plan 检查点分级」与「批准节奏」），本节是它的**唯一例外**，",
+                "其他任何合并都不适用，远端合并见本节末尾。",
+                "- **推送和远端合并（PR／MR）不因本节的例外而放宽**，逐件按下面的规矩：",
+                "  - 本节的任何批准（包括最终验收的批准）都推不出协调会话可以自己合并 PR。"):
+            with self.subTest(sentence=sentence[:20]):
+                self.assertEqual(self.text.count(sentence), 1)
+        self.assertNotIn("合并永远由用户在对话里决定", self.text)
+
+    def test_release_sentences_narrowed_by_o1(self):
+        # O1 A (user, 2026-11-27): only a takeover that hands the release to autopilot keeps the session out of it.
+        self.assertIn("建 tag、Release 和发版：生效档位把发版交给 autopilot（`release` 不是 `human`）的模块不由会话做，"
+                      "由 autopilot 按需求确认时的提前授权或用户确认过的发版步骤清单执行；`release` 是 `human` 的照旧在用户确认后由会话执行。",
+                      self.text)
+        self.assertIn("会话自己发布（生效档位把发版交给 autopilot 的，由 autopilot 按需求确认时的提前授权或用户确认过的步骤清单执行；"
+                      "`release` 是 `human` 的在用户确认后由会话执行）", self.text)
+        self.assertNotIn("建 tag、Release 和发版不由会话做：", self.text)
+
+    def test_release_question_and_overall_design_at_confirmation(self):
+        start = self.text.index("## 需求确认")
+        body = self.text[start:self.text.index("\n## ", start + 1)]
+        for phrase in ("做完自动发版吗？", "`auto-confirm` 或 `auto`", "`<!-- spec-guard: release-preauth yes -->`", "档位不允许时不问",
+                       "要不要总体技术方案", "项目还没有任何代码时默认提出「要」", "`<!-- spec-guard: overall-design spec/overall/<名字>.md -->`"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, body)
+
+    def test_overall_design_section(self):
+        start = self.text.index("\n## 总体技术方案\n")
+        body = self.text[start:self.text.index("\n## ", start + 1)]
+        for phrase in ("只由用户批", "`--target overall", "Codex 或第二审查者的批准都不算", "没批就不往下写", "verify-artifacts"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, body)
+
+    def test_milestone_under_autopilot(self):
+        start = self.text.index("### 里程碑停点")
+        body = self.text[start:self.text.index("\n## ", start)]
+        for phrase in ("`autopilot`", "不阻塞", "`milestoneStop.blocking` 为 `false`", "`milestone-mark`", "其余情况照下文停下"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, body)
 
 
 if __name__ == "__main__":
