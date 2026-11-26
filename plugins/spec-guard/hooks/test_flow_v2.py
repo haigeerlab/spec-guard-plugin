@@ -1911,6 +1911,41 @@ class ReworkOverreachTest(FlowOverreachTest):
         self.assertIsNotNone(module_scope.rework_info(self.project.root, "a"))
         self.assertEqual(review_mark._merge_at_base(self.project.root, "a"), "human")
 
+    def test_a_merge_of_main_is_left_out_and_said(self):
+        git(self.project.root, "branch", "-M", "main")
+        self.build()
+        self.project.write("src/a/old.py", "built\n")
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n")
+        self.commit("done")
+        git(self.project.root, "switch", "-q", "-c", "rw")
+        self.project.write("tasks/a/todo.md", "- [x] t\n- [x] 最终验收（gate）\n- [ ] 返工\n")
+        self.commit("rework")
+        start = git(self.project.root, "rev-parse", "HEAD")
+        git(self.project.root, "switch", "-q", "main")
+        self.project.write("src/later.py", "another module\n")
+        self.commit("another module merges")
+        git(self.project.root, "switch", "-q", "rw")
+        git(self.project.root, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "-m", "take main", "main")
+        self.project.write("src/other.py", "changed\n")
+        text = hint(self.project)
+        self.assertIn("越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/other.py`）；返工：从提交 `%s` 起算"
+                      "（已扣除默认分支上的提交）。" % start[:12], text)
+        self.assertNotIn("src/later.py", text)
+
+    def test_a_first_build_that_took_in_main_is_unchanged(self):
+        git(self.project.root, "branch", "-M", "main")
+        self.build()
+        git(self.project.root, "switch", "-q", "-c", "fb")
+        self.project.write("src/a/old.py", "built\n")
+        self.commit("build")
+        git(self.project.root, "switch", "-q", "main")
+        self.project.write("src/later.py", "another module\n")
+        self.commit("another module merges")
+        git(self.project.root, "switch", "-q", "fb")
+        git(self.project.root, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "-m", "take main", "main")
+        line = next(l for l in hint(self.project).splitlines() if "越界" in l)
+        self.assertEqual(line, "- 越界：1 个文件超出需求文档的并行边界与技术方案影响面（`src/later.py`）。")  # as in 0.96.2 (Q3 A)
+
 
 if __name__ == "__main__":
     unittest.main()

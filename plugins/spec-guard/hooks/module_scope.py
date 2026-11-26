@@ -379,10 +379,42 @@ def rework_info(root: Path, module_id: str) -> dict | None:
     return {"base": parent.strip(), "start": commit} if parent else None
 
 
-def scope_base(root: Path, module_id: str) -> str | None:
-    """The base the overreach and T4 checks compare with: the rework's, or default_base for a first build."""
+def _trim(root: Path, base: str) -> str | None:
+    """rework-scope-baseline (assumption 8, Q2 A): the merge-base of HEAD and the default branch when it is newer than
+    `base` -- so commits already on the default branch (another module taken in by a merge, an earlier part of the
+    rework) are left out -- else None.  Never on the default branch's own local branch: a rework done there keeps its
+    base even when the remote-tracking branch stopped halfway through it.
+    """
+    from verification import default_branch  # late: verification imports module_stage, which imports this module
+    branch = default_branch(root)
+    if not branch:
+        return None
+    local = branch[len("refs/remotes/origin/"):] if branch.startswith("refs/remotes/origin/") else branch
+    current = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    if current is not None and current.strip() == local:
+        return None
+    found = _git(root, "merge-base", "HEAD", branch)
+    merge_base = found.strip() if found else ""
+    if not merge_base or merge_base == base:
+        return None
+    if _git(root, "merge-base", "--is-ancestor", base, merge_base) is None:
+        return None
+    return merge_base
+
+
+def rework_trim(root: Path, module_id: str) -> str | None:
+    """The trimmed base of a rework (assumption 8); None for a first build or when nothing is left out (Q3 A)."""
     rework = rework_info(root, module_id)
-    return rework["base"] if rework else default_base(root, module_id)
+    return _trim(root, rework["base"]) if rework else None
+
+
+def scope_base(root: Path, module_id: str) -> str | None:
+    """The base the overreach and T4 checks compare with: the rework's (trimmed, assumption 8), or default_base for a
+    first build."""
+    rework = rework_info(root, module_id)
+    if not rework:
+        return default_base(root, module_id)
+    return _trim(root, rework["base"]) or rework["base"]
 
 
 def _declared_paths(root: Path, module_id: str) -> tuple:
