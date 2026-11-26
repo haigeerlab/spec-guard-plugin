@@ -2406,13 +2406,16 @@ def _t4_part(root: Path, module: str, zh: bool) -> tuple:
 
 def _rework_note(root: Path, module: str, zh: bool) -> str:
     """rework-scope-baseline (assumption 4): how a rework's overreach is counted; "" for a first build."""
-    from module_scope import rework_info  # late: module_scope imports this module
+    from module_scope import _trim, rework_info  # late: module_scope imports this module
     rework = rework_info(root, module)
     if rework is None:
         return ""
     if rework["start"] is None:
         return "；返工：还没提交，与 HEAD 比较" if zh else "; rework: not committed yet, compared with HEAD"
-    return ("；返工：从提交 `%s` 起算" if zh else "; rework: counted from commit `%s`") % rework["start"][:12]
+    note = ("；返工：从提交 `%s` 起算" if zh else "; rework: counted from commit `%s`") % rework["start"][:12]
+    if _trim(root, rework["base"]):  # assumption 9: commits already on the default branch were left out
+        note += "（已扣除默认分支上的提交）" if zh else " (commits already on the default branch left out)"
+    return note
 
 
 def _flow_overreach(root: Path, module: str, found: dict, zh: bool) -> tuple:

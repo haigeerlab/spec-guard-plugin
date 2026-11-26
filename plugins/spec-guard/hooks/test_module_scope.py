@@ -903,3 +903,124 @@ class ReworkBase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReworkMergeBase(ReworkBase):
+    """rework-scope-baseline (assumption 8, Q2 A): a rework branch that took in the default branch leaves those commits out."""
+
+    def setUp(self):
+        super().setUp()
+        self.git("branch", "-M", "main")
+
+    def reopen(self, *paths):
+        self.write("tasks/m/todo.md", "- [x] t\n- [ ] rework\n")
+        for path in paths:
+            self.write(path)
+        return self.commit("rework")
+
+    def other_module_on_main(self, path="apps/other/x.py"):
+        self.git("switch", "-q", "main")
+        self.write(path)
+        self.commit("another module merges")
+
+    def done(self):
+        self.write("apps/m/a.py")
+        self.write("tasks/m/todo.md", "- [x] t\n")
+        self.commit("done")
+
+    def test_a_merge_of_main_is_left_out(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw")
+        self.reopen("apps/m/b.py")
+        self.other_module_on_main()
+        self.git("switch", "-q", "rw")
+        self.git("merge", "-q", "-m", "take main", "main")
+        self.assertIsNotNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), [])
+        self.write("apps/other/y.py")  # the rework's own overreach is still reported
+        self.assertEqual(self.outside(), ["apps/other/y.py"])
+
+    def test_a_rebase_already_works(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw")
+        self.reopen("apps/m/b.py")
+        self.other_module_on_main()
+        self.git("switch", "-q", "rw")
+        self.git("rebase", "-q", "main")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), [])
+        self.write("apps/other/y.py")
+        self.assertEqual(self.outside(), ["apps/other/y.py"])
+
+    def test_a_second_branch_counts_only_its_own_part(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw1")
+        self.reopen("apps/m/b.py", "apps/other/early.py")  # the first part, merged after its own checks
+        self.git("switch", "-q", "main")
+        self.git("merge", "-q", "--no-ff", "-m", "first part", "rw1")
+        self.other_module_on_main()
+        self.git("switch", "-q", "-c", "rw2")
+        self.write("apps/m/c.py")  # not committed yet: the merge-base is HEAD
+        self.assertEqual(module_scope.rework_trim(self.root, "m"), self.git("rev-parse", "HEAD"))
+        self.assertEqual(self.outside(), [])
+        self.commit("second part")
+        self.assertEqual(self.outside(), [])
+
+    def test_a_rework_on_main_itself_keeps_the_rework_base(self):
+        import module_scope
+        self.done()
+        pushed = self.reopen("apps/other/early.py")
+        self.git("update-ref", "refs/remotes/origin/main", pushed)  # origin stopped halfway through the rework
+        self.git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        self.write("apps/m/c.py")
+        self.commit("more rework, not pushed")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), ["apps/other/early.py"])
+
+    def test_origin_head_is_the_default_branch(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw")
+        self.reopen("apps/m/b.py")
+        self.other_module_on_main()
+        self.git("update-ref", "refs/remotes/origin/main", self.git("rev-parse", "main"))
+        self.git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        self.git("switch", "-q", "rw")
+        self.git("merge", "-q", "-m", "take main", "origin/main")
+        self.git("branch", "-q", "-D", "main")
+        self.assertIsNotNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), [])
+
+    def test_no_default_branch_keeps_the_rework_base(self):
+        import module_scope
+        self.done()
+        self.git("branch", "-M", "trunk")
+        self.git("switch", "-q", "-c", "rw")
+        self.reopen("apps/m/b.py")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(module_scope.scope_base(self.root, "m"), module_scope.rework_info(self.root, "m")["base"])
+
+    def test_a_base_newer_than_the_merge_base_is_kept(self):
+        import module_scope
+        self.done()
+        self.git("switch", "-q", "-c", "rw")
+        self.write("apps/other/before.py")  # on the branch, before the rework starts: not the rework's change
+        self.commit("unrelated, before the rework")
+        self.reopen("apps/m/b.py")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(self.outside(), [])
+
+    def test_a_first_build_is_unchanged(self):
+        import module_scope
+        self.git("switch", "-q", "-c", "fb")
+        self.write("apps/m/a.py")
+        self.commit("build")
+        self.other_module_on_main()
+        self.git("switch", "-q", "fb")
+        self.git("merge", "-q", "-m", "take main", "main")
+        self.assertIsNone(module_scope.rework_trim(self.root, "m"))
+        self.assertEqual(module_scope.scope_base(self.root, "m"), module_scope.default_base(self.root, "m"))
+        self.assertEqual(self.outside(), ["apps/other/x.py"])  # as in 0.96.2 (Q3 A)

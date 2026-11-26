@@ -6,6 +6,10 @@
 - [x] Checkpoint 1（report）：本机完整检查、变异与老输出比对
 - [x] Task 3：规则与文档
 - [x] Checkpoint 2（gate）：推送、开 PR、最终验收并同时问合并（用户「验收通过并合并」）
+- [x] Task 4：merge 过默认分支时的 `trimmed` 与 `scope_base`（返工，Spec 假设 8）
+- [x] Task 5：提示、规则与版本 0.97.0
+- [x] Checkpoint 3（report）：完整档、变异与老输出比对
+- [x] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
 
 ## 证据
 - Task 0（2026-11-26）：能力图插入 rework-scope-baseline（用户「批准；Q1 A」）；Plan 经 Codex 两轮：第一轮 3 条阻断（返工勾完后丢基线、只剩正式延期不算完成、提示写错提交），改后第二轮全部解决、没有新阻断，记 codex-approved（第一次运行超时无结论，重跑）。
@@ -15,3 +19,7 @@
   真实历史：regression-doc-check 的 `rework_info` 给出 base `17b97ad2`、start `fce30e2f`（#505），返工开始认对了；从原基线比到当前 HEAD 有 25 个越界文件，从返工基线比到当前 HEAD 还有 10 个——都是返工开始之后才合进来的 #506～#508 与本模块的改动。Spec 没写到的边界：返工期间别的模块再合进 main、返工分支 rebase 跟上时，这些后来的改动仍会算进来（#505 当时分支直接从 main 开出、中途无合并，不受影响）。验收时交用户。
 - Task 3（2026-11-26）：共享检查点规则「返工与小模块」补一段；CHANGELOG「未发布 · 修复」一条；版本 0.96.1 → 0.96.2（两份 plugin.json、两份 README 的 `--ref`）。
 - Checkpoint 2（2026-11-26）：基于 main `0a5cee38` 推送，开 PR #509 并绑定；最终验收与合并合成一问，用户「验收通过并合并」。已知边界（返工期间别的模块再合入、rebase 后仍会算进来）已在验收时交用户，没有要求这次修。拟回告：无。
+- Task 4（2026-11-26）：`module_scope._trim`（默认分支取 `verification.default_branch`；当前分支是默认分支的本地分支 → None；`merge-base HEAD <默认分支>` 等于返工基线或不是它的后代 → None）、`rework_trim`，`scope_base` 返工时用 `_trim(...) or base`。没有按 Plan 给 `rework_info` 加 `trimmed` 键：老用例对整个字典做相等断言，改成独立函数不用动它们。用例：`test_module_scope.py` `ReworkMergeBase` 7 例（继承 `ReworkBase`，老的 7 例在 `main` 分支名下一起跑），实现前 7 例出错。提示（原属 Task 5）一并做了：`_rework_note` 在扣除时加「（已扣除默认分支上的提交）」；`test_flow_v2.py` 两例：merge 情形整句断言（实现前失败）、第一次开工 merge 过 main 的越界一行整行断言（实现前已通过，锁住 0.96.2 的写法）。
+- Task 5（2026-11-26）：共享检查点规则「返工与小模块」那段补两句；CHANGELOG「未发布 · 修复」一条；版本 0.96.2 → 0.97.0（两份 plugin.json、两份 README 的 `--ref`）。提示已在 Task 4 一起做。
+- Checkpoint 3（2026-11-26）：Task 4、5 的提交都走完整档且全绿。补一例 `test_a_base_newer_than_the_merge_base_is_kept`（返工在分支上晚于分叉点开始、默认分支没动），守住祖先判断。变异（临时副本）：去掉「当前分支是默认分支」→ 1 例变红；去掉祖先判断 → 1 例；`scope_base` 不用扣除后的基线 → 3 例；还原后全绿。已安装的 0.96.2 与本分支对本仓库的阶段提示、verify-artifacts 逐字相同。
+- Checkpoint 4（2026-11-26）：推送并开 PR #512、已绑定；最终验收与合并合成一问，用户「验收通过，CI 过了就合」。拟回告：给 ecosystem-lead 写明返工越界改为扣除默认分支上的提交（合并后发）。

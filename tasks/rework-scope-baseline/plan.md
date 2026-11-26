@@ -1,6 +1,6 @@
 # Plan: rework-scope-baseline
 
-<!-- spec-guard: review codex-approved b44904c089ac -->
+<!-- spec-guard: review approved -->
 
 Spec：[spec/rework-scope-baseline.md](../../spec/rework-scope-baseline.md)（2026-11-26 批准，Q1 A）。Codex 第一轮 3 条阻断（R1-1～R1-3），已按下面改。
 
@@ -37,7 +37,39 @@ Spec：[spec/rework-scope-baseline.md](../../spec/rework-scope-baseline.md)（20
 - **Task 3**：规则与文档。共享检查点规则「返工与小模块」补一句；CHANGELOG「未发布」；版本 0.96.1 → 0.96.2（两份 plugin.json、两份 README 的 `--ref`）。验证：快档。
 - **Checkpoint 2（gate）**：重跑完整档；推送、开 PR；最终验收与合并合成一问；发 0.96.2 另取授权。拟回告：无（不改对外字段）。
 
+## 返工：merge 过默认分支（2026-11-26，Spec 假设 8～10，Q2 A、Q3 A）
+
+预先声明不变（四行仍为「无」）。
+
+- **`module_scope.rework_info` 多给一个键 `trimmed`**（假设 8）：算出返工基线 `base` 之后——
+  1. 默认分支：延迟导入 `verification.default_branch`（verification 导入 module_stage，module_stage 导入本模块，所以只能在函数里导入）；读不到 → `trimmed` 为 None。
+  2. 当前分支（`git symbolic-ref --quiet --short HEAD`）就是默认分支的本地分支（`refs/remotes/origin/main` 对应 `main`）→ None：直接在默认分支上返工时始终保留返工基线，即使远端跟踪分支停在返工中途（R3-1）。
+  3. `git merge-base HEAD <默认分支>` 得 M；读不到、M 等于 `base`，或 `git merge-base --is-ancestor <base> M` 不成立 → None。
+  4. 否则 `trimmed = M`。只在工作区返工时 `base` 是 HEAD，M 不可能是它的后代，自然为 None。
+- **`scope_base`**：返工时返回 `trimmed or base`；第一次开工照旧 `default_base`（Q3 A，一字不改）。六个调用点都经它，不用改。
+- **提示**（假设 9，R3-2）：`_rework_note` 现在的返工说明是「；返工：从提交 `<12>` 起算」（不带括号）。`trimmed` 有值时完整文字为
+  「；返工：从提交 `<12>` 起算（已扣除默认分支上的提交）」/ "; rework: counted from commit `<12>` (commits already on the default branch left out)"；没有时文字逐字不变。用例对整行做精确断言。
+- **测试**：`test_module_scope.py` 加 `ReworkMergeBase`，git 夹具带一个本地 `main`，在 `rw` 分支上返工：
+  - merge 情形：只改边界内 → `classify` 的 `outside` 为空、不含别的模块文件；返工改了边界外的文件 → 只报它（AC9）。
+  - rebase 情形：结果同上，且 `trimmed` 为 None（AC10）。
+  - 两段返工：第一段 merge 进 `main`（todo 仍有未勾选项），别的模块再合入 `main`，从 `main` 开新分支续做 → 只比较第二段（AC11）。
+  - 直接在 `main` 上返工 → `trimmed` 为 None；带 `origin/HEAD` 时，远端跟踪分支停在返工中途、本地 `main` 继续领先 → 仍为 None，且早先返工改的边界外文件照样报（AC11、R3-1）；没有 `main`、没有 origin → None（AC11）。
+  - 正常返工分支、默认分支取自 `origin/HEAD`（远端跟踪分支）时照样扣除（AC9）。
+  - 从 `main` 新开续做分支、只有工作区改动（M 等于 HEAD）→ `trimmed` 为 HEAD，只比较工作区，不报已在 `main` 上的文件（R4-1）。
+  - 第一次开工的模块 merge 过 `main` → `scope_base` 仍等于 `default_base`，并对实际的越界分类结果与越界提示整行做精确断言，与 0.96.2 的写法逐字相同（AC12、R4-2）。
+  - `test_flow_v2.py` 的 `ReworkOverreachTest` 加一例提示文字（AC12）。
+
+第二轮审查（R4-1、R4-2）交用户，2026-11-26 用户「按改法改，批准」：去掉「M 等于 HEAD 不扣除」，补两条回归。
+
+### 返工任务
+
+- **Task 4**：`trimmed` 与 `scope_base`。先写会红的 `ReworkMergeBase`，再实现。验证：`test_module_scope.py`、`test_flow_v2.py`。
+- **Task 5**：提示、规则与版本。`_rework_note`；共享检查点规则「返工与小模块」那段补一句（返工分支同步过默认分支时，扣除已在默认分支上的提交）；CHANGELOG「未发布」；版本 0.96.2 → 0.97.0（两份 plugin.json、两份 README 的 `--ref`）。验证：`test_flow_v2.py`、快档。
+- **Checkpoint 3（report）**：完整档三条全绿；变异（临时副本）：去掉「当前分支是默认分支」、去掉祖先判断、`scope_base` 不用 `trimmed`，各让对应用例变红，还原后全绿；已安装的 0.96.2 与本分支对本仓库的阶段提示、verify-artifacts 逐字比对。
+- **Checkpoint 4（gate）**：推送、开 PR；最终验收与合并合成一问；发 0.97.0 等第 2 件（删退役接口）做完后另取授权。拟回告：给 lead「返工越界改为扣除默认分支上的提交」。
+
 ## 外部审查意见
 
 <!-- spec-guard: codex-review round=1 blocking=3 sha256=7c42309c609e -->
 <!-- spec-guard: codex-review round=2 blocking=0 sha256=d92bdcf5b050 -->
+<!-- spec-guard: codex-review round=3 blocking=2 sha256=e9be620ab690 -->
