@@ -7,7 +7,7 @@
 - [x] Task 3：规则与文档
 - [x] Checkpoint 2（gate）：推送、开 PR、最终验收并同时问合并（用户「验收通过并合并」）
 - [x] Task 4：merge 过默认分支时的 `trimmed` 与 `scope_base`（返工，Spec 假设 8）
-- [ ] Task 5：提示、规则与版本 0.97.0
+- [x] Task 5：提示、规则与版本 0.97.0
 - [ ] Checkpoint 3（report）：完整档、变异与老输出比对
 - [ ] Checkpoint 4（gate）：推送、开 PR、最终验收并同时问合并
 
@@ -20,4 +20,4 @@
 - Task 3（2026-11-26）：共享检查点规则「返工与小模块」补一段；CHANGELOG「未发布 · 修复」一条；版本 0.96.1 → 0.96.2（两份 plugin.json、两份 README 的 `--ref`）。
 - Checkpoint 2（2026-11-26）：基于 main `0a5cee38` 推送，开 PR #509 并绑定；最终验收与合并合成一问，用户「验收通过并合并」。已知边界（返工期间别的模块再合入、rebase 后仍会算进来）已在验收时交用户，没有要求这次修。拟回告：无。
 - Task 4（2026-11-26）：`module_scope._trim`（默认分支取 `verification.default_branch`；当前分支是默认分支的本地分支 → None；`merge-base HEAD <默认分支>` 等于返工基线或不是它的后代 → None）、`rework_trim`，`scope_base` 返工时用 `_trim(...) or base`。没有按 Plan 给 `rework_info` 加 `trimmed` 键：老用例对整个字典做相等断言，改成独立函数不用动它们。用例：`test_module_scope.py` `ReworkMergeBase` 7 例（继承 `ReworkBase`，老的 7 例在 `main` 分支名下一起跑），实现前 7 例出错。提示（原属 Task 5）一并做了：`_rework_note` 在扣除时加「（已扣除默认分支上的提交）」；`test_flow_v2.py` 两例：merge 情形整句断言（实现前失败）、第一次开工 merge 过 main 的越界一行整行断言（实现前已通过，锁住 0.96.2 的写法）。
-
+- Task 5（2026-11-26）：共享检查点规则「返工与小模块」那段补两句；CHANGELOG「未发布 · 修复」一条；版本 0.96.2 → 0.97.0（两份 plugin.json、两份 README 的 `--ref`）。提示已在 Task 4 一起做。
