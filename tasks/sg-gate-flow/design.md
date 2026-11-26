@@ -1,6 +1,6 @@
 # 技术方案: sg-gate-flow
 
-<!-- spec-guard: review approved 7c4caa19d26b -->
+<!-- spec-guard: review approved 0af31d8f7356 -->
 
 需求文档：`spec/sg-gate-flow.md`（用户 2026-11-27「确认需求」，指纹 `6229ba37`）。照已批总体技术方案第 6、7、8 节与 4.8，不重新选型。
 
