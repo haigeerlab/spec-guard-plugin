@@ -82,6 +82,7 @@ RELEASE_AUTO = ("auto-confirm", "auto")
 # sg-gate-flow (rules 6-8): a requirement that needs an overall design names the one file its modules share.
 OVERALL_DESIGN = re.compile(r"<!-- spec-guard: overall-design (\S+) -->")
 OVERALL_PATH = re.compile(r"spec/overall/[a-z0-9]+(?:-[a-z0-9]+)*\.md")
+OVERALL_PREFIX = "<!-- spec-guard: overall-design"
 OVERALL_STATUSES = ("approved", "missing", "pending", "revised", "invalid")  # release items that hand the release to autopilot and allow pre-authorisation
 SHORT_TIERS = ("bug", "small")  # one document: no design, no separate regression document
 DOC_SECTIONS = {
@@ -158,10 +159,15 @@ def overall_design(root: Path, module: str) -> dict | None:
         text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None
-    lines = [match.group(1) for line in _visible_lines(text.splitlines())
-             if (match := OVERALL_DESIGN.fullmatch(line.strip()))]
-    if not lines:
+    visible = [line.strip() for line in _visible_lines(text.splitlines())]
+    lines = [match.group(1) for line in visible if (match := OVERALL_DESIGN.fullmatch(line))]
+    # sg-design-outline: a line that starts like the marker but does not match it (no path, extra fields) is invalid,
+    # not absent
+    broken = any(line.startswith(OVERALL_PREFIX) and not OVERALL_DESIGN.fullmatch(line) for line in visible)
+    if not lines and not broken:
         return None
+    if broken:
+        return {"path": None, "status": "invalid"}
     if len(lines) > 1 or not OVERALL_PATH.fullmatch(lines[0]):
         return {"path": None, "status": "invalid"}
     path = lines[0]
@@ -550,6 +556,42 @@ def requirement_review(root: Path, module: str) -> dict | None:
     records = requirement_review_records(text)
     status = "not-required" if not required else ("reviewed" if records else "missing")
     return {"required": required, "status": status, "records": records}
+
+
+_BATCH_CACHE: dict = {}
+
+
+def _cached_batches(root: Path) -> list:
+    """usage_draft.batches, read once per project state (root, HEAD, the capability map's mtime and size) within this
+    process (sg-design-outline); raises UsageDraftError like it, and a failure is not cached."""
+    try:
+        stat = (root / "spec" / "CAPABILITY-MAP.md").stat()
+        mapped = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        mapped = None
+    key = (str(root.resolve()), _git(root, "rev-parse", "--verify", "--quiet", "HEAD"), mapped)
+    if key not in _BATCH_CACHE:
+        _BATCH_CACHE[key] = usage_draft.batches(str(root))
+    return _BATCH_CACHE[key]
+
+
+def design_outline_case(root: Path, module: str) -> dict | None:
+    """sg-design-outline (rules 1-4): {"new", "important", "cross"} of a flow v2 module with a design; None otherwise.
+
+    new: exactly one well-formed overall-design line with a valid path, whatever the overall design's state.
+    important: the effective tier.  cross: inserted into the capability map in one batch with another module; False
+    when git cannot tell.
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"] or flow["tier"] in SHORT_TIERS:
+        return None
+    overall = overall_design(root, module)
+    try:
+        cross = any(module in modules and len(modules) > 1 for _, modules in _cached_batches(root))
+    except usage_draft.UsageDraftError:
+        cross = False
+    return {"new": overall is not None and overall["path"] is not None, "important": flow["tier"] == "important",
+            "cross": cross}
 
 
 def flow_doc_problems(root: Path, module: str) -> list:
