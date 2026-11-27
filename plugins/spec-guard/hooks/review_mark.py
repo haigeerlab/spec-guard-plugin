@@ -24,7 +24,7 @@ from capability_map import MODULE_ID, MapError, parse_map
 import re
 
 from codex_review import CONCLUSIONS, REPORT_LIMIT, _invalid, inspect as inspect_report, inspect_check, inspect_final
-from module_stage import (EXTERNAL_REVIEW_HEADING, _git, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
+from module_stage import (EXTERNAL_REVIEW_HEADING, _git, _text_digest, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
                           design_approver, design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           overall_design, review_state, spec_baseline)
@@ -226,10 +226,7 @@ def _design(root: Path, relative: str, state: str, report: str | None, text: str
         updated = _with_marker(updated, REVIEW_PENDING)
     note = "round %d: %d blocking, %d suggestion(s), reviewer %s (same vendor: %s)." % (
         len(records) + 1, found["blocking"], found["suggestions"], found["vendor"], "yes" if found["sameVendor"] else "no")
-    if tier == "important":
-        note += (" The requirement is important: the reviewer's round goes with the design to the user, who approves "
-                 "it with --state approved.")
-    elif design_approver(root, Path(relative).parent.name) == "user":
+    if design_approver(root, Path(relative).parent.name) == "user":
         # takeover-redefine (C4 as revised): recorded as before, but under design=human it does not let it through.
         note += (" The module's takeover has design=human: this round does not let the design through; it goes with "
                  "the design to the user, who approves it with --state approved.")
@@ -365,14 +362,55 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
     return 0
 
 
+NO_REPORT_STATES = ("host-reviewed", "no-reviewer")  # sg-review-rules: rounds without a delegate report
+
+
+def _design_host(root: Path, relative: str, state: str, blocking: int | None, text: str):
+    """sg-review-rules (rule 12): (new text, message) or (None, refusal) for a design round with no delegate report --
+    a host subsession's review (host-reviewed --blocking N) or no reviewer at all (no-reviewer)."""
+    if state == "host-reviewed" and (blocking is None or blocking < 0):
+        return None, "blocking-missing: --state host-reviewed needs --blocking <the number of blocking findings, 0 or more>"
+    records = design_round_records(text)
+    reviewed = [record for record in records if record["vendor"] != "none"]
+    if state == "host-reviewed" and sum(1 for record in reviewed if record["blocking"]) >= ROUND_CAP:
+        return None, ("design-rounds-exhausted: %s already had two rounds with blocking findings; hand it to the "
+                      "user, who approves it with --state approved or sends it back" % relative)
+    criteria = "host" if state == "host-reviewed" else "none"
+    changed = sorted({record["criteria"] for record in records} - {criteria})
+    if changed:
+        return None, ("design-criteria-changed: earlier rounds used %s, this round %s; both rounds must use the same "
+                      "criteria" % (", ".join(changed), criteria))
+    digest = _text_digest(text)  # the whole file's sha256 prefix, from spec-digest.py (the only fingerprint algorithm)
+    vendor, same, count = ("host", "true", blocking) if state == "host-reviewed" else ("none", "false", 0)
+    line = ("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=%s same-vendor=%s criteria=%s "
+            "report=none -->" % (len(records) + 1, count, digest, vendor, same, criteria))
+    updated = _with_round(text, line)
+    if state == "no-reviewer":
+        return _with_marker(updated, REVIEW_PENDING), (
+            "round %d: no reviewer available. The design goes to the user, who approves it with --state approved."
+            % (len(records) + 1))
+    if count == 0:
+        updated = _with_marker(updated, review_reviewer_line(review_codex_digest(_with_marker(updated, REVIEW_PENDING))))
+    else:
+        updated = _with_marker(updated, REVIEW_PENDING)
+    note = ("round %d: %d blocking, host subsession (no report; write its findings into the external review section)."
+            % (len(records) + 1, count))
+    if design_approver(root, Path(relative).parent.name) == "user":
+        note += (" The module's takeover has design=human: this round does not let the design through; it goes with "
+                 "the design to the user, who approves it with --state approved.")
+    return updated, note
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Mark a module's Spec or Plan review state (preview unless --confirm).")
     parser.add_argument("--project", default=".")
     parser.add_argument("--module", required=True)
     parser.add_argument("--target", required=True, choices=["spec", "plan", "both", "acceptance", "design", "overall"])
     parser.add_argument("--state", required=True, choices=["pending", "approved", "codex-approved", "codex-reviewed",
-                                                          "reviewer-approved", "reviewer-reviewed"])
+                                                          "reviewer-approved", "reviewer-reviewed", "host-reviewed",
+                                                          "no-reviewer"])
     parser.add_argument("--review", help="codex states: the /delegate:review JSON report saved to a file")
+    parser.add_argument("--blocking", type=int, help="host-reviewed: the host subsession's number of blocking findings")
     parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args()
     root, module_id = Path(args.project), args.module
@@ -410,6 +448,9 @@ def main() -> int:
                   "spec/overall/<kebab-case>.md, once" % module_id)
             return 2
         overall = found["path"]
+    if args.state in NO_REPORT_STATES and args.target != "design":
+        print("no-report-state: --state %s is for --target design" % args.state)
+        return 2
     if args.state.startswith("reviewer-") and args.target != "design":
         print("reviewer-state: --state %s is for --target design only; a Spec or Plan uses codex-approved / "
               "codex-reviewed" % args.state)
@@ -420,12 +461,13 @@ def main() -> int:
             print("design-state: a design is reviewed with --state reviewer-approved / reviewer-reviewed, not %s"
                   % args.state)
             return 2
-        flow = flow_marker(root, module_id)
+        # sg-review-rules (rule 1): the effective tier, so a bug or small module the rules lift to important counts
+        flow = effective_tier(root, module_id)
         if not flow["v2"] or flow["tier"] not in ("normal", "important"):
             print("design-not-v2: --target design is for a new-flow module of tier normal or important "
                   "(spec/%s.md has %s)" % (module_id, "tier %s" % flow["tier"] if flow["v2"] else "no flow v2 marker"))
             return 2
-        tier = effective_tier(root, module_id)["tier"]
+        tier = flow["tier"]
     relative = {"spec": "spec/%s.md" % module_id, "plan": "tasks/%s/plan.md" % module_id,
                 "design": "tasks/%s/design.md" % module_id, "overall": overall}
     kinds = ["spec", "plan"] if args.target == "both" else [args.target]
@@ -444,8 +486,11 @@ def main() -> int:
             print("marker-invalid: %s has more than one review marker or a malformed one; fix it by hand "
                   "(run /spec-guard:verify-artifacts to see it)" % relative[kind])
             return 2
-    if args.state.startswith("reviewer-"):
-        updated, message = _design(root, relative["design"], args.state, args.review, before["design"], tier)
+    if args.state.startswith("reviewer-") or args.state in NO_REPORT_STATES:
+        if args.state.startswith("reviewer-"):
+            updated, message = _design(root, relative["design"], args.state, args.review, before["design"], tier)
+        else:
+            updated, message = _design_host(root, relative["design"], args.state, args.blocking, before["design"])
         print(message)
         if updated is None:
             return 2

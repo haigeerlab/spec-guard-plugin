@@ -1205,12 +1205,15 @@ class DesignMarks(unittest.TestCase):
         self.design.write_text(self.text().replace("做法", "新做法"), encoding="utf-8")
         self.assertEqual(review_state(self.text(), "design"), "revised")
 
-    def test_an_important_design_is_still_the_users(self):
+    def test_an_important_design_follows_the_takeover(self):
+        # sg-review-rules (rule 10): no separate note for an important requirement; the takeover (here the default
+        # design=human) decides, as for any other design.
         self.project.spec.write_text(self.project.spec.read_text(encoding="utf-8").replace("tier=normal", "tier=important"),
                                      encoding="utf-8")
         code, out = self.mark("reviewer-approved", self.report())
         self.assertEqual(code, 0, out)
-        self.assertIn("important", out)
+        self.assertNotIn("The requirement is important", out)
+        self.assertIn("The module's takeover has design=human", out)
 
     def test_design_human_records_the_round_and_waits_for_the_user(self):
         # takeover-redefine (C4 as revised, AC3): the clean round is recorded; it does not let the design through.

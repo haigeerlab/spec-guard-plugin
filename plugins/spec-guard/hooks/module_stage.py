@@ -56,7 +56,17 @@ DESIGN_REVIEW_STATES = ("none", "pending", "approved", "reviewer-approved", "rev
 REVIEW_REVIEWER_DIGEST = re.compile(r"<!-- spec-guard: review reviewer-approved ([0-9a-f]{12}) -->")
 DESIGN_ROUND = re.compile(r"<!-- spec-guard: design-review round=(\d+) blocking=(\d+) sha256=([0-9a-f]{12}) "
                           r"vendor=([a-z0-9][a-z0-9-]*) same-vendor=(true|false) criteria=([a-z0-9][a-z0-9.-]*) "
-                          r"report=([0-9a-f]{64}) -->")
+                          r"report=([0-9a-f]{64}|none) -->")
+# sg-review-rules (design section 3): report=none only for a host subsession's round or a no-reviewer round
+NO_REPORT_VENDORS = ("host", "none")
+
+
+def design_round_match(line: str):
+    """The DESIGN_ROUND match of a valid round line, else None (report=none with any other vendor is malformed)."""
+    match = DESIGN_ROUND.fullmatch(line.strip())
+    if match is None or (match.group(7) == "none" and match.group(4) not in NO_REPORT_VENDORS):
+        return None
+    return match
 _DIGEST_MODULE = None
 
 
@@ -258,11 +268,12 @@ def review_reviewer_line(digest: str) -> str:
 
 def design_round_records(text: str) -> list:
     """design-review: [{"round", "blocking", "sha256", "vendor", "sameVendor", "criteria", "report"}] from the round
-    lines outside code fences, in file order.  vendor "none" is a round in which no reviewer was available."""
+    lines outside code fences, in file order.  vendor "none" is a round in which no reviewer was available; vendor "host"
+    a host subsession's round (sg-review-rules), which has no report (report None)."""
     return [{"round": int(match.group(1)), "blocking": int(match.group(2)), "sha256": match.group(3),
              "vendor": match.group(4), "sameVendor": match.group(5) == "true", "criteria": match.group(6),
-             "report": match.group(7)}
-            for match in (DESIGN_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
+             "report": None if match.group(7) == "none" else match.group(7)}
+            for match in (design_round_match(line) for line in _visible_lines(text.splitlines()))
             if match]
 
 
@@ -958,7 +969,7 @@ def design_review_problems(root: Path, module: str) -> list:
     if review_state(text, "design") == "invalid":
         found.append(("fail", "`%s` 的批准标记无效（只能有一行：review pending、approved <指纹> 或 reviewer-approved <指纹>）" % path))
     broken = [line.strip() for line in _visible_lines(text.splitlines())
-              if line.strip().startswith(DESIGN_ROUND_PREFIX) and not DESIGN_ROUND.fullmatch(line.strip())]
+              if line.strip().startswith(DESIGN_ROUND_PREFIX) and not design_round_match(line)]
     if broken:
         found.append(("fail", "`%s` 有 %d 行技术方案审查轮次行写坏了" % (path, len(broken))))
     criteria = sorted({record["criteria"] for record in design_round_records(text)})

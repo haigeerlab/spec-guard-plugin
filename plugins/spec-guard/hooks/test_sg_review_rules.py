@@ -2,6 +2,8 @@
 on three high-risk reasons, the design approver from the takeover alone, and flow v2 important requirements decided
 by risk paths only.  No network; every project is a temporary git repository."""
 import json
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -175,6 +177,92 @@ class DesignApprover(unittest.TestCase):
         self.assertEqual((got["status"], got["approvedBy"]), ("pending-user", None))
         got = self.approval({}, impact="- 新增 `src/a/new.py`")
         self.assertEqual(got["status"], "pending-user")
+
+
+REVIEW_MARK = str(HERE / "review_mark.py")
+
+
+def mark(project, *args):
+    env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    done = subprocess.run([sys.executable, "-B", REVIEW_MARK, "--project", str(project.root), "--module", "a", *args],
+                          capture_output=True, text=True, timeout=30, env=env)
+    return done.returncode, done.stdout + done.stderr
+
+
+class DesignHostRound(unittest.TestCase):
+    """R9: a design round from a host subsession or with no reviewer, written with report=none."""
+
+    def setUp(self):
+        self.project = tfv.Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        tfv.approved_spec(self.project)
+        self.project.write(".agent/config.json", json.dumps({"version": 1, "takeover": "design"}))
+        self.project.write("tasks/a/design.md", design(interface="- 新字段 `x`"))
+
+    def text(self):
+        return (self.project.root / "tasks" / "a" / "design.md").read_text(encoding="utf-8")
+
+    def test_host_clean_round_lets_it_through(self):
+        code, out = mark(self.project, "--target", "design", "--state", "host-reviewed", "--blocking", "0", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertRegex(self.text(), r"design-review round=1 blocking=0 sha256=[0-9a-f]{12} vendor=host "
+                                      r"same-vendor=true criteria=host report=none -->")
+        got = module_stage.design_approval(self.project.root, "a")
+        self.assertEqual((got["status"], got["approvedBy"], got["reviewerVendor"], got["reportSha256"]),
+                         ("approved", "reviewer", "host", None))
+        self.assertIsNone(got["rounds"][0]["reportSha256"])
+
+    def test_host_blocking_round(self):
+        code, out = mark(self.project, "--target", "design", "--state", "host-reviewed", "--blocking", "3", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "in-review")
+        self.assertEqual(module_stage.review_state(self.text(), "design"), "pending")
+
+    def test_host_needs_blocking(self):
+        before = self.text()
+        code, out = mark(self.project, "--target", "design", "--state", "host-reviewed", "--confirm")
+        self.assertEqual(code, 2)
+        self.assertIn("blocking-missing", out)
+        self.assertEqual(self.text(), before)
+
+    def test_no_reviewer(self):
+        code, out = mark(self.project, "--target", "design", "--state", "no-reviewer", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertIn("vendor=none same-vendor=false criteria=none report=none -->", self.text())
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "unreviewed")
+
+    def test_report_none_with_another_vendor_is_broken(self):
+        line = ("<!-- spec-guard: design-review round=1 blocking=0 sha256=%s vendor=openai same-vendor=false "
+                "criteria=design-v1 report=none -->" % ("b" * 12))
+        self.project.write("tasks/a/design.md", self.text() + "## 外部审查意见\n\n" + line + "\n")
+        self.assertEqual(module_stage.design_round_records(self.text()), [])
+        problems = module_stage.design_review_problems(self.project.root, "a")
+        self.assertIn(("fail", "`tasks/a/design.md` 有 1 行技术方案审查轮次行写坏了"), problems)
+
+    def test_spec_target_refuses_for_now_unless_requirement(self):
+        code, out = mark(self.project, "--target", "plan", "--state", "no-reviewer")
+        self.assertEqual(code, 2)
+
+
+class ElevatedTier(unittest.TestCase):
+    """R10: a small module the rules lift to important can record its design; an unlifted one cannot."""
+
+    def run_mark(self, lifted):
+        with tfv.Project() as project:
+            if lifted:
+                project.write(".github/autopr/risk-paths.json", json.dumps(RISK))
+            tfv.approved_spec(project, "small", boundary="`src/secret/`" if lifted else "`src/a/`")
+            project.write("tasks/a/design.md", design())
+            return mark(project, "--target", "design", "--state", "no-reviewer")
+
+    def test_lifted(self):
+        code, out = self.run_mark(True)
+        self.assertEqual(code, 0, out)
+
+    def test_not_lifted(self):
+        code, out = self.run_mark(False)
+        self.assertEqual(code, 2)
+        self.assertIn("design-not-v2", out)
 
 
 if __name__ == "__main__":
