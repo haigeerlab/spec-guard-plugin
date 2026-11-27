@@ -15,7 +15,7 @@
 - **并行时的模块视角**：`role_view()`（`:2562`）给标了「模块」角色的 checkout 出它自己模块的提示，`_role_facts()`（`:2660`）给它的状态码；项目视角的行接在 `_describe_body` 里。
 - **完成态**：`module_state()` 的 `DONE` 不只看 todo 全部勾选——合并是自动的新流程模块有有效的合并前验证时，没勾的最终 gate 也算完成（`:1543` 附近）。
 - **钉接口版本的测试**：`test_map_view.py:176`、`test_sg_review_rules.py:568`、`test_sg_design_outline.py:280` 都写着 `1.27`。
-- **下游**：autopilot-hub `origin/main`（`b3aa2ae`）与 module-crew（`14a8221`）上 `git grep -e skillLog -e 'Skill 使用记录' -e MODULE_KEYS -e 'set(module)'`（只查 `*.py`）没有命中：不读 `skillLog`、也不枚举 `/map` 的字段集合；hub 模块 8 还没写，按本方案读新字段。最终验收前按这两个提交再核一次。
+- **下游**：autopilot-hub `origin/main`（`b3aa2ae`）与 module-crew（`14a8221`）上 `git grep -e skillLog -e 'Skill 使用记录' -e MODULE_KEYS -e 'set(module)'`（先只查 `*.py`），第 2 轮审查后对全部受版本控制的文件再查 `skillLog`、`Skill 使用记录`，都没有命中：不读 `skillLog`、也不枚举 `/map` 的字段集合；hub 模块 8 还没写，按本方案读新字段。最终验收前按这两个提交再核一次。
 
 没查的：其他已装 spec-guard 的项目里有没有 todo 已经用了「Skill 使用记录」这个标题（不太可能，新写法）。
 
@@ -52,7 +52,7 @@
 
 `skill_line(root, module, stage, zh)` 按位置取一张固定表（项目视角接在 `_describe_body`；模块角色的 checkout 由 `role_view()` 按它自己的模块与阶段同样接上一行）（中英文两份），返回 `"- Skill：…"`。每个位置一句：skill 名（agent-skills 裸名，其他插件写 `delegate:review`、`artifact-diagramming`），括号里的条件照需求原文，句末是记录要求——`review-first`、`confirm`、`overall`、`design` 写「写 todo 时补进 Skill 使用记录」，`build`、`final` 写「记进 todo 的 Skill 使用记录」；`build` 句末再加情境触发的一句（画图、数据迁移、登录权限、浏览器验证、性能、文档先在已装插件里找）。
 
-不进状态码：内容只取决于位置，位置由阶段、停点、档位决定，这些已在状态码里。
+项目视角不另进状态码（`requirement_review_fact`、`design_fact` 等已覆盖位置的变化）；模块角色的 `_role_facts()` 只记阶段、Spec／Plan 状态与停点，从「先审一轮」切到「确认停点」时这些可能都不变，所以把 `skill_position` 加进 `_role_facts()`。
 
 ### 3. 记录解析（需求规则 7、10）
 
@@ -68,7 +68,7 @@
 ### 5. 规则文字（需求规则 4～6）
 
 - `workflow-checkpoints.md` 新增「skill 对照」一节：阶段提示点名的六个位置（指向阶段提示）；对不上阶段的五处（能力图 planning-and-task-breakdown、质量底线 constraint-driven-development、出事自动修 debugging-and-error-recovery、发版与安装验证 shipping-and-launch、上线之后 observability-and-instrumentation）；情境触发；不进主流程的两个；记录写法与「写 todo 时补进」。「出事处理」一节与发版段落各补一句「skill 见『skill 对照』」。
-- `node-rules.md`「能力图审阅」补一句 planning-and-task-breakdown；「最终验收」补一句「Skill 使用记录为空时补上」（守住 3200 字节）。
+- `node-rules.md`「能力图审阅」补一句 planning-and-task-breakdown。「最终验收」一节不加：节点规则是整节附在提示里的静态文字，没法按记录空不空来决定出不出；提醒只由 `skill_reminder_line()` 动态给。
 - `doc-skeletons.md` 的 Plan 一节说明 todo 可以有「Skill 使用记录」一节及写法。
 
 ### 6. 接口
@@ -114,3 +114,10 @@
 4. （建议）放宽版本断言后测不出升到 1.28 → 采纳：`test_map_view` 钉 `1.28`，新测试也断言 `1.28`。
 5. （建议）下游结论核不了 → 采纳：写明 `git grep` 的范围与提交，最终验收前再核一次。
 6. （建议）S7 没落成步骤 → 采纳：写成 Plan 任务，消息编号进 todo，发送失败不勾。
+<!-- spec-guard: design-review round=2 blocking=1 sha256=a7f449d9cf59 vendor=openai same-vendor=false criteria=design-v1 report=88ecd5b2fc5f136c41dbd8cf7e84080965b8174cd4821bd1551c5317b08a8c3c -->
+
+第 2 轮（Codex，带第 1 轮报告复审）：第 1 轮阻断 2 条已解决（模块角色、完成态），1 条仍判未解决（`spec/map-view.md`），新建议 3 条：
+1. （阻断，未解决）仍不改 `spec/map-view.md` → **交用户定**：我仍建议不改（理由见第 1 轮第 1 条），请你在批准时选。
+2. （建议）模块角色的状态码缺审查记录状态 → 采纳：`skill_position` 进 `_role_facts()`，加「先审一轮切到确认停点」的用例。
+3. （建议）节点规则「最终验收」加静态提醒会在有记录时也出现 → 采纳：不加，只由 `skill_reminder_line()` 动态给。
+4. （建议）下游只查了 `*.py` → 采纳：对全部受版本控制的文件再查，没有命中。
