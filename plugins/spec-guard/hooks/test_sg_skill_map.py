@@ -136,8 +136,8 @@ class RoleView(Stages):
         lines, second = self.facts()
         self.assertTrue(any(line.startswith("- Skill：") and "interview-me" in line for line in lines))
         self.assertNotEqual(first, second)
-        self.assertEqual(first[-1], "review-first")
-        self.assertEqual(second[-1], "confirm")
+        self.assertEqual(first[-2], "review-first")
+        self.assertEqual(second[-2], "confirm")
 
 
 LOG = """- [ ] Task 1：t
@@ -207,6 +207,53 @@ class TodoProgress(Stages):
         path.write_text(path.read_text(encoding="utf-8") + "\n## Skill 使用记录\n\n- 实现：tdd\n", encoding="utf-8")
         after = (module_stage.module_state(self.project.root, "a"), module_stage.next_gate(self.project.root, "a"))
         self.assertEqual(before, after)
+
+
+class Reminder(Stages):
+    """R6: an empty Skill log at the final gate is reminded (warning only, in the state code); a done module too."""
+
+    def code(self):
+        self.hint()
+        return module_stage.describe(self.project.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1][:8]
+
+    def test_final_gate(self):
+        self.at("final")
+        text = self.hint()
+        self.assertEqual(text.count("- Skill 使用记录：还没有记录"), 1)
+        problems = module_stage.skill_log_problems(self.project.root, "a")
+        self.assertEqual([level for level, _m in problems], ["warn"])
+        empty = self.code()
+        path = self.project.root / "tasks" / "a" / "todo.md"
+        path.write_text(path.read_text(encoding="utf-8") + "\n## Skill 使用记录\n\n- 实现：tdd\n", encoding="utf-8")
+        self.assertNotIn("- Skill 使用记录：还没有记录", self.hint())
+        self.assertEqual(module_stage.skill_log_problems(self.project.root, "a"), [])
+        self.assertNotEqual(self.code(), empty)
+
+    def test_not_at_the_gate(self):
+        self.at("build")
+        self.assertNotIn("- Skill 使用记录：还没有记录", self.hint())
+        self.assertEqual(module_stage.skill_log_problems(self.project.root, "a"), [])
+
+    def test_done_all_ticked(self):
+        self.at("final")
+        self.project.write("tasks/a/todo.md", "- [x] Task 1：t\n" + FINAL.replace("[ ]", "[x]"))
+        self.assertEqual(module_stage.module_state(self.project.root, "a")["stage"], "DONE")
+        self.assertEqual([level for level, _m in module_stage.skill_log_problems(self.project.root, "a")], ["warn"])
+
+
+class DoneByVerification(unittest.TestCase):
+    """R6: DONE by a passing pre-merge verification (merge auto), the final gate still unticked, counts as done."""
+    GATE, setUp = tfv.VerificationHintTest.GATE, tfv.VerificationHintTest.setUp
+    author, at_gate, put = tfv.VerificationHintTest.author, tfv.VerificationHintTest.at_gate, tfv.VerificationHintTest.put
+
+    def test_done_with_an_open_final_gate(self):
+        self.author()
+        self.at_gate()
+        tfv.hint(self.project, route={"takeover": "merge"})
+        self.put("pass")
+        self.assertEqual(module_stage.module_state(self.root, "a")["stage"], "DONE")
+        self.assertIn("[ ]", (self.root / "tasks" / "a" / "todo.md").read_text(encoding="utf-8"))
+        self.assertEqual([level for level, _m in module_stage.skill_log_problems(self.root, "a")], ["warn"])
 
 
 if __name__ == "__main__":
