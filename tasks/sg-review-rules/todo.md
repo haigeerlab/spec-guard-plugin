@@ -9,7 +9,7 @@
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 7：规则文字
 - [x] Task 8：接口 1.27
-- [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
+- [x] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
 - 技术方案批准后回告 ecosystem-lead（2026-11-27）：消息 #23440（线程 `autopilot-m5-7`）；lead 回 #23443，hub `flow_check` 需求转 autopr-design（线程 `autopilot-m5-hub-req`），module-crew `_design` 需求转 mc-coord（线程 `autopilot-m5-mc-req`）。
@@ -25,3 +25,4 @@
 - Task 7（2026-11-27）：`workflow-checkpoints.md`「需求确认」加「需求文档先审一轮」（三条路、只审一轮、硬拦、交用户时写明、bug／small 与老流程不审），「多模块需求仍分两轮」注明重要需求只对老流程；「技术方案审查」改成三种高风险与 `designReview`，谁放行只看 `takeover.design`（重要需求也一样），补没装 delegate 的宿主子会话退路，「不能代替重要需求的用户批准」改为按档位；「重要需求判定」写明新流程只看风险路径。`node-rules.md`「Spec 交审」加一句、「技术方案交审」改一句（Spec 交审一节守住 2600 字节）；`doc-skeletons.md` 改 important 一行并加两种记录行写法；`commands/review-mark.md` 加「新流程需求文档先审一轮」一节；`spec-guard-ops/SKILL.md`（含两种新状态的调用，validate 要求 Codex 侧技能与命令说明的参数一致）、`docs/workflow.md`、`docs/commands.md` 同步。`test_workflow_checkpoints.py` 5 处钉旧文字的断言改钉新文字（不删断言），新增 `ReviewRulesText` 3 例（对旧规则文件 3 例全红）。
 - Task 8（2026-11-27）：`interface.json` 升 1.27：`reviewMark` 的 state 加 `host-reviewed`、`no-reviewer`，参数加 `--blocking`、`--reason`，退出码 2 写上 `requirement-unreviewed`、`requirement-review-recorded`、`blocking-missing`、`review-findings-missing`、`requirement-review-reason`、`no-report-state`，notes 写技术方案与需求文档的两种新记录；`takeover.design` 改为只看配置值，`designForcedBy` 写明从 1.27 起恒为 null；`importantReasons` 的 `multi-module`、`cross-module` 标明只对老流程（`designApproval`、`requirementReview` 的字段说明在 Task 2～5 已写）。不改版本号与 CHANGELOG（发版方式待用户定）。`InterfaceFields` 2 例；`test_map_view.py` 的接口版本断言 1.26 → 1.27（注释写着随接口一起升），`test_sg_gate_flow.py` 的 1.26 版本断言改为「主版本 1、次版本不低于 26」，1.26 字段的断言不动。`check-interface.py` 通过。
 - 最终验收（2026-11-27）：R1～R13、R16 逐条按回归文档的命令跑过全部通过（`test_sg_review_rules.py` 12 组、`test_map_view`、`test_workflow_checkpoints`、`test_important_requirement`、`test_flow_v2`、`test_review_marker`、`check-interface.py`）；R15 三条最小验证在 Task 8 的完整档提交里全绿（phase-guard 516 例、verify-artifacts 148 例）；R14 回告消息 #23440、lead 回复 #23443，hub 那条已合并（autopilot-hub#97）。
+  推送分支 `claude/sg-review-rules`，开 PR #525 并绑定，验收时 head 为 `719faed9`；合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
