@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.99.0] - 2026-11-27
+
+### 变更
+
+- **审查规则按自动驾驶第一版调整（sg-review-rules，自动驾驶模块 5）。** 接口升到 **1.27**，只加字段与取值，老流程模块行为不变。
+  - **需求文档先审一轮**：生效档位 normal／important 的新流程需求（含被规则抬升的 bug、small），交用户确认前要有一条审查记录——
+    delegate 审（`review-mark --target spec --state codex-reviewed`）、宿主全新子会话审（`--state host-reviewed --blocking N`，要先把结论写进「外部审查意见」）、
+    或写明没有审查者（`--state no-reviewer --reason "<一行原因>"`）。没有记录时 `--state approved` 拒绝（`requirement-unreviewed`）；只记一轮（`requirement-review-recorded`）。
+    确认停点与确认预览给出审查以来的改动（去掉批准标记与「外部审查意见」一节比较）。**正在走流程、还没确认的新流程需求升级后要先补一条记录**，写明原因即可放行。
+  - **技术方案只在三种高风险时送审**：影响面碰风险路径（`risk-path`）、「接口和数据改动」有实际内容（`irreversible`）、影响面列了依赖清单或锁文件（`new-dependency`），
+    加上 `designReview: on`。「影响面列了已有文件」「没写出路径」不再送审。读不到风险清单时阶段提示写明 `risk-path` 未检查。
+  - **谁批技术方案只看档位**：`design=reviewer` 时重要需求也由第二审查者放行；`takeover.designForcedBy` 从此恒为 `null`。技术方案也可用宿主子会话（`host-reviewed`）或
+    「没有审查者」（`no-reviewer`）记一轮，轮次行写 `report=none`；**0.98.0 及以前读到这种行会按损坏报**，团队都升级后再用。
+  - **新流程的重要需求只看风险路径**：不再因同批插入多个模块、跨模块而判为重要需求；老流程照旧。
+  - `/map --json` 每个模块加 `requirementReview`；`designApproval` 加 `reason`、`reasons`、`riskList`，`rounds` 每轮加 `reportSha256`。
+  - 配合方：autopilot-hub 的巡检已改为在 `takeover.design` 为 `reviewer` 时认审查者放行；module-crew 随后跟进。
+
 ## [0.98.0] - 2026-11-27
 
 ### 新增
