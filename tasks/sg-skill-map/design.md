@@ -11,9 +11,11 @@
 - **能判断的位置**：`requirement_wait()`（需求等确认）与 `requirement_review()`（模块 5，有没有审查记录）；`overall_wait()`（总体技术方案关卡）；`design_waits()`（技术方案等审或等批）；`at_final_gate()`（`module_stage.py:1865`，最终 gate）；`stop_node()`（`:1960` 起）按这些给停点。
 - **提示里加一行的写法**：`_describe_body` 里 `risk_list_line`、`design_outline_line`（模块 5、6）各返回 `(fact, line)`，line 接在 `counts` 后面，fact 进状态码（`info.update(facts=…)`）。
 - **todo 的结构**：`tasks/<id>/todo.md` 是勾选清单加「证据」一节；`regression_view._section_lines(text, names)` 能取某一节的行（带是否在代码块里）。
-- **`/map --json`**：`map_view.build()` 每个模块一行字典（`:515` 起），字段由 `interface.json` 的 `mapView.flow.fields` 说明；`test_map_view.MODULE_KEYS` 钉住字段集合。
+- **`/map --json`**：`map_view.build()` 每个模块一行字典（`:515` 起），字段由 `interface.json` 的 `mapView.flow.fields` 说明；`test_map_view.MODULE_KEYS` 钉住字段集合。`map_view.py` 文件头写着 JSON 契约在 `spec/map-view.md`，但那是已完成模块的需求文档，1.15 以后加的字段（`important`、`designApproval`、`requirementReview` 等）都只写进了 `interface.json`，`spec/map-view.md` 里一个都没有。
+- **并行时的模块视角**：`role_view()`（`:2562`）给标了「模块」角色的 checkout 出它自己模块的提示，`_role_facts()`（`:2660`）给它的状态码；项目视角的行接在 `_describe_body` 里。
+- **完成态**：`module_state()` 的 `DONE` 不只看 todo 全部勾选——合并是自动的新流程模块有有效的合并前验证时，没勾的最终 gate 也算完成（`:1543` 附近）。
 - **钉接口版本的测试**：`test_map_view.py:176`、`test_sg_review_rules.py:568`、`test_sg_design_outline.py:280` 都写着 `1.27`。
-- **下游**：autopilot-hub `origin/main`（`b3aa2ae`）与 module-crew（`14a8221`）没有读 `skillLog`、也不枚举 `/map` 的字段集合（`git grep` 核过）；hub 模块 8 还没写，按本方案读新字段。
+- **下游**：autopilot-hub `origin/main`（`b3aa2ae`）与 module-crew（`14a8221`）上 `git grep -e skillLog -e 'Skill 使用记录' -e MODULE_KEYS -e 'set(module)'`（只查 `*.py`）没有命中：不读 `skillLog`、也不枚举 `/map` 的字段集合；hub 模块 8 还没写，按本方案读新字段。最终验收前按这两个提交再核一次。
 
 没查的：其他已装 spec-guard 的项目里有没有 todo 已经用了「Skill 使用记录」这个标题（不太可能，新写法）。
 
@@ -24,7 +26,7 @@
 | 文件 | 改什么 |
 |---|---|
 | `plugins/spec-guard/hooks/module_stage.py` | 新函数 `skill_position`、`skill_line`、`skill_log`、`skill_log_problems`、`skill_reminder_line`；`_describe_body` 接上两行与状态码事实 |
-| `plugins/spec-guard/hooks/map_view.py` | 每个模块加 `skillLog` |
+| `plugins/spec-guard/hooks/map_view.py` | 每个模块加 `skillLog`；文件头注明 1.15 以后的字段以 `interface.json` 为准 |
 | `plugins/spec-guard/hooks/verify-artifacts.sh` | 多调一个 `skill_log_problems` |
 | `plugins/spec-guard/interface.json` | 升 `1.28`：`mapView.flow.fields.skillLog`；顺带把 #530 已改的 `takeover.notes` 一起发出去（不再改） |
 | `plugins/spec-guard/references/workflow-checkpoints.md`、`plugins/spec-guard/references/node-rules.md` | 新增「skill 对照」一节；「出事处理」、发版段落、能力图审阅各补一句指向 |
@@ -48,7 +50,7 @@
 
 ### 2. 点名那一行（需求规则 2、3、3a、7a、15）
 
-`skill_line(root, module, stage, zh)` 按位置取一张固定表（中英文两份），返回 `"- Skill：…"`。每个位置一句：skill 名（agent-skills 裸名，其他插件写 `delegate:review`、`artifact-diagramming`），括号里的条件照需求原文，句末是记录要求——`review-first`、`confirm`、`overall`、`design` 写「写 todo 时补进 Skill 使用记录」，`build`、`final` 写「记进 todo 的 Skill 使用记录」；`build` 句末再加情境触发的一句（画图、数据迁移、登录权限、浏览器验证、性能、文档先在已装插件里找）。
+`skill_line(root, module, stage, zh)` 按位置取一张固定表（项目视角接在 `_describe_body`；模块角色的 checkout 由 `role_view()` 按它自己的模块与阶段同样接上一行）（中英文两份），返回 `"- Skill：…"`。每个位置一句：skill 名（agent-skills 裸名，其他插件写 `delegate:review`、`artifact-diagramming`），括号里的条件照需求原文，句末是记录要求——`review-first`、`confirm`、`overall`、`design` 写「写 todo 时补进 Skill 使用记录」，`build`、`final` 写「记进 todo 的 Skill 使用记录」；`build` 句末再加情境触发的一句（画图、数据迁移、登录权限、浏览器验证、性能、文档先在已装插件里找）。
 
 不进状态码：内容只取决于位置，位置由阶段、停点、档位决定，这些已在状态码里。
 
@@ -60,8 +62,8 @@
 
 ### 4. 最终验收提醒（需求规则 12、13、15）
 
-- `skill_reminder_line(root, module, stage, zh)`：`skill_position` 是 `"final"` 且 `skill_log` 为空 → 返回 `(("skill-log", "empty"), "- Skill 使用记录：还没有记录；最终验收前把用过的 skill 记进 todo 的「Skill 使用记录」，找不到的写「没有现成的 skill，按常规做法来」")`，fact 进状态码；有记录 → `(None, "")`。
-- `skill_log_problems(root, module)`：新流程模块在最终 gate，或 todo 里的勾选项全部勾上，而 `skill_log` 为空 → `[("warn", …)]`，否则 `[]`；`verify-artifacts.sh` 接在 `design_outline_problems` 后面。
+- `skill_reminder_line(root, module, stage, zh)`（项目视角在 `_describe_body`，模块角色在 `role_view()`，fact 同时进 `_role_facts()`）：`skill_position` 是 `"final"` 且 `skill_log` 为空 → 返回 `(("skill-log", "empty"), "- Skill 使用记录：还没有记录；最终验收前把用过的 skill 记进 todo 的「Skill 使用记录」，找不到的写「没有现成的 skill，按常规做法来」")`，fact 进状态码；有记录 → `(None, "")`。
+- `skill_log_problems(root, module)`：新流程模块在最终 gate，或 `module_state(root, module)["stage"] == "DONE"`（不自己数勾选框），而 `skill_log` 为空 → `[("warn", …)]`，否则 `[]`；`verify-artifacts.sh` 接在 `design_outline_problems` 后面。
 
 ### 5. 规则文字（需求规则 4～6）
 
@@ -71,7 +73,7 @@
 
 ### 6. 接口
 
-`interface.json` 升 `1.28`：`mapView.flow.fields.skillLog`（含义、解析规则、位置、`null`／`[]` 的区别）。三处钉 `1.27` 的测试改成「主版本 1、次版本不低于 27」，原来钉的 1.27 字段断言不动。
+`interface.json` 升 `1.28`：`mapView.flow.fields.skillLog`（含义、解析规则、位置、`null`／`[]` 的区别）。契约以 `interface.json` 为准，不改 `spec/map-view.md`（已完成模块的需求文档，1.15 起的字段都没写进去）。`test_map_view.py` 的接口版本断言改成 `1.28`；`test_sg_review_rules.py`、`test_sg_design_outline.py` 里钉 `1.27` 的版本断言改成「主版本 1、次版本不低于 27」（它们钉的是各自那一版加的字段还在），本模块新测试另断言等于 `1.28`。
 
 ## 接口和数据改动
 
@@ -99,4 +101,16 @@
 ## 待定问题
 
 - **发版方式**（交用户定）：模块 7 单独发 0.101.0（本模块 PR 里改版本号与 CHANGELOG，连同 #530 的接口说明修正一起发出），还是先不发。
-- 技术方案批准后，把 `skillLog` 的位置、字段与 todo 写法回告 ecosystem-lead（S7）。
+- 技术方案批准后，把 `skillLog` 的位置、字段与 todo 写法回告 ecosystem-lead（S7）：这一步写成 Plan 里的一个任务——经 agent-relay 发到线程 `autopilot-m5-7`，读回投递结果，把消息编号写进本模块 todo 的「证据」；发送失败时这一项不勾。
+
+## 外部审查意见
+
+<!-- spec-guard: design-review round=1 blocking=3 sha256=71c5ba5558e4 vendor=openai same-vendor=false criteria=design-v1 report=ce2f9829712f52c3937dd8072af834996c8888d459b067c39091f9109d2e3be6 -->
+
+第 1 轮（Codex，gpt-5.6-sol high，3 条阻断、3 条建议），逐条对照代码核实：
+1. （阻断）漏了 `spec/map-view.md` 这份 `/map --json` 契约 → 部分采纳：那是已完成模块的需求文档，1.15 以后加的字段都只写在 `interface.json`，改它要动已批准的需求文档；契约以 `interface.json` 为准，并在 `map_view.py` 文件头写明。
+2. （阻断）模块角色 checkout 的提示路径没接 → 采纳：`role_view()` 与 `_role_facts()` 同样接上点名行与提醒。
+3. （阻断）「todo 全部勾选」不等于完成 → 采纳：用 `module_state()` 的 `DONE`。
+4. （建议）放宽版本断言后测不出升到 1.28 → 采纳：`test_map_view` 钉 `1.28`，新测试也断言 `1.28`。
+5. （建议）下游结论核不了 → 采纳：写明 `git grep` 的范围与提交，最终验收前再核一次。
+6. （建议）S7 没落成步骤 → 采纳：写成 Plan 任务，消息编号进 todo，发送失败不勾。
