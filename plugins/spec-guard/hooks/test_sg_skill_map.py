@@ -181,8 +181,10 @@ class SkillLog(Stages):
 
     def test_english_heading_missing_section_and_old_module(self):
         self.at("build")
-        self.project.write("tasks/a/todo.md", "- [ ] t\n\n## Skill log\n\n- Build: incremental-implementation\n")
-        self.assertEqual(self.log(), [{"place": "Build", "skills": ["incremental-implementation"], "none": False}])
+        self.project.write("tasks/a/todo.md", "- [ ] t\n\n## Skill log\n\n- Build: incremental-implementation\n"
+                                              "- Review: delegate:review\n")
+        self.assertEqual(self.log(), [{"place": "Build", "skills": ["incremental-implementation"], "none": False},
+                                      {"place": "Review", "skills": ["delegate:review"], "none": False}])
         self.project.write("tasks/a/todo.md", "- [ ] t\n")
         self.assertEqual(self.log(), [])
         self.setUp()
