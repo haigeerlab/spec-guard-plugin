@@ -1710,10 +1710,12 @@ def important(root: Path, module: str) -> list:
     from module_scope import ScopeError, overlap, parse, parse_declared  # late: module_scope imports this module
     # takeover-redefine (R2-1): a flow v2 requirement is always the user's, so the unknowns never count for it --
     # otherwise design=reviewer would make every module of a project without a risk list important.
-    codex = not _v2(root, module) and _takeover_item(root, module, "spec") == "codex"
+    v2 = _v2(root, module)
+    codex = not v2 and _takeover_item(root, module, "spec") == "codex"
     reasons = []
     try:
-        if any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
+        # sg-review-rules (rule 14): a flow v2 module is important on a risk path only
+        if not v2 and any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
             reasons.append("multi-module")
     except usage_draft.UsageDraftError:
         pass  # without git there are no batches to tell; the other rules still apply
@@ -1748,7 +1750,7 @@ def important(root: Path, module: str) -> list:
             if theirs is not None and overlap(scope, theirs):
                 clash = True
                 break
-        if scope.shared or clash:
+        if not v2 and (scope.shared or clash):
             reasons.append("cross-module")
     paths = list(scope.exclusive) if scope is not None else []
     try:
@@ -1757,7 +1759,7 @@ def important(root: Path, module: str) -> list:
         declared = None
     if declared is not None:
         paths += list(declared.public_paths)
-    if _v2(root, module):
+    if v2:
         # plan-auto-approve: a v2 design's impact section names what the module changes (old modules: unchanged)
         paths += impact_paths(read(root / "tasks" / module / "design.md"))
         # rework (assumption 13): its own documents, or its tasks/<id>/ directory entry, are not risk paths

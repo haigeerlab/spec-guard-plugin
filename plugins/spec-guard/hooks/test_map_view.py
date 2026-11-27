@@ -510,8 +510,10 @@ class FlowTest(unittest.TestCase):
         self.assertEqual((module["tier"], module["step"]), ("bug", "plan"))
         module, _ = self.module({"spec/a.md": self.spec("huge")})
         self.assertEqual(module["tier"], "normal")
-        lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/a/`\n- 公共：全局配置\n")
-        module, _ = self.module({"spec/a.md": lifted})
+        # sg-review-rules (rule 14): a flow v2 tier is lifted by a risk path only
+        lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/secret/`\n")
+        module, _ = self.module({"spec/a.md": lifted, ".github/autopr/risk-paths.json": json.dumps(
+            {"schema": "autopilot.risk-paths/v1", "T4": ["src/secret/**"], "T3": []})})
         self.assertEqual((module["tier"], module["step"]), ("important", "design"))
 
 

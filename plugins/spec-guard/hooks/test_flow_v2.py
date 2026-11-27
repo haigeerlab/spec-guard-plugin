@@ -19,6 +19,14 @@ def marker(tier):
     return "<!-- spec-guard: flow v2 tier=%s -->" % tier
 
 
+RISKY = {"schema": "autopilot.risk-paths/v1", "T4": ["src/secret/**"], "T3": []}
+
+
+def risky(project):
+    """sg-review-rules (rule 14): a flow v2 module is important by rule only on a risk path; this makes `src/secret/` one."""
+    project.write(".github/autopr/risk-paths.json", json.dumps(RISKY))
+
+
 def requirement(tier="normal", boundary="`src/a/`", shared=None, extra=""):
     text = "# a\n\n<!-- spec-guard: review approved -->\n%s\n\n" % marker(tier)
     text += "".join("## %s\n\n不涉及\n\n" % name for name in DOC_SECTIONS["requirement"]["zh"])
@@ -88,7 +96,8 @@ class MarkerTest(unittest.TestCase):
 class EffectiveTierTest(unittest.TestCase):
     def test_rule_lifts_a_lower_tier_to_important(self):
         with Project() as project:
-            project.write("spec/a.md", requirement("small", shared="全局配置"))
+            risky(project)
+            project.write("spec/a.md", requirement("small", boundary="`src/secret/`"))
             self.assertEqual(effective_tier(project.root, "a"),
                              {"v2": True, "tier": "important", "problems": ["tier-below-rule"]})
 
@@ -151,7 +160,8 @@ class StageTest(unittest.TestCase):
 
     def test_small_judged_important_needs_every_document(self):
         with Project() as project:
-            approved_spec(project, "small", shared="全局配置")
+            risky(project)
+            approved_spec(project, "small", boundary="`src/secret/`")
             self.assertEqual(module_state(project.root, "a")["stage"], "NEEDS_DESIGN")
 
     def test_old_module_never_sees_the_new_stages(self):
@@ -163,9 +173,10 @@ class StageTest(unittest.TestCase):
         with Project(("a", "b")) as project:
             project.write("spec/a.md", requirement("small", boundary="`src/x/`"))
             project.write("spec/b.md", requirement("small", boundary="`src/x/`").replace("# a", "# b"))
-            self.assertEqual(module_state(project.root, "a")["stage"], "NEEDS_DESIGN")
-            self.assertEqual(module_state(project.root, "b")["stage"], "NEEDS_DESIGN")
-            self.assertIn("NEEDS_DESIGN", hint(project))
+            # sg-review-rules (rule 14): the overlap no longer lifts a flow v2 tier; both stay small and finish.
+            self.assertEqual(module_state(project.root, "a")["stage"], "NEEDS_PLAN")
+            self.assertEqual(module_state(project.root, "b")["stage"], "NEEDS_PLAN")
+            self.assertIn("NEEDS_PLAN", hint(project))
 
     def test_stop_node_is_not_plan_review_before_the_plan(self):
         with Project() as project:
@@ -236,7 +247,8 @@ class HintTest(unittest.TestCase):
 
     def test_tier_problem_line(self):
         with Project() as project:
-            approved_spec(project, "small", shared="全局配置")
+            risky(project)
+            approved_spec(project, "small", boundary="`src/secret/`")
             self.assertIn("规则判为重要需求，按 `important` 处理", hint(project))
             project.write("spec/a.md", requirement("huge"))
             self.assertIn("treated as `normal`", hint(project, zh=False))
@@ -418,11 +430,12 @@ class RequirementConfirmHintTest(unittest.TestCase):
 
     def test_important_requirement_names_the_reasons(self):
         with Project() as project:
-            pending_spec(project, shared="全局配置")
+            risky(project)
+            pending_spec(project, boundary="`src/secret/`")
             configure(project)
             text = module_stage.describe(project.root)
             self.assertIn(WAIT_ZH, text)
-            self.assertIn("本需求是重要需求：cross-module", text)
+            self.assertIn("本需求是重要需求：risk-path", text)
             self.assertNotIn("Spec `spec/a.md` 是重要需求", text)
 
     def test_confirmed_and_revised(self):
@@ -685,13 +698,13 @@ class DesignRequirementTest(unittest.TestCase):
             project.write("tasks/a/design.md", design_text())
             self.assertEqual(self.need(project), {"need": "user", "reason": "important"})
 
-    def test_cross_module_is_important_by_rule(self):
-        # The cross-module case of assumption 2 reaches the first branch: important() already lifts the tier.
+    def test_cross_module_is_not_important_in_v2(self):
+        # sg-review-rules (rule 14): shared files no longer make a flow v2 requirement important.
         with Project() as project:
             approved_spec(project, "normal", shared="全局配置")
             project.write("tasks/a/design.md", design_text())
-            self.assertEqual(self.need(project), {"need": "user", "reason": "important"})
-            self.assertIn("cross-module", module_stage.important(project.root, "a"))
+            self.assertNotEqual(self.need(project), {"need": "user", "reason": "important"})
+            self.assertNotIn("cross-module", module_stage.important(project.root, "a"))
 
     def test_existing_files_at_the_baseline_are_reviewed(self):
         with Project() as project:
@@ -1493,7 +1506,7 @@ class RegressionViewCliTest(unittest.TestCase):
         code, out = self.view(self.project.root, "--module", "a", "--ref", first)
         self.assertEqual((code, out["tier"], out["document"]), (0, "small", "spec/a.md"))
 
-    def test_ref_sees_a_batch_insert_as_important(self):
+    def test_ref_batch_insert_is_not_important_in_v2(self):
         self.project.write("spec/CAPABILITY-MAP.md", "# Capability Map: t\n\n| Module id | Responsibility | Depends on |\n"
                            "|---|---|---|\n| z | x | — |\n\nBuild order: z\n")
         commit_all(self.project.root)
@@ -1503,7 +1516,8 @@ class RegressionViewCliTest(unittest.TestCase):
         self.project.write("tasks/a/regression.md", CASES_EN)
         first = commit_all(self.project.root)
         code, out = self.view(self.project.root, "--module", "a", "--ref", first)
-        self.assertEqual((code, out["tier"], out["document"]), (0, "important", "tasks/a/regression.md"))
+        # sg-review-rules (rule 14): a batch insert no longer makes a flow v2 requirement important.
+        self.assertEqual((code, out["tier"], out["document"]), (0, "small", "spec/a.md"))
 
     def test_ref_bytes_are_the_raw_blob(self):
         crlf = CASES_EN.replace("\n", "\r\n")
