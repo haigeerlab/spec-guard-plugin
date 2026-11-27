@@ -1,6 +1,6 @@
 # 技术方案: sg-skill-map
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved c776355a23fb -->
 
 需求文档：`spec/sg-skill-map.md`（用户 2026-11-27「确认需求」）。照已批总体技术方案 7.1 节与第 7 节模块 7 那一行，不重新选型。
 
