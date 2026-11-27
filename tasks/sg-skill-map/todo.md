@@ -7,7 +7,7 @@
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 5：规则文字
 - [x] Task 6：接口 1.28 与版本 0.101.0
-- [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
+- [x] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## Skill 使用记录
 
@@ -30,3 +30,4 @@
 - Task 5（2026-11-27）：`workflow-checkpoints.md` 新增「skill 对照」一节（阶段提示点名的位置、五处对不上阶段的关卡、情境触发、不进主流程的两个、怎么记）；「出事处理」与发版那一句各补指向；`node-rules.md`「能力图审阅」补 planning-and-task-breakdown，「最终验收」不加静态提醒；`doc-skeletons.md` 的 Plan 一节写记录写法；`docs/workflow.md` 补一句。`test_workflow_checkpoints.py` 新增 `SkillMapRulesText` 2 例，对改动前的规则文件全红；原有断言不动。
 - Task 6（2026-11-27）：`interface.json` 升 1.28，`mapView.flow.fields.skillLog` 写含义与解析规则；版本 0.100.0 → 0.101.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 写 `[0.101.0]`（含 #530 的说明修正）。`test_map_view.py` 接口版本 1.27 → 1.28；`test_sg_review_rules.py` 的接口版本断言与 `test_sg_design_outline.py` 的接口与插件版本断言改成「不低于」各自那一版（它们钉的是那一版加的东西还在），断言不删。用例 `Release` 2 例；`test_sg_skill_map.py` 读仓库的 CHANGELOG 与 README，移进 validate 的 `DOC_REGRESSIONS`。
 - 最终验收（2026-11-27）：R1～R8 按回归文档的命令逐条跑过全部通过（`test_sg_skill_map.py` 8 组、`test_workflow_checkpoints`、`check-interface.py`）；R9 回告 #23557；R10 下游复核：autopilot-hub `b3aa2ae`、module-crew `14a8221` 的 `origin/main` 全部受版本控制的文件里没有 `skillLog`、`Skill 使用记录`；R11 三条最小验证在 Task 6 的完整档提交里全绿。阶段提示（已装 0.100.0）没有越界行。
+  推送分支 `claude/sg-skill-map`，PR #531，验收时 head 为 `b5498078`；合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
