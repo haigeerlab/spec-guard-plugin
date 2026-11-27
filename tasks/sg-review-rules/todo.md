@@ -8,7 +8,7 @@
 - [x] Task 6：硬拦、确认停点提示与改动差异
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 7：规则文字
-- [ ] Task 8：接口 1.27
+- [x] Task 8：接口 1.27
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
@@ -23,3 +23,4 @@
 - 技术方案第 2 轮复审后补的实现（2026-11-27，用户重新批准后）：`risk_list_line` 让 `NEEDS_REGRESSION` 阶段只要读不到风险清单就单独出「T4 路径」一行并进状态码（原来挂在技术方案等批的提示上，`design=reviewer` 不送审时看不到）；`host-reviewed`（需求文档与技术方案）在「外部审查意见」一节除记录行外没有内容时拒绝（`review-findings-missing`）。新用例 3 例对上一版实现全红，`RiskListHint` 改成从阶段提示里看这一行；用到 `host-reviewed` 的用例先写一段审查结论。
 - Checkpoint 1（2026-11-27）：Task 1～6 与复审补充的提交都走完整档且全绿（phase-guard 516 例、verify-artifacts 148 例）。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），10 个：空值清单少「无」、去掉只记一轮、硬拦不看缺记录、`report=none` 不限 vendor、重要需求恢复交用户、差异不截断、新流程仍算 cross-module、不查审查结论、无清单提示只在构建阶段、差异比较不去掉审查一节——10 个全部变红；还原后 `test_sg_review_rules.py` 47 例全过。
 - Task 7（2026-11-27）：`workflow-checkpoints.md`「需求确认」加「需求文档先审一轮」（三条路、只审一轮、硬拦、交用户时写明、bug／small 与老流程不审），「多模块需求仍分两轮」注明重要需求只对老流程；「技术方案审查」改成三种高风险与 `designReview`，谁放行只看 `takeover.design`（重要需求也一样），补没装 delegate 的宿主子会话退路，「不能代替重要需求的用户批准」改为按档位；「重要需求判定」写明新流程只看风险路径。`node-rules.md`「Spec 交审」加一句、「技术方案交审」改一句（Spec 交审一节守住 2600 字节）；`doc-skeletons.md` 改 important 一行并加两种记录行写法；`commands/review-mark.md` 加「新流程需求文档先审一轮」一节；`spec-guard-ops/SKILL.md`（含两种新状态的调用，validate 要求 Codex 侧技能与命令说明的参数一致）、`docs/workflow.md`、`docs/commands.md` 同步。`test_workflow_checkpoints.py` 5 处钉旧文字的断言改钉新文字（不删断言），新增 `ReviewRulesText` 3 例（对旧规则文件 3 例全红）。
+- Task 8（2026-11-27）：`interface.json` 升 1.27：`reviewMark` 的 state 加 `host-reviewed`、`no-reviewer`，参数加 `--blocking`、`--reason`，退出码 2 写上 `requirement-unreviewed`、`requirement-review-recorded`、`blocking-missing`、`review-findings-missing`、`requirement-review-reason`、`no-report-state`，notes 写技术方案与需求文档的两种新记录；`takeover.design` 改为只看配置值，`designForcedBy` 写明从 1.27 起恒为 null；`importantReasons` 的 `multi-module`、`cross-module` 标明只对老流程（`designApproval`、`requirementReview` 的字段说明在 Task 2～5 已写）。不改版本号与 CHANGELOG（发版方式待用户定）。`InterfaceFields` 2 例；`test_map_view.py` 的接口版本断言 1.26 → 1.27（注释写着随接口一起升），`test_sg_gate_flow.py` 的 1.26 版本断言改为「主版本 1、次版本不低于 26」，1.26 字段的断言不动。`check-interface.py` 通过。

@@ -558,5 +558,30 @@ class RequirementDiffPreview(GitRequirement):
         self.assertIn("spec/a.md: the changes since the review cannot be shown", out)
 
 
+class InterfaceFields(unittest.TestCase):
+    """R12: interface 1.27 only adds values and fields, each one described."""
+
+    def setUp(self):
+        self.data = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))
+
+    def test_version(self):
+        self.assertEqual(self.data["interface"], "1.27")
+
+    def test_new_fields_and_values_are_described(self):
+        view = self.data["mapView"]
+        self.assertIn("since 1.27", view["flow"]["fields"]["requirementReview"])
+        for field in ("reason", "reasons", "riskList"):
+            with self.subTest(field=field):
+                self.assertIn("1.27", view["designApproval"]["fields"][field])
+        self.assertIn("reportSha256", view["designApproval"]["fields"]["rounds"])
+        self.assertIn("always null since 1.27", view["takeover"]["fields"]["designForcedBy"])
+        text = json.dumps(self.data["reviewMark"], ensure_ascii=False)
+        for word in ("host-reviewed", "no-reviewer", "--blocking", "--reason", "requirement-unreviewed",
+                     "requirement-review-recorded", "requirement-review-reason", "review-findings-missing"):
+            with self.subTest(word=word):
+                self.assertIn(word, text)
+        self.assertIn("old-files and impact-unknown no longer appear", view["designApproval"]["fields"]["reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
