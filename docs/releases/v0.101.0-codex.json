@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.101.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-codex",
+      "status": "host-verified",
+      "target": {
+        "kind": "host-session",
+        "id": "codex-cli;test:v0.101.0-upgrade-20261127"
+      },
+      "observedAt": "2026-11-27T10:11:48Z",
+      "evidence": [
+        "command:/bin/bash evals/codex-plugin-smoke.sh --plugin-id spec-guard@spec-guard-marketplace --expected-source '~/.codex/.tmp/marketplaces/spec-guard-marketplace/plugins/spec-guard' </dev/null",
+        "result:the marketplace ref moved from v0.100.0 to v0.101.0; codex plugin marketplace upgrade exited 0 at 2026-11-27T10:09:17.301729+00:00; the snapshot is identical to the release asset; codex plugin list --json shows spec-guard 0.101.0 enabled",
+        "result:codex-cli 0.172.0; the smoke exited 0 on its first run",
+        "result:the ChatGPT desktop app was restarted after the install; its main process started 2026-11-27T10:11:03Z (checked with ps)"
+      ]
+    }
+  ]
+}
