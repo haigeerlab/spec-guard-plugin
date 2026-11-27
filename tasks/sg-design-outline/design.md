@@ -31,7 +31,7 @@
 | `scripts/validate.sh` | 登记新测试文件 |
 | `docs/workflow.md` | 使用者说明一句 |
 | `CHANGELOG.md` | 写本模块的条目（标题按发版方式：单独发写 `[0.100.0]`，和模块 7 一起发写 `[未发布]`） |
-| 两份 `plugin.json`、`README.md`、`README.en.md`（**条件**） | 只在单独发 0.100.0 时升版本号与 `--ref`；和模块 7 一起发时本模块不改 |
+| `plugins/spec-guard/.claude-plugin/plugin.json`、`plugins/spec-guard/.codex-plugin/plugin.json`、`README.md`、`README.en.md`（**条件**） | 只在单独发 0.100.0 时升版本号与 `--ref`；和模块 7 一起发时本模块不改（构建中越界检查认不出「两份 `plugin.json`」这种简写，按用户 2026-11-27「A：补进影响面」改成完整路径） |
 
 ## 实现方案
 
