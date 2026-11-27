@@ -81,6 +81,12 @@
 
 ## 技术方案审查
 
+**写什么（sg-design-outline）。** 技术方案按三种情况写，可以叠加，章节见插件的 `references/doc-skeletons.md`：
+改已有功能写六节；全新项目或全新模块（需求文档恰好有一行格式正确、路径有效的 `overall-design` 行，重复、写坏或路径不合规的不算）
+再加技术选型、架构图、目录结构、数据模型四节，图用 Mermaid 这类文本格式，缺一节 verify-artifacts 判失败；重要需求（生效档位 `important`）
+的「方案取舍」至少比较两种做法；同一批插入 2 个及以上模块的，加「模块接口」一节画出与同批模块之间的接口。后两种不满足时阶段提示
+（`NEEDS_REGRESSION`）与 verify-artifacts 只警告。
+
 新流程 `normal`／`important` 模块写完技术方案 `tasks/<id>/design.md` 之后、写回归测试文档之前，按下面的顺序定由谁放行，先中先定：
 
 - **三种高风险：审（sg-review-rules）。** 按技术方案的文字和风险清单判定，不由 agent 自己判，命中一种就交第二审查者审：
