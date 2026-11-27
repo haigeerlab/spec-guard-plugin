@@ -1,6 +1,6 @@
 # 技术方案: sg-design-outline
 
-<!-- spec-guard: review approved a387228a47b3 -->
+<!-- spec-guard: review reviewer-approved deb1be0b6a44 -->
 
 需求文档：`spec/sg-design-outline.md`（用户 2026-11-27「确认需求」）。照已批总体技术方案第 7 节模块 6 那一行，不重新选型。
 
@@ -115,3 +115,4 @@
 3. 编号列表多认了 `1)` → 采纳：只认需求写的 `1.`。
 4. 批次缓存没有失效边界 → 采纳：缓存键加上 HEAD 和能力图文件状态。
 5. 下游结论仍核不了 → 不改结论，写明交付前按提交与行号再核一次；其他已装项目的影响标为未验证。
+<!-- spec-guard: design-review round=3 blocking=0 sha256=c7e8ab6a4377 vendor=openai same-vendor=false criteria=design-v1 report=a35456c1bc711f07bd2e429d6493da30f5f4eff178a72c276897dcbe501a94ab -->
