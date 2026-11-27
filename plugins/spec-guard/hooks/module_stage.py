@@ -94,6 +94,10 @@ DOC_SECTIONS = {
     "design": {"zh": ("现状调研", "影响面", "实现方案", "接口和数据改动", "风险与回滚", "方案取舍"),
                "en": ("Current state", "Impact", "Implementation", "Interface and data changes", "Risks and rollback",
                       "Alternatives")},
+    # sg-design-outline: a new project or module adds these four to the design; a multi-module one draws its interfaces
+    "design-new": {"zh": ("技术选型", "架构图", "目录结构", "数据模型"),
+                   "en": ("Technology choices", "Architecture diagram", "Directory layout", "Data model")},
+    "design-interfaces": {"zh": ("模块接口",), "en": ("Module interfaces",)},
     "regression": {"zh": ("用例清单", "成功标准对照", "受影响的老功能"),
                    "en": ("Cases", "Success criteria coverage", "Affected existing features")},
     "plan": {"zh": ("任务", "检查点"), "en": ("Tasks", "Checkpoints")},
@@ -618,6 +622,8 @@ def flow_doc_problems(root: Path, module: str) -> list:
             continue
         wanted = {"requirement": ("bug",) if flow["tier"] == "bug" else
                   (("requirement", "small") if flow["tier"] == "small" else ("requirement",))}.get(kind, (kind,))
+        if kind == "design" and (design_outline_case(root, module) or {}).get("new"):
+            wanted = ("design", "design-new")  # sg-design-outline (rule 5): missing ones fail like any skeleton section
         try:
             have = _sections((root / path).read_text(encoding="utf-8"))
         except (OSError, UnicodeError):

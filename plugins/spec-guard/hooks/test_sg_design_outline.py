@@ -11,6 +11,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import module_stage  # noqa: E402
+from module_stage import DOC_SECTIONS  # noqa: E402
+import test_flow_v2 as tfv  # noqa: E402
 import test_important_requirement as tir  # noqa: E402
 
 OVERALL = "<!-- spec-guard: overall-design spec/overall/x.md -->"
@@ -96,6 +98,70 @@ class BatchCache(GitProject):
             self.assertEqual(len(calls), 2)
         finally:
             module_stage.usage_draft.batches = real
+
+
+NEW_ZH, NEW_EN = DOC_SECTIONS["design-new"]["zh"], DOC_SECTIONS["design-new"]["en"]
+
+
+def design(extra=(), alternatives="不涉及", sections=None):
+    """tasks/a/design.md: the six sections plus `extra` section names (each 不涉及); `alternatives` fills 方案取舍."""
+    names = list(DOC_SECTIONS["design"]["zh"]) + list(extra)
+    fill = {"影响面": "- 新增 `src/a/new.py`", "方案取舍": alternatives}
+    fill.update(sections or {})
+    return "# 技术方案：a\n\n" + "".join("## %s\n\n%s\n\n" % (name, fill.get(name, "不涉及")) for name in names)
+
+
+class V2Project(unittest.TestCase):
+    """A flow v2 module `a` outside git (no batches); `spec_extra` goes into the requirement."""
+
+    def setUp(self):
+        self.project = tfv.Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+        module_stage._BATCH_CACHE.clear()
+
+    def requirement(self, tier="normal", new=False):
+        tfv.approved_spec(self.project, tier, extra=OVERALL + "\n" if new else "")
+
+    def problems(self):
+        return module_stage.flow_doc_problems(self.project.root, "a")
+
+
+class NewDesignSections(V2Project):
+    """R2: a new project or module's design without the four sections fails; with them (zh or en, 不涉及) it passes."""
+
+    def test_missing_fails_in_flight_and_done(self):
+        self.requirement(new=True)
+        self.project.write("tasks/a/design.md", design())
+        for done in (False, True):
+            with self.subTest(done=done):
+                if done:
+                    for name, text in (("regression.md", "# r\n"), ("plan.md", "# p\n"), ("todo.md", "- [x] t\n")):
+                        self.project.write("tasks/a/%s" % name, text)
+                failures = [m for level, m in self.problems() if level == "fail" and "design.md" in m]
+                self.assertEqual(len(failures), 1, self.problems())
+                for name in NEW_ZH:
+                    self.assertIn(name, failures[0])
+
+    def test_present_passes(self):
+        self.requirement(new=True)
+        for extra in (NEW_ZH, NEW_EN):
+            with self.subTest(extra=extra[0]):
+                self.project.write("tasks/a/design.md", design(extra))
+                self.assertEqual([m for level, m in self.problems() if "design.md" in m], [])
+
+
+class Unchanged(V2Project):
+    """R3: not new -- six sections as before, the same problems as before the change."""
+
+    def test_six_sections_pass(self):
+        self.requirement()
+        self.project.write("tasks/a/design.md", design())
+        self.assertEqual([m for level, m in self.problems() if "design.md" in m], [])
+
+    def test_missing_one_of_six_reads_as_before(self):
+        self.requirement()
+        self.project.write("tasks/a/design.md", design().replace("## 方案取舍\n\n不涉及\n\n", ""))
+        self.assertIn(("fail", "`tasks/a/design.md` 缺章节：方案取舍"), self.problems())
 
 
 if __name__ == "__main__":
