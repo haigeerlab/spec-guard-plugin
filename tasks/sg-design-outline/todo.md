@@ -6,7 +6,7 @@
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 4：骨架与规则文字
 - [x] Task 5：版本与 CHANGELOG
-- [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
+- [x] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
 - 技术方案（2026-11-27）：Codex 两轮（第 1 轮 3 条阻断，第 2 轮全部解决、5 条建议），用户「批准；单独发」。
@@ -19,3 +19,4 @@
 - Task 5（2026-11-27）：版本 0.99.0 → 0.100.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 写 `[0.100.0]`（含升级要补四节）；接口仍是 1.27。用例 `Release` 2 例；因为它读仓库自己的 CHANGELOG 与 README，按 validate 的要求把 `test_sg_design_outline.py` 从全套回归段移到 `DOC_REGRESSIONS`。
 - 最终验收（2026-11-27）：R1～R9 按回归文档的命令逐条跑过全部通过（`test_sg_design_outline.py` 8 组、`test_workflow_checkpoints`、`SkeletonTest`、`check-interface.py`）；R11 三条最小验证在 Task 5 的完整档提交里全绿。R10 下游复核：autopilot-hub `origin/main` `cfe2f1d` 里没有技术方案章节名，也不调用 verify-artifacts 脚本；module-crew `origin/main` `d9d3cd4` 的 `module_crew/protocol.py:747` `_DESIGN_POINTS` 未变，不含新章节名。
 - 越界与重新批准（2026-11-27）：用户第一次回「验收通过并合并」后，阶段提示的越界检查查出两份 `plugin.json` 不在影响面（影响面写的是「两份 `plugin.json`」简写）；我撤回「没有越界」的说法，停在中途 gate。用户「A：补进影响面」→ 改成完整路径 → Codex 第 3 轮复审无意见 → 用户「批准」。
+  推送分支 `claude/sg-design-outline`，PR #528 已绑定，验收时 head 为 `b3c6a6be`；合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
