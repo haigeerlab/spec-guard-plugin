@@ -113,29 +113,37 @@ class DesignRequirement(unittest.TestCase):
 
 
 class RiskListHint(unittest.TestCase):
-    """R7: without a readable risk-path list the design stage says risk-path was not checked."""
+    """R7: without a readable risk-path list the design stage says risk-path was not checked, waiting or not."""
 
-    def run_hint(self, risk):
+    def run_hint(self, risk, route=None, impact="- 改 `src/secret/key.py`"):
         with tfv.Project() as project:
             tfv.approved_spec(project)
             if risk:
                 project.write(".github/autopr/risk-paths.json", json.dumps(RISK))
-            project.write("tasks/a/design.md", design("- 改 `src/secret/key.py`"))
+            project.write("tasks/a/design.md", design(impact))
             need = module_stage.design_requirement(project.root, "a")
-            fact, _step = module_stage.design_hint(project.root, "a", "NEEDS_REGRESSION", CMD, True)
-            en, _step = module_stage.design_hint(project.root, "a", "NEEDS_REGRESSION", CMD, False)
-        return need, fact, en
+            zh = tfv.hint(project, route=route)
+            en = tfv.hint(project, zh=False, route=route)
+            stage = module_stage.module_state(project.root, "a")["stage"]
+        return need, zh, en, stage
 
     def test_no_list(self):
-        need, fact, en = self.run_hint(False)
-        self.assertEqual((need["riskList"], need["reasons"]), ("no-list", []))
-        self.assertIn("T4 路径：没有可读的风险路径清单，`risk-path` 未检查", fact)
+        need, zh, en, stage = self.run_hint(False, route={})
+        self.assertEqual((need["riskList"], need["reasons"], stage), ("no-list", [], "NEEDS_REGRESSION"))
+        self.assertEqual(zh.count("T4 路径：没有可读的风险路径清单，`risk-path` 未检查"), 1)
         self.assertIn("no readable risk-path list, `risk-path` not checked", en)
 
+    def test_no_list_when_the_design_needs_no_review(self):
+        # round 2 finding 1: design=reviewer and nothing to review lets the design through, the line still shows
+        need, zh, _en, _stage = self.run_hint(False)
+        self.assertEqual(need["need"], "none")
+        self.assertIn("T4 路径：没有可读的风险路径清单，`risk-path` 未检查", zh)
+        self.assertNotIn("技术方案 `tasks/a/design.md`", zh)
+
     def test_list(self):
-        need, fact, _en = self.run_hint(True)
+        need, zh, _en, _stage = self.run_hint(True)
         self.assertEqual((need["riskList"], need["reasons"]), ("ok", ["risk-path"]))
-        self.assertNotIn("没有可读的风险路径清单", fact)
+        self.assertNotIn("没有可读的风险路径清单", zh)
 
 
 class DesignApprover(unittest.TestCase):
@@ -197,10 +205,18 @@ class DesignHostRound(unittest.TestCase):
         self.addCleanup(self.project.__exit__, None, None, None)
         tfv.approved_spec(self.project)
         self.project.write(".agent/config.json", json.dumps({"version": 1, "takeover": "design"}))
-        self.project.write("tasks/a/design.md", design(interface="- 新字段 `x`"))
+        self.project.write("tasks/a/design.md", design(interface="- 新字段 `x`") + FINDINGS)
 
     def text(self):
         return (self.project.root / "tasks" / "a" / "design.md").read_text(encoding="utf-8")
+
+    def test_host_needs_findings(self):
+        self.project.write("tasks/a/design.md", design(interface="- 新字段 `x`"))
+        before = self.text()
+        code, out = mark(self.project, "--target", "design", "--state", "host-reviewed", "--blocking", "0", "--confirm")
+        self.assertEqual(code, 2)
+        self.assertIn("review-findings-missing", out)
+        self.assertEqual(self.text(), before)
 
     def test_host_clean_round_lets_it_through(self):
         code, out = mark(self.project, "--target", "design", "--state", "host-reviewed", "--blocking", "0", "--confirm")
@@ -266,6 +282,7 @@ class ElevatedTier(unittest.TestCase):
 
 
 CODEX_LINE = "<!-- spec-guard: codex-review round=1 blocking=2 sha256=%s -->" % ("c" * 12)
+FINDINGS = "\n## 外部审查意见\n\n- 子会话：目标一节没写怎样算做成（阻断）\n"
 
 
 class RequirementProject(unittest.TestCase):
@@ -306,8 +323,16 @@ class RequirementNotRequired(RequirementProject):
 class RequirementRecords(RequirementProject):
     """R3: the three records, one round only, and the reason rules."""
 
+    def test_host_needs_findings(self):
+        self.spec(extra="\n## 外部审查意见\n\n%s\n" % "<!-- spec-guard: something -->")
+        before = self.text()
+        code, out = mark(self.project, "--target", "spec", "--state", "host-reviewed", "--blocking", "0", "--confirm")
+        self.assertEqual(code, 2)
+        self.assertIn("review-findings-missing", out)
+        self.assertEqual(self.text(), before)
+
     def test_host_record(self):
-        self.spec()
+        self.spec(extra=FINDINGS)
         digest = module_stage._text_digest(self.text())
         code, out = mark(self.project, "--target", "spec", "--state", "host-reviewed", "--blocking", "2", "--confirm")
         self.assertEqual(code, 0, out)
@@ -336,7 +361,7 @@ class RequirementRecords(RequirementProject):
                     if first is None:
                         self.spec(extra="\n## 外部审查意见\n\n%s\n" % CODEX_LINE)
                     else:
-                        self.spec()
+                        self.spec(extra=FINDINGS)
                         self.assertEqual(mark(self.project, "--target", "spec", *first, "--confirm")[0], 0)
                     before = self.text()
                     code, out = mark(self.project, "--target", "spec", *second, "--confirm")
@@ -407,7 +432,7 @@ class RequirementGate(RequirementProject):
                 if args is None:
                     self.spec(extra="\n## 外部审查意见\n\n%s\n" % CODEX_LINE)
                 else:
-                    self.spec()
+                    self.spec(extra=FINDINGS)
                     self.assertEqual(mark(self.project, "--target", "spec", *args, "--confirm")[0], 0)
                 code, out = self.approve()
                 self.assertEqual(code, 0, out)

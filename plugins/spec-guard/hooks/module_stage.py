@@ -1262,16 +1262,18 @@ NO_RISK_LIST_EN = ("- T4 paths: no readable risk-path list, `risk-path` not chec
                    "to judge by risk paths.")
 
 
+def risk_list_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """sg-review-rules (rule 9, S6): (fact, line) at NEEDS_REGRESSION when no risk-path list is readable, whether or
+    not the design still waits (a design=reviewer design that needs no review included); (None, "") otherwise."""
+    if not module or stage != "NEEDS_REGRESSION":
+        return None, ""
+    need = design_requirement(root, module)
+    if need is None or need["riskList"] != "no-list":
+        return None, ""
+    return ("risk-list", "no-list"), NO_RISK_LIST_ZH if zh else NO_RISK_LIST_EN
+
+
 def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
-    """design_hint, plus the no-risk-list line (sg-review-rules rule 9) under the review line while the design waits."""
-    fact, step = _design_hint(root, module, stage, cmd, zh)
-    approval = design_waits(root, module, stage) if fact else None
-    if approval is not None and approval["riskList"] == "no-list":
-        fact += "\n" + (NO_RISK_LIST_ZH if zh else NO_RISK_LIST_EN)
-    return fact, step
-
-
-def _design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
     """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise.
 
     takeover-redefine: under design=human the reviewer's clean round is recorded as before and then goes to the
@@ -3145,6 +3147,9 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     rg_fact, rg_line = regression_line(root, module, stage, zh)
     if rg_line:
         counts += "\n" + rg_line
+    rl_fact, rl_line = risk_list_line(root, module, stage, zh)
+    if rl_line:
+        counts += "\n" + rl_line
     au_fact, au_line = author_line(root, module, stage, zh)
     if au_line:
         counts += "\n" + au_line
@@ -3174,6 +3179,7 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
+                      + ([rl_fact] if rl_fact else [])
                       + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh)
     if zh:

@@ -364,6 +364,23 @@ def _acceptance(root: Path, module_id: str, state: str, report: str | None, conf
 
 
 NO_REPORT_STATES = ("host-reviewed", "no-reviewer")  # sg-review-rules: rounds without a delegate report
+FINDINGS_MISSING = ("review-findings-missing: --state host-reviewed needs the host subsession's findings written into "
+                    "the external review section (## 外部审查意见 or ## External review) first, in its own words; "
+                    "that section has nothing but record lines")
+
+
+def _has_findings(text: str) -> bool:
+    """sg-review-rules (round 2): the external review section holds something besides spec-guard record lines."""
+    inside = False
+    for line in text.splitlines():
+        if EXTERNAL_REVIEW_HEADING.match(line):
+            inside = True
+            continue
+        if inside and line.startswith("## "):
+            inside = False
+        if inside and line.strip() and not line.strip().startswith("<!-- spec-guard:"):
+            return True
+    return False
 
 
 def _design_host(root: Path, relative: str, state: str, blocking: int | None, text: str):
@@ -371,6 +388,8 @@ def _design_host(root: Path, relative: str, state: str, blocking: int | None, te
     a host subsession's review (host-reviewed --blocking N) or no reviewer at all (no-reviewer)."""
     if state == "host-reviewed" and (blocking is None or blocking < 0):
         return None, "blocking-missing: --state host-reviewed needs --blocking <the number of blocking findings, 0 or more>"
+    if state == "host-reviewed" and not _has_findings(text):
+        return None, FINDINGS_MISSING
     records = design_round_records(text)
     reviewed = [record for record in records if record["vendor"] != "none"]
     if state == "host-reviewed" and sum(1 for record in reviewed if record["blocking"]) >= ROUND_CAP:
@@ -409,6 +428,8 @@ def _requirement_host(state: str, blocking: int | None, reason: str | None, text
     if state == "host-reviewed":
         if blocking is None or blocking < 0:
             return None, "blocking-missing: --state host-reviewed needs --blocking <the number of blocking findings, 0 or more>"
+        if not _has_findings(text):
+            return None, FINDINGS_MISSING
         line = "<!-- spec-guard: requirement-review reviewer=host blocking=%d sha256=%s -->" % (blocking, digest)
         return _with_round(text, line), ("host subsession review: %d blocking. Write its findings into the external review "
                                          "section, fix the requirement, then hand it to the user." % blocking)
