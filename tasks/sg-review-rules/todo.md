@@ -6,7 +6,7 @@
 - [x] Task 4：技术方案的宿主子会话与没有审查者
 - [x] Task 5：需求文档的三种审查记录
 - [x] Task 6：硬拦、确认停点提示与改动差异
-- [ ] Checkpoint 1（report）：完整档与变异
+- [x] Checkpoint 1（report）：完整档与变异
 - [ ] Task 7：规则文字
 - [ ] Task 8：接口 1.27
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
@@ -21,3 +21,4 @@
 - Task 6（2026-11-27）：`review-mark --target spec --state approved` 对缺审查记录的新流程 normal／important 需求拒绝（`requirement-unreviewed`），有记录时预览打印审查以来的全文差异或取不到的原因。`module_stage` 加 `requirement_review_diff`（在最近 50 个提交里按记录的整份文件摘要找审查时的版本；两边都去掉批准标记与「外部审查意见」一节再比，所以记下审查记录本身不算改动）、`_review_first_step`（缺记录时下一步改成先审一轮，列三条路）、`requirement_hint` 在有记录时加披露要求与差异（最多 60 行，超出写「还有 N 行」）、`requirement_review_fact` 进状态码。用例 `RequirementGate` 3 例、`RequirementHint` 7 例、`RequirementDiffPreview` 3 例，对改动前实现 13 例 11 失败 2 报错。
   旧夹具：`test_flow_v2.requirement()`、`test_sg_gate_flow.requirement()` 默认带一条「没有审查者」记录，`test_map_view.approve_spec` 确认前先记一条（其余 Spec 被拒绝、不影响）；需要「缺记录」的新用例显式传 `reviewed=False`。`--target spec` 上「只记一轮」的检查只对 `codex-reviewed` 与两种新状态生效，`codex-approved` 照旧先报 `codex-route-requirement`。回归文档 R1 去掉「以及 `--target both`」（新流程模块的 both 先被 plan-auto 拒绝）。
 - 技术方案第 2 轮复审后补的实现（2026-11-27，用户重新批准后）：`risk_list_line` 让 `NEEDS_REGRESSION` 阶段只要读不到风险清单就单独出「T4 路径」一行并进状态码（原来挂在技术方案等批的提示上，`design=reviewer` 不送审时看不到）；`host-reviewed`（需求文档与技术方案）在「外部审查意见」一节除记录行外没有内容时拒绝（`review-findings-missing`）。新用例 3 例对上一版实现全红，`RiskListHint` 改成从阶段提示里看这一行；用到 `host-reviewed` 的用例先写一段审查结论。
+- Checkpoint 1（2026-11-27）：Task 1～6 与复审补充的提交都走完整档且全绿（phase-guard 516 例、verify-artifacts 148 例）。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），10 个：空值清单少「无」、去掉只记一轮、硬拦不看缺记录、`report=none` 不限 vendor、重要需求恢复交用户、差异不截断、新流程仍算 cross-module、不查审查结论、无清单提示只在构建阶段、差异比较不去掉审查一节——10 个全部变红；还原后 `test_sg_review_rules.py` 47 例全过。
