@@ -24,7 +24,7 @@ MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step"
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm", "designApproval", "verification", "overallDesign"}
+               "requirementConfirm", "designApproval", "verification", "overallDesign", "requirementReview"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -93,6 +93,10 @@ class Project:
 def approve_spec(root, module):
     """Approve a Spec with the real marker tool so the digest is right."""
     tool = Path(__file__).with_name("review_mark.py")
+    # sg-review-rules (rule 3): a new-flow normal/important requirement needs a review record first; refused (and
+    # harmless) for any other Spec
+    subprocess.run([sys.executable, "-B", str(tool), "--project", str(root), "--module", module, "--target", "spec",
+                    "--state", "no-reviewer", "--reason", "测试夹具", "--confirm"], capture_output=True, timeout=30)
     subprocess.run([sys.executable, "-B", str(tool), "--project", str(root), "--module", module,
                     "--target", "spec", "--state", "approved", "--confirm"],
                    check=True, capture_output=True, timeout=30)
@@ -169,7 +173,7 @@ class RetiredAutonomyTest(unittest.TestCase):
 
     def test_interface_version(self):
         data = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["interface"], "1.26")  # bump together with interface.json
+        self.assertEqual(data["interface"], "1.27")  # bump together with interface.json
 
 
 class TakeoverTest(unittest.TestCase):
@@ -229,7 +233,7 @@ class TakeoverTest(unittest.TestCase):
                 self.assertEqual(rows["a"]["codexRoute"]["plan"], None if pair[1] == "codex" else "takeover", config)
                 self.assertEqual(rows["a"]["reviewApprovedBy"]["plan"], "codex" if pair[1] == "codex" else None, config)
 
-    def test_flow_v2_module_reports_the_pair_and_the_forced_design(self):
+    def test_flow_v2_module_reports_the_pair_and_no_forced_design(self):
         v2 = "# a\n\n<!-- spec-guard: review approved -->\n<!-- spec-guard: flow v2 tier=%s -->\n"
         with self.project({"takeover": {"spec": "codex", "plan": "codex", "merge": "auto"}},
                           {"spec/a.md": v2 % "normal"}) as project:
@@ -238,7 +242,8 @@ class TakeoverTest(unittest.TestCase):
                              ("codex", "codex", "human", None))
         with self.project({"takeover": "design"}, {"spec/a.md": v2 % "important"}) as project:
             row = self.takeover(project)["a"]
-            self.assertEqual((row["design"], row["designForcedBy"], row["widerThanProject"]), ("human", "important", False))
+            # sg-review-rules (rule 10): an important requirement no longer forces design to human
+            self.assertEqual((row["design"], row["designForcedBy"], row["widerThanProject"]), ("reviewer", None, False))
         with self.project({"takeover": "design"}, {"spec/a.md": v2 % "normal"}) as project:
             row = self.takeover(project)["a"]
             self.assertEqual((row["design"], row["designForcedBy"]), ("reviewer", None))
@@ -510,8 +515,10 @@ class FlowTest(unittest.TestCase):
         self.assertEqual((module["tier"], module["step"]), ("bug", "plan"))
         module, _ = self.module({"spec/a.md": self.spec("huge")})
         self.assertEqual(module["tier"], "normal")
-        lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/a/`\n- 公共：全局配置\n")
-        module, _ = self.module({"spec/a.md": lifted})
+        # sg-review-rules (rule 14): a flow v2 tier is lifted by a risk path only
+        lifted = self.spec("small", "\n## 并行边界\n\n- 独占：`src/secret/`\n")
+        module, _ = self.module({"spec/a.md": lifted, ".github/autopr/risk-paths.json": json.dumps(
+            {"schema": "autopilot.risk-paths/v1", "T4": ["src/secret/**"], "T3": []})})
         self.assertEqual((module["tier"], module["step"]), ("important", "design"))
 
 
@@ -597,7 +604,8 @@ class DesignApprovalMapTest(unittest.TestCase):
     def test_not_required(self):
         approval = self.module({"tasks/a/design.md": "# d\n\n## 影响面\n\n- `src/a/new.py`\n"})["designApproval"]
         self.assertEqual(approval, {"status": "not-required", "approvedBy": None, "reviewerVendor": None,
-                                    "sameVendor": None, "reportSha256": None, "rounds": []})
+                                    "sameVendor": None, "reportSha256": None, "rounds": [], "reason": None, "reasons": [],
+                                    "riskList": "ok"})
 
     def test_reviewer_approved_with_rounds(self):
         from map_view import DESIGN_APPROVAL_FIELDS, DESIGN_ROUND_FIELDS
@@ -613,7 +621,8 @@ class DesignApprovalMapTest(unittest.TestCase):
         self.assertEqual((approval["status"], approval["approvedBy"], approval["reviewerVendor"], approval["sameVendor"],
                           approval["reportSha256"]), ("approved", "reviewer", "anthropic", True, "c" * 64))
         self.assertEqual(approval["rounds"][0], {"round": 1, "blocking": 1, "sha256": "1" * 12, "vendor": "anthropic",
-                                                 "sameVendor": False})
+                                                 "sameVendor": False, "reportSha256": "a" * 64})
+        self.assertEqual((approval["reason"], approval["reasons"]), ("configured", ["configured"]))
         self.assertEqual(set(approval["rounds"][0]), set(DESIGN_ROUND_FIELDS))
 
     def test_statuses_are_the_published_ones(self):

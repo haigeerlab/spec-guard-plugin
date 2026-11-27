@@ -1005,7 +1005,7 @@ class NodeRulesTests(unittest.TestCase):
     ELEMENTS = {
         "## 技术方案交审": ("确认框之前", "只给链接", "技术方案六节", "第二审查者的意见逐条列出", "这一轮没有第二审查者",
                        "还剩哪几条", "“注意：”", "“批了会怎样：”", "--target design --state approved",
-                       "不能代替重要需求的用户批准"),
+                       "时第二审查者的放行不能代替用户批准"),
         "## 能力图审阅": ("需求说完了吗？还有要补充的吗？", "拆成哪些模块", "先后顺序", "文档建议", "README", "确认框之前",
                       "只给链接", "不算合并交审", "可复制代码块", "以所装协作插件的规定为准"),
         "## Spec 交审": ("目标", "边界", "总是做", "先问", "不做", "要你确认的假设", "验收标准", "AC1、AC2", "未决问题", "确认框之前",
@@ -1206,7 +1206,8 @@ class DesignReviewRuleTests(unittest.TestCase):
         self.section = text[start:text.index("\n## ", start + 1)]
 
     def test_order_review_and_edge_cases(self):
-        for phrase in ("先中先定", "重要需求：用户批", "跨模块的需求按规则已经是重要需求", "开工前已有的文件", "写不出路径",
+        # sg-review-rules: the three high-risk reasons replace "important -> user" and "old files / no path"
+        for phrase in ("先中先定", "三种高风险：审", "重要需求也一样", "`irreversible`", "`new-dependency`",
                        "`designReview` 为 `on`", "都不是：不审", "--profile design --backend auto --author-host",
                        "--state reviewer-approved", "--state reviewer-reviewed", "--previous-report", "第二轮只核对上一轮",
                        "两轮仍有阻断就交用户批", "`unresolved`", "criteria 必须相同", "同厂商时照记、不判定",
@@ -1214,6 +1215,38 @@ class DesignReviewRuleTests(unittest.TestCase):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, self.section)
 
+
+
+class ReviewRulesText(unittest.TestCase):
+    """sg-review-rules R13 (S11): the shared rules say the new rules, and the old wording is gone."""
+    REFS = Path(__file__).resolve().parent.parent / "references"
+
+    def read(self, name):
+        return (self.REFS / name).read_text(encoding="utf-8")
+
+    def test_requirement_review_first(self):
+        text = self.read("workflow-checkpoints.md")
+        section = text[text.index("## 需求确认"):text.index("## 总体技术方案")]
+        for phrase in ("需求文档先审一轮", "--state codex-reviewed", "全新子会话", "--state host-reviewed --blocking",
+                       "--state no-reviewer --reason", "只审一轮", "requirement-review-recorded", "requirement-unreviewed",
+                       "哪些没采纳", "审查以来的改动差异"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+    def test_old_wording_is_gone(self):
+        checkpoints, skeletons = self.read("workflow-checkpoints.md"), self.read("doc-skeletons.md")
+        for phrase in ("重要需求：用户批", "跨模块的需求按规则已经是重要需求", "碰了老逻辑：必审", "已算入重要需求"):
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, checkpoints)
+        self.assertNotIn("技术方案由用户批", skeletons)
+        self.assertNotIn("不能代替重要需求的用户批准", self.read("node-rules.md"))
+        self.assertIn("技术方案按档位的 design 项", skeletons)
+        self.assertIn("新流程模块只看最后一条", checkpoints)
+
+    def test_skeleton_has_the_record_lines(self):
+        text = self.read("doc-skeletons.md")
+        self.assertIn("requirement-review reviewer=host blocking=", text)
+        self.assertIn("requirement-review reviewer=none sha256=<12 位> reason=", text)
 
 
 class PlanAutoApproveRuleTests(unittest.TestCase):

@@ -593,7 +593,10 @@ project design-important
 flow_doc spec/alpha.md "${REQ[@]}"; printf '<!-- spec-guard: flow v2 tier=important -->\n' >>"$PROJECT/spec/alpha.md"
 flow_doc tasks/alpha/design.md 现状调研 影响面 实现方案 接口和数据改动 风险与回滚 方案取舍
 reviewer_mark
-check "重要需求：技术方案只有第二审查者放行时警告" 0 "只有第二审查者的放行：重要需求的技术方案要用户批"
+# sg-review-rules（规则 10）：重要需求跟着档位走——design=human 时照旧警告，design=reviewer 时不警告。
+check "重要需求：design=human 时技术方案只有第二审查者放行仍警告" 0 "只有第二审查者的放行：接管档位 design=human的技术方案要用户批"
+mkdir -p "$PROJECT/.agent" && printf '{"version": 1, "takeover": "design"}\n' > "$PROJECT/.agent/config.json"
+check_absent "重要需求：design=reviewer 时第二审查者放行不警告" "只有第二审查者的放行"
 project design-old
 mkdir -p "$PROJECT/tasks/alpha"; printf '# d\n\n<!-- spec-guard: design-review round=x -->\n' >"$PROJECT/tasks/alpha/design.md"
 check_absent "老模块不查技术方案的轮次行" "技术方案审查轮次行"

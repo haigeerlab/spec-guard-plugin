@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
-                          design_approval, design_requirement, file_review_state, module_state, requirement_confirm,
+                          design_approval, file_review_state, module_state, requirement_confirm, requirement_review,
                           gate_checkpoints, milestone_blocking, next_gate, overall_design, project_stage, release_preauth,
                           unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -58,8 +58,9 @@ ACCEPTANCE_FIELDS = ("marker", "sha")  # interface.json mapView.acceptance (code
 # interface.json mapView.reviewRounds (review-rounds-in-map, interface 1.17): the keys of one round entry.
 REVIEW_ROUND_FIELDS = ("round", "blocking", "sha256")
 # interface.json mapView.designApproval (design-review, interface 1.20): the object and the keys of one round entry.
-DESIGN_APPROVAL_FIELDS = ("status", "approvedBy", "reviewerVendor", "sameVendor", "reportSha256", "rounds")
-DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor")
+DESIGN_APPROVAL_FIELDS = ("status", "approvedBy", "reviewerVendor", "sameVendor", "reportSha256", "rounds", "reason",
+                          "reasons", "riskList")
+DESIGN_ROUND_FIELDS = REVIEW_ROUND_FIELDS + ("vendor", "sameVendor", "reportSha256")
 # interface.json mapView.flow (flow-doc-skeletons, interface 1.18): the steps of a flow v2 module before its Plan.
 FLOW_STEPS = {"NEEDS_DESIGN": "design", "NEEDS_REGRESSION": "regression"}
 # interface.json mapView.takeover (takeover-config, interface 1.15)
@@ -428,10 +429,9 @@ def _review_cadence(root: Path) -> dict:
 
 
 def _effective_takeover(root: Path, module: str, items: dict) -> dict:
-    """takeover-redefine (assumption 7): design as in effect -- an important flow v2 requirement's design is the user's."""
-    need = design_requirement(root, module)
-    forced = "important" if need is not None and need["reason"] == "important" else None
-    return {**items, "design": "human" if forced else items["design"], "designForcedBy": forced}
+    """takeover-redefine (assumption 7): design as in effect.  sg-review-rules (rule 10): nothing forces it any more, so
+    designForcedBy is always null (kept for interface compatibility)."""
+    return {**items, "designForcedBy": None}
 
 
 def _narrowed(record):
@@ -512,6 +512,7 @@ def build(root: Path) -> dict:
             "reviewRounds": _review_rounds(root, module),
             "tier": effective_tier(root, module)["tier"],
             "requirementConfirm": requirement_confirm(root, module),
+            "requirementReview": requirement_review(root, module),
             "overallDesign": overall_design(root, module),  # sg-gate-flow (interface 1.26)
             "designApproval": _design_approval(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),

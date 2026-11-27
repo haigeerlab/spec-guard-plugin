@@ -190,7 +190,7 @@ python3 -B "$ROOT/hooks/project_config.py" show --project "$PROJECT"
 - `moduleConcurrency`：`off`（默认）或 `on`，多模块并行开关，取什么值都不注入阶段提示；本身不开会话、不建 worktree；不控制协调会话：协调会话由 module-crew 的 `coordinator up` 开启，与本开关无关。0.67.1 及更早版本会把含这个键的配置整份判为无效，团队都升级后再设置；0.84.0 起遇到不认识的键只忽略那个键。
 - `takeover`：接管档位，预设 `none`（默认）、`design`、`merge`、`autopilot`（design=reviewer、merge=auto、release=auto-confirm，要写明才生效），或自定义对象 `{"design","merge","release"}`，对象可带 `"preset"` 从某个预设起改（技术方案为 `human`／`reviewer`，
   合并为 `human`／`auto`，发布为 `human`／`prepare`／`auto-confirm`／`auto`，没写的项按 `human`）；需求永远由用户确认、新流程 Plan 永远自动批准，两者不可配。
-  `none` 时每份技术方案都由用户批，`design` 让第二审查者审过即放行（重要需求仍由用户批），见共享检查点规则「技术方案审查」。
+  `none` 时每份技术方案都由用户批，`design` 让第二审查者审过即放行（重要需求也一样），见共享检查点规则「技术方案审查」。
   旧值只读不写（`set` 拒绝，`takeover-legacy`）：`plan` 读作 `none`、旧 `merge` 读作新 `merge`，自定义里的 `spec`、`plan` 对新流程模块不生效；
   老流程模块仍按旧含义读谁批 Spec、Plan（`plan`、`design` 都是 Codex 批 Plan，`merge` 是 Codex 批 Spec 和 Plan）；`show` 给生效值，存的是旧值时加 `note:`。
   取什么值都不注入阶段提示；spec-guard 只存、读、报告来源，autopilot 与 module-crew 读它放行。发布为 `auto-confirm`／`auto` 时预览提示两条限制，由 autopilot 拦截。
@@ -281,6 +281,15 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 ```
 
 总体技术方案（`spec/<id>.md` 里有 `overall-design` 行时）用 `--target overall --state approved`，只认用户批准，Codex 与审查者状态一律拒绝（`overall-user-only`）。
+
+新流程 normal／important 需求文档确认前先审一轮（sg-review-rules），没有记录时 `approved` 拒绝（`requirement-unreviewed`）；只记一轮（`requirement-review-recorded`）。
+没装 delegate 时用宿主全新子会话审，结论原话先写进「外部审查意见」；都不行就写明原因。技术方案同样接受这两种状态：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target <spec|design> --state host-reviewed --blocking <阻断数>
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state no-reviewer --reason "<一行原因>"
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target design --state no-reviewer
+```
 
 `pending` 在把 Spec 或 Plan 交给用户审阅时写，也可以写文件时直接带上这一行。交审时在对话正文里按小项呈现内容，名称与顺序同 session-protocol 契约的交审小项，
 每项写全（Spec：目标、边界（总是做、先问、不做三档）、要你确认的假设（含关键决策与取舍）、验收标准、未决问题，之后是附加项文档建议；

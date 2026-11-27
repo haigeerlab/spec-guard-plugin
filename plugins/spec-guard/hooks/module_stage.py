@@ -10,6 +10,7 @@ not an unchecked item: it is listed apart and does not keep the module open.
 Read-only: this never writes a file.
 """
 from __future__ import annotations
+import difflib
 import json
 import unicodedata
 from pathlib import Path
@@ -56,7 +57,17 @@ DESIGN_REVIEW_STATES = ("none", "pending", "approved", "reviewer-approved", "rev
 REVIEW_REVIEWER_DIGEST = re.compile(r"<!-- spec-guard: review reviewer-approved ([0-9a-f]{12}) -->")
 DESIGN_ROUND = re.compile(r"<!-- spec-guard: design-review round=(\d+) blocking=(\d+) sha256=([0-9a-f]{12}) "
                           r"vendor=([a-z0-9][a-z0-9-]*) same-vendor=(true|false) criteria=([a-z0-9][a-z0-9.-]*) "
-                          r"report=([0-9a-f]{64}) -->")
+                          r"report=([0-9a-f]{64}|none) -->")
+# sg-review-rules (design section 3): report=none only for a host subsession's round or a no-reviewer round
+NO_REPORT_VENDORS = ("host", "none")
+
+
+def design_round_match(line: str):
+    """The DESIGN_ROUND match of a valid round line, else None (report=none with any other vendor is malformed)."""
+    match = DESIGN_ROUND.fullmatch(line.strip())
+    if match is None or (match.group(7) == "none" and match.group(4) not in NO_REPORT_VENDORS):
+        return None
+    return match
 _DIGEST_MODULE = None
 
 
@@ -244,6 +255,50 @@ def review_codex_line(digest: str) -> str:
     return "<!-- spec-guard: review codex-approved %s -->" % digest
 
 
+REQUIREMENT_REVIEW_PREFIX = "<!-- spec-guard: requirement-review"
+REQUIREMENT_HOST = re.compile(r"<!-- spec-guard: requirement-review reviewer=host blocking=(\d+) sha256=([0-9a-f]{12}) -->")
+REQUIREMENT_NONE = re.compile(r"<!-- spec-guard: requirement-review reviewer=none sha256=([0-9a-f]{12}) reason=(.+?) -->")
+REASON_LIMIT = 200
+
+
+def requirement_reason_problem(reason: str) -> str | None:
+    """sg-review-rules (rule 2): why a no-reviewer reason cannot be recorded, None when it can (one line, at most
+    REASON_LIMIT characters, no `--` or `>`, which would end the record line's comment)."""
+    if "\n" in reason or "\r" in reason:
+        return "it spans more than one line"
+    reason = reason.strip()
+    if not reason:
+        return "it is empty"
+    if len(reason) > REASON_LIMIT:
+        return "it is longer than %d characters" % REASON_LIMIT
+    if "--" in reason or ">" in reason:
+        return "it contains -- or >"
+    return None
+
+
+def requirement_review_records(text: str) -> list:
+    """sg-review-rules (rule 2): [{"reviewer": codex|host|none, "blocking", "sha256", "reason"}] of a requirement's
+    review records outside code fences, in file order: Codex rounds, host subsession reviews and no-reviewer lines."""
+    found = []
+    for line in _visible_lines(text.splitlines()):
+        line = line.strip()
+        codex, host, none = CODEX_ROUND.fullmatch(line), REQUIREMENT_HOST.fullmatch(line), REQUIREMENT_NONE.fullmatch(line)
+        if codex:
+            found.append({"reviewer": "codex", "blocking": int(codex.group(2)), "sha256": codex.group(3), "reason": None})
+        elif host:
+            found.append({"reviewer": "host", "blocking": int(host.group(1)), "sha256": host.group(2), "reason": None})
+        elif none and requirement_reason_problem(none.group(2)) is None:
+            found.append({"reviewer": "none", "blocking": 0, "sha256": none.group(1), "reason": none.group(2).strip()})
+    return found
+
+
+def requirement_review_broken(text: str) -> int:
+    """sg-review-rules: requirement-review lines outside code fences that are not a valid record."""
+    return sum(1 for line in _visible_lines(text.splitlines()) if line.strip().startswith(REQUIREMENT_REVIEW_PREFIX)
+               and not (REQUIREMENT_HOST.fullmatch(line.strip()) or (REQUIREMENT_NONE.fullmatch(line.strip()) and
+                        requirement_reason_problem(REQUIREMENT_NONE.fullmatch(line.strip()).group(2)) is None)))
+
+
 def codex_round_records(text: str) -> list:
     """review-rounds-in-map: [{"round", "blocking", "sha256"}] from the round lines outside code fences, in file order.
     sha256 is the 12-hex prefix the round line keeps of the reviewed file's sha256 (its value in the report's scope.files)."""
@@ -258,11 +313,12 @@ def review_reviewer_line(digest: str) -> str:
 
 def design_round_records(text: str) -> list:
     """design-review: [{"round", "blocking", "sha256", "vendor", "sameVendor", "criteria", "report"}] from the round
-    lines outside code fences, in file order.  vendor "none" is a round in which no reviewer was available."""
+    lines outside code fences, in file order.  vendor "none" is a round in which no reviewer was available; vendor "host"
+    a host subsession's round (sg-review-rules), which has no report (report None)."""
     return [{"round": int(match.group(1)), "blocking": int(match.group(2)), "sha256": match.group(3),
              "vendor": match.group(4), "sameVendor": match.group(5) == "true", "criteria": match.group(6),
-             "report": match.group(7)}
-            for match in (DESIGN_ROUND.fullmatch(line.strip()) for line in _visible_lines(text.splitlines()))
+             "report": None if match.group(7) == "none" else match.group(7)}
+            for match in (design_round_match(line) for line in _visible_lines(text.splitlines()))
             if match]
 
 
@@ -477,6 +533,25 @@ def sections_sentence(root: Path, stage: str, zh: bool) -> str:
             " Also add this project's sections: %s." % ", ".join(names))
 
 
+def requirement_review(root: Path, module: str) -> dict | None:
+    """sg-review-rules (rules 1-5): {"required", "status", "records"} of a flow v2 requirement; None for an old module.
+
+    required: the effective tier is normal or important (a lifted bug or small included).  status: not-required,
+    missing (required and no record) or reviewed (one record is enough: one round only, later edits do not undo it).
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"]:
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        text = ""
+    required = flow["tier"] in ("normal", "important")
+    records = requirement_review_records(text)
+    status = "not-required" if not required else ("reviewed" if records else "missing")
+    return {"required": required, "status": status, "records": records}
+
+
 def flow_doc_problems(root: Path, module: str) -> list:
     """flow-doc-skeletons: [(level, message)] for a flow v2 module's documents; [] for an old-flow module.
 
@@ -515,6 +590,8 @@ def flow_doc_problems(root: Path, module: str) -> list:
         empty = [name for name in extra.get(kind, ()) if name in have and not _section_has_content(text, name)]
         if empty:  # regression-doc-check: a declared project section needs content or 不涉及 (Q2 A: only these)
             found.append(("fail", "`%s` 章节没有内容（section-empty）：%s" % (path, "、".join(empty))))
+        if kind == "requirement" and requirement_review_broken(text):  # sg-review-rules
+            found.append(("fail", "`%s` 有 %d 行需求文档审查记录写坏了" % (path, requirement_review_broken(text))))
         if kind == "regression" or (kind == "requirement" and short and any(n in have for n in SHORT_CASES_SECTION)):
             found += regression_problems(root, module, flow["tier"], path)
     return found
@@ -733,8 +810,145 @@ def _confirmed_at(root: Path, module: str, line: str) -> str | None:
     return earliest if len(rows) <= REQUIREMENT_AT_LIMIT else None
 
 
+DIFF_HINT_LINES = 60  # sg-review-rules: lines of the since-review diff the phase hint shows; the preview shows all
+
+
+def requirement_review_diff(root: Path, module: str) -> dict:
+    """sg-review-rules (rule 2, S9): what changed in spec/<id>.md since its review record.
+
+    The reviewed text is the newest of the last REQUIREMENT_AT_LIMIT commits of the file whose whole text has the
+    record's digest.  Both sides are compared without the approval marker and the external review section, which hold
+    the review records and findings rather than the requirement: {"status": "unchanged"} when the rest is the same,
+    {"status": "found", "commit", "diff"} with a unified diff of the rest otherwise, {"status": "unavailable",
+    "reason"} when there is no record, no such commit, or git cannot be read.  Read-only.
+    """
+    review = requirement_review(root, module)
+    relative = "spec/%s.md" % module
+    if not review or not review["records"]:
+        return {"status": "unavailable", "reason": "no review record"}
+    target = review["records"][-1]["sha256"]
+    try:
+        current = (root / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        return {"status": "unavailable", "reason": "%s: %s" % (relative, type(error).__name__)}
+    if _text_digest(current) == target:
+        return {"status": "unchanged"}
+    now = _requirement_body(current)
+
+    def run(*args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=5)
+
+    try:
+        log = run("log", "-n", str(REQUIREMENT_AT_LIMIT), "--format=%H", "--", relative)
+        if log.returncode != 0:
+            return {"status": "unavailable", "reason": "git log failed (not a git repository, or no commit yet)"}
+        for sha in log.stdout.decode("ascii", "replace").split():
+            shown = run("show", "%s:./%s" % (sha, relative))
+            if shown.returncode != 0:
+                continue
+            try:
+                text = shown.stdout.decode("utf-8")
+            except UnicodeError:
+                continue
+            if _text_digest(text) == target:
+                then = _requirement_body(text)
+                if then == now:
+                    return {"status": "unchanged"}
+                diff = "".join(difflib.unified_diff(then.splitlines(keepends=True), now.splitlines(keepends=True),
+                                                    fromfile="%s (reviewed, %s)" % (relative, sha[:7]),
+                                                    tofile="%s (now)" % relative))
+                return {"status": "found", "commit": sha, "diff": diff}
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unavailable", "reason": "git could not be read (%s)" % type(error).__name__}
+    return {"status": "unavailable", "reason": "the reviewed text is not in the last %d commits of %s (reviewed before "
+                                               "it was committed, or too far back)" % (REQUIREMENT_AT_LIMIT, relative)}
+
+
+def _requirement_body(text: str) -> str:
+    """The requirement without its approval marker and its external review section (sg-review-rules)."""
+    kept, inside = [], False
+    for line in text.splitlines(keepends=True):
+        if EXTERNAL_REVIEW_HEADING.match(line.rstrip("\r\n")):
+            inside = True
+            continue
+        if inside and line.startswith("## "):
+            inside = False
+        if not inside:
+            kept.append(line)
+    return review_body("".join(kept)).rstrip("\n") + "\n"  # the section's leading blank line is not a change
+
+
+def _review_diff_text(root: Path, module: str, zh: bool) -> str:
+    """The since-review part of the confirmation step: the diff, at most DIFF_HINT_LINES lines, or why there is none."""
+    got = requirement_review_diff(root, module)
+    if got["status"] == "unchanged":
+        return " 审查后没有改动。" if zh else " Nothing changed since the review."
+    if got["status"] == "unavailable":
+        return (" 审查以来的改动取不到：%s；交用户时说明这一点，给出整份需求。" % got["reason"] if zh else
+                " The changes since the review cannot be shown: %s; say so and give the user the whole requirement."
+                % got["reason"])
+    lines = got["diff"].splitlines()
+    shown = "\n".join(lines[:DIFF_HINT_LINES])
+    more = len(lines) - DIFF_HINT_LINES
+    tail = ""
+    if more > 0:
+        tail = ("\n还有 %d 行，`review-mark --target spec --state approved` 的预览里有全文。" % more if zh else
+                "\n%d more line(s); the preview of `review-mark --target spec --state approved` prints them all." % more)
+    return ((" 审查以来的改动（照原样给用户看）：\n```diff\n%s\n```%s" if zh else
+             " Changes since the review (show them to the user verbatim):\n```diff\n%s\n```%s") % (shown, tail))
+
+
+def _review_first_step(module: str, cmd: dict, zh: bool) -> str:
+    """sg-review-rules (rules 2-4, S2): the next step while a required requirement has no review record."""
+    path, mark = "spec/%s.md" % module, cmd["review-mark"]
+    review = "/delegate:review --backend auto --author-host %s --paths %s" % (cmd["author-host"], path)
+    if zh:
+        return ("需求文档要先审一轮，再交用户确认。三条路选一条：装了 delegate 就用 `%s` 审，把标准输出的 JSON 存成仓库外的文件，"
+                "用 %s `--target spec --state codex-reviewed --review <文件>` 记下；没装 delegate 就开一个不带本会话上下文的全新子会话审，"
+                "把它的结论原话写进「外部审查意见」一节，用 %s `--target spec --state host-reviewed --blocking <阻断数>` 记下；"
+                "都不行就用 %s `--target spec --state no-reviewer --reason \"<一行原因>\"` 写明原因。只审一轮：按意见改完直接复述交用户，"
+                "附上审查提了什么、改了哪些、哪些没采纳及原因。记下之前不要请用户确认。" % (review, mark, mark, mark))
+    return ("Review the requirement once before the user confirms it. Pick one way: with delegate installed, review it with "
+            "`%s`, save the standard-output JSON to a file outside the repository and record it with %s `--target spec "
+            "--state codex-reviewed --review <file>`; without delegate, have a fresh host subsession with none of this "
+            "conversation's context review it, write its findings verbatim into the external review section and record "
+            "it with %s `--target spec --state host-reviewed --blocking <count>`; when neither works, record why with %s "
+            "`--target spec --state no-reviewer --reason \"<one line>\"`. One round only: fix it from the findings and hand "
+            "it to the user, saying what the review raised, what you changed and what you did not take and why. Do not "
+            "ask the user to confirm before it is recorded." % (review, mark, mark, mark))
+
+
+def requirement_review_fact(root: Path, module: str) -> tuple | None:
+    """sg-review-rules: what of the requirement's review changes the confirmation step, for the state code."""
+    if not module or not requirement_wait(root, module):
+        return None
+    review = requirement_review(root, module)
+    if review is None or not review["required"]:
+        return None
+    try:
+        current = _text_digest((root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError):
+        current = None
+    return ("requirement-review", review["status"], current)
+
+
 def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
-    """requirement-confirm-gate: (review line, next step) while a v2 requirement waits for the user's confirmation."""
+    """requirement-confirm-gate: (review line, next step) while a v2 requirement waits for the user's confirmation.
+
+    sg-review-rules: a normal or important requirement with no review record is reviewed first; once it has one, the
+    restatement carries what the review raised and the changes since it."""
+    line, step = _requirement_hint(root, module, wait, cmd, zh)
+    review = requirement_review(root, module)
+    if review is None or not review["required"]:
+        return line, step
+    if review["status"] == "missing":
+        return line, _review_first_step(module, cmd, zh)
+    extra = ("交用户时附上审查提了什么、改了哪些、哪些没采纳及原因。" if zh else
+             " With it, tell the user what the review raised, what you changed and what you did not take and why.")
+    return line, step + extra + _review_diff_text(root, module, zh)
+
+
+def _requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
     tier = effective_tier(root, module)["tier"]
     lang = "zh" if zh else "en"
     names = DOC_SECTIONS["bug" if tier == "bug" else "requirement"][lang] + (
@@ -821,41 +1035,73 @@ def impact_has_old_files(root: Path, module: str, text: str) -> bool | None:
     return False
 
 
-def design_requirement(root: Path, module: str) -> dict | None:
-    """design-review (assumption 2): {"need": "user" | "review" | "none", "reason"}; None without a design step.
+INTERFACE_SECTIONS = (DOC_SECTIONS["design"]["zh"][3], DOC_SECTIONS["design"]["en"][3])
+# sg-review-rules (rule 6): a whole interface section of just one of these says "nothing changes" (case-insensitive)
+EMPTY_INTERFACE = frozenset(("不涉及", "无", "没有", "none", "n/a", "not applicable", "no changes"))
+LIST_MARK = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+INLINE_COMMENT = re.compile(r"<!--.*?-->")
+# sg-review-rules (rule 6): dependency manifests and lock files, by file name
+DEPENDENCY_FILES = frozenset(("package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+                              "pyproject.toml", "poetry.lock", "Pipfile", "Pipfile.lock", "go.mod", "go.sum",
+                              "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock"))
+REQUIREMENTS_FILE = re.compile(r"requirements[^/]*\.txt")
+DESIGN_REASONS = ("risk-path", "irreversible", "new-dependency")
 
-    In order: an important requirement goes to the user; a design whose impact section lists files that existed
-    before the module started (or names no path at all) is reviewed; so is every design when designReview is on.
-    A cross-module requirement is important by rule already (important(): cross-module), so it reaches the first
-    branch.  Old-flow, bug and small modules have no design.
+
+def interface_has_content(text: str) -> bool:
+    """sg-review-rules (rule 6): the design's interface and data section says something changes.
+
+    Blank lines, comments, list marks and closing punctuation are dropped; a section left empty, or holding only one
+    item from EMPTY_INTERFACE, has no content.  A missing section has none either.
+    """
+    import regression_view
+    items = []
+    for _n, line, in_fence, _m in regression_view._section_lines(text, INTERFACE_SECTIONS) or []:
+        if not in_fence:
+            line = INLINE_COMMENT.sub("", line)
+        item = LIST_MARK.sub("", line).strip().rstrip("。.！!；;，,、").strip()
+        if item:
+            items.append(item)
+    return bool(items) and not (len(items) == 1 and items[0].lower() in EMPTY_INTERFACE)
+
+
+def is_dependency_file(path: str) -> bool:
+    """sg-review-rules (rule 6): a dependency manifest or lock file, by its file name."""
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    return name in DEPENDENCY_FILES or bool(REQUIREMENTS_FILE.fullmatch(name))
+
+
+def design_requirement(root: Path, module: str) -> dict | None:
+    """design-review, sg-review-rules (rules 6-9): {"need": "review" | "none", "reason", "reasons", "riskList"}.
+
+    A design is reviewed on risk-path (an impact path, its own documents left out, on the T3/T4 list), irreversible
+    (the interface and data section says something changes) or new-dependency (the impact lists a dependency
+    manifest or lock file); `reason` is the first that applies, `reasons` all of them.  Without any, designReview: on
+    still reviews it (configured).  riskList is "no-list" when no risk-path list is readable: then risk-path is not
+    checked, neither a hit nor a miss.  Old-flow, bug and small modules have no design (None).
     """
     flow = effective_tier(root, module)
     if not flow["v2"] or flow["tier"] in SHORT_TIERS:
         return None
-    if flow["tier"] == "important":
-        return {"need": "user", "reason": "important"}
     try:
         text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
-        text = None
-    if text is not None:
-        old = impact_has_old_files(root, module, text)
-        if old is None:
-            return {"need": "review", "reason": "impact-unknown"}
-        if old:
-            return {"need": "review", "reason": "old-files"}
-    if load_config(root)[0].get("designReview") == "on":
-        return {"need": "review", "reason": "configured"}
-    return {"need": "none", "reason": None}
+        text = ""
+    paths = [path for path in impact_paths(text) if not own_doc(module, path) and path != "tasks/%s" % module]
+    patterns = _risk_patterns(root)
+    found = {"risk-path": patterns is not None and any(risk_hit(pattern, path) for pattern in patterns for path in paths),
+             "irreversible": interface_has_content(text) if text else False,
+             "new-dependency": any(is_dependency_file(path) for path in paths)}
+    reasons = [reason for reason in DESIGN_REASONS if found[reason]]
+    if not reasons and load_config(root)[0].get("designReview") == "on":
+        reasons = ["configured"]
+    return {"need": "review" if reasons else "none", "reason": reasons[0] if reasons else None, "reasons": reasons,
+            "riskList": "ok" if patterns is not None else "no-list"}
 
 
 def design_approver(root: Path, module: str) -> str:
-    """takeover-redefine (assumption 2): who lets a flow v2 design through -- "user" or "reviewer".
-
-    An important requirement is always the user's; otherwise the module's takeover item `design` decides.
-    """
-    if effective_tier(root, module)["tier"] == "important":
-        return "user"
+    """takeover-redefine (assumption 2), sg-review-rules (rule 10): who lets a flow v2 design through -- "user" or
+    "reviewer", from the module's takeover item `design` alone (an important requirement included)."""
     from project_config import module_takeover  # late: project_config is imported by callers of this module
     return "reviewer" if module_takeover(root, module)[0]["design"] == "reviewer" else "user"
 
@@ -869,7 +1115,7 @@ def design_approval(root: Path, module: str) -> dict | None:
     need = design_requirement(root, module)
     if need is None:
         return None
-    approver = "user" if need["need"] == "user" else design_approver(root, module)
+    approver = design_approver(root, module)
     try:
         text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
@@ -886,7 +1132,7 @@ def design_approval(root: Path, module: str) -> dict | None:
         status, by = "not-required", None
     elif state == "revised":
         status, by = "revised", None
-    elif need["need"] in ("none", "user"):
+    elif need["need"] == "none":
         status, by = "pending-user", None
     elif records and records[-1]["vendor"] == "none":
         status, by = "unreviewed", None
@@ -898,12 +1144,14 @@ def design_approval(root: Path, module: str) -> dict | None:
     else:
         status, by = "pending-review", None
     return {"status": status, "approvedBy": by, "need": need["need"], "reason": need["reason"],
+            "reasons": need["reasons"], "riskList": need["riskList"],
             "approver": approver, "marker": state,
             "reviewerVendor": last["vendor"] if last else None, "sameVendor": last["sameVendor"] if last else None,
             "reportSha256": last["report"] if last else None,
             "rounds": [{"round": record["round"], "blocking": record["blocking"], "sha256": record["sha256"],
                         "vendor": None if record["vendor"] == "none" else record["vendor"],
-                        "sameVendor": None if record["vendor"] == "none" else record["sameVendor"]}
+                        "sameVendor": None if record["vendor"] == "none" else record["sameVendor"],
+                        "reportSha256": record["report"]}
                        for record in records]}
 
 
@@ -924,16 +1172,15 @@ def design_review_problems(root: Path, module: str) -> list:
     if review_state(text, "design") == "invalid":
         found.append(("fail", "`%s` 的批准标记无效（只能有一行：review pending、approved <指纹> 或 reviewer-approved <指纹>）" % path))
     broken = [line.strip() for line in _visible_lines(text.splitlines())
-              if line.strip().startswith(DESIGN_ROUND_PREFIX) and not DESIGN_ROUND.fullmatch(line.strip())]
+              if line.strip().startswith(DESIGN_ROUND_PREFIX) and not design_round_match(line)]
     if broken:
         found.append(("fail", "`%s` 有 %d 行技术方案审查轮次行写坏了" % (path, len(broken))))
     criteria = sorted({record["criteria"] for record in design_round_records(text)})
     if len(criteria) > 1:
         found.append(("fail", "`%s` 的审查轮次用了不同的 criteria：%s" % (path, "、".join(criteria))))
-    if review_state(text, "design") == "reviewer-approved" and (need["need"] == "user"
-                                                                or design_approver(root, module) == "user"):
-        why = "重要需求" if need["need"] == "user" else "接管档位 design=human"
-        found.append(("warn", "`%s` 只有第二审查者的放行：%s的技术方案要用户批" % (path, why)))
+    if review_state(text, "design") == "reviewer-approved" and design_approver(root, module) == "user":
+        # sg-review-rules (rule 10): an important requirement follows the takeover like any other
+        found.append(("warn", "`%s` 只有第二审查者的放行：接管档位 design=human的技术方案要用户批" % path))
     return found
 
 
@@ -1005,6 +1252,27 @@ def _design_route(root: Path, module: str, approval: dict, zh: bool) -> str:
     return ("接管档位 design=%s（%s）" if zh else "takeover design=%s (%s)") % (value, origin)
 
 
+DESIGN_REASON_ZH = {"risk-path": "影响面碰了高风险路径", "irreversible": "有接口和数据改动",
+                    "new-dependency": "影响面列了依赖清单或锁文件", "configured": "项目开关 designReview 为 on"}
+DESIGN_REASON_EN = {"risk-path": "its impact touches a high-risk path", "irreversible": "it changes interfaces or data",
+                    "new-dependency": "its impact lists a dependency manifest or lock file",
+                    "configured": "designReview is on"}
+NO_RISK_LIST_ZH = "- T4 路径：没有可读的风险路径清单，`risk-path` 未检查；补上 `.github/autopr/risk-paths.json` 才能按风险路径判定。"
+NO_RISK_LIST_EN = ("- T4 paths: no readable risk-path list, `risk-path` not checked; add `.github/autopr/risk-paths.json` "
+                   "to judge by risk paths.")
+
+
+def risk_list_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """sg-review-rules (rule 9, S6): (fact, line) at NEEDS_REGRESSION when no risk-path list is readable, whether or
+    not the design still waits (a design=reviewer design that needs no review included); (None, "") otherwise."""
+    if not module or stage != "NEEDS_REGRESSION":
+        return None, ""
+    need = design_requirement(root, module)
+    if need is None or need["riskList"] != "no-list":
+        return None, ""
+    return ("risk-list", "no-list"), NO_RISK_LIST_ZH if zh else NO_RISK_LIST_EN
+
+
 def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
     """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise.
 
@@ -1021,12 +1289,10 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
     hold = _hold(root, module, stage, zh)
     last = approval["rounds"][-1] if approval["rounds"] else None
     user = approval["approver"] == "user"
-    important = approval["reason"] == "important"
-    route = "" if important else _design_route(root, module, approval, zh)
+    route = _design_route(root, module, approval, zh)
     exhausted = sum(1 for record in approval["rounds"] if record["blocking"] and record["vendor"]) >= 2
     if zh:
-        reason = {"old-files": "影响面列了已有文件", "impact-unknown": "影响面没写出路径，按碰了老逻辑处理",
-                  "configured": "项目开关 designReview 为 on", "important": "重要需求", None: "不需要第二审查者"}[approval["reason"]]
+        reason = "、".join(DESIGN_REASON_ZH[r] for r in approval["reasons"]) or "不需要第二审查者"
         why = "%s；%s" % (reason, route) if route else reason
         run = ("用 `%s` 审一轮（影响面里列的已有文件各加一个 `--spec`；开工前可用 `/delegate:doctor --reviewers --json` "
                "看有没有可用的审查者），把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下）" % review)
@@ -1052,23 +1318,14 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
             return ("- 批准: 技术方案 `%s` 放行后又改过，要重新审（%s）。" % (path, why),
                     "%s，按结果用 %s `--target design` 记下（没有阻断 `--state reviewer-approved`，有阻断 `--state reviewer-reviewed`）%s。"
                     "放行前%s。" % (run, mark, "，审完交用户批" if user else "", hold))
-        if important and not last:
-            return ("- 批准: 技术方案 `%s` 待用户批（重要需求，第二审查者先审一轮）。" % path,
-                    "%s，用 %s `--target design --state reviewer-reviewed --review <文件>` 记下这一轮；然后%s。批准前%s。"
-                    % (run, mark, to_user, hold))
-        if important:
-            cause = "重要需求"
-        elif approval["need"] == "none":
+        if approval["need"] == "none":
             cause = "不需要第二审查者；%s" % route
         elif exhausted:
             cause = "两轮审查仍有阻断；%s" % route
         else:
             cause = "第二审查者已审完；%s" % route
         return ("- 批准: 技术方案 `%s` 待用户批（%s）。" % (path, cause), "%s。批准前%s。" % (to_user, hold))
-    reason = {"old-files": "its impact section lists existing files",
-              "impact-unknown": "its impact section names no path, so it counts as touching existing code",
-              "configured": "designReview is on", "important": "an important requirement",
-              None: "no second reviewer is needed"}[approval["reason"]]
+    reason = ", ".join(DESIGN_REASON_EN[r] for r in approval["reasons"]) or "no second reviewer is needed"
     why = "%s; %s" % (reason, route) if route else reason
     run = ("review it once with `%s` (add one `--spec` per existing file the impact section lists; `/delegate:doctor "
            "--reviewers --json` tells beforehand whether a reviewer is available) and save its standard output, the JSON "
@@ -1102,14 +1359,7 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
                 "%s, and record the round with %s `--target design` (`--state reviewer-approved` when clean, "
                 "`--state reviewer-reviewed` otherwise)%s. Until it passes, %s."
                 % (run, mark, ", then hand it to the user" if user else "", hold))
-    if important and not last:
-        return ("- Review: the design `%s` awaits the user (an important requirement; a second reviewer reviews it "
-                "first)." % path,
-                "%s, record the round with %s `--target design --state reviewer-reviewed --review <file>`, then %s. "
-                "Until it is approved, %s." % (run[0].upper() + run[1:], mark, to_user, hold))
-    if important:
-        cause = "an important requirement"
-    elif approval["need"] == "none":
+    if approval["need"] == "none":
         cause = "no second reviewer is needed; %s" % route
     elif exhausted:
         cause = "two review rounds still blocking; %s" % route
@@ -1710,10 +1960,12 @@ def important(root: Path, module: str) -> list:
     from module_scope import ScopeError, overlap, parse, parse_declared  # late: module_scope imports this module
     # takeover-redefine (R2-1): a flow v2 requirement is always the user's, so the unknowns never count for it --
     # otherwise design=reviewer would make every module of a project without a risk list important.
-    codex = not _v2(root, module) and _takeover_item(root, module, "spec") == "codex"
+    v2 = _v2(root, module)
+    codex = not v2 and _takeover_item(root, module, "spec") == "codex"
     reasons = []
     try:
-        if any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
+        # sg-review-rules (rule 14): a flow v2 module is important on a risk path only
+        if not v2 and any(module in modules and len(modules) > 1 for _, modules in usage_draft.batches(str(root))):
             reasons.append("multi-module")
     except usage_draft.UsageDraftError:
         pass  # without git there are no batches to tell; the other rules still apply
@@ -1748,7 +2000,7 @@ def important(root: Path, module: str) -> list:
             if theirs is not None and overlap(scope, theirs):
                 clash = True
                 break
-        if scope.shared or clash:
+        if not v2 and (scope.shared or clash):
             reasons.append("cross-module")
     paths = list(scope.exclusive) if scope is not None else []
     try:
@@ -1757,7 +2009,7 @@ def important(root: Path, module: str) -> list:
         declared = None
     if declared is not None:
         paths += list(declared.public_paths)
-    if _v2(root, module):
+    if v2:
         # plan-auto-approve: a v2 design's impact section names what the module changes (old modules: unchanged)
         paths += impact_paths(read(root / "tasks" / module / "design.md"))
         # rework (assumption 13): its own documents, or its tasks/<id>/ directory entry, are not risk paths
@@ -2895,6 +3147,9 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     rg_fact, rg_line = regression_line(root, module, stage, zh)
     if rg_line:
         counts += "\n" + rg_line
+    rl_fact, rl_line = risk_list_line(root, module, stage, zh)
+    if rl_line:
+        counts += "\n" + rl_line
     au_fact, au_line = author_line(root, module, stage, zh)
     if au_line:
         counts += "\n" + au_line
@@ -2914,14 +3169,17 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
+    rr_fact = requirement_review_fact(root, module)  # sg-review-rules: the confirmation step follows the review
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
                        documentation_baseline_present(root), project_sections(root), requirement_wait(root, module),
                        design_fact(root, module, stage) if module else None,
                        overall_wait(root, module) if module else None]
+                      + ([rr_fact] if rr_fact else [])
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
+                      + ([rl_fact] if rl_fact else [])
                       + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh)
     if zh:

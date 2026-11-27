@@ -106,18 +106,21 @@ class DesignReviewNode(unittest.TestCase):
                 "## 并行边界\n\n- 独占：`src/alpha/`\n" % tier)
         return text.replace("<!-- spec-guard: review pending -->", review_approved_line(review_digest(text)))
 
-    def node(self, tier):
+    def node(self, tier, route=None):
         files = {"spec/alpha.md": self.spec(tier),
                  "tasks/alpha/design.md": "# d\n\n## 影响面\n\n- 新增 `src/alpha/new.py`\n",
                  ".github/autopr/risk-paths.json": json.dumps({"schema": "autopilot.risk-paths/v1", "T4": [], "T3": []}),
                  # takeover-redefine: the reviewer route (design=reviewer); under the default design=human a design
                  # that needs no review goes to the user (test_flow_v2.HumanDesignRouteTest).
-                 ".agent/config.json": json.dumps({"version": 1, "takeover": "design"})}
+                 ".agent/config.json": json.dumps({"version": 1, **({"takeover": "design"} if route is None else route)})}
         with Project(files) as p:
             return stop_node(p.root, "alpha", "NEEDS_REGRESSION", "approved", "none"), describe(p.root)
 
-    def test_important_design_stops_for_the_user(self):
-        node, out = self.node("important")
+    def test_important_design_follows_the_takeover(self):
+        # sg-review-rules (rule 10): under design=reviewer an important design needing no review does not stop;
+        # under design=human it stops for the user as before.
+        self.assertIsNone(self.node("important")[0])
+        node, out = self.node("important", route={})
         self.assertEqual(node, "design-review")
         self.assertIn("技术方案 `tasks/alpha/design.md` 待用户批", out)
         self.assertIn("停点规则（技术方案交审）：", out)
