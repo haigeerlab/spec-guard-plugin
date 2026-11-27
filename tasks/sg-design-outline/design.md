@@ -1,6 +1,6 @@
 # 技术方案: sg-design-outline
 
-<!-- spec-guard: review reviewer-approved deb1be0b6a44 -->
+<!-- spec-guard: review approved deb1be0b6a44 -->
 
 需求文档：`spec/sg-design-outline.md`（用户 2026-11-27「确认需求」）。照已批总体技术方案第 7 节模块 6 那一行，不重新选型。
 
