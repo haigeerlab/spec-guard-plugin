@@ -266,5 +266,26 @@ class OutlineHint(GitProject):
         self.assertEqual(text.count("- 技术方案大纲："), 2)
 
 
+class Release(unittest.TestCase):
+    """R9: version 0.100.0 everywhere, the CHANGELOG entry says what upgraders must do, the interface stays 1.27."""
+    ROOT = HERE.parent.parent.parent
+
+    def test_versions(self):
+        for path in ("plugins/spec-guard/.claude-plugin/plugin.json", "plugins/spec-guard/.codex-plugin/plugin.json"):
+            with self.subTest(path=path):
+                self.assertEqual(json.loads((self.ROOT / path).read_text(encoding="utf-8"))["version"], "0.100.0")
+        for path in ("README.md", "README.en.md"):
+            with self.subTest(path=path):
+                self.assertIn("--ref v0.100.0", (self.ROOT / path).read_text(encoding="utf-8"))
+        self.assertEqual(json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))["interface"], "1.27")
+
+    def test_changelog(self):
+        text = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        entry = text[text.index("## [0.100.0]"):text.index("## [0.99.0]")]
+        for phrase in ("sg-design-outline", "要补这四节", "模块接口", "方案取舍"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, entry)
+
+
 if __name__ == "__main__":
     unittest.main()

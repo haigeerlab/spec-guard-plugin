@@ -5,7 +5,7 @@
 - [x] Task 3：两条警告与阶段提示
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 4：骨架与规则文字
-- [ ] Task 5：版本与 CHANGELOG
+- [x] Task 5：版本与 CHANGELOG
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## 证据
@@ -16,3 +16,4 @@
 - Task 3（2026-11-27）：`module_stage` 加 `design_outline_findings`（`alternatives` 带实际条数，`interfaces` 分缺失与为空）、`design_outline_problems`（只出警告）、`design_outline_line`（只在 `NEEDS_REGRESSION`，每条一行，事实带条数与种类进状态码），列表项只认不缩进、不在代码块里的 `-`、`*`、`+`、`1.`，只有注释的项不算；`verify-artifacts.sh` 接上 `design_outline_problems`。用例 `Alternatives` 3 例、`ModuleInterfaces` 2 例、`OutlineHint` 3 例，对改动前实现 8 例全红（1 失败 21 报错）；`test_flow_v2`、`test_sg_review_rules`、`test_stop_rules`、`test_map_view`、verify-artifacts 148 例照旧全过。
 - Checkpoint 1（2026-11-27）：Task 1～3 的提交都走完整档且全绿。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），10 个：new 不看路径、写坏的前缀行当作没有、条数门槛改成 1、认 `1)` 编号、只有注释的项算内容、提示不限阶段、事实不带条数、缓存不看 HEAD、全新不加四节、cross 不看同批人数——10 个全部变红；还原后 `test_sg_design_outline.py` 18 例全过。
 - Task 4（2026-11-27）：`workflow-checkpoints.md`「技术方案审查」开头加「写什么」一段（三种情况、全新的判据、四节判失败、后两种只警告）；`node-rules.md`「技术方案交审」加一句（四节要点放进「实现方案」、写出比较了哪几种做法与接口要点，这一节 1026 字节）；`docs/workflow.md` 补一句（骨架在 Task 2 已改）。`test_workflow_checkpoints.py` 新增 `DesignOutlineRulesText` 3 例，对改动前的规则文件 16 处失败；原有断言不动，全部通过。
+- Task 5（2026-11-27）：版本 0.99.0 → 0.100.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 写 `[0.100.0]`（含升级要补四节）；接口仍是 1.27。用例 `Release` 2 例；因为它读仓库自己的 CHANGELOG 与 README，按 validate 的要求把 `test_sg_design_outline.py` 从全套回归段移到 `DOC_REGRESSIONS`。
