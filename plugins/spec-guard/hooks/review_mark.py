@@ -24,7 +24,8 @@ from capability_map import MODULE_ID, MapError, parse_map
 import re
 
 from codex_review import CONCLUSIONS, REPORT_LIMIT, _invalid, inspect as inspect_report, inspect_check, inspect_final
-from module_stage import (EXTERNAL_REVIEW_HEADING, _git, _text_digest, requirement_reason_problem, requirement_review, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
+from module_stage import (EXTERNAL_REVIEW_HEADING, _git, _text_digest, requirement_reason_problem, requirement_review,
+                          requirement_review_diff, acceptance_path, REVIEW_APPROVED, REVIEW_PENDING, codex_rounds, codex_route, effective_review,
                           design_approver, design_round_records, effective_tier, file_review_state, flow_marker, review_reviewer_line,
                           review_approved_line, review_body, review_codex_digest, review_codex_line, review_digest, review_marker_lines,
                           overall_design, review_state, spec_baseline)
@@ -519,7 +520,7 @@ def main() -> int:
             print("marker-invalid: %s has more than one review marker or a malformed one; fix it by hand "
                   "(run /spec-guard:verify-artifacts to see it)" % relative[kind])
             return 2
-    if args.target == "spec" and (args.state in NO_REPORT_STATES or args.state.startswith("codex-")):
+    if args.target == "spec" and (args.state in NO_REPORT_STATES or args.state == "codex-reviewed"):
         review = requirement_review(root, module_id)
         if review is not None and review["required"] and review["records"]:
             # sg-review-rules (rule 4): one round only, from whichever source came first
@@ -608,6 +609,24 @@ def main() -> int:
                       "diff against its approved baseline (preview this command with --target both to print it), then "
                       "record both with --target both.")
             return 2
+    if args.state == "approved" and "spec" in kinds:
+        review = requirement_review(root, module_id)
+        if review is not None and review["status"] == "missing":
+            # sg-review-rules (rule 3, Q3 A): a normal or important requirement is reviewed once before it is confirmed
+            print("requirement-unreviewed: %s has no review record; review it once first (delegate review recorded "
+                  "with --state codex-reviewed, a fresh host subsession with --state host-reviewed --blocking N, or "
+                  "--state no-reviewer --reason \"<why>\"), then confirm it" % relative["spec"])
+            return 2
+        if review is not None and review["status"] == "reviewed":
+            got = requirement_review_diff(root, module_id)
+            if got["status"] == "found":
+                print("Changes since the review (show this diff to the user verbatim):")
+                print(got["diff"])
+            elif got["status"] == "unchanged":
+                print("%s: nothing changed since the review." % relative["spec"])
+            else:
+                print("%s: the changes since the review cannot be shown (%s); give the user the whole requirement."
+                      % (relative["spec"], got["reason"]))
     if args.state == "approved" and "spec" in kinds and review_state(before["spec"], "spec") == "revised":
         # pre-build-spec-batch: the user approves the revision itself, so they must see what changed since approval.
         baseline = spec_baseline(root, module_id)

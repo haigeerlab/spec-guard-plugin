@@ -27,9 +27,15 @@ def risky(project):
     project.write(".github/autopr/risk-paths.json", json.dumps(RISKY))
 
 
-def requirement(tier="normal", boundary="`src/a/`", shared=None, extra=""):
+# sg-review-rules (rule 3): a fixture requirement carries a review record unless a case is about the missing one
+REVIEWED = "<!-- spec-guard: requirement-review reviewer=none sha256=000000000000 reason=测试夹具 -->"
+
+
+def requirement(tier="normal", boundary="`src/a/`", shared=None, extra="", reviewed=True):
     text = "# a\n\n<!-- spec-guard: review approved -->\n%s\n\n" % marker(tier)
     text += "".join("## %s\n\n不涉及\n\n" % name for name in DOC_SECTIONS["requirement"]["zh"])
+    if reviewed:
+        text += "## 外部审查意见\n\n%s\n\n" % REVIEWED
     text += extra
     if boundary:
         text += "## 并行边界\n\n- 独占：%s\n%s" % (boundary, "- 公共：%s\n" % shared if shared else "")

@@ -63,10 +63,15 @@ def draft(modules):
 PREAUTH = "<!-- spec-guard: release-preauth yes -->"
 
 
+# sg-review-rules (rule 3): a fixture requirement carries a review record
+REVIEWED = "<!-- spec-guard: requirement-review reviewer=none sha256=000000000000 reason=测试夹具 -->"
+
+
 def requirement(extra=(), approved=True, tier="normal", body="不涉及"):
     """spec/a.md of a flow v2 module; `extra` are marker lines under the flow marker; approved binds the digest."""
     head = "# a\n\n<!-- spec-guard: flow v2 tier=%s -->\n%s" % (tier, "".join(line + "\n" for line in extra))
     text = head + "\n" + "".join("## %s\n\n%s\n\n" % (name, body) for name in DOC_SECTIONS["requirement"]["zh"])
+    text += "## 外部审查意见\n\n%s\n\n" % REVIEWED
     if approved:
         text = text.replace("# a\n\n", "# a\n\n%s\n" % review_approved_line(review_digest(text)), 1)
     return text

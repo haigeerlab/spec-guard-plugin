@@ -6,7 +6,7 @@
 ## 用例清单
 
 ### R1: 需求文档没有审查记录时硬拦确认
-- 步骤：临时项目里建新流程模块，生效档位依次为 `normal`、`important`、被风险路径抬升的 `small`；需求文档没有任何审查记录，跑 `review_mark.py --target spec --state approved --confirm`（以及 `--target both`）
+- 步骤：临时项目里建新流程模块，生效档位依次为 `normal`、`important`、被风险路径抬升的 `small`；需求文档没有任何审查记录，跑 `review_mark.py --target spec --state approved --confirm`（新流程模块的 `--target both` 先被 plan-auto 拒绝，不在这里测）
 - 预期：都退出 2，拒绝码 `requirement-unreviewed`，文件字节不变；补上三种记录中任一种后，同一命令照常写入批准
 - 执行方式：command
 - 命令：`python3 -B plugins/spec-guard/hooks/test_sg_review_rules.py RequirementGate`

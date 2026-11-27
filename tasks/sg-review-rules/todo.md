@@ -5,7 +5,7 @@
 - [x] Task 3：谁批技术方案与 /map 字段
 - [x] Task 4：技术方案的宿主子会话与没有审查者
 - [x] Task 5：需求文档的三种审查记录
-- [ ] Task 6：硬拦、确认停点提示与改动差异
+- [x] Task 6：硬拦、确认停点提示与改动差异
 - [ ] Checkpoint 1（report）：完整档与变异
 - [ ] Task 7：规则文字
 - [ ] Task 8：接口 1.27
@@ -18,3 +18,5 @@
   用例：`DesignRequirement` 8 例、`RiskListHint` 2 例、`DesignApprover` 2 例，对改动前实现全部红（前两组 10 例 10 失败 5 报错；`DesignApprover` 2 例 2 失败）。`test_flow_v2.py` 改钉新规则 16 处（旧送审理由、重要需求一律交用户、`designForcedBy: important`；需要送审的夹具改用风险路径清单 `src/a/old.py` 或接口改动触发），`test_map_view.py` 3 处（新字段、`designForcedBy`）、`test_stop_rules.py` 1 处、`test-phase-guard.sh` 1 处（影响面没写路径改为接口改动触发）、`test-verify-artifacts.sh` 1 处（重要需求跟档位走，另加 design=reviewer 不警告 1 例），不删断言。verify-artifacts 的「只有第二审查者的放行」警告改为只看档位。`interface.json` 先写 `designApproval` 新字段与新判定的说明（版本号在 Task 8 升）。
 - Task 4（2026-11-27）：`DESIGN_ROUND` 的 `report=` 接受 `none`，新函数 `design_round_match` 只在 `vendor=host|none` 时认 `none`（其余算写坏）；`design_round_records` 把 `none` 解析成 `report: None`。`review_mark.py` 加 `--state host-reviewed --blocking N`（0 时同时写 reviewer-approved 标记）、`--state no-reviewer`（状态 `unreviewed`），两者只认 `--target design`（需求文档在 Task 5 接上），沿用两轮上限与 criteria 一致检查；`--target design` 的档位检查改用 `effective_tier`；去掉「重要需求」单独的提示；轮次行的文件摘要用 `module_stage._text_digest`（唯一指纹实现），不在 review_mark 里另算。用例 `DesignHostRound` 6 例、`ElevatedTier` 2 例，对改动前实现 8 例 6 失败；`test_review_marker.py` 1 处钉旧规则的断言改钉新规则。
 - Task 5（2026-11-27）：`module_stage` 加 `REQUIREMENT_HOST`、`REQUIREMENT_NONE`、`requirement_reason_problem`、`requirement_review_records`、`requirement_review_broken`、`requirement_review()`；`flow_doc_problems` 对需求文档写坏的记录行判失败。`review_mark.py` 的 `--target spec` 接受 `host-reviewed --blocking N`、`no-reviewer --reason`（只对生效档位 normal／important 的新流程模块，其余 `no-report-state`），原因不合规拒绝（`requirement-review-reason`）；已有任一种记录时三种写法都拒绝（`requirement-review-recorded`），批准标记不动。`/map --json` 每个模块加 `requirementReview`，`interface.json` 写上说明（版本号在 Task 8 升）。用例 `RequirementNotRequired` 1 例、`RequirementRecords` 7 例，对改动前实现 8 例全红（18 失败 7 报错）；`test_map_view.py` 的 `MODULE_KEYS` 加 `requirementReview`。
+- Task 6（2026-11-27）：`review-mark --target spec --state approved` 对缺审查记录的新流程 normal／important 需求拒绝（`requirement-unreviewed`），有记录时预览打印审查以来的全文差异或取不到的原因。`module_stage` 加 `requirement_review_diff`（在最近 50 个提交里按记录的整份文件摘要找审查时的版本；两边都去掉批准标记与「外部审查意见」一节再比，所以记下审查记录本身不算改动）、`_review_first_step`（缺记录时下一步改成先审一轮，列三条路）、`requirement_hint` 在有记录时加披露要求与差异（最多 60 行，超出写「还有 N 行」）、`requirement_review_fact` 进状态码。用例 `RequirementGate` 3 例、`RequirementHint` 7 例、`RequirementDiffPreview` 3 例，对改动前实现 13 例 11 失败 2 报错。
+  旧夹具：`test_flow_v2.requirement()`、`test_sg_gate_flow.requirement()` 默认带一条「没有审查者」记录，`test_map_view.approve_spec` 确认前先记一条（其余 Spec 被拒绝、不影响）；需要「缺记录」的新用例显式传 `reviewed=False`。`--target spec` 上「只记一轮」的检查只对 `codex-reviewed` 与两种新状态生效，`codex-approved` 照旧先报 `codex-route-requirement`。回归文档 R1 去掉「以及 `--target both`」（新流程模块的 both 先被 plan-auto 拒绝）。

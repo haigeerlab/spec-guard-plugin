@@ -37,7 +37,7 @@
 | `plugins/spec-guard/references/doc-skeletons.md` | 需求文档审查记录的两种写法；档位表 `important` 一行改成「碰高风险路径」「技术方案按档位的 design 项：reviewer 时由第二审查者放行，否则用户批」 |
 | `plugins/spec-guard/commands/review-mark.md`、`plugins/spec-guard/skills/spec-guard-ops/` | 两个新状态的用法 |
 | `plugins/spec-guard/interface.json` | 升 `1.27`，只加取值与字段 |
-| `plugins/spec-guard/hooks/test_sg_review_rules.py`（新）、`plugins/spec-guard/hooks/test_important_requirement.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh` | 正反例；钉旧规则的断言改成钉新规则，不删断言 |
+| `plugins/spec-guard/hooks/test_sg_review_rules.py`（新）、`plugins/spec-guard/hooks/test_important_requirement.py`、`plugins/spec-guard/hooks/test_flow_v2.py`、`plugins/spec-guard/hooks/test_review_marker.py`、`plugins/spec-guard/hooks/test_map_view.py`、`plugins/spec-guard/hooks/test_sg_gate_flow.py`、`plugins/spec-guard/hooks/test_workflow_checkpoints.py`、`plugins/spec-guard/hooks/test_stop_rules.py`、`plugins/spec-guard/hooks/test-phase-guard.sh`、`plugins/spec-guard/hooks/test-verify-artifacts.sh` | 正反例；钉旧规则的断言改成钉新规则，不删断言；新流程 normal 需求的测试夹具默认带一条审查记录（构建中发现 `test_sg_gate_flow.py` 漏列，用户 2026-11-27「同意，补进影响面」） |
 | `scripts/validate.sh` | 登记新测试文件 |
 | `docs/workflow.md`、`docs/commands.md` | 使用者说明 |
 

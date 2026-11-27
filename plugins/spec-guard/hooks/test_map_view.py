@@ -93,6 +93,10 @@ class Project:
 def approve_spec(root, module):
     """Approve a Spec with the real marker tool so the digest is right."""
     tool = Path(__file__).with_name("review_mark.py")
+    # sg-review-rules (rule 3): a new-flow normal/important requirement needs a review record first; refused (and
+    # harmless) for any other Spec
+    subprocess.run([sys.executable, "-B", str(tool), "--project", str(root), "--module", module, "--target", "spec",
+                    "--state", "no-reviewer", "--reason", "测试夹具", "--confirm"], capture_output=True, timeout=30)
     subprocess.run([sys.executable, "-B", str(tool), "--project", str(root), "--module", module,
                     "--target", "spec", "--state", "approved", "--confirm"],
                    check=True, capture_output=True, timeout=30)

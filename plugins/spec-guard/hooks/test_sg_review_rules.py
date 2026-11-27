@@ -274,7 +274,7 @@ class RequirementProject(unittest.TestCase):
         self.addCleanup(self.project.__exit__, None, None, None)
 
     def spec(self, tier="normal", old=False, extra=""):
-        tfv.pending_spec(self.project, tier)
+        tfv.pending_spec(self.project, tier, reviewed=False)
         if old:
             self.project.write("spec/a.md", self.text().replace(tfv.marker(tier) + "\n", ""))
         if extra:
@@ -372,6 +372,165 @@ class RequirementRecords(RequirementProject):
         code, out = mark(self.project, "--target", "spec", "--state", "host-reviewed", "--blocking", "0")
         self.assertEqual(code, 2)
         self.assertIn("no-report-state", out)
+
+
+GIT = tir.GIT
+
+
+class RequirementGate(RequirementProject):
+    """R1: a required requirement with no review record cannot be confirmed; any record lets it through."""
+
+    def approve(self, target="spec"):
+        return mark(self.project, "--target", target, "--state", "approved", "--confirm")
+
+    def test_refused_without_a_record(self):
+        for tier in ("normal", "important"):
+            for target in ("spec",):  # --target both is refused for a new-flow module (plan-auto) before this
+                with self.subTest(tier=tier, target=target):
+                    self.spec(tier)
+                    before = self.text()
+                    code, out = self.approve(target)
+                    self.assertEqual(code, 2)
+                    self.assertIn("requirement-unreviewed", out)
+                    self.assertEqual(self.text(), before)
+
+    def test_lifted_small_is_refused(self):
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(RISK))
+        tfv.pending_spec(self.project, "small", boundary="`src/secret/`", reviewed=False)
+        code, out = self.approve()
+        self.assertEqual(code, 2)
+        self.assertIn("requirement-unreviewed", out)
+
+    def test_each_record_lets_it_through(self):
+        for args in (("--state", "host-reviewed", "--blocking", "1"), ("--state", "no-reviewer", "--reason", "x"), None):
+            with self.subTest(args=args):
+                if args is None:
+                    self.spec(extra="\n## 外部审查意见\n\n%s\n" % CODEX_LINE)
+                else:
+                    self.spec()
+                    self.assertEqual(mark(self.project, "--target", "spec", *args, "--confirm")[0], 0)
+                code, out = self.approve()
+                self.assertEqual(code, 0, out)
+                self.assertEqual(module_stage.review_state(self.text(), "spec"), "approved")
+
+
+class GitRequirement(RequirementProject):
+    def git(self, *args):
+        subprocess.run(GIT + list(args), cwd=self.project.root, check=True, capture_output=True, timeout=30)
+
+    def commit(self, message):
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", message)
+
+    def reviewed(self, commit=True):
+        """A pending requirement, committed when `commit`, then recorded as reviewed with no reviewer."""
+        self.git("init", "-q")
+        self.spec()
+        if commit:
+            self.commit("requirement")
+        self.assertEqual(mark(self.project, "--target", "spec", "--state", "no-reviewer", "--reason", "x",
+                              "--confirm")[0], 0)
+
+    def edit(self, lines=1):
+        self.project.write("spec/a.md", self.text().replace("## 目标\n\n不涉及", "## 目标\n\n" + "\n".join(
+            "改了第 %d 行" % n for n in range(lines)), 1))
+
+    def hint(self, zh=True):
+        config = {"version": 1}
+        if zh:
+            config["artifactLanguage"] = "zh-CN"
+        self.project.write(".agent/config.json", json.dumps(config))
+        self.project.write(".agent/state.json", json.dumps({"activeModule": "a"}))
+        return module_stage.describe(self.project.root)
+
+
+class RequirementHint(GitRequirement):
+    """R4: the confirmation stop asks for the review first, then restates with the changes since it."""
+
+    def test_missing_asks_for_the_review_first(self):
+        self.spec()
+        text = self.hint()
+        self.assertIn("需求文档要先审一轮，再交用户确认", text)
+        for way in ("--state codex-reviewed", "全新子会话", "--state host-reviewed --blocking", "--state no-reviewer --reason"):
+            self.assertIn(way, text)
+        self.assertNotIn("在对话正文里复述需求", text)
+        self.assertIn("Review the requirement once before the user confirms it", self.hint(zh=False))
+
+    def test_reviewed_restates_and_discloses(self):
+        self.reviewed()
+        text = self.hint()
+        self.assertIn("在对话正文里复述需求", text)
+        self.assertIn("交用户时附上审查提了什么、改了哪些、哪些没采纳及原因", text)
+
+    def test_unchanged_since_the_review(self):
+        # the record line and its section are not the requirement: recording the review is not a change
+        self.reviewed()
+        self.commit("recorded")
+        self.assertEqual(module_stage.requirement_review_diff(self.project.root, "a"), {"status": "unchanged"})
+        self.assertIn("审查后没有改动", self.hint())
+
+    def test_diff_after_an_edit(self):
+        self.reviewed()
+        self.edit()
+        self.commit("edit")
+        text = self.hint()
+        self.assertIn("审查以来的改动（照原样给用户看）", text)
+        self.assertIn("+改了第 0 行", text)
+
+    def test_not_in_git(self):
+        self.reviewed(commit=False)
+        self.edit()
+        text = self.hint()
+        self.assertIn("审查以来的改动取不到", text)
+
+    def test_long_diff_is_cut(self):
+        self.reviewed()
+        self.edit(80)
+        lines = module_stage.requirement_review_diff(self.project.root, "a")["diff"].splitlines()
+        text = self.hint()
+        self.assertIn("还有 %d 行" % (len(lines) - module_stage.DIFF_HINT_LINES), text)
+        self.assertNotIn("+改了第 79 行", text)
+
+    def test_state_code_follows_the_review(self):
+        def code():
+            self.hint()
+            return module_stage.describe(self.project.root, state_extra="x").rsplit("spec-guard-state: ", 1)[1][:8]
+        self.git("init", "-q")
+        self.spec()
+        first = code()
+        self.assertEqual(mark(self.project, "--target", "spec", "--state", "no-reviewer", "--reason", "x",
+                              "--confirm")[0], 0)
+        self.assertNotEqual(code(), first)
+
+
+class RequirementDiffPreview(GitRequirement):
+    """R5: the confirmation preview prints the whole diff since the review, or why it cannot."""
+
+    def preview(self):
+        return mark(self.project, "--target", "spec", "--state", "approved")
+
+    def test_whole_diff(self):
+        self.reviewed()
+        self.edit(80)
+        before = self.text()
+        code, out = self.preview()
+        self.assertEqual(code, 0, out)
+        self.assertIn("Changes since the review (show this diff to the user verbatim):", out)
+        self.assertIn("+改了第 79 行", out)
+        self.assertEqual(self.text(), before)
+
+    def test_unchanged(self):
+        self.reviewed()
+        code, out = self.preview()
+        self.assertEqual(code, 0, out)
+        self.assertIn("spec/a.md: nothing changed since the review.", out)
+
+    def test_unavailable(self):
+        self.reviewed(commit=False)
+        self.edit()
+        code, out = self.preview()
+        self.assertEqual(code, 0, out)
+        self.assertIn("spec/a.md: the changes since the review cannot be shown", out)
 
 
 if __name__ == "__main__":

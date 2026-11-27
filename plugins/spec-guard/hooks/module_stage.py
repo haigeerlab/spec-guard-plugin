@@ -10,6 +10,7 @@ not an unchecked item: it is listed apart and does not keep the module open.
 Read-only: this never writes a file.
 """
 from __future__ import annotations
+import difflib
 import json
 import unicodedata
 from pathlib import Path
@@ -809,8 +810,145 @@ def _confirmed_at(root: Path, module: str, line: str) -> str | None:
     return earliest if len(rows) <= REQUIREMENT_AT_LIMIT else None
 
 
+DIFF_HINT_LINES = 60  # sg-review-rules: lines of the since-review diff the phase hint shows; the preview shows all
+
+
+def requirement_review_diff(root: Path, module: str) -> dict:
+    """sg-review-rules (rule 2, S9): what changed in spec/<id>.md since its review record.
+
+    The reviewed text is the newest of the last REQUIREMENT_AT_LIMIT commits of the file whose whole text has the
+    record's digest.  Both sides are compared without the approval marker and the external review section, which hold
+    the review records and findings rather than the requirement: {"status": "unchanged"} when the rest is the same,
+    {"status": "found", "commit", "diff"} with a unified diff of the rest otherwise, {"status": "unavailable",
+    "reason"} when there is no record, no such commit, or git cannot be read.  Read-only.
+    """
+    review = requirement_review(root, module)
+    relative = "spec/%s.md" % module
+    if not review or not review["records"]:
+        return {"status": "unavailable", "reason": "no review record"}
+    target = review["records"][-1]["sha256"]
+    try:
+        current = (root / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        return {"status": "unavailable", "reason": "%s: %s" % (relative, type(error).__name__)}
+    if _text_digest(current) == target:
+        return {"status": "unchanged"}
+    now = _requirement_body(current)
+
+    def run(*args):
+        return subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=5)
+
+    try:
+        log = run("log", "-n", str(REQUIREMENT_AT_LIMIT), "--format=%H", "--", relative)
+        if log.returncode != 0:
+            return {"status": "unavailable", "reason": "git log failed (not a git repository, or no commit yet)"}
+        for sha in log.stdout.decode("ascii", "replace").split():
+            shown = run("show", "%s:./%s" % (sha, relative))
+            if shown.returncode != 0:
+                continue
+            try:
+                text = shown.stdout.decode("utf-8")
+            except UnicodeError:
+                continue
+            if _text_digest(text) == target:
+                then = _requirement_body(text)
+                if then == now:
+                    return {"status": "unchanged"}
+                diff = "".join(difflib.unified_diff(then.splitlines(keepends=True), now.splitlines(keepends=True),
+                                                    fromfile="%s (reviewed, %s)" % (relative, sha[:7]),
+                                                    tofile="%s (now)" % relative))
+                return {"status": "found", "commit": sha, "diff": diff}
+    except (OSError, subprocess.SubprocessError) as error:
+        return {"status": "unavailable", "reason": "git could not be read (%s)" % type(error).__name__}
+    return {"status": "unavailable", "reason": "the reviewed text is not in the last %d commits of %s (reviewed before "
+                                               "it was committed, or too far back)" % (REQUIREMENT_AT_LIMIT, relative)}
+
+
+def _requirement_body(text: str) -> str:
+    """The requirement without its approval marker and its external review section (sg-review-rules)."""
+    kept, inside = [], False
+    for line in text.splitlines(keepends=True):
+        if EXTERNAL_REVIEW_HEADING.match(line.rstrip("\r\n")):
+            inside = True
+            continue
+        if inside and line.startswith("## "):
+            inside = False
+        if not inside:
+            kept.append(line)
+    return review_body("".join(kept)).rstrip("\n") + "\n"  # the section's leading blank line is not a change
+
+
+def _review_diff_text(root: Path, module: str, zh: bool) -> str:
+    """The since-review part of the confirmation step: the diff, at most DIFF_HINT_LINES lines, or why there is none."""
+    got = requirement_review_diff(root, module)
+    if got["status"] == "unchanged":
+        return " 审查后没有改动。" if zh else " Nothing changed since the review."
+    if got["status"] == "unavailable":
+        return (" 审查以来的改动取不到：%s；交用户时说明这一点，给出整份需求。" % got["reason"] if zh else
+                " The changes since the review cannot be shown: %s; say so and give the user the whole requirement."
+                % got["reason"])
+    lines = got["diff"].splitlines()
+    shown = "\n".join(lines[:DIFF_HINT_LINES])
+    more = len(lines) - DIFF_HINT_LINES
+    tail = ""
+    if more > 0:
+        tail = ("\n还有 %d 行，`review-mark --target spec --state approved` 的预览里有全文。" % more if zh else
+                "\n%d more line(s); the preview of `review-mark --target spec --state approved` prints them all." % more)
+    return ((" 审查以来的改动（照原样给用户看）：\n```diff\n%s\n```%s" if zh else
+             " Changes since the review (show them to the user verbatim):\n```diff\n%s\n```%s") % (shown, tail))
+
+
+def _review_first_step(module: str, cmd: dict, zh: bool) -> str:
+    """sg-review-rules (rules 2-4, S2): the next step while a required requirement has no review record."""
+    path, mark = "spec/%s.md" % module, cmd["review-mark"]
+    review = "/delegate:review --backend auto --author-host %s --paths %s" % (cmd["author-host"], path)
+    if zh:
+        return ("需求文档要先审一轮，再交用户确认。三条路选一条：装了 delegate 就用 `%s` 审，把标准输出的 JSON 存成仓库外的文件，"
+                "用 %s `--target spec --state codex-reviewed --review <文件>` 记下；没装 delegate 就开一个不带本会话上下文的全新子会话审，"
+                "把它的结论原话写进「外部审查意见」一节，用 %s `--target spec --state host-reviewed --blocking <阻断数>` 记下；"
+                "都不行就用 %s `--target spec --state no-reviewer --reason \"<一行原因>\"` 写明原因。只审一轮：按意见改完直接复述交用户，"
+                "附上审查提了什么、改了哪些、哪些没采纳及原因。记下之前不要请用户确认。" % (review, mark, mark, mark))
+    return ("Review the requirement once before the user confirms it. Pick one way: with delegate installed, review it with "
+            "`%s`, save the standard-output JSON to a file outside the repository and record it with %s `--target spec "
+            "--state codex-reviewed --review <file>`; without delegate, have a fresh host subsession with none of this "
+            "conversation's context review it, write its findings verbatim into the external review section and record "
+            "it with %s `--target spec --state host-reviewed --blocking <count>`; when neither works, record why with %s "
+            "`--target spec --state no-reviewer --reason \"<one line>\"`. One round only: fix it from the findings and hand "
+            "it to the user, saying what the review raised, what you changed and what you did not take and why. Do not "
+            "ask the user to confirm before it is recorded." % (review, mark, mark, mark))
+
+
+def requirement_review_fact(root: Path, module: str) -> tuple | None:
+    """sg-review-rules: what of the requirement's review changes the confirmation step, for the state code."""
+    if not module or not requirement_wait(root, module):
+        return None
+    review = requirement_review(root, module)
+    if review is None or not review["required"]:
+        return None
+    try:
+        current = _text_digest((root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError):
+        current = None
+    return ("requirement-review", review["status"], current)
+
+
 def requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
-    """requirement-confirm-gate: (review line, next step) while a v2 requirement waits for the user's confirmation."""
+    """requirement-confirm-gate: (review line, next step) while a v2 requirement waits for the user's confirmation.
+
+    sg-review-rules: a normal or important requirement with no review record is reviewed first; once it has one, the
+    restatement carries what the review raised and the changes since it."""
+    line, step = _requirement_hint(root, module, wait, cmd, zh)
+    review = requirement_review(root, module)
+    if review is None or not review["required"]:
+        return line, step
+    if review["status"] == "missing":
+        return line, _review_first_step(module, cmd, zh)
+    extra = ("交用户时附上审查提了什么、改了哪些、哪些没采纳及原因。" if zh else
+             " With it, tell the user what the review raised, what you changed and what you did not take and why.")
+    return line, step + extra + _review_diff_text(root, module, zh)
+
+
+def _requirement_hint(root: Path, module: str, wait: str, cmd: dict, zh: bool) -> tuple:
     tier = effective_tier(root, module)["tier"]
     lang = "zh" if zh else "en"
     names = DOC_SECTIONS["bug" if tier == "bug" else "requirement"][lang] + (
@@ -3026,11 +3164,13 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     if node == "final-gate" and role_kind not in ("module", "coordinator") and documentation_baseline_present(root):
         notes = notes + [documentation_check_line(module, cmd, zh)]
     # review-residual-fixes (C4): the final gate's documentation-check line depends on the baseline, so its presence is a fact.
+    rr_fact = requirement_review_fact(root, module)  # sg-review-rules: the confirmation step follows the review
     info.update(facts=[stage, module, spec_review, plan_review, node, zh, static_notes, role_facts, suspended_ids,
                        tuple(p["id"] for p in paused), bool(unmerged and unmerged[0] > 0),
                        documentation_baseline_present(root), project_sections(root), requirement_wait(root, module),
                        design_fact(root, module, stage) if module else None,
                        overall_wait(root, module) if module else None]
+                      + ([rr_fact] if rr_fact else [])
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
