@@ -1,6 +1,6 @@
 # Todo: sg-skill-map
 
-- [ ] Task 1：回告 lead
+- [x] Task 1：回告 lead
 - [ ] Task 2：位置判定与点名行
 - [ ] Task 3：记录解析与 /map
 - [ ] Task 4：最终验收提醒
@@ -18,3 +18,4 @@
 
 ## 证据
 - 技术方案（2026-11-27）：Codex 两轮（第 1 轮 3 条阻断，第 2 轮剩 `spec/map-view.md` 一条交用户），用户「批准；不改；单独发」。
+- Task 1（2026-11-27）：经 agent-relay 发给 ecosystem-lead（线程 `autopilot-m5-7`），消息 #23557，写了 `skillLog` 的位置、字段与 todo 写法；lead 会话未运行，消息已存入其收件箱，打开后读到。
