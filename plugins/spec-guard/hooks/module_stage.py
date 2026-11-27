@@ -1310,6 +1310,96 @@ NO_RISK_LIST_EN = ("- T4 paths: no readable risk-path list, `risk-path` not chec
                    "to judge by risk paths.")
 
 
+LIST_ITEM = re.compile(r"^(?:[-*+]|\d+\.)\s+")
+COMMENT_ONLY = re.compile(r"^(?:<!--.*?-->\s*)+$")
+
+
+def _outline_items(text: str, names) -> list | None:
+    """sg-design-outline: the section's list items (not indented, outside code fences, a list mark followed by more
+    than a comment); None when there is no such section."""
+    import regression_view
+    lines = regression_view._section_lines(text, names)
+    if lines is None:
+        return None
+    items = []
+    for _n, line, in_fence, _m in lines:
+        match = LIST_ITEM.match(line)
+        if in_fence or not match:
+            continue
+        rest = line[match.end():].strip()
+        if rest and not COMMENT_ONLY.match(rest):
+            items.append(rest)
+    return items
+
+
+def _outline_has_content(text: str, names) -> bool:
+    """sg-design-outline: the section holds something besides blank lines and comments (a list mark around a lone
+    comment does not count)."""
+    import regression_view
+    for _n, line, in_fence, _m in regression_view._section_lines(text, names) or []:
+        rest = LIST_ITEM.sub("", line.strip(), count=1).strip()
+        if rest and (in_fence or not COMMENT_ONLY.match(rest)):
+            return True
+    return False
+
+
+def design_outline_findings(root: Path, module: str) -> list:
+    """sg-design-outline (rules 8-10a): [(kind, detail)] -- ("alternatives", count) for an important requirement whose
+    design compares fewer than two approaches, ("interfaces", "missing" | "empty") for a multi-module one without
+    module interfaces.  [] without a design or a case."""
+    case = design_outline_case(root, module)
+    try:
+        text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return []
+    if case is None:
+        return []
+    found = []
+    if case["important"]:
+        count = len(_outline_items(text, (DOC_SECTIONS["design"]["zh"][5], DOC_SECTIONS["design"]["en"][5])) or [])
+        if count < 2:
+            found.append(("alternatives", count))
+    if case["cross"]:
+        names = (DOC_SECTIONS["design-interfaces"]["zh"][0], DOC_SECTIONS["design-interfaces"]["en"][0])
+        if not _sections(text) & set(names):
+            found.append(("interfaces", "missing"))
+        elif not _outline_has_content(text, names):
+            found.append(("interfaces", "empty"))
+    return found
+
+
+def _outline_message(module: str, finding: tuple, zh: bool) -> str:
+    path = "tasks/%s/design.md" % module
+    kind, detail = finding
+    if kind == "alternatives":
+        return ("`%s` 是重要需求，「方案取舍」只列了 %d 种做法，至少比较两种" % (path, detail) if zh else
+                "`%s` is an important requirement; its alternatives list %d approach(es), compare at least two"
+                % (path, detail))
+    what = "缺「模块接口」一节" if detail == "missing" else "「模块接口」一节没有内容"
+    return ("`%s` 所在需求一次插入了多个模块，%s（画出与同批模块之间的接口；没有直接接口写「无直接接口」并说明原因）"
+            % (path, what) if zh else
+            "`%s` belongs to a multi-module requirement; its module interfaces section is %s (draw the interfaces "
+            "with the modules inserted with it; with none, write that there is no direct interface and why)"
+            % (path, "missing" if detail == "missing" else "empty"))
+
+
+def design_outline_problems(root: Path, module: str) -> list:
+    """sg-design-outline: [(level, message)] for verify-artifacts -- warnings only, never a failure."""
+    return [("warn", _outline_message(module, finding, True)) for finding in design_outline_findings(root, module)]
+
+
+def design_outline_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """sg-design-outline (rules 8, 10, 10a): (fact, lines) at NEEDS_REGRESSION, one line per finding; the fact carries
+    every finding with its count or kind, so the state code follows what the lines say.  (None, "") otherwise."""
+    if not module or stage != "NEEDS_REGRESSION":
+        return None, ""
+    findings = design_outline_findings(root, module)
+    if not findings:
+        return None, ""
+    head = "- 技术方案大纲：" if zh else "- Design outline: "
+    return ("design-outline", tuple(findings)), "\n".join(head + _outline_message(module, f, zh) for f in findings)
+
+
 def risk_list_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
     """sg-review-rules (rule 9, S6): (fact, line) at NEEDS_REGRESSION when no risk-path list is readable, whether or
     not the design still waits (a design=reviewer design that needs no review included); (None, "") otherwise."""
@@ -3198,6 +3288,9 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     rl_fact, rl_line = risk_list_line(root, module, stage, zh)
     if rl_line:
         counts += "\n" + rl_line
+    do_fact, do_line = design_outline_line(root, module, stage, zh)
+    if do_line:
+        counts += "\n" + do_line
     au_fact, au_line = author_line(root, module, stage, zh)
     if au_line:
         counts += "\n" + au_line
@@ -3227,7 +3320,7 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
                       + ([ms_fact] if ms_fact else [])
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
-                      + ([rl_fact] if rl_fact else [])
+                      + ([rl_fact] if rl_fact else []) + ([do_fact] if do_fact else [])
                       + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh)
     if zh:

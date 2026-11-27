@@ -164,5 +164,107 @@ class Unchanged(V2Project):
         self.assertIn(("fail", "`tasks/a/design.md` 缺章节：方案取舍"), self.problems())
 
 
+class Alternatives(V2Project):
+    """R4: an important requirement's design comparing fewer than two approaches warns, never fails."""
+
+    def warnings(self, text, tier="important"):
+        self.requirement(tier)
+        self.project.write("tasks/a/design.md", design(alternatives=text))
+        return [m for level, m in module_stage.design_outline_problems(self.project.root, "a") if level == "warn"]
+
+    def test_fewer_than_two(self):
+        for text, count in (("不涉及", 0), ("- 做法甲", 1), ("只考虑过一种做法，就是甲。", 0), ("1) 甲\n2) 乙", 0),
+                            ("- <!-- 甲 -->\n- 乙", 1), ("- 甲\n  - 甲的细节", 1), ("```\n- 甲\n- 乙\n```", 0)):
+            with self.subTest(text=text):
+                found = self.warnings(text)
+                self.assertEqual(len(found), 1)
+                self.assertIn("只列了 %d 种做法" % count, found[0])
+
+    def test_two_or_more_and_not_important(self):
+        for text in ("- 甲\n- 乙", "1. 甲\n2. 乙", "* 甲\n+ 乙\n- 丙"):
+            with self.subTest(text=text):
+                self.assertEqual(self.warnings(text), [])
+        self.assertEqual(self.warnings("- 甲", tier="normal"), [])
+
+    def test_never_a_failure(self):
+        self.warnings("不涉及")
+        self.assertFalse([m for level, m in module_stage.design_outline_problems(self.project.root, "a")
+                          if level == "fail"])
+
+
+class ModuleInterfaces(GitProject):
+    """R5: a multi-module requirement's design without module interfaces (missing, empty, only a comment) warns."""
+
+    def setUp(self):
+        super().setUp()
+        self.add("alpha", "beta")
+        self.add("gamma")
+
+    def warnings(self, module, extra=None):
+        names = list(DOC_SECTIONS["design"]["zh"])
+        body = "".join("## %s\n\n不涉及\n\n" % name for name in names) + (extra or "")
+        path = self.root / "tasks" / module / "design.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# d\n\n" + body, encoding="utf-8")
+        return module_stage.design_outline_problems(self.root, module)
+
+    def test_warns(self):
+        for extra, what in ((None, "缺「模块接口」一节"), ("## 模块接口\n\n", "「模块接口」一节没有内容"),
+                            ("## 模块接口\n\n- <!-- TODO -->\n", "「模块接口」一节没有内容")):
+            with self.subTest(extra=extra):
+                found = self.warnings("alpha", extra)
+                self.assertEqual([level for level, _m in found], ["warn"])
+                self.assertIn(what, found[0][1])
+
+    def test_passes(self):
+        for extra in ("## 模块接口\n\n无直接接口，因为 beta 只读 alpha 写的文件。\n",
+                      "## 模块接口\n\n```mermaid\ngraph LR\n  alpha --> beta\n```\n",
+                      "## Module interfaces\n\n- alpha calls beta\n"):
+            with self.subTest(extra=extra):
+                self.assertEqual(self.warnings("alpha", extra), [])
+        self.assertEqual(self.warnings("gamma"), [])
+
+
+class OutlineHint(GitProject):
+    """R6: the lines show only at NEEDS_REGRESSION, one per finding, and the state code follows the count."""
+
+    def setUp(self):
+        super().setUp()
+        self.add("alpha", "beta", tier="important")
+
+    def write(self, alternatives):
+        path = self.root / "tasks" / "alpha" / "design.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(design(alternatives=alternatives), encoding="utf-8")
+
+    def test_stages_and_lines(self):
+        self.assertEqual(module_stage.design_outline_line(self.root, "alpha", "NEEDS_DESIGN", True), (None, ""))
+        self.write("不涉及")
+        fact, lines = module_stage.design_outline_line(self.root, "alpha", "NEEDS_REGRESSION", True)
+        self.assertEqual(len(lines.splitlines()), 2)
+        self.assertTrue(all(line.startswith("- 技术方案大纲：") for line in lines.splitlines()))
+        for stage in ("NEEDS_PLAN", "BUILDING"):
+            self.assertEqual(module_stage.design_outline_line(self.root, "alpha", stage, True), (None, ""))
+        self.assertTrue(module_stage.design_outline_line(self.root, "alpha", "NEEDS_REGRESSION", False)[1]
+                        .startswith("- Design outline: "))
+
+    def test_fact_follows_the_count(self):
+        self.write("不涉及")
+        first = module_stage.design_outline_line(self.root, "alpha", "NEEDS_REGRESSION", True)
+        self.write("- 甲")
+        second = module_stage.design_outline_line(self.root, "alpha", "NEEDS_REGRESSION", True)
+        self.assertNotEqual(first[0], second[0])
+        self.assertIn("只列了 1 种做法", second[1])
+
+    def test_in_the_phase_hint(self):
+        self.write("不涉及")
+        (self.root / ".agent" / "config.json").write_text(json.dumps({"version": 1, "artifactLanguage": "zh-CN"}),
+                                                         encoding="utf-8")
+        (self.root / ".agent" / "state.json").write_text(json.dumps({"activeModule": "alpha"}), encoding="utf-8")
+        text = module_stage.describe(self.root)
+        self.assertIn("NEEDS_REGRESSION", text)
+        self.assertEqual(text.count("- 技术方案大纲："), 2)
+
+
 if __name__ == "__main__":
     unittest.main()
