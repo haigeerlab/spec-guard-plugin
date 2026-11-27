@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "release": {
+    "version": "0.99.0"
+  },
+  "records": [
+    {
+      "subject": "spec-guard-source",
+      "status": "source-verified",
+      "target": {
+        "kind": "source-checkout",
+        "id": "commit:c2b44765759e60b3bc7c28d7ed300b86df2ef330"
+      },
+      "observedAt": "2026-11-27T04:09:48Z",
+      "evidence": [
+        "result:the v0.99.0 annotated tag resolves to merge commit c2b44765759e60b3bc7c28d7ed300b86df2ef330 (pull request #526); merged==true and main==merge sha were checked before tagging; the CI run on the tagged merge commit succeeded"
+      ]
+    }
+  ]
+}
