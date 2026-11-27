@@ -1249,6 +1249,34 @@ class ReviewRulesText(unittest.TestCase):
         self.assertIn("requirement-review reviewer=none sha256=<12 位> reason=", text)
 
 
+class DesignOutlineRulesText(unittest.TestCase):
+    """sg-design-outline R8 (S6): the shared rule and the node rule say the three cases."""
+    REFS = Path(__file__).resolve().parent.parent / "references"
+
+    def test_shared_rule(self):
+        text = (self.REFS / "workflow-checkpoints.md").read_text(encoding="utf-8")
+        section = text[text.index("## 技术方案审查"):text.index("## 阶段交接")]
+        for phrase in ("写什么（sg-design-outline）", "恰好有一行格式正确、路径有效的 `overall-design` 行", "技术选型、架构图、目录结构、数据模型",
+                       "Mermaid", "缺一节 verify-artifacts 判失败", "至少比较两种做法", "「模块接口」", "只警告"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+    def test_node_rule(self):
+        text = (self.REFS / "node-rules.md").read_text(encoding="utf-8")
+        section = text[text.index("## 技术方案交审"):text.index("## Plan 交审")]
+        for phrase in ("恰好一行合规的 `overall-design`", "四节要点写在「实现方案」一项里", "比较了哪几种做法",
+                       "与同批模块的接口要点"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+    def test_skeleton(self):
+        text = (self.REFS / "doc-skeletons.md").read_text(encoding="utf-8")
+        for phrase in ("| 技术选型 | Technology choices |", "| 架构图 | Architecture diagram |", "| 模块接口 | Module interfaces |",
+                       "恰好有一行格式正确、路径有效的 `overall-design` 行", "至少比较两种做法"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+
+
 class PlanAutoApproveRuleTests(unittest.TestCase):
     """plan-auto-approve assumption 8 (R1-10): what the automatic approval authorizes, and how a stop is released."""
 
