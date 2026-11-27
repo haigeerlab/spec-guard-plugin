@@ -2,7 +2,7 @@
 
 <!-- spec-guard: flow v2 tier=normal -->
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved ea039c350803 -->
 
 ## 目标
 
