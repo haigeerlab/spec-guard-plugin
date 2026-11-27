@@ -24,7 +24,7 @@ MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step"
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm", "designApproval", "verification", "overallDesign", "requirementReview"}
+               "requirementConfirm", "designApproval", "verification", "overallDesign", "requirementReview", "skillLog"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]
@@ -173,7 +173,7 @@ class RetiredAutonomyTest(unittest.TestCase):
 
     def test_interface_version(self):
         data = json.loads((Path(__file__).resolve().parent.parent / "interface.json").read_text(encoding="utf-8"))
-        self.assertEqual(data["interface"], "1.27")  # bump together with interface.json
+        self.assertEqual(data["interface"], "1.28")  # bump together with interface.json
 
 
 class TakeoverTest(unittest.TestCase):

@@ -7,7 +7,8 @@ review markers and the next gate are taken from `module_stage`; this script only
 six display states, follows the dependency graph, and renders.  It never writes, never fetches.
 
 Exit codes: 0 ok, 2 usage, 3 no capability map, 4 map or module file unreadable.
-The JSON contract (schemaVersion 1) is specified in spec/map-view.md.
+The JSON contract (schemaVersion 1) is specified in spec/map-view.md; fields added since interface 1.15 (important,
+designApproval, requirementReview, skillLog and the rest) are described in interface.json only, which wins.
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ from pathlib import Path
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
                           design_approval, file_review_state, module_state, requirement_confirm, requirement_review,
+                          skill_log,
                           gate_checkpoints, milestone_blocking, next_gate, overall_design, project_stage, release_preauth,
                           unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -513,6 +515,7 @@ def build(root: Path) -> dict:
             "tier": effective_tier(root, module)["tier"],
             "requirementConfirm": requirement_confirm(root, module),
             "requirementReview": requirement_review(root, module),
+            "skillLog": skill_log(root, module),
             "overallDesign": overall_design(root, module),  # sg-gate-flow (interface 1.26)
             "designApproval": _design_approval(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),

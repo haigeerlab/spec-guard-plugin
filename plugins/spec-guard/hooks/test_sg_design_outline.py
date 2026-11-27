@@ -267,17 +267,22 @@ class OutlineHint(GitProject):
 
 
 class Release(unittest.TestCase):
-    """R9: version 0.100.0 everywhere, the CHANGELOG entry says what upgraders must do, the interface stays 1.27."""
+    """R9: version 0.100.0 or later everywhere (sg-skill-map moved on), the CHANGELOG entry says what upgraders must
+    do, the interface at least 1.27."""
     ROOT = HERE.parent.parent.parent
 
     def test_versions(self):
         for path in ("plugins/spec-guard/.claude-plugin/plugin.json", "plugins/spec-guard/.codex-plugin/plugin.json"):
             with self.subTest(path=path):
-                self.assertEqual(json.loads((self.ROOT / path).read_text(encoding="utf-8"))["version"], "0.100.0")
+                version = json.loads((self.ROOT / path).read_text(encoding="utf-8"))["version"]
+                self.assertGreaterEqual(tuple(int(p) for p in version.split(".")), (0, 100, 0))
         for path in ("README.md", "README.en.md"):
             with self.subTest(path=path):
-                self.assertIn("--ref v0.100.0", (self.ROOT / path).read_text(encoding="utf-8"))
-        self.assertEqual(json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))["interface"], "1.27")
+                self.assertRegex((self.ROOT / path).read_text(encoding="utf-8"), r"--ref v0\.1\d\d\.\d+")
+        major, minor = (int(p) for p in json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))
+                        ["interface"].split("."))
+        self.assertEqual(major, 1)
+        self.assertGreaterEqual(minor, 27)
 
     def test_changelog(self):
         text = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")

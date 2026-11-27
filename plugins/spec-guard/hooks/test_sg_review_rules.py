@@ -565,7 +565,10 @@ class InterfaceFields(unittest.TestCase):
         self.data = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))
 
     def test_version(self):
-        self.assertEqual(self.data["interface"], "1.27")
+        # sg-skill-map bumped it to 1.28 (only additions); the 1.27 fields below must still be there
+        major, minor = (int(part) for part in self.data["interface"].split("."))
+        self.assertEqual(major, 1)
+        self.assertGreaterEqual(minor, 27)
 
     def test_new_fields_and_values_are_described(self):
         view = self.data["mapView"]

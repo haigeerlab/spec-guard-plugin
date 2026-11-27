@@ -1400,6 +1400,131 @@ def design_outline_line(root: Path, module: str | None, stage: str, zh: bool) ->
     return ("design-outline", tuple(findings)), "\n".join(head + _outline_message(module, f, zh) for f in findings)
 
 
+SKILL_LATER_ZH, SKILL_LATER_EN = "用过的写 todo 时补进「Skill 使用记录」", "write the ones used into the todo's Skill log when you write it"
+SKILL_NOW_ZH, SKILL_NOW_EN = "用过的记进 todo 的「Skill 使用记录」", "record the ones used in the todo's Skill log"
+# sg-skill-map (rules 2, 3a): the skills named at each position, with their conditions as plain words (never parsed)
+SKILL_TABLE = {
+    "review-first": ("装了 delegate 时用 `delegate:review`；没装就开宿主全新子会话审，都不行写明没有审查者",
+                     "with delegate installed use `delegate:review`; without it a fresh host subsession reviews it, and "
+                     "with neither record that no reviewer was available"),
+    "confirm": ("interview-me（重要需求必用，其余在信息不全时用）、idea-refine（想法还粗时）、spec-driven-development",
+                "interview-me (always for an important requirement, otherwise when something is missing), idea-refine "
+                "(while the idea is still rough), spec-driven-development"),
+    "overall": ("source-driven-development、api-and-interface-design、documentation-and-adrs；画图用 artifact-diagramming",
+                "source-driven-development, api-and-interface-design, documentation-and-adrs; artifact-diagramming for "
+                "diagrams"),
+    "design": ("security-and-hardening（技术方案要送审时）、doubt-driven-development（关键假设）、deprecation-and-migration（涉及数据迁移时）",
+               "security-and-hardening (when the design is reviewed), doubt-driven-development (key assumptions), "
+               "deprecation-and-migration (for a data migration)"),
+    "build": ("incremental-implementation、test-driven-development、frontend-ui-engineering（改前端时）；碰到画图、数据迁移、"
+              "登录权限、浏览器验证、性能、文档时先在已装插件里找 skill，找不到记「没有现成的 skill，按常规做法来」",
+              "incremental-implementation, test-driven-development, frontend-ui-engineering (for front-end changes); for "
+              "diagrams, data migrations, login and permissions, browser checks, performance or documents look for a "
+              "skill among the installed plugins first, and with none record \"no existing skill, done the usual way\""),
+    "final": ("browser-testing-with-devtools（回归里有 `ai-operate` 用例时）、performance-optimization（有性能要求时）、"
+              "git-workflow-and-versioning、ci-cd-and-automation",
+              "browser-testing-with-devtools (with `ai-operate` regression cases), performance-optimization (with "
+              "performance requirements), git-workflow-and-versioning, ci-cd-and-automation"),
+}
+
+
+SKILL_LOG_SECTIONS = ("Skill 使用记录", "Skill log")
+SKILL_NONE = ("没有现成的 skill，按常规做法来", "no existing skill, done the usual way")
+SKILL_SPLIT = re.compile(r"[、，,；;]")
+SKILL_COLON = re.compile(r"[：:]")
+
+
+def skill_log(root: Path, module: str) -> list | None:
+    """sg-skill-map (rule 10): [{"place", "skills", "none"}] from the todo's Skill log section; None for an old module.
+
+    Only `- ` lines outside code fences count; the first colon (full or half width) splits off the place; the whole
+    rest, trimmed of spaces and closing punctuation, matching a no-existing-skill phrase (English case-insensitive)
+    sets none; otherwise it splits on the five separators, dropping empty and repeated names.  [] without the section
+    or when the todo cannot be read.
+    """
+    if not _v2(root, module):
+        return None
+    import regression_view
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return []
+    found = []
+    for _n, line, in_fence, _m in regression_view._section_lines(text, SKILL_LOG_SECTIONS) or []:
+        if in_fence or not line.startswith("- "):
+            continue
+        parts = SKILL_COLON.split(line[2:], maxsplit=1)
+        if len(parts) < 2:
+            continue
+        place, rest = parts[0].strip(), parts[1].strip()
+        if not place or not rest:
+            continue
+        bare = rest.rstrip("。.！!；;，,").strip()
+        if bare == SKILL_NONE[0] or bare.lower() == SKILL_NONE[1]:
+            found.append({"place": place, "skills": [], "none": True})
+            continue
+        skills = []
+        for name in (part.strip() for part in SKILL_SPLIT.split(rest)):
+            if name and name not in skills:
+                skills.append(name)
+        found.append({"place": place, "skills": skills, "none": False})
+    return found
+
+
+def skill_position(root: Path, module: str | None, stage: str) -> str | None:
+    """sg-skill-map (rules 2, 3): where a flow v2 module stands for the skill map, one position at a time; None for an
+    old-flow module or a stage with no fixed gate.  First match wins, so positions never overlap."""
+    if not module or not _v2(root, module):
+        return None
+    if requirement_wait(root, module):
+        review = requirement_review(root, module)
+        return "review-first" if review is not None and review["status"] == "missing" else "confirm"
+    if stage in BEFORE_PLAN + ("BUILDING",) and overall_wait(root, module):
+        return "overall"
+    if stage == "NEEDS_DESIGN" or (stage == "NEEDS_REGRESSION" and design_waits(root, module, stage) is not None):
+        return "design"
+    if stage == "BUILDING":
+        return "final" if at_final_gate(root, module) else "build"
+    return None
+
+
+def skill_line(root: Path, module: str | None, stage: str, zh: bool) -> str:
+    """sg-skill-map: the one "- Skill:" line for the position, "" without one."""
+    position = skill_position(root, module, stage)
+    if position is None:
+        return ""
+    names = SKILL_TABLE[position][0 if zh else 1]
+    later = position in ("review-first", "confirm", "overall", "design")
+    if zh:
+        return "- Skill：%s；%s。" % (names, SKILL_LATER_ZH if later else SKILL_NOW_ZH)
+    return "- Skill: %s; %s." % (names, SKILL_LATER_EN if later else SKILL_NOW_EN)
+
+
+def skill_reminder_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
+    """sg-skill-map (rules 12, 15): (fact, line) at the final gate of a flow v2 module whose Skill log is empty; the
+    fact goes into the state code so empty <-> filled refreshes the hint.  (None, "") otherwise."""
+    if skill_position(root, module, stage) != "final" or skill_log(root, module):
+        return None, ""
+    return ("skill-log", "empty"), (
+        "- Skill 使用记录：还没有记录；最终验收前把用过的 skill 记进 todo 的「Skill 使用记录」，找不到的写「没有现成的 skill，按常规做法来」。"
+        if zh else
+        "- Skill log: nothing recorded yet; before the final acceptance record the skills used in the todo's Skill "
+        "log, and \"no existing skill, done the usual way\" where there was none.")
+
+
+def skill_log_problems(root: Path, module: str) -> list:
+    """sg-skill-map (rules 12, 13): a warning for verify-artifacts when a flow v2 module is at its final gate, or done
+    (module_state's DONE, not a count of ticks), with an empty Skill log; never a failure."""
+    log = skill_log(root, module)
+    if log is None or log:
+        return []
+    stage = module_state(root, module)["stage"]
+    if stage != "DONE" and not (stage == "BUILDING" and at_final_gate(root, module)):
+        return []
+    return [("warn", "`tasks/%s/todo.md` 的「Skill 使用记录」还是空的：把用过的 skill 记上，找不到的写「没有现成的 skill，按常规做法来」"
+             % module)]
+
+
 def risk_list_line(root: Path, module: str | None, stage: str, zh: bool) -> tuple:
     """sg-review-rules (rule 9, S6): (fact, line) at NEEDS_REGRESSION when no risk-path list is readable, whether or
     not the design still waits (a design=reviewer design that needs no review included); (None, "") otherwise."""
@@ -2606,6 +2731,10 @@ def role_view(root: Path, kind: str, module: str | None, by_id: dict, cmd: dict,
     review_line, own_step, _spec, _plan = review_hint(root, module, stage, cmd, zh)
     if review_line:
         lines.append(review_line)
+    if skill_line(root, module, stage, zh):  # sg-skill-map: a module checkout is told its own module's skills
+        lines.append(skill_line(root, module, stage, zh))
+    if skill_reminder_line(root, module, stage, zh)[1]:
+        lines.append(skill_reminder_line(root, module, stage, zh)[1])
     approval = design_waits(root, module, stage)
     if own_step and approval is not None and not design_to_user(approval) and own_step == design_hint(
             root, module, stage, cmd, zh)[1]:
@@ -2669,7 +2798,9 @@ def _role_facts(root: Path, kind: str, module: str | None, by_id: dict, cmd: dic
     return (kind, module, stage, spec_review, plan_review, stop_node(root, module, stage, spec_review, plan_review),
             next_gate(root, module) if stage == "BUILDING" else None, requirement_wait(root, module),
             design_fact(root, module, stage), regression_line(root, module, stage, zh)[0],
-            author_line(root, module, stage, zh)[0], verification_line(root, module, stage, zh)[0])
+            author_line(root, module, stage, zh)[0], verification_line(root, module, stage, zh)[0],
+            skill_position(root, module, stage),  # sg-skill-map: review-first -> confirm may change nothing else
+            skill_reminder_line(root, module, stage, zh)[0])
 
 
 def brief_line(root: Path, stage: str, module: str | None, open_items: int | None, code: str, zh: bool) -> str:
@@ -3291,6 +3422,12 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
     do_fact, do_line = design_outline_line(root, module, stage, zh)
     if do_line:
         counts += "\n" + do_line
+    sk_line = skill_line(root, module, stage, zh) if module else ""
+    if sk_line:
+        counts += "\n" + sk_line
+    sr_fact, sr_line = skill_reminder_line(root, module, stage, zh)
+    if sr_line:
+        counts += "\n" + sr_line
     au_fact, au_line = author_line(root, module, stage, zh)
     if au_line:
         counts += "\n" + au_line
@@ -3321,6 +3458,7 @@ def _describe_body(root: Path, host: str | None, info: dict) -> str:
                       + ([dg_fact] if dg_fact else []) + ([sc_fact] if sc_fact else [])
                       + ([ac_fact] if ac_fact else []) + ([rg_fact] if rg_fact else [])
                       + ([rl_fact] if rl_fact else []) + ([do_fact] if do_fact else [])
+                      + ([sr_fact] if sr_fact else [])
                       + ([au_fact] if au_fact else []) + ([vf_fact] if vf_fact else []),
                 stage=stage, module=module, open=current["open"], zh=zh)
     if zh:

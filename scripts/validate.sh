@@ -106,6 +106,7 @@ DOC_REGRESSIONS=(
   'python3 -B plugins/spec-guard/hooks/test_hosted_ticket_entry.py'
   'python3 -B plugins/spec-guard/hooks/test_workflow_checkpoints.py'
   'python3 -B plugins/spec-guard/hooks/test_sg_design_outline.py'
+  'python3 -B plugins/spec-guard/hooks/test_sg_skill_map.py'
   '/bin/bash plugins/spec-guard/hooks/test-retire-legacy-tracker-bridge.sh'
 )
 echo "═══ 读仓库文档的回归 ═══"
