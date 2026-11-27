@@ -1,6 +1,6 @@
 # 技术方案: sg-review-rules
 
-<!-- spec-guard: review pending -->
+<!-- spec-guard: review approved 5b0e4b5a3ae1 -->
 
 需求文档：`spec/sg-review-rules.md`（用户 2026-11-27「确认需求」）。照已批总体技术方案第 7 节模块 5 那一行，不重新选型。
 
