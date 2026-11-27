@@ -258,5 +258,32 @@ class DoneByVerification(unittest.TestCase):
         self.assertEqual([level for level, _m in module_stage.skill_log_problems(self.root, "a")], ["warn"])
 
 
+class Release(unittest.TestCase):
+    """R8: interface 1.28 with skillLog described, version 0.101.0, CHANGELOG covers #530."""
+    ROOT = HERE.parent.parent.parent
+
+    def test_interface(self):
+        data = json.loads((HERE.parent / "interface.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["interface"], "1.28")
+        field = data["mapView"]["flow"]["fields"]["skillLog"]
+        for phrase in ("since 1.28", "first full- or half-width colon", "none true", "delegate:review", "null for an old-flow"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, field)
+        self.assertIn("important included, since 1.27", data["takeover"]["notes"])
+
+    def test_versions_and_changelog(self):
+        for path in ("plugins/spec-guard/.claude-plugin/plugin.json", "plugins/spec-guard/.codex-plugin/plugin.json"):
+            with self.subTest(path=path):
+                self.assertEqual(json.loads((self.ROOT / path).read_text(encoding="utf-8"))["version"], "0.101.0")
+        for path in ("README.md", "README.en.md"):
+            with self.subTest(path=path):
+                self.assertIn("--ref v0.101.0", (self.ROOT / path).read_text(encoding="utf-8"))
+        text = (self.ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        entry = text[text.index("## [0.101.0]"):text.index("## [0.100.0]")]
+        for phrase in ("sg-skill-map", "skillLog", "1.28", "#530"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, entry)
+
+
 if __name__ == "__main__":
     unittest.main()

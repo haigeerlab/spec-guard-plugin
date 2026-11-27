@@ -6,7 +6,7 @@
 - [x] Task 4：最终验收提醒
 - [x] Checkpoint 1（report）：完整档与变异
 - [x] Task 5：规则文字
-- [ ] Task 6：接口 1.28 与版本 0.101.0
+- [x] Task 6：接口 1.28 与版本 0.101.0
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
 ## Skill 使用记录
@@ -26,3 +26,4 @@
 - Task 4（2026-11-27）：`skill_reminder_line`（最终 gate 且记录为空时一行，事实进状态码；项目视角与模块角色都接，角色事实也带上）、`skill_log_problems`（最终 gate 或 `module_state` 为 `DONE` 而记录为空时警告，不判失败），`verify-artifacts.sh` 接上。用例 `Reminder` 3 例、`DoneByVerification` 1 例（合并自动、验证通过、最终 gate 没勾也算完成），对改动前实现 4 例全红；`RoleView` 的事实下标因多一项改为倒数第二；verify-artifacts 148 例照旧全过。
 - Checkpoint 1（2026-11-27）：Task 2～4 的提交都走完整档且全绿。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），7 个：位置顺序颠倒、最终 gate 仍出构建行、按最后一个冒号切、`none` 判断放在拆分之后、提醒不进状态码、完成态改成数勾选框、角色视角不接。第一次跑 6 个变红、「按最后一个冒号切」没红——用例只有全角冒号加 `delegate:review` 一种，两种切法碰巧一样；`SkillLog` 补一行半角冒号的 `- Review: delegate:review` 后单独复跑变红。还原后 `test_sg_skill_map.py` 14 例全过。
 - Task 5（2026-11-27）：`workflow-checkpoints.md` 新增「skill 对照」一节（阶段提示点名的位置、五处对不上阶段的关卡、情境触发、不进主流程的两个、怎么记）；「出事处理」与发版那一句各补指向；`node-rules.md`「能力图审阅」补 planning-and-task-breakdown，「最终验收」不加静态提醒；`doc-skeletons.md` 的 Plan 一节写记录写法；`docs/workflow.md` 补一句。`test_workflow_checkpoints.py` 新增 `SkillMapRulesText` 2 例，对改动前的规则文件全红；原有断言不动。
+- Task 6（2026-11-27）：`interface.json` 升 1.28，`mapView.flow.fields.skillLog` 写含义与解析规则；版本 0.100.0 → 0.101.0（两份 plugin.json、两份 README 的 `--ref`），CHANGELOG 写 `[0.101.0]`（含 #530 的说明修正）。`test_map_view.py` 接口版本 1.27 → 1.28；`test_sg_review_rules.py` 的接口版本断言与 `test_sg_design_outline.py` 的接口与插件版本断言改成「不低于」各自那一版（它们钉的是那一版加的东西还在），断言不删。用例 `Release` 2 例；`test_sg_skill_map.py` 读仓库的 CHANGELOG 与 README，移进 validate 的 `DOC_REGRESSIONS`。
