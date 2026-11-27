@@ -1,6 +1,6 @@
 # 技术方案: sg-review-rules
 
-<!-- spec-guard: review approved 85b89e5610ea -->
+<!-- spec-guard: review pending -->
 
 需求文档：`spec/sg-review-rules.md`（用户 2026-11-27「确认需求」）。照已批总体技术方案第 7 节模块 5 那一行，不重新选型。
 
@@ -50,13 +50,13 @@
 - **哪些模块要审**：`requirement_review_required(root, module)`：新流程模块，且 `effective_tier` 是 `normal` 或 `important`。被规则抬升的 `bug`、`small` 也要审。
 - **三种记录**，都写在需求文档的「外部审查意见」一节，都带审查当时整份文件 sha256 的前 12 位：
   - delegate：沿用现有的 `codex-review round=N blocking=B sha256=…` 行（`review-mark --target spec --state codex-reviewed --review <报告>`）。
-  - 宿主子会话：新行 `<!-- spec-guard: requirement-review reviewer=host blocking=B sha256=… -->`，用 `review-mark --target spec --state host-reviewed --blocking <B>` 写。审查结论由 agent 照子会话的原话写进同一节。
+  - 宿主子会话：新行 `<!-- spec-guard: requirement-review reviewer=host blocking=B sha256=… -->`，用 `review-mark --target spec --state host-reviewed --blocking <B>` 写。审查结论由 agent 照子会话的原话先写进同一节：「外部审查意见」一节除记录行外没有任何内容时拒绝（`review-findings-missing`），不写文件。技术方案的 `host-reviewed` 同样要求。
   - 没有审查者：新行 `<!-- spec-guard: requirement-review reviewer=none sha256=… reason=<原因> -->`，用 `review-mark --target spec --state no-reviewer --reason "<一行原因>"` 写。`--reason` 必填：去掉首尾空白后不能为空、不超过 200 字、不能含换行、`--`、`>`，否则拒绝（`requirement-review-reason`），不写文件。解析时 `reason=` 为空或缺失的行算损坏，不算记录。
 - **`requirement_review(root, module)`** 返回 `None`（老流程）或 `{"required", "status", "records"}`：`status` 是 `not-required`、`missing`、`reviewed` 之一；`records` 是 `[{reviewer: codex|host|none, blocking, sha256, reason}]`（`reason` 只有 `none` 有，其余为 `null`）。只审一轮：有一条就是 `reviewed`，之后改了文件也算数。
 - **只记一轮**：`required` 的需求文档已有任一种记录（`codex-review`、`requirement-review reviewer=host|none`）时，`codex-reviewed`、`host-reviewed`、`no-reviewer` 三种写法都拒绝（`requirement-review-recorded`），退出 2，不写文件。老流程模块和不 `required` 的模块，`codex-reviewed` 照旧按轮次累加。
 - **硬拦**：`review-mark --target spec --state approved`（以及 `both`）对 `required` 且 `missing` 的模块拒绝，退出 2，拒绝码 `requirement-unreviewed`，不写文件。
 - **确认停点的提示**：`requirement_hint` 在 `missing` 时，下一步写「先审一轮」，列出三条路（delegate 的 review 命令、宿主全新子会话、写明没有审查者），并说明审完改好、附上审查结论再复述确认；`reviewed` 时照现在的复述确认，另加一句「交用户时附上审查提了什么、改了哪些、哪些没采纳」。
-- **审查以来的改动差异**（S9）：新函数 `requirement_review_diff(root, module)`，从 git 里倒着找需求文档整份 sha256 前 12 位等于那条记录的版本（最多看 50 个提交，同 `REQUIREMENT_AT_LIMIT`），返回统一差异；当前文本与记录指纹相同时返回「审查后没有改动」；找不到（没提交过、超出范围、git 读不了）返回原因。两处用它：
+- **审查以来的改动差异**（S9）：新函数 `requirement_review_diff(root, module)`，从 git 里倒着找需求文档整份 sha256 前 12 位等于那条记录的版本（最多看 50 个提交，同 `REQUIREMENT_AT_LIMIT`）。比较时两边都去掉批准标记与「外部审查意见」一节（记录行和审查结论在那一节，不是需求本身），一样就返回「审查后没有改动」，不一样返回统一差异；找不到（审查时的文本没提交过、超出范围、git 读不了）返回原因。所以交审前先提交需求文档，阶段提示的「先审一轮」写明这一点。两处用它：
   - **阶段提示**：`requirement_hint` 在 `reviewed` 的确认停点直接写出差异，最多 60 行，超出时写「还有 N 行，`review-mark --target spec --state approved` 的预览里有全文」；取不到时写原因。只在确认停点算，其他阶段不跑 git。
   - **`review-mark --target spec --state approved` 的预览**：打印全文差异或原因。
 
@@ -71,7 +71,7 @@
    - `new-dependency`：影响面里有路径的文件名是依赖清单或锁文件：`package.json`、`package-lock.json`、`npm-shrinkwrap.json`、`yarn.lock`、`pnpm-lock.yaml`、`requirements*.txt`、`pyproject.toml`、`poetry.lock`、`Pipfile`、`Pipfile.lock`、`go.mod`、`go.sum`、`Cargo.toml`、`Cargo.lock`、`Gemfile`、`Gemfile.lock`。
 3. 都不命中时，`designReview: on` 返回 `configured`；否则 `need: none`。
 4. 删掉 `important → need: user` 和 `old-files`、`impact-unknown` 两个分支；`impact_has_old_files()` 留给回归文档检查用。
-5. **没有风险清单的提示**（S6）：`riskList` 是 `no-list` 时，技术方案阶段（`NEEDS_REGRESSION` 的技术方案提示，`_review_hint` 的 design 一关）也写「T4 路径：没有可读的风险路径清单，`risk-path` 未检查」，并建议补清单；`/map --json` 的 `designApproval.riskList` 给同一个值。`BUILDING` 的越界检查那句照旧。
+5. **没有风险清单的提示**（S6）：`riskList` 是 `no-list` 时，`NEEDS_REGRESSION` 阶段**不管技术方案是否还在等批**（包括 `design=reviewer` 下不送审、直接放行的情形）都在阶段事实里加一行「T4 路径：没有可读的风险路径清单，`risk-path` 未检查」，并建议补清单，与回归文档那一行同处、也进状态码；`/map --json` 的 `designApproval.riskList` 给同一个值。`BUILDING` 的越界检查那句照旧。
 
 ### 3. 谁批技术方案（需求规则 10～12、Q4 A）
 
@@ -102,7 +102,7 @@
 
 ### 7. 接口
 
-`interface.json` 升 `1.27`：`designApproval` 新字段 `reason`（取值 `risk-path`、`irreversible`、`new-dependency`、`configured`，不送审时为 `null`；`old-files`、`impact-unknown` 写明「1.27 起新流程不再出现」）、`reasons`、`riskList`；`designApproval.rounds` 每轮加 `reportSha256`；顶层 `reportSha256` 与 `rounds` 的报告指纹允许 `null`（宿主子会话、没有审查者）；`statusValues` 里写着「not important、只列新文件」的说明按新判定改写；`mapView` 每个模块加 `requirementReview`；`reviewMark` 的 state 加 `host-reviewed`、`no-reviewer`，参数加 `--blocking`、`--reason`，拒绝码加 `requirement-unreviewed`、`requirement-review-recorded`、`requirement-review-reason`；`important.reasons` 说明新流程只会是 `risk-path`；`designForcedBy` 说明改写。
+`interface.json` 升 `1.27`：`designApproval` 新字段 `reason`（取值 `risk-path`、`irreversible`、`new-dependency`、`configured`，不送审时为 `null`；`old-files`、`impact-unknown` 写明「1.27 起新流程不再出现」）、`reasons`、`riskList`；`designApproval.rounds` 每轮加 `reportSha256`；顶层 `reportSha256` 与 `rounds` 的报告指纹允许 `null`（宿主子会话、没有审查者）；`statusValues` 里写着「not important、只列新文件」的说明按新判定改写；`mapView` 每个模块加 `requirementReview`；`reviewMark` 的 state 加 `host-reviewed`、`no-reviewer`，参数加 `--blocking`、`--reason`，拒绝码加 `requirement-unreviewed`、`requirement-review-recorded`、`requirement-review-reason`；`important.reasons` 说明新流程只会是 `risk-path`；`designForcedBy` 说明改写；`takeover.design` 字段与 takeover 的总说明里「重要的新流程需求生效值为 human」改成「按档位，重要需求不再强制」。
 
 ## 接口和数据改动
 
@@ -126,6 +126,7 @@
   - hub `audit/flow_check.py:36-42` 要求新流程重要需求的技术方案 `approvedBy == user`。spec-guard 让它在 `design=reviewer` 时由审查者放行后，hub 巡检会对这类模块报严重问题，是误报。要 hub 改成：`takeover.design` 是 `reviewer` 时也接受 `approvedBy == reviewer`。
   - module-crew `takeover.py:169-170` 把重要需求的技术方案一律交人。不会出错，只是用户要多批一次；要 module-crew 去掉这条，改按 `takeover.design`。
   - 这两处是对方仓库的代码，本模块不改；技术方案批准后经 ecosystem-lead 把两条改动需求发给两边。发版顺序见待定问题。
+  - 进展（2026-11-27）：hub 那条已合并（autopilot-hub#97，主干 `0bf35a5`，`takeover.design` 为 `reviewer` 时认 `approvedBy == reviewer`）；module-crew 那条由 mc-coord 在 spec-guard 发版后做。
   - 其余读法不受影响：hub `orchestrator/flow.py:86-95` 合并前核验已接受 `reviewer`，`:212` 只看 `designForcedBy` 键在不在；两边读 `important.reasons` 都只在老流程分支。
 - **硬拦会挡住正在走流程的模块**：已经交给用户、还没确认的新流程需求文档，升级后要先补一轮审查记录才能确认。可以用 `no-reviewer` 写明原因放行，不会卡死。
 - **没有风险清单的项目**：`risk-path` 永远不命中，技术方案只因 `irreversible`、`new-dependency` 送审。提示照旧写明没有清单。
@@ -159,3 +160,11 @@
 7. `doc-skeletons.md` 档位表仍写「技术方案由用户批」→ 采纳：改表并加文字回归。
 8. `no-reviewer` 不写原因也能过闸 → 采纳：`--reason` 必填并写进记录行。
 9. （建议）下游兼容结论没有证据 → 采纳。重新核对后**原结论是错的**：hub `audit/flow_check.py:36-42` 会误报、module-crew `takeover.py:169-170` 仍交人；已写进现状调研、接口表、风险与待定问题，并写明核对的提交。
+<!-- spec-guard: design-review round=2 blocking=1 sha256=033a20423230 vendor=openai same-vendor=false criteria=design-v1 report=265a3617ddcce5919f69c945c0840febe2857ce5a5757e10d9169f048bbcacb9 -->
+
+第 2 轮（Codex，gpt-5.6-sol high，带第 1 轮报告复审）：第 1 轮 8 条里 7 条已解决；1 条未解决、4 条新建议：
+1. （未解决，阻断）没有风险清单的提示只挂在技术方案等批的提示上，`design=reviewer` 不送审时看不到 → 采纳：改成 `NEEDS_REGRESSION` 阶段只要读不到清单就单独出这一行。
+2. （建议）`takeover.design` 的接口说明仍写重要需求生效为 human → 采纳，列入接口改动。
+3. （建议）`host-reviewed` 不检查审查结论是否写了 → 采纳：「外部审查意见」一节除记录行外没有内容时拒绝（`review-findings-missing`）。
+4. （建议）整份文件指纹定位审查版本不稳 → 部分采纳：比较时已去掉批准标记与外部审查一节（实现已按此做、有用例），并写明交审前先提交需求文档；不改成另一种指纹，因为 delegate 报告里给的就是整份文件的 sha256，记录要和它对得上。
+5. （建议）hub、module-crew 兼容结论缺可复核材料 → 部分采纳：写明核对的提交与 hub 已合并的 PR；消费者契约测试属于对方仓库，不在本模块做。
