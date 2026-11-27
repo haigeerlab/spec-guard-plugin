@@ -15,7 +15,7 @@
 - **列表项与章节正文**：`regression_view._section_lines(text, names)` 给出某一节的行（带是否在代码块里）；`_section_has_content()`（`module_stage.py`）判一节有没有非空、非注释的内容。
 - **下游**：hub 主干（`d1e0f2a5`）不读技术方案章节，也不跑 verify-artifacts 脚本；module-crew（`1797dd12`）`module_crew/protocol.py:747` 的 `_DESIGN_POINTS` 是 session-protocol 契约 v2.10 里「技术方案」交审消息的固定小项（现状调研、影响面、实现方案、风险与回滚、回归用例、受影响的老功能、未决问题），按名字核对交审消息，和文件章节无关。
 
-没查的：已装 spec-guard 的其他项目里有没有带 `overall-design` 行的模块（这一行 0.98.0 才有，2026-11-27 发布）。
+没查的（未验证）：已装 spec-guard 的其他项目里有没有带 `overall-design` 行的模块（这一行 0.98.0 才有，2026-11-27 发布）。下游两处结论在最终验收前按上面的提交与行号再核一次。
 
 ## 影响面
 
@@ -38,9 +38,9 @@
 ### 1. 判定（需求规则 1～4）
 
 `design_outline_case(root, module)` 返回 `None`（老流程，或生效档位是 bug、small）或 `{"new": bool, "important": bool, "cross": bool}`：
-- `new`：`overall_design()` 不是 `None` 且 `path` 不是 `None`（恰好一行、路径合规），不看状态；
+- `new`：`overall_design()` 不是 `None` 且 `path` 不是 `None`（恰好一行、路径合规），不看状态。另补现有检查的一个缺口：以 `<!-- spec-guard: overall-design` 开头、却整行匹配不上的行（缺路径、多余字段），`overall_design()` 现在当作没有这一行；改成判 `invalid`，由 `overall_problems` 报出，`new` 为假；
 - `important`：`effective_tier()["tier"] == "important"`；
-- `cross`：`usage_draft.batches()` 里有一批同时含本模块和至少一个别的模块；抛 `UsageDraftError` 时为 `False`。`batches()` 的结果按项目根目录在本进程内缓存（模块级字典），一次阶段描述或一次 verify-artifacts 遍历只跑一次 `git diff` 加 `git log -p`。
+- `cross`：`usage_draft.batches()` 里有一批同时含本模块和至少一个别的模块；抛 `UsageDraftError` 时为 `False`。`batches()` 的结果在一次顶层调用里复用：缓存键是（项目根目录、`HEAD` 提交、能力图文件的修改时间与大小），能力图或 HEAD 一变就重算；一次阶段描述或一次 verify-artifacts 遍历只跑一次 `git diff` 加 `git log -p`。
 
 ### 2. 全新：四节判失败（需求规则 5～7、14）
 
@@ -51,8 +51,8 @@
 ### 3. 重要需求与跨模块：两条警告（需求规则 8～10a）
 
 `design_outline_problems(root, module)` 返回 `[(level, message)]`，只在技术方案存在时查：
-- `important` 时数「方案取舍」（`Alternatives`）一节的列表项：用 `regression_view._section_lines`，不在代码块里、不是注释、匹配 `^(?:[-*+]|\d+[.)])\s+` 的行（不认缩进的续行）。少于 2 条（含这一节写成段落）→ `("warn", "`tasks/<id>/design.md` 是重要需求，「方案取舍」只列了 N 种做法，至少比较两种")`。
-- `cross` 时找「模块接口」（`Module interfaces`）一节：没有，或 `_section_has_content` 为假 → `("warn", "`tasks/<id>/design.md` 所在需求一次插入了多个模块，缺「模块接口」一节（画出与同批模块之间的接口；没有直接接口写「无直接接口」并说明原因）")`。
+- `important` 时数「方案取舍」（`Alternatives`）一节的列表项：用 `regression_view._section_lines`，不在代码块里、去掉列表标记后不是注释、匹配 `^(?:[-*+]|\d+\.)\s+` 的行（只认 `1.` 这种编号，不认 `1)`；不认缩进的续行）。少于 2 条（含这一节写成段落）→ `("warn", "`tasks/<id>/design.md` 是重要需求，「方案取舍」只列了 N 种做法，至少比较两种")`。
+- `cross` 时找「模块接口」（`Module interfaces`）一节：没有，或去掉列表标记后除空行与注释外没有内容（`- <!-- TODO -->` 这种只有注释的列表项不算内容）→ `("warn", "`tasks/<id>/design.md` 所在需求一次插入了多个模块，缺「模块接口」一节（画出与同批模块之间的接口；没有直接接口写「无直接接口」并说明原因）")`。
 - `DOC_SECTIONS["design-interfaces"] = {"zh": ("模块接口",), "en": ("Module interfaces",)}` 只为骨架测试与标题匹配，不进 `wanted`（缺了是警告，不是失败）。
 
 `verify-artifacts.sh` 把它接在 `design_review_problems` 后面。
@@ -107,3 +107,11 @@
 4. （建议）「`important()` 已经跑同样的调用」前提错了 → 采纳：模块 5 起新流程不再调用，改写风险，并按项目在进程内缓存批次结果。
 5. （建议）下游结论在审查材料里核不了 → 不改结论：是在本机两个仓库的 `origin/main` 上 `git grep` 后打开命中行核过的，提交号已写在现状调研里；审查快照没带这两个仓库。
 6. （建议）发版方式没定，影响面不闭合 → 采纳：版本号文件标为条件影响面；发版方式在你批技术方案时一起定。
+<!-- spec-guard: design-review round=2 blocking=0 sha256=df288366d9d5 vendor=openai same-vendor=false criteria=design-v1 report=10fe02afa36c9711bbc43f258ea762023f51515ff8d2122dd7664f33b7807c2a -->
+
+第 2 轮（Codex，带第 1 轮报告复审）：第 1 轮 3 条阻断全部解决，没有新阻断；5 条建议，记下这一轮之后按下面处理（这些改动没有再送审）：
+1. 写坏的 `overall-design` 行被当成没有 → 采纳：判 `invalid`，由 `overall_problems` 报。
+2. `- <!-- TODO -->` 会被当成「模块接口」的内容 → 采纳：去掉列表标记后再判注释。
+3. 编号列表多认了 `1)` → 采纳：只认需求写的 `1.`。
+4. 批次缓存没有失效边界 → 采纳：缓存键加上 HEAD 和能力图文件状态。
+5. 下游结论仍核不了 → 不改结论，写明交付前按提交与行号再核一次；其他已装项目的影响标为未验证。
