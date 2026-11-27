@@ -142,7 +142,7 @@
 
 ## 待定问题
 
-- **发版顺序**（交用户定）：hub 巡检的误报要 hub 先改。建议：技术方案批准后就经 ecosystem-lead 把两条需求发给 hub、module-crew；spec-guard 照常实现、开 PR、合并，**发版等 hub 的 `flow_check` 改动合并后再发**；module-crew 那条只是多批一次，不卡发版。
+- **发版顺序**（用户 2026-11-27「批准，发版等 hub」）：技术方案批准后经 ecosystem-lead 把两条需求发给 hub、module-crew；spec-guard 照常实现、开 PR、合并，**发版等 hub 的 `flow_check` 改动合并后再发**；module-crew 那条只是多批一次，不卡发版。
 - 审查报告给 hub 的位置与格式在第 5 节定下，技术方案批准后回告 ecosystem-lead。
 
 ## 外部审查意见
