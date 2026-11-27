@@ -1277,6 +1277,35 @@ class DesignOutlineRulesText(unittest.TestCase):
                 self.assertIn(phrase, text)
 
 
+class SkillMapRulesText(unittest.TestCase):
+    """sg-skill-map R7 (S2): the skill map section, its pointers, and no static reminder at the final acceptance."""
+    REFS = Path(__file__).resolve().parent.parent / "references"
+
+    def read(self, name):
+        return (self.REFS / name).read_text(encoding="utf-8")
+
+    def test_section(self):
+        text = self.read("workflow-checkpoints.md")
+        section = text[text.index("## skill 对照"):text.index("## 批准节奏")]
+        for phrase in ("planning-and-task-breakdown", "constraint-driven-development", "debugging-and-error-recovery",
+                       "shipping-and-launch", "observability-and-instrumentation", "画图、数据迁移、登录与权限、浏览器验证、性能、文档",
+                       "先在所有已装插件里找", "没有现成的 skill，按常规做法来", "code-review-and-quality、code-simplification",
+                       "## Skill 使用记录", "写 todo 时一并补进", "`skillLog`"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+    def test_pointers(self):
+        text = self.read("workflow-checkpoints.md")
+        incident = text[text.index("## 出事处理"):text.index("## skill 对照")]
+        self.assertIn("debugging-and-error-recovery，见「skill 对照」", incident)
+        self.assertIn("发版与安装验证用的 skill 见「skill 对照」", text)
+        nodes = self.read("node-rules.md")
+        self.assertIn("planning-and-task-breakdown", nodes[nodes.index("## 能力图审阅"):nodes.index("## Spec 交审")])
+        final = nodes[nodes.index("## 最终验收"):nodes.index("## 里程碑停点")]
+        self.assertNotIn("Skill 使用记录", final)
+        self.assertIn("## Skill 使用记录", self.read("doc-skeletons.md"))
+
+
 class PlanAutoApproveRuleTests(unittest.TestCase):
     """plan-auto-approve assumption 8 (R1-10): what the automatic approval authorizes, and how a stop is released."""
 
