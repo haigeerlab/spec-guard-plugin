@@ -265,5 +265,114 @@ class ElevatedTier(unittest.TestCase):
         self.assertIn("design-not-v2", out)
 
 
+CODEX_LINE = "<!-- spec-guard: codex-review round=1 blocking=2 sha256=%s -->" % ("c" * 12)
+
+
+class RequirementProject(unittest.TestCase):
+    def setUp(self):
+        self.project = tfv.Project().__enter__()
+        self.addCleanup(self.project.__exit__, None, None, None)
+
+    def spec(self, tier="normal", old=False, extra=""):
+        tfv.pending_spec(self.project, tier)
+        if old:
+            self.project.write("spec/a.md", self.text().replace(tfv.marker(tier) + "\n", ""))
+        if extra:
+            self.project.write("spec/a.md", self.text() + extra)
+
+    def text(self):
+        return (self.project.root / "spec" / "a.md").read_text(encoding="utf-8")
+
+    def review(self):
+        return module_stage.requirement_review(self.project.root, "a")
+
+
+class RequirementNotRequired(RequirementProject):
+    """R2 (the /map part): bug and small are not reviewed; an old module has no requirementReview."""
+
+    def test_values(self):
+        for tier in ("bug", "small"):
+            with self.subTest(tier=tier):
+                self.spec(tier)
+                self.assertEqual(self.review(), {"required": False, "status": "not-required", "records": []})
+        self.spec(old=True)
+        self.assertIsNone(self.review())
+        from map_view import build
+        self.spec()
+        row = next(m for m in build(self.project.root)["modules"] if m["id"] == "a")
+        self.assertEqual(row["requirementReview"], {"required": True, "status": "missing", "records": []})
+
+
+class RequirementRecords(RequirementProject):
+    """R3: the three records, one round only, and the reason rules."""
+
+    def test_host_record(self):
+        self.spec()
+        digest = module_stage._text_digest(self.text())
+        code, out = mark(self.project, "--target", "spec", "--state", "host-reviewed", "--blocking", "2", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertIn("<!-- spec-guard: requirement-review reviewer=host blocking=2 sha256=%s -->" % digest, self.text())
+        self.assertEqual(self.review(), {"required": True, "status": "reviewed",
+                                         "records": [{"reviewer": "host", "blocking": 2, "sha256": digest, "reason": None}]})
+        self.assertEqual(module_stage.review_state(self.text(), "spec"), "pending")
+
+    def test_none_record(self):
+        self.spec()
+        code, out = mark(self.project, "--target", "spec", "--state", "no-reviewer", "--reason", " 没装 delegate，也开不了子会话 ",
+                         "--confirm")
+        self.assertEqual(code, 0, out)
+        record = self.review()["records"][0]
+        self.assertEqual((record["reviewer"], record["reason"]), ("none", "没装 delegate，也开不了子会话"))
+
+    def test_codex_record_counts(self):
+        self.spec(extra="\n## 外部审查意见\n\n%s\n" % CODEX_LINE)
+        self.assertEqual(self.review()["records"], [{"reviewer": "codex", "blocking": 2, "sha256": "c" * 12, "reason": None}])
+
+    def test_one_round_only(self):
+        for first in (("--state", "host-reviewed", "--blocking", "0"), ("--state", "no-reviewer", "--reason", "x"), None):
+            for second in (("--state", "host-reviewed", "--blocking", "1"), ("--state", "no-reviewer", "--reason", "y"),
+                           ("--state", "codex-reviewed", "--review", "/nonexistent.json")):
+                with self.subTest(first=first, second=second):
+                    if first is None:
+                        self.spec(extra="\n## 外部审查意见\n\n%s\n" % CODEX_LINE)
+                    else:
+                        self.spec()
+                        self.assertEqual(mark(self.project, "--target", "spec", *first, "--confirm")[0], 0)
+                    before = self.text()
+                    code, out = mark(self.project, "--target", "spec", *second, "--confirm")
+                    self.assertEqual(code, 2)
+                    self.assertIn("requirement-review-recorded", out)
+                    self.assertEqual(self.text(), before)
+
+    def test_reasons_refused(self):
+        self.spec()
+        before = self.text()
+        for reason in (None, "", "   ", "a -- b", "a > b", "两行\n原因", "长" * 201):
+            with self.subTest(reason=reason):
+                args = ["--target", "spec", "--state", "no-reviewer", "--confirm"]
+                if reason is not None:
+                    args[4:4] = ["--reason", reason]
+                code, out = mark(self.project, *args)
+                self.assertEqual(code, 2)
+                self.assertIn("requirement-review-reason", out)
+                self.assertEqual(self.text(), before)
+
+    def test_broken_lines(self):
+        for line in ("<!-- spec-guard: requirement-review reviewer=none sha256=%s -->" % ("d" * 12),
+                     "<!-- spec-guard: requirement-review reviewer=none sha256=%s reason= -->" % ("d" * 12),
+                     "<!-- spec-guard: requirement-review reviewer=host sha256=%s -->" % ("d" * 12)):
+            with self.subTest(line=line):
+                self.spec(extra="\n## 外部审查意见\n\n%s\n" % line)
+                self.assertEqual(self.review()["status"], "missing")
+                self.assertIn(("fail", "`spec/a.md` 有 1 行需求文档审查记录写坏了"),
+                              module_stage.flow_doc_problems(self.project.root, "a"))
+
+    def test_not_required_modules_refuse_the_new_states(self):
+        self.spec("bug")
+        code, out = mark(self.project, "--target", "spec", "--state", "host-reviewed", "--blocking", "0")
+        self.assertEqual(code, 2)
+        self.assertIn("no-report-state", out)
+
+
 if __name__ == "__main__":
     unittest.main()

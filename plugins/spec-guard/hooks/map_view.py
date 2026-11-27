@@ -24,7 +24,7 @@ from pathlib import Path
 
 from capability_map import MapError, parse_map
 from module_stage import (SUSPEND_MARKER, UNCHECKED, _git, acceptance_record, active_module, codex_round_records, codex_route, effective_review, effective_tier, external_review_state, flow_marker, important,
-                          design_approval, file_review_state, module_state, requirement_confirm,
+                          design_approval, file_review_state, module_state, requirement_confirm, requirement_review,
                           gate_checkpoints, milestone_blocking, next_gate, overall_design, project_stage, release_preauth,
                           unmerged_commits)
 from checkout_role import MARKER, read_marker
@@ -512,6 +512,7 @@ def build(root: Path) -> dict:
             "reviewRounds": _review_rounds(root, module),
             "tier": effective_tier(root, module)["tier"],
             "requirementConfirm": requirement_confirm(root, module),
+            "requirementReview": requirement_review(root, module),
             "overallDesign": overall_design(root, module),  # sg-gate-flow (interface 1.26)
             "designApproval": _design_approval(root, module),
             "important": ({"reasons": reasons} if (reasons := important(root, module)) else None),

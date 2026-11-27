@@ -254,6 +254,50 @@ def review_codex_line(digest: str) -> str:
     return "<!-- spec-guard: review codex-approved %s -->" % digest
 
 
+REQUIREMENT_REVIEW_PREFIX = "<!-- spec-guard: requirement-review"
+REQUIREMENT_HOST = re.compile(r"<!-- spec-guard: requirement-review reviewer=host blocking=(\d+) sha256=([0-9a-f]{12}) -->")
+REQUIREMENT_NONE = re.compile(r"<!-- spec-guard: requirement-review reviewer=none sha256=([0-9a-f]{12}) reason=(.+?) -->")
+REASON_LIMIT = 200
+
+
+def requirement_reason_problem(reason: str) -> str | None:
+    """sg-review-rules (rule 2): why a no-reviewer reason cannot be recorded, None when it can (one line, at most
+    REASON_LIMIT characters, no `--` or `>`, which would end the record line's comment)."""
+    if "\n" in reason or "\r" in reason:
+        return "it spans more than one line"
+    reason = reason.strip()
+    if not reason:
+        return "it is empty"
+    if len(reason) > REASON_LIMIT:
+        return "it is longer than %d characters" % REASON_LIMIT
+    if "--" in reason or ">" in reason:
+        return "it contains -- or >"
+    return None
+
+
+def requirement_review_records(text: str) -> list:
+    """sg-review-rules (rule 2): [{"reviewer": codex|host|none, "blocking", "sha256", "reason"}] of a requirement's
+    review records outside code fences, in file order: Codex rounds, host subsession reviews and no-reviewer lines."""
+    found = []
+    for line in _visible_lines(text.splitlines()):
+        line = line.strip()
+        codex, host, none = CODEX_ROUND.fullmatch(line), REQUIREMENT_HOST.fullmatch(line), REQUIREMENT_NONE.fullmatch(line)
+        if codex:
+            found.append({"reviewer": "codex", "blocking": int(codex.group(2)), "sha256": codex.group(3), "reason": None})
+        elif host:
+            found.append({"reviewer": "host", "blocking": int(host.group(1)), "sha256": host.group(2), "reason": None})
+        elif none and requirement_reason_problem(none.group(2)) is None:
+            found.append({"reviewer": "none", "blocking": 0, "sha256": none.group(1), "reason": none.group(2).strip()})
+    return found
+
+
+def requirement_review_broken(text: str) -> int:
+    """sg-review-rules: requirement-review lines outside code fences that are not a valid record."""
+    return sum(1 for line in _visible_lines(text.splitlines()) if line.strip().startswith(REQUIREMENT_REVIEW_PREFIX)
+               and not (REQUIREMENT_HOST.fullmatch(line.strip()) or (REQUIREMENT_NONE.fullmatch(line.strip()) and
+                        requirement_reason_problem(REQUIREMENT_NONE.fullmatch(line.strip()).group(2)) is None)))
+
+
 def codex_round_records(text: str) -> list:
     """review-rounds-in-map: [{"round", "blocking", "sha256"}] from the round lines outside code fences, in file order.
     sha256 is the 12-hex prefix the round line keeps of the reviewed file's sha256 (its value in the report's scope.files)."""
@@ -488,6 +532,25 @@ def sections_sentence(root: Path, stage: str, zh: bool) -> str:
             " Also add this project's sections: %s." % ", ".join(names))
 
 
+def requirement_review(root: Path, module: str) -> dict | None:
+    """sg-review-rules (rules 1-5): {"required", "status", "records"} of a flow v2 requirement; None for an old module.
+
+    required: the effective tier is normal or important (a lifted bug or small included).  status: not-required,
+    missing (required and no record) or reviewed (one record is enough: one round only, later edits do not undo it).
+    """
+    flow = effective_tier(root, module)
+    if not flow["v2"]:
+        return None
+    try:
+        text = (root / "spec" / ("%s.md" % module)).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        text = ""
+    required = flow["tier"] in ("normal", "important")
+    records = requirement_review_records(text)
+    status = "not-required" if not required else ("reviewed" if records else "missing")
+    return {"required": required, "status": status, "records": records}
+
+
 def flow_doc_problems(root: Path, module: str) -> list:
     """flow-doc-skeletons: [(level, message)] for a flow v2 module's documents; [] for an old-flow module.
 
@@ -526,6 +589,8 @@ def flow_doc_problems(root: Path, module: str) -> list:
         empty = [name for name in extra.get(kind, ()) if name in have and not _section_has_content(text, name)]
         if empty:  # regression-doc-check: a declared project section needs content or 不涉及 (Q2 A: only these)
             found.append(("fail", "`%s` 章节没有内容（section-empty）：%s" % (path, "、".join(empty))))
+        if kind == "requirement" and requirement_review_broken(text):  # sg-review-rules
+            found.append(("fail", "`%s` 有 %d 行需求文档审查记录写坏了" % (path, requirement_review_broken(text))))
         if kind == "regression" or (kind == "requirement" and short and any(n in have for n in SHORT_CASES_SECTION)):
             found += regression_problems(root, module, flow["tier"], path)
     return found
