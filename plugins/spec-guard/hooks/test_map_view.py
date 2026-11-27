@@ -24,7 +24,7 @@ MODULE_KEYS = {"id", "position", "responsibility", "dependsOn", "status", "step"
                "suspendedReason", "blockedOn", "missingDeps", "blocks", "review", "lastTickAt", "suspendedAt",
                "firstTickAt", "tickCommits", "externalReview", "uncommittedTicks", "startedAt", "gates", "deferred",
                "takeover", "reviewApprovedBy", "codexRoute", "reviewRounds", "important", "acceptance", "tier",
-               "requirementConfirm", "designApproval", "verification", "overallDesign", "requirementReview"}
+               "requirementConfirm", "designApproval", "verification", "overallDesign", "requirementReview", "skillLog"}
 HEAD_KEYS = {"sha", "branch", "unmerged", "unpushed", "committedAt"}
 GIT = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "core.hooksPath=/dev/null",
        "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"]

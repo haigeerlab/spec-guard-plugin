@@ -140,5 +140,74 @@ class RoleView(Stages):
         self.assertEqual(second[-1], "confirm")
 
 
+LOG = """- [ ] Task 1：t
+
+## Skill 使用记录
+
+- 实现：incremental-implementation、test-driven-development
+- 审查：delegate:review
+- 画图：没有现成的 skill，按常规做法来。
+- Diagram: No existing skill, done the usual way
+- 混合：a，b,c；d;e、a
+- 没有冒号
+- ：x
+- 空：
+```
+- 代码块：x
+```
+  - 缩进：x
+
+## 证据
+
+- 证据里的一行：不算
+"""
+
+
+class SkillLog(Stages):
+    """R4: the Skill log is parsed by the first colon, the no-existing-skill phrase first, five separators."""
+
+    def log(self):
+        return module_stage.skill_log(self.project.root, "a")
+
+    def test_parse(self):
+        self.at("build")
+        self.project.write("tasks/a/todo.md", LOG)
+        self.assertEqual(self.log(), [
+            {"place": "实现", "skills": ["incremental-implementation", "test-driven-development"], "none": False},
+            {"place": "审查", "skills": ["delegate:review"], "none": False},
+            {"place": "画图", "skills": [], "none": True},
+            {"place": "Diagram", "skills": [], "none": True},
+            {"place": "混合", "skills": ["a", "b", "c", "d", "e"], "none": False}])
+
+    def test_english_heading_missing_section_and_old_module(self):
+        self.at("build")
+        self.project.write("tasks/a/todo.md", "- [ ] t\n\n## Skill log\n\n- Build: incremental-implementation\n")
+        self.assertEqual(self.log(), [{"place": "Build", "skills": ["incremental-implementation"], "none": False}])
+        self.project.write("tasks/a/todo.md", "- [ ] t\n")
+        self.assertEqual(self.log(), [])
+        self.setUp()
+        self.project.write("spec/a.md", "# a\n")
+        self.assertIsNone(self.log())
+
+    def test_in_the_map(self):
+        self.at("build")
+        self.project.write("tasks/a/todo.md", LOG)
+        from map_view import build
+        row = next(m for m in build(self.project.root)["modules"] if m["id"] == "a")
+        self.assertEqual(row["skillLog"], self.log())
+
+
+class TodoProgress(Stages):
+    """R5: the Skill log section does not change the todo's progress, stage or next gate."""
+
+    def test_unchanged(self):
+        self.at("build")
+        before = (module_stage.module_state(self.project.root, "a"), module_stage.next_gate(self.project.root, "a"))
+        path = self.project.root / "tasks" / "a" / "todo.md"
+        path.write_text(path.read_text(encoding="utf-8") + "\n## Skill 使用记录\n\n- 实现：tdd\n", encoding="utf-8")
+        after = (module_stage.module_state(self.project.root, "a"), module_stage.next_gate(self.project.root, "a"))
+        self.assertEqual(before, after)
+
+
 if __name__ == "__main__":
     unittest.main()

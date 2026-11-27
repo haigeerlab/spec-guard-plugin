@@ -1428,6 +1428,49 @@ SKILL_TABLE = {
 }
 
 
+SKILL_LOG_SECTIONS = ("Skill 使用记录", "Skill log")
+SKILL_NONE = ("没有现成的 skill，按常规做法来", "no existing skill, done the usual way")
+SKILL_SPLIT = re.compile(r"[、，,；;]")
+SKILL_COLON = re.compile(r"[：:]")
+
+
+def skill_log(root: Path, module: str) -> list | None:
+    """sg-skill-map (rule 10): [{"place", "skills", "none"}] from the todo's Skill log section; None for an old module.
+
+    Only `- ` lines outside code fences count; the first colon (full or half width) splits off the place; the whole
+    rest, trimmed of spaces and closing punctuation, matching a no-existing-skill phrase (English case-insensitive)
+    sets none; otherwise it splits on the five separators, dropping empty and repeated names.  [] without the section
+    or when the todo cannot be read.
+    """
+    if not _v2(root, module):
+        return None
+    import regression_view
+    try:
+        text = (root / "tasks" / module / "todo.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return []
+    found = []
+    for _n, line, in_fence, _m in regression_view._section_lines(text, SKILL_LOG_SECTIONS) or []:
+        if in_fence or not line.startswith("- "):
+            continue
+        parts = SKILL_COLON.split(line[2:], maxsplit=1)
+        if len(parts) < 2:
+            continue
+        place, rest = parts[0].strip(), parts[1].strip()
+        if not place or not rest:
+            continue
+        bare = rest.rstrip("。.！!；;，,").strip()
+        if bare == SKILL_NONE[0] or bare.lower() == SKILL_NONE[1]:
+            found.append({"place": place, "skills": [], "none": True})
+            continue
+        skills = []
+        for name in (part.strip() for part in SKILL_SPLIT.split(rest)):
+            if name and name not in skills:
+                skills.append(name)
+        found.append({"place": place, "skills": skills, "none": False})
+    return found
+
+
 def skill_position(root: Path, module: str | None, stage: str) -> str | None:
     """sg-skill-map (rules 2, 3): where a flow v2 module stands for the skill map, one position at a time; None for an
     old-flow module or a stage with no fixed gate.  First match wins, so positions never overlap."""
