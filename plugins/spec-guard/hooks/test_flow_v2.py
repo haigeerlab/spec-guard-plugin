@@ -681,6 +681,9 @@ def git(root, *args):
     subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True)
 
 
+OLD_IS_RISKY = {"schema": "autopilot.risk-paths/v1", "T4": ["src/a/old.py"], "T3": []}
+
+
 def design_text(impact="- 新增 `src/a/new.py`"):
     return "# 技术方案：a\n\n" + "".join("## %s\n\n%s\n\n" % (name, impact if name == "影响面" else "不涉及")
                                     for name in DOC_SECTIONS["design"]["zh"])
@@ -690,13 +693,16 @@ class DesignRequirementTest(unittest.TestCase):
     """design-review AC2: the order in assumption 2, one positive case each, and new files only."""
 
     def need(self, project):
-        return module_stage.design_requirement(project.root, "a")
+        # sg-review-rules: (need, reason) of design_requirement; reasons and riskList are pinned in test_sg_review_rules
+        got = module_stage.design_requirement(project.root, "a")
+        return {"need": got["need"], "reason": got["reason"]} if got is not None else None
 
-    def test_important_goes_to_the_user(self):
+    def test_important_is_not_a_reason_in_v2(self):
+        # sg-review-rules (rule 10): an important requirement no longer sends its design to the user by itself.
         with Project() as project:
             approved_spec(project, "important")
             project.write("tasks/a/design.md", design_text())
-            self.assertEqual(self.need(project), {"need": "user", "reason": "important"})
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})
 
     def test_cross_module_is_not_important_in_v2(self):
         # sg-review-rules (rule 14): shared files no longer make a flow v2 requirement important.
@@ -706,7 +712,8 @@ class DesignRequirementTest(unittest.TestCase):
             self.assertNotEqual(self.need(project), {"need": "user", "reason": "important"})
             self.assertNotIn("cross-module", module_stage.important(project.root, "a"))
 
-    def test_existing_files_at_the_baseline_are_reviewed(self):
+    def test_existing_files_at_the_baseline_are_not_a_reason(self):
+        # sg-review-rules (rule 7): old-files is gone; listing an existing file no longer sends the design to review.
         with Project() as project:
             project.write("src/a/old.py", "x = 1\n")
             git(project.root, "init", "-q")
@@ -723,20 +730,21 @@ class DesignRequirementTest(unittest.TestCase):
             for impact in ("- 改 `src/a/old.py:12`", "- 改 `src/a/` 目录"):
                 with self.subTest(impact=impact):
                     project.write("tasks/a/design.md", design_text(impact))
-                    self.assertEqual(self.need(project), {"need": "review", "reason": "old-files"})
+                    self.assertEqual(self.need(project), {"need": "none", "reason": None})
 
     def test_outside_git_the_working_tree_stands_in(self):
         with Project() as project:
             approved_spec(project)
             project.write("src/a/old.py", "x = 1\n")
             project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`，新增 `src/a/new.py`"))
-            self.assertEqual(self.need(project), {"need": "review", "reason": "old-files"})
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})  # sg-review-rules (rule 7)
 
-    def test_no_path_counts_as_old_logic(self):
+    def test_no_path_is_not_a_reason(self):
+        # sg-review-rules (rule 7): impact-unknown is gone.
         with Project() as project:
             approved_spec(project)
             project.write("tasks/a/design.md", design_text("不涉及"))
-            self.assertEqual(self.need(project), {"need": "review", "reason": "impact-unknown"})
+            self.assertEqual(self.need(project), {"need": "none", "reason": None})
 
     def test_the_switch_reviews_every_design(self):
         with Project() as project:
@@ -793,6 +801,8 @@ class DesignApprovalTest(unittest.TestCase):
         self.project = Project().__enter__()
         self.addCleanup(self.project.__exit__, None, None, None)
         self.project.write(".agent/config.json", json.dumps({"version": 1, **REVIEWER_ROUTE}))
+        # sg-review-rules (rule 6): the default impact `src/a/old.py` is reviewed as a risk path, not as an old file
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(OLD_IS_RISKY))
 
     def round(self, n, blocking, vendor="openai", same="false", report="a" * 64):
         return ("<!-- spec-guard: design-review round=%d blocking=%d sha256=%s vendor=%s same-vendor=%s "
@@ -835,7 +845,7 @@ class DesignApprovalTest(unittest.TestCase):
         self.design()
         self.assertEqual(self.approval()["status"], "pending-review")
         text = hint(self.project)
-        self.assertIn("技术方案 `tasks/a/design.md` 待审（第二审查者；影响面列了已有文件；接管档位 design=reviewer（项目的 takeover））", text)
+        self.assertIn("技术方案 `tasks/a/design.md` 待审（第二审查者；影响面碰了高风险路径；接管档位 design=reviewer（项目的 takeover））", text)
         self.assertIn("--author-host <claude-code|codex> --paths tasks/a/design.md --spec spec/a.md", text)
         self.assertIn("放行前先不要写回归测试文档", text)
         self.assertNotIn("建议下一步: 写回归测试文档", text)
@@ -869,19 +879,20 @@ class DesignApprovalTest(unittest.TestCase):
         self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
         self.assertIsNone(self.stop())
 
-    def test_important_is_always_the_users(self):
-        # AC6
+    def test_important_follows_the_takeover(self):
+        # AC6, sg-review-rules (rule 10): under design=reviewer an important requirement's design is the reviewer's too
         approved_spec(self.project, "important")
         self.design("- 新增 `src/a/new.py`")
-        self.assertEqual(self.approval()["status"], "pending-user")
+        self.assertEqual(self.approval()["status"], "not-required")
+        self.assertNotIn("重要需求，第二审查者先审一轮", hint(self.project))
+        self.design()
+        self.assertEqual(self.approval()["status"], "pending-review")
         text = hint(self.project)
-        self.assertIn("待用户批（重要需求，第二审查者先审一轮）", text)
         self.assertIn("/delegate:review --profile design", text)
-        self.assertEqual(self.stop(), "design-review")
-        self.design("- 新增 `src/a/new.py`", marker="reviewer-approved", rounds=[self.round(1, 0)])
-        self.assertEqual(self.approval()["status"], "pending-user")
-        self.assertIn("待用户批（重要需求）", hint(self.project))
-        self.design("- 新增 `src/a/new.py`", marker="approved", rounds=[self.round(1, 0)])
+        self.assertIsNone(self.stop())  # the reviewer route: the agent runs the review, no user stop
+        self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
+        self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "reviewer"))
+        self.design(marker="approved", rounds=[self.round(1, 0)])
         self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("approved", "user"))
 
     def test_no_reviewer_goes_to_the_user(self):
@@ -913,10 +924,11 @@ class DesignApprovalTest(unittest.TestCase):
         self.project.write("tasks/a/plan.md", "# p\n")
         self.project.write("tasks/a/todo.md", "- [ ] t\n")
         self.assertIn("放行后又改过，要重新审", hint(self.project))
-        approved_spec(self.project, "important")
-        self.design(marker="approved", rounds=[self.round(1, 0)])
+        # sg-review-rules: a user-approved design under design=human (it was an important one before; an important
+        # requirement no longer forces the user, so the takeover does)
+        self.design("- 新增 `src/a/new.py`", marker="approved", rounds=[self.round(1, 0)])
         path.write_text(path.read_text(encoding="utf-8").replace("不涉及", "改过", 1), encoding="utf-8")
-        self.assertIn("批准后又改过，要用户重新批", hint(self.project))
+        self.assertIn("批准后又改过，要用户重新批", hint(self.project, route={}))
         self.assertEqual(self.stop("BUILDING"), "design-review")
 
     def test_a_design_from_before_this_check_is_not_stopped_later(self):
@@ -932,7 +944,7 @@ class DesignApprovalTest(unittest.TestCase):
         self.project.write("src/a/old.py", "x\n")
         self.design()
         text = hint(self.project, zh=False)
-        self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact section lists existing files; takeover design=reviewer (the project's takeover))",
+        self.assertIn("the design `tasks/a/design.md` awaits a second reviewer (its impact touches a high-risk path; takeover design=reviewer (the project's takeover))",
                       text)
         self.assertIn("Until it passes, do not write the regression document yet.", text)
 
@@ -951,6 +963,7 @@ class HumanDesignRouteTest(unittest.TestCase):
         self.addCleanup(self.project.__exit__, None, None, None)
         approved_spec(self.project)
         self.project.write("src/a/old.py", "x\n")
+        self.project.write(".github/autopr/risk-paths.json", json.dumps(OLD_IS_RISKY))  # sg-review-rules (rule 6)
 
     def human(self, **config):
         return hint(self.project, route=config)
@@ -959,7 +972,7 @@ class HumanDesignRouteTest(unittest.TestCase):
         self.design()
         self.assertEqual(self.approval()["status"], "pending-review")
         text = self.human()
-        self.assertIn("待审（第二审查者；影响面列了已有文件；接管档位 design=human（默认，没设 takeover））", text)
+        self.assertIn("待审（第二审查者；影响面碰了高风险路径；接管档位 design=human（默认，没设 takeover））", text)
         self.assertIn("这不算放行，接着交用户批", text)
         self.design(marker="reviewer-approved", rounds=[self.round(1, 0)])
         self.assertEqual((self.approval()["status"], self.approval()["approvedBy"]), ("pending-user", None))
@@ -1122,7 +1135,9 @@ class FlowOverreachTest(unittest.TestCase):
         from module_stage import REVIEW_PENDING, review_codex_digest, review_reviewer_line
         self.build()
         path = self.project.root / "tasks" / "a" / "design.md"
-        text = path.read_text(encoding="utf-8").replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
+        # sg-review-rules (rule 6): the design is reviewed because it changes an interface (old-files is gone)
+        text = path.read_text(encoding="utf-8").replace("## 接口和数据改动\n\n不涉及", "## 接口和数据改动\n\n- 新字段 x", 1)
+        text = text.replace("\n", "\n\n%s\n" % REVIEW_PENDING, 1)
         path.write_text(text.replace(REVIEW_PENDING, review_reviewer_line(review_codex_digest(text))), encoding="utf-8")
         self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "approved")
         path.write_text(path.read_text(encoding="utf-8").replace("`src/a/old.py`", "`src/a/old.py`、`src/other.py`"),
@@ -1201,7 +1216,8 @@ class T4Test(FlowOverreachTest):
         self.project.write("src/secret/k.py", "changed\n")
         self.project.write("tasks/a/design.md", design_text("- 改 `src/a/old.py`、`src/secret/k.py`"))
         self.assertIn("risk-path", module_stage.important(self.project.root, "a"))
-        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "pending-user")
+        # sg-review-rules (rules 6, 11): the risk path sends the design to a second reviewer first, then the user
+        self.assertEqual(module_stage.design_approval(self.project.root, "a")["status"], "pending-review")
 
     def test_an_unreadable_list_is_reported_not_stopped(self):
         (self.project.root / ".github" / "autopr" / "risk-paths.json").write_text("{", encoding="utf-8")

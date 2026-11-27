@@ -129,18 +129,21 @@
         "reviewerVendor": "the last round's reviewer vendor (delegate report reviewer.vendor, e.g. openai or anthropic); null when no round was recorded or the last one had no reviewer available",
         "sameVendor": "the last round's reviewer.same_vendor (true when the reviewer is from the same vendor as the host that wrote the design; recorded, not judged); null like reviewerVendor",
         "reportSha256": "the full sha256 of the last round's report file, from the round line's report field; null like reviewerVendor",
-        "rounds": "every design review round in tasks/<id>/design.md, in file order: the reviewRounds entry fields plus vendor and sameVendor (both null for a round with no reviewer available)"
+        "rounds": "every design review round in tasks/<id>/design.md, in file order: the reviewRounds entry fields plus vendor and sameVendor (both null for a round with no reviewer available), and since interface 1.27 reportSha256 (that round's report sha256)",
+        "reason": "interface 1.27 (spec/sg-review-rules.md): why the design is reviewed, the first of reasons; null when it needs no review. risk-path (an impact path, the module's own documents left out, is on the T3/T4 risk-path list), irreversible (the interface and data section has content other than one of 不涉及/无/没有/None/N/A/Not applicable/No changes), new-dependency (the impact lists a dependency manifest or lock file), configured (none of these and designReview is on). old-files and impact-unknown no longer appear from interface 1.27",
+        "reasons": "interface 1.27: every review reason that applies, in the order risk-path, irreversible, new-dependency; [configured] when only the switch applies; [] when none",
+        "riskList": "interface 1.27: ok when a risk-path list is readable, no-list when not (then risk-path is not checked, neither a hit nor a miss, and the phase hint says so)"
       },
       "statusValues": {
-        "not-required": "the design needs no review: not important, its impact section lists only files that did not exist before the module started, and designReview is off",
+        "not-required": "the design needs no review (no reason applies and designReview is off) and the takeover's design item is reviewer",
         "pending-review": "a second reviewer must review it and no round is recorded yet (also before the design is written)",
         "in-review": "the last round had blocking items (unresolved recheck items plus findings that are not suggestions); the second round rechecks the first",
-        "pending-user": "the user approves it: an important requirement (whatever the reviewer said), or two rounds still blocking",
-        "approved": "passed: by the user (the approval line) or by the reviewer (reviewer-approved, not for an important requirement); the digest matches the design without its external review section",
+        "pending-user": "the user approves it: the takeover's design item is human (after the review when one is needed), or two rounds still blocking. Since interface 1.27 an important requirement follows the takeover like any other",
+        "approved": "passed: by the user (the approval line) or by the reviewer (reviewer-approved, when the takeover's design item is reviewer, an important requirement included since interface 1.27); the digest matches the design without its external review section",
         "unreviewed": "the last round found no reviewer available (report reviewer.selection none); the user approves it",
         "revised": "the design changed after it was approved or passed; it is reviewed or approved again"
       },
-      "meaning": "facts from the approval line and the round lines <!-- spec-guard: design-review round=N blocking=N sha256=<12 hex> vendor=<v> same-vendor=<true|false> criteria=design-v1 report=<64 hex> --> outside code fences, written by reviewMark --target design. Whether a design needs review: important -> the user; impact section lists an existing file at the module's baseline (the parent of the commit that first added spec/<id>.md), or names no path -> reviewed; designReview on -> reviewed; else not required. A cross-module requirement is important by rule. An unreadable design fails the whole view (exit 4) like review"
+      "meaning": "facts from the approval line and the round lines <!-- spec-guard: design-review round=N blocking=N sha256=<12 hex> vendor=<v> same-vendor=<true|false> criteria=design-v1 report=<64 hex> --> outside code fences, written by reviewMark --target design. Whether a design needs review (interface 1.27): risk-path, irreversible or new-dependency (see reason) -> reviewed; designReview on -> reviewed; else not required. Who approves it is the takeover's design item alone. An unreadable design fails the whole view (exit 4) like review"
     },
     "acceptance": {
       "appearsWhen": "per module, always (interface 1.15, spec/codex-final-acceptance.md); null for a flow v2 module (interface 1.24: verified against its regression document, see verification) and unless the module's takeover has merge=auto and the common git directory (or the legacy checkout location) holds its Codex acceptance record",

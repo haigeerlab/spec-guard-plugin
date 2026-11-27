@@ -821,41 +821,73 @@ def impact_has_old_files(root: Path, module: str, text: str) -> bool | None:
     return False
 
 
-def design_requirement(root: Path, module: str) -> dict | None:
-    """design-review (assumption 2): {"need": "user" | "review" | "none", "reason"}; None without a design step.
+INTERFACE_SECTIONS = (DOC_SECTIONS["design"]["zh"][3], DOC_SECTIONS["design"]["en"][3])
+# sg-review-rules (rule 6): a whole interface section of just one of these says "nothing changes" (case-insensitive)
+EMPTY_INTERFACE = frozenset(("不涉及", "无", "没有", "none", "n/a", "not applicable", "no changes"))
+LIST_MARK = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+INLINE_COMMENT = re.compile(r"<!--.*?-->")
+# sg-review-rules (rule 6): dependency manifests and lock files, by file name
+DEPENDENCY_FILES = frozenset(("package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml",
+                              "pyproject.toml", "poetry.lock", "Pipfile", "Pipfile.lock", "go.mod", "go.sum",
+                              "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock"))
+REQUIREMENTS_FILE = re.compile(r"requirements[^/]*\.txt")
+DESIGN_REASONS = ("risk-path", "irreversible", "new-dependency")
 
-    In order: an important requirement goes to the user; a design whose impact section lists files that existed
-    before the module started (or names no path at all) is reviewed; so is every design when designReview is on.
-    A cross-module requirement is important by rule already (important(): cross-module), so it reaches the first
-    branch.  Old-flow, bug and small modules have no design.
+
+def interface_has_content(text: str) -> bool:
+    """sg-review-rules (rule 6): the design's interface and data section says something changes.
+
+    Blank lines, comments, list marks and closing punctuation are dropped; a section left empty, or holding only one
+    item from EMPTY_INTERFACE, has no content.  A missing section has none either.
+    """
+    import regression_view
+    items = []
+    for _n, line, in_fence, _m in regression_view._section_lines(text, INTERFACE_SECTIONS) or []:
+        if not in_fence:
+            line = INLINE_COMMENT.sub("", line)
+        item = LIST_MARK.sub("", line).strip().rstrip("。.！!；;，,、").strip()
+        if item:
+            items.append(item)
+    return bool(items) and not (len(items) == 1 and items[0].lower() in EMPTY_INTERFACE)
+
+
+def is_dependency_file(path: str) -> bool:
+    """sg-review-rules (rule 6): a dependency manifest or lock file, by its file name."""
+    name = path.rstrip("/").rsplit("/", 1)[-1]
+    return name in DEPENDENCY_FILES or bool(REQUIREMENTS_FILE.fullmatch(name))
+
+
+def design_requirement(root: Path, module: str) -> dict | None:
+    """design-review, sg-review-rules (rules 6-9): {"need": "review" | "none", "reason", "reasons", "riskList"}.
+
+    A design is reviewed on risk-path (an impact path, its own documents left out, on the T3/T4 list), irreversible
+    (the interface and data section says something changes) or new-dependency (the impact lists a dependency
+    manifest or lock file); `reason` is the first that applies, `reasons` all of them.  Without any, designReview: on
+    still reviews it (configured).  riskList is "no-list" when no risk-path list is readable: then risk-path is not
+    checked, neither a hit nor a miss.  Old-flow, bug and small modules have no design (None).
     """
     flow = effective_tier(root, module)
     if not flow["v2"] or flow["tier"] in SHORT_TIERS:
         return None
-    if flow["tier"] == "important":
-        return {"need": "user", "reason": "important"}
     try:
         text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
-        text = None
-    if text is not None:
-        old = impact_has_old_files(root, module, text)
-        if old is None:
-            return {"need": "review", "reason": "impact-unknown"}
-        if old:
-            return {"need": "review", "reason": "old-files"}
-    if load_config(root)[0].get("designReview") == "on":
-        return {"need": "review", "reason": "configured"}
-    return {"need": "none", "reason": None}
+        text = ""
+    paths = [path for path in impact_paths(text) if not own_doc(module, path) and path != "tasks/%s" % module]
+    patterns = _risk_patterns(root)
+    found = {"risk-path": patterns is not None and any(risk_hit(pattern, path) for pattern in patterns for path in paths),
+             "irreversible": interface_has_content(text) if text else False,
+             "new-dependency": any(is_dependency_file(path) for path in paths)}
+    reasons = [reason for reason in DESIGN_REASONS if found[reason]]
+    if not reasons and load_config(root)[0].get("designReview") == "on":
+        reasons = ["configured"]
+    return {"need": "review" if reasons else "none", "reason": reasons[0] if reasons else None, "reasons": reasons,
+            "riskList": "ok" if patterns is not None else "no-list"}
 
 
 def design_approver(root: Path, module: str) -> str:
-    """takeover-redefine (assumption 2): who lets a flow v2 design through -- "user" or "reviewer".
-
-    An important requirement is always the user's; otherwise the module's takeover item `design` decides.
-    """
-    if effective_tier(root, module)["tier"] == "important":
-        return "user"
+    """takeover-redefine (assumption 2), sg-review-rules (rule 10): who lets a flow v2 design through -- "user" or
+    "reviewer", from the module's takeover item `design` alone (an important requirement included)."""
     from project_config import module_takeover  # late: project_config is imported by callers of this module
     return "reviewer" if module_takeover(root, module)[0]["design"] == "reviewer" else "user"
 
@@ -869,7 +901,7 @@ def design_approval(root: Path, module: str) -> dict | None:
     need = design_requirement(root, module)
     if need is None:
         return None
-    approver = "user" if need["need"] == "user" else design_approver(root, module)
+    approver = design_approver(root, module)
     try:
         text = (root / "tasks" / module / "design.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
@@ -886,7 +918,7 @@ def design_approval(root: Path, module: str) -> dict | None:
         status, by = "not-required", None
     elif state == "revised":
         status, by = "revised", None
-    elif need["need"] in ("none", "user"):
+    elif need["need"] == "none":
         status, by = "pending-user", None
     elif records and records[-1]["vendor"] == "none":
         status, by = "unreviewed", None
@@ -898,12 +930,14 @@ def design_approval(root: Path, module: str) -> dict | None:
     else:
         status, by = "pending-review", None
     return {"status": status, "approvedBy": by, "need": need["need"], "reason": need["reason"],
+            "reasons": need["reasons"], "riskList": need["riskList"],
             "approver": approver, "marker": state,
             "reviewerVendor": last["vendor"] if last else None, "sameVendor": last["sameVendor"] if last else None,
             "reportSha256": last["report"] if last else None,
             "rounds": [{"round": record["round"], "blocking": record["blocking"], "sha256": record["sha256"],
                         "vendor": None if record["vendor"] == "none" else record["vendor"],
-                        "sameVendor": None if record["vendor"] == "none" else record["sameVendor"]}
+                        "sameVendor": None if record["vendor"] == "none" else record["sameVendor"],
+                        "reportSha256": record["report"]}
                        for record in records]}
 
 
@@ -930,10 +964,9 @@ def design_review_problems(root: Path, module: str) -> list:
     criteria = sorted({record["criteria"] for record in design_round_records(text)})
     if len(criteria) > 1:
         found.append(("fail", "`%s` 的审查轮次用了不同的 criteria：%s" % (path, "、".join(criteria))))
-    if review_state(text, "design") == "reviewer-approved" and (need["need"] == "user"
-                                                                or design_approver(root, module) == "user"):
-        why = "重要需求" if need["need"] == "user" else "接管档位 design=human"
-        found.append(("warn", "`%s` 只有第二审查者的放行：%s的技术方案要用户批" % (path, why)))
+    if review_state(text, "design") == "reviewer-approved" and design_approver(root, module) == "user":
+        # sg-review-rules (rule 10): an important requirement follows the takeover like any other
+        found.append(("warn", "`%s` 只有第二审查者的放行：接管档位 design=human的技术方案要用户批" % path))
     return found
 
 
@@ -1005,7 +1038,26 @@ def _design_route(root: Path, module: str, approval: dict, zh: bool) -> str:
     return ("接管档位 design=%s（%s）" if zh else "takeover design=%s (%s)") % (value, origin)
 
 
+DESIGN_REASON_ZH = {"risk-path": "影响面碰了高风险路径", "irreversible": "有接口和数据改动",
+                    "new-dependency": "影响面列了依赖清单或锁文件", "configured": "项目开关 designReview 为 on"}
+DESIGN_REASON_EN = {"risk-path": "its impact touches a high-risk path", "irreversible": "it changes interfaces or data",
+                    "new-dependency": "its impact lists a dependency manifest or lock file",
+                    "configured": "designReview is on"}
+NO_RISK_LIST_ZH = "- T4 路径：没有可读的风险路径清单，`risk-path` 未检查；补上 `.github/autopr/risk-paths.json` 才能按风险路径判定。"
+NO_RISK_LIST_EN = ("- T4 paths: no readable risk-path list, `risk-path` not checked; add `.github/autopr/risk-paths.json` "
+                   "to judge by risk paths.")
+
+
 def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
+    """design_hint, plus the no-risk-list line (sg-review-rules rule 9) under the review line while the design waits."""
+    fact, step = _design_hint(root, module, stage, cmd, zh)
+    approval = design_waits(root, module, stage) if fact else None
+    if approval is not None and approval["riskList"] == "no-list":
+        fact += "\n" + (NO_RISK_LIST_ZH if zh else NO_RISK_LIST_EN)
+    return fact, step
+
+
+def _design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tuple:
     """design-review (assumptions 4, 7): (review line, next step) while the design waits; ("", "") otherwise.
 
     takeover-redefine: under design=human the reviewer's clean round is recorded as before and then goes to the
@@ -1021,12 +1073,10 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
     hold = _hold(root, module, stage, zh)
     last = approval["rounds"][-1] if approval["rounds"] else None
     user = approval["approver"] == "user"
-    important = approval["reason"] == "important"
-    route = "" if important else _design_route(root, module, approval, zh)
+    route = _design_route(root, module, approval, zh)
     exhausted = sum(1 for record in approval["rounds"] if record["blocking"] and record["vendor"]) >= 2
     if zh:
-        reason = {"old-files": "影响面列了已有文件", "impact-unknown": "影响面没写出路径，按碰了老逻辑处理",
-                  "configured": "项目开关 designReview 为 on", "important": "重要需求", None: "不需要第二审查者"}[approval["reason"]]
+        reason = "、".join(DESIGN_REASON_ZH[r] for r in approval["reasons"]) or "不需要第二审查者"
         why = "%s；%s" % (reason, route) if route else reason
         run = ("用 `%s` 审一轮（影响面里列的已有文件各加一个 `--spec`；开工前可用 `/delegate:doctor --reviewers --json` "
                "看有没有可用的审查者），把它标准输出的 JSON 存成仓库外的文件（例如 `$TMPDIR` 下）" % review)
@@ -1052,23 +1102,14 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
             return ("- 批准: 技术方案 `%s` 放行后又改过，要重新审（%s）。" % (path, why),
                     "%s，按结果用 %s `--target design` 记下（没有阻断 `--state reviewer-approved`，有阻断 `--state reviewer-reviewed`）%s。"
                     "放行前%s。" % (run, mark, "，审完交用户批" if user else "", hold))
-        if important and not last:
-            return ("- 批准: 技术方案 `%s` 待用户批（重要需求，第二审查者先审一轮）。" % path,
-                    "%s，用 %s `--target design --state reviewer-reviewed --review <文件>` 记下这一轮；然后%s。批准前%s。"
-                    % (run, mark, to_user, hold))
-        if important:
-            cause = "重要需求"
-        elif approval["need"] == "none":
+        if approval["need"] == "none":
             cause = "不需要第二审查者；%s" % route
         elif exhausted:
             cause = "两轮审查仍有阻断；%s" % route
         else:
             cause = "第二审查者已审完；%s" % route
         return ("- 批准: 技术方案 `%s` 待用户批（%s）。" % (path, cause), "%s。批准前%s。" % (to_user, hold))
-    reason = {"old-files": "its impact section lists existing files",
-              "impact-unknown": "its impact section names no path, so it counts as touching existing code",
-              "configured": "designReview is on", "important": "an important requirement",
-              None: "no second reviewer is needed"}[approval["reason"]]
+    reason = ", ".join(DESIGN_REASON_EN[r] for r in approval["reasons"]) or "no second reviewer is needed"
     why = "%s; %s" % (reason, route) if route else reason
     run = ("review it once with `%s` (add one `--spec` per existing file the impact section lists; `/delegate:doctor "
            "--reviewers --json` tells beforehand whether a reviewer is available) and save its standard output, the JSON "
@@ -1102,14 +1143,7 @@ def design_hint(root: Path, module: str, stage: str, cmd: dict, zh: bool) -> tup
                 "%s, and record the round with %s `--target design` (`--state reviewer-approved` when clean, "
                 "`--state reviewer-reviewed` otherwise)%s. Until it passes, %s."
                 % (run, mark, ", then hand it to the user" if user else "", hold))
-    if important and not last:
-        return ("- Review: the design `%s` awaits the user (an important requirement; a second reviewer reviews it "
-                "first)." % path,
-                "%s, record the round with %s `--target design --state reviewer-reviewed --review <file>`, then %s. "
-                "Until it is approved, %s." % (run[0].upper() + run[1:], mark, to_user, hold))
-    if important:
-        cause = "an important requirement"
-    elif approval["need"] == "none":
+    if approval["need"] == "none":
         cause = "no second reviewer is needed; %s" % route
     elif exhausted:
         cause = "two review rounds still blocking; %s" % route

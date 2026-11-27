@@ -242,8 +242,10 @@ injects "新流程模块缺技术方案时报告 NEEDS_DESIGN" "$local_project" 
 injects "NEEDS_DESIGN 指向技术方案与骨架" "$local_project" 'write the design `tasks/alpha/design.md`'
 mkdir -p "$local_project/tasks/alpha" && : >"$local_project/tasks/alpha/design.md"
 injects "有技术方案缺回归时报告 NEEDS_REGRESSION" "$local_project" "Current stage: **NEEDS_REGRESSION**"
-# design-review：影响面写不出路径按碰老逻辑处理，交第二审查者；只列新文件时不审，直接写回归文档；老模块不受影响。
-injects "技术方案影响面没写路径时待审" "$local_project" 'Review: the design `tasks/alpha/design.md` awaits a second reviewer'
+# design-review、sg-review-rules（规则 6、7）：有接口和数据改动的技术方案交第二审查者（影响面没写路径不再算理由）；
+# 只列新文件时不审，直接写回归文档；老模块不受影响。
+printf '# d\n\n## Interface and data changes\n\n- new field `x`\n' >"$local_project/tasks/alpha/design.md"
+injects "技术方案有接口改动时待审" "$local_project" 'Review: the design `tasks/alpha/design.md` awaits a second reviewer'
 injects "待审时给出带 --author-host 的审查命令" "$local_project" '/delegate:review --profile design --backend auto --author-host '
 printf '# d\n\n## Impact\n\n- new `src/alpha/new.py`\n' >"$local_project/tasks/alpha/design.md"
 # takeover-redefine（Q2 A）：默认档位 design=human 时，不需要审的技术方案也交用户批；takeover=design 时才直接放行。

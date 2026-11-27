@@ -229,7 +229,7 @@ class TakeoverTest(unittest.TestCase):
                 self.assertEqual(rows["a"]["codexRoute"]["plan"], None if pair[1] == "codex" else "takeover", config)
                 self.assertEqual(rows["a"]["reviewApprovedBy"]["plan"], "codex" if pair[1] == "codex" else None, config)
 
-    def test_flow_v2_module_reports_the_pair_and_the_forced_design(self):
+    def test_flow_v2_module_reports_the_pair_and_no_forced_design(self):
         v2 = "# a\n\n<!-- spec-guard: review approved -->\n<!-- spec-guard: flow v2 tier=%s -->\n"
         with self.project({"takeover": {"spec": "codex", "plan": "codex", "merge": "auto"}},
                           {"spec/a.md": v2 % "normal"}) as project:
@@ -238,7 +238,8 @@ class TakeoverTest(unittest.TestCase):
                              ("codex", "codex", "human", None))
         with self.project({"takeover": "design"}, {"spec/a.md": v2 % "important"}) as project:
             row = self.takeover(project)["a"]
-            self.assertEqual((row["design"], row["designForcedBy"], row["widerThanProject"]), ("human", "important", False))
+            # sg-review-rules (rule 10): an important requirement no longer forces design to human
+            self.assertEqual((row["design"], row["designForcedBy"], row["widerThanProject"]), ("reviewer", None, False))
         with self.project({"takeover": "design"}, {"spec/a.md": v2 % "normal"}) as project:
             row = self.takeover(project)["a"]
             self.assertEqual((row["design"], row["designForcedBy"]), ("reviewer", None))
@@ -599,7 +600,8 @@ class DesignApprovalMapTest(unittest.TestCase):
     def test_not_required(self):
         approval = self.module({"tasks/a/design.md": "# d\n\n## 影响面\n\n- `src/a/new.py`\n"})["designApproval"]
         self.assertEqual(approval, {"status": "not-required", "approvedBy": None, "reviewerVendor": None,
-                                    "sameVendor": None, "reportSha256": None, "rounds": []})
+                                    "sameVendor": None, "reportSha256": None, "rounds": [], "reason": None, "reasons": [],
+                                    "riskList": "ok"})
 
     def test_reviewer_approved_with_rounds(self):
         from map_view import DESIGN_APPROVAL_FIELDS, DESIGN_ROUND_FIELDS
@@ -615,7 +617,8 @@ class DesignApprovalMapTest(unittest.TestCase):
         self.assertEqual((approval["status"], approval["approvedBy"], approval["reviewerVendor"], approval["sameVendor"],
                           approval["reportSha256"]), ("approved", "reviewer", "anthropic", True, "c" * 64))
         self.assertEqual(approval["rounds"][0], {"round": 1, "blocking": 1, "sha256": "1" * 12, "vendor": "anthropic",
-                                                 "sameVendor": False})
+                                                 "sameVendor": False, "reportSha256": "a" * 64})
+        self.assertEqual((approval["reason"], approval["reasons"]), ("configured", ["configured"]))
         self.assertEqual(set(approval["rounds"][0]), set(DESIGN_ROUND_FIELDS))
 
     def test_statuses_are_the_published_ones(self):
