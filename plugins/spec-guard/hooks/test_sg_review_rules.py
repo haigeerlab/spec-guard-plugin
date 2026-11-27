@@ -582,6 +582,12 @@ class InterfaceFields(unittest.TestCase):
                 self.assertIn(word, text)
         self.assertIn("old-files and impact-unknown no longer appear", view["designApproval"]["fields"]["reason"])
 
+    def test_takeover_notes_follow_the_takeover(self):
+        # Task 9 (rework, reported by module-crew): the config notes said an important design is always the user's
+        notes = self.data["takeover"]["notes"]
+        self.assertNotIn("an important requirement's design is always the user's", notes)
+        self.assertIn("important included", notes)
+
 
 if __name__ == "__main__":
     unittest.main()
