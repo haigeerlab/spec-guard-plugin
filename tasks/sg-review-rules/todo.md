@@ -10,6 +10,7 @@
 - [x] Task 7：规则文字
 - [x] Task 8：接口 1.27
 - [x] 最终验收（gate）：推送、开 PR、验收并同时问合并
+- [x] Task 9（返工）：`interface.json` 配置项 `takeover` 的说明删掉「an important requirement's design is always the user's」（技术方案第 105 行要求改 takeover 总说明，当时漏改；mc-coord 2026-11-27 报告）
 
 ## 证据
 - 技术方案批准后回告 ecosystem-lead（2026-11-27）：消息 #23440（线程 `autopilot-m5-7`）；lead 回 #23443，hub `flow_check` 需求转 autopr-design（线程 `autopilot-m5-hub-req`），module-crew `_design` 需求转 mc-coord（线程 `autopilot-m5-mc-req`）。
@@ -26,3 +27,4 @@
 - Task 8（2026-11-27）：`interface.json` 升 1.27：`reviewMark` 的 state 加 `host-reviewed`、`no-reviewer`，参数加 `--blocking`、`--reason`，退出码 2 写上 `requirement-unreviewed`、`requirement-review-recorded`、`blocking-missing`、`review-findings-missing`、`requirement-review-reason`、`no-report-state`，notes 写技术方案与需求文档的两种新记录；`takeover.design` 改为只看配置值，`designForcedBy` 写明从 1.27 起恒为 null；`importantReasons` 的 `multi-module`、`cross-module` 标明只对老流程（`designApproval`、`requirementReview` 的字段说明在 Task 2～5 已写）。不改版本号与 CHANGELOG（发版方式待用户定）。`InterfaceFields` 2 例；`test_map_view.py` 的接口版本断言 1.26 → 1.27（注释写着随接口一起升），`test_sg_gate_flow.py` 的 1.26 版本断言改为「主版本 1、次版本不低于 26」，1.26 字段的断言不动。`check-interface.py` 通过。
 - 最终验收（2026-11-27）：R1～R13、R16 逐条按回归文档的命令跑过全部通过（`test_sg_review_rules.py` 12 组、`test_map_view`、`test_workflow_checkpoints`、`test_important_requirement`、`test_flow_v2`、`test_review_marker`、`check-interface.py`）；R15 三条最小验证在 Task 8 的完整档提交里全绿（phase-guard 516 例、verify-artifacts 148 例）；R14 回告消息 #23440、lead 回复 #23443，hub 那条已合并（autopilot-hub#97）。
   推送分支 `claude/sg-review-rules`，开 PR #525 并绑定，验收时 head 为 `719faed9`；合并前验证没有结论（没有非作者执行），在验收消息里写明。用户回「验收通过并合并」。
+- Task 9（返工，2026-11-27）：`interface.json` 的 `takeover.notes` 把「a normal flow v2 design … an important requirement's design is always the user's」改成「a flow v2 design (important included, since 1.27) …」；同文件另一处 `mapView.takeover.fields.spec` 说的是「requirement is always the user's」，规则如此，不改。`InterfaceFields` 加一例，改前红、改后绿；行为不变，接口版本不升。CHANGELOG 随模块 7 的发版写。
