@@ -7,7 +7,7 @@
 ## 现状调研
 
 查了下面这些（spec-guard 主干 `d531fd2a` 加本分支）：
-- **阶段提示里点名 skill 的地方**：只有需求确认停点（`module_stage._requirement_hint`，「先用 agent-skills 的 interview-me…」）与老流程重要 Spec 的交审步骤；`CODEX_SKILLS`（`module_stage.py:1733` 附近）只给 Codex 宿主映射 `/plan`、`/build` 的写法，不是点名。
+- **阶段提示里点名 skill 的地方**：只有需求确认停点（`module_stage._requirement_hint`，「先用 agent-skills 的 interview-me…」）与老流程重要 Spec 的交审步骤；`COMMANDS["codex"]`（`module_stage.py:1725` 起）只给 Codex 宿主映射 `/plan`、`/build` 等命令的写法，不是点名。
 - **能判断的位置**：`requirement_wait()`（需求等确认）与 `requirement_review()`（模块 5，有没有审查记录）；`overall_wait()`（总体技术方案关卡）；`design_waits()`（技术方案等审或等批）；`at_final_gate()`（`module_stage.py:1865`，最终 gate）；`stop_node()`（`:1960` 起）按这些给停点。
 - **提示里加一行的写法**：`_describe_body` 里 `risk_list_line`、`design_outline_line`（模块 5、6）各返回 `(fact, line)`，line 接在 `counts` 后面，fact 进状态码（`info.update(facts=…)`）。
 - **todo 的结构**：`tasks/<id>/todo.md` 是勾选清单加「证据」一节；`regression_view._section_lines(text, names)` 能取某一节的行（带是否在代码块里）。
