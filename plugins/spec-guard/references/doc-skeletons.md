@@ -11,7 +11,7 @@
 | `bug` | 修缺陷 | 只写需求文档：复现步骤、预期结果、回归用例 |
 | `small` | 小改动 | 只写需求文档：需求各节，再加「做法」「回归用例」 |
 | `normal` | 普通需求 | 需求文档、技术方案、回归测试文档、Plan |
-| `important` | 重要需求（新模块、跨模块、碰高风险路径） | 同 `normal`；技术方案由用户批 |
+| `important` | 重要需求（碰高风险路径） | 同 `normal`；技术方案按档位的 design 项：reviewer 时由第二审查者放行，否则用户批 |
 
 档位由 agent 在复述需求时提出，用户确认需求时一并确认。规则判为重要需求时，档位写得再低也按 `important` 处理。
 没有流程标记的模块按原来的 Spec → Plan → todo 走，不需要这些文档。
@@ -58,6 +58,15 @@
 
 - `release-preauth yes`：档位把发版交给 autopilot（`release` 是 `auto-confirm`／`auto`）时，用户在需求确认时答「做完自动发版」才写；只认 `yes`。
 - `overall-design`：需求确认时定了要总体技术方案才写；同一需求的模块指向同一个文件，路径只能是 `spec/overall/<kebab-case>.md`。
+
+需求文档的审查记录写在「外部审查意见」一节，由 review-mark 写，不手写（sg-review-rules）：
+
+```markdown
+<!-- spec-guard: requirement-review reviewer=host blocking=<阻断数> sha256=<12 位> -->
+<!-- spec-guard: requirement-review reviewer=none sha256=<12 位> reason=<一行原因> -->
+```
+
+delegate 审的那一轮照旧是 `codex-review` 行。三种都带审查时整份文件 sha256 的前 12 位；只记一轮。
 
 ## 总体技术方案 `spec/overall/<名字>.md`
 

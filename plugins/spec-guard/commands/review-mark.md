@@ -111,6 +111,21 @@ python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id
 每次都在「外部审查意见」一节追加一行轮次；`codex-approved` 要求本轮没有阻断，并写 `<!-- spec-guard: review codex-approved <digest> -->`；
 有阻断用 `codex-reviewed` 只记这一轮，改完再审。两轮仍有阻断后两种都拒绝，交用户批（`--state approved`）。Codex 的批准不是用户的批准：
 档位不允许、或 Plan 的「预先声明」有内容时，阶段提示把它当作待用户批准。
+### 新流程需求文档先审一轮（sg-review-rules）
+
+生效档位 normal／important 的新流程需求文档，确认（`--state approved`）之前要有一条审查记录，没有就拒绝（`requirement-unreviewed`）：
+
+```bash
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state codex-reviewed --review <报告文件>
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state host-reviewed --blocking <阻断数>
+python3 -B "$ROOT/hooks/review_mark.py" --project "$PROJECT" --module <module-id> --target spec --state no-reviewer --reason "<一行原因>"
+```
+
+`host-reviewed` 要先把宿主子会话的结论原话写进「外部审查意见」（没有就拒绝，`review-findings-missing`）；`no-reviewer` 的原因一行、不超过 200 字、
+不含 `--` 与 `>`（`requirement-review-reason`）。只记一轮：已有任一种记录时三种都拒绝（`requirement-review-recorded`）。三种都不改批准标记；
+确认时预览打印审查以来的改动（去掉批准标记与「外部审查意见」一节比较）。技术方案同样接受 `--target design --state host-reviewed --blocking N`
+（0 时同时记 reviewer-approved）与 `--state no-reviewer`（记为未审），轮次行写 `report=none`。
+
 档位不允许、Spec 判为重要需求、或 Plan 的「预先声明」有内容（或格式不对）时，`codex-approved` 在读报告之前就拒绝（`codex-route-takeover`／`codex-route-important`／`codex-route-pre-declared`），什么都不写；改用 `codex-reviewed` 记下这一轮，交用户批。同一判定见 `/map --json` 每个模块的 `codexRoute`。
 
 ## Codex 最终验收（合并：自动）

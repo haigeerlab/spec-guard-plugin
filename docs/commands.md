@@ -108,7 +108,7 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 | `projectSections` | 文档 → 追加章节名列表，如 `{"design": ["浏览器兼容"]}` | 未设置 |
 
 `takeover`（接管档位）定技术方案、合并、发布三项各由你做还是交给 AI；需求永远由你确认，新流程 Plan 永远自动批准，两者不可配。
-`none` 全由你做（每份技术方案都由你批，不需要审的也一样），`design` 让第二审查者审过即放行技术方案（重要需求仍由你批），`merge` 再加审查通过后自动合并；
+`none` 全由你做（每份技术方案都由你批，不需要审的也一样），`design` 让第二审查者审过即放行技术方案（重要需求也一样），`merge` 再加审查通过后自动合并；
 `autopilot` 在 `merge` 之上再把发布设为 `auto-confirm`：需求确认时会问你「做完自动发版吗？」，答是就记成提前授权；它不是出厂默认，要写明才生效，
 装了 autopilot 的项目才用得上。其余发布取值用自定义打开（`human`／`prepare`／`auto-confirm`／`auto`）；自定义对象可带 `"preset"` 从某个预设起改，
 例如 `{"preset":"autopilot","release":"human"}` 是「其余照 autopilot，发布由你」。spec-guard 只存、读、报告来源，自动接管由 autopilot 与 module-crew 读它去做。
@@ -161,14 +161,14 @@ spec-guard 在 Claude Code 里以斜杠命令提供下列功能。Codex 不加�
 接管档位里 Spec 或 Plan 交给 Codex 时，agent 用 /delegate:review 请 Codex 审，再用 `--state codex-approved --review <报告文件>` 记下
 （有阻断时用 `codex-reviewed` 记一轮、改完再审，两轮仍有阻断就交给你）。spec-guard 核对报告确实是 Codex 对这份文件的完成审查；
 `/map --json` 的 `reviewApprovedBy` 写明每份文件实际是你批的还是 Codex 批的；`important` 写明哪些模块按规则是重要需求、理由是什么
-（同批多模块、跨模块、碰高风险路径），这些模块的 Spec 不论档位都由你批。
+（老流程：同批多模块、跨模块、碰高风险路径；新流程只看碰高风险路径），这些模块的 Spec 不论档位都由你批。
 
 合并交给自动化的模块，最终验收也可以由 Codex 做：agent 请 Codex 审最终补丁，等 autopilot 在同一个提交上跑完检查（由非作者跑、全部通过），
 再用 `--target acceptance --state codex-approved --review <报告文件>` 记下。记录写在 git 目录里、不进提交，autopilot 据此合并；
 `/map --json` 每个模块的 `acceptance` 报出它（`null` 或 `{marker, sha}`）。缺一样证据或有越界改动就拒绝，停下等你；拟回告不会自动发出。
 
-新流程（`normal`／`important`）模块的技术方案用 `--target design` 记录。重要需求由你批（`--state approved`），第二审查者的意见一并附上；
-影响面列了开工前已有的文件（或写不出路径）、或项目开关 `designReview` 为 `on` 时，agent 用 `/delegate:review --profile design --backend auto --author-host <宿主>` 请第二审查者审一轮，
+新流程（`normal`／`important`）模块的技术方案用 `--target design` 记录，谁批只看接管档位的 design 一项，重要需求也一样；
+影响面碰了高风险路径、「接口和数据改动」有实际内容、影响面列了依赖清单或锁文件，或项目开关 `designReview` 为 `on` 时，agent 用 `/delegate:review --profile design --backend auto --author-host <宿主>` 请第二审查者审一轮，
 没有阻断就用 `--state reviewer-approved --review <报告文件>` 记下、不用你批，有阻断用 `reviewer-reviewed` 记一轮、改完带 `--previous-report` 复审，两轮仍有阻断就交给你；
 阻断数算上复审里仍未解决的旧条目。没有可用的审查者时记为「未审」，交给你批。都不是时不审，技术方案写完直接往下。
 `/map --json` 每个模块的 `designApproval` 报出状态、谁放行的、审查者厂商、是否同厂商、最后一轮报告的 sha256 与每一轮（interface 1.20 起；老模块与 bug、small 为 null）。

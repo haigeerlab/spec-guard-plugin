@@ -7,7 +7,7 @@
 - [x] Task 5：需求文档的三种审查记录
 - [x] Task 6：硬拦、确认停点提示与改动差异
 - [x] Checkpoint 1（report）：完整档与变异
-- [ ] Task 7：规则文字
+- [x] Task 7：规则文字
 - [ ] Task 8：接口 1.27
 - [ ] 最终验收（gate）：推送、开 PR、验收并同时问合并
 
@@ -22,3 +22,4 @@
   旧夹具：`test_flow_v2.requirement()`、`test_sg_gate_flow.requirement()` 默认带一条「没有审查者」记录，`test_map_view.approve_spec` 确认前先记一条（其余 Spec 被拒绝、不影响）；需要「缺记录」的新用例显式传 `reviewed=False`。`--target spec` 上「只记一轮」的检查只对 `codex-reviewed` 与两种新状态生效，`codex-approved` 照旧先报 `codex-route-requirement`。回归文档 R1 去掉「以及 `--target both`」（新流程模块的 both 先被 plan-auto 拒绝）。
 - 技术方案第 2 轮复审后补的实现（2026-11-27，用户重新批准后）：`risk_list_line` 让 `NEEDS_REGRESSION` 阶段只要读不到风险清单就单独出「T4 路径」一行并进状态码（原来挂在技术方案等批的提示上，`design=reviewer` 不送审时看不到）；`host-reviewed`（需求文档与技术方案）在「外部审查意见」一节除记录行外没有内容时拒绝（`review-findings-missing`）。新用例 3 例对上一版实现全红，`RiskListHint` 改成从阶段提示里看这一行；用到 `host-reviewed` 的用例先写一段审查结论。
 - Checkpoint 1（2026-11-27）：Task 1～6 与复审补充的提交都走完整档且全绿（phase-guard 516 例、verify-artifacts 148 例）。变异在临时副本里做（`mktemp -d` 固定前缀，跑完按前缀删除），10 个：空值清单少「无」、去掉只记一轮、硬拦不看缺记录、`report=none` 不限 vendor、重要需求恢复交用户、差异不截断、新流程仍算 cross-module、不查审查结论、无清单提示只在构建阶段、差异比较不去掉审查一节——10 个全部变红；还原后 `test_sg_review_rules.py` 47 例全过。
+- Task 7（2026-11-27）：`workflow-checkpoints.md`「需求确认」加「需求文档先审一轮」（三条路、只审一轮、硬拦、交用户时写明、bug／small 与老流程不审），「多模块需求仍分两轮」注明重要需求只对老流程；「技术方案审查」改成三种高风险与 `designReview`，谁放行只看 `takeover.design`（重要需求也一样），补没装 delegate 的宿主子会话退路，「不能代替重要需求的用户批准」改为按档位；「重要需求判定」写明新流程只看风险路径。`node-rules.md`「Spec 交审」加一句、「技术方案交审」改一句（Spec 交审一节守住 2600 字节）；`doc-skeletons.md` 改 important 一行并加两种记录行写法；`commands/review-mark.md` 加「新流程需求文档先审一轮」一节；`spec-guard-ops/SKILL.md`（含两种新状态的调用，validate 要求 Codex 侧技能与命令说明的参数一致）、`docs/workflow.md`、`docs/commands.md` 同步。`test_workflow_checkpoints.py` 5 处钉旧文字的断言改钉新文字（不删断言），新增 `ReviewRulesText` 3 例（对旧规则文件 3 例全红）。
